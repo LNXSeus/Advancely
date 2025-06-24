@@ -1,0 +1,172 @@
+{
+  "minecraft:pillager": {
+    "name": "Pillager",
+    "icon": "monsters/pillager.png",
+    "done": false
+  },
+  "minecraft:blaze": {
+    "name": "Blaze",
+    "icon": "monsters/blaze.png",
+    "done": false
+  },
+  "minecraft:skeleton": {
+    "name": "Skeleton",
+    "icon": "monsters/skeleton.png",
+    "done": false
+  },
+  "minecraft:zoglin": {
+    "name": "Zoglin",
+    "icon": "monsters/zoglin.png",
+    "done": false
+  },
+  "minecraft:elder_guardian": {
+    "name": "Elder Guardian",
+    "icon": "monsters/elder_guardian.png",
+    "done": false
+  },
+  "minecraft:ravager": {
+    "name": "Ravager",
+    "icon": "monsters/ravager.png",
+    "done": false
+  },
+  "minecraft:ghast": {
+    "name": "Ghast",
+    "icon": "monsters/ghast.png",
+    "done": false
+  },
+  "minecraft:hoglin": {
+    "name": "Hoglin",
+    "icon": "monsters/hoglin.png",
+    "done": false
+  },
+  "minecraft:guardian": {
+    "name": "Guardian",
+    "icon": "monsters/guardian.png",
+    "done": false
+  },
+  "minecraft:vindicator": {
+    "name": "Vindicator",
+    "icon": "monsters/vindicator.png",
+    "done": false
+  },
+  "minecraft:magma_cube": {
+    "name": "Magma Cube",
+    "icon": "monsters/magma_cube.png",
+    "done": false
+  },
+  "minecraft:piglin_brute": {
+    "name": "Piglin Brute",
+    "icon": "monsters/piglin_brute.png",
+    "done": false
+  },
+  "minecraft:spider": {
+    "name": "Spider",
+    "icon": "monsters/spider.png",
+    "done": false
+  },
+  "minecraft:creeper": {
+    "name": "Creeper",
+    "icon": "monsters/creeper.png",
+    "done": false
+  },
+  "minecraft:wither": {
+    "name": "Wither",
+    "icon": "monsters/wither.png",
+    "done": false
+  },
+  "minecraft:slime": {
+    "name": "Slime",
+    "icon": "monsters/slime.png",
+    "done": false
+  },
+  "minecraft:evoker": {
+    "name": "Evoker",
+    "icon": "monsters/evoker.png",
+    "done": false
+  },
+  "minecraft:phantom": {
+    "name": "Phantom",
+    "icon": "monsters/phantom.png",
+    "done": false
+  },
+  "minecraft:zombified_piglin": {
+    "name": "Zombified Piglin",
+    "icon": "monsters/zombified_piglin.png",
+    "done": false
+  },
+  "minecraft:witch": {
+    "name": "Witch",
+    "icon": "monsters/witch.png",
+    "done": false
+  },
+  "minecraft:wither_skeleton": {
+    "name": "Wither Skeleton",
+    "icon": "monsters/wither_skeleton.png",
+    "done": false
+  },
+  "minecraft:husk": {
+    "name": "Husk",
+    "icon": "monsters/husk.png",
+    "done": false
+  },
+  "minecraft:ender_dragon": {
+    "name": "Ender Dragon",
+    "icon": "monsters/ender_dragon.png",
+    "done": false
+  },
+  "minecraft:shulker": {
+    "name": "Shulker",
+    "icon": "monsters/shulker.png",
+    "done": false
+  },
+  "minecraft:cave_spider": {
+    "name": "Cave Spider",
+    "icon": "monsters/cave_spider.png",
+    "done": false
+  },
+  "minecraft:piglin": {
+    "name": "Piglin",
+    "icon": "monsters/piglin.png",
+    "done": false
+  },
+  "minecraft:enderman": {
+    "name": "Enderman",
+    "icon": "monsters/enderman.png",
+    "done": false
+  },
+  "minecraft:silverfish": {
+    "name": "Silverfish",
+    "icon": "monsters/silverfish.png",
+    "done": false
+  },
+  "minecraft:stray": {
+    "name": "Stray",
+    "icon": "monsters/stray.png",
+    "done": false
+  },
+  "minecraft:endermite": {
+    "name": "Endermite",
+    "icon": "monsters/endermite.png",
+    "done": false
+  },
+  "minecraft:vex": {
+    "name": "Vex",
+    "icon": "monsters/vex.png",
+    "done": false
+  },
+  "minecraft:zombie": {
+    "name": "Zombie",
+    "icon": "monsters/zombie.png",
+    "done": false
+  },
+  "minecraft:drowned": {
+    "name": "Drowned",
+    "icon": "monsters/drowned.png",
+    "done": false
+  },
+  "minecraft:zombie_villager": {
+    "name": "Zombie Villager",
+    "icon": "monsters/zombie_villager.png",
+    "done": false
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "minecraft:donkey": {
+    "name": "Donkey",
+    "icon": "animals/donkey.png",
+    "done": false
+  },
+  "minecraft:mule": {
+    "name": "Mule",
+    "icon": "animals/mule.png",
+    "done": false
+  },
+  "minecraft:hoglin": {
+    "name": "Hoglin",
+    "icon": "animals/hoglin.png",
+    "done": false
+  },
+  "minecraft:sniffer": {
+    "name": "Sniffer",
+    "icon": "animals/sniffer.png",
+    "done": false
+  },
+  "minecraft:strider": {
+    "name": "Strider",
+    "icon": "animals/strider.png",
+    "done": false
+  },
+  "minecraft:cow": {
+    "name": "Cow",
+    "icon": "animals/cow.png",
+    "done": false
+  },
+  "minecraft:camel": {
+    "name": "Camel",
+    "icon": "animals/camel.png",
+    "done": false
+  },
+  "minecraft:horse": {
+    "name": "Horse",
+    "icon": "animals/horse.png",
+    "done": false
+  },
+  "minecraft:bee": {
+    "name": "Bee",
+    "icon": "animals/bee.png",
+    "done": false
+  },
+  "minecraft:cat": {
+    "name": "Cat",
+    "icon": "animals/cat.png",
+    "done": false
+  },
+  "minecraft:fox": {
+    "name": "Fox",
+    "icon": "animals/fox.png",
+    "done": false
+  },
+  "minecraft:pig": {
+    "name": "Pig",
+    "icon": "animals/pig.png",
+    "done": false
+  },
+  "minecraft:llama": {
+    "name": "Llama",
+    "icon": "animals/llama.png",
+    "done": false
+  },
+  "minecraft:turtle": {
+    "name": "Turtle",
+    "icon": "animals/turtle.png",
+    "done": false
+  },
+  "minecraft:frog": {
+    "name": "Frog",
+    "icon": "animals/frog.png",
+    "done": false
+  },
+  "minecraft:sheep": {
+    "name": "Sheep",
+    "icon": "animals/sheep.png",
+    "done": false
+  },
+  "minecraft:mooshroom": {
+    "name": "Mooshroom",
+    "icon": "animals/mooshroom.png",
+    "done": false
+  },
+  "minecraft:ocelot": {
+    "name": "Ocelot",
+    "icon": "animals/ocelot.png",
+    "done": false
+  },
+  "minecraft:goat": {
+    "name": "Goat",
+    "icon": "animals/goat.png",
+    "done": false
+  },
+  "minecraft:chicken": {
+    "name": "Chicken",
+    "icon": "animals/chicken.png",
+    "done": false
+  },
+  "minecraft:armadillo": {
+    "name": "Armadillo",
+    "icon": "animals/armadillo.png",
+    "done": false
+  },
+  "minecraft:wolf": {
+    "name": "Wolf",
+    "icon": "animals/wolf.png",
+    "done": false
+  },
+  "minecraft:panda": {
+    "name": "Panda",
+    "icon": "animals/panda.png",
+    "done": false
+  },
+  "minecraft:rabbit": {
+    "name": "Rabbit",
+    "icon": "animals/rabbit.png",
+    "done": false
+  },
+  "minecraft:axolotl": {
+    "name": "Axolotl",
+    "icon": "animals/axolotl.png",
+    "done": false
+  }
+}

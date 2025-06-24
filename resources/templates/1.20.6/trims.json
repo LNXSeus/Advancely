@@ -1,0 +1,42 @@
+{
+  "armor_trimmed_minecraft:silence_armor_trim_smithing_template_smithing_trim": {
+    "name": "Silence",
+    "icon": "trims/silence.png",
+    "done": false
+  },
+  "armor_trimmed_minecraft:wayfinder_armor_trim_smithing_template_smithing_trim": {
+    "name": "Wayfinder",
+    "icon": "trims/wayfinder.png",
+    "done": false
+  },
+  "armor_trimmed_minecraft:tide_armor_trim_smithing_template_smithing_trim": {
+    "name": "Tide",
+    "icon": "trims/tide.png",
+    "done": false
+  },
+  "armor_trimmed_minecraft:spire_armor_trim_smithing_template_smithing_trim": {
+    "name": "Spire",
+    "icon": "trims/spire.png",
+    "done": false
+  },
+  "armor_trimmed_minecraft:vex_armor_trim_smithing_template_smithing_trim": {
+    "name": "Vex",
+    "icon": "trims/vex.png",
+    "done": false
+  },
+  "armor_trimmed_minecraft:ward_armor_trim_smithing_template_smithing_trim": {
+    "name": "Ward",
+    "icon": "trims/ward.png",
+    "done": false
+  },
+  "armor_trimmed_minecraft:snout_armor_trim_smithing_template_smithing_trim": {
+    "name": "Snout",
+    "icon": "trims/snout.png",
+    "done": false
+  },
+  "armor_trimmed_minecraft:rib_armor_trim_smithing_template_smithing_trim": {
+    "name": "Rib",
+    "icon": "trims/rib.png",
+    "done": false
+  }
+}

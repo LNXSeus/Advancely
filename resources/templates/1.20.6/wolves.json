@@ -1,0 +1,47 @@
+{
+  "minecraft:spotted": {
+    "name": "Spotted",
+    "icon": "wolves/wolf_spotted.png",
+    "done": false
+  },
+  "minecraft:rusty": {
+    "name": "Rusty",
+    "icon": "wolves/wolf_rusty.png",
+    "done": false
+  },
+  "minecraft:chestnut": {
+    "name": "Chestnut",
+    "icon": "wolves/wolf_chestnut.png",
+    "done": false
+  },
+  "minecraft:striped": {
+    "name": "Striped",
+    "icon": "wolves/wolf_striped.png",
+    "done": false
+  },
+  "minecraft:woods": {
+    "name": "Woods",
+    "icon": "wolves/wolf_woods.png",
+    "done": false
+  },
+  "minecraft:pale": {
+    "name": "Pale",
+    "icon": "wolves/wolf_pale.png",
+    "done": false
+  },
+  "minecraft:black": {
+    "name": "Black",
+    "icon": "wolves/wolf_black.png",
+    "done": false
+  },
+  "minecraft:ashen": {
+    "name": "Ashen",
+    "icon": "wolves/wolf_ashen.png",
+    "done": false
+  },
+  "minecraft:snowy": {
+    "name": "Snowy",
+    "icon": "wolves/wolf_snowy.png",
+    "done": false
+  }
+}

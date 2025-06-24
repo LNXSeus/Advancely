@@ -1,0 +1,4 @@
+# ignore all .txt files
+# *.txt
+cmake-build-advancely-debug/ # slash at the end makes it a folder
+cmake-build-advancely-release/

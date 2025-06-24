@@ -1,0 +1,202 @@
+{
+  "cooked_porkchop": {
+    "name": "Cooked Porkchop",
+    "icon": "food/cooked_porkchop.png",
+    "done": false
+  },
+  "chicken": {
+    "name": "Chicken",
+    "icon": "food/raw_chicken.png",
+    "done": false
+  },
+  "honey_bottle": {
+    "name": "Honey Bottle",
+    "icon": "food/honey_bottle.png",
+    "done": false
+  },
+  "cooked_mutton": {
+    "name": "Cooked Mutton",
+    "icon": "food/cooked_mutton.png",
+    "done": false
+  },
+  "sweet_berries": {
+    "name": "Sweet Berries",
+    "icon": "food/sweet_berries.png",
+    "done": false
+  },
+  "cooked_beef": {
+    "name": "Cooked Beef",
+    "icon": "food/cooked_beef.png",
+    "done": false
+  },
+  "chorus_fruit": {
+    "name": "Chorus Fruit",
+    "icon": "food/chorus_fruit.png",
+    "done": false
+  },
+  "beef": {
+    "name": "Beef",
+    "icon": "food/beef.png",
+    "done": false
+  },
+  "baked_potato": {
+    "name": "Baked Potato",
+    "icon": "food/baked_potato.png",
+    "done": false
+  },
+  "porkchop": {
+    "name": "Porkchop",
+    "icon": "food/porkchop.png",
+    "done": false
+  },
+  "tropical_fish": {
+    "name": "Tropical Fish",
+    "icon": "food/tropical_fish.png",
+    "done": false
+  },
+  "beetroot_soup": {
+    "name": "Beetroot Soup",
+    "icon": "food/beetroot_soup.png",
+    "done": false
+  },
+  "apple": {
+    "name": "Apple",
+    "icon": "food/apple.png",
+    "done": false
+  },
+  "spider_eye": {
+    "name": "Spider Eye",
+    "icon": "food/spider_eye.png",
+    "done": false
+  },
+  "potato": {
+    "name": "Potato",
+    "icon": "food/potato.png",
+    "done": false
+  },
+  "rabbit": {
+    "name": "Rabbit",
+    "icon": "food/raw_rabbit.png",
+    "done": false
+  },
+  "cooked_cod": {
+    "name": "Cooked Cod",
+    "icon": "food/cooked_cod.png",
+    "done": false
+  },
+  "poisonous_potato": {
+    "name": "Poisonous Potato",
+    "icon": "food/poisonous_potato.png",
+    "done": false
+  },
+  "pumpkin_pie": {
+    "name": "Pumpkin Pie",
+    "icon": "food/pumpkin_pie.png",
+    "done": false
+  },
+  "mutton": {
+    "name": "Mutton",
+    "icon": "food/mutton.png",
+    "done": false
+  },
+  "pufferfish": {
+    "name": "Pufferfish",
+    "icon": "food/pufferfish.png",
+    "done": false
+  },
+  "golden_apple": {
+    "name": "Golden Apple",
+    "icon": "food/golden_apple.png",
+    "done": false
+  },
+  "bread": {
+    "name": "Bread",
+    "icon": "food/bread.png",
+    "done": false
+  },
+  "rotten_flesh": {
+    "name": "Rotten Flesh",
+    "icon": "food/rotten_flesh.png",
+    "done": false
+  },
+  "cookie": {
+    "name": "Cookie",
+    "icon": "food/cookie.png",
+    "done": false
+  },
+  "suspicious_stew": {
+    "name": "Suspicious Stew",
+    "icon": "food/suspicious_stew.png",
+    "done": false
+  },
+  "glow_berries": {
+    "name": "Glow Berries",
+    "icon": "food/glow_berries.png",
+    "done": false
+  },
+  "salmon": {
+    "name": "Salmon",
+    "icon": "food/salmon.png",
+    "done": false
+  },
+  "dried_kelp": {
+    "name": "Dried Kelp",
+    "icon": "food/dried_kelp.png",
+    "done": false
+  },
+  "melon_slice": {
+    "name": "Melon Slice",
+    "icon": "food/melon_slice.png",
+    "done": false
+  },
+  "golden_carrot": {
+    "name": "Golden Carrot",
+    "icon": "food/golden_carrot.png",
+    "done": false
+  },
+  "beetroot": {
+    "name": "Beetroot",
+    "icon": "food/beetroot.png",
+    "done": false
+  },
+  "cooked_rabbit": {
+    "name": "Cooked Rabbit",
+    "icon": "food/cooked_rabbit.png",
+    "done": false
+  },
+  "cooked_chicken": {
+    "name": "Cooked Chicken",
+    "icon": "food/cooked_chicken.png",
+    "done": false
+  },
+  "enchanted_golden_apple": {
+    "name": "Enchanted Golden Apple",
+    "icon": "food/enchanted_golden_apple.gif",
+    "done": false
+  },
+  "mushroom_stew": {
+    "name": "Mushroom Stew",
+    "icon": "food/mushroom_stew.png",
+    "done": false
+  },
+  "cod": {
+    "name": "Cod",
+    "icon": "food/cod.png",
+    "done": false
+  },
+  "rabbit_stew": {
+    "name": "Rabbit Stew",
+    "icon": "food/rabbit_stew.png",
+    "done": false
+  },
+  "cooked_salmon": {
+    "name": "Cooked Salmon",
+    "icon": "food/cooked_salmon.png",
+    "done": false
+  },
+  "carrot": {
+    "name": "Carrot",
+    "icon": "food/carrot.png",
+    "done": false
+  }
+}
