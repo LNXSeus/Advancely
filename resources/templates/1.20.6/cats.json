@@ -1,0 +1,57 @@
+{
+  "minecraft:white": {
+    "name": "White",
+    "icon": "cats/white.png",
+    "done": false
+  },
+  "minecraft:tabby": {
+    "name": "Tabby",
+    "icon": "cats/tabby.png",
+    "done": false
+  },
+  "minecraft:calico": {
+    "name": "Calico",
+    "icon": "cats/calico.png",
+    "done": false
+  },
+  "minecraft:siamese": {
+    "name": "Siamese",
+    "icon": "cats/siamese.png",
+    "done": false
+  },
+  "minecraft:persian": {
+    "name": "Persian",
+    "icon": "cats/persian.png",
+    "done": false
+  },
+  "minecraft:jellie": {
+    "name": "Jellie",
+    "icon": "cats/jellie.png",
+    "done": false
+  },
+  "minecraft:black": {
+    "name": "Tuxedo",
+    "icon": "cats/tuxedo.png",
+    "done": false
+  },
+  "minecraft:all_black": {
+    "name": "Black",
+    "icon": "cats/black.png",
+    "done": false
+  },
+  "minecraft:ragdoll": {
+    "name": "Ragdoll",
+    "icon": "cats/ragdoll.png",
+    "done": false
+  },
+  "minecraft:british_shorthair": {
+    "name": "British",
+    "icon": "cats/british_shorthair.png",
+    "done": false
+  },
+  "minecraft:red": {
+    "name": "Red",
+    "icon": "cats/red.png",
+    "done": false
+  }
+}

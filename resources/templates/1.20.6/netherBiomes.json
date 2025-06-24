@@ -1,0 +1,27 @@
+{
+  "minecraft:crimson_forest": {
+    "name": "Crimson Forest",
+    "icon": "netherBiomes/crimson_forest.png",
+    "done": false
+  },
+  "minecraft:nether_wastes": {
+    "name": "Nether Wastes",
+    "icon": "netherBiomes/nether_wastes.png",
+    "done": false
+  },
+  "minecraft:soul_sand_valley": {
+    "name": "Soul Sand Valley",
+    "icon": "netherBiomes/soul_sand_valley.png",
+    "done": false
+  },
+  "minecraft:basalt_deltas": {
+    "name": "Basalt Deltas",
+    "icon": "netherBiomes/basalt_deltas.png",
+    "done": false
+  },
+  "minecraft:warped_forest": {
+    "name": "Warped Forest",
+    "icon": "netherBiomes/warped_forest.png",
+    "done": false
+  }
+}

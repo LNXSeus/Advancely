@@ -1,0 +1,267 @@
+{
+  "minecraft:snowy_slopes": {
+    "name": "Snowy Slopes",
+    "icon": "biomes/snowy_slopes.png",
+    "done": false
+  },
+  "minecraft:old_growth_pine_taiga": {
+    "name": "Old Growth Pine Taiga",
+    "icon": "biomes/old_growth_pine_taiga.png",
+    "done": false
+  },
+  "minecraft:mushroom_fields": {
+    "name": "Mushroom Fields",
+    "icon": "biomes/mushroom_fields.png",
+    "done": false
+  },
+  "minecraft:taiga": {
+    "name": "Taiga",
+    "icon": "biomes/taiga.png",
+    "done": false
+  },
+  "minecraft:deep_ocean": {
+    "name": "Deep Ocean",
+    "icon": "biomes/deep_ocean.png",
+    "done": false
+  },
+  "minecraft:eroded_badlands": {
+    "name": "Eroded Badlands",
+    "icon": "biomes/eroded_badlands.png",
+    "done": false
+  },
+  "minecraft:frozen_river": {
+    "name": "Frozen River",
+    "icon": "biomes/frozen_river.png",
+    "done": false
+  },
+  "minecraft:cherry_grove": {
+    "name": "Cherry Grove",
+    "icon": "biomes/cherry_grove.png",
+    "done": false
+  },
+  "minecraft:sunflower_plains": {
+    "name": "Sunflower Plains",
+    "icon": "biomes/sunflower_plains.png",
+    "done": false
+  },
+  "minecraft:birch_forest": {
+    "name": "Birch Forest",
+    "icon": "biomes/birch_forest.png",
+    "done": false
+  },
+  "minecraft:windswept_hills": {
+    "name": "Windswept Hills",
+    "icon": "biomes/windswept_hills.png",
+    "done": false
+  },
+  "minecraft:wooded_badlands": {
+    "name": "Wooded Badlands",
+    "icon": "biomes/wooded_badlands.png",
+    "done": false
+  },
+  "minecraft:bamboo_jungle": {
+    "name": "Bamboo Jungle",
+    "icon": "biomes/bamboo_jungle.png",
+    "done": false
+  },
+  "minecraft:badlands": {
+    "name": "Badlands",
+    "icon": "biomes/badlands.png",
+    "done": false
+  },
+  "minecraft:savanna_plateau": {
+    "name": "Savanna Plateau",
+    "icon": "biomes/savanna_plateau.png",
+    "done": false
+  },
+  "minecraft:beach": {
+    "name": "Beach",
+    "icon": "biomes/beach.png",
+    "done": false
+  },
+  "minecraft:dark_forest": {
+    "name": "Dark Forest",
+    "icon": "biomes/dark_forest.png",
+    "done": false
+  },
+  "minecraft:stony_peaks": {
+    "name": "Stony Peaks",
+    "icon": "biomes/stony_peaks.png",
+    "done": false
+  },
+  "minecraft:mangrove_swamp": {
+    "name": "Mangrove Swamp",
+    "icon": "biomes/mangrove_swamp.png",
+    "done": false
+  },
+  "minecraft:sparse_jungle": {
+    "name": "Sparse Jungle",
+    "icon": "biomes/sparse_jungle.png",
+    "done": false
+  },
+  "minecraft:river": {
+    "name": "River",
+    "icon": "biomes/river.png",
+    "done": false
+  },
+  "minecraft:lukewarm_ocean": {
+    "name": "Lukewarm Ocean",
+    "icon": "biomes/lukewarm_ocean.png",
+    "done": false
+  },
+  "minecraft:stony_shore": {
+    "name": "Stony Shore",
+    "icon": "biomes/stony_shore.png",
+    "done": false
+  },
+  "minecraft:snowy_plains": {
+    "name": "Snowy Plains",
+    "icon": "biomes/snowy_plains.png",
+    "done": false
+  },
+  "minecraft:dripstone_caves": {
+    "name": "Dripstone Caves",
+    "icon": "biomes/dripstone_caves.png",
+    "done": false
+  },
+  "minecraft:snowy_taiga": {
+    "name": "Snowy Taiga",
+    "icon": "biomes/snowy_taiga.png",
+    "done": false
+  },
+  "minecraft:grove": {
+    "name": "Grove",
+    "icon": "biomes/grove.png",
+    "done": false
+  },
+  "minecraft:swamp": {
+    "name": "Swamp",
+    "icon": "biomes/swamp.png",
+    "done": false
+  },
+  "minecraft:jagged_peaks": {
+    "name": "Jagged Peaks",
+    "icon": "biomes/jagged_peaks.png",
+    "done": false
+  },
+  "minecraft:cold_ocean": {
+    "name": "Cold Ocean",
+    "icon": "biomes/cold_ocean.png",
+    "done": false
+  },
+  "minecraft:forest": {
+    "name": "Forest",
+    "icon": "biomes/forest.png",
+    "done": false
+  },
+  "minecraft:lush_caves": {
+    "name": "Lush Caves",
+    "icon": "biomes/lush_caves.png",
+    "done": false
+  },
+  "minecraft:deep_cold_ocean": {
+    "name": "Deep Cold Ocean",
+    "icon": "biomes/deep_cold_ocean.png",
+    "done": false
+  },
+  "minecraft:ice_spikes": {
+    "name": "Ice Spikes",
+    "icon": "biomes/ice_spikes.png",
+    "done": false
+  },
+  "minecraft:frozen_ocean": {
+    "name": "Frozen Ocean",
+    "icon": "biomes/frozen_ocean.png",
+    "done": false
+  },
+  "minecraft:desert": {
+    "name": "Desert",
+    "icon": "biomes/desert.png",
+    "done": false
+  },
+  "minecraft:deep_frozen_ocean": {
+    "name": "Deep Frozen Ocean",
+    "icon": "biomes/deep_frozen_ocean.png",
+    "done": false
+  },
+  "minecraft:windswept_forest": {
+    "name": "Windswept Forest",
+    "icon": "biomes/windswept_forest.png",
+    "done": false
+  },
+  "minecraft:ocean": {
+    "name": "Ocean",
+    "icon": "biomes/ocean.png",
+    "done": false
+  },
+  "minecraft:jungle": {
+    "name": "Jungle",
+    "icon": "biomes/jungle.png",
+    "done": false
+  },
+  "minecraft:old_growth_spruce_taiga": {
+    "name": "Old Growth Spruce Taiga",
+    "icon": "biomes/old_growth_spruce_taiga.png",
+    "done": false
+  },
+  "minecraft:snowy_beach": {
+    "name": "Snowy Beach",
+    "icon": "biomes/snowy_beach.png",
+    "done": false
+  },
+  "minecraft:windswept_savanna": {
+    "name": "Windswept Savanna",
+    "icon": "biomes/windswept_savanna.png",
+    "done": false
+  },
+  "minecraft:warm_ocean": {
+    "name": "Warm Ocean",
+    "icon": "biomes/warm_ocean.png",
+    "done": false
+  },
+  "minecraft:deep_lukewarm_ocean": {
+    "name": "Deep Lukewarm Ocean",
+    "icon": "biomes/deep_lukewarm_ocean.png",
+    "done": false
+  },
+  "minecraft:flower_forest": {
+    "name": "Flower Forest",
+    "icon": "biomes/flower_forest.png",
+    "done": false
+  },
+  "minecraft:frozen_peaks": {
+    "name": "Frozen Peaks",
+    "icon": "biomes/frozen_peaks.png",
+    "done": false
+  },
+  "minecraft:old_growth_birch_forest": {
+    "name": "Old Growth Birch Forest",
+    "icon": "biomes/old_growth_birch_forest.png",
+    "done": false
+  },
+  "minecraft:deep_dark": {
+    "name": "Deep Dark",
+    "icon": "biomes/deep_dark.png",
+    "done": false
+  },
+  "minecraft:meadow": {
+    "name": "Meadow",
+    "icon": "biomes/meadow.png",
+    "done": false
+  },
+  "minecraft:windswept_gravelly_hills": {
+    "name": "Windswept Gravelly Hills",
+    "icon": "biomes/windswept_gravelly_hills.png",
+    "done": false
+  },
+  "minecraft:savanna": {
+    "name": "Savanna",
+    "icon": "biomes/savanna.png",
+    "done": false
+  },
+  "minecraft:plains": {
+    "name": "Plains",
+    "icon": "biomes/plains.png",
+    "done": false
+  }
+}
