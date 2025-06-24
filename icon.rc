@@ -3,4 +3,4 @@
 
 // IDI_ICON1 is a standard name for the main application icon.
 // The path must be relative to the project's root directory.
-IDI_ICON1 ICON "resources/images/Advancely_Icon.ico"
+IDI_ICON1 ICON "resources/gui/Advancely_Icon.ico"
