@@ -19,6 +19,8 @@ set(SOURCE_FILES
         "icon.rc" # For the EXE ICON
         "source/main.h"
         "source/main.c"
+        source/init.c
+        source/init.h
 
         # "include/SDL_FontCache.h"
         # "include/SDL_FontCache.c" OUTDATED
@@ -41,7 +43,7 @@ set_property(TARGET ${EXECUTABLE_NAME} PROPERTY WIN32_EXECUTABLE true)
 
 # Set the icon file path
 set_property(TARGET ${EXECUTABLE_NAME} PROPERTY
-        WIN32_EXECUTABLE_ICON_VALUE "${CMAKE_SOURCE_DIR}/resources/images/Advancely_Icon.ico")
+        WIN32_EXECUTABLE_ICON_VALUE "${CMAKE_SOURCE_DIR}/resources/gui/Advancely_Icon.ico")
 
 
 
@@ -52,12 +54,12 @@ set_property(TARGET ${EXECUTABLE_NAME} PROPERTY
 # The HINTS argument explicitly tells CMake where to look.
 # find_library(LIB_SDL3MAIN NAMES libSDL3 libSDL3main SDL3main SDL_main REQUIRED HINTS ${LOCAL_LIB_PATH})
 # f1ind_library(LIB_SDL3MAIN NAMES libSDL_main REQUIRED HINTS ${LOCAL_LIB_PATH})
-find_library(LIB_SDL3 NAMES libSDL3 REQUIRED HINTS ${LOCAL_LIB_PATH})
-find_library(LIB_SDL3_IMAGE NAMES libSDL3_image REQUIRED HINTS ${LOCAL_LIB_PATH})
-find_library(LIB_SDL3_TTF NAMES libSDL3_ttf.dll REQUIRED HINTS ${LOCAL_LIB_PATH})
+find_library(LIB_SDL3 NAMES SDL3 REQUIRED HINTS ${LOCAL_LIB_PATH})
+find_library(LIB_SDL3_IMAGE NAMES SDL3_image REQUIRED HINTS ${LOCAL_LIB_PATH})
+find_library(LIB_SDL3_TTF NAMES SDL3_ttf.dll REQUIRED HINTS ${LOCAL_LIB_PATH})
 
 # TODO: Keep this SLD2 for now
-find_library(LIB_SDL3_MIXER NAMES libSDL2_mixer REQUIRED HINTS ${LOCAL_LIB_PATH})
+find_library(LIB_SDL3_MIXER NAMES SDL2_mixer REQUIRED HINTS ${LOCAL_LIB_PATH})
 
 
 # --- 4. CONFIGURE THE EXECUTABLE ---
@@ -77,15 +79,7 @@ target_link_libraries(${EXECUTABLE_NAME} PRIVATE
         ${LIB_SDL3_MIXER}
 
         # --- Windows System Libraries ---
-        gdi32
-        user32
-        winmm
-        imm32
-        ole32
-        oleaut32
-        shell32
-        version
-        uuid
+        gdi32 user32 winmm imm32 ole32 oleaut32 shell32 version uuid
 )
 
 
@@ -104,4 +98,23 @@ add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
         "${CMAKE_SOURCE_DIR}/resources"
         "${CMAKE_BINARY_DIR}/resources"
         COMMENT "Copying resources to build directory"
+)
+
+# --- 6. COMPILER FLAGS & SANITIZERS ---
+# These flags add strict warnings to help you write better code.
+# They apply to all build types (Debug, Release, etc.).
+target_compile_options(${EXECUTABLE_NAME} PRIVATE
+        -Wall             # Enable all standard warnings
+        -Wextra           # Enable even more warnings
+        -Wpedantic        # Warn on non-standard language extensions
+        -Werror           # Treat all warnings as errors, forcing you to fix them
+)
+
+# Add the AddressSanitizer for Debug builds ONLY.
+# This injects code to detect memory errors (like leaks, buffer overflows) at runtime.
+target_compile_options(${EXECUTABLE_NAME} PRIVATE
+        $<$<CONFIG:Debug>:-fsanitize=address>
+)
+target_link_options(${EXECUTABLE_NAME} PRIVATE
+        $<$<CONFIG:Debug>:-fsanitize=address>
 )
