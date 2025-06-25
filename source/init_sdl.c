@@ -5,13 +5,25 @@
 #include "init_sdl.h" //  includes tracker.h and then main.h through that
 
 bool tracker_init_sdl(struct Tracker *t) {
-    (void)t;
     if (!SDL_Init(SDL_FLAGS)) {
         fprintf(stderr, "Failed to initialize SDL3: %s\n", SDL_GetError());
         return false;
     }
 
-    printf("Tracker initialized!\n"); // Shows through MINGW64, not terminal ./SDL3_Tutorial to run
+    t->window = SDL_CreateWindow(TRACKER_TITLE, TRACKER_WIDTH, TRACKER_HEIGHT, SDL_TRACKER_WINDOW_FLAGS);
+    if (!t->window) {
+        fprintf(stderr, "Failed to create tracker window: %s\n", SDL_GetError());
+        return false;
+    }
 
+    t->renderer = SDL_CreateRenderer(t->window, NULL);
+
+    if (!t->renderer) {
+        fprintf(stderr, "Failed to create tracker renderer: %s\n", SDL_GetError());
+        return false;
+    } // Then destroy the renderer in tracker_free
+
+
+    printf("Tracker initialized!\n"); // Shows through MINGW64, not terminal ./SDL3_Tutorial to run
     return true;
 }

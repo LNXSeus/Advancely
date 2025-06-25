@@ -29,6 +29,7 @@ struct Tracker { // TODO: Also needs to be defineed in init_sdl.h
 
 bool tracker_new(struct Tracker **tracker);
 void tracker_free(struct Tracker **tracker);
+void tracker_events(struct Tracker *t);
 void tracker_run(struct Tracker *t);
 
 #endif //TRACKER_H
