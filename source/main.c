@@ -17,6 +17,7 @@ int main(int argc, char *argv[]) {
     struct Tracker *tracker = NULL; // pass address to function
 
     if (tracker_new(&tracker)) { // Address of pointer, that's why pointer to pointer
+        tracker_run(tracker);
         exit_status = EXIT_SUCCESS;
     }
 

@@ -21,11 +21,13 @@
 
 // Set my own SDL_FLAGS
 #define SDL_FLAGS SDL_INIT_VIDEO // TODO: OR'd together with SDL_INIT_AUDIO
-#define SDL_TRACKER_WINDOW_FLAGS 0 // SDL_WINDOW_FULLSCREEN, SDL_WINDOW_RESIZABLE
+#define SDL_TRACKER_WINDOW_FLAGS SDL_WINDOW_ALWAYS_ON_TOP // SDL_WINDOW_FULLSCREEN, SDL_WINDOW_RESIZABLE, TODO: Make this a setting
+
 
 #define TRACKER_TITLE "Advancely" // TODO: Dynamically update title based on progress
 #define TRACKER_WIDTH 1440 // 16:9
-#define TRACKER_HEIGHT 960
+#define TRACKER_HEIGHT 900
+#define TRACKER_BACKGROUND_COLOR (SDL_Color){13, 17, 23, 255} // not a pointer so accessing with .r, .g, .b, .a
 
 #define OVERLAY_TITLE "Stream Overlay" // Also needs the icon
 #define OVERLAY_WIDTH 1440
@@ -35,8 +37,6 @@
 
 #define FPS 60.0f
 #define FRAME_TARGET_TIME (1000.0f / FPS)
-
-
 
 
 #endif //MAIN_H

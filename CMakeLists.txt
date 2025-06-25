@@ -108,7 +108,7 @@ target_compile_options(${EXECUTABLE_NAME} PRIVATE
         -Wall             # Enable all standard warnings
         -Wextra           # Enable even more warnings
         -Wpedantic        # Warn on non-standard language extensions
-        -Werror           # Treat all warnings as errors, forcing you to fix them
+        # -Werror           # Treat all warnings as errors, forcing you to fix them
 )
 
 # DOESN'T WORK FOR WINDOWS

@@ -12,6 +12,4 @@ struct Tracker;
 bool tracker_init_sdl(struct Tracker *t);
 
 
-
-
 #endif //INIT_H
