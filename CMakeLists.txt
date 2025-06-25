@@ -19,11 +19,10 @@ set(SOURCE_FILES
         "icon.rc" # For the EXE ICON
         "source/main.h"
         "source/main.c"
-        source/init.c
-        source/init.h
-
-        # "include/SDL_FontCache.h"
-        # "include/SDL_FontCache.c" OUTDATED
+        "source/init_sdl.h"
+        "source/init_sdl.c"
+        "source/tracker.h"
+        "source/tracker.c"
 )
 
 # Define the path to your local libraries folder
@@ -100,6 +99,8 @@ add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
         COMMENT "Copying resources to build directory"
 )
 
+
+
 # --- 6. COMPILER FLAGS & SANITIZERS ---
 # These flags add strict warnings to help you write better code.
 # They apply to all build types (Debug, Release, etc.).
@@ -110,11 +111,15 @@ target_compile_options(${EXECUTABLE_NAME} PRIVATE
         -Werror           # Treat all warnings as errors, forcing you to fix them
 )
 
-# Add the AddressSanitizer for Debug builds ONLY.
-# This injects code to detect memory errors (like leaks, buffer overflows) at runtime.
-target_compile_options(${EXECUTABLE_NAME} PRIVATE
-        $<$<CONFIG:Debug>:-fsanitize=address>
-)
-target_link_options(${EXECUTABLE_NAME} PRIVATE
-        $<$<CONFIG:Debug>:-fsanitize=address>
-)
+# DOESN'T WORK FOR WINDOWS
+## Add the AddressSanitizer for Debug builds ONLY.
+## This injects code to detect memory errors (like leaks, buffer overflows) at runtime.
+#target_compile_options(${EXECUTABLE_NAME} PRIVATE
+#        $<$<CONFIG:Debug>:-fsanitize=address>
+#)
+#
+## Link the AddressSanitizer library for Debug builds ONLY.
+#target_link_options(${EXECUTABLE_NAME} PRIVATE
+#        # For MinGW on Windows, -static-libasan is often required to resolve linker errors.
+#        $<$<CONFIG:Debug>:-fsanitize=address -Wl,-Bstatic -lasan -Wl,-Bdynamic>
+#)
