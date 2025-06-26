@@ -23,32 +23,6 @@ bool overlay_new(struct Overlay **overlay) {
     return true;
 }
 
-// void overlay_events(struct Overlay *o, bool *is_running, float *deltaTime) {
-//     while (SDL_PollEvent(&o->event)) {
-//         // only care about events for this specific window
-//         if (o->event.window.windowID == SDL_GetWindowID(o->window)) {
-//             switch (o->event.type) {
-//                 case SDL_EVENT_QUIT: // X button or Alt+F4
-//                     *is_running = false;
-//                     break;
-//
-//                 case SDL_EVENT_KEY_DOWN: // SPACE SHOULD SPEED UP TRACKER
-//                     switch (o->event.key.scancode) {
-//                         case SDL_SCANCODE_SPACE: // Can add some functionality to this
-//                             printf("Overlay Space key pressed, speeding up tracker.\n");
-//                             // speed up tracker
-//                             *deltaTime *= OVERLAY_SPEEDUP_FACTOR;
-//                             break;
-//                         default:
-//                             break;
-//                     }
-//                     break;
-//                 default:
-//                     break;
-//             }
-//         }
-//     }
-// }
 
 void overlay_events(struct Overlay *o, SDL_Event *event, bool *is_running, float *deltaTime) {
     (void) o;
@@ -66,8 +40,18 @@ void overlay_events(struct Overlay *o, SDL_Event *event, bool *is_running, float
                     default:
                         break;
                 }
-
             }
+            break;
+        // TODO: Work with mouse events
+        case SDL_EVENT_MOUSE_BUTTON_DOWN:
+            printf("Mouse button pressed in overlay.\n");
+            break;
+        case SDL_EVENT_MOUSE_MOTION:
+            printf("Mouse moved in overlay.\n");
+            break;
+        case SDL_EVENT_MOUSE_BUTTON_UP:
+            printf("Mouse button released in overlay.\n");
+            break;
         default:
             break;
     }
@@ -76,7 +60,7 @@ void overlay_events(struct Overlay *o, SDL_Event *event, bool *is_running, float
 void overlay_update(struct Overlay *o, float *deltaTime) {
     // Game logic here
     (void) o;
-    (void)deltaTime;
+    (void) deltaTime;
 }
 
 
