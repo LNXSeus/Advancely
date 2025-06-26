@@ -23,7 +23,7 @@ bool tracker_new(struct Tracker **tracker) {
     return true;
 }
 
-void  tracker_events(struct Tracker *t, SDL_Event *event, bool *is_running) {
+void  tracker_events(struct Tracker *t, SDL_Event *event, bool *is_running, bool *settings_opened) {
     (void) t;
 
     switch (event->type) {
@@ -37,12 +37,8 @@ void  tracker_events(struct Tracker *t, SDL_Event *event, bool *is_running) {
                 switch (event->key.scancode) {
                     case SDL_SCANCODE_ESCAPE:
                         printf("Escape key pressed in tracker: Opening settings window now.\n");
-                        //
-                        // --- TODO: Add your logic here ---
-                        //
-                        // 1. Create a new settings_new() function.
-                        // 2. Run a new, separate loop for the settings window.
-                        // 3. The main loop will be "paused" until the settings loop finishes.
+                        // Open settings window, TOGGLE settings_opened
+                        *settings_opened = !(*settings_opened);
                         break;
                     default:
                         break;
