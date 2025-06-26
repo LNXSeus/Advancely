@@ -23,34 +23,6 @@ bool tracker_new(struct Tracker **tracker) {
     return true;
 }
 
-// void tracker_events(struct Tracker *t, bool *is_running) {
-//     while (SDL_PollEvent(&t->event)) {
-//         // only care about events for this specific window
-//         if (t->event.window.windowID == SDL_GetWindowID(t->window)) {
-//             switch (t->event.type) {
-//                 case SDL_EVENT_QUIT: // X button or Alt+F4
-//                     *is_running = false;
-//                     break;
-//
-//                 case SDL_EVENT_KEY_DOWN:
-//                     // Make sure Esc does not repeat
-//                     if (t->event.key.repeat == 0) {
-//                         switch (t->event.key.scancode) {
-//                             case SDL_SCANCODE_ESCAPE:
-//                                 printf("Escape key pressed.\n"); // This should open up another window
-//                                 break;
-//                             default:
-//                                 break;
-//                         }
-//                     }
-//                     break;
-//                 default:
-//                     break;
-//             }
-//         }
-//     }
-// }
-
 void  tracker_events(struct Tracker *t, SDL_Event *event, bool *is_running) {
     (void) t;
 
@@ -76,6 +48,17 @@ void  tracker_events(struct Tracker *t, SDL_Event *event, bool *is_running) {
                         break;
                 }
             }
+            break;
+        // TODO: Work with mouse events
+        case SDL_EVENT_MOUSE_BUTTON_DOWN:
+            printf("Mouse button pressed in tracker.\n");
+            break;
+        case SDL_EVENT_MOUSE_MOTION:
+            printf("Mouse moved in tracker.\n");
+            break;
+        case SDL_EVENT_MOUSE_BUTTON_UP:
+            printf("Mouse button released in tracker.\n");
+            break;
         default:
             break;
     }
