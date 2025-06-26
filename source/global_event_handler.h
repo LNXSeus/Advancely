@@ -6,6 +6,7 @@
 #define GLOBAL_EVENT_HANDLER_H
 
 #include "tracker.h"
+#include "settings.h"
 #include "overlay.h"
 
 /**
@@ -16,11 +17,14 @@
  * It also handles global quit events.
  *
  * @param t A pointer to the main tracker struct.
- * @param overlay A pointer to the overlay struct.
+ * @param o A pointer to the overlay struct.
+ * @param s A pointer to the settings struct.
  * @param is_running A pointer to the main application loop's running flag.
+ * @param settings_opened A pointer to the settings window's opened flag.
  * @param deltaTime A pointer to the frame's delta time, passed to the overlay event handler.
  */
 
-void handle_global_events(struct Tracker *t, struct Overlay *overlay, bool *is_running, float *deltaTime);
+void handle_global_events(struct Tracker *t, struct Overlay *o, struct Settings *s, bool *is_running,
+                          bool *settings_opened, float *deltaTime);
 
 #endif //GLOBAL_EVENT_HANDLER_H

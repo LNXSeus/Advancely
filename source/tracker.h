@@ -8,7 +8,7 @@
 #include "main.h"
 
 
-struct Tracker { // TODO: Also needs to be defineed in init_sdl.h
+struct Tracker { // TODO: Also needs to be defined in init_sdl.h
     SDL_Window *window;
     SDL_Renderer *renderer;
     // SDL_Texture *texture;
@@ -23,7 +23,7 @@ struct Tracker { // TODO: Also needs to be defineed in init_sdl.h
 };
 
 bool tracker_new(struct Tracker **tracker);
-void tracker_events(struct Tracker *t, SDL_Event *event, bool *is_running);
+void tracker_events(struct Tracker *t, SDL_Event *event, bool *is_running, bool *settings_opened);
 void tracker_update(struct Tracker *t, float *deltaTime);
 void tracker_render(struct Tracker *t);
 void tracker_free(struct Tracker **tracker);

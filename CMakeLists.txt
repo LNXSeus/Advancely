@@ -27,6 +27,8 @@ set(SOURCE_FILES
         "source/overlay.c"
         "source/global_event_handler.c"
         "source/global_event_handler.h"
+        "source/settings.c"
+        "source/settings.h"
 )
 
 # Define the path to your local libraries folder
