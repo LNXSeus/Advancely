@@ -23,6 +23,10 @@ set(SOURCE_FILES
         "source/init_sdl.c"
         "source/tracker.h"
         "source/tracker.c"
+        "source/overlay.h"
+        "source/overlay.c"
+        "source/global_event_handler.c"
+        "source/global_event_handler.h"
 )
 
 # Define the path to your local libraries folder
@@ -108,7 +112,7 @@ target_compile_options(${EXECUTABLE_NAME} PRIVATE
         -Wall             # Enable all standard warnings
         -Wextra           # Enable even more warnings
         -Wpedantic        # Warn on non-standard language extensions
-        # -Werror           # Treat all warnings as errors, forcing you to fix them
+        -Werror           # Treat all warnings as errors, forcing you to fix them
 )
 
 # DOESN'T WORK FOR WINDOWS

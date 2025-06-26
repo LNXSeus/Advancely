@@ -4,24 +4,57 @@
 
 #include <SDL3/SDL_main.h>
 #include "tracker.h" // includes main.h
+#include "overlay.h"
+#include "global_event_handler.h"
 
 
 int main(int argc, char *argv[]) {
-
     // Satisfying Werror
-    (void)argc;
-    (void)argv;
+    (void) argc;
+    (void) argv;
 
     bool exit_status = EXIT_FAILURE;
 
     struct Tracker *tracker = NULL; // pass address to function
+    struct Overlay *overlay = NULL;
 
-    if (tracker_new(&tracker)) { // Address of pointer, that's why pointer to pointer
-        tracker_run(tracker);
+    if (tracker_new(&tracker) && overlay_new(&overlay)) {
+        bool is_running = true;
+        float last_frame_time = (float) SDL_GetTicks();
+
+        // Unified Main Loop at 60 FPS
+        while (is_running) {
+            float current_time = (float) SDL_GetTicks();
+            float deltaTime = (current_time - last_frame_time) / 1000.0f;
+            last_frame_time = current_time;
+
+            handle_global_events(tracker, overlay, &is_running, &deltaTime);
+
+            // Close immediately if app not running
+            if (!is_running) {
+                break;
+            }
+
+
+            tracker_update(tracker, &deltaTime);
+            overlay_update(overlay, &deltaTime);
+
+            tracker_render(tracker);
+            overlay_render(overlay);
+
+            // --- Frame limiting ---
+            const float frame_time = (float) SDL_GetTicks() - current_time;
+            if (frame_time < FRAME_TARGET_TIME) {
+                SDL_Delay(FRAME_TARGET_TIME - frame_time);
+            }
+        }
         exit_status = EXIT_SUCCESS;
     }
 
     tracker_free(&tracker);
+    overlay_free(&overlay);
+
+    SDL_Quit(); // This is ONCE for all windows
 
     // One happy path
     return exit_status;

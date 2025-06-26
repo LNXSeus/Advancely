@@ -12,14 +12,9 @@ struct Tracker { // TODO: Also needs to be defineed in init_sdl.h
     SDL_Window *window;
     SDL_Renderer *renderer;
     // SDL_Texture *texture;
-    SDL_Event event;
-    bool is_running;
 
     int tracker_width;
     int tracker_height;
-
-    int overlay_width;
-    int overlay_height;
 
     cJSON *settings;
     cJSON *translation; // ENGLISH ONLY
@@ -28,8 +23,9 @@ struct Tracker { // TODO: Also needs to be defineed in init_sdl.h
 };
 
 bool tracker_new(struct Tracker **tracker);
+void tracker_events(struct Tracker *t, SDL_Event *event, bool *is_running);
+void tracker_update(struct Tracker *t, float *deltaTime);
+void tracker_render(struct Tracker *t);
 void tracker_free(struct Tracker **tracker);
-void tracker_events(struct Tracker *t);
-void tracker_run(struct Tracker *t);
 
 #endif //TRACKER_H
