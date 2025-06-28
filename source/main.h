@@ -16,7 +16,7 @@
 
 #include <cJSON.h>
 
-#include "init_sdl.h" // load h file after all includes
+// Not including any utility headers here
 
 
 
@@ -44,7 +44,13 @@
 
 #define OVERLAY_SPEEDUP_FACTOR 3
 
-#define CONFIG_PATH "resources/config/settings.json" // ENGLISH ONLY
+
+// Used in path_utils.h, settings_utils.h
+#define MAX_PATH_LENGTH 1024 // Also defined in path_utils.h
+
+// PATH DETECTION MODE IN SETTINGS -> AUTO OR MANUAL -> path_utils.h
+
+// #define CONFIG_PATH "resources/config/settings.json" // ENGLISH ONLY
 
 #define FPS 60.0f
 #define FRAME_TARGET_TIME (1000.0f / FPS)

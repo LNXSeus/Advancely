@@ -15,8 +15,8 @@ struct Settings { // TODO: Also needs to be defined in init_sdl.h
     int settings_width;
     int settings_height;
 
-    cJSON *settings;
-    cJSON *translation; // ENGLISH ONLY
+    cJSON *settings; // Replaced by AppSettings in settings_utils
+    cJSON *translation; // ENGLISH ONLY, probably unsused
 
     // More stuff to be added like TTF_Font *font and SDL_Texture *sprite whatever
 };

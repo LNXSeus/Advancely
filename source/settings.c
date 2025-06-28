@@ -10,7 +10,7 @@ bool settings_new(struct Settings **settings) {
     *settings = calloc(1, sizeof(struct Settings));
     // Check here if calloc failed
     if (*settings == NULL) {
-        fprintf(stderr, "Error allocating memory for settings.\n");
+        fprintf(stderr, "[SETTINGS] Error allocating memory for settings.\n");
         return false;
     }
 
@@ -34,7 +34,7 @@ void settings_events(struct Settings *s, SDL_Event *event, bool *is_running, boo
                 switch (event->key.scancode) {
                     case SDL_SCANCODE_ESCAPE:
                         // Close settings
-                        printf("Settings Space key pressed, closing settings.\n");
+                        printf("[SETTINGS] Settings Space key pressed, closing settings.\n");
                         *settings_opened = false;
                         break;
                     default:
@@ -44,13 +44,13 @@ void settings_events(struct Settings *s, SDL_Event *event, bool *is_running, boo
             break;
         // TODO: Work with mouse events
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
-            printf("Mouse button pressed in settings.\n");
+            printf("[SETTINGS] Mouse button pressed in settings.\n");
             break;
         case SDL_EVENT_MOUSE_MOTION:
-            printf("Mouse moved in settings.\n");
+            printf("[SETTINGS] Mouse moved in settings.\n");
             break;
         case SDL_EVENT_MOUSE_BUTTON_UP:
-            printf("Mouse button released in settings.\n");
+            printf("[SETTINGS] Mouse button released in settings.\n");
             break;
         default:
             break;
@@ -101,7 +101,7 @@ void settings_free(struct Settings **settings) {
         s = NULL;
         *settings = NULL;
 
-        printf("Settings freed!\n");
+        printf("[SETTINGS] Settings freed!\n");
     }
 }
 

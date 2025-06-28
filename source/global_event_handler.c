@@ -16,7 +16,7 @@ void handle_global_events(struct Tracker *t, struct Overlay *o, struct Settings 
             *is_running = false;
             break;
         }
-        // Important saveguard to check for s to be NULL
+        // Important saveguard to check for s to be not NULL, then settings were opened and can be closed
         if (s != NULL && event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.key.windowID == SDL_GetWindowID(s->window)) {
             *settings_opened = false;
             continue; // Skip next event

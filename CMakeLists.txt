@@ -11,7 +11,6 @@ enable_language(RC)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED True)
 
-
 # --- 1. DEFINE PATHS & SOURCE FILES ---
 set(EXECUTABLE_NAME "Advancely")
 set(SOURCE_FILES
@@ -29,6 +28,20 @@ set(SOURCE_FILES
         "source/global_event_handler.h"
         "source/settings.c"
         "source/settings.h"
+        "source/path_utils.c"
+        "source/path_utils.h"
+        "source/settings_utils.c"
+        "source/settings_utils.h"
+        "source/file_utils.c"
+        "source/file_utils.h"
+
+        # Get cJSON
+        "source/cJSON.c"
+        "external_libs/include/cJSON.h"
+        # Get cJSON utils
+        # "external_libs/include/cJSON/cJSON_Utils.c"
+        # "external_libs/include/cJSON/cJSON_Utils.h"
+
 )
 
 # Define the path to your local libraries folder
@@ -38,10 +51,16 @@ set(LOCAL_LIB_PATH "${LOCAL_LIBS_PATH}/lib")
 set(LOCAL_BIN_PATH "${LOCAL_LIBS_PATH}/bin")
 
 
+
 # --- 2. CREATE THE EXECUTABLE ---
 # The WIN32 keyword is critical for graphical apps on Windows to solve the "WinMain" error.
-add_executable(${EXECUTABLE_NAME} WIN32 ${SOURCE_FILES})
+add_executable(${EXECUTABLE_NAME} WIN32 ${SOURCE_FILES}) # This creates Advancely.exe
 
+# Tell the compiler where to find header files for your project and external libs
+target_include_directories(Advancely PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/source"
+        "${CMAKE_CURRENT_SOURCE_DIR}/external_libs"  # Points to where cJSON.h is
+)
 
 # Give executable an icon
 set_property(TARGET ${EXECUTABLE_NAME} PROPERTY WIN32_EXECUTABLE true)
@@ -94,7 +113,7 @@ add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${LOCAL_BIN_PATH}"
         $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-        COMMENT "Copying DLLs to build directory"
+        COMMENT "[CMAKE] Copying DLLs to build directory"
 )
 
 # IMPORTANT NEEDS resources folder
@@ -102,7 +121,7 @@ add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/resources"
         "${CMAKE_BINARY_DIR}/resources"
-        COMMENT "Copying resources to build directory"
+        COMMENT "[CMAKE] Copying resources to build directory"
 )
 
 

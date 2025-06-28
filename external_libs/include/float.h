@@ -629,4 +629,5 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #endif
 
 #endif /* _FLOAT_H___ */
-#include_next <float.h>
+// TODO: I commented this out manually
+// #include_next <float.h>
