@@ -13,7 +13,7 @@
  * @brief Processes the global SDL event queue.
  *
  * This function polls for all pending SDL events for the current frame and dispatches
- * them to the appropriate handlers (tracker or overlay) based on the event's window ID.
+ * them to the appropriate handlers (tracker, settings, overlay) based on the event's window ID.
  * It also handles global quit events.
  *
  * @param t A pointer to the main tracker struct.

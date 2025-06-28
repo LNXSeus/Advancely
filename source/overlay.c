@@ -10,7 +10,7 @@ bool overlay_new(struct Overlay **overlay) {
     *overlay = calloc(1, sizeof(struct Overlay));
     // Check here if calloc failed
     if (*overlay == NULL) {
-        fprintf(stderr, "Error allocating memory for overlay.\n");
+        fprintf(stderr, "[OVERLAY] Error allocating memory for overlay.\n");
         return false;
     }
 
@@ -34,7 +34,7 @@ void overlay_events(struct Overlay *o, SDL_Event *event, bool *is_running, float
             // Allowing repeats here
             switch (event->key.scancode) {
                 case SDL_SCANCODE_SPACE:
-                    printf("Overlay Space key pressed, speeding up tracker.\n");
+                    printf("[OVERLAY] Overlay Space key pressed, speeding up tracker.\n");
                     // speed up tracker
                     *deltaTime *= OVERLAY_SPEEDUP_FACTOR;
                     break;
@@ -44,13 +44,13 @@ void overlay_events(struct Overlay *o, SDL_Event *event, bool *is_running, float
             break;
         // TODO: Work with mouse events
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
-            printf("Mouse button pressed in overlay.\n");
+            printf("[OVERLAY] Mouse button pressed in overlay.\n");
             break;
         case SDL_EVENT_MOUSE_MOTION:
-            printf("Mouse moved in overlay.\n");
+            printf("[OVERLAY] Mouse moved in overlay.\n");
             break;
         case SDL_EVENT_MOUSE_BUTTON_UP:
-            printf("Mouse button released in overlay.\n");
+            printf("[OVERLAY] Mouse button released in overlay.\n");
             break;
         default:
             break;
@@ -114,6 +114,6 @@ void overlay_free(struct Overlay **overlay) {
         o = NULL;
         *overlay = NULL;
 
-        printf("Overlay freed!\n");
+        printf("[OVERLAY] Overlay freed!\n");
     }
 }

@@ -31,6 +31,14 @@ int main(int argc, char *argv[]) {
             float deltaTime = (current_time - last_frame_time) / 1000.0f;
             last_frame_time = current_time;
 
+            handle_global_events(tracker, overlay, settings, &is_running, &settings_opened, &deltaTime);
+
+            // Close immediately if app not running
+            if (!is_running) {
+                break;
+            }
+
+            // Initialize settings when not opened
             if (settings_opened && settings == NULL) {
                 // Showing settings if window is closed
                 if (!settings_new(&settings)) {
@@ -39,13 +47,6 @@ int main(int argc, char *argv[]) {
             } else if (!settings_opened && settings != NULL) {
                 // Free it
                 settings_free(&settings);
-            }
-
-            handle_global_events(tracker, overlay, settings, &is_running, &settings_opened, &deltaTime);
-
-            // Close immediately if app not running
-            if (!is_running) {
-                break;
             }
 
             // Freeze other windows when settings are opened

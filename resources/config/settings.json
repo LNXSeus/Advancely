@@ -1,4 +1,9 @@
 {
-  "version": 4,
-  "savesPath": "C:/Users/Linus/AppData/Roaming/PrismLauncher/instances/Snapshots/minecraft/saves"
+  "version": "1.21.6",
+  "path_mode": "auto",
+  "manual_saves_path": "C:\Users\Linus\AppData\Roaming\PrismLauncher\instances\Snapshots\minecraft\saves",
+  "mc_version_dir": "1.21.6",
+  "mc_version_filename": "1_21_6",
+  "category": "all_advancements",
+  "optional_flag": "_optimized"
 }
