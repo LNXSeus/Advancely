@@ -4,18 +4,6 @@
 
 #include "init_sdl.h" //  includes tracker.h and then main.h through that
 
-
-// Creates a hitbox for the overlay to be draggable
-SDL_HitTestResult HitTestCallback(SDL_Window *win, const SDL_Point *area, void *data) {
-    (void) win;
-    (void) data;
-
-    if (area->y < OVERLAY_TITLE_BAR_HEIGHT) {
-        return SDL_HITTEST_DRAGGABLE; // This area is draggable
-    }
-    return SDL_HITTEST_NORMAL;
-}
-
 bool tracker_init_sdl(struct Tracker *t) {
     if (!SDL_Init(SDL_FLAGS)) {
         fprintf(stderr, "[INIT SDL] Failed to initialize SDL3: %s\n", SDL_GetError());
@@ -45,12 +33,6 @@ bool overlay_init_sdl(struct Overlay *o) {
     o->window = SDL_CreateWindow(OVERLAY_TITLE, OVERLAY_WIDTH, OVERLAY_HEIGHT, SDL_OVERLAY_WINDOW_FLAGS);
     if (!o->window) {
         fprintf(stderr, "[INIT SDL] Failed to create overlay window: %s\n", SDL_GetError());
-        return false;
-    }
-
-    // For the draggable hitbox
-    if (!SDL_SetWindowHitTest(o->window, HitTestCallback, NULL)) {
-        fprintf(stderr, "[INIT SDL] Failed to set hit test: %s\n", SDL_GetError());
         return false;
     }
 

@@ -204,7 +204,7 @@ void tracker_load_and_parse_advancements(struct Tracker *t) {
     // Count advancements in the object
     int count = 0;
     cJSON *adv_json_iterator = NULL;
-    cJSON_ArrayForEach(adv_json_iterator, template_json) {
+    cJSON_ArrayForEach(adv_json_iterator, template_json) { // Iterate over advancements
         count++;
     }
     t->advancement_count = count;
@@ -240,6 +240,7 @@ void tracker_load_and_parse_advancements(struct Tracker *t) {
             cJSON_ArrayForEach(crit_iterator, criteria_obj) { crit_count++; }
             new_adv->criteria_count = crit_count;
 
+            // Allocate memory for criteria
             if (new_adv->criteria_count > 0) {
                 new_adv->criteria = calloc(new_adv->criteria_count, sizeof(Criterion*));
                 if (new_adv->criteria) {
@@ -252,11 +253,15 @@ void tracker_load_and_parse_advancements(struct Tracker *t) {
                             continue;
                         }
 
+                        // The key of the object is the root name
                         strncpy(new_crit->root_name, crit_json->string, sizeof(new_crit->root_name) - 1);
                         cJSON *crit_name = cJSON_GetObjectItem(crit_json, "name");
+
+                        // Set the name if it exists
                         if(cJSON_IsString(crit_name)) strncpy(new_crit->name, crit_name->valuestring, sizeof(new_crit->name) - 1);
                         new_crit->done = false;
 
+                        // Add the new criterion
                         new_adv->criteria[j++] = new_crit;
                         crit_json = crit_json->next;
                     }
@@ -273,7 +278,9 @@ void tracker_load_and_parse_advancements(struct Tracker *t) {
         cJSON *player_adv_json = cJSON_from_file(t->advancements_path);
         if(player_adv_json) {
             for(int k=0; k < t->advancement_count; ++k) {
-                Advancement* adv = t->advancements[k];
+                Advancement* adv = t->advancements[k]; // Get the advancement
+
+                // Within player advancement file check if the advancement is done with "adv->root_name" name
                 cJSON* player_entry = cJSON_GetObjectItem(player_adv_json, adv->root_name);
                 if(player_entry) {
                     cJSON* done_flag = cJSON_GetObjectItem(player_entry, "done");

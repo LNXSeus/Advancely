@@ -11,8 +11,8 @@
 // TODO: Sync this with the advancement template
 // Data structure for a single advancement criterion
 typedef struct {
-    char name[128];
-    char root_name[128];
+    char name[192];
+    char root_name[192];
     bool done;
     SDL_Texture *texture;
 } Criterion;
@@ -21,8 +21,8 @@ typedef struct {
 // Data structure for a single advancement
 
 typedef struct {
-    char name[128];
-    char root_name[128];
+    char name[192];
+    char root_name[192];
     bool done;
     SDL_Texture *texture;
     int criteria_count;
@@ -48,7 +48,7 @@ struct Tracker { // TODO: Also needs to be defined in init_sdl.h
     char advancement_template_path[MAX_PATH_LENGTH]; // TODO: This will be the path to advancement templates
 
     int advancement_count;
-    Advancement **advancements; // Array of pointers to all possible advancements
+    Advancement **advancements; // Array of pointers to all possible advancements and their criteria
 
     // More stuff to be added like TTF_Font *font and SDL_Texture *sprite whatever
 };

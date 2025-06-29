@@ -142,7 +142,7 @@ void find_latest_world_files(
             if (CompareFileTime(&find_world_data.ftLastWriteTime, &latest_time) > 0) {
                 latest_time = find_world_data.ftLastWriteTime;
                 // copy directory name into latest_world_name buffer
-                strncpy(latest_world_name, find_world_data.cFileName, MAX_PATH_LENGTH - 1);
+                strncpy(latest_world_name, find_world_data.cFileName, MAX_PATH_LENGTH - 1); // TODO: Display this on tracker screen
             }
         }
     } while (FindNextFileA(h_find_world, &find_world_data) != 0);
