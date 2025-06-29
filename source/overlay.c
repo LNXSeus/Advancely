@@ -29,6 +29,9 @@ void overlay_events(struct Overlay *o, SDL_Event *event, bool *is_running, float
     (void) is_running;
 
     switch (event->type) {
+        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+            *is_running = false;
+            break;
 
         case SDL_EVENT_KEY_DOWN:
             // Allowing repeats here
@@ -71,14 +74,6 @@ void overlay_render(struct Overlay *o) {
     SDL_RenderClear(o->renderer);
 
     // DRAWING HAPPENS HERE
-
-    // Define title bar
-    const SDL_FRect title_bar_rect = {0, 0, OVERLAY_WIDTH, OVERLAY_TITLE_BAR_HEIGHT};
-    const SDL_Color title_bar_color = {43, 43, 43, 255}; // RGBA
-
-    SDL_SetRenderDrawColor(o->renderer, title_bar_color.r, title_bar_color.g, title_bar_color.b,
-                           title_bar_color.a);
-    SDL_RenderFillRect(o->renderer, &title_bar_rect);
 
     // TODO: Draw the title text. This requires the SDL_ttf library,
     // which you already have included in main.h. You would load a font,

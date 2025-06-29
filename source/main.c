@@ -58,10 +58,6 @@ int main(int argc, char *argv[]) {
                 overlay_update(overlay, &deltaTime);
             }
 
-
-            tracker_update(tracker, &deltaTime);
-            overlay_update(overlay, &deltaTime);
-
             tracker_render(tracker);
             overlay_render(overlay);
 
