@@ -13,7 +13,7 @@
 #define SETTINGS_FILE_PATH "resources/config/settings.json"
 
 // TODO: Define versions here, go with correct subversions
-typedef enum {
+typedef enum { // Puts vaLue starting at 0, allows for comparisons
     MC_VERSION_1_11,
     MC_VERSION_1_12,
     MC_VERSION_1_16_1,
@@ -25,26 +25,18 @@ typedef enum {
 // A struct to hold all application settings in one place
 // TODO: Remember window position in settings.json
 typedef struct { // names should match json keys
-    MC_Version version;
+    char version_str[64]; // Store version as string
     PathMode path_mode;
     char manual_saves_path[MAX_PATH_LENGTH]; // path length from path_utils.h
-    char advancement_template_path[MAX_PATH_LENGTH];
-    char advancement_lang_path[MAX_PATH_LENGTH]; // Path for the language file
-    char mc_version_dir[MAX_PATH_LENGTH]; // New field to store Minecraft version directory
-    char mc_version_filename[MAX_PATH_LENGTH]; // New field for the filename version component
     char category[MAX_PATH_LENGTH]; // New field to store speedrunning category
     char optional_flag[MAX_PATH_LENGTH]; // New field to store optional flag (any string or empty) (e.g.,"_optimized")
+
+    // These paths are constructed from the above fields
+    char template_path[MAX_PATH_LENGTH];
+    char lang_path[MAX_PATH_LENGTH];
 } AppSettings;
 
-/**
- * @brief Loads settings from the settings.json file.
- *
- * If the file doesn't exist or a setting is missing, it populates
- * the struct with safe, default values.
- *
- * @param settings A pointer to the AppSettings struct to be populated.
- */
-void settings_load(AppSettings *settings);
+
 
 /**
  * @brief Converts a version string (e.g., "1.12") to an MC_Version enum.
@@ -61,9 +53,26 @@ MC_Version settings_get_version_from_string(const char *version_str);
 PathMode settings_get_path_mode_from_string(const char *mode_str);
 
 /**
- * @brief Constructs the advancement template and language paths based on the provided settings.
- * @param settings A pointer to the AppSettings struct to be populated with the constructed paths.
+ * @brief Loads settings from the settings.json file.
+ *
+ * If the file doesn't exist or a setting is missing, it populates
+ * the struct with safe, default values. After loading, it calls
+ * `construct_template_paths` to build the final file paths.
+ *
+ * @param settings A pointer to the AppSettings struct to be populated.
  */
-void construct_advancement_paths(AppSettings *settings);
+void settings_load(AppSettings *settings);
+
+/**
+ * @brief Constructs the full paths to the template and language JSON files.
+ *
+ * Based on the version, category, and optional flag settings, this function
+ * builds the final, relative paths to the required data files and stores them
+ * in the `template_path` and `lang_path` fields of the AppSettings struct.
+ *
+ * @param settings A pointer to the AppSettings struct containing the base settings
+ * and which will be updated with the constructed paths.
+ */
+void construct_template_paths(AppSettings *settings);
 
 #endif //SETTINGS_UTILS_H

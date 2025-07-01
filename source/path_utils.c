@@ -21,8 +21,10 @@
 #endif
 
 // LOCAL HELPER FUNCTIONS
+
 /**
- * @brief Converts all backslashes in a path to forward slashes.
+ * @brief Converts DOUBLE backslashes in a path to SINGLE forward slashes.
+ * This is a local helper function to ensure consistent path formats internally.
  * @param path The path string to modify in-place.
  */
 void normalize_path(char *path) {
@@ -38,8 +40,12 @@ void normalize_path(char *path) {
 
 /**
  * @brief Automatically detects the default .minecraft saves path (platform-specific).
+ * This is a local helper function that contains the OS-specific logic for finding
+ * the Minecraft installation directory.
+ * @param out_path A buffer to store the resulting path.
+ * @param max_len The size of the out_path buffer.
+ * @return true if the path was found, false otherwise.
  */
-
 static bool get_auto_saves_path(char *out_path, size_t max_len) {
     #ifdef _WIN32
         PWSTR appdata_path_wide = NULL; // Wide string UTF-16
@@ -62,7 +68,7 @@ static bool get_auto_saves_path(char *out_path, size_t max_len) {
             return true;
         }
     #else
-        // Linux/Mac
+    // Linux
         const char *home_dir = getenv("HOME");
         if (!home_dir) {
             struct passwd *pw = getpwuid(getuid());
@@ -70,12 +76,12 @@ static bool get_auto_saves_path(char *out_path, size_t max_len) {
         }
 
         if (home_dir) {
-    #if __APPLE__
+    #if __APPLE__ // macOS
                 snprintf(out_path, max_len, "%s/Library/Application Support/minecraft/saves", home_dir);
-    #else
+    #else // Linux
                 snprintf(out_path, max_len, "%s/.minecraft/saves", home_dir);
     #endif
-                return true;
+                return true; // success path was found
             }
     #endif
         return false;
@@ -178,7 +184,7 @@ void find_latest_world_files(
 
     // UNLOCKS SEARCH for 25w14craftmine
     if (use_unlocks) {
-        snprintf(temp_path, max_len, "%s%s/unlocks", saves_path, latest_world_name);
+        snprintf(temp_path, max_len, "%s/%s/unlocks", saves_path, latest_world_name);
         normalize_path(temp_path);
         snprintf(sub_search_path, sizeof(sub_search_path), "%s/*.json", temp_path); // search for any .json files in temp path
         h_find_file = FindFirstFileA(sub_search_path, &find_file_data);
@@ -190,7 +196,7 @@ void find_latest_world_files(
     } else { out_unlocks_path[0] = '\0'; }
 
     // STATS SEARCH (ALWAYS USED)
-    snprintf(temp_path, max_len, "%s%s/stats", saves_path, latest_world_name);
+    snprintf(temp_path, max_len, "%s/%s/stats", saves_path, latest_world_name);
     normalize_path(temp_path);
     snprintf(sub_search_path, sizeof(sub_search_path), "%s/*.json", temp_path); // search for any .json files in temp path
     h_find_file = FindFirstFileA(sub_search_path, &find_file_data);
@@ -261,7 +267,7 @@ void find_latest_world_files(
         } else { out_adv_path[0] = '\0'; }
     } else { out_adv_path[0] = '\0'; }
 
-    // --- Unlocks Search (NEW) ---
+    // --- Unlocks Search ---
     if (use_unlocks) {
         snprintf(folder_path, sizeof(folder_path), "%s/%s/unlocks", saves_path, latest_world_name);
         DIR *dir = opendir(folder_path);

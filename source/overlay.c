@@ -47,13 +47,13 @@ void overlay_events(struct Overlay *o, SDL_Event *event, bool *is_running, float
             break;
         // TODO: Work with mouse events
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
-            printf("[OVERLAY] Mouse button pressed in overlay.\n");
+            // printf("[OVERLAY] Mouse button pressed in overlay.\n");
             break;
         case SDL_EVENT_MOUSE_MOTION:
-            printf("[OVERLAY] Mouse moved in overlay.\n");
+            // printf("[OVERLAY] Mouse moved in overlay.\n");
             break;
         case SDL_EVENT_MOUSE_BUTTON_UP:
-            printf("[OVERLAY] Mouse button released in overlay.\n");
+            // printf("[OVERLAY] Mouse button released in overlay.\n");
             break;
         default:
             break;
