@@ -21,8 +21,7 @@ typedef enum {
 } PathMode;
 
 /**
- * @brief Converts all backslashes in a path to forward slashes.
- * @param path The path string to modify in-place.
+ * @brief Enum to determine how the saves path is obtained.
  */
 void normalize_path(char *path);
 
@@ -45,7 +44,8 @@ bool get_saves_path(char *out_path, size_t max_len, PathMode mode, const char* m
  * @brief Finds the most recently modified world and gets its data file paths.
  *
  * Scans the provided Minecraft saves directory to find the world folder
- * that was modified last. It conditionally searches for advancements, unlocks,
+ * that was modified last. It then constructs the full paths to the player's
+ * data files within that world. It conditionally searches for advancements, unlocks,
  * and stats files based on the provided boolean flags.
  *
  * @param saves_path The full path to the .minecraft/saves directory.
@@ -54,7 +54,7 @@ bool get_saves_path(char *out_path, size_t max_len, PathMode mode, const char* m
  * @param out_unlocks_path A buffer to store the path to the unlocks JSON file.
  * @param max_len The size of the output path buffers.
  * @param use_advancements Set to true for modern versions (1.12+).
- * @param use_unlocks Set to true for version 25w14craftmine.
+ * @param use_unlocks Set to true for specific versions like 25w14craftmine.
  */
 void find_latest_world_files(
     const char *saves_path,
@@ -65,8 +65,5 @@ void find_latest_world_files(
     bool use_advancements,
     bool use_unlocks
 );
-
-
-
 
 #endif //PATH_UTILS_H

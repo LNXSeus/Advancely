@@ -1,9 +1,10 @@
 {
-  "version": "1.21.6",
-  "path_mode": "auto",
-  "manual_saves_path": "C:\Users\Linus\AppData\Roaming\PrismLauncher\instances\Snapshots\minecraft\saves",
-  "mc_version_dir": "1.21.6",
-  "mc_version_filename": "1_21_6",
-  "category": "all_advancements",
-  "optional_flag": "_optimized"
+  "path_mode": "manual",
+  "manual_saves_path": "C:\Users\Linus\AppData\Roaming\PrismLauncher\instances\1.21.5\minecraft\saves",
+  "version": "25w14craftmine",
+  "category": "acquire_hardware",
+  "optional_flag": "_test",
+  "custom_progress": {
+    "custom:unbreaking_3_book": false
+  }
 }

@@ -1,0 +1,63 @@
+{
+  "advancements": {
+    "minecraft:story/smelt_iron": {
+      "icon": "items/iron_ingot.png",
+      "criteria": {}
+    }
+  },
+  "stats": [
+    {
+      "root_name": "mined:oak_log",
+      "target": 1024,
+      "icon": "items/oak_log.png"
+    }
+  ],
+  "unlocks": [
+    {
+      "root_name": "minecraft:exploration",
+      "icon": "items/leather_boots.png"
+    },
+    {
+      "root_name": "minecraft:ender_pearl_starter",
+      "icon": "items/ender_pearl.png"
+    }
+  ],
+  "custom": [
+    {
+      "root_name": "custom:unbreaking_3_book",
+      "icon": "items/enchanted_book.png"
+    }
+  ],
+  "multi_stage_goals": [
+    {
+      "display_name": "Thunder Advancements",
+      "icon": "items/trident.png",
+      "stages": [
+        {
+          "display_text": "Needs Trident",
+          "type": "stat",
+          "root_name": "picked_up:trident",
+          "goal": 1
+        },
+        {
+          "display_text": "Awaiting thunder",
+          "type": "advancement",
+          "root_name": "minecraft:adventure/very_very_frightening",
+          "goal": 1
+        },
+        {
+          "display_text": "Needs Surge Protector",
+          "type": "advancement",
+          "root_name": "minecraft:adventure/lightning_rod_with_villager_no_fire",
+          "goal": 1
+        },
+        {
+          "display_text": "Done with thunder",
+          "type": "final",
+          "root_name": "",
+          "goal": 0
+        }
+      ]
+    }
+  ]
+}

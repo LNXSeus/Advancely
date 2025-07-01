@@ -34,7 +34,7 @@ void settings_events(struct Settings *s, SDL_Event *event, bool *is_running, boo
                 switch (event->key.scancode) {
                     case SDL_SCANCODE_ESCAPE:
                         // Close settings
-                        printf("[SETTINGS] Settings Space key pressed, closing settings.\n");
+                        printf("[SETTINGS] Settings Escape key pressed, closing settings.\n");
                         *settings_opened = false;
                         break;
                     default:
@@ -44,13 +44,13 @@ void settings_events(struct Settings *s, SDL_Event *event, bool *is_running, boo
             break;
         // TODO: Work with mouse events
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
-            printf("[SETTINGS] Mouse button pressed in settings.\n");
+            // printf("[SETTINGS] Mouse button pressed in settings.\n");
             break;
         case SDL_EVENT_MOUSE_MOTION:
-            printf("[SETTINGS] Mouse moved in settings.\n");
+            // printf("[SETTINGS] Mouse moved in settings.\n");
             break;
         case SDL_EVENT_MOUSE_BUTTON_UP:
-            printf("[SETTINGS] Mouse button released in settings.\n");
+            // printf("[SETTINGS] Mouse button released in settings.\n");
             break;
         default:
             break;
