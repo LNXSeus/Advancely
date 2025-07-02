@@ -14,41 +14,43 @@
 // HELPER FUNCTION FOR PARSING
 
 /**
- * @brief Parses a cJSON object containing advancement categories into an array of TrackableCategory structs.
- *
- * This function iterates through a JSON object where each key is an advancement's root name.
- * It allocates memory for each category, populates it with data (root name, display name, icon),
- * and prepares it for having its criteria parsed.
- *
- * @param category_json The cJSON object for the "advancements" key from the template file.
- * @param lang_json The cJSON object from the language file to look up display names.
- * @param categories_array A pointer to the array of TrackableCategory pointers to be populated.
- * @param count A pointer to an integer that will store the number of categories parsed.
+ * @brief Parses advancement categories and their criteria from the template.
  */
-static void parse_trackable_categories(cJSON *category_json, cJSON *lang_json, TrackableCategory ***categories_array,
-                                       int *count) {
+static void parse_trackable_categories(cJSON *category_json, cJSON *lang_json, struct Tracker *t) {
     if (!category_json) {
         printf("[TRACKER] parse_trackable_categories: category_json is NULL\n");
         return;
     }
 
-    *count = 0;
-    cJSON *temp = NULL;
-    cJSON_ArrayForEach(temp, category_json) { (*count)++; } // count the number of categories
-    if (*count == 0) {
-        printf("[TRACKER] parse_trackable_categories: No categories found\n");
+    t->template_data->advancement_count = 0;
+    cJSON *count_item = NULL;
+    if (category_json) {
+        // count the number of advancements
+        for (count_item = category_json->child; count_item != NULL; count_item = count_item->next) {
+            t->template_data->advancement_count++;
+        }
+    }
+    // count the number of advancements
+    if (t->template_data->advancement_count == 0) {
+        printf("[TRACKER] parse_trackable_categories: No advancements found in template.\n");
         return;
     }
 
-    *categories_array = calloc(*count, sizeof(TrackableCategory *));
-    if (!categories_array) return;
+    t->template_data->advancements = calloc(t->template_data->advancement_count, sizeof(TrackableCategory *));
+    // * because it's an array
+    if (!t->template_data->advancements) return; // allocation failed for advancements
 
     cJSON *cat_json = category_json->child;
     int i = 0;
+    t->template_data->total_criteria_count = 0; // Initialize total criteria count
+
     while (cat_json) {
         TrackableCategory *new_cat = calloc(1, sizeof(TrackableCategory));
         if (new_cat) {
             strncpy(new_cat->root_name, cat_json->string, sizeof(new_cat->root_name) - 1);
+
+            // TODO: Placeholder for getting display name and icon
+            strncpy(new_cat->display_name, new_cat->root_name, sizeof(new_cat->display_name) - 1);
 
             // Build the language key from the root_name, e.g., "minecraft:story/smelt_iron" -> "advancements.story.smelt_iron"
             char lang_key[256] = {0};
@@ -76,11 +78,30 @@ static void parse_trackable_categories(cJSON *category_json, cJSON *lang_json, T
             // Parse criteria
             cJSON *criteria_obj = cJSON_GetObjectItem(cat_json, "criteria");
             if (criteria_obj) {
-                // TODO: Parse nested criteria (Similar parsing logic for criteria would go here)
+                cJSON *crit_item = NULL;
+                cJSON_ArrayForEach(crit_item, criteria_obj) { new_cat->criteria_count++; }
+                // count the number of criteria
+
+                if (new_cat->criteria_count > 0) {
+                    // if there are criteria
+                    new_cat->criteria = calloc(new_cat->criteria_count, sizeof(TrackableItem *));
+                    t->template_data->total_criteria_count += new_cat->criteria_count; // add to total criteria count
+                    int k = 0;
+                    cJSON_ArrayForEach(crit_item, criteria_obj) {
+                        // for each criterion
+                        TrackableItem *new_crit = calloc(1, sizeof(TrackableItem));
+                        if (new_crit) {
+                            strncpy(new_crit->root_name, crit_item->string, sizeof(new_crit->root_name) - 1);
+                            // TODO: Add logic here to get criterion display names/icons if needed
+                            strncpy(new_crit->display_name, crit_item->string, sizeof(new_crit->display_name) - 1);
+                            new_cat->criteria[k++] = new_crit; // Add the new criterion to the criteria array
+                        }
+                    }
+                }
             }
-            (*categories_array)[i++] = new_cat;
+            t->template_data->advancements[i++] = new_cat; // Add the new category to the advancements array
         }
-        cat_json = cat_json->next;
+        cat_json = cat_json->next; // Move to the next category
     }
 }
 
@@ -243,29 +264,54 @@ static void parse_multi_stage_goals(cJSON *goals_json, cJSON *lang_json, MultiSt
 }
 
 /**
- * @brief Updates advancement progress from a pre-loaded cJSON object.
+ * @brief Updates advancement and criteria progress from a pre-loaded cJSON object.
  * @param t A pointer to the Tracker struct.
  * @param player_adv_json The parsed player advancements JSON file.
  */
 static void tracker_update_advancement_progress(struct Tracker *t, const cJSON *player_adv_json) {
     if (!player_adv_json) return;
 
-    for (int i = 0; i < t->template_data->advancement_count; i++) {
-    }
+    t->template_data->advancements_completed_count = 0;
+    t->template_data->completed_criteria_count = 0;
 
-    printf("[TRACKER] Reading player advancements from: %s\n", t->advancements_path);
+    // printf("[TRACKER] Reading player advancements from: %s\n", t->advancements_path);
 
     for (int i = 0; i < t->template_data->advancement_count; i++) {
         TrackableCategory *adv = t->template_data->advancements[i]; // Get the current advancement
+        adv->completed_criteria_count = 0; // Reset completed criteria count for this advancement
+
         cJSON *player_entry = cJSON_GetObjectItem(player_adv_json, adv->root_name);
         // Get the entry for this advancement
-
         if (player_entry) {
-            cJSON *done_flag = cJSON_GetObjectItem(player_entry, "done");
-            adv->done = cJSON_IsTrue(done_flag);
+            adv->done = cJSON_IsTrue(cJSON_GetObjectItem(player_entry, "done"));
+            if (adv->done) {
+                t->template_data->advancements_completed_count++;
+            }
+
+            // Criteria don't have a "done" field, so we just check if the entry exists
+            cJSON *player_criteria = cJSON_GetObjectItem(player_entry, "criteria");
+            if (player_criteria) {
+                // If the entry exists, we have criteria
+                for (int j = 0; j < adv->criteria_count; j++) {
+                    TrackableItem *crit = adv->criteria[j];
+                    // Check if the criteria exist -> meaning it's been completed
+                    if (cJSON_HasObjectItem(player_criteria, crit->root_name)) {
+                        crit->done = true;
+                        adv->completed_criteria_count++;
+                    } else {
+                        crit->done = false;
+                    }
+                }
+            }
         } else {
+            // If the entry doesn't exist, reset everything
             adv->done = false;
+            for (int j = 0; j < adv->criteria_count; j++) {
+                adv->criteria[j]->done = false;
+            }
         }
+        // Update completed criteria count for this advancement
+        t->template_data->completed_criteria_count += adv->completed_criteria_count;
     }
 }
 
@@ -277,7 +323,7 @@ static void tracker_update_advancement_progress(struct Tracker *t, const cJSON *
 static void tracker_update_unlock_progress(struct Tracker *t, const cJSON *player_unlocks_json) {
     if (!player_unlocks_json) return;
 
-    printf("[TRACKER] Reading player unlocks from: %s\n", t->unlocks_path);
+    // printf("[TRACKER] Reading player unlocks from: %s\n", t->unlocks_path);
 
     cJSON *obtained_obj = cJSON_GetObjectItem(player_unlocks_json, "obtained"); // Top level object in unlocks file
     if (!obtained_obj) {
@@ -310,7 +356,7 @@ static void tracker_update_unlock_progress(struct Tracker *t, const cJSON *playe
 static void tracker_update_stat_progress(struct Tracker *t, const cJSON *player_stats_json) {
     if (!player_stats_json) return;
 
-    printf("[TRACKER] Reading player stats from: %s\n", t->stats_path);
+    // printf("[TRACKER] Reading player stats from: %s\n", t->stats_path);
 
 
     cJSON *stats_obj = cJSON_GetObjectItem(player_stats_json, "stats");
@@ -400,75 +446,138 @@ static void tracker_update_multi_stage_progress(struct Tracker *t, const cJSON *
 
     cJSON *stats_obj = player_stats_json ? cJSON_GetObjectItem(player_stats_json, "stats") : NULL;
 
+    // Iterate through the multi-stage goals
     for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
-        // Iterate through the multi-stage goals
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
-        if (goal->current_stage >= goal->stage_count - 1) continue; // Goal is already on its final stage
 
-        SubGoal *active_stage = goal->stages[goal->current_stage];
-        bool stage_completed = false;
+        // Reset and re-evaluate progress from the start (important for world-changes when tracker is running)
+        goal->current_stage = 0;
 
-        switch (active_stage->type) {
-            case SUBGOAL_ADVANCEMENT:
-                // We take the item with the root name then check if it is done then call this stage completed
-                if (player_adv_json) {
-                    cJSON *adv_entry = cJSON_GetObjectItem(player_adv_json, active_stage->root_name);
-                    // Get the entry for this advancement
-                    if (adv_entry && cJSON_IsTrue(cJSON_GetObjectItem(adv_entry, "done"))) {
-                        stage_completed = true;
-                    }
-                }
+        // Loop through each stage sequentially to determine the current progress
+        for (int j = 0; j < goal->stage_count; j++) {
+            SubGoal *stage_to_check = goal->stages[j];
+            bool stage_completed = false; // Default to false
+
+            // Stop checking if we are on the final stage (SUBGOAL_MANUAL)
+            if (stage_to_check->type == SUBGOAL_MANUAL) {
                 break;
+            }
 
-            case SUBGOAL_STAT:
-                if (stats_obj) {
-                    // Handle shortend stat format e.g., "custom:jump"
-                    char root_name_copy[192];
-                    strncpy(root_name_copy, active_stage->root_name, sizeof(root_name_copy) - 1);
-                    root_name_copy[sizeof(root_name_copy) - 1] = '\0'; // Ensure null termination
+            switch (stage_to_check->type) {
+                case SUBGOAL_ADVANCEMENT:
+                    // We take the item with the root name then check if it is done then call this stage completed
+                    if (player_adv_json) {
+                        cJSON *adv_entry = cJSON_GetObjectItem(player_adv_json, stage_to_check->root_name);
+                        // Get the entry for this advancement
+                        if (adv_entry && cJSON_IsTrue(cJSON_GetObjectItem(adv_entry, "done"))) {
+                            stage_completed = true;
+                        }
+                    }
+                    break;
 
-                    char *item_str = strchr(root_name_copy, ':'); // Find the first colon
-                    if (item_str) {
-                        *item_str = '\0';
-                        item_str++;
-                        char *category_str = root_name_copy;
+                case SUBGOAL_STAT:
+                    if (stats_obj) {
+                        // Handle shortend stat format e.g., "custom:jump"
+                        char root_name_copy[192];
+                        strncpy(root_name_copy, stage_to_check->root_name, sizeof(root_name_copy) - 1);
+                        root_name_copy[sizeof(root_name_copy) - 1] = '\0'; // Ensure null termination
 
-                        // Construct the full JSON keys used in the stats file
-                        char full_category_key[256];
-                        snprintf(full_category_key, sizeof(full_category_key), "minecraft:%s", category_str);
+                        char *item_str = strchr(root_name_copy, ':'); // Find the first colon
+                        if (item_str) {
+                            *item_str = '\0';
+                            item_str++;
+                            char *category_str = root_name_copy;
 
-                        printf("[MULTISTAGE DEBUG] Checking stat: category_key=[%s]\n", full_category_key);
-                        cJSON *category_obj = cJSON_GetObjectItem(stats_obj, full_category_key);
+                            // Construct the full JSON keys used in the stats file
+                            char full_category_key[256];
+                            snprintf(full_category_key, sizeof(full_category_key), "minecraft:%s", category_str);
 
-                        if (category_obj) {
-                            printf("[MULTISTAGE DEBUG] Found category object: %s\n", full_category_key);
-                            char full_item_key[256];
-                            snprintf(full_item_key, sizeof(full_item_key), "minecraft:%s", item_str);
+                            printf("[MULTISTAGE DEBUG] Checking stat: category_key=[%s]\n", full_category_key);
+                            cJSON *category_obj = cJSON_GetObjectItem(stats_obj, full_category_key);
 
-                            printf("[MULTISTAGE DEBUG] Checking item_key=[%s]\n", full_item_key);
-                            cJSON *stat_value = cJSON_GetObjectItem(category_obj, full_item_key);
+                            if (category_obj) {
+                                printf("[MULTISTAGE DEBUG] Found category object: %s\n", full_category_key);
+                                char full_item_key[256];
+                                snprintf(full_item_key, sizeof(full_item_key), "minecraft:%s", item_str);
 
-                            // Check if the stat value is greater than or equal to the required progress
-                            if (cJSON_IsNumber(stat_value)) {
-                                printf("[MULTISTAGE DEBUG] Found stat value: %d\n", stat_value->valueint);
-                                if (stat_value->valueint >= active_stage->required_progress) {
-                                    stage_completed = true;
-                                    printf("[MULTISTAGE DEBUG] Stage completed!\n");
+                                printf("[MULTISTAGE DEBUG] Checking item_key=[%s]\n", full_item_key);
+                                cJSON *stat_value = cJSON_GetObjectItem(category_obj, full_item_key);
+
+                                // Check if the stat value is greater than or equal to the required progress
+                                if (cJSON_IsNumber(stat_value)) {
+                                    printf("[MULTISTAGE DEBUG] Found stat value: %d\n", stat_value->valueint);
+                                    if (stat_value->valueint >= stage_to_check->required_progress) {
+                                        stage_completed = true;
+                                        printf("[MULTISTAGE DEBUG] Stage completed!\n");
+                                    }
+                                } else {
+                                    printf("[MULTISTAGE DEBUG] Stat value not found or not a number for key: %s\n",
+                                           full_item_key);
                                 }
-                            } else { printf("[MULTISTAGE DEBUG] Stat value not found or not a number for key: %s\n", full_item_key); }
-                        } else { printf("[MULTISTAGE DEBUG] Category object not found for key: %s\n", full_category_key); }
+                            } else {
+                                printf("[MULTISTAGE DEBUG] Category object not found for key: %s\n", full_category_key);
+                            }
+                        }
                     }
-                }
+                    break;
+
+                case SUBGOAL_MANUAL: // Already handled above, used for final stages
+                default:
+                    break; // Manual stages are not updated here
+            }
+
+            if (stage_completed) {
+                goal->current_stage = j + 1; // Move to the next stage
+            } else {
                 break;
-
-            case SUBGOAL_MANUAL: // Not used
-            default:
-                break; // Manual stages are not updated here
+            }
         }
+    }
+}
 
-        if (stage_completed) {
-            goal->current_stage++; // Advance to the next stage
-        }
+
+/**
+ * @brief Calculates the overall progress percentage based on all tracked items. Advancements are separately!!
+ *
+ * It first calculates the total number of "steps" (e.g., criteria, stats, unlocks, custom goals, and multi-stage goals),
+ * then the number of completed "steps", and finally calculates the overall progress percentage.
+ *
+ * @param t A pointer to the Tracker struct.
+ *
+ */
+static void tracker_calculate_overall_progress(struct Tracker *t) {
+    if (!t || !t->template_data) return; // || because we can't be sure if the template_data is initialized
+
+    // calculate the total number of "steps"
+    int total_steps = 0;
+    total_steps += t->template_data->total_criteria_count;
+    total_steps += t->template_data->stat_count;
+    total_steps += t->template_data->unlock_count;
+    total_steps += t->template_data->custom_goal_count;
+    for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
+        // Each stage (except the last) is a step
+        total_steps += (t->template_data->multi_stage_goals[i]->stage_count - 1);
+    }
+
+    // Calculate the number of completed "steps"
+    int completed_steps = 0;
+    completed_steps += t->template_data->completed_criteria_count;
+    completed_steps += t->template_data->unlocks_completed_count;
+    for (int i = 0; i < t->template_data->stat_count; i++) {
+        if (t->template_data->stats[i]->done) completed_steps++;
+    }
+    for (int i = 0; i < t->template_data->custom_goal_count; i++) {
+        if (t->template_data->custom_goals[i]->done) completed_steps++;
+    }
+    for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
+        completed_steps += t->template_data->multi_stage_goals[i]->current_stage;
+    }
+
+    // Calculate the overall progress percentage
+    if (total_steps > 0) {
+        t->template_data->overall_progress_percentage = ((float) completed_steps / (float) total_steps) * 100.0f;
+    } else {
+        t->template_data->overall_progress_percentage = 0.0f;
     }
 }
 
@@ -549,6 +658,13 @@ bool tracker_new(struct Tracker **tracker) {
         t->stats_path[0] = '\0';
         t->unlocks_path[0] = '\0';
     }
+
+    // Parse the advancement template JSON file
+    // This should only happen once on initialization
+    // TODO: Allow for choosing different advancement templates while running
+    tracker_load_and_parse_data(t);
+
+
     return true; // Success
 }
 
@@ -608,22 +724,20 @@ void tracker_update(struct Tracker *t, float *deltaTime) {
     // game logic goes here
     (void) deltaTime;
 
-    static bool initial_load_done = false;
-    if (!initial_load_done) {
-        if (strlen(t->advancement_template_path) > 0) {
-            tracker_load_and_parse_data(t);
-            initial_load_done = true; // To only do this once
-        }
-
-        // Force one update immediately after loading
-        if (initial_load_done) {
-            // Fall through to the update logic on the same frame as the initial load
-        } else {
-            return; // Return if still not loaded
-        }
-    }
-
-    // TODO: Call this block whenever custom goal is checked off or save files update (dmon.h) maybe
+    // static bool initial_load_done = false;
+    // if (!initial_load_done) {
+    //     if (strlen(t->advancement_template_path) > 0) {
+    //         tracker_load_and_parse_data(t);
+    //         initial_load_done = true; // To only do this once
+    //     }
+    //
+    //     // Force one update immediately after loading
+    //     if (initial_load_done) {
+    //         // Fall through to the update logic on the same frame as the initial load
+    //     } else {
+    //         return; // Return if still not loaded
+    //     }
+    // }
 
     // Load all necessary player files ONCE
     cJSON *player_adv_json = (strlen(t->advancements_path) > 0) ? cJSON_from_file(t->advancements_path) : NULL;
@@ -637,6 +751,9 @@ void tracker_update(struct Tracker *t, float *deltaTime) {
     tracker_update_stat_progress(t, player_stats_json);
     tracker_update_custom_progress(t, settings_json);
     tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json);
+
+    // Calculate the final overall progress
+    tracker_calculate_overall_progress(t);
 
     // Clean up the parsed JSON objects
     cJSON_Delete(player_adv_json);
@@ -680,6 +797,7 @@ void tracker_load_and_parse_data(struct Tracker *t) {
     t->template_data->lang_json = cJSON_from_file(t->lang_path);
     if (!t->template_data->lang_json) {
         fprintf(stderr, "[TRACKER] Failed to load or parse language file.\n");
+        cJSON_Delete(template_json);
         return;
     }
 
@@ -698,8 +816,7 @@ void tracker_load_and_parse_data(struct Tracker *t) {
     cJSON *multi_stage_goals_json = cJSON_GetObjectItem(template_json, "multi_stage_goals");
 
     // Parse the 5 main categories
-    parse_trackable_categories(advancements_json, t->template_data->lang_json, &t->template_data->advancements,
-                               &t->template_data->advancement_count);
+    parse_trackable_categories(advancements_json, t->template_data->lang_json, t);
     parse_simple_trackables(stats_json, t->template_data->lang_json, &t->template_data->stats,
                             &t->template_data->stat_count);
     parse_simple_trackables(unlocks_json, t->template_data->lang_json, &t->template_data->unlocks,
@@ -709,93 +826,13 @@ void tracker_load_and_parse_data(struct Tracker *t) {
     parse_multi_stage_goals(multi_stage_goals_json, t->template_data->lang_json, &t->template_data->multi_stage_goals,
                             &t->template_data->multi_stage_goal_count);
 
-
-    // ---------------- Printing for debugging ----------------
-    printf("[TRACKER] Parsed %d advancements.\n", t->template_data->advancement_count);
-
-    // print found advancements
-    for (int i = 0; i < t->template_data->advancement_count; i++) {
-        TrackableCategory *adv = t->template_data->advancements[i];
-        printf("[TRACKER] Advancement %d: %s\n", i, adv->root_name);
-    }
-
-    printf("[TRACKER] Parsed %d stats.\n", t->template_data->stat_count);
-
-    // print found stats
-    for (int i = 0; i < t->template_data->stat_count; i++) {
-        TrackableItem *stat = t->template_data->stats[i];
-        printf("[TRACKER] Stat %d: %s\n", i, stat->root_name);
-    }
-
-
-    printf("[TRACKER] Parsed %d unlocks.\n", t->template_data->unlock_count);
-
-    // print found unlocks
-    for (int i = 0; i < t->template_data->unlock_count; i++) {
-        TrackableItem *unlock = t->template_data->unlocks[i];
-        printf("[TRACKER] Unlock %d: %s\n", i, unlock->root_name);
-    }
-
-
-    printf("[TRACKER] Parsed %d custom goals.\n", t->template_data->custom_goal_count);
-
-    // print found custom goals
-    for (int i = 0; i < t->template_data->custom_goal_count; i++) {
-        TrackableItem *custom = t->template_data->custom_goals[i];
-        printf("[TRACKER] Custom Goal %d: %s\n", i, custom->root_name);
-    }
-
-    // Print for multi-stage goals
-
-    printf("[MULTISTAGE] Parsed %d multi-stage goals.\n", t->template_data->multi_stage_goal_count);
-
-    for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
-        MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
-        printf("[MULTISTAGE] Multi-Stage Goal %d: %s\n", i, goal->display_name);
-    }
-
-    // Print the final status of all tracked items
-    printf("\n--- Player Progress Status ---\n");
-    for (int i = 0; i < t->template_data->advancement_count; i++) {
-        TrackableCategory *adv = t->template_data->advancements[i];
-        printf("[Advancement] %s: %s\n", adv->display_name, adv->done ? "COMPLETED" : "INCOMPLETE");
-    }
-
-    for (int i = 0; i < t->template_data->stat_count; i++) {
-        TrackableItem *stat = t->template_data->stats[i];
-        printf("[Stat] %s: %d / %d - %s\n", stat->display_name, stat->progress, stat->goal,
-               stat->done ? "COMPLETE" : "INCOMPLETE");
-    }
-
-    for (int i = 0; i < t->template_data->unlock_count; i++) {
-        TrackableItem *unlock = t->template_data->unlocks[i];
-        printf("[Unlock] %s: %s\n", unlock->display_name, unlock->done ? "UNLOCKED" : "LOCKED");
-    }
-
-    printf("[Unlocks] %d / %d completed\n", t->template_data->unlocks_completed_count, t->template_data->unlock_count);
-
-    for (int i = 0; i < t->template_data->custom_goal_count; i++) {
-        TrackableItem *custom_goal = t->template_data->custom_goals[i];
-        printf("[Custom Goal] %s: %s\n", custom_goal->display_name, custom_goal->done ? "COMPLETED" : "INCOMPLETE");
-    }
-
-    // Print for multi-stage goals
-    for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) { // For each multi-stage goal
-        MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
-        // Check if the goal and its stages exist and the index is valid
-        if (goal && goal->stages && goal->current_stage < goal->stage_count) {
-            SubGoal *active_stage = goal->stages[goal->current_stage];
-            printf("[Multi-Stage Goal] %s: %s\n", goal->display_name, active_stage->display_text);
-        }
-    }
-
-    printf("----------------------------\n\n");
-
     printf("[TRACKER] Initial template parsing complete.\n");
 
-    // ---------------- End of Printing for debugging ----------------
-
     cJSON_Delete(template_json);
+    if (t->template_data->lang_json) {
+        cJSON_Delete(t->template_data->lang_json);
+        t->template_data->lang_json = NULL;
+    }
     // No need to delete settings_json, because it's not parsed, handled in tracker_update()
 }
 
@@ -882,4 +919,61 @@ void tracker_free(struct Tracker **tracker) {
         tracker = NULL;
         printf("[TRACKER] Tracker freed!\n");
     }
+}
+
+
+void tracker_print_debug_status(struct Tracker *t) {
+    if (!t || !t->template_data) return;
+
+    printf("\n--- Player Progress Status ---\n");
+
+    // Advancements and Criteria
+    printf("[Advancements] %d / %d completed\n", t->template_data->advancements_completed_count,
+           t->template_data->advancement_count);
+    for (int i = 0; i < t->template_data->advancement_count; i++) {
+        TrackableCategory *adv = t->template_data->advancements[i];
+        printf("  - %s (%d/%d criteria): %s\n", adv->display_name, adv->completed_criteria_count, adv->criteria_count,
+               adv->done ? "COMPLETED" : "INCOMPLETE");
+        for (int j = 0; j < adv->criteria_count; j++) {
+            TrackableItem *crit = adv->criteria[j];
+            printf("    - %s: %s\n", crit->display_name, crit->done ? "Done" : "Not Done");
+        }
+    }
+
+    // Other categories...
+    for (int i = 0; i < t->template_data->stat_count; i++) {
+        TrackableItem *stat = t->template_data->stats[i];
+        printf("[Stat] %s: %d / %d - %s\n", stat->display_name, stat->progress, stat->goal,
+               stat->done ? "COMPLETE" : "INCOMPLETE");
+    }
+
+
+    printf("[Unlocks] %d / %d completed\n", t->template_data->unlocks_completed_count, t->template_data->unlock_count);
+
+    // Loop to print each unlock individually
+    for (int i = 0; i < t->template_data->unlock_count; i++) {
+        TrackableItem *unlock = t->template_data->unlocks[i];
+        if (!unlock) continue;
+        printf("  - %s: %s\n", unlock->display_name, unlock->done ? "UNLOCKED" : "LOCKED");
+    }
+
+
+    for (int i = 0; i < t->template_data->custom_goal_count; i++) {
+        TrackableItem *custom_goal = t->template_data->custom_goals[i];
+        printf("[Custom Goal] %s: %s\n", custom_goal->display_name, custom_goal->done ? "COMPLETED" : "INCOMPLETE");
+    }
+    for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
+        MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+        if (goal && goal->stages && goal->current_stage < goal->stage_count) {
+            SubGoal *active_stage = goal->stages[goal->current_stage];
+            printf("[Multi-Stage Goal] %s: %s\n", goal->display_name, active_stage->display_text);
+        }
+    }
+
+    // Overall Progress
+    printf("\n[Overall Progress] %.2f%%\n", t->template_data->overall_progress_percentage);
+    printf("----------------------------\n\n");
+
+    // Force the output buffer to write to the console immediately
+    fflush(stdout);
 }
