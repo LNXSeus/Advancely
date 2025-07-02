@@ -8,7 +8,8 @@
 #include "main.h"
 #include "data_structures.h"
 
-struct Tracker { // TODO: Also needs to be defined in init_sdl.h
+struct Tracker {
+    // TODO: Also needs to be defined in init_sdl.h
     SDL_Window *window;
     SDL_Renderer *renderer;
     // SDL_Texture *texture;
@@ -77,7 +78,8 @@ void tracker_render(struct Tracker *t);
  * @brief Frees all resources associated with the Tracker instance.
  *
  * This includes destroying the SDL renderer and window, and deallocating all dynamically
- * allocated memory for template data, including advancements, stats, unlocks, (NOT custom, as that is saved in settings.json) and their sub-items.
+ * allocated memory for template data, including advancements, stats, unlocks,
+ * (NOT custom, as that is saved in settings.json) and their sub-items.
  *
  * @param tracker A pointer to the Tracker struct pointer to be freed.
  */
@@ -93,5 +95,15 @@ void tracker_free(struct Tracker **tracker);
  * @param t A pointer to the Tracker struct containing the necessary paths.
  */
 void tracker_load_and_parse_data(struct Tracker *t);
+
+/**
+ * @brief Prints the current advancement status to the console.
+ *
+ * This function is for debugging and prints progress on advancements, stats, unlocks,
+ * custom goals and multi-stage goals.
+ *
+ * @param t A pointer to the Tracker struct.
+ */
+void tracker_print_debug_status(struct Tracker *t);
 
 #endif //TRACKER_H

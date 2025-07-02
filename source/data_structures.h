@@ -38,6 +38,7 @@ typedef struct TrackableCategory {
     int goal;
 
     int criteria_count;
+    int completed_criteria_count; // Track completed criteria for that advancement
     TrackableItem **criteria; // An array of sub-items
 } TrackableCategory;
 
@@ -75,6 +76,7 @@ typedef struct MultiStageGoal {
 // The main container for all data loaded from the template files.
 typedef struct TemplateData {
     int advancement_count;
+    int advancements_completed_count;
     TrackableCategory **advancements;
 
     int stat_count;
@@ -90,6 +92,11 @@ typedef struct TemplateData {
 
     int multi_stage_goal_count; // Number of multi-stage goals
     MultiStageGoal **multi_stage_goals;
+
+    // Overall Progress Metrics
+    int total_criteria_count;
+    int completed_criteria_count;
+    float overall_progress_percentage; // Percentage score of everything BUT ADVANCEMENTS (have their own advancements_completed_count)
 
     cJSON *lang_json; // The loaded language file for display names
 } TemplateData;
