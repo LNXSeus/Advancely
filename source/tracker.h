@@ -74,16 +74,17 @@ void tracker_update(struct Tracker *t, float *deltaTime);
  */
 void tracker_render(struct Tracker *t);
 
+
+
 /**
- * @brief Frees all resources associated with the Tracker instance.
+ * @brief Reloads settings and re-initializes all relevant paths in the tracker struct.
  *
- * This includes destroying the SDL renderer and window, and deallocating all dynamically
- * allocated memory for template data, including advancements, stats, unlocks,
- * (NOT custom, as that is saved in settings.json) and their sub-items.
+ * This function is used to update the tracker's paths when the settings.json file
+ * is changed at runtime, for example, to point to a new saves folder.
  *
- * @param tracker A pointer to the Tracker struct pointer to be freed.
+ * @param t A pointer to the Tracker struct.
  */
-void tracker_free(struct Tracker **tracker);
+void tracker_reinit_paths(struct Tracker *t);
 
 /**
  * @brief Loads and parses all data from template and language files.
@@ -95,6 +96,17 @@ void tracker_free(struct Tracker **tracker);
  * @param t A pointer to the Tracker struct containing the necessary paths.
  */
 void tracker_load_and_parse_data(struct Tracker *t);
+
+/**
+ * @brief Frees all resources associated with the Tracker instance.
+ *
+ * This includes destroying the SDL renderer and window, and deallocating all dynamically
+ * allocated memory for template data, including advancements, stats, unlocks,
+ * (NOT custom, as that is saved in settings.json) and their sub-items.
+ *
+ * @param tracker A pointer to the Tracker struct pointer to be freed.
+ */
+void tracker_free(struct Tracker **tracker);
 
 /**
  * @brief Prints the current advancement status to the console.
