@@ -8,7 +8,7 @@
   "stats": [
     {
       "root_name": "mined:oak_log",
-      "target": 1024,
+      "target": 4,
       "icon": "items/oak_log.png"
     }
   ],

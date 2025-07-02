@@ -177,7 +177,7 @@ void find_latest_world_files(
         h_find_file = FindFirstFileA(sub_search_path, &find_file_data);
         if (h_find_file != INVALID_HANDLE_VALUE) {
             snprintf(out_adv_path, max_len, "%s/%s", temp_path, find_file_data.cFileName);
-            printf("[PATH UTILS] Set advancements path to: %s\n", out_adv_path);
+            // printf("[PATH UTILS] Set advancements path to: %s\n", out_adv_path);
             FindClose(h_find_file); // Close the file handle
         } else { out_adv_path[0] = '\0'; }
     } else { out_adv_path[0] = '\0'; }
@@ -190,7 +190,7 @@ void find_latest_world_files(
         h_find_file = FindFirstFileA(sub_search_path, &find_file_data);
         if (h_find_file != INVALID_HANDLE_VALUE) {
             snprintf(out_unlocks_path, max_len, "%s/%s", temp_path, find_file_data.cFileName);
-            printf("[PATH UTILS] Set unlocks path to: %s\n", out_unlocks_path);
+            // printf("[PATH UTILS] Set unlocks path to: %s\n", out_unlocks_path);
             FindClose(h_find_file); // Close the file handle
         } else { out_unlocks_path[0] = '\0'; }
     } else { out_unlocks_path[0] = '\0'; }
@@ -202,7 +202,7 @@ void find_latest_world_files(
     h_find_file = FindFirstFileA(sub_search_path, &find_file_data);
     if (h_find_file != INVALID_HANDLE_VALUE) {
         snprintf(out_stats_path, max_len, "%s/%s", temp_path, find_file_data.cFileName);
-        printf("[PATH UTILS] Set stats path to: %s\n", out_stats_path);
+        // printf("[PATH UTILS] Set stats path to: %s\n", out_stats_path);
         FindClose(h_find_file); // Close the file handle
     } else { out_stats_path[0] = '\0'; }
 }
