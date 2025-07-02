@@ -7,6 +7,7 @@
 
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_atomic.h>
+#include <SDL3/SDL_mutex.h>
 #include "tracker.h" // includes main.h
 #include "overlay.h"
 #include "settings.h"
@@ -20,6 +21,11 @@
 // global flag TODO: Should be set to true when custom goal is checked off (manual update) -> SDL_SetAtomicInt(&g_needs_update, 1);
 // TODO: Currently tracker needs to be restarted when saves path is changed in settings.json file
 static SDL_AtomicInt g_needs_update;
+static SDL_AtomicInt g_settings_changed; // Watching when settings.json is modified to re-init paths
+
+// Global mutex to protect the watcher and paths (see they don't break when called in close succession)
+static SDL_Mutex *g_watcher_mutex = NULL;
+
 
 
 /**
@@ -27,8 +33,8 @@ static SDL_AtomicInt g_needs_update;
  * This function is called by dmon in a separate thread whenever a file event occurs.
  * It sets a global flag (g_needs_update) to true if a file is modified.
  */
-static void watch_callback(dmon_watch_id watch_id, dmon_action action, const char *rootdir, const char *filepath,
-                           const char *oldfilepath, void *user) {
+static void global_watch_callback(dmon_watch_id watch_id, dmon_action action, const char *rootdir, const char *filepath,
+                                  const char *oldfilepath, void *user) {
     // Satisfying Werror - not used
     (void) watch_id;
     (void) rootdir;
@@ -47,6 +53,24 @@ static void watch_callback(dmon_watch_id watch_id, dmon_action action, const cha
     }
 }
 
+/**
+ * @brief Callback for dmon watching the CONFIG directory.
+ */
+static void settings_watch_callback(dmon_watch_id watch_id, dmon_action action, const char *rootdir,
+                                    const char *filepath, const char *oldfilepath, void *user) {
+    (void) watch_id;
+    (void) rootdir;
+    (void) oldfilepath;
+    (void) user;
+
+    if (action == DMON_ACTION_MODIFY) {
+        // Check if the modified file is our settings file
+        if (strcmp(filepath, "settings.json") == 0) {
+            printf("[DMON - MAIN] settings.json modified. Triggering update.\n");
+            SDL_SetAtomicInt(&g_settings_changed, 1);
+        }
+    }
+}
 
 int main(int argc, char *argv[]) {
     // Satisfying Werror
@@ -59,20 +83,35 @@ int main(int argc, char *argv[]) {
     struct Overlay *overlay = NULL;
     struct Settings *settings = NULL;
 
+    // Variable to hold the ID of our saves watcher
+    dmon_watch_id saves_watcher_id;
+    g_watcher_mutex = SDL_CreateMutex();
+
+    if (!g_watcher_mutex) {
+        fprintf(stderr, "[MAIN] Failed to create mutex: %s\n", SDL_GetError());
+        return EXIT_FAILURE;
+    }
+
     if (tracker_new(&tracker) && overlay_new(&overlay)) {
-        // --- DMON Setup ---
 
         dmon_init();
+
+        // HARDCODED SETTINGS DIRECTORY
+        printf("[DMON - MAIN] Watching config directory: resources/config/\n");
+        dmon_watch("resources/config/", settings_watch_callback, 0, NULL);
+
+        // Watch saves directory and store the watcher ID
         if (strlen(tracker->saves_path) > 0) {
             printf("[DMON - MAIN] Watching saves directory: %s\n", tracker->saves_path);
-            dmon_watch(tracker->saves_path, watch_callback, DMON_WATCHFLAGS_RECURSIVE, NULL);
             // Watch saves directory and monitor child diretories
+            saves_watcher_id = dmon_watch(tracker->saves_path, global_watch_callback, DMON_WATCHFLAGS_RECURSIVE, NULL);
         } else {
             fprintf(stderr, "[DMON - MAIN] Failed to watch saves directory as it's empty: %s\n", tracker->saves_path);
         }
 
         // Initialize the atomic flag to 1 to trigger an initial update.
         SDL_SetAtomicInt(&g_needs_update, 1);
+        SDL_SetAtomicInt(&g_settings_changed, 0);
 
         bool is_running = true;
         bool settings_opened = false;
@@ -84,10 +123,37 @@ int main(int argc, char *argv[]) {
             float deltaTime = (current_time - last_frame_time) / 1000.0f;
             last_frame_time = current_time;
 
+            // --- Per-Frame Logic ---
+
             handle_global_events(tracker, overlay, settings, &is_running, &settings_opened, &deltaTime);
 
             // Close immediately if app not running
             if (!is_running) break;
+
+            // Lock mutex before touching watchers or paths
+            SDL_LockMutex(g_watcher_mutex);
+
+            // Check if settings.json has been modified
+            if (SDL_SetAtomicInt(&g_settings_changed, 0) == 1) {
+                printf("[MAIN] Settings changed. Re-initializing paths and file watcher.\n");
+
+                // Stop watching the old directory
+                dmon_unwatch(saves_watcher_id);
+
+                // Update the tracker with the new paths
+                tracker_reinit_paths(tracker); // changes tracker->saves_path
+
+                // Start watching the new directory
+                if (strlen(tracker->saves_path) > 0) {
+                    printf("[MAIN] Now watching new saves directory: %s\n", tracker->saves_path);
+                    saves_watcher_id = dmon_watch(tracker->saves_path, global_watch_callback, DMON_WATCHFLAGS_RECURSIVE, NULL);
+                } else {
+                    fprintf(stderr, "[MAIN] Failed to watch new saves directory as it's empty: %s\n", tracker->saves_path);
+                }
+
+                // Force an update from the new path
+                SDL_SetAtomicInt(&g_needs_update, 1);
+            }
 
             // Check if dmon (or manual update through custom goal) has requested an update
             // Atomically check if the flag is 1, and if so, set it to 0.
@@ -111,7 +177,8 @@ int main(int argc, char *argv[]) {
                 tracker_print_debug_status(tracker);
             }
 
-            // --- Per-Frame Logic ---
+            // Unlock mutex after all updates are done
+            SDL_UnlockMutex(g_watcher_mutex);
 
             // Initialize settings when not opened
             if (settings_opened && settings == NULL) {
@@ -146,6 +213,7 @@ int main(int argc, char *argv[]) {
     tracker_free(&tracker);
     overlay_free(&overlay);
     settings_free(&settings);
+    SDL_DestroyMutex(g_watcher_mutex); // Destroy the mutex
     SDL_Quit(); // This is ONCE for all windows
 
     // One happy path

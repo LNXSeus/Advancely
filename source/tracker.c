@@ -620,44 +620,8 @@ bool tracker_new(struct Tracker **tracker) {
         return false;
     }
 
-    AppSettings settings; // struct used below, temporary
-    settings_load(&settings); // load settings from file in settings_utils.c
-
-    // Copy the template path into our tracker struct
-    strncpy(t->advancement_template_path, settings.template_path, MAX_PATH_LENGTH - 1);
-    t->advancement_template_path[MAX_PATH_LENGTH - 1] = '\0';
-
-    strncpy(t->lang_path, settings.lang_path, MAX_PATH_LENGTH - 1);
-    t->lang_path[MAX_PATH_LENGTH - 1] = '\0';
-
-
-    MC_Version version = settings_get_version_from_string(settings.version_str);
-    bool use_advancements = (version >= MC_VERSION_1_12);
-    bool use_unlocks = (version == MC_VERSION_25W14CRAFTMINE);
-
-    // Get the final, normalized saves path using the loaded settings
-    if (get_saves_path(t->saves_path, MAX_PATH_LENGTH, settings.path_mode, settings.manual_saves_path)) {
-        printf("[TRACKER] Using Minecraft saves folder: %s\n", t->saves_path);
-
-        // Find the specific world files using the correct flags.
-        find_latest_world_files(
-            t->saves_path,
-            t->advancements_path,
-            t->stats_path,
-            t->unlocks_path,
-            MAX_PATH_LENGTH,
-            use_advancements,
-            use_unlocks
-        );
-    } else {
-        fprintf(stderr, "[TRACKER] CRITICAL: Could not determine Minecraft saves folder.\n");
-
-        // Ensure paths are empty, so no attempts are made to access them.
-        t->saves_path[0] = '\0';
-        t->advancements_path[0] = '\0';
-        t->stats_path[0] = '\0';
-        t->unlocks_path[0] = '\0';
-    }
+    // Initialize paths (also during runtime)
+    tracker_reinit_paths(t);
 
     // Parse the advancement template JSON file
     // This should only happen once on initialization
@@ -783,6 +747,48 @@ void tracker_render(struct Tracker *t) {
 
     // present backbuffer
     SDL_RenderPresent(t->renderer);
+}
+
+void tracker_reinit_paths(struct Tracker *t) {
+    if (!t) return;
+
+    AppSettings settings;
+    settings_load(&settings);
+
+    // Copy the template and lang paths
+    strncpy(t->advancement_template_path, settings.template_path, MAX_PATH_LENGTH - 1);
+    t->advancement_template_path[MAX_PATH_LENGTH - 1] = '\0';
+    strncpy(t->lang_path, settings.lang_path, MAX_PATH_LENGTH - 1);
+    t->lang_path[MAX_PATH_LENGTH - 1] = '\0';
+
+    MC_Version version = settings_get_version_from_string(settings.version_str);
+    bool use_advancements = (version >= MC_VERSION_1_12);
+    bool use_unlocks = (version >= MC_VERSION_25W14CRAFTMINE);
+
+    // Get the final, normalized saves path using the loaded settings
+    if (get_saves_path(t->saves_path, MAX_PATH_LENGTH, settings.path_mode, settings.manual_saves_path)) {
+        printf("[TRACKER] Using saves path: %s\n", t->saves_path);
+
+        // Find the specific world files using the correct flag
+        find_latest_world_files(
+            t->saves_path,
+            t->advancements_path,
+            t->stats_path,
+            t->unlocks_path,
+            MAX_PATH_LENGTH,
+            use_advancements,
+            use_unlocks
+        );
+    } else {
+        fprintf(stderr, "[TRACKER] CRITICAL: Failed to get saves path.\n");
+
+        // Ensure paths are empty
+        t->saves_path[0] = '\0';
+        t->advancements_path[0] = '\0';
+        t->stats_path[0] = '\0';
+        t->unlocks_path[0] = '\0';
+        return;
+    }
 }
 
 void tracker_load_and_parse_data(struct Tracker *t) {
