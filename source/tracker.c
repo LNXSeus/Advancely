@@ -246,7 +246,7 @@ static void parse_multi_stage_goals(cJSON *goals_json, cJSON *lang_json, MultiSt
                 if (cJSON_IsString(root))
                     strncpy(new_stage->root_name, root->valuestring,
                             sizeof(new_stage->root_name) - 1);
-                if (cJSON_IsString(goal_val)) new_stage->required_progress = goal_val->valueint;
+                if (cJSON_IsNumber(goal_val)) new_stage->required_progress = goal_val->valueint; // This is a number
 
                 // Parse type
                 if (cJSON_IsString(type)) {
@@ -458,6 +458,8 @@ static void tracker_update_multi_stage_progress(struct Tracker *t, const cJSON *
             SubGoal *stage_to_check = goal->stages[j];
             bool stage_completed = false; // Default to false
 
+            stage_to_check->current_stat_progress = 0;
+
             // Stop checking if we are on the final stage (SUBGOAL_MANUAL)
             if (stage_to_check->type == SUBGOAL_MANUAL) {
                 break;
@@ -505,8 +507,12 @@ static void tracker_update_multi_stage_progress(struct Tracker *t, const cJSON *
 
                                 // Check if the stat value is greater than or equal to the required progress
                                 if (cJSON_IsNumber(stat_value)) {
+                                    // store the current progress of this stat
+                                    stage_to_check->current_stat_progress = stat_value->valueint;
                                     printf("[MULTISTAGE DEBUG] Found stat value: %d\n", stat_value->valueint);
-                                    if (stat_value->valueint >= stage_to_check->required_progress) {
+
+                                    // Check if the stat value is greater than or equal to the stat progress
+                                    if (stage_to_check->current_stat_progress >= stage_to_check->required_progress) {
                                         stage_completed = true;
                                         printf("[MULTISTAGE DEBUG] Stage completed!\n");
                                     }
@@ -521,7 +527,7 @@ static void tracker_update_multi_stage_progress(struct Tracker *t, const cJSON *
                     }
                     break;
 
-                case SUBGOAL_MANUAL: // Already handled above, used for final stages
+                case SUBGOAL_MANUAL: // Already handled above, when string in subgoal ISN'T "stat" or "advancement"
                 default:
                     break; // Manual stages are not updated here
             }
@@ -550,6 +556,7 @@ static void tracker_calculate_overall_progress(struct Tracker *t) {
 
     // calculate the total number of "steps"
     int total_steps = 0;
+    // INCLUDES SUB-CRITERIA PROGRESS
     total_steps += t->template_data->total_criteria_count;
     total_steps += t->template_data->stat_count;
     total_steps += t->template_data->unlock_count;
@@ -688,21 +695,6 @@ void tracker_update(struct Tracker *t, float *deltaTime) {
     // game logic goes here
     (void) deltaTime;
 
-    // static bool initial_load_done = false;
-    // if (!initial_load_done) {
-    //     if (strlen(t->advancement_template_path) > 0) {
-    //         tracker_load_and_parse_data(t);
-    //         initial_load_done = true; // To only do this once
-    //     }
-    //
-    //     // Force one update immediately after loading
-    //     if (initial_load_done) {
-    //         // Fall through to the update logic on the same frame as the initial load
-    //     } else {
-    //         return; // Return if still not loaded
-    //     }
-    // }
-
     // Load all necessary player files ONCE
     cJSON *player_adv_json = (strlen(t->advancements_path) > 0) ? cJSON_from_file(t->advancements_path) : NULL;
     cJSON *player_stats_json = (strlen(t->stats_path) > 0) ? cJSON_from_file(t->stats_path) : NULL;
@@ -717,6 +709,7 @@ void tracker_update(struct Tracker *t, float *deltaTime) {
     tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json);
 
     // Calculate the final overall progress
+    // Advancements themselves are seperate, but THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
     tracker_calculate_overall_progress(t);
 
     // Clean up the parsed JSON objects
@@ -972,12 +965,26 @@ void tracker_print_debug_status(struct Tracker *t) {
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
         if (goal && goal->stages && goal->current_stage < goal->stage_count) {
             SubGoal *active_stage = goal->stages[goal->current_stage];
-            printf("[Multi-Stage Goal] %s: %s\n", goal->display_name, active_stage->display_text);
+
+            // Check if the active stage is a stat and print its progress
+            if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress > 0) {
+                printf("[Multi-Stage Goal] %s: %s (%d/%d)\n",
+                    goal->display_name,
+                    active_stage->display_text,
+                    active_stage->current_stat_progress,
+                    active_stage->required_progress);
+            } else {
+                // If it's not "stat" print this
+                printf("[Multi-Stage Goal] %s: %s\n", goal->display_name, active_stage->display_text);
+            }
         }
     }
 
+    // Advancement Progress AGAIN
+    printf("\n[Advancements] %d / %d completed\n", t->template_data->advancements_completed_count,
+       t->template_data->advancement_count);
     // Overall Progress
-    printf("\n[Overall Progress] %.2f%%\n", t->template_data->overall_progress_percentage);
+    printf("[Overall Progress] %.2f%%\n", t->template_data->overall_progress_percentage);
     printf("----------------------------\n\n");
 
     // Force the output buffer to write to the console immediately

@@ -1,0 +1,85 @@
+{
+  "advancements": {
+    "minecraft:story/mine_stone": {
+      "icon": "items/wooden_pickaxe.png",
+      "criteria": {}
+    },
+    "minecraft:story/smelt_iron": {
+      "icon": "items/iron_ingot.png",
+      "criteria": {}
+    },
+    "minecraft:mines/all_special_mines_completed": {
+      "icon": "items/beacon.png",
+      "criteria": {
+        "minecraft:wither_boss": "",
+        "minecraft:kuiper_belt": "",
+        "minecraft:raid": "",
+        "minecraft:spooky_scary_skeletons_boss": "",
+        "minecraft:ender_dragon_boss": "",
+        "minecraft:small_but_deadly_boss": "",
+        "minecraft:angry_ghast_boss": "",
+        "minecraft:warden_boss": "",
+        "minecraft:enderman_boss": ""
+      }
+    },
+    "minecraft:recipes/misc/charcoal": {
+      "icon": "items/charcoal.png",
+      "criteria": {}
+    }
+  },
+  "stats": [
+    {
+      "root_name": "mined:oak_log",
+      "target": 4,
+      "icon": "items/oak_log.png"
+    }
+  ],
+  "unlocks": [
+    {
+      "root_name": "minecraft:exploration",
+      "icon": "items/leather_boots.png"
+    },
+    {
+      "root_name": "minecraft:ender_pearl_starter",
+      "icon": "items/ender_pearl.png"
+    }
+  ],
+  "custom": [
+    {
+      "root_name": "custom:unbreaking_3_book",
+      "icon": "items/enchanted_book.png"
+    }
+  ],
+  "multi_stage_goals": [
+    {
+      "display_name": "Getting started",
+      "icon": "items/dirt.png",
+      "stages": [
+        {
+          "display_text": "Mine 8 Dirt",
+          "type": "stat",
+          "root_name": "mined:dirt",
+          "goal": 8
+        },
+        {
+          "display_text": "Get Iron Armor",
+          "type": "advancement",
+          "root_name": "minecraft:story/obtain_armor",
+          "goal": 1
+        },
+        {
+          "display_text": "Collect 4 Sand",
+          "type": "stat",
+          "root_name": "picked_up:sand",
+          "goal": 4
+        },
+        {
+          "display_text": "Done",
+          "type": "final",
+          "root_name": "",
+          "goal": 0
+        }
+      ]
+    }
+  ]
+}

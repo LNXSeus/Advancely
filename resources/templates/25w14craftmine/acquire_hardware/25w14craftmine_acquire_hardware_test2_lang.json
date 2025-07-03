@@ -1,0 +1,23 @@
+{
+  "advancements.story.mine_stone": "Stone Age",
+
+  "advancements.story.smelt_iron": "Acquire Hardware",
+
+  "advancements.mines.all_special_mines_completed": "Yess Boss!",
+  "advancements.mines.all_special_mines_completed.criteria.minecraft:wither_boss": "Defeat the Wither",
+  "advancements.mines.all_special_mines_completed.criteria.minecraft:kuiper_belt": "Visit the Kuiper Belt",
+  "advancements.mines.all_special_mines_completed.criteria.minecraft:raid": "Win a Raid",
+  "advancements.mines.all_special_mines_completed.criteria.minecraft:spooky_scary_skeletons_boss": "Defeat the Skeleton Boss",
+  "advancements.mines.all_special_mines_completed.criteria.minecraft:ender_dragon_boss": "Defeat the Ender Dragon",
+  "advancements.mines.all_special_mines_completed.criteria.minecraft:small_but_deadly_boss": "Defeat the Small But Deadly Boss",
+  "advancements.mines.all_special_mines_completed.criteria.minecraft:angry_ghast_boss": "Defeat the Angry Ghast Boss",
+  "advancements.mines.all_special_mines_completed.criteria.minecraft:warden_boss": "Defeat the Warden",
+  "advancements.mines.all_special_mines_completed.criteria.minecraft:enderman_boss": "Defeat the Enderman Boss",
+
+  "advancements.recipes.misc.charcoal": "Renewable Energy",
+
+  "mined:oak_log": "Mine 4 Oak Logs",
+  "minecraft:exploration": "Exploration",
+  "minecraft:ender_pearl_starter": "Starter Ender Pearl",
+  "custom:unbreaking_3_book": "Obtain Unbreaking 3 Book"
+}
