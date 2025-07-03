@@ -51,15 +51,16 @@ typedef enum {
 
     // For goals with no automatic trigger, used for final stages (displays once all previous stages are done)
     // TODO: Make subgoal_manual stages clickable in the UI, similar to custom_goals, NOT THAT IMPORTANT
-    SUBGOAL_MANUAL
+    SUBGOAL_MANUAL // When it's not "stat" or "advancement"
 } SubGoalType;
 
 // Represents one step in a multi-stage goal
 typedef struct SubGoal {
-    char display_text[192]; // e.g., "Awaiting thunder"
-    SubGoalType type;         // What kind of trigger to check for
-    char root_name[192];      // The target, e.g., "minecraft:trident" or "minecraft:adventure/very_very_frightening"
-    int required_progress;    // The value to reach, e.g., 1
+    char display_text[192];    // e.g., "Awaiting thunder"
+    SubGoalType type;          // What kind of trigger to check for
+    char root_name[192];       // The target, e.g., "minecraft:trident" or "minecraft:adventure/very_very_frightening"
+    int required_progress;     // The value to reach, e.g., 1
+    int current_stat_progress; // Current value of stat within multi-stage goal
 } SubGoal;
 
 // Represents a complete multi-stage goal
