@@ -11,15 +11,15 @@
     "minecraft:mines/all_special_mines_completed": {
       "icon": "items/beacon.png",
       "criteria": {
-        "minecraft:wither_boss": "",
-        "minecraft:kuiper_belt": "",
-        "minecraft:raid": "",
-        "minecraft:spooky_scary_skeletons_boss": "",
-        "minecraft:ender_dragon_boss": "",
-        "minecraft:small_but_deadly_boss": "",
-        "minecraft:angry_ghast_boss": "",
-        "minecraft:warden_boss": "",
-        "minecraft:enderman_boss": ""
+        "minecraft:wither_boss": {"icon": "items/wither_spawn_egg.png"},
+        "minecraft:kuiper_belt": {"icon": "items/polar_bear_spawn_egg.png"},
+        "minecraft:raid": {"icon": "items/pillager_spawn_egg.png"},
+        "minecraft:spooky_scary_skeletons_boss": {"icon": "items/skeleton_spawn_egg.png"},
+        "minecraft:ender_dragon_boss": {"icon": "items/dragon_egg.png"},
+        "minecraft:small_but_deadly_boss": {"icon": "items/silverfish_spawn_egg.png"},
+        "minecraft:angry_ghast_boss": {"icon": "items/ghast_spawn_egg.png"},
+        "minecraft:warden_boss": {"icon": "items/warden_spawn_egg.png"},
+        "minecraft:enderman_boss": {"icon": "items/enderman_spawn_egg.png"}
       }
     },
     "minecraft:recipes/misc/charcoal": {

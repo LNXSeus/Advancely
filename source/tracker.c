@@ -79,21 +79,47 @@ static void parse_trackable_categories(cJSON *category_json, cJSON *lang_json, s
             cJSON *criteria_obj = cJSON_GetObjectItem(cat_json, "criteria");
             if (criteria_obj) {
                 cJSON *crit_item = NULL;
-                cJSON_ArrayForEach(crit_item, criteria_obj) { new_cat->criteria_count++; }
-                // count the number of criteria
+                for (crit_item = criteria_obj->child; crit_item != NULL; crit_item = crit_item->next) {
+                    new_cat->criteria_count++;
+                }
 
+                // count the number of criteria
                 if (new_cat->criteria_count > 0) {
                     // if there are criteria
                     new_cat->criteria = calloc(new_cat->criteria_count, sizeof(TrackableItem *));
                     t->template_data->total_criteria_count += new_cat->criteria_count; // add to total criteria count
                     int k = 0;
-                    cJSON_ArrayForEach(crit_item, criteria_obj) {
+                    for (crit_item = criteria_obj->child; crit_item != NULL; crit_item = crit_item->next) {
                         // for each criterion
                         TrackableItem *new_crit = calloc(1, sizeof(TrackableItem));
                         if (new_crit) {
                             strncpy(new_crit->root_name, crit_item->string, sizeof(new_crit->root_name) - 1);
-                            // TODO: Add logic here to get criterion display names/icons if needed
-                            strncpy(new_crit->display_name, crit_item->string, sizeof(new_crit->display_name) - 1);
+
+                            // Parse the icon from the criterion's value object
+                            if (cJSON_IsObject(crit_item)) {
+                                cJSON *icon = cJSON_GetObjectItem(crit_item, "icon");
+                                if (cJSON_IsString(icon)) {
+                                    strncpy(new_crit->icon_path, icon->valuestring, sizeof(new_crit->icon_path) - 1);
+                                }
+                            }
+
+                            // Look up the criterion's display name from the lang files
+                            char crit_lang_key[256] = {0};
+
+                            snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", lang_key,
+                                     new_crit->root_name);
+
+                            // Get the criterion's display name from the language file
+                            cJSON *lang_entry = cJSON_GetObjectItem(lang_json, crit_lang_key);
+                            if (cJSON_IsString(lang_entry)) {
+                                strncpy(new_crit->display_name, lang_entry->valuestring,
+                                        sizeof(new_crit->display_name) - 1);
+                            } else {
+                                // Fallback to the root_name if no translation is found
+                                strncpy(new_crit->display_name, new_crit->root_name,
+                                        sizeof(new_crit->display_name) - 1);
+                            }
+
                             new_cat->criteria[k++] = new_crit; // Add the new criterion to the criteria array
                         }
                     }
@@ -935,7 +961,8 @@ void tracker_print_debug_status(struct Tracker *t) {
                adv->done ? "COMPLETED" : "INCOMPLETE");
         for (int j = 0; j < adv->criteria_count; j++) {
             TrackableItem *crit = adv->criteria[j];
-            printf("    - %s: %s\n", crit->display_name, crit->done ? "Done" : "Not Done");
+            // takes translation from the language file otherwise root_name
+            printf("    - %s: %s\n", crit->display_name, crit->done ? "DONE" : "NOT DONE");
         }
     }
 
@@ -969,10 +996,10 @@ void tracker_print_debug_status(struct Tracker *t) {
             // Check if the active stage is a stat and print its progress
             if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress > 0) {
                 printf("[Multi-Stage Goal] %s: %s (%d/%d)\n",
-                    goal->display_name,
-                    active_stage->display_text,
-                    active_stage->current_stat_progress,
-                    active_stage->required_progress);
+                       goal->display_name,
+                       active_stage->display_text,
+                       active_stage->current_stat_progress,
+                       active_stage->required_progress);
             } else {
                 // If it's not "stat" print this
                 printf("[Multi-Stage Goal] %s: %s\n", goal->display_name, active_stage->display_text);
@@ -982,7 +1009,7 @@ void tracker_print_debug_status(struct Tracker *t) {
 
     // Advancement Progress AGAIN
     printf("\n[Advancements] %d / %d completed\n", t->template_data->advancements_completed_count,
-       t->template_data->advancement_count);
+           t->template_data->advancement_count);
     // Overall Progress
     printf("[Overall Progress] %.2f%%\n", t->template_data->overall_progress_percentage);
     printf("----------------------------\n\n");
