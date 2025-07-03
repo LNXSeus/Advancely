@@ -6,5 +6,9 @@
   "optional_flag": "_test2",
   "custom_progress": {
     "custom:unbreaking_3_book": false
+  },
+  "stat_progress_override": {
+    "minecraft:mined/minecraft:oak_log": false,
+    "minecraft:mined/minecraft:acacia_log": true
   }
 }
