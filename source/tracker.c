@@ -14,7 +14,7 @@
 // HELPER FUNCTION FOR PARSING
 
 /**
- * @brief Parses advancement categories and their criteria from the template.
+ * @brief Parses advancement categories and their criteria from the template, supporting modded advancements.
  */
 static void parse_trackable_categories(cJSON *category_json, cJSON *lang_json, struct Tracker *t) {
     if (!category_json) {
@@ -52,18 +52,29 @@ static void parse_trackable_categories(cJSON *category_json, cJSON *lang_json, s
             // TODO: Placeholder for getting display name and icon
             strncpy(new_cat->display_name, new_cat->root_name, sizeof(new_cat->display_name) - 1);
 
-            // Build the language key from the root_name, e.g., "minecraft:story/smelt_iron" -> "advancements.story.smelt_iron"
+            // Build the language key from the root_name, e.g., "conquest:story/smelt_iron" -> "advancement.conquest.story.smelt_iron"
             char lang_key[256] = {0};
-            const char *prefix = "minecraft:";
-            if (strncmp(new_cat->root_name, prefix, strlen(prefix)) == 0) {
-                snprintf(lang_key, sizeof(lang_key), "advancements.%s", new_cat->root_name + strlen(prefix));
-                for (char *p = lang_key; *p; ++p) {
-                    if (*p == '/') {
-                        *p = '.';
-                    }
-                }
+            char temp_root_name[192];
+            strncpy(temp_root_name, new_cat->root_name, sizeof(temp_root_name) - 1);
+
+            char *path_part = strchr(temp_root_name, ':');
+            if (path_part) {
+                // Found a namespace, replace ':' with '.'
+                *path_part = '.';
+                path_part++;
             } else {
-                strncpy(lang_key, new_cat->root_name, sizeof(lang_key) - 1);
+                // No namespace found, treat the whole thing as a path
+                path_part = temp_root_name;
+            }
+
+            // Construct the full key
+            snprintf(lang_key, sizeof(lang_key), "advancement.%s", temp_root_name);
+
+            // replace all slashes in the path with dots
+            for (char *p = lang_key; *p; p++) {
+                if (*p == '/') {
+                    *p = '.';
+                }
             }
 
             cJSON *lang_entry = cJSON_GetObjectItem(lang_json, lang_key);
@@ -129,6 +140,91 @@ static void parse_trackable_categories(cJSON *category_json, cJSON *lang_json, s
         }
         cat_json = cat_json->next; // Move to the next category
     }
+}
+
+/**
+ * @brief Detects criteria that are shared across multiple advancements and flags them.
+ *
+ * This function iterates through all parsed advancements and their criteria to identify
+ * criteria that have the same root_name. If a criterion is found in more than one
+ * advancement, its 'is_shared' flag is set to true. This allows the rendering
+ * logic to visually distinguish them, for example, by overlaying the parent
+ * advancement's icon.
+ *
+ * @param t A pointer to the Tracker struct containing the template_data.
+ */
+static void tracker_detect_shared_criteria(struct Tracker *t) {
+    if (!t || !t->template_data || t->template_data->advancement_count == 0) {
+        printf("[TRACKER] tracker_detect_shared_criteria: t or t->template_data is NULL\n");
+        return;
+    }
+
+    // A temporary structure to hold counts of each criterion
+    typedef struct {
+        char root_name[192];
+        int count;
+    } CriterionCounter;
+
+    // Use a dynamic array to store the counters
+    int capacity = t->template_data->total_criteria_count;
+    if (capacity == 0) return; // No criteria to check
+
+    CriterionCounter *counts = malloc(capacity * sizeof(CriterionCounter));
+    if (!counts) {
+        fprintf(stderr, "[TRACKER] Failed to allocate memory for criterion counters.\n");
+        return;
+    }
+    int unique_criteria_count = 0;
+
+    // Count all criteria occurences
+    for (int i = 0; i < t->template_data->advancement_count; i++) {
+        TrackableCategory *adv = t->template_data->advancements[i];
+        for (int j = 0; j < adv->criteria_count; j++) {
+            TrackableItem *crit = adv->criteria[j];
+            bool found = false;
+
+            // Check if we've already counted this criterion name
+            for (int k = 0; k < unique_criteria_count; k++) {
+                // compare current root_name with all other root_names
+                if (strcmp(counts[k].root_name, crit->root_name) == 0) {
+                    counts[k].count++;
+                    found = true;
+                    break;
+                }
+            }
+
+            // If not found, add it as a new entry
+            if (!found) {
+                strncpy(counts[unique_criteria_count].root_name, crit->root_name, 191);
+                counts[unique_criteria_count].count = 1;
+                unique_criteria_count++;
+            }
+        }
+    }
+
+    // Flag the shared criteria is_shared flag
+    for (int i = 0; i < t->template_data->advancement_count; i++) {
+        // Loop through advancements
+        TrackableCategory *adv = t->template_data->advancements[i];
+        for (int j = 0; j < adv->criteria_count; j++) {
+            // Loop through criteria
+            TrackableItem *crit = adv->criteria[j];
+
+            // Find our criterion in the counters
+            for (int k = 0; k < unique_criteria_count; k++) {
+                if (strcmp(counts[k].root_name, crit->root_name) == 0) {
+                    if (counts[k].count > 1) {
+                        crit->is_shared = true; // Set the is_shared flag
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    // Clean up the temporary counter
+    free(counts);
+    counts = NULL;
+    printf("[TRACKER] Shared criteria detection complete.\n");
 }
 
 /**
@@ -235,14 +331,27 @@ static void parse_multi_stage_goals(cJSON *goals_json, cJSON *lang_json, MultiSt
         MultiStageGoal *new_goal = calloc(1, sizeof(MultiStageGoal));
         if (!new_goal) continue;
 
-        // Parse parent goal properties
-        cJSON *display_name = cJSON_GetObjectItem(goal_item_json, "display_name");
+        // Parse root_name and icon
+        cJSON *root_name = cJSON_GetObjectItem(goal_item_json, "root_name");
         cJSON *icon = cJSON_GetObjectItem(goal_item_json, "icon");
 
-        if (cJSON_IsString(display_name))
-            strncpy(new_goal->display_name, display_name->valuestring,
-                    sizeof(new_goal->display_name) - 1);
+        if (cJSON_IsString(root_name))
+            strncpy(new_goal->root_name, root_name->valuestring,
+                    sizeof(new_goal->root_name) - 1);
         if (cJSON_IsString(icon)) strncpy(new_goal->icon_path, icon->valuestring, sizeof(new_goal->icon_path) - 1);
+
+
+        // Look up display name from lang file
+        char goal_lang_key[256];
+        snprintf(goal_lang_key, sizeof(goal_lang_key), "multi_stage_goal.%s.display_name", new_goal->root_name);
+        cJSON *goal_lang_entry = cJSON_GetObjectItem(lang_json, goal_lang_key);
+
+        // If the display name is not found in the lang file, use the root name
+        if (cJSON_IsString(goal_lang_entry)) {
+            strncpy(new_goal->display_name, goal_lang_entry->valuestring, sizeof(new_goal->display_name) - 1);
+        } else {
+            strncpy(new_goal->display_name, new_goal->root_name, sizeof(new_goal->display_name) - 1);
+        }
 
         // Parse stages
         cJSON *stages_json = cJSON_GetObjectItem(goal_item_json, "stages");
@@ -261,7 +370,9 @@ static void parse_multi_stage_goals(cJSON *goals_json, cJSON *lang_json, MultiSt
                 SubGoal *new_stage = calloc(1, sizeof(SubGoal));
                 if (!new_stage) continue;
 
+                // parse stage_id and other properties
                 cJSON *text = cJSON_GetObjectItem(stage_item_json, "display_text");
+                cJSON *stage_id = cJSON_GetObjectItem(stage_item_json, "stage_id");
                 cJSON *type = cJSON_GetObjectItem(stage_item_json, "type");
                 cJSON *root = cJSON_GetObjectItem(stage_item_json, "root_name");
                 cJSON *goal_val = cJSON_GetObjectItem(stage_item_json, "goal");
@@ -269,10 +380,29 @@ static void parse_multi_stage_goals(cJSON *goals_json, cJSON *lang_json, MultiSt
                 if (cJSON_IsString(text))
                     strncpy(new_stage->display_text, text->valuestring,
                             sizeof(new_stage->display_text) - 1);
+                if (cJSON_IsString(stage_id)) strncpy(new_stage->stage_id, stage_id->valuestring,
+                                                      sizeof(new_stage->stage_id) - 1);
                 if (cJSON_IsString(root))
                     strncpy(new_stage->root_name, root->valuestring,
                             sizeof(new_stage->root_name) - 1);
                 if (cJSON_IsNumber(goal_val)) new_stage->required_progress = goal_val->valueint; // This is a number
+
+
+                // Look up stage display name from lang file
+                char stage_lang_key[256];
+                snprintf(stage_lang_key, sizeof(stage_lang_key), "multi_stage_goal.%s.stage.%s", new_goal->root_name,
+                         new_stage->stage_id);
+                cJSON *stage_lang_entry = cJSON_GetObjectItem(lang_json, stage_lang_key);
+                // take stage key and search in lang file
+
+                // If the display name is not found in the lang file, use the stage ID
+                if (cJSON_IsString(stage_lang_entry)) {
+                    strncpy(new_stage->display_text, stage_lang_entry->valuestring,
+                            sizeof(new_stage->display_text) - 1);
+                } else {
+                    strncpy(new_stage->display_text, new_stage->stage_id,
+                            sizeof(new_stage->display_text) - 1); // Fallback
+                }
 
                 // Parse type
                 if (cJSON_IsString(type)) {
@@ -375,11 +505,12 @@ static void tracker_update_unlock_progress(struct Tracker *t, const cJSON *playe
 
 
 /**
- * @brief Updates stat progress from a pre-loaded cJSON object.
+ * @brief Updates stat progress from a pre-loaded cJSON object. Supports modded stats. No hardcoded "minecraft:".
  * @param t A pointer to the Tracker struct.
  * @param player_stats_json The parsed player stats JSON file.
  */
-static void tracker_update_stat_progress(struct Tracker *t, const cJSON *player_stats_json) {
+static void tracker_update_stat_progress(struct Tracker *t, const cJSON *player_stats_json,
+                                         const cJSON *settings_json) {
     if (!player_stats_json) return;
 
     // printf("[TRACKER] Reading player stats from: %s\n", t->stats_path);
@@ -391,42 +522,56 @@ static void tracker_update_stat_progress(struct Tracker *t, const cJSON *player_
         return;
     }
 
+    // MANUAL OVERRIDE FOR STATS GOAL
+    cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : NULL;
+
     for (int i = 0; i < t->template_data->stat_count; i++) {
         TrackableItem *stat = t->template_data->stats[i];
-        stat->progress = 0; // Default to 0
 
-        // The root_name is in the format "category:key", e.g., "custom:jump"
-        // The player stats file uses "minecraft:category" and "minecraft:key"
-        // Prepending "minecraft:" to both parts
+        stat->progress = 0; // Default to 0
+        stat->is_manually_completed = false;
+
+        // The root_name is now in the format "full:category/full:item", e.g., "minecraft:mined/minecraft:dirt"
         char root_name_copy[192];
         strncpy(root_name_copy, stat->root_name, sizeof(root_name_copy) - 1);
         root_name_copy[sizeof(root_name_copy) - 1] = '\0'; // Ensure null termination
 
-        char *item_str = strchr(root_name_copy, ':');
-        if (item_str) {
-            *item_str = '\0'; // Split the string by placing a null terminator
-            item_str++; // Move pointer to the start of the key
+        // Find the separator '/' to distinguish category and item
 
-            char *category_str = root_name_copy;
+        char *item_key = strchr(root_name_copy, '/');
+        if (item_key) {
+            *item_key = '\0'; // Split the string with null terminator
+            item_key++; // Move pointer to the start of the item key
 
-            char full_category_key[256];
-            snprintf(full_category_key, sizeof(full_category_key), "minecraft:%s", category_str);
+            char *category_key = root_name_copy;
 
-            cJSON *category_obj = cJSON_GetObjectItem(stats_obj, full_category_key);
+            // Look up the category (e.g., "minecraft:mined")
+            cJSON *category_obj = cJSON_GetObjectItem(stats_obj, category_key);
             if (category_obj) {
-                char full_stat_key[256];
-                snprintf(full_stat_key, sizeof(full_stat_key), "minecraft:%s", item_str);
+                // Look up the item within that category (e.g., "minecraft:dirt")
 
                 // Check if the stat exists in the category
-                cJSON *stat_value = cJSON_GetObjectItem(category_obj, full_stat_key);
+                cJSON *stat_value = cJSON_GetObjectItem(category_obj, item_key);
                 if (cJSON_IsNumber(stat_value)) {
                     stat->progress = stat_value->valueint;
                 }
             }
         }
 
-        // Check if the goal has been met and update the 'done' flag
-        stat->done = (stat->goal > 0 && stat->progress >= stat->goal);
+        if (override_obj) {
+            cJSON *override_status = cJSON_GetObjectItem(override_obj, stat->root_name);
+            if (cJSON_IsBool(override_status)) {
+                if (cJSON_IsTrue(override_status)) {
+                    stat->done = true;
+                    stat->is_manually_completed = true;
+                }
+            }
+        }
+
+        // If not manually completed, determine 'done' status by progress
+        if (!stat->is_manually_completed) {
+            stat->done = (stat->goal > 0 && stat->progress >= stat->goal);
+        }
     }
 }
 
@@ -505,49 +650,27 @@ static void tracker_update_multi_stage_progress(struct Tracker *t, const cJSON *
 
                 case SUBGOAL_STAT:
                     if (stats_obj) {
-                        // Handle shortend stat format e.g., "custom:jump"
+                        // Handle format "full:category/full:item"
                         char root_name_copy[192];
                         strncpy(root_name_copy, stage_to_check->root_name, sizeof(root_name_copy) - 1);
                         root_name_copy[sizeof(root_name_copy) - 1] = '\0'; // Ensure null termination
 
-                        char *item_str = strchr(root_name_copy, ':'); // Find the first colon
-                        if (item_str) {
-                            *item_str = '\0';
-                            item_str++;
-                            char *category_str = root_name_copy;
+                        char *item_key = strchr(root_name_copy, '/');
+                        if (item_key) {
+                            *item_key = '\0'; // Split the string
+                            item_key++;
+                            char *category_key = root_name_copy;
 
-                            // Construct the full JSON keys used in the stats file
-                            char full_category_key[256];
-                            snprintf(full_category_key, sizeof(full_category_key), "minecraft:%s", category_str);
-
-                            printf("[MULTISTAGE DEBUG] Checking stat: category_key=[%s]\n", full_category_key);
-                            cJSON *category_obj = cJSON_GetObjectItem(stats_obj, full_category_key);
-
+                            // Check if the category exists
+                            cJSON *category_obj = cJSON_GetObjectItem(stats_obj, category_key);
                             if (category_obj) {
-                                printf("[MULTISTAGE DEBUG] Found category object: %s\n", full_category_key);
-                                char full_item_key[256];
-                                snprintf(full_item_key, sizeof(full_item_key), "minecraft:%s", item_str);
-
-                                printf("[MULTISTAGE DEBUG] Checking item_key=[%s]\n", full_item_key);
-                                cJSON *stat_value = cJSON_GetObjectItem(category_obj, full_item_key);
-
-                                // Check if the stat value is greater than or equal to the required progress
+                                cJSON *stat_value = cJSON_GetObjectItem(category_obj, item_key);
                                 if (cJSON_IsNumber(stat_value)) {
-                                    // store the current progress of this stat
                                     stage_to_check->current_stat_progress = stat_value->valueint;
-                                    printf("[MULTISTAGE DEBUG] Found stat value: %d\n", stat_value->valueint);
-
-                                    // Check if the stat value is greater than or equal to the stat progress
                                     if (stage_to_check->current_stat_progress >= stage_to_check->required_progress) {
                                         stage_completed = true;
-                                        printf("[MULTISTAGE DEBUG] Stage completed!\n");
                                     }
-                                } else {
-                                    printf("[MULTISTAGE DEBUG] Stat value not found or not a number for key: %s\n",
-                                           full_item_key);
                                 }
-                            } else {
-                                printf("[MULTISTAGE DEBUG] Category object not found for key: %s\n", full_category_key);
                             }
                         }
                     }
@@ -730,7 +853,7 @@ void tracker_update(struct Tracker *t, float *deltaTime) {
     // Pass the parsed data to the update functions
     tracker_update_advancement_progress(t, player_adv_json);
     tracker_update_unlock_progress(t, player_unlocks_json);
-    tracker_update_stat_progress(t, player_stats_json);
+    tracker_update_stat_progress(t, player_stats_json, settings_json);
     tracker_update_custom_progress(t, settings_json);
     tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json);
 
@@ -751,17 +874,25 @@ void tracker_render(struct Tracker *t) {
                            TRACKER_BACKGROUND_COLOR.b, TRACKER_BACKGROUND_COLOR.a);
     SDL_RenderClear(t->renderer);
 
-    // --- NEW: Placeholder for rendering advancements ---
-    // In the next step, we will iterate through t->advancements here and draw them.
-    // For example:
-    // for (int i = 0; i < t->advancement_count; ++i) {
-    //     Advancement* adv = t->advancements[i];
-    //     // ... draw icon and text ...
-    //     if (adv->done) {
-    //         // ... draw a checkmark or change color ...
+    // TODO: Draw the advancement icons
+    // ... inside your loop for drawing advancements ...
+    // for (int i = 0; i < t->template_data->advancement_count; ++i) {
+    //     TrackableCategory* adv = t->template_data->advancements[i];
+    //
+    //     // ... loop through criteria to draw them ...
+    //     for (int j = 0; j < adv->criteria_count; ++j) {
+    //         TrackableItem* crit = adv->criteria[j];
+    //
+    //         // 1. Draw the criterion's own icon (e.g., from crit->texture)
+    //
+    //         // 2. Check the flag
+    //         if (crit->is_shared) {
+    //             // If it's a shared criterion, also draw the parent
+    //             // advancement's icon (e.g., from adv->texture)
+    //             // as an overlay or next to the criterion's icon.
+    //         }
     //     }
     // }
-
     // Drawing happens here
 
     // present backbuffer
@@ -850,6 +981,9 @@ void tracker_load_and_parse_data(struct Tracker *t) {
                             &t->template_data->custom_goal_count); // Update progress from player files
     parse_multi_stage_goals(multi_stage_goals_json, t->template_data->lang_json, &t->template_data->multi_stage_goals,
                             &t->template_data->multi_stage_goal_count);
+
+    // Detect and flag criteria that are shared between multiple advancements
+    tracker_detect_shared_criteria(t);
 
     printf("[TRACKER] Initial template parsing complete.\n");
 
@@ -962,7 +1096,9 @@ void tracker_print_debug_status(struct Tracker *t) {
         for (int j = 0; j < adv->criteria_count; j++) {
             TrackableItem *crit = adv->criteria[j];
             // takes translation from the language file otherwise root_name
-            printf("    - %s: %s\n", crit->display_name, crit->done ? "DONE" : "NOT DONE");
+            // Print if criteria is shared
+            printf("    - %s: %s%s\n", crit->display_name, crit->is_shared ? "SHARED - " : "",
+                   crit->done ? "DONE" : "NOT DONE");
         }
     }
 

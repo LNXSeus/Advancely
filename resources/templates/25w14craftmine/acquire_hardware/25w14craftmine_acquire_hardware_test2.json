@@ -22,6 +22,18 @@
         "minecraft:enderman_boss": {"icon": "items/enderman_spawn_egg.png"}
       }
     },
+    "minecraft:feats/wither": {
+      "icon": "items/wither_spawn_egg.png",
+      "criteria": {
+        "completed_event": {"icon": "items/wither_skeleton_skull.png"}
+      }
+    },
+    "minecraft:feats/kuiper_world": {
+      "icon": "items/snow_block.png",
+      "criteria": {
+        "completed_event": {"icon": "items/snowball.png"}
+      }
+    },
     "minecraft:recipes/misc/charcoal": {
       "icon": "items/charcoal.png",
       "criteria": {}
@@ -29,9 +41,14 @@
   },
   "stats": [
     {
-      "root_name": "mined:oak_log",
+      "root_name": "minecraft:mined/minecraft:oak_log",
       "target": 4,
       "icon": "items/oak_log.png"
+    },
+    {
+      "root_name": "minecraft:mined/minecraft:acacia_log",
+      "target": -1,
+      "icon": "items/acacia_log.png"
     }
   ],
   "unlocks": [
@@ -52,29 +69,29 @@
   ],
   "multi_stage_goals": [
     {
-      "display_name": "Getting started",
+      "root_name": "ms_goal:getting_started",
       "icon": "items/dirt.png",
       "stages": [
         {
-          "display_text": "Mine 8 Dirt",
+          "stage_id": "0",
           "type": "stat",
-          "root_name": "mined:dirt",
+          "root_name": "minecraft:mined/minecraft:dirt",
           "goal": 8
         },
         {
-          "display_text": "Get Iron Armor",
+          "stage_id": "1",
           "type": "advancement",
           "root_name": "minecraft:story/obtain_armor",
           "goal": 1
         },
         {
-          "display_text": "Collect 4 Sand",
+          "stage_id": "2",
           "type": "stat",
-          "root_name": "picked_up:sand",
+          "root_name": "minecraft:picked_up/minecraft:sand",
           "goal": 4
         },
         {
-          "display_text": "Done",
+          "stage_id": "final",
           "type": "final",
           "root_name": "",
           "goal": 0

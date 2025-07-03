@@ -14,14 +14,18 @@
 
 // A generic struct for a sub-item, like and advancement's criterion or a stat
 typedef struct TrackableItem {
-    char root_name[192];    // The unique ID, e.g., "minecraft:husbandry/balanced_diet"
+    char root_name[192]; // The unique ID, e.g., "minecraft:husbandry/balanced_diet"
     char display_name[192]; // The user-facing name, e.g., "A Balanced Diet"
-    char icon_path[256];    // Relative path to the icon, e.g., "items/apple.png"
-    SDL_Texture *texture;   // The loaded texture for the icon.
+    char icon_path[256]; // Relative path to the icon, e.g., "items/apple.png"
+    SDL_Texture *texture; // The loaded texture for the icon.
 
-    bool done;              // For advancements/unlocks: Is it completed?
-    int progress;           // For stats: The current value, e.g., 5.
-    int goal;               // For stats: The target value, e.g., 40.
+    bool done; // For advancements/unlocks: Is it completed?
+    int progress; // For stats: The current value, e.g., 5.
+    int goal; // For stats: The target value, e.g., 40.
+
+    // Flag to allow "conflicting" criteria to overlay parent advancements icon (e.g., hoglin), init with false, cause of calloc
+    bool is_shared;
+    bool is_manually_completed; // For manual stat override
 } TrackableItem;
 
 
@@ -56,22 +60,24 @@ typedef enum {
 
 // Represents one step in a multi-stage goal
 typedef struct SubGoal {
-    char display_text[192];    // e.g., "Awaiting thunder"
-    SubGoalType type;          // What kind of trigger to check for
-    char root_name[192];       // The target, e.g., "minecraft:trident" or "minecraft:adventure/very_very_frightening"
-    int required_progress;     // The value to reach, e.g., 1
+    char stage_id[64]; // Unique ID for every stage e.g., "0", "1", "final_stage"
+    char display_text[192]; // e.g., "Awaiting thunder"
+    SubGoalType type; // What kind of trigger to check for
+    char root_name[192]; // The target, e.g., "minecraft:trident" or "minecraft:adventure/very_very_frightening"
+    int required_progress; // The value to reach, e.g., 1
     int current_stat_progress; // Current value of stat within multi-stage goal
 } SubGoal;
 
 // Represents a complete multi-stage goal
 typedef struct MultiStageGoal {
+    char root_name[192]; // Unique ID for every multi-stage goal e.g., "ms_goal:getting_started"
     char display_name[192]; // The overall name, e.g., "Thunder advancements"
-    char icon_path[256];    // The icon for the entire goal
-    SDL_Texture *texture;   // The loaded icon texture
+    char icon_path[256]; // The icon for the entire goal
+    SDL_Texture *texture; // The loaded icon texture
 
-    int current_stage;      // Index of the currently active sub-goal
-    int stage_count;        // How many stages there are
-    SubGoal **stages;       // An array of the sub-goals
+    int current_stage; // Index of the currently active sub-goal
+    int stage_count; // How many stages there are
+    SubGoal **stages; // An array of the sub-goals
 } MultiStageGoal;
 
 // The main container for all data loaded from the template files.
@@ -80,7 +86,7 @@ typedef struct TemplateData {
     int advancements_completed_count;
     TrackableCategory **advancements;
 
-    int stat_count;
+    int stat_count; // Number of stat goals
     TrackableItem **stats;
 
     int unlock_count; // Number of unlocks
@@ -97,7 +103,8 @@ typedef struct TemplateData {
     // Overall Progress Metrics
     int total_criteria_count;
     int completed_criteria_count;
-    float overall_progress_percentage; // Percentage score of everything BUT ADVANCEMENTS (have their own advancements_completed_count)
+    float overall_progress_percentage;
+    // Percentage score of everything BUT ADVANCEMENTS (have their own advancements_completed_count)
 
     cJSON *lang_json; // The loaded language file for display names
 } TemplateData;
