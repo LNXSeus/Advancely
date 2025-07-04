@@ -5,10 +5,18 @@
   "category": "acquire_hardware",
   "optional_flag": "_test2",
   "custom_progress": {
-    "custom:unbreaking_3_book": false
+    "custom:unbreaking_3_book": false,
+    "custom:deepslate_emerald_count": 0
   },
   "stat_progress_override": {
     "minecraft:mined/minecraft:oak_log": false,
     "minecraft:mined/minecraft:acacia_log": true
-  }
+  },
+  "hotkeys": [
+    {
+      "target_goal": "custom:deepslate_emerald_count",
+      "increment_key": "PageUp",
+      "decrement_key": "PageDown"
+    }
+  ]
 }

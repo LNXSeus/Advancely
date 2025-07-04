@@ -27,6 +27,14 @@ struct Tracker {
     char stats_path[MAX_PATH_LENGTH];
 };
 
+
+/**
+ * @brief Saves the current progress of all custom goals to settings.json.
+ * @param td A pointer to the Tracker's template data.
+ */
+void settings_save_custom_progress(TemplateData *td);
+
+
 /**
  * @brief Initializes a new Tracker instance.
  *

@@ -65,6 +65,11 @@
     {
       "root_name": "custom:unbreaking_3_book",
       "icon": "items/enchanted_book.png"
+    },
+    {
+      "root_name": "custom:deepslate_emerald_count",
+      "icon": "items/deepslate_emerald_ore.png",
+      "target": 5
     }
   ],
   "multi_stage_goals": [
@@ -76,25 +81,25 @@
           "stage_id": "0",
           "type": "stat",
           "root_name": "minecraft:mined/minecraft:dirt",
-          "goal": 8
+          "target": 8
         },
         {
           "stage_id": "1",
           "type": "advancement",
           "root_name": "minecraft:story/obtain_armor",
-          "goal": 1
+          "target": 1
         },
         {
           "stage_id": "2",
           "type": "stat",
           "root_name": "minecraft:picked_up/minecraft:sand",
-          "goal": 4
+          "target": 4
         },
         {
           "stage_id": "final",
           "type": "final",
           "root_name": "",
-          "goal": 0
+          "target": 0
         }
       ]
     }
