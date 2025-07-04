@@ -14,9 +14,9 @@
 
 * **Comprehensive Tracking**: Advancely isn't limited to just advancements. It tracks multiple data types directly from your save file, including:
 
-    * **Advancements**: Tracks completion status and individual criteria.
+    * **Advancements/Recipes**: Tracks completion status and individual criteria as well as recipes.
     * **Statistics**: Monitors any game statistic, such as blocks mined or distance flown, against a target value.
-    * **Recipes & Unlocks**: Can track recipe unlocks for any game version, including the unique format from snapshot 25w14craftmine.
+    * **Unlocks**: Allows you to fully track unlocks, which is exclusive to the 25w14craftmine snapshot.
 
 * **Full Mod & Datapack Support**: The tracker is designed to be data-driven. It correctly parses items, stats, and advancements from any mod or data pack (e.g., `conquest:`, `blazeandcave:`) without being limited to the vanilla `minecraft:` namespace.
 
