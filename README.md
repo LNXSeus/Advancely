@@ -1,8 +1,14 @@
 ![Advancely Logo](/resources/gui/Advancely_Logo.png)
 
-A highly customizable tool to track Minecraft progress beyond just Advancements. <br>
-This tracker supports modded advancements/recipes, custom statistics, has multi-stage goals, and custom counters. <br>
-This tracker is built to be flexible, supporting everything from vanilla to heavily modded unique data packs. It automatically detects changes in your latest world save file, providing real-time progress updates.
+# A highly customizable tool to track Minecraft progress beyond just Advancements. <br>
+## This tracker supports modded advancements/recipes, custom statistics, has multi-stage goals, and custom counters. <br>
+### This tracker is built to be flexible, supporting everything from vanilla to heavily modded unique data packs. It automatically detects changes in your latest world save file, providing real-time progress updates.
+
+## Download (Windows, Linux, MacOS)
+
+[**Advancely Releases**](https://github.com/LNXSeus/Advancely/releases)
+
+[My YouTube](https://www.youtube.com/@lnxs?sub_confirmation=1)
 
 ## Core Features
 
@@ -32,13 +38,6 @@ Simply create a `.json` template file and a corresponding `_lang.json` language 
 1.  **Download**: Grab the latest release from the releases page (supports Windows, Linux, and MacOS).
 2.  **Configure**: Open `settings.json` to select your Minecraft version, category, and save path detection mode (`auto` or `manual`). You can also configure hotkeys here.
 3.  **Run**: Launch Advancely and play Minecraft. The tracker will automatically find your most recent world and display your progress in real time.
-
-
-### Download (Windows, Linux, MacOS)
-
-[**Advancely Releases**](https://github.com/LNXSeus/Advancely/releases)
-
-[My YouTube](https://www.youtube.com/@lnxs?sub_confirmation=1)
 
 ### Licenses
 
