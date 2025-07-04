@@ -22,9 +22,7 @@
 
 * **Multi-Stage Goals**: Create long-term objectives that combine several smaller steps. A single goal can require you to first achieve an advancement, then reach a certain statistic, then an unlock (from the 25w14craftmine) and lastly complete another advancement in sequence.
 
-* **Custom Counters with Hotkeys**: For goals that can't be automatically tracked (like counting amount of structures visited or finding specific items), you can create custom counters. Set a target value in your template and use configurable hotkeys to increment or decrement the count. List of hotkeys can be found [here](https://pastebin.com/vPKgWAen). All progress is saved automatically back into `settings.json`.
-
-* **Shared Criteria Detection**: For clarity, if a single advancement criterion (e.g., "kill a wither skeleton") is part of multiple parent advancements, the UI is designed to overlay the parent advancement's icon on that criterion. This helps you distinguish which goal you are making progress towards.
+* **Custom Counters with Hotkeys and Manual Tracking**: For goals that can't be automatically tracked (like counting amount of structures visited or finding specific items), you can create custom counters or check them off manually. Set a target value in your template and use configurable hotkeys to increment or decrement the count. List of hotkeys can be found [here](https://pastebin.com/vPKgWAen). All progress is saved automatically back into `settings.json`.
 
 ## Customization
 
