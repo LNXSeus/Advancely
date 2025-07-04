@@ -1,7 +1,7 @@
 ![Advancely Logo](/resources/gui/Advancely_Logo.png)
 
 # A highly customizable tool to track Minecraft progress beyond just Advancements. <br>
-## This tracker supports modded advancements/recipes, custom statistics, has multi-stage goals, and custom counters. <br>
+## This tracker supports modded advancements/recipes, custom statistics, unlocks, multi-stage goals, manual goals and custom counters. <br>
 ### This tracker is built to be flexible, supporting everything from vanilla to heavily modded unique data packs. It automatically detects changes in your latest world save file, providing real-time progress updates.
 
 ## Download (Windows, Linux, MacOS)
@@ -20,7 +20,7 @@
 
 * **Full Mod & Datapack Support**: The tracker is designed to be data-driven. It correctly parses items, stats, and advancements from any mod or data pack (e.g., `conquest:`, `blazeandcave:`) without being limited to the vanilla `minecraft:` namespace.
 
-* **Multi-Stage Goals**: Create long-term objectives that combine several smaller steps. A single goal can require you to first achieve an advancement, then reach a certain statistic, and then complete another advancement in sequence.
+* **Multi-Stage Goals**: Create long-term objectives that combine several smaller steps. A single goal can require you to first achieve an advancement, then reach a certain statistic, then an unlock (from the 25w14craftmine) and lastly complete another advancement in sequence.
 
 * **Custom Counters with Hotkeys**: For goals that can't be automatically tracked (like counting amount of structures visited or finding specific items), you can create custom counters. Set a target value in your template and use configurable hotkeys to increment or decrement the count. List of hotkeys can be found [here](https://pastebin.com/vPKgWAen). All progress is saved automatically back into `settings.json`.
 

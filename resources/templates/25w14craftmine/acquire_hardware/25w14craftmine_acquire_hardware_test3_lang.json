@@ -30,7 +30,8 @@
 
   "multi_stage_goal.ms_goal:getting_started.display_name": "Getting Started!",
   "multi_stage_goal.ms_goal:getting_started.stage.0": "Mine 8 Dirt",
-  "multi_stage_goal.ms_goal:getting_started.stage.1": "Get Iron Armor",
-  "multi_stage_goal.ms_goal:getting_started.stage.2": "Pick up 4 Sand",
+  "multi_stage_goal.ms_goal:getting_started.stage.1": "Unlock Starter Ender Pearl",
+  "multi_stage_goal.ms_goal:getting_started.stage.2": "Get Iron Armor",
+  "multi_stage_goal.ms_goal:getting_started.stage.3": "Pick up 4 Sand",
   "multi_stage_goal.ms_goal:getting_started.stage.final": "Done!"
 }

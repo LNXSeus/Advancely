@@ -2,8 +2,8 @@
   "path_mode": "manual",
   "manual_saves_path": "C:\Users\Linus\AppData\Roaming\PrismLauncher\instances\1.21.5\minecraft\saves",
   "version": "25w14craftmine",
-  "category": "cool",
-  "optional_flag": "_test",
+  "category": "acquire_hardware",
+  "optional_flag": "_test3",
   "custom_progress": {
     "custom:unbreaking_3_book": false,
     "custom:deepslate_emerald_count": 0
