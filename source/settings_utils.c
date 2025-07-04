@@ -7,7 +7,16 @@
 #include <stdio.h>
 #include <string.h>
 
-// TODO: should create one that opens, reads, and parses a file into a cJSON object.
+/**
+ * @brief Converts key names from JSON file (like "PageUp") into SDL scancodes that the event handler can use
+ * @param key_name
+ * @return SDL_Scancode or SDL_SCANCODE_UNKNOWN if not found
+ */
+static SDL_Scancode scancode_from_string(const char *key_name) {
+    if (!key_name || key_name[0] == '\0') return SDL_SCANCODE_UNKNOWN;
+
+    return SDL_GetScancodeFromName(key_name);
+}
 
 MC_Version settings_get_version_from_string(const char *version_str) {
     // TODO: Shorten this so it can convert the dot into underscore, prepend MC_VERSION_ and capitalize
@@ -25,6 +34,26 @@ PathMode settings_get_path_mode_from_string(const char *mode_str) {
         return PATH_MODE_MANUAL;
     }
     return PATH_MODE_AUTO; // Default to auto
+}
+
+cJSON *settings_read_full() {
+    return cJSON_from_file(SETTINGS_FILE_PATH);
+}
+
+void settings_write_full(cJSON *json_to_write) {
+    if (!json_to_write) return;
+
+    FILE *file = fopen(SETTINGS_FILE_PATH, "w");
+    if (file) {
+        char *json_str = cJSON_Print(json_to_write);
+        if (json_str) {
+            fputs(json_str, file);
+            free(json_str);
+        }
+        fclose(file);
+    } else {
+        fprintf(stderr, "[SETTINGS UTILS] Failed to open settings file for writing: %s\n", SETTINGS_FILE_PATH);
+    }
 }
 
 void settings_load(AppSettings *settings) {
@@ -70,12 +99,40 @@ void settings_load(AppSettings *settings) {
             settings->optional_flag[sizeof(settings->optional_flag) - 1] = '\0';
         }
 
+        // Parse hotkeys
+        settings->hotkey_count = 0;
+        const cJSON *hotkeys_json = cJSON_GetObjectItem(json, "hotkeys");
+        if (cJSON_IsArray(hotkeys_json)) {
+            cJSON *hotkey_item;
+
+            // Parse each hotkey
+            cJSON_ArrayForEach(hotkey_item, hotkeys_json) {
+                if (settings->hotkey_count >= MAX_HOTKEYS) break;
+
+                // Takes the string within the settings.json
+                const cJSON *target = cJSON_GetObjectItem(hotkey_item, "target_goal");
+                const cJSON *inc_key = cJSON_GetObjectItem(hotkey_item, "increment_key");
+                const cJSON *dec_key = cJSON_GetObjectItem(hotkey_item, "decrement_key");
+
+                if (cJSON_IsString(target) && cJSON_IsString(inc_key) && cJSON_IsString(dec_key)) {
+                    // Create a new hotkey binding
+                    HotkeyBinding *hb = &settings->hotkeys[settings->hotkey_count];
+                    strncpy(hb->target_goal, target->valuestring, sizeof(hb->target_goal) - 1);
+
+                    hb->increment_scancode = scancode_from_string(inc_key->valuestring);
+                    hb->decrement_scancode = scancode_from_string(dec_key->valuestring);
+
+                    settings->hotkey_count++;
+                }
+            }
+        }
+
         cJSON_Delete(json);
         json = NULL;
     }
 
     construct_template_paths(settings);
-    printf("[SETTINGS UTILS] Settings loaded successfully!\n");
+    // printf("[SETTINGS UTILS] Settings loaded successfully!\n");
 }
 
 void construct_template_paths(AppSettings *settings) {
