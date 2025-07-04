@@ -52,7 +52,7 @@ typedef struct TrackableCategory {
 typedef enum {
     SUBGOAL_STAT,
     SUBGOAL_ADVANCEMENT,
-
+    SUBGOAL_UNLOCK, // Allows to also complete a stage based on a specific unlock
     // For goals with no automatic trigger, used for final stages (displays once all previous stages are done)
     // TODO: Make subgoal_manual stages clickable in the UI, similar to custom_goals, NOT THAT IMPORTANT
     SUBGOAL_MANUAL // When it's not "stat" or "advancement"

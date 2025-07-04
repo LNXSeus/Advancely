@@ -409,6 +409,7 @@ static void parse_multi_stage_goals(cJSON *goals_json, cJSON *lang_json, MultiSt
                 if (cJSON_IsString(type)) {
                     if (strcmp(type->valuestring, "stat") == 0) new_stage->type = SUBGOAL_STAT;
                     else if (strcmp(type->valuestring, "advancement") == 0) new_stage->type = SUBGOAL_ADVANCEMENT;
+                    else if (strcmp(type->valuestring, "unlock") == 0) new_stage->type = SUBGOAL_UNLOCK;
                     else new_stage->type = SUBGOAL_MANUAL; // "final" maps to manual/unused
                 }
                 // Add the stage to the goal
@@ -615,9 +616,10 @@ static void tracker_update_custom_progress(struct Tracker *t, cJSON *settings_js
  * @param t A pointer to the Tracker struct.
  * @param player_adv_json The parsed player advancements JSON file.
  * @param player_stats_json The parsed player stats JSON file.
+ * @param player_unlocks_json The parsed player unlocks JSON file.
  */
 static void tracker_update_multi_stage_progress(struct Tracker *t, const cJSON *player_adv_json,
-                                                const cJSON *player_stats_json) {
+                                                const cJSON *player_stats_json, const cJSON *player_unlocks_json) {
     if (t->template_data->multi_stage_goal_count == 0) return;
 
     if (!player_adv_json && !player_stats_json) {
@@ -687,6 +689,16 @@ static void tracker_update_multi_stage_progress(struct Tracker *t, const cJSON *
                     }
                     break;
 
+                case SUBGOAL_UNLOCK:
+                    if (player_unlocks_json) {
+                        cJSON *obtained_obj = cJSON_GetObjectItem(player_unlocks_json, "obtained");
+                        if (obtained_obj) {
+                            cJSON *unlock_status = cJSON_GetObjectItem(obtained_obj, stage_to_check->root_name);
+                            if (cJSON_IsTrue(unlock_status)) {
+                                stage_completed = true;
+                            }
+                        }
+                    }
                 case SUBGOAL_MANUAL: // Already handled above, when string in subgoal ISN'T "stat" or "advancement"
                 default:
                     break; // Manual stages are not updated here
@@ -975,7 +987,7 @@ void tracker_update(struct Tracker *t, float *deltaTime) {
     tracker_update_unlock_progress(t, player_unlocks_json);
     tracker_update_stat_progress(t, player_stats_json, settings_json);
     tracker_update_custom_progress(t, settings_json);
-    tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json);
+    tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json, player_unlocks_json);
 
     // Calculate the final overall progress
     // Advancements themselves are seperate, but THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE

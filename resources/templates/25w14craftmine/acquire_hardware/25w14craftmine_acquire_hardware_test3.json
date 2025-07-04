@@ -85,12 +85,18 @@
         },
         {
           "stage_id": "1",
+          "type": "unlock",
+          "root_name": "minecraft:ender_pearl_starter",
+          "target": 1
+        },
+        {
+          "stage_id": "2",
           "type": "advancement",
           "root_name": "minecraft:story/obtain_armor",
           "target": 1
         },
         {
-          "stage_id": "2",
+          "stage_id": "3",
           "type": "stat",
           "root_name": "minecraft:picked_up/minecraft:sand",
           "target": 4
