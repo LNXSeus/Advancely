@@ -26,6 +26,7 @@
   "minecraft:exploration": "Exploration",
   "minecraft:ender_pearl_starter": "Starter Ender Pearl",
   "custom:unbreaking_3_book": "Obtain Unbreaking 3 Book",
+  "custom:deepslate_emerald_count": "Deepslate Emerald Count",
 
   "multi_stage_goal.ms_goal:getting_started.display_name": "Getting Started!",
   "multi_stage_goal.ms_goal:getting_started.stage.0": "Mine 8 Dirt",

@@ -126,6 +126,66 @@ int main(int argc, char *argv[]) {
             // --- Per-Frame Logic ---
 
             handle_global_events(tracker, overlay, settings, &is_running, &settings_opened, &deltaTime);
+            const Uint8 *key_state = (const Uint8 *)SDL_GetKeyboardState(NULL);
+            static Uint32 last_hotkey_time = 0; // Prevent rapid-fire counting
+
+            // HOTKEY LOGIC
+
+            if (SDL_GetTicks() - last_hotkey_time > 200) {
+                AppSettings app_settings;
+                settings_load(&app_settings); // Load settings to get current hotkey bindings, TODO: List all possible hotkeys
+                bool changed = false;
+
+                for (int i = 0; i < app_settings.hotkey_count; i++) {
+                    HotkeyBinding *hb = &app_settings.hotkeys[i];
+                    TrackableItem *target_goal = NULL;
+
+                    // Find the goal this hotkey is bound to
+                    for (int j = 0; j < tracker->template_data->custom_goal_count; j++) {
+                        if (strcmp(tracker->template_data->custom_goals[j]->root_name, hb->target_goal) == 0) {
+                            target_goal = tracker->template_data->custom_goals[j];
+                            break;
+                        }
+                    }
+                    if (!target_goal) continue;
+
+                    // Check if increment or decrement key is pressed
+                    if (key_state[hb->increment_scancode]) {
+                        target_goal->progress++;
+                        changed = true;
+                    } else if (key_state[hb->decrement_scancode]) {
+                        target_goal->progress--;
+                        changed = true;
+                    }
+                }
+
+                if (changed) {
+                    last_hotkey_time = SDL_GetTicks(); // Update timestamp
+
+                    // Use the flexible save system
+                    cJSON *settings = settings_read_full();
+                    if (settings) {
+                        cJSON *progress_obj = cJSON_GetObjectItem(settings, "custom_progress");
+                        if (!progress_obj) {
+                            // If it doesn't exist, create it
+                            progress_obj = cJSON_AddObjectToObject(settings, "custom_progress");
+                        }
+
+                        // Save all custom goals back to the object
+                        for (int i = 0; i < tracker->template_data->custom_goal_count; i++) {
+                            TrackableItem *item = tracker->template_data->custom_goals[i];
+                            if (item->goal > 0) { // Save numbers for counters
+                                cJSON_ReplaceItemInObject(progress_obj, item->root_name, cJSON_CreateNumber(item->progress));
+                            } else { // Save booleans for toggles
+                                cJSON_ReplaceItemInObject(progress_obj, item->root_name, cJSON_CreateBool(item->done));
+                            }
+                        }
+                        settings_write_full(settings);
+                        cJSON_Delete(settings);
+                    }
+                    SDL_SetAtomicInt(&g_needs_update, 1); // Trigger UI update
+                }
+            }
 
             // Close immediately if app not running
             if (!is_running) break;

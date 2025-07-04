@@ -8,9 +8,16 @@
 #include <cJSON.h>
 
 #include "path_utils.h"
-
+#include "tracker.h" // TODO: Has tracker struct for when the static functions from tracker.c are moved over here
 
 #define SETTINGS_FILE_PATH "resources/config/settings.json"
+#define MAX_HOTKEYS 16 // Limit for amount of hotkeys
+
+typedef struct {
+    char target_goal[192];
+    SDL_Scancode increment_scancode;
+    SDL_Scancode decrement_scancode;
+} HotkeyBinding;
 
 // TODO: Define versions here, go with correct subversions
 typedef enum { // Puts vaLue starting at 0, allows for comparisons
@@ -34,6 +41,10 @@ typedef struct { // names should match json keys
     // These paths are constructed from the above fields
     char template_path[MAX_PATH_LENGTH];
     char lang_path[MAX_PATH_LENGTH];
+
+    // Hotkeys
+    int hotkey_count;
+    HotkeyBinding hotkeys[MAX_HOTKEYS]; // Array of hotkey bindings
 } AppSettings;
 
 
@@ -51,6 +62,19 @@ MC_Version settings_get_version_from_string(const char *version_str);
  * @return The corresponding PathMode enum.
  */
 PathMode settings_get_path_mode_from_string(const char *mode_str);
+
+/**
+ * @brief Reads the entire settings.json file and returns it as a cJSON object.
+ * The caller is responsible for deleting the cJSON object.
+ * @return A cJSON pointer or NULL on failure.
+ */
+cJSON *settings_read_full();
+
+/**
+ * @brief Writes a cJSON object to the settings.json file, overwriting it.
+ * @param json_to_write The cJSON object to save.
+ */
+void settings_write_full(cJSON *json_to_write);
 
 /**
  * @brief Loads settings from the settings.json file.

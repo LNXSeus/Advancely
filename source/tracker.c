@@ -12,7 +12,7 @@
 #include "file_utils.h" // has the cJSON_from_file function
 
 // HELPER FUNCTION FOR PARSING
-
+// TODO: Move these static functions into tracker_utils.c (then they are not static anymore)
 /**
  * @brief Parses advancement categories and their criteria from the template, supporting modded advancements.
  */
@@ -375,7 +375,7 @@ static void parse_multi_stage_goals(cJSON *goals_json, cJSON *lang_json, MultiSt
                 cJSON *stage_id = cJSON_GetObjectItem(stage_item_json, "stage_id");
                 cJSON *type = cJSON_GetObjectItem(stage_item_json, "type");
                 cJSON *root = cJSON_GetObjectItem(stage_item_json, "root_name");
-                cJSON *goal_val = cJSON_GetObjectItem(stage_item_json, "goal");
+                cJSON *target_val = cJSON_GetObjectItem(stage_item_json, "target");
 
                 if (cJSON_IsString(text))
                     strncpy(new_stage->display_text, text->valuestring,
@@ -385,7 +385,7 @@ static void parse_multi_stage_goals(cJSON *goals_json, cJSON *lang_json, MultiSt
                 if (cJSON_IsString(root))
                     strncpy(new_stage->root_name, root->valuestring,
                             sizeof(new_stage->root_name) - 1);
-                if (cJSON_IsNumber(goal_val)) new_stage->required_progress = goal_val->valueint; // This is a number
+                if (cJSON_IsNumber(target_val)) new_stage->required_progress = target_val->valueint; // This is a number
 
 
                 // Look up stage display name from lang file
@@ -594,8 +594,18 @@ static void tracker_update_custom_progress(struct Tracker *t, cJSON *settings_js
     // Iterate through the custom goals
     for (int i = 0; i < t->template_data->custom_goal_count; i++) {
         TrackableItem *item = t->template_data->custom_goals[i];
-        cJSON *item_status = cJSON_GetObjectItem(progress_obj, item->root_name);
-        item->done = cJSON_IsTrue(item_status);
+        cJSON *item_progress_json = cJSON_GetObjectItem(progress_obj, item->root_name);
+
+        // Check if the goal in the template has a target defined
+        if (item->goal > 0) {
+            // It's a COUNTER goal
+            item->progress = cJSON_IsNumber(item_progress_json) ? item_progress_json->valueint : 0;
+            item->done = (item->progress >= item->goal);
+        } else {
+            // It's a simple TOGGLE goal
+            item->done = cJSON_IsTrue(item_progress_json);
+            item->progress = item->done ? 1 : 0; // Set progress for consistency
+        }
     }
 }
 
@@ -735,6 +745,56 @@ static void tracker_calculate_overall_progress(struct Tracker *t) {
     } else {
         t->template_data->overall_progress_percentage = 0.0f;
     }
+}
+
+void settings_save_custom_progress(TemplateData *td) {
+    if (!td) return;
+
+    // Read the existing settings file
+    cJSON *settings_json = cJSON_from_file(SETTINGS_FILE_PATH);
+    if (!settings_json) {
+        // If this file doesn't exist, create it
+        settings_json = cJSON_CreateObject();
+        if (!settings_json) {
+            fprintf(stderr, "[TRACKER] Failed to create settings file.\n");
+            return;
+        }
+
+        // Get or create the custom_progress object
+        cJSON *progress_obj = cJSON_GetObjectItem(settings_json, "custom_progress");
+        if (!progress_obj) {
+            progress_obj = cJSON_AddObjectToObject(settings_json, "custom_progress");
+        }
+
+        // Update the progress for each custom goal
+        for (int i = 0; i < td->custom_goal_count; i++) {
+            TrackableItem *item = td->custom_goals[i];
+            cJSON *item_json = cJSON_GetObjectItem(progress_obj, item->root_name);
+
+            // Update the progress
+            if (item_json) {
+                cJSON_SetNumberValue(item_json, item->progress);
+            } else { // If it doesn't exist, add it
+                cJSON_AddNumberToObject(progress_obj, item->root_name, item->progress);
+            }
+
+        }
+
+        // Write the modified JSON back to the file
+        FILE *file = fopen(SETTINGS_FILE_PATH, "w");
+        if (file) {
+            char *json_str = cJSON_Print(settings_json); // render the cJSON object to text
+            fputs(json_str, file); // write to the file
+            fclose(file);
+            free(json_str);
+        } else {
+            fprintf(stderr, "[TRACKER] Failed to open settings file for writing.\n");
+        }
+
+    }
+
+    cJSON_Delete(settings_json);
+
 }
 
 
@@ -1122,8 +1182,21 @@ void tracker_print_debug_status(struct Tracker *t) {
 
     for (int i = 0; i < t->template_data->custom_goal_count; i++) {
         TrackableItem *custom_goal = t->template_data->custom_goals[i];
-        printf("[Custom Goal] %s: %s\n", custom_goal->display_name, custom_goal->done ? "COMPLETED" : "INCOMPLETE");
+
+        // Check if the custom goal is a counter (has a target > 0)
+        if (custom_goal->goal > 0) {
+            printf("[Custom Goal] %s: %d / %d - %s\n",
+                custom_goal->display_name,
+                custom_goal->progress,
+                custom_goal->goal,
+                custom_goal->done ? "COMPLETED" : "INCOMPLETE");
+        } else { // Otherwise it's a simple toggle (no target entry needs to be specified)
+            printf("[Custom Goal] %s: %s\n",
+                custom_goal->display_name,
+                custom_goal->done ? "COMPLETED" : "INCOMPLETE");
+        }
     }
+
     for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
         if (goal && goal->stages && goal->current_stage < goal->stage_count) {
