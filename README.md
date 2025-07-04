@@ -34,7 +34,7 @@ You select the minecraft version, the category, all the advancements, statistics
 ## How To Use
 
 1.  **Download**: Grab the latest release from the releases page (supports Windows, Linux, and MacOS).
-2.  **Configure**: Open `settings.json` to select your Minecraft version, category, and save path detection mode (`auto` or `manual`). You can also configure hotkeys here.
+2.  **Configure**: Open `settings.json` to select your Minecraft version, category, and save path detection mode (`auto` or `manual`). You can also configure hotkeys there.
 3.  **Run**: Launch Advancely and play Minecraft. The tracker will automatically find your most recent world and display your progress in real time.
 
 ### Licenses
