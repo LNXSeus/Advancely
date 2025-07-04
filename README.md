@@ -18,19 +18,19 @@
     * **Statistics**: Monitors any game statistic, such as blocks mined or distance flown, against a target value.
     * **Recipes & Unlocks**: Can track recipe unlocks for any game version, including the unique format from snapshot 25w14craftmine.
 
-* **Full Mod & Datapack Support**: The tracker is designed to be data-driven. It correctly parses items, stats, and advancements from any mod or data pack (e.g., `conquest:`, `blazeandcaves:`) without being limited to the vanilla `minecraft:` namespace.
+* **Full Mod & Datapack Support**: The tracker is designed to be data-driven. It correctly parses items, stats, and advancements from any mod or data pack (e.g., `conquest:`, `blazeandcave:`) without being limited to the vanilla `minecraft:` namespace.
 
 * **Multi-Stage Goals**: Create long-term objectives that combine several smaller steps. A single goal can require you to first achieve an advancement, then reach a certain statistic, and then complete another advancement in sequence.
 
-* **Custom Counters with Hotkeys**: For goals that can't be automatically tracked (like counting manual resets or finding specific items), you can create custom counters. Set a target value in your template and use configurable hotkeys to increment or decrement the count. All progress is saved automatically back into `settings.json`.
+* **Custom Counters with Hotkeys**: For goals that can't be automatically tracked (like counting amount of structures visited or finding specific items), you can create custom counters. Set a target value in your template and use configurable hotkeys to increment or decrement the count. List of hotkeys can be found [here](https://pastebin.com/vPKgWAen). All progress is saved automatically back into `settings.json`.
 
 * **Shared Criteria Detection**: For clarity, if a single advancement criterion (e.g., "kill a wither skeleton") is part of multiple parent advancements, the UI is designed to overlay the parent advancement's icon on that criterion. This helps you distinguish which goal you are making progress towards.
 
 ## Customization
 
-The true power of Advancely lies in its customization. You can define exactly what you want to track by creating your own template files.
+The true power of Advancely lies in its customization. You can define exactly what you want to track by creating your own template files from within the settings window.
 
-Simply create a `.json` template file and a corresponding `_lang.json` language file for your specific Minecraft version, mod set, or speedrunning category. The tracker will then parse your template and track progress against the goals you've defined.
+You select the minecraft version, the category, all the advancements, statistics, goals you want to track with custom translations. The tracker will then parse your template and track progress against the goals you've defined.
 
 
 ## How To Use

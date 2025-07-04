@@ -19,7 +19,6 @@
 // Set to true initially to perform the first update
 
 // global flag TODO: Should be set to true when custom goal is checked off (manual update) -> SDL_SetAtomicInt(&g_needs_update, 1);
-// TODO: Currently tracker needs to be restarted when saves path is changed in settings.json file
 static SDL_AtomicInt g_needs_update;
 static SDL_AtomicInt g_settings_changed; // Watching when settings.json is modified to re-init paths
 
@@ -201,7 +200,7 @@ int main(int argc, char *argv[]) {
                 dmon_unwatch(saves_watcher_id);
 
                 // Update the tracker with the new paths
-                tracker_reinit_paths(tracker); // changes tracker->saves_path
+                tracker_reinit_template(tracker); // Re-initialize the template (so it can be changed during runtime)
 
                 // Start watching the new directory
                 if (strlen(tracker->saves_path) > 0) {

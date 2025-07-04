@@ -126,7 +126,7 @@ void find_latest_world_files(
     bool use_unlocks) {
 
     char search_path[MAX_PATH_LENGTH];
-    snprintf(search_path, sizeof(search_path), "%s/*", saves_path);
+    snprintf(search_path, sizeof(search_path), "%s/*", saves_path); // Search for files in saves directory
 
     WIN32_FIND_DATAA find_world_data;
     HANDLE h_find_world = FindFirstFileA(search_path, &find_world_data);
@@ -175,7 +175,7 @@ void find_latest_world_files(
         normalize_path(temp_path);
         snprintf(sub_search_path, sizeof(sub_search_path), "%s/*.json", temp_path); // search for any .json files
         h_find_file = FindFirstFileA(sub_search_path, &find_file_data);
-        if (h_find_file != INVALID_HANDLE_VALUE) {
+        if (h_find_file != INVALID_HANDLE_VALUE) { // if file was found
             snprintf(out_adv_path, max_len, "%s/%s", temp_path, find_file_data.cFileName);
             // printf("[PATH UTILS] Set advancements path to: %s\n", out_adv_path);
             FindClose(h_find_file); // Close the file handle

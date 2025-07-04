@@ -19,7 +19,7 @@ typedef struct {
     SDL_Scancode decrement_scancode;
 } HotkeyBinding;
 
-// TODO: Define versions here, go with correct subversions
+// TODO: Define versions here and in VersionMapEntry in settings_utils.c
 typedef enum { // Puts vaLue starting at 0, allows for comparisons
     MC_VERSION_1_11,
     MC_VERSION_1_12,
@@ -88,7 +88,7 @@ void settings_write_full(cJSON *json_to_write);
 void settings_load(AppSettings *settings);
 
 /**
- * @brief Constructs the full paths to the template and language JSON files.
+ * @brief Constructs the full paths to the template and language JSON files. Does NOT CREATE the files or load them.
  *
  * Based on the version, category, and optional flag settings, this function
  * builds the final, relative paths to the required data files and stores them

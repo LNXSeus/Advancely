@@ -83,6 +83,15 @@ void tracker_update(struct Tracker *t, float *deltaTime);
 void tracker_render(struct Tracker *t);
 
 
+/**
+ * @brief Reloads settings, frees all old template data, and loads a new template.
+ *
+ * This function is called at runtime when settings have changed to allow for
+ * switching advancement templates or languages without restarting the application.
+ *
+ * @param t A pointer to the Tracker struct.
+ */
+void tracker_reinit_template(struct Tracker *t);
 
 /**
  * @brief Reloads settings and re-initializes all relevant paths in the tracker struct.
