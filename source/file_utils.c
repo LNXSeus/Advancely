@@ -17,6 +17,7 @@ cJSON* cJSON_from_file(const char* filename) {
     cJSON *json = NULL;
 
     if (f) {
+        // Get the file size
         fseek(f, 0, SEEK_END);
         length = ftell(f);
         fseek(f, 0, SEEK_SET);

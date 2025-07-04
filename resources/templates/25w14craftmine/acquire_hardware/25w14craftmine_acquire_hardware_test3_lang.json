@@ -1,0 +1,36 @@
+{
+  "advancement.minecraft.story.smelt_iron": "Acquire Hardware",
+  "advancement.minecraft.story.deflect_arrow": "Block an Arrow!",
+
+
+  "advancement.minecraft.mines.all_special_mines_completed": "Yess Boss!",
+  "advancement.minecraft.mines.all_special_mines_completed.criteria.minecraft:wither_boss": "Defeat the Wither",
+  "advancement.minecraft.mines.all_special_mines_completed.criteria.minecraft:kuiper_belt": "Visit the Kuiper Belt",
+  "advancement.minecraft.mines.all_special_mines_completed.criteria.minecraft:raid": "Win a Raid",
+  "advancement.minecraft.mines.all_special_mines_completed.criteria.minecraft:spooky_scary_skeletons_boss": "Defeat the Skeleton Boss",
+  "advancement.minecraft.mines.all_special_mines_completed.criteria.minecraft:ender_dragon_boss": "Defeat the Ender Dragon",
+  "advancement.minecraft.mines.all_special_mines_completed.criteria.minecraft:small_but_deadly_boss": "Defeat the Small But Deadly Boss",
+  "advancement.minecraft.mines.all_special_mines_completed.criteria.minecraft:angry_ghast_boss": "Defeat the Angry Ghast Boss",
+  "advancement.minecraft.mines.all_special_mines_completed.criteria.minecraft:warden_boss": "Defeat the Warden",
+  "advancement.minecraft.mines.all_special_mines_completed.criteria.minecraft:enderman_boss": "Defeat the Enderman Boss",
+
+  "advancement.minecraft.feats.wither": "Wither",
+  "advancement.minecraft.feats.wither.criteria.completed_event": "Defeat the Wither Skeleton",
+  "advancement.minecraft.feats.kuiper_world": "Kuiper Belt",
+  "advancement.minecraft.feats.kuiper_world.criteria.completed_event": "Visit the Kuiper Belt",
+
+  "advancement.recipes.misc.charcoal": "Renewable Energy",
+
+  "minecraft:mined/minecraft:oak_log": "Mine 4 Oak Logs",
+  "minecraft:mined/minecraft:acacia_log": "Mine as many Acacia Logs as you can...",
+  "minecraft:exploration": "Exploration",
+  "minecraft:ender_pearl_starter": "Starter Ender Pearl",
+  "custom:unbreaking_3_book": "Obtain Unbreaking 3 Book",
+  "custom:deepslate_emerald_count": "Deepslate Emerald Count",
+
+  "multi_stage_goal.ms_goal:getting_started.display_name": "Getting Started!",
+  "multi_stage_goal.ms_goal:getting_started.stage.0": "Mine 8 Dirt",
+  "multi_stage_goal.ms_goal:getting_started.stage.1": "Get Iron Armor",
+  "multi_stage_goal.ms_goal:getting_started.stage.2": "Pick up 4 Sand",
+  "multi_stage_goal.ms_goal:getting_started.stage.final": "Done!"
+}

@@ -7,6 +7,23 @@
 #include <stdio.h>
 #include <string.h>
 
+// Create lookup table to map version strings to enum values
+typedef struct {
+    const char* str;
+    MC_Version value;
+} VersionMapEntry;
+
+// Create static lookup table with all supported versions
+// TODO: Versions need to be added in MCVersion enum and here
+static const VersionMapEntry version_map[] = {
+  {"1.11", MC_VERSION_1_11},
+    {"1.12", MC_VERSION_1_12},
+    {"1.16.1", MC_VERSION_1_16_1},
+    {"1.21.6", MC_VERSION_1_21_6},
+    {"25w14craftmine", MC_VERSION_25W14CRAFTMINE},
+    {NULL, MC_VERSION_UNKNOWN} //Sentinel to mark end of the array
+};
+
 /**
  * @brief Converts key names from JSON file (like "PageUp") into SDL scancodes that the event handler can use
  * @param key_name
@@ -19,14 +36,16 @@ static SDL_Scancode scancode_from_string(const char *key_name) {
 }
 
 MC_Version settings_get_version_from_string(const char *version_str) {
-    // TODO: Shorten this so it can convert the dot into underscore, prepend MC_VERSION_ and capitalize
-
     if (version_str == NULL) return MC_VERSION_UNKNOWN;
-    if (strcmp(version_str, "1.11") == 0) return MC_VERSION_1_11;
-    if (strcmp(version_str, "1.12") == 0) return MC_VERSION_1_12;
-    if (strcmp(version_str, "1.21.6") == 0) return MC_VERSION_1_21_6;
-    if (strcmp(version_str, "25w14craftmine") == 0) return MC_VERSION_25W14CRAFTMINE;
-    return MC_VERSION_UNKNOWN;
+
+    // Loop through the map to find a matching string
+    for (int i = 0; version_map[i].str != NULL; i++) {
+        if (strcmp(version_str, version_map[i].str) == 0) {
+            return version_map[i].value; // Return the corresponding enum value
+        }
+    }
+
+    return MC_VERSION_UNKNOWN; // Return if no match was found
 }
 
 PathMode settings_get_path_mode_from_string(const char *mode_str) {
@@ -157,7 +176,6 @@ void construct_template_paths(AppSettings *settings) {
         settings->optional_flag
     );
 
-    // TODO: FIX AppSettings struct and continue with tracker.h
     // Construct the main template and language file paths
     snprintf(settings->template_path, MAX_PATH_LENGTH, "%s.json", base_path);
     snprintf(settings->lang_path, MAX_PATH_LENGTH, "%s_lang.json", base_path);

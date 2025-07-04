@@ -35,6 +35,8 @@ set(SOURCE_FILES
         "source/file_utils.c"
         "source/file_utils.h"
         "source/data_structures.h"
+        "source/temp_create_utils.c"
+        "source/temp_create_utils.h"
 
         # Get cJSON
         "source/external/cJSON.c"
@@ -42,6 +44,7 @@ set(SOURCE_FILES
 
         # get dmon for file watching
         "source/external/dmon.h"
+
 
         # Get cJSON utils
         # "external_libs/include/cJSON/cJSON_Utils.c"

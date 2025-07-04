@@ -10,6 +10,7 @@
 #include "path_utils.h"
 #include "settings_utils.h"
 #include "file_utils.h" // has the cJSON_from_file function
+#include "temp_create_utils.h"
 
 // HELPER FUNCTION FOR PARSING
 // TODO: Move these static functions into tracker_utils.c (then they are not static anymore)
@@ -747,6 +748,67 @@ static void tracker_calculate_overall_progress(struct Tracker *t) {
     }
 }
 
+
+/**
+ * @brief Frees all dynamically allocated memory within a TemplateData struct.
+ *
+ * To avoid memory leaks when switching templates during runtime.
+ * It only frees the CONTENT of the TemplateData struct NOT the struct itself.
+ *
+ * @param td A pointer to the TemplateData struct to be freed.
+ */
+static void tracker_free_template_data(TemplateData *td) {
+    if (!td) return;
+
+    // Free advancements data
+    for (int i = 0; i < td->advancement_count; i++) {
+        if (td->advancements[i]) {
+            for (int j = 0; j < td->advancements[i]->criteria_count; j++) {
+                free(td->advancements[i]->criteria[j]);
+            }
+            free(td->advancements[i]->criteria);
+            free(td->advancements[i]);
+        }
+    }
+    free(td->advancements);
+
+
+    // Free stats data
+    for (int i = 0; i < td->stat_count; i++) {
+        free(td->stats[i]);
+    }
+    free(td->stats);
+
+    // Free unlocks data
+    for (int i = 0; i < td->unlock_count; i++) {
+        free(td->unlocks[i]);
+    }
+    free(td->unlocks);
+
+    // Free custom goal data
+    if (td->custom_goals) {
+        for (int i = 0; i < td->custom_goal_count; i++) {
+            free(td->custom_goals[i]);
+        }
+        free(td->custom_goals);
+    }
+
+    // Free multi-stage goals data
+    if (td->multi_stage_goals) {
+        for (int i = 0; i < td->multi_stage_goal_count; i++) {
+            MultiStageGoal *goal = td->multi_stage_goals[i];
+            if (goal) {
+                for (int j = 0; j < goal->stage_count; j++) {
+                    free(goal->stages[j]);
+                }
+                free(goal->stages);
+                free(goal);
+            }
+        }
+        free(td->multi_stage_goals);
+    }
+}
+
 void settings_save_custom_progress(TemplateData *td) {
     if (!td) return;
 
@@ -840,8 +902,6 @@ bool tracker_new(struct Tracker **tracker) {
     tracker_reinit_paths(t);
 
     // Parse the advancement template JSON file
-    // This should only happen once on initialization
-    // TODO: Allow for choosing different advancement templates while running
     tracker_load_and_parse_data(t);
 
 
@@ -959,6 +1019,26 @@ void tracker_render(struct Tracker *t) {
     SDL_RenderPresent(t->renderer);
 }
 
+void tracker_reinit_template(struct Tracker *t) {
+    if (!t) return;
+
+    printf("[TRACKER] Re-initializing template...\n");
+
+    // Update the paths from settings.json
+    tracker_reinit_paths(t);
+
+    // Free all the old advancement, stat, etc. data
+    if (t->template_data) {
+        tracker_free_template_data(t->template_data);
+
+        // Reset the entire struct to zero to clear dangling pointers and old counts.
+        memset(t->template_data, 0, sizeof(TemplateData));
+    }
+
+    // Load and parse data from the new template files
+    tracker_load_and_parse_data(t);
+}
+
 void tracker_reinit_paths(struct Tracker *t) {
     if (!t) return;
 
@@ -973,7 +1053,7 @@ void tracker_reinit_paths(struct Tracker *t) {
 
     MC_Version version = settings_get_version_from_string(settings.version_str);
     bool use_advancements = (version >= MC_VERSION_1_12);
-    bool use_unlocks = (version >= MC_VERSION_25W14CRAFTMINE);
+    bool use_unlocks = (version == MC_VERSION_25W14CRAFTMINE);
 
     // Get the final, normalized saves path using the loaded settings
     if (get_saves_path(t->saves_path, MAX_PATH_LENGTH, settings.path_mode, settings.manual_saves_path)) {
@@ -1004,17 +1084,33 @@ void tracker_reinit_paths(struct Tracker *t) {
 void tracker_load_and_parse_data(struct Tracker *t) {
     printf("[TRACKER] Loading advancement template from: %s\n", t->advancement_template_path);
     cJSON *template_json = cJSON_from_file(t->advancement_template_path);
+
+    // Check if template file exists otherwise create it using temp_create_utils.c
     if (!template_json) {
-        fprintf(stderr, "[TRACKER] Failed to load or parse advancement template file.\n");
-        fprintf(stderr, "[TRACKER] Please check the 'version', 'category', and 'optional_flag' in settings.json.\n");
-        return;
+        fprintf(stderr, "[TRACKER] Template file not found: %s\n", t->advancement_template_path);
+        fprintf(stderr, "[TRACKER] Attempting to create new template and language files...\n");
+
+        // Ensure directory structure exists
+        fs_ensure_directory_exists(t->advancement_template_path);
+
+        // Create the empty template and language files
+        // TODO: Allow user to populate the language and template files through the settings
+        fs_create_empty_template_file(t->advancement_template_path);
+        fs_create_empty_lang_file(t->lang_path);
+
+        // Try to load the newly create template file again
+        template_json = cJSON_from_file(t->advancement_template_path);
+
+        if (!template_json) {
+            fprintf(stderr, "[TRACKER] CRITICAL: Failed to load the newly created template file.\n");
+            return;
+        }
     }
 
     t->template_data->lang_json = cJSON_from_file(t->lang_path);
     if (!t->template_data->lang_json) {
-        fprintf(stderr, "[TRACKER] Failed to load or parse language file.\n");
-        cJSON_Delete(template_json);
-        return;
+        // Handle case where lang file might still be missing for some reason
+        t->template_data->lang_json = cJSON_CreateObject();
     }
 
     // Load settings.json to check for custom progress
@@ -1061,63 +1157,8 @@ void tracker_free(struct Tracker **tracker) {
         struct Tracker *t = *tracker;
 
         if (t->template_data) {
-            // Free advancements data
-            for (int i = 0; i < t->template_data->advancement_count; i++) {
-                // For each advancement
-                if (t->template_data->advancements[i]) {
-                    for (int j = 0; j < t->template_data->advancements[i]->criteria_count; j++) {
-                        // For each criterion
-                        free(t->template_data->advancements[i]->criteria[j]);
-                    }
-                    free(t->template_data->advancements[i]->criteria);
-                    free(t->template_data->advancements[i]);
-                }
-            }
-            free(t->template_data->advancements);
-
-            // Free stats data
-            for (int i = 0; i < t->template_data->stat_count; i++) {
-                free(t->template_data->stats[i]);
-            }
-            free(t->template_data->stats);
-
-            // Free unlocks data
-            for (int i = 0; i < t->template_data->unlock_count; i++) {
-                free(t->template_data->unlocks[i]);
-            }
-            free(t->template_data->unlocks);
-
-            // Free the language file
-            if (t->template_data->lang_json) {
-                cJSON_Delete(t->template_data->lang_json);
-            }
-
-            // Free custom goals data
-            if (t->template_data->custom_goals) {
-                for (int i = 0; i < t->template_data->custom_goal_count; i++) {
-                    free(t->template_data->custom_goals[i]);
-                }
-                free(t->template_data->custom_goals);
-            }
-
-            // Free multi stage goals data
-            if (t->template_data->multi_stage_goals) {
-                for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
-                    MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
-                    if (goal) {
-                        // Free all sub-stages within the goal
-                        for (int j = 0; j < goal->stage_count; j++) {
-                            free(goal->stages[j]);
-                        }
-                        free(goal->stages);
-                        free(goal);
-                    }
-                }
-                free(t->template_data->multi_stage_goals);
-            }
-
-            // Free the array of advancement pointers
-            free(t->template_data);
+            tracker_free_template_data(t->template_data); // This ONLY frees the CONTENT of the struct
+            free(t->template_data); // This frees the struct
         }
 
         if (t->renderer) {
@@ -1170,7 +1211,10 @@ void tracker_print_debug_status(struct Tracker *t) {
     }
 
 
-    printf("[Unlocks] %d / %d completed\n", t->template_data->unlocks_completed_count, t->template_data->unlock_count);
+    // Only print unlocks if they exist
+    if (t->template_data->unlock_count > 0) {
+        printf("[Unlocks] %d / %d completed\n", t->template_data->unlocks_completed_count, t->template_data->unlock_count);
+    }
 
     // Loop to print each unlock individually
     for (int i = 0; i < t->template_data->unlock_count; i++) {
