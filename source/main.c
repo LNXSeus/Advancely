@@ -125,14 +125,14 @@ int main(int argc, char *argv[]) {
             // --- Per-Frame Logic ---
 
             handle_global_events(tracker, overlay, settings, &is_running, &settings_opened, &deltaTime);
-            const Uint8 *key_state = (const Uint8 *)SDL_GetKeyboardState(NULL);
+            const Uint8 *key_state = (const Uint8 *)SDL_GetKeyboardState(NULL); // For counter hotkeys
             static Uint32 last_hotkey_time = 0; // Prevent rapid-fire counting
 
             // HOTKEY LOGIC
 
-            if (SDL_GetTicks() - last_hotkey_time > 200) {
+            if (SDL_GetTicks() - last_hotkey_time > HOTKEY_PRESS_DELAY) { // 100 ms to prevent rapid-fire counting
                 AppSettings app_settings;
-                settings_load(&app_settings); // Load settings to get current hotkey bindings, TODO: List all possible hotkeys
+                settings_load(&app_settings); // Load settings to get current hotkey bindings
                 bool changed = false;
 
                 for (int i = 0; i < app_settings.hotkey_count; i++) {

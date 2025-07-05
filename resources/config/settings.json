@@ -6,7 +6,8 @@
   "optional_flag": "_test3",
   "custom_progress": {
     "custom:unbreaking_3_book": false,
-    "custom:deepslate_emerald_count": 0
+    "custom:deepslate_emerald_count": 0,
+    "custom:diamond_ore_count": 0
   },
   "stat_progress_override": {
     "minecraft:mined/minecraft:oak_log": false,
@@ -17,6 +18,11 @@
       "target_goal": "custom:deepslate_emerald_count",
       "increment_key": "PageUp",
       "decrement_key": "PageDown"
+    },
+    {
+      "target_goal": "custom:diamond_ore_count",
+      "increment_key": "Home",
+      "decrement_key": "End"
     }
   ]
 }

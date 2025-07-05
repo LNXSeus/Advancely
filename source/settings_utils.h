@@ -12,6 +12,7 @@
 
 #define SETTINGS_FILE_PATH "resources/config/settings.json"
 #define MAX_HOTKEYS 16 // Limit for amount of hotkeys
+#define HOTKEY_PRESS_DELAY 100 // ms
 
 typedef struct {
     char target_goal[192];

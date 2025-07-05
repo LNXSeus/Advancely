@@ -70,6 +70,11 @@
       "root_name": "custom:deepslate_emerald_count",
       "icon": "items/deepslate_emerald_ore.png",
       "target": 5
+    },
+    {
+      "root_name": "custom:diamond_ore_count",
+      "icon": "items/diamond_ore.png",
+      "target": 10
     }
   ],
   "multi_stage_goals": [
