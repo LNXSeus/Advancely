@@ -151,7 +151,7 @@ void settings_load(AppSettings *settings) {
     }
 
     construct_template_paths(settings);
-    // printf("[SETTINGS UTILS] Settings loaded successfully!\n");
+    printf("[SETTINGS UTILS] Settings loaded successfully!\n");
 }
 
 void construct_template_paths(AppSettings *settings) {

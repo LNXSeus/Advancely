@@ -54,7 +54,7 @@ typedef enum {
     SUBGOAL_ADVANCEMENT,
     SUBGOAL_UNLOCK, // Allows to also complete a stage based on a specific unlock
     // For goals with no automatic trigger, used for final stages (displays once all previous stages are done)
-    // TODO: Make subgoal_manual stages clickable in the UI, similar to custom_goals, NOT THAT IMPORTANT
+    // TODO: Make subgoal_manual stages clickable in the UI, similar to custom_goals, NOT THAT IMPORTANT (Can't go back)
     SUBGOAL_MANUAL // When it's not "stat" or "advancement"
 } SubGoalType;
 
@@ -105,6 +105,8 @@ typedef struct TemplateData {
     int completed_criteria_count;
     float overall_progress_percentage;
     // Percentage score of everything BUT ADVANCEMENTS (have their own advancements_completed_count)
+
+    long long play_time_ticks; // Store the player's total playtime in ticks
 
     cJSON *lang_json; // The loaded language file for display names
 } TemplateData;

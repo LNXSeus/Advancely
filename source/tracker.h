@@ -22,6 +22,7 @@ struct Tracker {
 
     // Path to the actual saves folder
     char saves_path[MAX_PATH_LENGTH];
+    char world_name[MAX_PATH_LENGTH]; // To store the name of the current world for display
     char advancements_path[MAX_PATH_LENGTH];
     char unlocks_path[MAX_PATH_LENGTH];
     char stats_path[MAX_PATH_LENGTH];

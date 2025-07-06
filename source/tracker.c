@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <cJSON.h>
+#include <ctype.h>
 
 #include "tracker.h"
 #include "init_sdl.h"
@@ -381,8 +382,9 @@ static void parse_multi_stage_goals(cJSON *goals_json, cJSON *lang_json, MultiSt
                 if (cJSON_IsString(text))
                     strncpy(new_stage->display_text, text->valuestring,
                             sizeof(new_stage->display_text) - 1);
-                if (cJSON_IsString(stage_id)) strncpy(new_stage->stage_id, stage_id->valuestring,
-                                                      sizeof(new_stage->stage_id) - 1);
+                if (cJSON_IsString(stage_id))
+                    strncpy(new_stage->stage_id, stage_id->valuestring,
+                            sizeof(new_stage->stage_id) - 1);
                 if (cJSON_IsString(root))
                     strncpy(new_stage->root_name, root->valuestring,
                             sizeof(new_stage->root_name) - 1);
@@ -508,6 +510,7 @@ static void tracker_update_unlock_progress(struct Tracker *t, const cJSON *playe
 
 /**
  * @brief Updates stat progress from a pre-loaded cJSON object. Supports modded stats. No hardcoded "minecraft:".
+ * It also looks specifically for and stores the minecraft:play_time statistic for finished runs.
  * @param t A pointer to the Tracker struct.
  * @param player_stats_json The parsed player stats JSON file.
  */
@@ -522,6 +525,14 @@ static void tracker_update_stat_progress(struct Tracker *t, const cJSON *player_
     if (!stats_obj) {
         fprintf(stderr, "[TRACKER] Failed to find 'stats' object in player stats file.\n");
         return;
+    }
+
+    cJSON *custom_stats = cJSON_GetObjectItem(stats_obj, "minecraft:custom");
+    if (custom_stats) {
+        cJSON *play_time = cJSON_GetObjectItem(custom_stats, "minecraft:play_time");
+        if (cJSON_IsNumber(play_time)) {
+            t->template_data->play_time_ticks = (long long) play_time->valuedouble;
+        }
     }
 
     // MANUAL OVERRIDE FOR STATS GOAL
@@ -821,6 +832,56 @@ static void tracker_free_template_data(TemplateData *td) {
     }
 }
 
+/**
+ * @brief Formats a string like "acquire_hardware" into "Acquire Hardware".
+ * It replaces underscores with spaces and capitalizes the first letter of each word.
+ * @param input The source string.
+ * @param output The buffer to write the formatted string to.
+ * @param max_len The size of the output buffer.
+ */
+static void format_category_string(const char *input, char *output, size_t max_len) {
+    if (!input || !output || max_len == 0) return;
+
+    size_t i = 0;
+    bool capitalize_next = true;
+
+    while (*input && i < max_len - 1) {
+        if (*input == '_') {
+            output[i++] = ' ';
+            capitalize_next = true;
+        } else {
+            output[i++] = capitalize_next ? (char) toupper(*input) : *input;
+            capitalize_next = false;
+        }
+        input++;
+    }
+    output[i] = '\0';
+}
+
+/**
+ * @brief Formats a time in Minecraft ticks into a DD:HH:MM:SS.MS string.
+ * @param ticks The total number of ticks (20 ticks per second).
+ * @param output The buffer to write the formatted time string to.
+ * @param max_len The size of the output buffer.
+ */
+
+static void format_time(int ticks, char *output, size_t max_len) {
+    if (!output || max_len == 0) return;
+
+    long long total_seconds = ticks / 20;
+    long long days = total_seconds / 86400;
+    long long hours = total_seconds / 3600;
+    long long minutes = (total_seconds % 3600) / 60;
+    long long seconds = total_seconds % 60;
+    long long milliseconds = ticks % 20 * 50;
+
+    snprintf(output, max_len, "%02lld:%02lld:%02lld:%02lld.%02lld", days,hours, minutes, seconds, milliseconds);
+}
+
+
+// ----------------------------------------- END OF STATIC FUNCTIONS -----------------------------------------
+
+
 void settings_save_custom_progress(TemplateData *td) {
     if (!td) return;
 
@@ -850,7 +911,6 @@ void settings_save_custom_progress(TemplateData *td) {
             } else {
                 cJSON_ReplaceItemInObject(progress_obj, item->root_name, cJSON_CreateBool(item->done));
             }
-
         }
 
         // Write the modified JSON back to the file
@@ -865,11 +925,9 @@ void settings_save_custom_progress(TemplateData *td) {
         } else {
             fprintf(stderr, "[TRACKER] Failed to open settings file for writing.\n");
         }
-
     }
 
     cJSON_Delete(settings_json);
-
 }
 
 
@@ -1075,6 +1133,7 @@ void tracker_reinit_paths(struct Tracker *t) {
         // Find the specific world files using the correct flag
         find_latest_world_files(
             t->saves_path,
+            t->world_name,
             t->advancements_path,
             t->stats_path,
             t->unlocks_path,
@@ -1087,6 +1146,7 @@ void tracker_reinit_paths(struct Tracker *t) {
 
         // Ensure paths are empty
         t->saves_path[0] = '\0';
+        t->world_name[0] = '\0';
         t->advancements_path[0] = '\0';
         t->stats_path[0] = '\0';
         t->unlocks_path[0] = '\0';
@@ -1198,88 +1258,118 @@ void tracker_free(struct Tracker **tracker) {
 void tracker_print_debug_status(struct Tracker *t) {
     if (!t || !t->template_data) return;
 
-    printf("\n--- Player Progress Status ---\n");
+    AppSettings settings;
+    settings_load(&settings);
 
-    // Advancements and Criteria
-    printf("[Advancements] %d / %d completed\n", t->template_data->advancements_completed_count,
-           t->template_data->advancement_count);
-    for (int i = 0; i < t->template_data->advancement_count; i++) {
-        TrackableCategory *adv = t->template_data->advancements[i];
-        printf("  - %s (%d/%d criteria): %s\n", adv->display_name, adv->completed_criteria_count, adv->criteria_count,
-               adv->done ? "COMPLETED" : "INCOMPLETE");
-        for (int j = 0; j < adv->criteria_count; j++) {
-            TrackableItem *crit = adv->criteria[j];
-            // takes translation from the language file otherwise root_name
-            // Print if criteria is shared
-            printf("    - %s: %s%s\n", crit->display_name, crit->is_shared ? "SHARED - " : "",
-                   crit->done ? "DONE" : "NOT DONE");
-        }
-    }
+    char formatted_category[128];
+    format_category_string(settings.category, formatted_category, sizeof(formatted_category));
 
-    // Other categories...
-    for (int i = 0; i < t->template_data->stat_count; i++) {
-        TrackableItem *stat = t->template_data->stats[i];
-        printf("[Stat] %s: %d / %d - %s\n", stat->display_name, stat->progress, stat->goal,
-               stat->done ? "COMPLETE" : "INCOMPLETE");
-    }
+    // Format the time to DD:HH:MM:SS.MS
+    char formatted_time[32];
+    format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
+
+    printf("\n============================================================\n");
+    printf(" World:      %s\n", t->world_name);
+    printf(" Version:    %s\n", settings.version_str);
+    printf(" Category:   %s\n", formatted_category);
+    printf(" Flag:       %s\n", settings.optional_flag);
+    printf(" Play Time:  %s\n", formatted_time);
+    printf("============================================================\n");
 
 
-    // Only print unlocks if they exist
-    if (t->template_data->unlock_count > 0) {
-        printf("[Unlocks] %d / %d completed\n", t->template_data->unlocks_completed_count, t->template_data->unlock_count);
-    }
+    // Check if the run is completed, check both advancement and overall progress
+    if (t->template_data->advancements_completed_count >= t->template_data->advancement_count && t->template_data->
+        overall_progress_percentage >= 100.0f) {
 
-    // Loop to print each unlock individually
-    for (int i = 0; i < t->template_data->unlock_count; i++) {
-        TrackableItem *unlock = t->template_data->unlocks[i];
-        if (!unlock) continue;
-        printf("  - %s: %s\n", unlock->display_name, unlock->done ? "UNLOCKED" : "LOCKED");
-    }
+        printf("\n                  *** RUN COMPLETE! ***\n\n");
+        printf("                  Final Time: %s\n\n", formatted_time);
+        printf("============================================================\n\n");
+    } else {
+        printf("\n--- Player Progress Status ---\n\n");
 
-
-    for (int i = 0; i < t->template_data->custom_goal_count; i++) {
-        TrackableItem *custom_goal = t->template_data->custom_goals[i];
-
-        // Check if the custom goal is a counter (has a target > 0)
-        if (custom_goal->goal > 0) {
-            printf("[Custom Goal] %s: %d / %d - %s\n",
-                custom_goal->display_name,
-                custom_goal->progress,
-                custom_goal->goal,
-                custom_goal->done ? "COMPLETED" : "INCOMPLETE");
-        } else { // Otherwise it's a simple toggle (no target entry needs to be specified)
-            printf("[Custom Goal] %s: %s\n",
-                custom_goal->display_name,
-                custom_goal->done ? "COMPLETED" : "INCOMPLETE");
-        }
-    }
-
-    for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
-        MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
-        if (goal && goal->stages && goal->current_stage < goal->stage_count) {
-            SubGoal *active_stage = goal->stages[goal->current_stage];
-
-            // Check if the active stage is a stat and print its progress
-            if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress > 0) {
-                printf("[Multi-Stage Goal] %s: %s (%d/%d)\n",
-                       goal->display_name,
-                       active_stage->display_text,
-                       active_stage->current_stat_progress,
-                       active_stage->required_progress);
-            } else {
-                // If it's not "stat" print this
-                printf("[Multi-Stage Goal] %s: %s\n", goal->display_name, active_stage->display_text);
+        // Advancements and Criteria
+        printf("[Advancements] %d / %d completed\n", t->template_data->advancements_completed_count,
+               t->template_data->advancement_count);
+        for (int i = 0; i < t->template_data->advancement_count; i++) {
+            TrackableCategory *adv = t->template_data->advancements[i];
+            printf("  - %s (%d/%d criteria): %s\n", adv->display_name, adv->completed_criteria_count,
+                   adv->criteria_count,
+                   adv->done ? "COMPLETED" : "INCOMPLETE");
+            for (int j = 0; j < adv->criteria_count; j++) {
+                TrackableItem *crit = adv->criteria[j];
+                // takes translation from the language file otherwise root_name
+                // Print if criteria is shared
+                printf("    - %s: %s%s\n", crit->display_name, crit->is_shared ? "SHARED - " : "",
+                       crit->done ? "DONE" : "NOT DONE");
             }
         }
+
+        // Other categories...
+        for (int i = 0; i < t->template_data->stat_count; i++) {
+            TrackableItem *stat = t->template_data->stats[i];
+            printf("[Stat] %s: %d / %d - %s\n", stat->display_name, stat->progress, stat->goal,
+                   stat->done ? "COMPLETE" : "INCOMPLETE");
+        }
+
+
+        // Only print unlocks if they exist
+        if (t->template_data->unlock_count > 0) {
+            printf("[Unlocks] %d / %d completed\n", t->template_data->unlocks_completed_count,
+                   t->template_data->unlock_count);
+        }
+
+        // Loop to print each unlock individually
+        for (int i = 0; i < t->template_data->unlock_count; i++) {
+            TrackableItem *unlock = t->template_data->unlocks[i];
+            if (!unlock) continue;
+            printf("  - %s: %s\n", unlock->display_name, unlock->done ? "UNLOCKED" : "LOCKED");
+        }
+
+
+        for (int i = 0; i < t->template_data->custom_goal_count; i++) {
+            TrackableItem *custom_goal = t->template_data->custom_goals[i];
+
+            // Check if the custom goal is a counter (has a target > 0)
+            if (custom_goal->goal > 0) {
+                printf("[Custom Goal] %s: %d / %d - %s\n",
+                       custom_goal->display_name,
+                       custom_goal->progress,
+                       custom_goal->goal,
+                       custom_goal->done ? "COMPLETED" : "INCOMPLETE");
+            } else {
+                // Otherwise it's a simple toggle (no target entry needs to be specified)
+                printf("[Custom Goal] %s: %s\n",
+                       custom_goal->display_name,
+                       custom_goal->done ? "COMPLETED" : "INCOMPLETE");
+            }
+        }
+
+        for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
+            MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+            if (goal && goal->stages && goal->current_stage < goal->stage_count) {
+                SubGoal *active_stage = goal->stages[goal->current_stage];
+
+                // Check if the active stage is a stat and print its progress
+                if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress > 0) {
+                    printf("[Multi-Stage Goal] %s: %s (%d/%d)\n",
+                           goal->display_name,
+                           active_stage->display_text,
+                           active_stage->current_stat_progress,
+                           active_stage->required_progress);
+                } else {
+                    // If it's not "stat" print this
+                    printf("[Multi-Stage Goal] %s: %s\n", goal->display_name, active_stage->display_text);
+                }
+            }
+        }
+
+        // Advancement Progress AGAIN
+        printf("\n[Advancements] %d / %d completed\n", t->template_data->advancements_completed_count,
+               t->template_data->advancement_count);
+        // Overall Progress
+        printf("[Overall Progress] %.2f%%\n", t->template_data->overall_progress_percentage);
+        printf("============================================================\n\n");
     }
-
-    // Advancement Progress AGAIN
-    printf("\n[Advancements] %d / %d completed\n", t->template_data->advancements_completed_count,
-           t->template_data->advancement_count);
-    // Overall Progress
-    printf("[Overall Progress] %.2f%%\n", t->template_data->overall_progress_percentage);
-    printf("----------------------------\n\n");
-
     // Force the output buffer to write to the console immediately
     fflush(stdout);
 }
