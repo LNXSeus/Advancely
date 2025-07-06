@@ -97,7 +97,6 @@ int main(int argc, char *argv[]) {
 
         AppSettings app_settings;
         settings_load(&app_settings);
-        // construct_template_paths(&app_settings); // TODO: Do we need this here?
 
         SDL_SetAtomicInt(&g_needs_update, 1);
         SDL_SetAtomicInt(&g_settings_changed, 0);
@@ -159,6 +158,7 @@ int main(int argc, char *argv[]) {
                     if (changed) break; // Only process one hotkey at a time
                 }
 
+                // Save custom progress with hotkeys
                 if (changed) {
                     last_hotkey_time = SDL_GetTicks(); // Update timestamp
 
@@ -186,7 +186,6 @@ int main(int argc, char *argv[]) {
                         settings_write_full(settings);
                         cJSON_Delete(settings);
                     }
-                    // SDL_SetAtomicInt(&g_needs_update, 1); // Trigger UI update  // TODO: Is this needed?
                 }
             }
 
@@ -223,10 +222,11 @@ int main(int argc, char *argv[]) {
             if (SDL_SetAtomicInt(&g_needs_update, 0) == 1) {
                 // Re-scan for the latest world to handle world switching
                 AppSettings app_settings;
-                settings_load(&app_settings);
+                settings_load(&app_settings); // Also constructs the template paths
                 MC_Version version = settings_get_version_from_string(app_settings.version_str);
                 find_latest_world_files(
                     tracker->saves_path,
+                    tracker->world_name,
                     tracker->advancements_path,
                     tracker->stats_path,
                     tracker->unlocks_path,

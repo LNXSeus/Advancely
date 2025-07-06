@@ -118,6 +118,7 @@ bool get_saves_path(char *out_path, size_t max_len, PathMode mode, const char *m
 #ifdef _WIN32
 void find_latest_world_files(
     const char *saves_path,
+    char *out_world_name,
     char *out_adv_path,
     char *out_stats_path,
     char *out_unlocks_path,
@@ -132,6 +133,7 @@ void find_latest_world_files(
     HANDLE h_find_world = FindFirstFileA(search_path, &find_world_data);
     if (h_find_world == INVALID_HANDLE_VALUE) {
         fprintf(stderr, "[PATH UTILS] Cannot find files in saves directory: %s. Error: %lu\n", saves_path, GetLastError());
+        out_world_name[0] = '\0';
         return;
     }
 
@@ -156,11 +158,17 @@ void find_latest_world_files(
 
     if (strlen(latest_world_name) == 0) {
         fprintf(stderr, "[PATH UTILS] No World directories found in saves path: %s\n", saves_path);
+        out_world_name[0] = '\0';
         out_adv_path[0] = '\0';
         out_stats_path[0] = '\0';
         return;
     }
-    printf("[PATH UTILS] Found latest world: %s\n", latest_world_name);
+
+
+    // Copy the found world name to the output buffer
+    strncpy(out_world_name, latest_world_name, max_len - 1);
+    out_world_name[max_len - 1] = '\0'; // Ensure null-termination
+    printf("[PATH UTILS] Found latest world: %s\n", out_world_name);
 
     WIN32_FIND_DATAA find_file_data;
     HANDLE h_find_file;
@@ -209,6 +217,7 @@ void find_latest_world_files(
 #else // LINUX/MAC
 void find_latest_world_files(
     const char *saves_path,
+    char *out_world_name,
     char *out_adv_path,
     char *out_stats_path,
     char *out_unlocks_path,
@@ -219,6 +228,7 @@ void find_latest_world_files(
     DIR *saves_dir = opendir(saves_path);
     if (!saves_dir) {
         fprintf(stderr, "[PATH UTILS] Cannot open saves directory: %s\n", saves_path);
+        out_world_name[0] = '\0';
         return;
     }
 
@@ -242,11 +252,17 @@ void find_latest_world_files(
 
     if (strlen(latest_world_name) == 0) {
         fprintf(stderr, "[PATH UTILS] No world directories found in saves path: %s\n", saves_path);
+        out_world_name[0] = '\0';
         out_adv_path[0] = '\0';
         out_stats_path[0] = '\0';
         out_unlocks_path[0] = '\0';
         return;
     }
+
+
+    // Copy latest world name to output buffer
+    strncpy(out_world_name, latest_world_name, max_len - 1);
+    out_world_name[max_len - 1] = '\0';
     printf("[PATH UTILS] Found latest world: %s\n", latest_world_name);
 
     char folder_path[MAX_PATH_LEN];

@@ -49,6 +49,7 @@ bool get_saves_path(char *out_path, size_t max_len, PathMode mode, const char* m
  * and stats files based on the provided boolean flags.
  *
  * @param saves_path The full path to the .minecraft/saves directory.
+ * @param out_world_name A buffer to store the name of the latest world.
  * @param out_adv_path A buffer to store the path to the advancements JSON file.
  * @param out_stats_path A buffer to store the path to the stats JSON file.
  * @param out_unlocks_path A buffer to store the path to the unlocks JSON file.
@@ -58,6 +59,7 @@ bool get_saves_path(char *out_path, size_t max_len, PathMode mode, const char* m
  */
 void find_latest_world_files(
     const char *saves_path,
+    char *out_world_name,
     char *out_adv_path,
     char *out_stats_path,
     char *out_unlocks_path,
