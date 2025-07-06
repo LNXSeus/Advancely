@@ -95,6 +95,13 @@ int main(int argc, char *argv[]) {
 
         dmon_init();
 
+        AppSettings app_settings;
+        settings_load(&app_settings);
+        // construct_template_paths(&app_settings); // TODO: Do we need this here?
+
+        SDL_SetAtomicInt(&g_needs_update, 1);
+        SDL_SetAtomicInt(&g_settings_changed, 0);
+
         // HARDCODED SETTINGS DIRECTORY
         printf("[DMON - MAIN] Watching config directory: resources/config/\n");
         dmon_watch("resources/config/", settings_watch_callback, 0, NULL);
@@ -108,31 +115,23 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "[DMON - MAIN] Failed to watch saves directory as it's empty: %s\n", tracker->saves_path);
         }
 
-        // Initialize the atomic flag to 1 to trigger an initial update.
-        SDL_SetAtomicInt(&g_needs_update, 1);
-        SDL_SetAtomicInt(&g_settings_changed, 0);
-
         bool is_running = true;
         bool settings_opened = false;
-        float last_frame_time = (float) SDL_GetTicks();
+        Uint32 last_frame_time = SDL_GetTicks();
+        static Uint32 last_hotkey_time = 0;
 
         // Unified Main Loop at 60 FPS
         while (is_running) {
-            float current_time = (float) SDL_GetTicks();
-            float deltaTime = (current_time - last_frame_time) / 1000.0f;
+            Uint32 current_time = SDL_GetTicks();
+            float deltaTime = (float)(current_time - last_frame_time) / 1000.0f;
             last_frame_time = current_time;
 
             // --- Per-Frame Logic ---
 
             handle_global_events(tracker, overlay, settings, &is_running, &settings_opened, &deltaTime);
-            const Uint8 *key_state = (const Uint8 *)SDL_GetKeyboardState(NULL); // For counter hotkeys
-            static Uint32 last_hotkey_time = 0; // Prevent rapid-fire counting
 
-            // HOTKEY LOGIC
-
-            if (SDL_GetTicks() - last_hotkey_time > HOTKEY_PRESS_DELAY) { // 100 ms to prevent rapid-fire counting
-                AppSettings app_settings;
-                settings_load(&app_settings); // Load settings to get current hotkey bindings
+            if (current_time - last_hotkey_time > HOTKEY_PRESS_DELAY) {
+                const Uint8 *key_state = (const Uint8 *)SDL_GetKeyboardState(NULL);
                 bool changed = false;
 
                 for (int i = 0; i < app_settings.hotkey_count; i++) {
@@ -156,10 +155,15 @@ int main(int argc, char *argv[]) {
                         target_goal->progress--;
                         changed = true;
                     }
+
+                    if (changed) break; // Only process one hotkey at a time
                 }
 
                 if (changed) {
                     last_hotkey_time = SDL_GetTicks(); // Update timestamp
+
+                    // Single point of truth for saving custom progress
+                    settings_save_custom_progress(tracker->template_data);
 
                     // Use the flexible save system
                     cJSON *settings = settings_read_full();
@@ -182,7 +186,7 @@ int main(int argc, char *argv[]) {
                         settings_write_full(settings);
                         cJSON_Delete(settings);
                     }
-                    SDL_SetAtomicInt(&g_needs_update, 1); // Trigger UI update
+                    // SDL_SetAtomicInt(&g_needs_update, 1); // Trigger UI update  // TODO: Is this needed?
                 }
             }
 

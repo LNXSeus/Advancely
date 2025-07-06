@@ -843,13 +843,12 @@ void settings_save_custom_progress(TemplateData *td) {
         // Update the progress for each custom goal
         for (int i = 0; i < td->custom_goal_count; i++) {
             TrackableItem *item = td->custom_goals[i];
-            cJSON *item_json = cJSON_GetObjectItem(progress_obj, item->root_name);
 
             // Update the progress
-            if (item_json) {
-                cJSON_SetNumberValue(item_json, item->progress);
-            } else { // If it doesn't exist, add it
-                cJSON_AddNumberToObject(progress_obj, item->root_name, item->progress);
+            if (item->goal > 0) {
+                cJSON_ReplaceItemInObject(progress_obj, item->root_name, cJSON_CreateNumber(item->progress));
+            } else {
+                cJSON_ReplaceItemInObject(progress_obj, item->root_name, cJSON_CreateBool(item->done));
             }
 
         }
@@ -858,9 +857,11 @@ void settings_save_custom_progress(TemplateData *td) {
         FILE *file = fopen(SETTINGS_FILE_PATH, "w");
         if (file) {
             char *json_str = cJSON_Print(settings_json); // render the cJSON object to text
-            fputs(json_str, file); // write to the file
+            if (file) {
+                fputs(json_str, file); // write to the file
+                free(json_str);
+            }
             fclose(file);
-            free(json_str);
         } else {
             fprintf(stderr, "[TRACKER] Failed to open settings file for writing.\n");
         }
