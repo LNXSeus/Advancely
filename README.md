@@ -22,7 +22,7 @@
 
 * **Multi-Stage Goals**: Create long-term objectives that combine several smaller steps. A single goal can require you to first achieve an advancement, then reach a certain statistic, then an unlock (from the 25w14craftmine) and lastly complete another advancement in sequence.
 
-* **Custom Counters with Hotkeys and Manual Tracking**: For goals that can't be automatically tracked (like counting amount of structures visited or finding specific items), you can create custom counters or check them off manually. Set a target value in your template and use configurable hotkeys to increment or decrement the count. List of hotkeys can be found [here](https://pastebin.com/vPKgWAen). All progress is saved automatically back into `settings.json`.
+* **Custom Counters with Hotkeys and Manual Tracking**: For goals that can't be automatically tracked (like counting amount of structures visited or finding specific items), you can create custom counters or check them off manually. Set a target value in your template and use configurable hotkeys to increment or decrement the count. List of hotkeys can be found [here](https://pastebin.com/vPKgWAen). Currently the hotkeys only work when tabbed into the tracker window. All progress is saved automatically back into `settings.json`.
 
 ## Customization
 
