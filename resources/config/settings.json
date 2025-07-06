@@ -16,8 +16,8 @@
   "hotkeys": [
     {
       "target_goal": "custom:deepslate_emerald_count",
-      "increment_key": "PageUp",
-      "decrement_key": "PageDown"
+      "increment_key": "O",
+      "decrement_key": "L"
     },
     {
       "target_goal": "custom:diamond_ore_count",
