@@ -199,6 +199,10 @@ int main(int argc, char *argv[]) {
             if (SDL_SetAtomicInt(&g_settings_changed, 0) == 1) {
                 printf("[MAIN] Settings changed. Re-initializing paths and file watcher.\n");
 
+                // Update hotkeys during runtime
+                settings_load(&app_settings); // Reload settings
+
+
                 // Stop watching the old directory
                 dmon_unwatch(saves_watcher_id);
 
@@ -221,9 +225,9 @@ int main(int argc, char *argv[]) {
             // Atomically check if the flag is 1, and if so, set it to 0.
             if (SDL_SetAtomicInt(&g_needs_update, 0) == 1) {
                 // Re-scan for the latest world to handle world switching
-                AppSettings app_settings;
-                settings_load(&app_settings); // Also constructs the template paths
-                MC_Version version = settings_get_version_from_string(app_settings.version_str);
+                AppSettings current_settings;
+                settings_load(&current_settings); // Also constructs the template paths
+                MC_Version version = settings_get_version_from_string(current_settings.version_str);
                 find_latest_world_files(
                     tracker->saves_path,
                     tracker->world_name,
