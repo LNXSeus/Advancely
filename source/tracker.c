@@ -880,8 +880,10 @@ static void format_time(long long ticks, char *output, size_t max_len) {
         snprintf(output, max_len, "%lld %02lld:%02lld:%02lld.%03lld", days, hours, minutes, seconds, milliseconds);
     } else if (hours > 0) {
         snprintf(output, max_len, "%02lld:%02lld:%02lld.%03lld", hours, minutes, seconds, milliseconds);
-    } else {
+    } else if (minutes > 0) {
         snprintf(output, max_len, "%02lld:%02lld.%03lld", minutes, seconds, milliseconds);
+    } else {
+        snprintf(output, max_len, "%02lld.%03lld", seconds, milliseconds);
     }
 }
 
