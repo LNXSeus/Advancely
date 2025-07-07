@@ -865,7 +865,7 @@ static void format_category_string(const char *input, char *output, size_t max_l
  * @param max_len The size of the output buffer.
  */
 
-static void format_time(int ticks, char *output, size_t max_len) {
+static void format_time(long long ticks, char *output, size_t max_len) {
     if (!output || max_len == 0) return;
 
     long long total_seconds = ticks / 20;
@@ -875,7 +875,14 @@ static void format_time(int ticks, char *output, size_t max_len) {
     long long seconds = total_seconds % 60;
     long long milliseconds = ticks % 20 * 50;
 
-    snprintf(output, max_len, "%02lld:%02lld:%02lld:%02lld.%02lld", days, hours, minutes, seconds, milliseconds);
+    // Use a more compact format for the title bar
+    if (days > 0) {
+        snprintf(output, max_len, "%lld %02lld:%02lld:%02lld.%03lld", days, hours, minutes, seconds, milliseconds);
+    } else if (hours > 0) {
+        snprintf(output, max_len, "%02lld:%02lld:%02lld.%03lld", hours, minutes, seconds, milliseconds);
+    } else {
+        snprintf(output, max_len, "%02lld:%02lld.%03lld", minutes, seconds, milliseconds);
+    }
 }
 
 
@@ -1191,6 +1198,30 @@ void tracker_free(struct Tracker **tracker) {
     }
 }
 
+void tracker_update_title(struct Tracker *t, const AppSettings *settings) {
+    if (!t || !t->template_data || !settings) return;
+
+    char title_buffer[512];
+    char formatted_category[128];
+    char formatted_time[64];
+
+    format_category_string(settings->category, formatted_category, sizeof(formatted_category));
+    format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
+
+    // Creating the title buffer
+    snprintf(title_buffer, sizeof(title_buffer),
+             "Advancely    -    %s    -    %s    -    %s    |    Adv: %d/%d    |    Progress: %.2f%%    |    %s",
+             t->world_name,
+             settings->version_str,
+             formatted_category,
+             t->template_data->advancements_completed_count,
+             t->template_data->advancement_count,
+             t->template_data->overall_progress_percentage,
+             formatted_time);
+
+    // Putting buffer into Window title
+    SDL_SetWindowTitle(t->window, title_buffer);
+}
 
 void tracker_print_debug_status(struct Tracker *t) {
     if (!t || !t->template_data) return;
@@ -1202,7 +1233,7 @@ void tracker_print_debug_status(struct Tracker *t) {
     format_category_string(settings.category, formatted_category, sizeof(formatted_category));
 
     // Format the time to DD:HH:MM:SS.MS
-    char formatted_time[32];
+    char formatted_time[128];
     format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
 
     printf("\n============================================================\n");

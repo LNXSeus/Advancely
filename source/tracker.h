@@ -126,6 +126,17 @@ void tracker_load_and_parse_data(struct Tracker *t);
 void tracker_free(struct Tracker **tracker);
 
 /**
+ * @brief Updates the tracker window's title with dynamic information.
+ *
+ * Constructs a detailed title string including world name, version, category,
+ * progress, and playtime, then sets it as the window title.
+ *
+ * @param t A pointer to the Tracker struct containing the live data.
+ * @param settings A pointer to the application settings.
+ */
+void tracker_update_title(struct Tracker *t, const AppSettings *settings);
+
+/**
  * @brief Prints the current advancement status to the console.
  *
  * This function is for debugging and prints progress on advancements, stats, unlocks,
