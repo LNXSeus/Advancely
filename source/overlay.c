@@ -5,7 +5,7 @@
 #include "overlay.h"
 #include "init_sdl.h"
 
-bool overlay_new(struct Overlay **overlay) {
+bool overlay_new(struct Overlay **overlay, const AppSettings *settings) {
     // dereference once and use calloc
     *overlay = calloc(1, sizeof(struct Overlay));
     // Check here if calloc failed
@@ -17,16 +17,18 @@ bool overlay_new(struct Overlay **overlay) {
     // temp variable to not dereference over and over again
     struct Overlay *o = *overlay;
 
-    if (!overlay_init_sdl(o)) {
+    if (!overlay_init_sdl(o, settings)) {
+        overlay_free(overlay);
         return false;
     }
     return true;
 }
 
 
-void overlay_events(struct Overlay *o, SDL_Event *event, bool *is_running, float *deltaTime) {
+void overlay_events(struct Overlay *o, SDL_Event *event, bool *is_running, float *deltaTime,
+                    const AppSettings *settings) {
     (void) o;
-    (void) is_running;
+    (void) settings;
 
     switch (event->type) {
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
@@ -39,6 +41,7 @@ void overlay_events(struct Overlay *o, SDL_Event *event, bool *is_running, float
                 case SDL_SCANCODE_SPACE:
                     printf("[OVERLAY] Overlay Space key pressed, speeding up tracker.\n");
                     // speed up tracker
+                    // The speedup is applied to deltaTime, which affect the update rate of the animation in overlay_update()
                     *deltaTime *= OVERLAY_SPEEDUP_FACTOR;
                     break;
                 default:
@@ -60,20 +63,31 @@ void overlay_events(struct Overlay *o, SDL_Event *event, bool *is_running, float
     }
 }
 
-void overlay_update(struct Overlay *o, float *deltaTime) {
+void overlay_update(struct Overlay *o, float *deltaTime, const AppSettings *settings) {
     // Game logic here
-    (void) o;
-    (void) deltaTime;
+    // Animate the scroll offset
+    float scroll_speed = settings->overlay_scroll_speed;
+    float direction = settings->overlay_scroll_left_to_right ? 1.0f : -1.0f;
+
+    // TODO: Adjust the 50.0f is just arbitrary multiplier
+    // Can be turned into a setting later
+    o->scroll_offset += scroll_speed * direction * (*deltaTime) * 50.0f;
+
+    // TODO: Wrap scroll_offset based on the total width of rendered overlay content.
+    // For example: if (o->scroll_offset > total_content_width) { o->scroll_offset = 0; }
 }
 
 
-void overlay_render(struct Overlay *o) {
-    SDL_SetRenderDrawColor(o->renderer, OVERLAY_BACKGROUND_COLOR.r, OVERLAY_BACKGROUND_COLOR.g,
-                           OVERLAY_BACKGROUND_COLOR.b, OVERLAY_BACKGROUND_COLOR.a);
+void overlay_render(struct Overlay *o, const AppSettings *settings) {
+    SDL_SetRenderDrawColor(o->renderer, settings->overlay_bg_color.r, settings->overlay_bg_color.g,
+                           settings->overlay_bg_color.b, settings->overlay_bg_color.a);
     // Clear the screen
     SDL_RenderClear(o->renderer);
 
     // DRAWING HAPPENS HERE
+
+    // TODO: When rendering items, use o->scroll_offset and settings->goal_align_left
+    // to determine their position on the screen.
 
     // TODO: Draw the title text. This requires the SDL_ttf library,
     // which you already have included in main.h. You would load a font,
@@ -85,7 +99,7 @@ void overlay_render(struct Overlay *o) {
 }
 
 void overlay_free(struct Overlay **overlay) {
-    if (*overlay) {
+    if (overlay && *overlay) {
         struct Overlay *o = *overlay;
 
         if (o->renderer) {

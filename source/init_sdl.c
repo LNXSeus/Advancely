@@ -4,17 +4,31 @@
 
 #include "init_sdl.h" //  includes tracker.h and then main.h through that
 
-bool tracker_init_sdl(struct Tracker *t) {
+bool tracker_init_sdl(struct Tracker *t, const AppSettings *settings) {
     if (!SDL_Init(SDL_FLAGS)) {
         fprintf(stderr, "[INIT SDL] Failed to initialize SDL3: %s\n", SDL_GetError());
         return false;
     }
 
-    t->window = SDL_CreateWindow(TRACKER_TITLE, TRACKER_WIDTH, TRACKER_HEIGHT, SDL_TRACKER_WINDOW_FLAGS);
+    Uint32 window_flags = SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE; // TODO: Look into SDL_WINDOW_HIGH_PIXEL_DENSITY
+    if (settings->tracker_always_on_top) {
+        window_flags |= SDL_WINDOW_ALWAYS_ON_TOP;
+    }
+
+    // Use loaded settings for window creation, with SDL_WINDOWPOS_CENTERED as a fallback
+    int x = (settings->tracker_window.x == DEFAULT_WINDOW_POS) ? (int)SDL_WINDOWPOS_CENTERED : settings->tracker_window.x;
+    int y = (settings->tracker_window.y == DEFAULT_WINDOW_POS) ? (int)SDL_WINDOWPOS_CENTERED : settings->tracker_window.y;
+    int w = (settings->tracker_window.w == DEFAULT_WINDOW_SIZE) ? 1440 : settings->tracker_window.w;
+    int h = (settings->tracker_window.h == DEFAULT_WINDOW_SIZE) ? 900 : settings->tracker_window.h;
+
+    t->window = SDL_CreateWindow(TRACKER_TITLE, w, h, window_flags);
     if (!t->window) {
         fprintf(stderr, "[INIT SDL] Failed to create tracker window: %s\n", SDL_GetError());
         return false;
     }
+
+    // Set position after creation to handle multi-monitor setups better
+    SDL_SetWindowPosition(t->window, x, y);
 
     t->renderer = SDL_CreateRenderer(t->window, NULL);
 
@@ -29,12 +43,20 @@ bool tracker_init_sdl(struct Tracker *t) {
 }
 
 
-bool overlay_init_sdl(struct Overlay *o) {
-    o->window = SDL_CreateWindow(OVERLAY_TITLE, OVERLAY_WIDTH, OVERLAY_HEIGHT, SDL_OVERLAY_WINDOW_FLAGS);
+bool overlay_init_sdl(struct Overlay *o, const AppSettings *settings) {
+    Uint32 window_flags = SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
+
+    int x = (settings->overlay_window.x == DEFAULT_WINDOW_POS) ? (int)SDL_WINDOWPOS_CENTERED : settings->overlay_window.x;
+    int y = (settings->overlay_window.y == DEFAULT_WINDOW_POS) ? (int)SDL_WINDOWPOS_CENTERED : settings->overlay_window.y;
+    int w = (settings->overlay_window.w == DEFAULT_WINDOW_SIZE) ? 1440 : settings->overlay_window.w;
+    int h = (settings->overlay_window.h == DEFAULT_WINDOW_SIZE) ? 420 : settings->overlay_window.h;
+
+    o->window = SDL_CreateWindow(OVERLAY_TITLE, w, h, window_flags);
     if (!o->window) {
         fprintf(stderr, "[INIT SDL] Failed to create overlay window: %s\n", SDL_GetError());
         return false;
     }
+    SDL_SetWindowPosition(o->window, x, y);
 
     o->renderer = SDL_CreateRenderer(o->window, NULL);
 
@@ -43,17 +65,29 @@ bool overlay_init_sdl(struct Overlay *o) {
         return false;
     } // Then destroy the renderer in overlay_free
 
-
     printf("[INIT SDL] Overlay initialized!\n"); // Shows through MINGW64, not terminal ./Advancely to run
     return true;
 }
 
-bool settings_init_sdl(struct Settings *s) {
+bool settings_init_sdl(struct Settings *s, const AppSettings *settings) {
+    (void)settings;
+    // Settings window opens relative to the tracker window
+    int tracker_x, tracker_y;
+    SDL_GetWindowPosition(s->parent_window, &tracker_x, &tracker_y);
+
+    // Center the settings window over the tracker window
+    int x = tracker_x + ((settings->tracker_window.w - SETTINGS_WIDTH)/2); // + (SETTINGS_WIDTH / 2) // settings->tracker_window.w comes out as -1
+    int y = tracker_y + ((settings->tracker_window.h- SETTINGS_HEIGHT)/2); // + (SETTINGS_HEIGHT / 2)
+
+    printf("[INIT SDL] Tracker W: %d, H: %d\n", settings->tracker_window.w, settings->tracker_window.h);
+
+    // Settings window is NOT USER CONFIGURABLE SO HARDCODED HERE
     s->window = SDL_CreateWindow(SETTINGS_TITLE, SETTINGS_WIDTH, SETTINGS_HEIGHT, SDL_SETTINGS_WINDOW_FLAGS);
     if (!s->window) {
         fprintf(stderr, "[INIT SDL] Failed to create settings window: %s\n", SDL_GetError());
         return false;
     }
+    SDL_SetWindowPosition(s->window, x, y);
 
     s->renderer = SDL_CreateRenderer(s->window, NULL);
 

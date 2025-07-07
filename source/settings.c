@@ -5,7 +5,7 @@
 #include "settings.h"
 #include "init_sdl.h"
 
-bool settings_new(struct Settings **settings) {
+bool settings_new(struct Settings **settings, const AppSettings *app_settings, SDL_Window *parent) {
     // dereference once and use calloc
     *settings = calloc(1, sizeof(struct Settings));
     // Check here if calloc failed
@@ -16,8 +16,10 @@ bool settings_new(struct Settings **settings) {
 
     // temp variable to dereference over and over again
     struct Settings *s = *settings;
+    s->parent_window = parent; // Store the parent window
 
-    if (!settings_init_sdl(s)) {
+    if (!settings_init_sdl(s, app_settings)) {
+        settings_free(settings);
         return false;
     }
     return true;
@@ -64,9 +66,9 @@ void settings_update(struct Settings *s, float *deltaTime) {
 }
 
 
-void settings_render(struct Settings *s) {
-    SDL_SetRenderDrawColor(s->renderer, SETTINGS_BACKGROUND_COLOR.r, SETTINGS_BACKGROUND_COLOR.g,
-                           SETTINGS_BACKGROUND_COLOR.b, SETTINGS_BACKGROUND_COLOR.a);
+void settings_render(struct Settings *s, const AppSettings *app_settings) {
+    SDL_SetRenderDrawColor(s->renderer, app_settings->settings_bg_color.r, app_settings->settings_bg_color.g,
+                           app_settings->settings_bg_color.b, app_settings->settings_bg_color.a);
     // Clear the screen
     SDL_RenderClear(s->renderer);
 
@@ -77,7 +79,7 @@ void settings_render(struct Settings *s) {
 }
 
 void settings_free(struct Settings **settings) {
-    if (*settings) {
+    if (settings && *settings) {
         struct Settings *s = *settings;
 
         if (s->renderer) {
@@ -94,8 +96,6 @@ void settings_free(struct Settings **settings) {
             s->window = NULL;
         }
 
-        // SDL_Quit(); // This is ONCE for all windows in the main loop
-
         // settings is heap allocated so free it
         free(s);
         s = NULL;
@@ -104,4 +104,3 @@ void settings_free(struct Settings **settings) {
         printf("[SETTINGS] Settings freed!\n");
     }
 }
-

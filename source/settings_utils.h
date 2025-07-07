@@ -8,11 +8,28 @@
 #include <cJSON.h>
 
 #include "path_utils.h"
-#include "tracker.h" // TODO: Has tracker struct for when the static functions from tracker.c are moved over here
+#include "data_structures.h" // For TemplateData
 
 #define SETTINGS_FILE_PATH "resources/config/settings.json"
 #define MAX_HOTKEYS 16 // Limit for amount of hotkeys
-#define HOTKEY_PRESS_DELAY 100 // ms
+#define HOTKEY_PRESS_DELAY 100 // Handled by the event loop in "global_event_handler.c" // TODO: Should be removable soon
+
+// DEFAULT values
+#define DEFAULT_FPS 60
+#define DEFAULT_TRACKER_ALWAYS_ON_TOP true
+#define DEFAULT_OVERLAY_SCROLL_SPEED 1.0f
+#define DEFAULT_OVERLAY_SCROLL_LEFT_TO_RIGHT true
+#define DEFAULT_GOAL_ALIGN_LEFT true
+
+// Default window positions/sizes. -1 means centered or default size.
+#define DEFAULT_WINDOW_POS -1
+#define DEFAULT_WINDOW_SIZE -1
+
+// Default colors when it's just {} in settings.json, so no r, g, b, a values
+#define DEFAULT_TRACKER_BG_COLOR (ColorRGBA){13, 17, 23, 255}
+#define DEFAULT_OVERLAY_BG_COLOR (ColorRGBA){0, 80, 255, 255}
+#define DEFAULT_SETTINGS_BG_COLOR (ColorRGBA){13, 17, 23, 255}
+#define DEFAULT_TEXT_COLOR (ColorRGBA){255, 255, 255, 255}
 
 typedef struct {
     char target_goal[192];
@@ -21,7 +38,8 @@ typedef struct {
 } HotkeyBinding;
 
 // TODO: Define versions here and in VersionMapEntry in settings_utils.c
-typedef enum { // Puts vaLue starting at 0, allows for comparisons
+typedef enum {
+    // Puts vaLue starting at 0, allows for comparisons
     MC_VERSION_1_11,
     MC_VERSION_1_12,
     MC_VERSION_1_16_1,
@@ -30,9 +48,21 @@ typedef enum { // Puts vaLue starting at 0, allows for comparisons
     MC_VERSION_UNKNOWN, // For error handling
 } MC_Version;
 
+// Data structures for settings
+typedef struct {
+    int x, y, w, h;
+} WindowRect;
+
+typedef struct {
+    Uint8 r, g, b, a;
+} ColorRGBA;
+
+// A Struct to hold all application settings in one place
+
 // A struct to hold all application settings in one place
 // TODO: Remember window position in settings.json
-typedef struct { // names should match json keys
+typedef struct {
+    // names should match json keys
     char version_str[64]; // Store version as string
     PathMode path_mode;
     char manual_saves_path[MAX_PATH_LENGTH]; // path length from path_utils.h
@@ -46,8 +76,24 @@ typedef struct { // names should match json keys
     // Hotkeys
     int hotkey_count;
     HotkeyBinding hotkeys[MAX_HOTKEYS]; // Array of hotkey bindings
-} AppSettings;
 
+    // General and Visual Settings
+    float fps;
+    bool tracker_always_on_top;
+    float overlay_scroll_speed;
+    bool overlay_scroll_left_to_right;
+    bool goal_align_left;
+
+    // Window Geometry
+    WindowRect tracker_window;
+    WindowRect overlay_window;
+
+    // Colors
+    ColorRGBA tracker_bg_color;
+    ColorRGBA overlay_bg_color;
+    ColorRGBA settings_bg_color;
+    ColorRGBA text_color;
+} AppSettings;
 
 
 /**
@@ -65,19 +111,6 @@ MC_Version settings_get_version_from_string(const char *version_str);
 PathMode settings_get_path_mode_from_string(const char *mode_str);
 
 /**
- * @brief Reads the entire settings.json file and returns it as a cJSON object.
- * The caller is responsible for deleting the cJSON object.
- * @return A cJSON pointer or NULL on failure.
- */
-cJSON *settings_read_full();
-
-/**
- * @brief Writes a cJSON object to the settings.json file, overwriting it.
- * @param json_to_write The cJSON object to save.
- */
-void settings_write_full(cJSON *json_to_write);
-
-/**
  * @brief Loads settings from the settings.json file.
  *
  * If the file doesn't exist or a setting is missing, it populates
@@ -85,8 +118,18 @@ void settings_write_full(cJSON *json_to_write);
  * `construct_template_paths` to build the final file paths.
  *
  * @param settings A pointer to the AppSettings struct to be populated.
+ * @return true if any default values were used (signaling a need to re-save), false otherwise.
  */
-void settings_load(AppSettings *settings);
+bool settings_load(AppSettings *settings);
+
+/**
+ * @brief Saves the entire AppSettings configuration to settings.json.
+ * It reads the existing file, updates values, and writes it back, preserving unknown fields.
+ * This is the new centralized save function.
+ * @param settings A pointer to the AppSettings struct containing the data to save.
+ * @param td A pointer to the TemplateData struct to save custom progress. Can be NULL.
+ */
+void settings_save(const AppSettings *settings, const TemplateData *td);
 
 /**
  * @brief Constructs the full paths to the template and language JSON files. Does NOT CREATE the files or load them.

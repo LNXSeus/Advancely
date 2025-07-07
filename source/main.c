@@ -19,12 +19,12 @@
 // Set to true initially to perform the first update
 
 // global flag TODO: Should be set to true when custom goal is checked off (manual update) -> SDL_SetAtomicInt(&g_needs_update, 1);
-static SDL_AtomicInt g_needs_update;
+// We make g_needs_update available to global_event_handler.h with external linkage
+SDL_AtomicInt g_needs_update;
 static SDL_AtomicInt g_settings_changed; // Watching when settings.json is modified to re-init paths
 
 // Global mutex to protect the watcher and paths (see they don't break when called in close succession)
 static SDL_Mutex *g_watcher_mutex = NULL;
-
 
 
 /**
@@ -71,12 +71,26 @@ static void settings_watch_callback(dmon_watch_id watch_id, dmon_action action, 
     }
 }
 
+
+// ------------------------------------ END OF STATIC FUNCTIONS ------------------------------------
+
+
 int main(int argc, char *argv[]) {
     // Satisfying Werror
     (void) argc;
     (void) argv;
 
+    // Expect the worst
     bool exit_status = EXIT_FAILURE;
+
+    // Load settings ONCE at the start and check if file was incomplete to use default values
+    // settings_load() returns true if the file was incomplete and used default values
+    AppSettings app_settings;
+    if (settings_load(&app_settings)) {
+        printf("[MAIN] Settings file was incomplete or missing, saving with default values.\n");
+        settings_save(&app_settings, NULL); // Save complete settings back to the file
+    }
+
 
     struct Tracker *tracker = NULL; // pass address to function
     struct Overlay *overlay = NULL;
@@ -84,20 +98,15 @@ int main(int argc, char *argv[]) {
 
     // Variable to hold the ID of our saves watcher
     dmon_watch_id saves_watcher_id;
-    g_watcher_mutex = SDL_CreateMutex();
 
+    g_watcher_mutex = SDL_CreateMutex();
     if (!g_watcher_mutex) {
         fprintf(stderr, "[MAIN] Failed to create mutex: %s\n", SDL_GetError());
         return EXIT_FAILURE;
     }
 
-    if (tracker_new(&tracker) && overlay_new(&overlay)) {
-
+    if (tracker_new(&tracker, &app_settings) && overlay_new(&overlay, &app_settings)) {
         dmon_init();
-
-        AppSettings app_settings;
-        settings_load(&app_settings);
-
         SDL_SetAtomicInt(&g_needs_update, 1);
         SDL_SetAtomicInt(&g_settings_changed, 0);
 
@@ -117,77 +126,18 @@ int main(int argc, char *argv[]) {
         bool is_running = true;
         bool settings_opened = false;
         Uint32 last_frame_time = SDL_GetTicks();
-        static Uint32 last_hotkey_time = 0;
+        float frame_target_time = 1000.0f / app_settings.fps;
 
         // Unified Main Loop at 60 FPS
         while (is_running) {
             Uint32 current_time = SDL_GetTicks();
-            float deltaTime = (float)(current_time - last_frame_time) / 1000.0f;
+            float deltaTime = (float) (current_time - last_frame_time) / 1000.0f;
             last_frame_time = current_time;
 
             // --- Per-Frame Logic ---
 
-            handle_global_events(tracker, overlay, settings, &is_running, &settings_opened, &deltaTime);
+            handle_global_events(tracker, overlay, settings, &app_settings, &is_running, &settings_opened, &deltaTime);
 
-            if (current_time - last_hotkey_time > HOTKEY_PRESS_DELAY) {
-                const Uint8 *key_state = (const Uint8 *)SDL_GetKeyboardState(NULL);
-                bool changed = false;
-
-                for (int i = 0; i < app_settings.hotkey_count; i++) {
-                    HotkeyBinding *hb = &app_settings.hotkeys[i];
-                    TrackableItem *target_goal = NULL;
-
-                    // Find the goal this hotkey is bound to
-                    for (int j = 0; j < tracker->template_data->custom_goal_count; j++) {
-                        if (strcmp(tracker->template_data->custom_goals[j]->root_name, hb->target_goal) == 0) {
-                            target_goal = tracker->template_data->custom_goals[j];
-                            break;
-                        }
-                    }
-                    if (!target_goal) continue;
-
-                    // Check if increment or decrement key is pressed
-                    if (key_state[hb->increment_scancode]) {
-                        target_goal->progress++;
-                        changed = true;
-                    } else if (key_state[hb->decrement_scancode]) {
-                        target_goal->progress--;
-                        changed = true;
-                    }
-
-                    if (changed) break; // Only process one hotkey at a time
-                }
-
-                // Save custom progress with hotkeys
-                if (changed) {
-                    last_hotkey_time = SDL_GetTicks(); // Update timestamp
-
-                    // Single point of truth for saving custom progress
-                    settings_save_custom_progress(tracker->template_data);
-
-                    // Use the flexible save system
-                    cJSON *settings = settings_read_full();
-                    if (settings) {
-                        cJSON *progress_obj = cJSON_GetObjectItem(settings, "custom_progress");
-                        if (!progress_obj) {
-                            // If it doesn't exist, create it
-                            progress_obj = cJSON_AddObjectToObject(settings, "custom_progress");
-                        }
-
-                        // Save all custom goals back to the object
-                        for (int i = 0; i < tracker->template_data->custom_goal_count; i++) {
-                            TrackableItem *item = tracker->template_data->custom_goals[i];
-                            if (item->goal > 0) { // Save numbers for counters
-                                cJSON_ReplaceItemInObject(progress_obj, item->root_name, cJSON_CreateNumber(item->progress));
-                            } else { // Save booleans for toggles
-                                cJSON_ReplaceItemInObject(progress_obj, item->root_name, cJSON_CreateBool(item->done));
-                            }
-                        }
-                        settings_write_full(settings);
-                        cJSON_Delete(settings);
-                    }
-                }
-            }
 
             // Close immediately if app not running
             if (!is_running) break;
@@ -201,6 +151,12 @@ int main(int argc, char *argv[]) {
 
                 // Update hotkeys during runtime
                 settings_load(&app_settings); // Reload settings
+                frame_target_time = 1000.0f / app_settings.fps; // Update frame limiter if fps has changed in settings
+
+                // Change always on top flag during runtime in settings.json
+                if (!settings_opened) {
+                    SDL_SetWindowAlwaysOnTop(tracker->window, app_settings.tracker_always_on_top);
+                }
 
 
                 // Stop watching the old directory
@@ -212,9 +168,11 @@ int main(int argc, char *argv[]) {
                 // Start watching the new directory
                 if (strlen(tracker->saves_path) > 0) {
                     printf("[MAIN] Now watching new saves directory: %s\n", tracker->saves_path);
-                    saves_watcher_id = dmon_watch(tracker->saves_path, global_watch_callback, DMON_WATCHFLAGS_RECURSIVE, NULL);
+                    saves_watcher_id = dmon_watch(tracker->saves_path, global_watch_callback, DMON_WATCHFLAGS_RECURSIVE,
+                                                  NULL);
                 } else {
-                    fprintf(stderr, "[MAIN] Failed to watch new saves directory as it's empty: %s\n", tracker->saves_path);
+                    fprintf(stderr, "[MAIN] Failed to watch new saves directory as it's empty: %s\n",
+                            tracker->saves_path);
                 }
 
                 // Force an update from the new path
@@ -249,28 +207,30 @@ int main(int argc, char *argv[]) {
 
             // Initialize settings when not opened
             if (settings_opened && settings == NULL) {
-                // Showing settings if window is closed
-                if (!settings_new(&settings)) settings_opened = false;
+                // Disable always-on-top before opening settings
+                SDL_SetWindowAlwaysOnTop(tracker->window, false);
+                if (!settings_new(&settings, &app_settings, tracker->window)) settings_opened = false;
             } else if (!settings_opened && settings != NULL) {
-                // Free it
+                // Restore always-on-top statues based on settings when closing settings
+                SDL_SetWindowAlwaysOnTop(tracker->window, app_settings.tracker_always_on_top);
                 settings_free(&settings);
             }
 
             // Freeze other windows when settings are opened
             if (settings_opened && settings != NULL) {
                 settings_update(settings, &deltaTime);
-                settings_render(settings);
+                settings_render(settings, &app_settings);
             } else {
                 // Overlay animations should run every frame
-                overlay_update(overlay, &deltaTime);
-                tracker_render(tracker);
-                overlay_render(overlay);
+                overlay_update(overlay, &deltaTime, &app_settings);
+                tracker_render(tracker, &app_settings);
+                overlay_render(overlay, &app_settings);
             }
 
             // --- Frame limiting ---
             const float frame_time = (float) SDL_GetTicks() - current_time;
-            if (frame_time < FRAME_TARGET_TIME) {
-                SDL_Delay(FRAME_TARGET_TIME - frame_time);
+            if (frame_time < frame_target_time) {
+                SDL_Delay((Uint32) (frame_target_time - frame_time));
             }
         }
         exit_status = EXIT_SUCCESS;
