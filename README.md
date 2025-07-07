@@ -2,7 +2,7 @@
 
 # A highly customizable tool to track Minecraft progress beyond just Advancements. <br>
 ## This tracker supports modded advancements/recipes, custom statistics, unlocks, multi-stage goals, manual goals and custom counters. <br>
-### This tracker is built to be flexible, supporting everything from vanilla to heavily modded unique data packs. It automatically detects changes in your latest world save file, providing real-time progress updates.
+### This tracker is built to be flexible, supporting everything from vanilla, through modded advancements and even custom datapacks. It automatically detects changes in your latest world save file, providing real-time progress updates.
 
 ## Download (Windows, Linux, MacOS)
 
@@ -30,6 +30,9 @@ The true power of Advancely lies in its customization. You can define exactly wh
 
 You select the minecraft version, the category, all the advancements, statistics, goals you want to track with custom translations. The tracker will then parse your template and track progress against the goals you've defined.
 
+## Supported Minecraft Versions (Java Edition Only)
+
+This tracker supports **any version** from Minecraft 1.0 upwards. It does so by only reading from the stats file for any version prior to 1.12. From 1.12 upwards in reads the stats and advancements file and for the 25w14craftmine snapshot it additionally reads the unlocks file.
 
 ## How To Use
 

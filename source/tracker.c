@@ -909,7 +909,7 @@ bool tracker_new(struct Tracker **tracker, const AppSettings *settings) {
     }
 
     // Initialize paths (also during runtime)
-    tracker_reinit_paths(t);
+    tracker_reinit_paths(t, settings);
 
     // Parse the advancement template JSON file
     tracker_load_and_parse_data(t);
@@ -1029,17 +1029,17 @@ void tracker_render(struct Tracker *t, const AppSettings *settings) {
     SDL_RenderPresent(t->renderer);
 }
 
-void tracker_reinit_template(struct Tracker *t) {
+void tracker_reinit_template(struct Tracker *t, const AppSettings *settings) {
     if (!t) return;
 
     printf("[TRACKER] Re-initializing template...\n");
 
     // Update the paths from settings.json
-    tracker_reinit_paths(t);
+    tracker_reinit_paths(t, settings);
 
     // Free all the old advancement, stat, etc. data
     if (t->template_data) {
-        tracker_free_template_data(t->template_data);
+        // tracker_free_template_data(t->template_data); // TODO: Remove this when possible
 
         // Reset the entire struct to zero to clear dangling pointers and old counts.
         memset(t->template_data, 0, sizeof(TemplateData));
@@ -1049,24 +1049,22 @@ void tracker_reinit_template(struct Tracker *t) {
     tracker_load_and_parse_data(t);
 }
 
-void tracker_reinit_paths(struct Tracker *t) {
-    if (!t) return;
+void tracker_reinit_paths(struct Tracker *t, const AppSettings *settings) {
+    if (!t || !settings) return;
 
-    AppSettings settings;
-    settings_load(&settings);
 
     // Copy the template and lang paths
-    strncpy(t->advancement_template_path, settings.template_path, MAX_PATH_LENGTH - 1);
+    strncpy(t->advancement_template_path, settings->template_path, MAX_PATH_LENGTH - 1);
     t->advancement_template_path[MAX_PATH_LENGTH - 1] = '\0';
-    strncpy(t->lang_path, settings.lang_path, MAX_PATH_LENGTH - 1);
+    strncpy(t->lang_path, settings->lang_path, MAX_PATH_LENGTH - 1);
     t->lang_path[MAX_PATH_LENGTH - 1] = '\0';
 
-    MC_Version version = settings_get_version_from_string(settings.version_str);
+    MC_Version version = settings_get_version_from_string(settings->version_str);
     bool use_advancements = (version >= MC_VERSION_1_12);
     bool use_unlocks = (version == MC_VERSION_25W14CRAFTMINE);
 
     // Get the final, normalized saves path using the loaded settings
-    if (get_saves_path(t->saves_path, MAX_PATH_LENGTH, settings.path_mode, settings.manual_saves_path)) {
+    if (get_saves_path(t->saves_path, MAX_PATH_LENGTH, settings->path_mode, settings->manual_saves_path)) {
         printf("[TRACKER] Using saves path: %s\n", t->saves_path);
 
         // Find the specific world files using the correct flag

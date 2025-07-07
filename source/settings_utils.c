@@ -256,109 +256,137 @@ bool settings_load(AppSettings *settings) {
         fprintf(stderr, "[SETTINGS UTILS] Failed to load settings file: %s. Using default settings.\n",
                 SETTINGS_FILE_PATH);
         defaults_were_used = true; // The whole file is missing, so it needs to be created.
-    } else {
-        // Check each setting and track if a default is used.
-        const cJSON *path_mode_json = cJSON_GetObjectItem(json, "path_mode");
-        if (cJSON_IsString(path_mode_json)) settings->path_mode = settings_get_path_mode_from_string(
-                                                path_mode_json->valuestring);
-        else defaults_were_used = true;
-
-        const cJSON *manual_path_json = cJSON_GetObjectItem(json, "manual_saves_path");
-        if (cJSON_IsString(manual_path_json)) strncpy(settings->manual_saves_path, manual_path_json->valuestring,
-                                                      sizeof(settings->manual_saves_path) - 1);
-        else defaults_were_used = true;
-
-        const cJSON *version_json = cJSON_GetObjectItem(json, "version");
-        if (cJSON_IsString(version_json)) strncpy(settings->version_str, version_json->valuestring,
-                                                  sizeof(settings->version_str) - 1);
-        else defaults_were_used = true;
-
-        const cJSON *category_json = cJSON_GetObjectItem(json, "category");
-        if (cJSON_IsString(category_json)) strncpy(settings->category, category_json->valuestring,
-                                                   sizeof(settings->category) - 1);
-        else defaults_were_used = true;
-
-        const cJSON *optional_flag_json = cJSON_GetObjectItem(json, "optional_flag");
-        if (cJSON_IsString(optional_flag_json)) strncpy(settings->optional_flag, optional_flag_json->valuestring,
-                                                        sizeof(settings->optional_flag) - 1);
-        else defaults_were_used = true;
-
-        cJSON *general_settings = cJSON_GetObjectItem(json, "general");
-        if (general_settings) {
-            const cJSON *fps = cJSON_GetObjectItem(general_settings, "fps");
-            if (cJSON_IsNumber(fps) && fps->valueint != -1) settings->fps = fps->valueint;
-            else defaults_were_used = true;
-
-            const cJSON *on_top = cJSON_GetObjectItem(general_settings, "tracker_always_on_top");
-            if (cJSON_IsBool(on_top)) settings->tracker_always_on_top = cJSON_IsTrue(on_top);
-            else defaults_were_used = true;
-
-            const cJSON *scroll_speed = cJSON_GetObjectItem(general_settings, "overlay_scroll_speed");
-            if (cJSON_IsNumber(scroll_speed) && scroll_speed->valuedouble != -1.0)
-                settings->overlay_scroll_speed = (float) scroll_speed->valuedouble;
-            else defaults_were_used = true;
-
-            const cJSON *scroll_dir = cJSON_GetObjectItem(general_settings, "overlay_scroll_left_to_right");
-            if (cJSON_IsBool(scroll_dir)) settings->overlay_scroll_left_to_right = cJSON_IsTrue(scroll_dir);
-            else defaults_were_used = true;
-
-            const cJSON *align = cJSON_GetObjectItem(general_settings, "goal_align_left");
-            if (cJSON_IsBool(align)) settings->goal_align_left = cJSON_IsTrue(align);
-            else defaults_were_used = true;
-        } else {
-            defaults_were_used = true;
-        }
-
-        cJSON *visual_settings = cJSON_GetObjectItem(json, "visuals");
-        if (visual_settings) {
-            if (load_window_rect(visual_settings, "tracker_window", &settings->tracker_window, &default_window))
-                defaults_were_used = true;
-            if (load_window_rect(visual_settings, "overlay_window", &settings->overlay_window, &default_window))
-                defaults_were_used = true;
-            if (load_color(visual_settings, "tracker_bg_color", &settings->tracker_bg_color, &DEFAULT_TRACKER_BG_COLOR))
-                defaults_were_used = true;
-            if (load_color(visual_settings, "overlay_bg_color", &settings->overlay_bg_color, &DEFAULT_OVERLAY_BG_COLOR))
-                defaults_were_used = true;
-            if (load_color(visual_settings, "settings_bg_color", &settings->settings_bg_color,
-                           &DEFAULT_SETTINGS_BG_COLOR)) defaults_were_used = true;
-            if (load_color(visual_settings, "text_color", &settings->text_color, &DEFAULT_TEXT_COLOR))
-                defaults_were_used = true;
-        } else {
-            defaults_were_used = true;
-        }
-
-        // Parse hotkeys
-        const cJSON *hotkeys_json = cJSON_GetObjectItem(json, "hotkeys");
-        if (cJSON_IsArray(hotkeys_json)) {
-            cJSON *hotkey_item;
-
-            // Parse each hotkey
-            cJSON_ArrayForEach(hotkey_item, hotkeys_json) {
-                if (settings->hotkey_count >= MAX_HOTKEYS) break;
-
-                // Takes the string within the settings.json
-                const cJSON *target = cJSON_GetObjectItem(hotkey_item, "target_goal");
-                const cJSON *inc_key = cJSON_GetObjectItem(hotkey_item, "increment_key");
-                const cJSON *dec_key = cJSON_GetObjectItem(hotkey_item, "decrement_key");
-
-                if (cJSON_IsString(target) && cJSON_IsString(inc_key) && cJSON_IsString(dec_key)) {
-                    // Create a new hotkey binding
-                    HotkeyBinding *hb = &settings->hotkeys[settings->hotkey_count];
-                    strncpy(hb->target_goal, target->valuestring, sizeof(hb->target_goal) - 1);
-
-                    hb->increment_scancode = scancode_from_string(inc_key->valuestring);
-                    hb->decrement_scancode = scancode_from_string(dec_key->valuestring);
-
-                    settings->hotkey_count++;
-                }
-            }
-        }
-
-        cJSON_Delete(json);
-        json = NULL;
     }
 
-    // Construct derived paths
+    // --- Load settings, explicitly applying defaults if a key is missing or invalid ---
+    const cJSON *path_mode_json = cJSON_GetObjectItem(json, "path_mode");
+    if (path_mode_json && cJSON_IsString(path_mode_json)) settings->path_mode = settings_get_path_mode_from_string(
+                                            path_mode_json->valuestring);
+    else {
+        settings->path_mode = PATH_MODE_AUTO;
+        defaults_were_used = true;
+    }
+
+    const cJSON *manual_path_json = cJSON_GetObjectItem(json, "manual_saves_path");
+    if (manual_path_json && cJSON_IsString(manual_path_json)) strncpy(settings->manual_saves_path, manual_path_json->valuestring,
+                                                  sizeof(settings->manual_saves_path) - 1);
+    else {
+        settings->manual_saves_path[0] = '\0';
+        defaults_were_used = true;
+    }
+
+    const cJSON *version_json = cJSON_GetObjectItem(json, "version");
+    if (version_json && cJSON_IsString(version_json)) strncpy(settings->version_str, version_json->valuestring,
+                                              sizeof(settings->version_str) - 1);
+    else {
+        strncpy(settings->version_str, "1.21.6", sizeof(settings->version_str) - 1);
+        defaults_were_used = true;
+    }
+
+    const cJSON *category_json = cJSON_GetObjectItem(json, "category");
+    if (category_json && cJSON_IsString(category_json)) strncpy(settings->category, category_json->valuestring,
+                                               sizeof(settings->category) - 1);
+    else {
+        strncpy(settings->category, "all_advancements", sizeof(settings->category) - 1);
+        defaults_were_used = true;
+    }
+
+    const cJSON *optional_flag_json = cJSON_GetObjectItem(json, "optional_flag");
+    if (optional_flag_json && cJSON_IsString(optional_flag_json)) strncpy(settings->optional_flag, optional_flag_json->valuestring,
+                                                    sizeof(settings->optional_flag) - 1);
+    else {
+        settings->optional_flag[0] = '\0';
+        defaults_were_used = true;
+    }
+
+    // --- Load general settings, explicitly applying defaults if a key is missing or invalid ---
+    cJSON *general_settings = cJSON_GetObjectItem(json, "general");
+    if (general_settings) {
+        const cJSON *fps = cJSON_GetObjectItem(general_settings, "fps");
+        if (fps && cJSON_IsNumber(fps) && fps->valueint != -1) settings->fps = fps->valueint;
+        else {
+            settings->fps = DEFAULT_FPS;
+            defaults_were_used = true;
+        }
+        const cJSON *on_top = cJSON_GetObjectItem(general_settings, "always_on_top");
+        if (on_top && cJSON_IsBool(on_top)) settings->tracker_always_on_top = cJSON_IsTrue(on_top);
+        else {
+            settings->tracker_always_on_top = DEFAULT_TRACKER_ALWAYS_ON_TOP;
+            defaults_were_used = true;
+        }
+
+        const cJSON *scroll_speed = cJSON_GetObjectItem(general_settings, "overlay_scroll_speed");
+        if (scroll_speed && cJSON_IsNumber(scroll_speed) && scroll_speed->valuedouble != -1.0)
+            settings->overlay_scroll_speed = (float) scroll_speed->valuedouble;
+        else {
+            settings->overlay_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
+            defaults_were_used = true;
+        }
+
+        const cJSON *scroll_dir = cJSON_GetObjectItem(general_settings, "overlay_scroll_left_to_right");
+        if (scroll_dir && cJSON_IsBool(scroll_dir)) settings->overlay_scroll_left_to_right = cJSON_IsTrue(scroll_dir);
+        else {
+            settings->overlay_scroll_left_to_right = DEFAULT_OVERLAY_SCROLL_LEFT_TO_RIGHT;
+            defaults_were_used = true;
+        }
+
+        const cJSON *align = cJSON_GetObjectItem(general_settings, "goal_align_left");
+        if (align && cJSON_IsBool(align)) settings->goal_align_left = cJSON_IsTrue(align);
+        else {
+            settings->goal_align_left = DEFAULT_GOAL_ALIGN_LEFT;
+            defaults_were_used = true;
+        }
+    } else {
+        defaults_were_used = true;
+    }
+
+    cJSON *visual_settings = cJSON_GetObjectItem(json, "visuals");
+    if (visual_settings) {
+        if (load_window_rect(visual_settings, "tracker_window", &settings->tracker_window, &default_window))
+            defaults_were_used = true;
+        if (load_window_rect(visual_settings, "overlay_window", &settings->overlay_window, &default_window))
+            defaults_were_used = true;
+        if (load_color(visual_settings, "tracker_bg_color", &settings->tracker_bg_color, &DEFAULT_TRACKER_BG_COLOR))
+            defaults_were_used = true;
+        if (load_color(visual_settings, "overlay_bg_color", &settings->overlay_bg_color, &DEFAULT_OVERLAY_BG_COLOR))
+            defaults_were_used = true;
+        if (load_color(visual_settings, "settings_bg_color", &settings->settings_bg_color,
+                       &DEFAULT_SETTINGS_BG_COLOR))
+            defaults_were_used = true;
+        if (load_color(visual_settings, "text_color", &settings->text_color, &DEFAULT_TEXT_COLOR))
+            defaults_were_used = true;
+    } else {
+        defaults_were_used = true;
+    }
+
+    // Parse hotkeys
+    const cJSON *hotkeys_json = cJSON_GetObjectItem(json, "hotkeys");
+    if (cJSON_IsArray(hotkeys_json)) {
+        cJSON *hotkey_item;
+
+        // Parse each hotkey
+        cJSON_ArrayForEach(hotkey_item, hotkeys_json) {
+            if (settings->hotkey_count >= MAX_HOTKEYS) break;
+
+            // Takes the string within the settings.json
+            const cJSON *target = cJSON_GetObjectItem(hotkey_item, "target_goal");
+            const cJSON *inc_key = cJSON_GetObjectItem(hotkey_item, "increment_key");
+            const cJSON *dec_key = cJSON_GetObjectItem(hotkey_item, "decrement_key");
+
+            if (cJSON_IsString(target) && cJSON_IsString(inc_key) && cJSON_IsString(dec_key)) {
+                // Create a new hotkey binding
+                HotkeyBinding *hb = &settings->hotkeys[settings->hotkey_count];
+                strncpy(hb->target_goal, target->valuestring, sizeof(hb->target_goal) - 1);
+
+                hb->increment_scancode = scancode_from_string(inc_key->valuestring);
+                hb->decrement_scancode = scancode_from_string(dec_key->valuestring);
+
+                settings->hotkey_count++;
+            }
+        }
+    }
+
+    cJSON_Delete(json);
     construct_template_paths(settings);
     printf("[SETTINGS UTILS] Settings loaded successfully!\n");
     return defaults_were_used;
