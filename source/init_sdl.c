@@ -3,6 +3,7 @@
 //
 
 #include "init_sdl.h" //  includes tracker.h and then main.h through that
+#include <stdio.h> // For printf
 
 bool tracker_init_sdl(struct Tracker *t, const AppSettings *settings) {
     if (!SDL_Init(SDL_FLAGS)) {
@@ -10,10 +11,8 @@ bool tracker_init_sdl(struct Tracker *t, const AppSettings *settings) {
         return false;
     }
 
+    // First create without he ALWAYS_ON_TOP flag
     Uint32 window_flags = SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE; // TODO: Look into SDL_WINDOW_HIGH_PIXEL_DENSITY
-    if (settings->tracker_always_on_top) {
-        window_flags |= SDL_WINDOW_ALWAYS_ON_TOP;
-    }
 
     // Use loaded settings for window creation, with SDL_WINDOWPOS_CENTERED as a fallback
     int x = (settings->tracker_window.x == DEFAULT_WINDOW_POS) ? (int)SDL_WINDOWPOS_CENTERED : settings->tracker_window.x;
@@ -29,6 +28,12 @@ bool tracker_init_sdl(struct Tracker *t, const AppSettings *settings) {
 
     // Set position after creation to handle multi-monitor setups better
     SDL_SetWindowPosition(t->window, x, y);
+
+    // DEBUG: Print the value being set at initialization
+    printf("[INIT SDL] Settings initial AlwaysOnTop state to: %s\n", settings->tracker_always_on_top ? "true" : "false");
+
+    // More reliable than SDL_WINDOW_ALWAYS_ON_TOP flag
+    SDL_SetWindowAlwaysOnTop(t->window, settings->tracker_always_on_top); // TODO: settings->tracker_always_on_top
 
     t->renderer = SDL_CreateRenderer(t->window, NULL);
 
@@ -75,9 +80,12 @@ bool settings_init_sdl(struct Settings *s, const AppSettings *settings) {
     int tracker_x, tracker_y;
     SDL_GetWindowPosition(s->parent_window, &tracker_x, &tracker_y);
 
+    int tracker_w, tracker_h;
+    SDL_GetWindowSize(s->parent_window, &tracker_w, &tracker_h);
+
     // Center the settings window over the tracker window
-    int x = tracker_x + ((settings->tracker_window.w - SETTINGS_WIDTH)/2); // + (SETTINGS_WIDTH / 2) // settings->tracker_window.w comes out as -1
-    int y = tracker_y + ((settings->tracker_window.h- SETTINGS_HEIGHT)/2); // + (SETTINGS_HEIGHT / 2)
+    int x = tracker_x + ((settings->tracker_window.w - SETTINGS_WIDTH)/2);
+    int y = tracker_y + ((settings->tracker_window.h- SETTINGS_HEIGHT)/2);
 
     printf("[INIT SDL] Tracker W: %d, H: %d\n", settings->tracker_window.w, settings->tracker_window.h);
 

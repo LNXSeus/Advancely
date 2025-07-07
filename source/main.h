@@ -25,7 +25,8 @@
 #define TRACKER_TITLE "Advancely" // TODO: Dynamically update title based on progress
 
 // Settings window is NOT USER CONFIGURABLE SO HARDCODED HERE, ONLY COLOR IS
-#define SDL_SETTINGS_WINDOW_FLAGS (SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_HIGH_PIXEL_DENSITY)
+// Tracker window flags are in init_sdl.c in tracker_init_sdl()
+#define SDL_SETTINGS_WINDOW_FLAGS (SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_ALWAYS_ON_TOP)
 #define SETTINGS_TITLE "Advancely Settings"
 #define SETTINGS_WIDTH 1280
 #define SETTINGS_HEIGHT 720

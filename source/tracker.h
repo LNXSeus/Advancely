@@ -88,8 +88,9 @@ void tracker_render(struct Tracker *t, const AppSettings *settings);
  * switching advancement templates or languages without restarting the application.
  *
  * @param t A pointer to the Tracker struct.
+ * @param settings A pointer to the application settings to use for re-initialization.
  */
-void tracker_reinit_template(struct Tracker *t);
+void tracker_reinit_template(struct Tracker *t, const AppSettings *settings);
 
 /**
  * @brief Reloads settings and re-initializes all relevant paths in the tracker struct.
@@ -98,8 +99,9 @@ void tracker_reinit_template(struct Tracker *t);
  * is changed at runtime, for example, to point to a new saves folder.
  *
  * @param t A pointer to the Tracker struct.
+ * @param settings A pointer to the application settings to use for path finding.
  */
-void tracker_reinit_paths(struct Tracker *t);
+void tracker_reinit_paths(struct Tracker *t, const AppSettings *settings);
 
 /**
  * @brief Loads and parses all data from template and language files.

@@ -163,7 +163,7 @@ int main(int argc, char *argv[]) {
                 dmon_unwatch(saves_watcher_id);
 
                 // Update the tracker with the new paths
-                tracker_reinit_template(tracker); // Re-initialize the template (so it can be changed during runtime)
+                tracker_reinit_template(tracker, &app_settings); // Re-initialize the template (so it can be changed during runtime)
 
                 // Start watching the new directory
                 if (strlen(tracker->saves_path) > 0) {
