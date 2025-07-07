@@ -7,6 +7,7 @@
 
 #include "main.h"
 #include "data_structures.h"
+#include "settings_utils.h" // For AppSettings
 
 struct Tracker {
     // TODO: Also needs to be defined in init_sdl.h
@@ -29,12 +30,6 @@ struct Tracker {
 };
 
 
-/**
- * @brief Saves the current progress of all custom goals to settings.json.
- * @param td A pointer to the Tracker's template data.
- */
-void settings_save_custom_progress(TemplateData *td);
-
 
 /**
  * @brief Initializes a new Tracker instance.
@@ -44,9 +39,10 @@ void settings_save_custom_progress(TemplateData *td);
  * main 'template_data' container.
  *
  * @param tracker A pointer to a Tracker struct pointer that will be allocated.
+ * @param settings A pointer to the loaded application settings.
  * @return true if initialization was successful, false otherwise.
  */
-bool tracker_new(struct Tracker **tracker);
+bool tracker_new(struct Tracker **tracker, const AppSettings *settings);
 
 /**
  * @brief Handles SDL events specifically for the tracker window.
@@ -80,8 +76,9 @@ void tracker_update(struct Tracker *t, float *deltaTime);
  * all visual elements of the tracker, such as advancement icons, progress bars, and text.
  *
  * @param t A pointer to the Tracker struct.
+ * @param settings A pointer to the application settings containing color information.
  */
-void tracker_render(struct Tracker *t);
+void tracker_render(struct Tracker *t, const AppSettings *settings);
 
 
 /**

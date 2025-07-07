@@ -875,63 +875,14 @@ static void format_time(int ticks, char *output, size_t max_len) {
     long long seconds = total_seconds % 60;
     long long milliseconds = ticks % 20 * 50;
 
-    snprintf(output, max_len, "%02lld:%02lld:%02lld:%02lld.%02lld", days,hours, minutes, seconds, milliseconds);
+    snprintf(output, max_len, "%02lld:%02lld:%02lld:%02lld.%02lld", days, hours, minutes, seconds, milliseconds);
 }
 
 
 // ----------------------------------------- END OF STATIC FUNCTIONS -----------------------------------------
 
 
-void settings_save_custom_progress(TemplateData *td) {
-    if (!td) return;
-
-    // Read the existing settings file
-    cJSON *settings_json = cJSON_from_file(SETTINGS_FILE_PATH);
-    if (!settings_json) {
-        // If this file doesn't exist, create it
-        settings_json = cJSON_CreateObject();
-        if (!settings_json) {
-            fprintf(stderr, "[TRACKER] Failed to create settings file.\n");
-            return;
-        }
-
-        // Get or create the custom_progress object
-        cJSON *progress_obj = cJSON_GetObjectItem(settings_json, "custom_progress");
-        if (!progress_obj) {
-            progress_obj = cJSON_AddObjectToObject(settings_json, "custom_progress");
-        }
-
-        // Update the progress for each custom goal
-        for (int i = 0; i < td->custom_goal_count; i++) {
-            TrackableItem *item = td->custom_goals[i];
-
-            // Update the progress
-            if (item->goal > 0) {
-                cJSON_ReplaceItemInObject(progress_obj, item->root_name, cJSON_CreateNumber(item->progress));
-            } else {
-                cJSON_ReplaceItemInObject(progress_obj, item->root_name, cJSON_CreateBool(item->done));
-            }
-        }
-
-        // Write the modified JSON back to the file
-        FILE *file = fopen(SETTINGS_FILE_PATH, "w");
-        if (file) {
-            char *json_str = cJSON_Print(settings_json); // render the cJSON object to text
-            if (file) {
-                fputs(json_str, file); // write to the file
-                free(json_str);
-            }
-            fclose(file);
-        } else {
-            fprintf(stderr, "[TRACKER] Failed to open settings file for writing.\n");
-        }
-    }
-
-    cJSON_Delete(settings_json);
-}
-
-
-bool tracker_new(struct Tracker **tracker) {
+bool tracker_new(struct Tracker **tracker, const AppSettings *settings) {
     // Allocate memory for the tracker struct itself
     *tracker = calloc(1, sizeof(struct Tracker));
     if (*tracker == NULL) {
@@ -942,30 +893,18 @@ bool tracker_new(struct Tracker **tracker) {
     struct Tracker *t = *tracker;
 
     // Initialize SDL components for the tracker
-    if (!tracker_init_sdl(t)) {
+    if (!tracker_init_sdl(t, settings)) {
         free(t);
         *tracker = NULL;
         tracker = NULL;
         return false;
     }
 
-    // Allocate the main data container, TODO: Give user another chance to select a different template
+    // Allocate the main data container
     t->template_data = calloc(1, sizeof(TemplateData));
     if (!t->template_data) {
         fprintf(stderr, "[TRACKER] Failed to allocate memory for template data.\n");
-
-        if (t->renderer) {
-            SDL_DestroyRenderer(t->renderer);
-            t->renderer = NULL;
-        }
-        if (t->window) {
-            SDL_DestroyWindow(t->window);
-            t->window = NULL;
-        }
-
-        free(t);
-        *tracker = NULL;
-        tracker = NULL;
+        tracker_free(tracker);
         return false;
     }
 
@@ -975,12 +914,11 @@ bool tracker_new(struct Tracker **tracker) {
     // Parse the advancement template JSON file
     tracker_load_and_parse_data(t);
 
-
     return true; // Success
 }
 
 void tracker_events(struct Tracker *t, SDL_Event *event, bool *is_running, bool *settings_opened) {
-    (void) t;
+    (void) t; // Not directly used, but kept for consistency
 
     switch (event->type) {
         // This should be handled in the global event handler
@@ -996,6 +934,7 @@ void tracker_events(struct Tracker *t, SDL_Event *event, bool *is_running, bool 
                         // Open settings window, TOGGLE settings_opened
                         *settings_opened = !(*settings_opened);
                         break;
+                    // Window move/resize events are handled in main.c
                     default:
                         break;
                 }
@@ -1004,7 +943,7 @@ void tracker_events(struct Tracker *t, SDL_Event *event, bool *is_running, bool 
         // TODO: Work with mouse events
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
             //printf("[TRACKER] Mouse button pressed in tracker.\n");
-            // TODO: Where toggling custom goals will be implemented, create new settings_save() function
+            // TODO: Make mouse events work to check off custom goals
             // 1. Get mouse coordinates: event->button.x, event->button.y
 
             // 2. Loop through all custom goals and check if the mouse is inside the bounding box of a goal's checkbox.
@@ -1059,10 +998,10 @@ void tracker_update(struct Tracker *t, float *deltaTime) {
     cJSON_Delete(settings_json);
 }
 
-void tracker_render(struct Tracker *t) {
+void tracker_render(struct Tracker *t, const AppSettings *settings) {
     // Set draw color and clear screen
-    SDL_SetRenderDrawColor(t->renderer, TRACKER_BACKGROUND_COLOR.r, TRACKER_BACKGROUND_COLOR.g,
-                           TRACKER_BACKGROUND_COLOR.b, TRACKER_BACKGROUND_COLOR.a);
+    SDL_SetRenderDrawColor(t->renderer, settings->tracker_bg_color.r, settings->tracker_bg_color.g,
+                           settings->tracker_bg_color.b, settings->tracker_bg_color.a);
     SDL_RenderClear(t->renderer);
 
     // TODO: Draw the advancement icons
@@ -1280,7 +1219,6 @@ void tracker_print_debug_status(struct Tracker *t) {
     // Check if the run is completed, check both advancement and overall progress
     if (t->template_data->advancements_completed_count >= t->template_data->advancement_count && t->template_data->
         overall_progress_percentage >= 100.0f) {
-
         printf("\n                  *** RUN COMPLETE! ***\n\n");
         printf("                  Final Time: %s\n\n", formatted_time);
         printf("============================================================\n\n");

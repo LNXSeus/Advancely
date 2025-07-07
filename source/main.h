@@ -22,36 +22,20 @@
 // Set my own SDL_FLAGS
 #define SDL_FLAGS SDL_INIT_VIDEO // TODO: OR'd together with SDL_INIT_AUDIO
 
-#define SDL_TRACKER_WINDOW_FLAGS (SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE) // SDL_WINDOW_ALWAYS_ON_TOP // SDL_WINDOW_FULLSCREEN, SDL_WINDOW_RESIZABLE, TODO: Make this a setting
 #define TRACKER_TITLE "Advancely" // TODO: Dynamically update title based on progress
-#define TRACKER_WIDTH 1440 // 16:9
-#define TRACKER_HEIGHT 900
-#define TRACKER_BACKGROUND_COLOR (SDL_Color){13, 17, 23, 255} // not a pointer so accessing with .r, .g, .b, .a
 
+// Settings window is NOT USER CONFIGURABLE SO HARDCODED HERE, ONLY COLOR IS
 #define SDL_SETTINGS_WINDOW_FLAGS (SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_HIGH_PIXEL_DENSITY)
 #define SETTINGS_TITLE "Advancely Settings"
 #define SETTINGS_WIDTH 1280
 #define SETTINGS_HEIGHT 720
-#define SETTINGS_BACKGROUND_COLOR (SDL_Color){13, 17, 23, 255}
-
-#define SDL_OVERLAY_WINDOW_FLAGS (SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE)
-#define OVERLAY_TITLE "Advancely Overlay" // Also needs the icon
-#define OVERLAY_WIDTH 1440
-#define OVERLAY_HEIGHT 420
-#define OVERLAY_BACKGROUND_COLOR (SDL_Color){0, 80, 255, 255}
-
-#define OVERLAY_SPEEDUP_FACTOR 3
 
 
-// Used in path_utils.h, settings_utils.h
-#define MAX_PATH_LENGTH 1024 // Also defined in path_utils.h
+#define OVERLAY_TITLE "Advancely Overlay"
 
-// PATH DETECTION MODE IN SETTINGS -> AUTO OR MANUAL -> path_utils.h
-
-// #define CONFIG_PATH "resources/config/settings.json" // ENGLISH ONLY
-
-#define FPS 60.0f
-#define FRAME_TARGET_TIME (1000.0f / FPS)
+// Not user-configurable, so it remains a define
+#define OVERLAY_SPEEDUP_FACTOR 3.0f
+#define MAX_PATH_LENGTH 1024
 
 
 #endif //MAIN_H

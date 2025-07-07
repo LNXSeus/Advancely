@@ -1,28 +1,65 @@
 {
-  "path_mode": "manual",
-  "manual_saves_path": "C:\Users\Linus\AppData\Roaming\PrismLauncher\instances\1.21.5\minecraft\saves",
-  "version": "25w14craftmine",
-  "category": "acquire_hardware",
-  "optional_flag": "_test3",
-  "custom_progress": {
-    "custom:unbreaking_3_book": false,
-    "custom:deepslate_emerald_count": 0,
-    "custom:diamond_ore_count": 0
+  "path_mode":	"manual",
+  "manual_saves_path":	"C:\\Users\\Linus\\AppData\\Roaming\\PrismLauncher\\instances\\1.21.5\\minecraft\\saves",
+  "version":	"25w14craftmine",
+  "category":	"acquire_hardware",
+  "optional_flag":	"_test3",
+  "custom_progress":	{
+    "custom:unbreaking_3_book":	false,
+    "custom:deepslate_emerald_count":	0,
+    "custom:diamond_ore_count":	0
   },
-  "stat_progress_override": {
-    "minecraft:mined/minecraft:oak_log": false,
-    "minecraft:mined/minecraft:acacia_log": true
+  "stat_progress_override":	{
+    "minecraft:mined/minecraft:oak_log":	false,
+    "minecraft:mined/minecraft:acacia_log":	true
   },
-  "hotkeys": [
-    {
-      "target_goal": "custom:deepslate_emerald_count",
-      "increment_key": "O",
-      "decrement_key": "L"
+  "hotkeys":	[{
+    "target_goal":	"custom:deepslate_emerald_count",
+    "increment_key":	"O",
+    "decrement_key":	"L"
+  }, {
+    "target_goal":	"custom:diamond_ore_count",
+    "increment_key":	"Home",
+    "decrement_key":	"End"
+  }],
+  "general":	{ "fps": -1, "always_on_top": true, "overlay_scroll_speed": -1.0
+  },
+  "visuals":	{
+    "tracker_window":	{
+      "x":	-1,
+      "y":	-1,
+      "w":	-1,
+      "h":	-1
     },
-    {
-      "target_goal": "custom:diamond_ore_count",
-      "increment_key": "Home",
-      "decrement_key": "End"
+    "overlay_window":	{
+      "x":	-1,
+      "y":	-1,
+      "w":	-1,
+      "h":	-1
+    },
+    "tracker_bg_color":	{
+      "r":	13,
+      "g":	17,
+      "b":	23,
+      "a":	255
+    },
+    "overlay_bg_color":	{
+      "r":	0,
+      "g":	80,
+      "b":	255,
+      "a":	255
+    },
+    "settings_bg_color":	{
+      "r":	13,
+      "g":	17,
+      "b":	23,
+      "a":	255
+    },
+    "text_color":	{
+      "r":	255,
+      "g":	255,
+      "b":	255,
+      "a":	255
     }
-  ]
+  }
 }

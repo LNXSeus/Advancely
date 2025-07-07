@@ -6,19 +6,14 @@
 #define SETTINGS_H
 
 #include "main.h"
+#include "settings_utils.h" // For AppSettings
 
 struct Settings { // TODO: Also needs to be defined in init_sdl.h
     SDL_Window *window;
     SDL_Renderer *renderer;
     // SDL_Texture *texture;
 
-    int settings_width;
-    int settings_height;
-
-    cJSON *settings; // Replaced by AppSettings in settings_utils
-    cJSON *translation; // ENGLISH ONLY, probably unsused
-
-    // More stuff to be added like TTF_Font *font and SDL_Texture *sprite whatever
+     SDL_Window *parent_window; // Keep track of the tracker window to center the settings window
 };
 
 /**
@@ -28,9 +23,11 @@ struct Settings { // TODO: Also needs to be defined in init_sdl.h
  * SDL window and renderer.
  *
  * @param settings A pointer to a Settings struct pointer that will be allocated.
+ * @param app_settings A pointer to the loaded application settings.
+ * @param parent A pointer to the main tracker window, used for positioning.
  * @return true if initialization was successful, false otherwise.
  */
-bool settings_new(struct Settings **settings);
+bool settings_new(struct Settings **settings, const AppSettings *app_settings, SDL_Window *parent);
 
 /**
  * @brief Handles SDL events specifically for the settings window.
@@ -62,8 +59,9 @@ void settings_update(struct Settings *s, float *deltaTime);
  * for the settings will be drawn.
  *
  * @param s A pointer to the Settings struct.
+ * @param settings A pointer to the application settings containing color information.
  */
-void settings_render(struct Settings *s);
+void settings_render(struct Settings *s, const AppSettings *settings);
 
 /**
  * @brief Frees all resources associated with the Settings instance.
