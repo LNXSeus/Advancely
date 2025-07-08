@@ -33,6 +33,7 @@ You select the minecraft version, the category, all the advancements, statistics
 ## Supported Minecraft Versions (Java Edition Only)
 
 This tracker supports **any version** from Minecraft 1.0 upwards. It does so by only reading from the stats file for any version prior to 1.12. From 1.12 upwards in reads the stats and advancements file and for the 25w14craftmine snapshot it additionally reads the unlocks file.
+When creating a template for version 1.0 - 1.6.4 it comes in handy to know which ID corresponds to which stat or advancement. You can find the translations for those IDs [here](https://pastebin.com/qPsgc4Eb).
 
 ## How To Use
 
