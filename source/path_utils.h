@@ -9,16 +9,9 @@
 #include <stddef.h>
 
 #include "main.h"
+#include "data_structures.h" // For MC_Version enum and PathMode
 
 #define MAX_PATH_LENGTH 1024 // Also defined in main.h
-
-/**
- * @brief Enum to determine how the saves path is obtained.
- */
-typedef enum {
-    PATH_MODE_AUTO,   // Automatically detect the path from standard locations.
-    PATH_MODE_MANUAL  // Use a user-provided path.
-} PathMode;
 
 /**
  * @brief Enum to determine how the saves path is obtained.
@@ -41,31 +34,30 @@ void normalize_path(char *path);
 bool get_saves_path(char *out_path, size_t max_len, PathMode mode, const char* manual_path);
 
 /**
- * @brief Finds the most recently modified world and gets its data file paths.
+ * @brief Finds the player's data files based on the Minecraft version.
  *
- * Scans the provided Minecraft saves directory to find the world folder
- * that was modified last. It then constructs the full paths to the player's
- * data files within that world. It conditionally searches for advancements, unlocks,
- * and stats files based on the provided boolean flags.
+ * This function contains version-specific logic to locate the correct statistics
+ * and advancement/achievement files.
+ * - For MC < 1.7.2, it finds the global .dat stats file.
+ * - For MC 1.7.2-1.11.2, it finds the per-world stats JSON containing achievements.
+ * - For MC 1.12+, it finds the separate per-world advancements and stats JSONs.
  *
  * @param saves_path The full path to the .minecraft/saves directory.
- * @param out_world_name A buffer to store the name of the latest world.
- * @param out_adv_path A buffer to store the path to the advancements JSON file.
- * @param out_stats_path A buffer to store the path to the stats JSON file.
+ * @param version The Minecraft version from the MC_Version enum.
+ * @param out_world_name A buffer to store the name of the latest world (or "Global").
+ * @param out_adv_path A buffer to store the path to the advancements/achievements file.
+ * @param out_stats_path A buffer to store the path to the stats file.
  * @param out_unlocks_path A buffer to store the path to the unlocks JSON file.
  * @param max_len The size of the output path buffers.
- * @param use_advancements Set to true for modern versions (1.12+).
- * @param use_unlocks Set to true for specific versions like 25w14craftmine.
  */
-void find_latest_world_files(
+void find_player_data_files(
     const char *saves_path,
+    MC_Version version,
     char *out_world_name,
     char *out_adv_path,
     char *out_stats_path,
     char *out_unlocks_path,
-    size_t max_len,
-    bool use_advancements,
-    bool use_unlocks
+    size_t max_len
 );
 
 #endif //PATH_UTILS_H

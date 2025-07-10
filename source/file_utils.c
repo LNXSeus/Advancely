@@ -25,6 +25,11 @@ cJSON* cJSON_from_file(const char* filename) {
         if (buffer) {
             fread(buffer, 1, length, f);
             buffer[length] = '\0'; // Null-terminate the buffer
+
+            // TODO: DEBUGGING - CHECKING FOR ANY CONTENT BEING READ
+            // printf("\n--- FILE CONTENT FOR: %s ---\n", filename);
+            // printf("%s\n", buffer);
+            // printf("--- END OF FILE CONTENT ---\n\n");
         }
         fclose(f);
     } else {

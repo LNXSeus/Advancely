@@ -23,6 +23,9 @@ typedef struct TrackableItem {
     int progress; // For stats: The current value, e.g., 5.
     int goal; // For stats: The target value, e.g., 40.
 
+    // For legacy stat snapshotting
+    int initial_progress;
+
     // Flag to allow "conflicting" criteria to overlay parent advancements icon (e.g., hoglin), init with false, cause of calloc
     bool is_shared;
     bool is_manually_completed; // For manual stat override
@@ -108,7 +111,134 @@ typedef struct TemplateData {
 
     long long play_time_ticks; // Store the player's total playtime in ticks
 
+    // Taking snapshot for legacy versions when world is changed to track changes per world
+    long long playtime_snapshot; // Stores playtime at world load for legacy versions
+    char snapshot_world_name[MAX_PATH_LENGTH]; // The world the current snapshot belongs to
+
     cJSON *lang_json; // The loaded language file for display names
 } TemplateData;
+
+// PATHMODE AND VERSION STUFF
+
+/**
+ * @brief Enum to determine how the saves path is obtained.
+ */
+typedef enum {
+    PATH_MODE_AUTO,   // Automatically detect the path from standard locations.
+    PATH_MODE_MANUAL  // Use a user-provided path.
+} PathMode;
+
+// TODO: Define versions here and in VersionMapEntry in settings_utils.c
+typedef enum {
+    // Puts vaLue starting at 0, allows for comparisons
+    // Era 1: Legacy Stats (.dat file), counts playtime in Ticks ID: 1100
+    // TODO: (102 versions + unknown as of 2025-07-08)
+    MC_VERSION_1_0,
+    MC_VERSION_1_1,
+    MC_VERSION_1_2_1,
+    MC_VERSION_1_2_2,
+    MC_VERSION_1_2_3,
+    MC_VERSION_1_2_4,
+    MC_VERSION_1_2_5,
+    MC_VERSION_1_3_1,
+    MC_VERSION_1_3_2,
+    MC_VERSION_1_4_2,
+    MC_VERSION_1_4_4,
+    MC_VERSION_1_4_5,
+    MC_VERSION_1_4_6,
+    MC_VERSION_1_4_7,
+    MC_VERSION_1_5_1,
+    MC_VERSION_1_5_2,
+    MC_VERSION_1_6_1,
+    MC_VERSION_1_6_2,
+    MC_VERSION_1_6_4,
+    // Era 2: Mid-era Achievements/Stats (per-world JSON), stat.playOneMinute is in ticks
+    MC_VERSION_1_7_2,
+    MC_VERSION_1_7_3,
+    MC_VERSION_1_7_4,
+    MC_VERSION_1_7_5,
+    MC_VERSION_1_7_6,
+    MC_VERSION_1_7_7,
+    MC_VERSION_1_7_8,
+    MC_VERSION_1_7_9,
+    MC_VERSION_1_7_10,
+    MC_VERSION_1_8,
+    MC_VERSION_1_8_1,
+    MC_VERSION_1_8_2,
+    MC_VERSION_1_8_3,
+    MC_VERSION_15W14A, // 2015 APRIL FOOLS VERSION, SNAPSHOT is a fork of 1.8.3, The Love and Hugs Update
+    MC_VERSION_1_8_4,
+    MC_VERSION_1_8_5,
+    MC_VERSION_1_8_6,
+    MC_VERSION_1_8_7,
+    MC_VERSION_1_8_8,
+    MC_VERSION_1_8_9,
+    MC_VERSION_1_9,
+    MC_VERSION_1_9_1,
+    MC_VERSION_1_9_2,
+    MC_VERSION_1_RV_PRE1, // 2016 APRIL FOOLS VERSION, Trendy Update
+    MC_VERSION_1_9_3,
+    MC_VERSION_1_9_4,
+    MC_VERSION_1_10,
+    MC_VERSION_1_10_1,
+    MC_VERSION_1_10_2,
+    MC_VERSION_1_11,
+    MC_VERSION_1_11_1,
+    MC_VERSION_1_11_2,
+    // Era 3: Modern Advancements/Stats (separate per-world JSONs), minecraft:play_one_minute is in ticks
+    MC_VERSION_1_12,
+    MC_VERSION_1_12_1,
+    MC_VERSION_1_12_2,
+    MC_VERSION_1_13,
+    MC_VERSION_1_13_1,
+    MC_VERSION_1_13_2,
+    MC_VERSION_3D_SHAREWARE_V1_34, // 2019 APRIL FOOLS VERSION, MineCraft [sic] 3D: Memory Block Edition
+    MC_VERSION_1_14,
+    MC_VERSION_1_14_1,
+    MC_VERSION_1_14_2,
+    MC_VERSION_1_14_3,
+    MC_VERSION_1_14_4,
+    MC_VERSION_1_15,
+    MC_VERSION_1_15_1,
+    MC_VERSION_1_15_2,
+    MC_VERSION_20W14INFINITE, // 2020 APRIL FOOLS VERSION, Java Edition 20w14∞, Infinity Snapshot
+    MC_VERSION_1_16,
+    MC_VERSION_1_16_1,
+    MC_VERSION_1_16_2,
+    MC_VERSION_1_16_3,
+    MC_VERSION_1_16_4,
+    MC_VERSION_1_16_5,
+    // minecraft:play_one_minute FINALLY renamed to minecraft:play_time
+    MC_VERSION_1_17,
+    MC_VERSION_1_17_1,
+    MC_VERSION_1_18,
+    MC_VERSION_1_18_1,
+    MC_VERSION_1_18_2,
+    MC_VERSION_22W13ONEBLOCKATATIME, // 2022 APRIL FOOLS VERSION, One Block at a Time Update
+    MC_VERSION_1_19,
+    MC_VERSION_1_19_1,
+    MC_VERSION_1_19_2,
+    MC_VERSION_1_19_3,
+    MC_VERSION_1_19_4,
+    MC_VERSION_23W13A_OR_B, // 2023 APRIL FOOLS VERSION, The Vote Update
+    MC_VERSION_1_20,
+    MC_VERSION_1_20_1,
+    MC_VERSION_1_20_2,
+    MC_VERSION_1_20_3,
+    MC_VERSION_1_20_4,
+    MC_VERSION_24W14POTATO, // 2024 APRIL FOOLS VERSION, Poisonous Potato Update
+    MC_VERSION_1_20_5,
+    MC_VERSION_1_20_6,
+    MC_VERSION_1_21,
+    MC_VERSION_1_21_1,
+    MC_VERSION_1_21_2,
+    MC_VERSION_1_21_3,
+    MC_VERSION_1_21_4,
+    MC_VERSION_1_21_5,
+    MC_VERSION_25W14CRAFTMINE, // 2025 APRIL FOOLS VERSION, Craftmine Update
+    MC_VERSION_1_21_6,
+    MC_VERSION_1_21_7,
+    MC_VERSION_UNKNOWN // For error handling
+} MC_Version;
 
 #endif //DATA_STRUCTURES_H

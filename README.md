@@ -30,16 +30,19 @@ The true power of Advancely lies in its customization. You can define exactly wh
 
 You select the minecraft version, the category, all the advancements, statistics, goals you want to track with custom translations. The tracker will then parse your template and track progress against the goals you've defined.
 
-## Supported Minecraft Versions (Java Edition Only)
+## Supporting over 100+ Minecraft versions (1.0 - 1.21.7)
 
-This tracker supports **any version** from Minecraft 1.0 upwards. It does so by only reading from the stats file for any version prior to 1.12. From 1.12 upwards in reads the stats and advancements file and for the 25w14craftmine snapshot it additionally reads the unlocks file.
-When creating a template for version 1.0 - 1.6.4 it comes in handy to know which ID corresponds to which stat or advancement. You can find the translations for those IDs [here](https://pastebin.com/qPsgc4Eb).
+Find the full list of supported versions [here](https://pastebin.com/NhkaT3qD).
+
+This tracker supports **any full release** from Minecraft 1.0 upwards including all april fool snapshots. It does so by only reading from the stats file for any version prior to 1.12. From 1.12 upwards in reads the stats and advancements file and for the 25w14craftmine snapshot it additionally reads the unlocks file.
+When creating a template for version 1.0 - 1.6.4 it comes in handy to know which ID corresponds to which stat or advancement. You can find the translations for those IDs [here](https://pastebin.com/qPsgc4Eb) and the individual item IDs [here](https://pastebin.com/r5tpjPFm). (Credits: [minecraftinfo.com](https://www.minecraftinfo.com/idlist.htm))
+In version 1.0 - 1.6.4, as the stats are tracked globally, when starting a new all advancements run you must quit the game, delete everything in the minecraft\stats folder then start a new world.
 
 ## How To Use
 
-1.  **Download**: Grab the latest release from the releases page (supports Windows, Linux, and MacOS).
+1.  **Download**: Grab the latest release from the [**release page**](https://github.com/LNXSeus/Advancely/releases) (supports Windows, Linux, and MacOS).
 2.  **Configure**: Open `settings.json` to select your Minecraft version, category, and save path detection mode (`auto` or `manual`). You can also configure hotkeys there.
-3.  **Run**: Launch Advancely and play Minecraft. The tracker will automatically find your most recent world and display your progress in real time.
+3.  **Run**: Launch Advancely and speedrun Minecraft. The tracker will automatically find your most recent world and display your progress in real time.
 
 ### Licenses
 

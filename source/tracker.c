@@ -13,8 +13,401 @@
 #include "file_utils.h" // has the cJSON_from_file function
 #include "temp_create_utils.h"
 
+// FOR VERSION-SPECIFIC PARSERS
+
+/**
+ * @brief (Era 1: 1.0-1.6.4) Takes a snapshot of the current global stats.
+ * This is called when a new world is loaded to establish a baseline for progress.
+ */
+static void tracker_snapshot_legacy_stats(struct Tracker *t) {
+    cJSON *player_stats_json = cJSON_from_file(t->stats_path);
+    if (!player_stats_json) {
+        fprintf(stderr, "[TRACKER] Could not read stats file to create snapshot.\n");
+        return;
+    }
+
+    // Get the stats-change array within the stats object
+    cJSON *stats_change = cJSON_GetObjectItem(player_stats_json, "stats-change");
+    if (!cJSON_IsArray(stats_change)) {
+        cJSON_Delete(player_stats_json);
+        return;
+    }
+
+    // Set the snapshot world name
+    strncpy(t->template_data->snapshot_world_name, t->world_name, MAX_PATH_LENGTH - 1);
+    t->template_data->snapshot_world_name[MAX_PATH_LENGTH - 1] = '\0';
+
+    // Reset all initial progress fields first
+    for (int i = 0; i < t->template_data->stat_count; i++) {
+        // TODO: Stat + advancements right??
+        t->template_data->stats[i]->initial_progress = 0;
+    }
+    t->template_data->playtime_snapshot = 0;
+
+    // Iterate the live stats and store them as the initial values
+    cJSON *stat_entry;
+    cJSON_ArrayForEach(stat_entry, stats_change) {
+        cJSON *item = stat_entry->child; // Then we go into the curly brackets
+        if (item) {
+            const char *key = item->string;
+            int value = item->valueint;
+
+            // Snapshot playtime
+            if (strcmp(key, "1100") == 0) {
+                t->template_data->playtime_snapshot = value;
+            }
+
+            // Snapshot other tracked stats (including playtime)
+            for (int i = 0; i < t->template_data->stat_count; i++) {
+                // TODO: Stat + advancements right??
+                TrackableItem *stat = t->template_data->stats[i];
+                if (strcmp(stat->root_name, key) == 0) {
+                    stat->initial_progress = value;
+                    break;
+                }
+            }
+        }
+    }
+    cJSON_Delete(player_stats_json);
+
+    // TODO: DEBUGGING CODE TO PRINT WHAT THE SNAPSHOT LOOKS LIKE
+    // --- ADD THIS EXPANDED DEBUGGING CODE ---
+    printf("\n--- STARTING SNAPSHOT FOR WORLD: %s ---\n", t->template_data->snapshot_world_name);
+
+    // Re-load the JSON file just for this debug print (this is inefficient but simple for debugging)
+    cJSON *debug_json = cJSON_from_file(t->stats_path);
+    if (debug_json) {
+        cJSON *stats_change = cJSON_GetObjectItem(debug_json, "stats-change");
+        if (cJSON_IsArray(stats_change)) {
+            printf("\n--- LEGACY ACHIEVEMENT CHECK ---\n");
+            // Loop through achievements from the template
+            for (int i = 0; i < t->template_data->advancement_count; i++) {
+                TrackableCategory *ach = t->template_data->advancements[i];
+                bool found = false;
+                int value = 0;
+
+                // Search for this achievement in the player's stats data
+                cJSON *stat_entry;
+                cJSON_ArrayForEach(stat_entry, stats_change) {
+                    cJSON *item = stat_entry->child;
+                    if (item && strcmp(item->string, ach->root_name) == 0) {
+                        found = true;
+                        value = item->valueint;
+                        break;
+                    }
+                }
+
+                if (found) {
+                    printf("  - Achievement '%s' (ID: %s): FOUND with value: %d\n", ach->display_name, ach->root_name,
+                           value);
+                } else {
+                    printf("  - Achievement '%s' (ID: %s): NOT FOUND in player data\n", ach->display_name,
+                           ach->root_name);
+                }
+            }
+        }
+        cJSON_Delete(debug_json);
+    }
+
+    printf("\n--- LEGACY STAT SNAPSHOT ---\n");
+    printf("Playtime Snapshot: %lld ticks\n", t->template_data->playtime_snapshot);
+
+    for (int i = 0; i < t->template_data->stat_count; i++) {
+        TrackableItem *stat = t->template_data->stats[i];
+        printf("  - Stat '%s' (ID: %s): Snapshot Value = %d\n", stat->display_name, stat->root_name,
+               stat->initial_progress);
+    }
+    printf("--- END OF SNAPSHOT ---\n\n");
+}
+
+/**
+ * @brief (Era 1: 1.0-1.6.4) Parses legacy .dat stats files.
+ */
+static void tracker_update_stats_legacy(struct Tracker *t, const cJSON *player_stats_json) {
+    if (!player_stats_json) return;
+
+    cJSON *stats_change = cJSON_GetObjectItem(player_stats_json, "stats-change");
+    if (!cJSON_IsArray(stats_change)) return;
+
+    // Reset progress to 0 before recalculating
+    for (int i = 0; i < t->template_data->stat_count; i++) {
+        t->template_data->stats[i]->progress = 0;
+    }
+    t->template_data->play_time_ticks = 0;
+
+    cJSON *stat_entry;
+    // stat_change is an array
+    cJSON_ArrayForEach(stat_entry, stats_change) {
+        cJSON *item = stat_entry->child; // Then we go into the curly brackets
+
+        if (item) {
+            const char *key = item->string;
+            int current_value = item->valueint;
+
+            // Update playtime relative to snapshot
+            if (strcmp(key, "1100") == 0) {
+                long long diff = current_value - t->template_data->playtime_snapshot;
+                // Subtract the snapshot to be left with the actual playtime
+                t->template_data->play_time_ticks = (diff > 0) ? diff : 0;
+
+                // PRINT DIFFERENCE TO SNAPSHOT
+                printf("[TRACKER] PLAYTIME | Snapshot: %-6d | Current: %-6lld | Tracker Diff: %lld\n", current_value,
+                       t->template_data->playtime_snapshot, t->template_data->play_time_ticks);
+            }
+
+            // Update other stats relative to snapshot
+            for (int i = 0; i < t->template_data->stat_count; i++) {
+                TrackableItem *stat = t->template_data->stats[i];
+                if (strcmp(stat->root_name, key) == 0) {
+                    int diff = current_value - stat->initial_progress;
+                    stat->progress = diff > 0 ? diff : 0;
+                    stat->done = (stat->goal > 0 && stat->progress >= stat->goal);
+                    printf("STAT: %-28s | Current: %-6d | Snapshot: %-6d | Tracked Diff: %d\n",
+                           stat->display_name, current_value, stat->initial_progress, stat->progress);
+                    break;
+                }
+            }
+        }
+    }
+}
+
+// TODO: Delete once possible
+// /**
+//  * @brief (Era 2: 1.7.2-1.11.2) Parses unified JSON with achievements and stats.
+//  */
+// static void tracker_update_achievements_and_stats_mid(struct Tracker *t, const cJSON *player_stats_json) {
+//     if (!player_stats_json) return;
+//
+//     t->template_data->advancement_count = 0;
+//     t->template_data->completed_criteria_count = 0;
+//     t->template_data->play_time_ticks = 0;
+//
+//     // Update Achievements
+//     for (int i = 0; i < t->template_data->advancement_count; i++) {
+//         TrackableCategory *ach = t->template_data->advancements[i];
+//         ach->completed_criteria_count = 0;
+//         ach->done = false;
+//
+//         cJSON *ach_entry = cJSON_GetObjectItem(player_stats_json, ach->root_name);
+//         if (!ach_entry) continue;
+//
+//         if (cJSON_IsNumber(ach_entry)) {
+//             // Simple achievement
+//             ach->done = (ach_entry->valueint > 0);
+//         } else if (cJSON_IsObject(ach_entry)) {
+//             // Achievement with criteria
+//             cJSON *progress_array = cJSON_GetObjectItem(ach_entry, "progress");
+//             if (cJSON_IsArray(progress_array)) {
+//                 for (int j = 0; j < ach->criteria_count; j++) {
+//                     TrackableItem *crit = ach->criteria[j];
+//                     crit->done = false;
+//                     cJSON *progress_item;
+//                     cJSON_ArrayForEach(progress_item, progress_array) {
+//                         if (cJSON_IsString(progress_item) && strcmp(progress_item->valuestring, crit->root_name) == 0) {
+//                             crit->done = true;
+//                             ach->completed_criteria_count++;
+//                             break;
+//                         }
+//                     }
+//                 }
+//             }
+//             // Achievement is done if all criteria are done
+//             if (ach->criteria_count > 0 && ach->completed_criteria_count >= ach->criteria_count) {
+//                 ach->done = true;
+//             }
+//         }
+//         if (ach->done) {
+//             t->template_data->advancements_completed_count++;
+//         }
+//         t->template_data->completed_criteria_count += ach->completed_criteria_count;
+//     }
+//
+//     // Update Stats
+//     for (int i = 0; i < t->template_data->stat_count; i++) {
+//         TrackableItem *stat = t->template_data->stats[i];
+//         cJSON *stat_entry = cJSON_GetObjectItem(player_stats_json, stat->root_name);
+//         // take root name (from template) from player advancements
+//         stat->progress = cJSON_IsNumber(stat_entry) ? stat_entry->valueint : 0;
+//         stat->done = (stat->goal > 0 && stat->progress >= stat->goal);
+//     }
+//
+//     // Update Playtime
+//     cJSON *play_time_entry = cJSON_GetObjectItem(player_stats_json, "stat.playOneMinute");
+//     if (cJSON_IsNumber(play_time_entry)) {
+//         t->template_data->play_time_ticks = (long long) play_time_entry->valuedouble;
+//     }
+// }
+
+/**
+ * @brief (Era 2: 1.7.2-1.11.2) Parses unified JSON with achievements and stats.
+ */
+static void tracker_update_achievements_and_stats_mid(struct Tracker *t, const cJSON *player_stats_json) {
+    if (!player_stats_json) return;
+
+    t->template_data->advancements_completed_count = 0; // Corrected from advancement_count
+    t->template_data->completed_criteria_count = 0;
+    t->template_data->play_time_ticks = 0;
+
+    for (int i = 0; i < t->template_data->advancement_count; i++) {
+        TrackableCategory *ach = t->template_data->advancements[i];
+        ach->completed_criteria_count = 0;
+        ach->done = false;
+        cJSON *ach_entry = cJSON_GetObjectItem(player_stats_json, ach->root_name);
+        if (!ach_entry) continue;
+        if (cJSON_IsNumber(ach_entry)) {
+            ach->done = (ach_entry->valueint > 0);
+        } else if (cJSON_IsObject(ach_entry)) {
+            cJSON *progress_array = cJSON_GetObjectItem(ach_entry, "progress");
+            if (cJSON_IsArray(progress_array)) {
+                for (int j = 0; j < ach->criteria_count; j++) {
+                    TrackableItem *crit = ach->criteria[j];
+                    crit->done = false;
+                    cJSON *progress_item;
+                    cJSON_ArrayForEach(progress_item, progress_array) {
+                        if (cJSON_IsString(progress_item) && strcmp(progress_item->valuestring, crit->root_name) == 0) {
+                            crit->done = true;
+                            ach->completed_criteria_count++;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (ach->criteria_count > 0 && ach->completed_criteria_count >= ach->criteria_count) {
+                ach->done = true;
+            }
+        }
+        if (ach->done) {
+            t->template_data->advancements_completed_count++;
+        }
+        t->template_data->completed_criteria_count += ach->completed_criteria_count;
+    }
+
+    for (int i = 0; i < t->template_data->stat_count; i++) {
+        TrackableItem *stat = t->template_data->stats[i];
+        cJSON *stat_entry = cJSON_GetObjectItem(player_stats_json, stat->root_name);
+        stat->progress = cJSON_IsNumber(stat_entry) ? stat_entry->valueint : 0;
+        stat->done = (stat->goal > 0 && stat->progress >= stat->goal);
+    }
+
+    cJSON *play_time_entry = cJSON_GetObjectItem(player_stats_json, "stat.playOneMinute");
+    if (cJSON_IsNumber(play_time_entry)) {
+        t->template_data->play_time_ticks = (long long) play_time_entry->valuedouble;
+    }
+}
+
+/**
+ * @brief (Era 3: 1.12+) Updates advancement progress from modern JSON files.
+ */
+static void tracker_update_advancements_modern(struct Tracker *t, const cJSON *player_adv_json) {
+    if (!player_adv_json) return;
+
+    t->template_data->advancements_completed_count = 0;
+    t->template_data->completed_criteria_count = 0;
+
+    for (int i = 0; i < t->template_data->advancement_count; i++) {
+        TrackableCategory *adv = t->template_data->advancements[i];
+        adv->completed_criteria_count = 0;
+
+        cJSON *player_entry = cJSON_GetObjectItem(player_adv_json, adv->root_name);
+        // take root name (from template) from player advancements
+        if (player_entry) {
+            adv->done = cJSON_IsTrue(cJSON_GetObjectItem(player_entry, "done"));
+            if (adv->done) {
+                t->template_data->advancements_completed_count++;
+            }
+
+            cJSON *player_criteria = cJSON_GetObjectItem(player_entry, "criteria");
+            if (player_criteria) {
+                // If advancement has criteria
+                for (int j = 0; j < adv->criteria_count; j++) {
+                    TrackableItem *crit = adv->criteria[j];
+
+                    // Set to done if the entry exists
+                    if (cJSON_HasObjectItem(player_criteria, crit->root_name)) {
+                        crit->done = true;
+                        adv->completed_criteria_count++;
+                    } else {
+                        crit->done = false;
+                    }
+                }
+            }
+        } else {
+            adv->done = false;
+            for (int j = 0; j < adv->criteria_count; j++) {
+                adv->criteria[j]->done = false;
+            }
+        }
+        t->template_data->completed_criteria_count += adv->completed_criteria_count;
+    }
+}
+
+/**
+ * @brief (Era 3: 1.12+) Updates stat progress from modern JSON files.
+ */
+static void tracker_update_stats_modern(struct Tracker *t, const cJSON *player_stats_json, const cJSON *settings_json,
+                                        MC_Version version) {
+    if (!player_stats_json) return;
+
+    cJSON *stats_obj = cJSON_GetObjectItem(player_stats_json, "stats");
+    if (!stats_obj) return;
+
+    // Get the playtime for display, when 1.17+ its minecraft:play_time below, below it's minecraft:play_one_minute
+    cJSON *custom_stats = cJSON_GetObjectItem(stats_obj, "minecraft:custom");
+    if (custom_stats) {
+        // 1.17+
+        cJSON *play_time = NULL;
+        if (version >= MC_VERSION_1_17) {
+            play_time = cJSON_GetObjectItem(custom_stats, "minecraft:play_time");
+        } else {
+            // 1.12 -> 1.16.5
+            play_time = cJSON_GetObjectItem(custom_stats, "minecraft:play_one_minute");
+        }
+
+        if (cJSON_IsNumber(play_time)) {
+            t->template_data->play_time_ticks = (long long) play_time->valuedouble;
+        }
+    }
+
+    cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : NULL;
+
+    for (int i = 0; i < t->template_data->stat_count; i++) {
+        TrackableItem *stat = t->template_data->stats[i];
+        stat->progress = 0;
+        stat->is_manually_completed = false;
+
+        char root_name_copy[192];
+        strncpy(root_name_copy, stat->root_name, sizeof(root_name_copy) - 1);
+        root_name_copy[sizeof(root_name_copy) - 1] = '\0';
+
+        char *item_key = strchr(root_name_copy, '/');
+        if (item_key) {
+            *item_key = '\0'; // Null-terminate any existing '/' in the root_name
+            item_key++;
+            char *category_key = root_name_copy;
+            cJSON *category_obj = cJSON_GetObjectItem(stats_obj, category_key);
+            if (category_obj) {
+                cJSON *stat_value = cJSON_GetObjectItem(category_obj, item_key);
+                if (cJSON_IsNumber(stat_value)) {
+                    stat->progress = stat_value->valueint;
+                }
+            }
+        }
+
+        if (override_obj) {
+            cJSON *override_status = cJSON_GetObjectItem(override_obj, stat->root_name);
+            if (cJSON_IsTrue(override_status)) {
+                stat->done = true;
+                stat->is_manually_completed = true;
+            }
+        }
+
+        if (!stat->is_manually_completed) {
+            stat->done = (stat->goal > 0 && stat->progress >= stat->goal);
+        }
+    }
+}
+
 // HELPER FUNCTION FOR PARSING
-// TODO: Move these static functions into tracker_utils.c (then they are not static anymore)
 /**
  * @brief Parses advancement categories and their criteria from the template, supporting modded advancements.
  */
@@ -423,57 +816,57 @@ static void parse_multi_stage_goals(cJSON *goals_json, cJSON *lang_json, MultiSt
     }
 }
 
-/**
- * @brief Updates advancement and criteria progress from a pre-loaded cJSON object.
- * @param t A pointer to the Tracker struct.
- * @param player_adv_json The parsed player advancements JSON file.
- */
-static void tracker_update_advancement_progress(struct Tracker *t, const cJSON *player_adv_json) {
-    if (!player_adv_json) return;
-
-    t->template_data->advancements_completed_count = 0;
-    t->template_data->completed_criteria_count = 0;
-
-    // printf("[TRACKER] Reading player advancements from: %s\n", t->advancements_path);
-
-    for (int i = 0; i < t->template_data->advancement_count; i++) {
-        TrackableCategory *adv = t->template_data->advancements[i]; // Get the current advancement
-        adv->completed_criteria_count = 0; // Reset completed criteria count for this advancement
-
-        cJSON *player_entry = cJSON_GetObjectItem(player_adv_json, adv->root_name);
-        // Get the entry for this advancement
-        if (player_entry) {
-            adv->done = cJSON_IsTrue(cJSON_GetObjectItem(player_entry, "done"));
-            if (adv->done) {
-                t->template_data->advancements_completed_count++;
-            }
-
-            // Criteria don't have a "done" field, so we just check if the entry exists
-            cJSON *player_criteria = cJSON_GetObjectItem(player_entry, "criteria");
-            if (player_criteria) {
-                // If the entry exists, we have criteria
-                for (int j = 0; j < adv->criteria_count; j++) {
-                    TrackableItem *crit = adv->criteria[j];
-                    // Check if the criteria exist -> meaning it's been completed
-                    if (cJSON_HasObjectItem(player_criteria, crit->root_name)) {
-                        crit->done = true;
-                        adv->completed_criteria_count++;
-                    } else {
-                        crit->done = false;
-                    }
-                }
-            }
-        } else {
-            // If the entry doesn't exist, reset everything
-            adv->done = false;
-            for (int j = 0; j < adv->criteria_count; j++) {
-                adv->criteria[j]->done = false;
-            }
-        }
-        // Update completed criteria count for this advancement
-        t->template_data->completed_criteria_count += adv->completed_criteria_count;
-    }
-}
+// /**
+//  * @brief Updates advancement and criteria progress from a pre-loaded cJSON object.
+//  * @param t A pointer to the Tracker struct.
+//  * @param player_adv_json The parsed player advancements JSON file.
+//  */
+// static void tracker_update_advancement_progress(struct Tracker *t, const cJSON *player_adv_json) {
+//     if (!player_adv_json) return;
+//
+//     t->template_data->advancements_completed_count = 0;
+//     t->template_data->completed_criteria_count = 0;
+//
+//     // printf("[TRACKER] Reading player advancements from: %s\n", t->advancements_path);
+//
+//     for (int i = 0; i < t->template_data->advancement_count; i++) {
+//         TrackableCategory *adv = t->template_data->advancements[i]; // Get the current advancement
+//         adv->completed_criteria_count = 0; // Reset completed criteria count for this advancement
+//
+//         cJSON *player_entry = cJSON_GetObjectItem(player_adv_json, adv->root_name);
+//         // Get the entry for this advancement
+//         if (player_entry) {
+//             adv->done = cJSON_IsTrue(cJSON_GetObjectItem(player_entry, "done"));
+//             if (adv->done) {
+//                 t->template_data->advancements_completed_count++;
+//             }
+//
+//             // Criteria don't have a "done" field, so we just check if the entry exists
+//             cJSON *player_criteria = cJSON_GetObjectItem(player_entry, "criteria");
+//             if (player_criteria) {
+//                 // If the entry exists, we have criteria
+//                 for (int j = 0; j < adv->criteria_count; j++) {
+//                     TrackableItem *crit = adv->criteria[j];
+//                     // Check if the criteria exist -> meaning it's been completed
+//                     if (cJSON_HasObjectItem(player_criteria, crit->root_name)) {
+//                         crit->done = true;
+//                         adv->completed_criteria_count++;
+//                     } else {
+//                         crit->done = false;
+//                     }
+//                 }
+//             }
+//         } else {
+//             // If the entry doesn't exist, reset everything
+//             adv->done = false;
+//             for (int j = 0; j < adv->criteria_count; j++) {
+//                 adv->criteria[j]->done = false;
+//             }
+//         }
+//         // Update completed criteria count for this advancement
+//         t->template_data->completed_criteria_count += adv->completed_criteria_count;
+//     }
+// }
 
 /**
  * @brief Updates unlock progress from a pre-loaded cJSON object and counts completed unlocks.
@@ -508,85 +901,85 @@ static void tracker_update_unlock_progress(struct Tracker *t, const cJSON *playe
 }
 
 
-/**
- * @brief Updates stat progress from a pre-loaded cJSON object. Supports modded stats. No hardcoded "minecraft:".
- * It also looks specifically for and stores the minecraft:play_time statistic for finished runs.
- * @param t A pointer to the Tracker struct.
- * @param player_stats_json The parsed player stats JSON file.
- */
-static void tracker_update_stat_progress(struct Tracker *t, const cJSON *player_stats_json,
-                                         const cJSON *settings_json) {
-    if (!player_stats_json) return;
-
-    // printf("[TRACKER] Reading player stats from: %s\n", t->stats_path);
-
-
-    cJSON *stats_obj = cJSON_GetObjectItem(player_stats_json, "stats");
-    if (!stats_obj) {
-        fprintf(stderr, "[TRACKER] Failed to find 'stats' object in player stats file.\n");
-        return;
-    }
-
-    cJSON *custom_stats = cJSON_GetObjectItem(stats_obj, "minecraft:custom");
-    if (custom_stats) {
-        cJSON *play_time = cJSON_GetObjectItem(custom_stats, "minecraft:play_time");
-        if (cJSON_IsNumber(play_time)) {
-            t->template_data->play_time_ticks = (long long) play_time->valuedouble;
-        }
-    }
-
-    // MANUAL OVERRIDE FOR STATS GOAL
-    cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : NULL;
-
-    for (int i = 0; i < t->template_data->stat_count; i++) {
-        TrackableItem *stat = t->template_data->stats[i];
-
-        stat->progress = 0; // Default to 0
-        stat->is_manually_completed = false;
-
-        // The root_name is now in the format "full:category/full:item", e.g., "minecraft:mined/minecraft:dirt"
-        char root_name_copy[192];
-        strncpy(root_name_copy, stat->root_name, sizeof(root_name_copy) - 1);
-        root_name_copy[sizeof(root_name_copy) - 1] = '\0'; // Ensure null termination
-
-        // Find the separator '/' to distinguish category and item
-
-        char *item_key = strchr(root_name_copy, '/');
-        if (item_key) {
-            *item_key = '\0'; // Split the string with null terminator
-            item_key++; // Move pointer to the start of the item key
-
-            char *category_key = root_name_copy;
-
-            // Look up the category (e.g., "minecraft:mined")
-            cJSON *category_obj = cJSON_GetObjectItem(stats_obj, category_key);
-            if (category_obj) {
-                // Look up the item within that category (e.g., "minecraft:dirt")
-
-                // Check if the stat exists in the category
-                cJSON *stat_value = cJSON_GetObjectItem(category_obj, item_key);
-                if (cJSON_IsNumber(stat_value)) {
-                    stat->progress = stat_value->valueint;
-                }
-            }
-        }
-
-        if (override_obj) {
-            cJSON *override_status = cJSON_GetObjectItem(override_obj, stat->root_name);
-            if (cJSON_IsBool(override_status)) {
-                if (cJSON_IsTrue(override_status)) {
-                    stat->done = true;
-                    stat->is_manually_completed = true;
-                }
-            }
-        }
-
-        // If not manually completed, determine 'done' status by progress
-        if (!stat->is_manually_completed) {
-            stat->done = (stat->goal > 0 && stat->progress >= stat->goal);
-        }
-    }
-}
+// /**
+//  * @brief Updates stat progress from a pre-loaded cJSON object. Supports modded stats. No hardcoded "minecraft:".
+//  * It also looks specifically for and stores the minecraft:play_time statistic for finished runs.
+//  * @param t A pointer to the Tracker struct.
+//  * @param player_stats_json The parsed player stats JSON file.
+//  */
+// static void tracker_update_stat_progress(struct Tracker *t, const cJSON *player_stats_json,
+//                                          const cJSON *settings_json) {
+//     if (!player_stats_json) return;
+//
+//     // printf("[TRACKER] Reading player stats from: %s\n", t->stats_path);
+//
+//
+//     cJSON *stats_obj = cJSON_GetObjectItem(player_stats_json, "stats");
+//     if (!stats_obj) {
+//         fprintf(stderr, "[TRACKER] Failed to find 'stats' object in player stats file.\n");
+//         return;
+//     }
+//
+//     cJSON *custom_stats = cJSON_GetObjectItem(stats_obj, "minecraft:custom");
+//     if (custom_stats) {
+//         cJSON *play_time = cJSON_GetObjectItem(custom_stats, "minecraft:play_time");
+//         if (cJSON_IsNumber(play_time)) {
+//             t->template_data->play_time_ticks = (long long) play_time->valuedouble;
+//         }
+//     }
+//
+//     // MANUAL OVERRIDE FOR STATS GOAL
+//     cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : NULL;
+//
+//     for (int i = 0; i < t->template_data->stat_count; i++) {
+//         TrackableItem *stat = t->template_data->stats[i];
+//
+//         stat->progress = 0; // Default to 0
+//         stat->is_manually_completed = false;
+//
+//         // The root_name is now in the format "full:category/full:item", e.g., "minecraft:mined/minecraft:dirt"
+//         char root_name_copy[192];
+//         strncpy(root_name_copy, stat->root_name, sizeof(root_name_copy) - 1);
+//         root_name_copy[sizeof(root_name_copy) - 1] = '\0'; // Ensure null termination
+//
+//         // Find the separator '/' to distinguish category and item
+//
+//         char *item_key = strchr(root_name_copy, '/');
+//         if (item_key) {
+//             *item_key = '\0'; // Split the string with null terminator
+//             item_key++; // Move pointer to the start of the item key
+//
+//             char *category_key = root_name_copy;
+//
+//             // Look up the category (e.g., "minecraft:mined")
+//             cJSON *category_obj = cJSON_GetObjectItem(stats_obj, category_key);
+//             if (category_obj) {
+//                 // Look up the item within that category (e.g., "minecraft:dirt")
+//
+//                 // Check if the stat exists in the category
+//                 cJSON *stat_value = cJSON_GetObjectItem(category_obj, item_key);
+//                 if (cJSON_IsNumber(stat_value)) {
+//                     stat->progress = stat_value->valueint;
+//                 }
+//             }
+//         }
+//
+//         if (override_obj) {
+//             cJSON *override_status = cJSON_GetObjectItem(override_obj, stat->root_name);
+//             if (cJSON_IsBool(override_status)) {
+//                 if (cJSON_IsTrue(override_status)) {
+//                     stat->done = true;
+//                     stat->is_manually_completed = true;
+//                 }
+//             }
+//         }
+//
+//         // If not manually completed, determine 'done' status by progress
+//         if (!stat->is_manually_completed) {
+//             stat->done = (stat->goal > 0 && stat->progress >= stat->goal);
+//         }
+//     }
+// }
 
 /**
  * @brief Updates the 'done' status of custom goals by reading from the settings file.
@@ -767,10 +1160,25 @@ static void tracker_calculate_overall_progress(struct Tracker *t) {
     if (total_steps > 0) {
         t->template_data->overall_progress_percentage = ((float) completed_steps / (float) total_steps) * 100.0f;
     } else {
-        t->template_data->overall_progress_percentage = 0.0f;
+        t->template_data->overall_progress_percentage = 100.0f; // Display 100% if there are no steps
     }
 }
 
+/**
+ * @brief Frees an array of TrackableItem pointers.
+ *
+ * This is used in tracker_free_template_data(). Used for stats, unlocks and custom goals.
+ *
+ * @param items The array of TrackableItem pointers to be freed.
+ * @param count The number of elements in the array.
+ */
+static void free_trackable_items(TrackableItem **items, int count) {
+    if (!items) return;
+    for (int i = 0; i < count; i++) {
+        free(items[i]);
+    }
+    free(items);
+}
 
 /**
  * @brief Frees all dynamically allocated memory within a TemplateData struct.
@@ -795,25 +1203,13 @@ static void tracker_free_template_data(TemplateData *td) {
     }
     free(td->advancements);
 
-
     // Free stats data
-    for (int i = 0; i < td->stat_count; i++) {
-        free(td->stats[i]);
-    }
-    free(td->stats);
-
-    // Free unlocks data
-    for (int i = 0; i < td->unlock_count; i++) {
-        free(td->unlocks[i]);
-    }
-    free(td->unlocks);
+    free_trackable_items(td->stats, td->stat_count);
+    free_trackable_items(td->unlocks, td->unlock_count);
 
     // Free custom goal data
     if (td->custom_goals) {
-        for (int i = 0; i < td->custom_goal_count; i++) {
-            free(td->custom_goals[i]);
-        }
-        free(td->custom_goals);
+        free_trackable_items(td->custom_goals, td->custom_goal_count);
     }
 
     // Free multi-stage goals data
@@ -864,7 +1260,6 @@ static void format_category_string(const char *input, char *output, size_t max_l
  * @param output The buffer to write the formatted time string to.
  * @param max_len The size of the output buffer.
  */
-
 static void format_time(long long ticks, char *output, size_t max_len) {
     if (!output || max_len == 0) return;
 
@@ -916,6 +1311,9 @@ bool tracker_new(struct Tracker **tracker, const AppSettings *settings) {
         tracker_free(tracker);
         return false;
     }
+
+    // Ensure snapshot world name is initially empty
+    t->template_data->snapshot_world_name[0] = '\0';
 
     // Initialize paths (also during runtime)
     tracker_reinit_paths(t, settings);
@@ -983,22 +1381,44 @@ void tracker_update(struct Tracker *t, float *deltaTime) {
     // game logic goes here
     (void) deltaTime;
 
+    AppSettings settings;
+    settings_load(&settings);
+    MC_Version version = settings_get_version_from_string(settings.version_str);
+
+    // Legacy Snapshot Logic
+    // If the version is legacy and the current world name doesn't match the snapshot's world name,
+    // it means we've loaded a new world and need to take a new snapshot of the global stats
+    if (version <= MC_VERSION_1_6_4 && strcmp(t->world_name, t->template_data->snapshot_world_name) != 0) {
+        printf("[TRACKER] Legacy world change detected. Taking new stat snapshot for world: %s\n", t->world_name);
+        tracker_snapshot_legacy_stats(t);
+    }
+
     // Load all necessary player files ONCE
-    cJSON *player_adv_json = (strlen(t->advancements_path) > 0) ? cJSON_from_file(t->advancements_path) : NULL;
+    cJSON *player_adv_json = NULL; // (strlen(t->advancements_path) > 0) ? cJSON_from_file(t->advancements_path) : NULL;
     cJSON *player_stats_json = (strlen(t->stats_path) > 0) ? cJSON_from_file(t->stats_path) : NULL;
     cJSON *player_unlocks_json = (strlen(t->unlocks_path) > 0) ? cJSON_from_file(t->unlocks_path) : NULL;
     cJSON *settings_json = cJSON_from_file(SETTINGS_FILE_PATH);
 
+    // Version-based Dispatch
+    if (version <= MC_VERSION_1_6_4) {
+        tracker_update_stats_legacy(t, player_stats_json);
+    } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_11_2) {
+        tracker_update_achievements_and_stats_mid(t, player_stats_json);
+    } else if (version >= MC_VERSION_1_12) {
+        player_adv_json = (strlen(t->advancements_path) > 0) ? cJSON_from_file(t->advancements_path) : NULL;
+        tracker_update_advancements_modern(t, player_adv_json);
+
+        // Needs version for playtime as 1.17 renames minecraft:play_one_minute into minecraft:play_time
+        tracker_update_stats_modern(t, player_stats_json, settings_json, version);
+        tracker_update_unlock_progress(t, player_unlocks_json); // Just returns if unlocks don't exist
+    }
+
     // Pass the parsed data to the update functions
-    tracker_update_advancement_progress(t, player_adv_json);
-    tracker_update_unlock_progress(t, player_unlocks_json);
-    tracker_update_stat_progress(t, player_stats_json, settings_json);
+    // tracker_update_advancement_progress(t, player_adv_json); // TODO: Remove once possible
+    // tracker_update_stat_progress(t, player_stats_json, settings_json); // TODO: Remove once possible
     tracker_update_custom_progress(t, settings_json);
     tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json, player_unlocks_json);
-
-    // Calculate the final overall progress
-    // Advancements themselves are seperate, but THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
-    tracker_calculate_overall_progress(t);
+    tracker_calculate_overall_progress(t); //THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
 
     // Clean up the parsed JSON objects
     cJSON_Delete(player_adv_json);
@@ -1048,19 +1468,20 @@ void tracker_reinit_template(struct Tracker *t, const AppSettings *settings) {
 
     // Free all the old advancement, stat, etc. data
     if (t->template_data) {
-        // tracker_free_template_data(t->template_data); // TODO: Remove this when possible
+        tracker_free_template_data(t->template_data);
 
         // Reset the entire struct to zero to clear dangling pointers and old counts.
         memset(t->template_data, 0, sizeof(TemplateData));
-    }
 
+        // After clearing, ensure the snapshot name is also cleared to force a new snapshot
+        t->template_data->snapshot_world_name[0] = '\0';
+    }
     // Load and parse data from the new template files
     tracker_load_and_parse_data(t);
 }
 
 void tracker_reinit_paths(struct Tracker *t, const AppSettings *settings) {
     if (!t || !settings) return;
-
 
     // Copy the template and lang paths
     strncpy(t->advancement_template_path, settings->template_path, MAX_PATH_LENGTH - 1);
@@ -1069,24 +1490,20 @@ void tracker_reinit_paths(struct Tracker *t, const AppSettings *settings) {
     t->lang_path[MAX_PATH_LENGTH - 1] = '\0';
 
     MC_Version version = settings_get_version_from_string(settings->version_str);
-    bool use_advancements = (version >= MC_VERSION_1_12);
-    bool use_unlocks = (version == MC_VERSION_25W14CRAFTMINE);
 
     // Get the final, normalized saves path using the loaded settings
     if (get_saves_path(t->saves_path, MAX_PATH_LENGTH, settings->path_mode, settings->manual_saves_path)) {
         printf("[TRACKER] Using saves path: %s\n", t->saves_path);
 
         // Find the specific world files using the correct flag
-        find_latest_world_files(
+        find_player_data_files(
             t->saves_path,
+            version,
             t->world_name,
             t->advancements_path,
             t->stats_path,
             t->unlocks_path,
-            MAX_PATH_LENGTH,
-            use_advancements,
-            use_unlocks
-        );
+            MAX_PATH_LENGTH);
     } else {
         fprintf(stderr, "[TRACKER] CRITICAL: Failed to get saves path.\n");
 
@@ -1096,7 +1513,6 @@ void tracker_reinit_paths(struct Tracker *t, const AppSettings *settings) {
         t->advancements_path[0] = '\0';
         t->stats_path[0] = '\0';
         t->unlocks_path[0] = '\0';
-        return;
     }
 }
 
