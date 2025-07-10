@@ -1,0 +1,40 @@
+{
+  "advancements": {
+    "5242889": {
+      "icon": "items/iron_pickaxe.png",
+      "criteria": {}
+    },
+    "5242881": {
+      "icon": "items/oak_log.png",
+      "criteria": {}
+    },
+    "5242882": {
+      "icon": "items/crafting_table.png",
+      "criteria": {}
+    },
+    "5242883": {
+      "icon": "items/stone_pickaxe.png",
+      "criteria": {}
+    }
+  },
+  "stats": [
+    {
+      "root_name": "1100",
+      "target": 72000,
+      "icon": "items/clock.png"
+    },
+    {
+      "root_name": "2010",
+      "target": 50,
+      "icon": "items/slime_block.png"
+    },
+    {
+      "root_name": "5242880",
+      "target": 10,
+      "icon": "items/diamond_sword.png"
+    }
+  ],
+  "unlocks": [],
+  "custom": [],
+  "multi_stage_goals": []
+}

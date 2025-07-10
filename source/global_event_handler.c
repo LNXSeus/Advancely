@@ -25,32 +25,36 @@ void handle_global_events(struct Tracker *t, struct Overlay *o, struct Settings 
         // Event-based HOTKEY HANDLING
         if (event.type == SDL_EVENT_KEY_DOWN && event.key.repeat == 0) { // Only trigger on initial key press
             bool hotkey_triggered = false;
-            for (int i = 0; i < app_settings->hotkey_count; i++) {
-                HotkeyBinding *hb = &app_settings->hotkeys[i];
-                TrackableItem *target_goal = NULL;
 
-                // Find the goal this hotkey is bound to
-                for (int j = 0; j < t->template_data->custom_goal_count; j++) {
-                    if (strcmp(t->template_data->custom_goals[j]->root_name, hb->target_goal) == 0) {
-                        target_goal = t->template_data->custom_goals[j];
+            // Defensive check to prevent crash if data is not ready
+            if (t && t->template_data && t->template_data->custom_goals) {
+                for (int i = 0; i < app_settings->hotkey_count; i++) {
+                    HotkeyBinding *hb = &app_settings->hotkeys[i];
+                    TrackableItem *target_goal = NULL;
+
+                    // Find the goal this hotkey is bound to
+                    for (int j = 0; j < t->template_data->custom_goal_count; j++) {
+                        if (strcmp(t->template_data->custom_goals[j]->root_name, hb->target_goal) == 0) {
+                            target_goal = t->template_data->custom_goals[j];
+                            break;
+                        }
+                    }
+                    if (!target_goal) continue;
+
+                    // Check if the pressed key matches a hotkey
+                    if (event.key.scancode == hb->increment_scancode) {
+                        target_goal->progress++;
+                        hotkey_triggered = true;
+                    } else if (event.key.scancode == hb->decrement_scancode) {
+                        target_goal->progress--;
+                        hotkey_triggered = true;
+                    }
+
+                    if (hotkey_triggered) {
+                        settings_save(app_settings, t->template_data);
+                        SDL_SetAtomicInt(&g_needs_update, 1); // Request a data refresh
                         break;
                     }
-                }
-                if (!target_goal) continue;
-
-                // Check if the pressed key matches a hotkey
-                if (event.key.scancode == hb->increment_scancode) {
-                    target_goal->progress++;
-                    hotkey_triggered = true;
-                } else if (event.key.scancode == hb->decrement_scancode) {
-                    target_goal->progress--;
-                    hotkey_triggered = true;
-                }
-
-                if (hotkey_triggered) {
-                    settings_save(app_settings, t->template_data);
-                    SDL_SetAtomicInt(&g_needs_update, 1); // Request a data refresh
-                    break;
                 }
             }
 

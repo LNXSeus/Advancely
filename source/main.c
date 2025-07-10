@@ -12,7 +12,7 @@
 #include "overlay.h"
 #include "settings.h"
 #include "global_event_handler.h"
-#include "path_utils.h" // Include for find_latest_world_files
+#include "path_utils.h" // Include for find_player_data_files
 #include "settings_utils.h" // Include for AppSettings and version checking
 
 // Gloabal flag to signal that an update is needed
@@ -43,7 +43,8 @@ static void global_watch_callback(dmon_watch_id watch_id, dmon_action action, co
     // We only care about file modifications to existing files
     if (action == DMON_ACTION_MODIFY) {
         const char *ext = strrchr(filepath, '.'); // Locate last '.' in string
-        if (ext && strcmp(ext, ".json") == 0) {
+        if (ext && (strcmp(ext, ".json") == 0) | (strcmp(ext, ".dat") == 0)) {
+            // Check for .json or .dat
             // Check if file extension is .json, IMPORTANT: This triggers for useless .json files as well
             printf("[DMON - MAIN] File modified: %s. Triggering update.\n", filepath);
             // Automatically set the flag to 1. Safe to call from any thread.
@@ -136,47 +137,58 @@ int main(int argc, char *argv[]) {
 
             // --- Per-Frame Logic ---
 
+            // Lock mutex before touching watchers or paths
+            SDL_LockMutex(g_watcher_mutex);
+
             handle_global_events(tracker, overlay, settings, &app_settings, &is_running, &settings_opened, &deltaTime);
 
 
             // Close immediately if app not running
             if (!is_running) break;
 
-            // Lock mutex before touching watchers or paths
-            SDL_LockMutex(g_watcher_mutex);
-
             // Check if settings.json has been modified
             if (SDL_SetAtomicInt(&g_settings_changed, 0) == 1) {
                 printf("[MAIN] Settings changed. Re-initializing paths and file watcher.\n");
 
+                // Store old critical settings for comparison
+                // Making sure only NOT EVERY change in settings.json reloads game data (problem with legacy version
+                // resetting difference to snapshot when tracker window was moved)
+                char old_version[64];
+                char old_category[MAX_PATH_LENGTH];
+                strncpy(old_version, app_settings.version_str, 64);
+                strncpy(old_category, app_settings.category, MAX_PATH_LENGTH);
+
                 // Update hotkeys during runtime
                 settings_load(&app_settings); // Reload settings
-                frame_target_time = 1000.0f / app_settings.fps; // Update frame limiter if fps has changed in settings
 
-                // Change always on top flag during runtime in settings.json
-                if (!settings_opened) {
-                    SDL_SetWindowAlwaysOnTop(tracker->window, app_settings.tracker_always_on_top);
+                // ONLY RE-INIT IF A CRITICAL SETTING HAS CHANGED
+                // Not something like window position of the tracker
+                if (strcmp(old_version, app_settings.version_str) != 0 ||
+                    strcmp(old_category, app_settings.category) != 0) {
+                    printf("[MAIN] Critical settings (saves path, version, category) changed. Re-initializing template.\n");
+
+                    // Stop watching the old directory
+                    dmon_unwatch(saves_watcher_id);
+
+                    // Update the tracker with the new paths and template data
+                    tracker_reinit_template(tracker, &app_settings);
                 }
-
-
-                // Stop watching the old directory
-                dmon_unwatch(saves_watcher_id);
-
-                // Update the tracker with the new paths
-                tracker_reinit_template(tracker, &app_settings); // Re-initialize the template (so it can be changed during runtime)
 
                 // Start watching the new directory
                 if (strlen(tracker->saves_path) > 0) {
                     printf("[MAIN] Now watching new saves directory: %s\n", tracker->saves_path);
                     saves_watcher_id = dmon_watch(tracker->saves_path, global_watch_callback, DMON_WATCHFLAGS_RECURSIVE,
                                                   NULL);
-                } else {
-                    fprintf(stderr, "[MAIN] Failed to watch new saves directory as it's empty: %s\n",
-                            tracker->saves_path);
                 }
-
-                // Force an update from the new path
                 SDL_SetAtomicInt(&g_needs_update, 1);
+
+                // ALWAYS apply non-critical changes
+                frame_target_time = 1000.0f / app_settings.fps; // Update frame limiter if fps has changed in settings
+
+                // Change always on top flag during runtime in settings.json
+                if (!settings_opened) {
+                    SDL_SetWindowAlwaysOnTop(tracker->window, app_settings.tracker_always_on_top);
+                }
             }
 
             // Check if dmon (or manual update through custom goal) has requested an update
@@ -186,15 +198,14 @@ int main(int argc, char *argv[]) {
                 AppSettings current_settings;
                 settings_load(&current_settings); // Also constructs the template paths
                 MC_Version version = settings_get_version_from_string(current_settings.version_str);
-                find_latest_world_files(
+                find_player_data_files(
                     tracker->saves_path,
+                    version,
                     tracker->world_name,
                     tracker->advancements_path,
                     tracker->stats_path,
                     tracker->unlocks_path,
-                    MAX_PATH_LENGTH,
-                    (version >= MC_VERSION_1_12),
-                    (version >= MC_VERSION_25W14CRAFTMINE)
+                    MAX_PATH_LENGTH
                 );
 
                 // Now update progress with the correct paths

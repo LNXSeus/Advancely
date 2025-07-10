@@ -7,8 +7,8 @@
 
 #include <cJSON.h>
 
-#include "path_utils.h"
-#include "data_structures.h" // For TemplateData
+#include "path_utils.h" // For MAX_PATH_LENGTH
+#include "data_structures.h" // For TemplateData, MC_Version and PathMode enums
 
 #define SETTINGS_FILE_PATH "resources/config/settings.json"
 #define MAX_HOTKEYS 16 // Limit for amount of hotkeys
@@ -36,17 +36,6 @@ typedef struct {
     SDL_Scancode increment_scancode;
     SDL_Scancode decrement_scancode;
 } HotkeyBinding;
-
-// TODO: Define versions here and in VersionMapEntry in settings_utils.c
-typedef enum {
-    // Puts vaLue starting at 0, allows for comparisons
-    MC_VERSION_1_11,
-    MC_VERSION_1_12,
-    MC_VERSION_1_16_1,
-    MC_VERSION_25W14CRAFTMINE,
-    MC_VERSION_1_21_6,
-    MC_VERSION_UNKNOWN, // For error handling
-} MC_Version;
 
 // Data structures for settings
 typedef struct {
