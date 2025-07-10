@@ -34,7 +34,7 @@ You select the minecraft version, the category, all the advancements, statistics
 
 Find the full list of supported versions [here](https://pastebin.com/NhkaT3qD).
 
-This tracker supports **any full release** from Minecraft 1.0 upwards including all april fool snapshots.
+This tracker supports **any full release** from Minecraft 1.0 upwards including all april fool snapshots:
 
 * **1.0–1.6.4**: It reads the global stats file and takes a snapshot when a new world is created and then starts counting from zero to simulate local per-world stats. Working with these versions requires knowing the IDs of stats and advancements. You can find the translations for those IDs [here](https://pastebin.com/qPsgc4Eb) and the individual item IDs [here](https://pastebin.com/r5tpjPFm). (Credits: [minecraftinfo.com](https://www.minecraftinfo.com/idlist.htm))
 * **1.7.2–1.11.2**: Advancely reads the stats file for stats and achievements  and playtime is tracked through the stat.playOneMinute entry.
