@@ -30,13 +30,18 @@ The true power of Advancely lies in its customization. You can define exactly wh
 
 You select the minecraft version, the category, all the advancements, statistics, goals you want to track with custom translations. The tracker will then parse your template and track progress against the goals you've defined.
 
-## Supporting over 100+ Minecraft versions (1.0 - 1.21.7)
+## Supporting 100+ Minecraft versions (1.0–1.21.7+)
 
 Find the full list of supported versions [here](https://pastebin.com/NhkaT3qD).
 
-This tracker supports **any full release** from Minecraft 1.0 upwards including all april fool snapshots. It does so by only reading from the stats file for any version prior to 1.12. From 1.12 upwards in reads the stats and advancements file and for the 25w14craftmine snapshot it additionally reads the unlocks file.
-When creating a template for version 1.0 - 1.6.4 it comes in handy to know which ID corresponds to which stat or advancement. You can find the translations for those IDs [here](https://pastebin.com/qPsgc4Eb) and the individual item IDs [here](https://pastebin.com/r5tpjPFm). (Credits: [minecraftinfo.com](https://www.minecraftinfo.com/idlist.htm))
-In version 1.0 - 1.6.4, as the stats are tracked globally, when starting a new all advancements run you must quit the game, delete everything in the minecraft\stats folder then start a new world.
+This tracker supports **any full release** from Minecraft 1.0 upwards including all april fool snapshots. It does so by only reading from the stats file for any version prior to 1.12. From 1.12 upwards in reads the stats and advancements file; and for the 25w14craftmine snapshot it additionally reads the unlocks file.
+
+* **1.0–1.6.4**: It reads the global stats file and takes a snapshot when a new world is created and then starts counting from zero to simulate local per-world stats. Working with these versions requires knowing the IDs of stats and advancements. You can find the translations for those IDs [here](https://pastebin.com/qPsgc4Eb) and the individual item IDs [here](https://pastebin.com/r5tpjPFm). (Credits: [minecraftinfo.com](https://www.minecraftinfo.com/idlist.htm))
+* **1.7.2–1.11.2**: Advancely reads the stats file for stats and achievements  and playtime is tracked through the stat.playOneMinute entry.
+* **1.12–1.16.5**: Advancely reads the stats and advancements file and playtime is tracked through the minecraft:play_one_minute entry.
+* **1.17+**: Advancely reads the stats and advancements file and playtime is tracked through the minecraft:play_time entry.
+* **25w14craftmine**: Advancely reads the stats, advancements, and unlocks file. (Game version 1.21.5)
+
 
 ## How To Use
 
