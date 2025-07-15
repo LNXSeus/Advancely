@@ -28,7 +28,7 @@ typedef struct TrackableItem {
 
     // Flag to allow "conflicting" criteria to overlay parent advancements icon (e.g., hoglin), init with false, cause of calloc
     bool is_shared;
-    bool is_manually_completed; // For manual stat override
+    // bool is_manually_completed; // TODO: Probably not needed as stats now use TrackableCategory
 } TrackableItem;
 
 
@@ -41,6 +41,8 @@ typedef struct TrackableCategory {
     SDL_Texture *texture;
 
     bool done;
+    bool is_manually_completed; // For manually overriding stats (as they have criteria now with sub-stats)
+    bool done_in_snapshot; // For legacy stat snapshotting (for achievements)
     int progress;
     int goal;
 
@@ -56,8 +58,8 @@ typedef enum {
     SUBGOAL_STAT,
     SUBGOAL_ADVANCEMENT,
     SUBGOAL_UNLOCK, // Allows to also complete a stage based on a specific unlock
+    SUBGOAL_CRITERION, // Allows to complete a stage based on a specific advancement/achievement criterion, e.g., visit plains biome
     // For goals with no automatic trigger, used for final stages (displays once all previous stages are done)
-    // TODO: Make subgoal_manual stages clickable in the UI, similar to custom_goals, NOT THAT IMPORTANT (Can't go back)
     SUBGOAL_MANUAL // When it's not "stat" or "advancement"
 } SubGoalType;
 
@@ -66,6 +68,7 @@ typedef struct SubGoal {
     char stage_id[64]; // Unique ID for every stage e.g., "0", "1", "final_stage"
     char display_text[192]; // e.g., "Awaiting thunder"
     SubGoalType type; // What kind of trigger to check for
+    char parent_advancement[192]; // Used for "criterion" stage of multi-stage goal
     char root_name[192]; // The target, e.g., "minecraft:trident" or "minecraft:adventure/very_very_frightening"
     int required_progress; // The value to reach, e.g., 1
     int current_stat_progress; // Current value of stat within multi-stage goal
@@ -89,8 +92,12 @@ typedef struct TemplateData {
     int advancements_completed_count;
     TrackableCategory **advancements;
 
+    // Stats support criteria like advancements
     int stat_count; // Number of stat goals
-    TrackableItem **stats;
+    int stats_completed_count; // For progress tracking
+    int stat_total_criteria_count; // For progress tracking
+    int stats_completed_criteria_count; // So individual stat criteria count towards percentage progress
+    TrackableCategory **stats; // Stats can now be categories
 
     int unlock_count; // Number of unlocks
     TrackableItem **unlocks;

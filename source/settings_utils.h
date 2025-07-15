@@ -61,6 +61,7 @@ typedef struct {
     // These paths are constructed from the above fields
     char template_path[MAX_PATH_LENGTH];
     char lang_path[MAX_PATH_LENGTH];
+    char snapshot_path[MAX_PATH_LENGTH]; // For legacy snapshots
 
     // Hotkeys
     int hotkey_count;

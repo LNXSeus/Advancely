@@ -534,9 +534,20 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
         cJSON *progress_obj = get_or_create_object(root, "custom_progress");
         for (int i = 0; i < td->custom_goal_count; i++) {
             TrackableItem *item = td->custom_goals[i];
-            if (item->goal > 0) {
+
+            // 3-way logic for custom progress, -1, greater than 0, or 0 and not set
+            if (item->goal == -1) {
+                // Infinite Counter: Save 'true' if done, otherwise save the number.
+                if (item->done) {
+                    cJSON_ReplaceItemInObject(progress_obj, item->root_name, cJSON_CreateBool(true));
+                } else {
+                    cJSON_ReplaceItemInObject(progress_obj, item->root_name, cJSON_CreateNumber(item->progress));
+                }
+            } else if (item->goal > 0) {
+                // Normal Counter: Always save the number.
                 cJSON_ReplaceItemInObject(progress_obj, item->root_name, cJSON_CreateNumber(item->progress));
             } else {
+                // Simple Toggle: Always save the boolean 'done' status.
                 cJSON_ReplaceItemInObject(progress_obj, item->root_name, cJSON_CreateBool(item->done));
             }
         }
@@ -580,7 +591,8 @@ void construct_template_paths(AppSettings *settings) {
              settings->optional_flag
     );
 
-    // Construct the main template and language file paths
+    // Construct the main template, language file and (if needed) legacy snapshot paths
     snprintf(settings->template_path, MAX_PATH_LENGTH, "%s.json", base_path);
     snprintf(settings->lang_path, MAX_PATH_LENGTH, "%s_lang.json", base_path);
+    snprintf(settings->snapshot_path, MAX_PATH_LENGTH, "%s_snapshot.json", base_path);
 }

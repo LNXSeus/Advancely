@@ -27,6 +27,7 @@ struct Tracker {
     char advancements_path[MAX_PATH_LENGTH];
     char unlocks_path[MAX_PATH_LENGTH];
     char stats_path[MAX_PATH_LENGTH];
+    char snapshot_path[MAX_PATH_LENGTH]; // Path to the snapshot file for legacy snapshots
 };
 
 

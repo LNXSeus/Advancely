@@ -1,0 +1,221 @@
+{
+  "advancements": {
+    "5242880": {
+      "icon": "items/book.png",
+      "criteria": {}
+    },
+    "5242881": {
+      "icon": "items/oak_log.png",
+      "criteria": {}
+    },
+    "5242882": {
+      "icon": "items/crafting_table.png",
+      "criteria": {}
+    },
+    "5242883": {
+      "icon": "items/wooden_pickaxe.png",
+      "criteria": {}
+    },
+    "5242884": {
+      "icon": "items/furnace.png",
+      "criteria": {}
+    },
+    "5242885": {
+      "icon": "items/iron_ingot.png",
+      "criteria": {}
+    },
+    "5242886": {
+      "icon": "items/wooden_hoe.png",
+      "criteria": {}
+    },
+    "5242887": {
+      "icon": "items/bread.png",
+      "criteria": {}
+    },
+    "5242888": {
+      "icon": "items/cake.png",
+      "criteria": {}
+    },
+    "5242889": {
+      "icon": "items/stone_pickaxe.png",
+      "criteria": {}
+    },
+    "5242890": {
+      "icon": "items/cooked_fish.png",
+      "criteria": {}
+    },
+    "5242891": {
+      "icon": "items/rail.png",
+      "criteria": {}
+    },
+    "5242892": {
+      "icon": "items/wooden_sword.png",
+      "criteria": {}
+    },
+    "5242893": {
+      "icon": "items/bone.png",
+      "criteria": {}
+    },
+    "5242894": {
+      "icon": "items/leather.png",
+      "criteria": {}
+    },
+    "5242895": {
+      "icon": "items/saddle.png",
+      "criteria": {}
+    },
+    "5242896": {
+      "icon": "items/bow.png",
+      "criteria": {}
+    },
+    "5242897": {
+      "icon": "items/diamond.png",
+      "criteria": {}
+    },
+    "5242898": {
+      "icon": "items/obsidian.png",
+      "criteria": {}
+    },
+    "5242899": {
+      "icon": "items/ghast_tear.png",
+      "criteria": {}
+    },
+    "5242900": {
+      "icon": "items/blaze_rod.png",
+      "criteria": {}
+    },
+    "5242901": {
+      "icon": "items/potion.png",
+      "criteria": {}
+    },
+    "5242902": {
+      "icon": "items/eye_of_ender.png",
+      "criteria": {}
+    },
+    "5242903": {
+      "icon": "items/dragon_egg.png",
+      "criteria": {}
+    },
+    "5242904": {
+      "icon": "items/enchanting_table.png",
+      "criteria": {}
+    },
+    "5242905": {
+      "icon": "items/diamond_sword.png",
+      "criteria": {}
+    },
+    "5242906": {
+      "icon": "items/bookshelf.png",
+      "criteria": {}
+    }
+  },
+  "stats": {
+    "stat_category:ben_10": {
+      "icon": "items/iron_ingot.png",
+      "criteria": {
+        "1100": {
+          "target": 12000,
+          "icon": "items/clock.png"
+        },
+        "2010": {
+          "target": 10,
+          "icon": "items/slime_block.png"
+        },
+        "5242880": {
+          "target": 10,
+          "icon": "items/book.png"
+        }
+      }
+    },
+    "stat_category:50_shades_of_grey": {
+      "icon": "items/iron_ingot.png",
+      "criteria": {
+        "2010": {
+          "target": 50,
+          "icon": "items/slime_block.png"
+        },
+        "5242880": {
+          "target": 50,
+          "icon": "items/book.png"
+        }
+      }
+    },
+    "stat_category:mine_more_sand": {
+      "icon": "items/sand.png",
+      "root_name": "16777228",
+      "target": -1
+    },
+    "stat_category:break_wooden_shovel": {
+      "icon": "items/wooden_shovel.png",
+      "root_name": "16974093",
+      "target": 1
+    },
+    "stat_category:hidden_ms_mine_wood": {
+      "root_name": "5242881"
+    },
+    "stat_category:hidden_ms_craft_wood_pick": {
+      "root_name": "5242883"
+    },
+    "stat_category:hidden_ms_mine_stone": {
+      "root_name": "16777217"
+    },
+    "stat_category:hidden_ms_craft_cobble_slab": {
+      "root_name": "16842796"
+    }
+  },
+  "unlocks": [],
+  "custom": [
+    {
+      "root_name": "custom:good_view",
+      "icon": "items/eye_of_ender.png"
+    },
+    {
+      "root_name": "custom:fun_counter",
+      "icon": "items/cake.png",
+      "target": -1
+    },
+    {
+      "root_name": "custom:count_100",
+      "icon": "items/compass.png",
+      "target": 100
+    }
+  ],
+  "multi_stage_goals": [
+    {
+      "root_name": "ms_goal:get_playin_MC",
+      "icon": "items/dirt.png",
+      "stages": [
+        {
+          "stage_id": "0",
+          "type": "stat",
+          "root_name": "5242881",
+          "target": 3
+        },
+        {
+          "stage_id": "1",
+          "type": "stat",
+          "root_name": "5242883",
+          "target": 1
+        },
+        {
+          "stage_id": "2",
+          "type": "stat",
+          "root_name": "16777217",
+          "target": 3
+        },
+        {
+          "stage_id": "3",
+          "type": "stat",
+          "root_name": "16842796",
+          "target": 1
+        },
+        {
+          "stage_id": "final",
+          "type": "final",
+          "root_name": "",
+          "target": 0
+        }
+      ]
+    }
+  ]
+}
