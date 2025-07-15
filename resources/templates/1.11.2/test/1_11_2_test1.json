@@ -1,0 +1,274 @@
+{
+  "advancements": {
+    "achievement.buildHoe": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.killWither": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.snipeSkeleton": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.buildWorkBench": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.flyPig": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.killCow": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.makeBread": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.exploreAllBiomes": {
+      "icon": "items/placeholder.png",
+      "criteria": {
+        "Beach": {},
+        "Birch Forest": {},
+        "Birch Forest Hills": {},
+        "Cold Beach": {},
+        "Cold Taiga": {},
+        "Cold Taiga Hills": {},
+        "Deep Ocean": {},
+        "Desert": {},
+        "DesertHills": {},
+        "Extreme Hills": {},
+        "Extreme Hills+": {},
+        "Forest": {},
+        "ForestHills": {},
+        "FrozenRiver": {},
+        "Ice Mountains": {},
+        "Ice Plains": {},
+        "Jungle": {},
+        "JungleEdge": {},
+        "JungleHills": {},
+        "Mega Taiga": {},
+        "Mega Taiga Hills": {},
+        "Mesa": {},
+        "Mesa Plateau": {},
+        "Mesa Plateau F": {},
+        "MushroomIsland": {},
+        "MushroomIslandShore": {},
+        "Ocean": {},
+        "Plains": {},
+        "River": {},
+        "Roofed Forest": {},
+        "Savanna": {},
+        "Savanna Plateau": {},
+        "Stone Beach": {},
+        "Swampland": {},
+        "Taiga": {},
+        "TaigaHills": {}
+      }
+    },
+    "achievement.overpowered": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.onARail": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.diamondsToYou": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.blazeRod": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.diamonds": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.bakeCake": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.fullBeacon": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.buildPickaxe": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.buildBetterPickaxe": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.theEnd": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.breedCow": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.spawnWither": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.enchantments": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.theEnd2": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.overkill": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.buildSword": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.mineWood": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.portal": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.openInventory": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.killEnemy": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.buildFurnace": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.ghast": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.acquireIron": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.bookcase": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.cookFish": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    },
+    "achievement.potion": {
+      "icon": "items/placeholder.png",
+      "criteria": {}
+    }
+  },
+  "stats": {
+    "stat_cat:ben_10": {
+      "icon": "items/iron_ingot.png",
+      "criteria": {
+        "stat.playOneMinute": {
+          "target": 12000,
+          "icon": "items/clock.png"
+        },
+        "stat.jump": {
+          "target": 10,
+          "icon": "items/slime_block.png"
+        },
+        "achievement.openInventory": {
+          "target": 10,
+          "icon": "items/book.png"
+        }
+      }
+    },
+    "stat_category:50_shades_of_grey": {
+      "icon": "items/iron_ingot.png",
+      "criteria": {
+        "stat.jump": {
+          "target": 50,
+          "icon": "items/slime_block.png"
+        },
+        "achievement.openInventory": {
+          "target": 50,
+          "icon": "items/book.png"
+        }
+      }
+    },
+    "stat_cat:mine_more_sand": {
+      "icon": "items/sand.png",
+      "root_name": "stat.mineBlock.minecraft.sand",
+      "target": -1
+    },
+    "stat_cat:break_wooden_shovel": {
+      "icon": "items/wooden_shovel.png",
+      "root_name": "stat.breakItem.minecraft.wooden_shovel",
+      "target": 1
+    }
+  },
+  "unlocks": [],
+  "custom": [
+    {
+      "root_name": "custom:good_view",
+      "icon": "items/eye_of_ender.png"
+    },
+    {
+      "root_name": "custom:fun_counter",
+      "icon": "items/cake.png",
+      "target": -1
+    },
+    {
+      "root_name": "custom:count_100",
+      "icon": "items/compass.png",
+      "target": 100
+    }
+  ],
+  "multi_stage_goals": [
+    {
+      "root_name": "ms_goal:MC_Tutorial",
+      "icon": "items/grass_block.png",
+      "stages": [
+        {
+          "stage_id": "first",
+          "type": "stat",
+          "root_name": "stat.pickup.minecraft.log",
+          "target": 3
+        },
+        {
+          "stage_id": "second",
+          "type": "stat",
+          "root_name": "stat.craftItem.minecraft.stone_pickaxe",
+          "target": 1
+        },
+        {
+          "stage_id": "third",
+          "type": "criterion",
+          "parent_advancement": "achievement.exploreAllBiomes",
+          "root_name": "Plains"
+        },
+        {
+          "stage_id": "fourth",
+          "type": "stat",
+          "root_name": "stat.useItem.minecraft.dirt",
+          "target": 10
+        },
+        {
+          "stage_id": "final",
+          "type": "final",
+          "root_name": "",
+          "target": 0
+        }
+      ]
+    }
+  ]
+}

@@ -14,19 +14,19 @@
 
 * **Comprehensive Tracking**: Advancely isn't limited to just advancements. It tracks multiple data types directly from your save file, including:
 
-    * **Advancements/Recipes**: Tracks completion status and individual criteria as well as recipes.
-    * **Statistics**: Monitors any game statistic, such as blocks mined or distance flown, against a target value.
+    * **Advancements/Recipes**: Tracks completion status and individual criteria as well as recipes (also stored as advancements in the advancements file).
+    * **Statistics**: Monitors any game statistic, such as blocks mined or distance flown, against a target value. Also allows for nested statistics e.g., tracking certain armor trims being applied.
     * **Unlocks**: Allows you to fully track unlocks, which is exclusive to the 25w14craftmine snapshot.
 
 * **Full Mod & Datapack Support**: The tracker is designed to be data-driven. It correctly parses items, stats, and advancements from any mod or data pack (e.g., `conquest:`, `blazeandcave:`) without being limited to the vanilla `minecraft:` namespace.
 
 * **Multi-Stage Goals**: Create long-term objectives that combine several smaller steps. A single goal can require you to first achieve an advancement, then reach a certain statistic, then an unlock (from the 25w14craftmine) and lastly complete another advancement in sequence.
 
-* **Custom Counters with Hotkeys and Manual Tracking**: For goals that can't be automatically tracked (like counting amount of structures visited or finding specific items), you can create custom counters or check them off manually. Set a target value in your template and use configurable hotkeys to increment or decrement the count. List of hotkeys can be found [here](https://pastebin.com/vPKgWAen). Currently the hotkeys only work when tabbed into the tracker window. All progress is saved automatically back into `settings.json`.
+* **Custom Counters with Hotkeys and Manual Tracking**: For goals that can't be automatically tracked (like counting amount of structures visited or finding specific items), you can create custom counters or check them off manually. Set a target value in your template and use configurable hotkeys to increment or decrement the count. List of hotkeys can be found [here](https://pastebin.com/vPKgWAen). Currently, the hotkeys only work when tabbed into the tracker window. All progress is saved automatically back into `settings.json`.
 
 ## Customization
 
-The true power of Advancely lies in its customization. You can define exactly what you want to track by creating your own template files from within the settings window.
+The true power of Advancely lies in its customization. You can define exactly what you want to track by creating your own template files from within the settings window alongside the text it should display. This allows for translations into any language.
 
 You select the minecraft version, the category, all the advancements, statistics, goals you want to track with custom translations. The tracker will then parse your template and track progress against the goals you've defined.
 
@@ -36,12 +36,11 @@ Find the full list of supported versions [here](https://pastebin.com/NhkaT3qD).
 
 This tracker supports **any full release** from Minecraft 1.0 upwards including all april fool snapshots:
 
-* **1.0–1.6.4**: It reads the global stats file and takes a snapshot when a new world is created and then starts counting from zero to simulate local per-world stats. Working with these versions requires knowing the IDs of stats and advancements. You can find the translations for those IDs [here](https://pastebin.com/qPsgc4Eb) and the individual item IDs [here](https://pastebin.com/r5tpjPFm). (Credits: [minecraftinfo.com](https://www.minecraftinfo.com/idlist.htm))
+* **1.0–1.6.4**: It reads the global stats file and takes a snapshot when a new world is created and then starts counting from zero to simulate local per-world stats. Working with these versions requires knowing the IDs of stats and advancements. You can find the translations for those IDs [here](https://pastebin.com/qPsgc4Eb) and the individual item IDs [here](https://pastebin.com/r5tpjPFm). It's important to note that for example item ID 24 (Regular Sandstone), 24:1 (Chiseled Sandstone) and 24:2 (Smooth Sandstone) all contribute to the same statistic, so can't be separated. (Credits: [minecraftinfo.com](https://www.minecraftinfo.com/idlist.htm))
 * **1.7.2–1.11.2**: Advancely reads the stats file for stats and achievements  and playtime is tracked through the stat.playOneMinute entry.
 * **1.12–1.16.5**: Advancely reads the stats and advancements file and playtime is tracked through the minecraft:play_one_minute entry.
 * **1.17+**: Advancely reads the stats and advancements file and playtime is tracked through the minecraft:play_time entry.
 * **25w14craftmine**: Advancely reads the stats, advancements, and unlocks file. (Game version 1.21.5)
-
 
 ## How To Use
 
@@ -53,3 +52,4 @@ This tracker supports **any full release** from Minecraft 1.0 upwards including 
 
 *This project uses dmon by Sepehr Taghdisian, licensed under the BSD 2-Clause License.*
 *This project also uses the SDL3 library suite and cJSON. More information can be found in the [LICENSES.txt](LICENSES.txt) file.*
+*Minecraft item .png files downloaded from [Minecraft Asset Clout](https://mcasset.cloud/1.0/) and block renders from the [Minecraft Wiki](https://www.minecraft.wiki)* 

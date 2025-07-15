@@ -46,7 +46,7 @@ void fs_create_empty_template_file(const char *path) {
 
     const char *skeleton = "{\n"
             "  \"advancements\": {},\n"
-            "  \"stats\": [],\n"
+            "  \"stats\": {},\n"
             "  \"unlocks\": [],\n"
             "  \"custom\": [],\n"
             "  \"multi_stage_goals\": []\n"

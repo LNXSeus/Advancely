@@ -1,7 +1,7 @@
 {
-  "advancement.minecraft.story.mine_stone": "Stone Age",
-
   "advancement.minecraft.story.smelt_iron": "Acquire Hardware",
+  "advancement.minecraft.story.deflect_arrow": "Block an Arrow!",
+
 
   "advancement.minecraft.mines.all_special_mines_completed": "Yess Boss!",
   "advancement.minecraft.mines.all_special_mines_completed.criteria.minecraft:wither_boss": "Defeat the Wither",
@@ -19,18 +19,35 @@
   "advancement.minecraft.feats.kuiper_world": "Kuiper Belt",
   "advancement.minecraft.feats.kuiper_world.criteria.completed_event": "Visit the Kuiper Belt",
 
-  "advancement.recipes.misc.charcoal": "Renewable Energy",
+  "advancement.minecraft.recipes.misc.charcoal": "Renewable Energy",
 
-  "minecraft:mined/minecraft:oak_log": "Mine 4 Oak Logs",
-  "minecraft:mined/minecraft:acacia_log": "Mine as many Acacia Logs as you can...",
-  "minecraft:exploration": "Exploration",
-  "minecraft:ender_pearl_starter": "Starter Ender Pearl",
-  "custom:unbreaking_3_book": "Obtain Unbreaking 3 Book",
-  "custom:deepslate_emerald_count": "Deepslate Emerald Count",
+
+  "stat.stat_category:3_armor_trims": "Applied Armor Trims",
+  "stat.stat_category:3_armor_trims.criteria.minecraft:used/minecraft:sentry_armor_trim_smithing_template": "Apply Sentry",
+  "stat.stat_category:3_armor_trims.criteria.minecraft:used/minecraft:vex_armor_trim_smithing_template": "Apply Vex Armor Trim",
+  "stat.stat_category:3_armor_trims.criteria.minecraft:used/minecraft:wild_armor_trim_smithing_template": "Apply Wild Armor Trim",
+
+  "stat.stat_category:2_armor_trims": "Applied Armor Trims",
+  "stat.stat_category:2_armor_trims.criteria.minecraft:used/minecraft:sentry_armor_trim_smithing_template": "Apply Sentry",
+  "stat.stat_category:2_armor_trims.criteria.minecraft:used/minecraft:vex_armor_trim_smithing_template": "Apply Vex Armor Trim",
+
+  "stat.stat_category:log_collection": "Mine 4 Oak Logs",
+
+  "stat.stat_category:inf_dirt_collection": "Dirt Collection!",
+  "stat.stat_category:inf_dirt_collection.criteria.minecraft:mined/minecraft:dirt": "Mine Dirt!",
+
+
+  "unlock.minecraft:exploration": "Exploration",
+  "unlock.minecraft:ender_pearl_starter": "Starter Ender Pearl",
+
+
+  "custom.custom:unbreaking_3_book": "Obtain Unbreaking 3 Book",
+  "custom.custom:deepslate_emerald_count": "Deepslate Emerald Count",
+  "custom.custom:diamond_ore_count_inf": "Diamond Ore Count",
 
   "multi_stage_goal.ms_goal:getting_started.display_name": "Getting Started!",
-  "multi_stage_goal.ms_goal:getting_started.stage.0": "Unlock Starter Ender Pearl",
-  "multi_stage_goal.ms_goal:getting_started.stage.1": "Mine 8 Dirt",
+  "multi_stage_goal.ms_goal:getting_started.stage.0": "Mine 8 Dirt",
+  "multi_stage_goal.ms_goal:getting_started.stage.1": "Unlock Starter Ender Pearl",
   "multi_stage_goal.ms_goal:getting_started.stage.2": "Get Iron Armor",
   "multi_stage_goal.ms_goal:getting_started.stage.3": "Pick up 4 Sand",
   "multi_stage_goal.ms_goal:getting_started.stage.final": "Done!"

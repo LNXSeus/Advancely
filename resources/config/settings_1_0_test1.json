@@ -1,7 +1,7 @@
 {
   "path_mode":	"manual",
-  "manual_saves_path":	"C:\\Users\\Linus\\AppData\\Roaming\\PrismLauncher\\instances\\1.11.2\\minecraft\\saves",
-  "version":	"1.11.2",
+  "manual_saves_path":	"C:\\Users\\Linus\\AppData\\Roaming\\PrismLauncher\\instances\\1.0\\minecraft\\saves",
+  "version":	"1.0",
   "category":	"test",
   "optional_flag":	"1",
   "general":	{
@@ -12,8 +12,8 @@
     "goal_align_left":	true
   },
   "stat_progress_override":	{
-    "stat_cat:mine_more_sand": false,
-    "stat_cat:break_wooden_shovel": false
+    "stat_category:mine_more_sand": false,
+    "stat_category:break_wooden_shovel": false
   },
   "custom_progress":	{
     "custom:good_view":	false,

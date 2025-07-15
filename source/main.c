@@ -155,31 +155,44 @@ int main(int argc, char *argv[]) {
                 // resetting difference to snapshot when tracker window was moved)
                 char old_version[64];
                 char old_category[MAX_PATH_LENGTH];
+                PathMode old_path_mode = app_settings.path_mode;
+                char old_manual_path[MAX_PATH_LENGTH];
+                char old_optional_flag[MAX_PATH_LENGTH];
+
                 strncpy(old_version, app_settings.version_str, 64);
                 strncpy(old_category, app_settings.category, MAX_PATH_LENGTH);
+                strncpy(old_manual_path, app_settings.manual_saves_path, MAX_PATH_LENGTH);
+                strncpy(old_optional_flag, app_settings.optional_flag, MAX_PATH_LENGTH);
 
                 // Update hotkeys during runtime
                 settings_load(&app_settings); // Reload settings
 
                 // ONLY RE-INIT IF A CRITICAL SETTING HAS CHANGED
                 // Not something like window position of the tracker
+                // Changes that need to be made in the settings.json to trigger a full reload
                 if (strcmp(old_version, app_settings.version_str) != 0 ||
-                    strcmp(old_category, app_settings.category) != 0) {
-                    printf("[MAIN] Critical settings (saves path, version, category) changed. Re-initializing template.\n");
+                    strcmp(old_category, app_settings.category) != 0 ||
+                    strcmp(old_optional_flag, app_settings.optional_flag) != 0 ||
+                    old_path_mode != app_settings.path_mode ||
+                    (app_settings.path_mode == PATH_MODE_MANUAL && strcmp(old_manual_path, app_settings.manual_saves_path) != 0)) {
+                    printf("[MAIN] Critical settings (saves path, version, category) changed. Re-initializing template and file watcher.\n");
 
-                    // Stop watching the old directory
+                    // Stop watching the old directory when critical changes were made to settings.json
                     dmon_unwatch(saves_watcher_id);
 
                     // Update the tracker with the new paths and template data
                     tracker_reinit_template(tracker, &app_settings);
+
+                    // Start watching the new directory when critical changes were made to settings.json
+                    if (strlen(tracker->saves_path) > 0) {
+                        printf("[MAIN] Now watching new saves directory: %s\n", tracker->saves_path);
+                        saves_watcher_id = dmon_watch(tracker->saves_path, global_watch_callback, DMON_WATCHFLAGS_RECURSIVE,
+                                                      NULL);
+                    }
+                } else {
+                    printf("[MAIN] Non-critical settings changed. Applying changes without full reload.\n");
                 }
 
-                // Start watching the new directory
-                if (strlen(tracker->saves_path) > 0) {
-                    printf("[MAIN] Now watching new saves directory: %s\n", tracker->saves_path);
-                    saves_watcher_id = dmon_watch(tracker->saves_path, global_watch_callback, DMON_WATCHFLAGS_RECURSIVE,
-                                                  NULL);
-                }
                 SDL_SetAtomicInt(&g_needs_update, 1);
 
                 // ALWAYS apply non-critical changes

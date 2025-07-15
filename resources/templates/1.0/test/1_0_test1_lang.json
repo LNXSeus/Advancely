@@ -1,0 +1,55 @@
+{
+  "advancement.5242880": "Taking Inventory",
+  "advancement.5242881": "Getting Wood",
+  "advancement.5242882": "Benchmarking",
+  "advancement.5242883": "Time to Mine!",
+  "advancement.5242884": "Hot Topic",
+  "advancement.5242885": "Acquire Hardware",
+  "advancement.5242886": "Time to Farm!",
+  "advancement.5242887": "Bake Bread",
+  "advancement.5242888": "The Lie",
+  "advancement.5242889": "Getting an Upgrade",
+  "advancement.5242890": "Delicious Fish",
+  "advancement.5242891": "On A Rail",
+  "advancement.5242892": "Time to Strike!",
+  "advancement.5242893": "Monster Hunter",
+  "advancement.5242894": "Cow Tipper",
+  "advancement.5242895": "When Pigs Fly",
+  "advancement.5242896": "Sniper Duel",
+  "advancement.5242897": "DIAMONDS!",
+  "advancement.5242898": "We Need to Go Deeper",
+  "advancement.5242899": "Return to Sender",
+  "advancement.5242900": "Into Fire",
+  "advancement.5242901": "Local Brewery",
+  "advancement.5242902": "The End?",
+  "advancement.5242903": "The End.",
+  "advancement.5242904": "Enchanter",
+  "advancement.5242905": "Overkill",
+  "advancement.5242906": "Librarian",
+
+  "stat.stat_category:ben_10": "Ben 10",
+  "stat.stat_category:ben_10.criteria.1100": "Play for 10 minutes",
+  "stat.stat_category:ben_10.criteria.2010": "Jump 10 times",
+  "stat.stat_category:ben_10.criteria.5242880": "Open your inventory 10 times",
+
+  "stat.stat_category:50_shades_of_grey": "Ben 10",
+  "stat.stat_category:50_shades_of_grey.criteria.2010": "Jump 50 times",
+  "stat.stat_category:50_shades_of_grey.criteria.5242880": "Open your inventory 50 times",
+
+  "stat.stat_category:mine_more_sand": "Mine unlimited sand!",
+  "stat.stat_category:break_wooden_shovel": "Break A Wooden Shovel",
+
+  "custom.custom:good_view": "Get a Good View!",
+  "custom.custom:fun_counter": "Count Forever!",
+  "custom.custom:count_100": "Count to 100!",
+
+  "multi_stage_goal.ms_goal:get_playin_MC.display_name": "Get playin' MC",
+  "multi_stage_goal.ms_goal:get_playin_MC.stage.0": "Mine 3 Logs",
+  "multi_stage_goal.ms_goal:get_playin_MC.stage.1": "Craft a Pickaxe",
+  "multi_stage_goal.ms_goal:get_playin_MC.stage.2": "Mine 3 stone!",
+  "multi_stage_goal.ms_goal:get_playin_MC.stage.3": "Craft cobble slab!",
+  "multi_stage_goal.ms_goal:get_playin_MC.stage.final": "Done!"
+
+
+
+}
