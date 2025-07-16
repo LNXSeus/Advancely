@@ -52,4 +52,4 @@ This tracker supports **any full release** from Minecraft 1.0 upwards including 
 
 *This project uses dmon by Sepehr Taghdisian, licensed under the BSD 2-Clause License.*
 *This project also uses the SDL3 library suite and cJSON. More information can be found in the [LICENSES.txt](LICENSES.txt) file.*
-*Minecraft item .png files downloaded from [Minecraft Asset Clout](https://mcasset.cloud/1.0/) and block renders from the [Minecraft Wiki](https://www.minecraft.wiki)* 
+*Minecraft item .png files downloaded from [Minecraft Asset Clout](https://mcasset.cloud/1.0/) and block renders from the [Minecraft Wiki](https://www.minecraft.wiki)* (downloaded by [Dogmaster](https://www.twitch.tv/thedogmaster28))

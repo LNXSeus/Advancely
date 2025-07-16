@@ -87,7 +87,7 @@
   "custom.custom:count_100": "Count to 100!",
 
   "multi_stage_goal.ms_goal:MC_Tutorial.display_name": "Minecraft Tutorial",
-  "multi_stage_goal.ms_goal:MC_Tutorial.stage.first": "Mine 3 Logs",
+  "multi_stage_goal.ms_goal:MC_Tutorial.stage.first": "Mine 3 Oak Logs",
   "multi_stage_goal.ms_goal:MC_Tutorial.stage.second": "Craft Stone Pickaxe",
   "multi_stage_goal.ms_goal:MC_Tutorial.stage.third": "Visit Plains Biome",
   "multi_stage_goal.ms_goal:MC_Tutorial.stage.fourth": "Place 10 Dirt",
