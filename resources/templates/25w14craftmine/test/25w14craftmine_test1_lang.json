@@ -1,7 +1,6 @@
 {
-  "advancement.minecraft.story.smelt_iron": "Acquire Hardware",
   "advancement.minecraft.story.deflect_arrow": "Block an Arrow!",
-
+  "advancement.minecraft.story.smelt_iron": "Acquire Hardware",
 
   "advancement.minecraft.mines.all_special_mines_completed": "Yess Boss!",
   "advancement.minecraft.mines.all_special_mines_completed.criteria.minecraft:wither_boss": "Defeat the Wither",

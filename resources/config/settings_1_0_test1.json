@@ -12,6 +12,13 @@
     "goal_align_left":	true
   },
   "stat_progress_override":	{
+    "stat_category:ben_10": false,
+    "stat_category:ben_10.criteria.1100": false,
+    "stat_category:ben_10.criteria.2010": false,
+    "stat_category:ben_10.criteria.5242880": false,
+    "stat_category:50_shades_of_grey": false,
+    "stat_category:50_shades_of_grey.criteria.2010": false,
+    "stat_category:50_shades_of_grey.criteria.5242880": true,
     "stat_category:mine_more_sand": false,
     "stat_category:break_wooden_shovel": false
   },

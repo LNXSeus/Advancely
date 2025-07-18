@@ -28,7 +28,7 @@ typedef struct TrackableItem {
 
     // Flag to allow "conflicting" criteria to overlay parent advancements icon (e.g., hoglin), init with false, cause of calloc
     bool is_shared;
-    // bool is_manually_completed; // TODO: Probably not needed as stats now use TrackableCategory
+    bool is_manually_completed; // Allow manually overriding sub-stats (NOT FOR ACHIEVEMENTS/ADVANCEMENTS)
 } TrackableItem;
 
 

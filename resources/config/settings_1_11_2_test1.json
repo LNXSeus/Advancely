@@ -12,6 +12,8 @@
     "goal_align_left":	true
   },
   "stat_progress_override":	{
+    "stat_cat:ben_10": false,
+    "stat_cat:ben_10.criteria.stat.playOneMinute": true,
     "stat_cat:mine_more_sand": false,
     "stat_cat:break_wooden_shovel": false
   },

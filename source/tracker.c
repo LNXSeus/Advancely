@@ -252,13 +252,12 @@ static void tracker_update_stats_legacy(struct Tracker *t, const cJSON *player_s
     if (!cJSON_IsArray(stats_change)) return;
 
     // Reset achievement counts before updating
-    t->template_data->advancements_completed_count = 0; // No criteria in these versions
+    t->template_data->advancements_completed_count = 0;
 
     // Loop to update achievement progress
     for (int i = 0; i < t->template_data->advancement_count; i++) {
         TrackableCategory *ach = t->template_data->advancements[i];
-        bool is_currently_done = false; // Check status from file
-
+        bool is_currently_done = false;
 
         cJSON *stat_entry;
         cJSON_ArrayForEach(stat_entry, stats_change) {
@@ -268,9 +267,8 @@ static void tracker_update_stats_legacy(struct Tracker *t, const cJSON *player_s
                 break;
             }
         }
-        ach->done = is_currently_done; // Update display status
+        ach->done = is_currently_done;
 
-        // Only increment the counter if it was completed AFTER the snapshot
         if (ach->done && !ach->done_in_snapshot) {
             t->template_data->advancements_completed_count++;
         }
@@ -281,161 +279,85 @@ static void tracker_update_stats_legacy(struct Tracker *t, const cJSON *player_s
 
     t->template_data->play_time_ticks = 0;
     t->template_data->stats_completed_count = 0;
+    t->template_data->stats_completed_criteria_count = 0;
 
-    // Reset progress to 0 before recalculating
     for (int i = 0; i < t->template_data->stat_count; i++) {
         TrackableCategory *stat_cat = t->template_data->stats[i];
-        stat_cat->is_manually_completed = false;
-
-        // Check for manual override
-        if (override_obj && cJSON_IsTrue(cJSON_GetObjectItem(override_obj, stat_cat->root_name))) {
-            stat_cat->done = true;
-            stat_cat->is_manually_completed = true;
-            t->template_data->stats_completed_count++;
-            continue;
-        }
-
         stat_cat->completed_criteria_count = 0;
 
-        // loop through each SUB-STAT
+        // Check for parent override
+        cJSON *parent_override = override_obj ? cJSON_GetObjectItem(override_obj, stat_cat->root_name) : NULL;
+        stat_cat->is_manually_completed = cJSON_IsBool(parent_override);
+        bool parent_forced_true = stat_cat->is_manually_completed && cJSON_IsTrue(parent_override);
+
+        // Loop through each SUB-STAT
         for (int j = 0; j < stat_cat->criteria_count; j++) {
             TrackableItem *sub_stat = stat_cat->criteria[j];
-            sub_stat->progress = 0;
 
+            // Always get live progress from file first
+            sub_stat->progress = 0;
             cJSON *stat_entry;
             cJSON_ArrayForEach(stat_entry, stats_change) {
                 cJSON *item = stat_entry->child;
-
-                // Check if this stat is the one we're looking for
                 if (item && strcmp(item->string, sub_stat->root_name) == 0) {
-                    int diff = item->valueint - sub_stat->initial_progress;
+                    int diff = item->valueint - sub_stat->initial_progress; // Difference to snapshot
                     sub_stat->progress = diff > 0 ? diff : 0;
                     break;
                 }
             }
-            sub_stat->done = (sub_stat->goal > 0 && sub_stat->progress >= sub_stat->goal);
-            if (sub_stat->done) stat_cat->completed_criteria_count++;
-        }
-        stat_cat->done = (stat_cat->criteria_count > 0 && stat_cat->completed_criteria_count >= stat_cat->
-                          criteria_count);
-        if (stat_cat->done) t->template_data->stats_completed_count++;
-    }
 
+            // When completed through playing
+            bool naturally_done = (sub_stat->goal > 0 && sub_stat->progress >= sub_stat->goal);
+
+            // For single-criterion stats, the override key is the parent's.
+            // For multi-criterion, it's the specific sub-stat key.
+            // Creates ONE criteria behind the scenes, even if template doesn't have "criteria" field
+            cJSON *sub_override;
+            if (stat_cat->criteria_count == 1) { // WHEN IT HAS NO SUB-STATS
+                sub_override = parent_override;
+                sub_stat->is_manually_completed = stat_cat->is_manually_completed;
+            } else {
+                // Multi-criterion
+                char sub_stat_key[512];
+                snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name, sub_stat->root_name);
+                sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : NULL;
+                sub_stat->is_manually_completed = cJSON_IsBool(sub_override);
+            }
+
+            bool sub_forced_true = sub_stat->is_manually_completed && cJSON_IsTrue(sub_override);
+
+            // Sub-stat is done if it's naturally completed OR manually forced to be true (sub-stat or parent)
+            sub_stat->done = naturally_done || sub_forced_true || parent_forced_true;
+
+            // Increment category's completed count
+            if (sub_stat->done) {
+                stat_cat->completed_criteria_count++;
+            }
+        }
+
+        // Determine final 'done' status for PARENT category
+        bool all_children_done = (stat_cat->criteria_count > 0 && stat_cat->completed_criteria_count >= stat_cat->criteria_count);
+
+        // A category is done if all its children are done OR it's manually forced to be true
+        stat_cat->done = all_children_done || parent_forced_true;
+
+        if (stat_cat->done) t->template_data->stats_completed_count++;
+        t->template_data->stats_completed_criteria_count += stat_cat->completed_criteria_count;
+    }
 
     // Handle playtime separately
     cJSON *stat_entry;
-    // stat_change is an array
     cJSON_ArrayForEach(stat_entry, stats_change) {
-        cJSON *item = stat_entry->child; // Then we go into the curly brackets
-
+        cJSON *item = stat_entry->child;
         if (item && strcmp(item->string, "1100") == 0) {
             long long diff = item->valueint - t->template_data->playtime_snapshot;
             t->template_data->play_time_ticks = (diff > 0) ? diff : 0;
             break;
-
-            // TODO: Replace this once possible
-            // // Update playtime relative to snapshot
-            // if (strcmp(key, "1100") == 0) {
-            //     long long diff = current_value - t->template_data->playtime_snapshot;
-            //     // Subtract the snapshot to be left with the actual playtime
-            //     t->template_data->play_time_ticks = (diff > 0) ? diff : 0;
-            //
-            //     // PRINT DIFFERENCE TO SNAPSHOT
-            //     printf("[TRACKER] PLAYTIME | Snapshot: %-6d | Current: %-6lld | Tracker Diff: %lld\n", current_value,
-            //            t->template_data->playtime_snapshot, t->template_data->play_time_ticks);
-            // }
-            //
-            // // Update other stats relative to snapshot
-            // for (int i = 0; i < t->template_data->stat_count; i++) {
-            //     TrackableItem *stat = t->template_data->stats[i];
-            //     if (strcmp(stat->root_name, key) == 0) {
-            //         int diff = current_value - stat->initial_progress;
-            //         stat->progress = diff > 0 ? diff : 0;
-            //         stat->done = (stat->goal > 0 && stat->progress >= stat->goal);
-            //         printf("STAT: %-28s | Current: %-6d | Snapshot: %-6d | Tracked Diff: %d\n",
-            //                stat->display_name, current_value, stat->initial_progress, stat->progress);
-            //         break;
-            //     }
-            // }
         }
     }
 
     cJSON_Delete(settings_json);
-
-    // Make sure individual stat criteria count towards percentage progress
-    t->template_data->stats_completed_criteria_count = 0;
-    for (int i = 0; i < t->template_data->stat_count; i++) {
-        // Add individual stat criteria count to total
-        t->template_data->stats_completed_criteria_count += t->template_data->stats[i]->completed_criteria_count;
-    }
 }
-
-// TODO: Delete once possible
-// /**
-//  * @brief (Era 2: 1.7.2-1.11.2) Parses unified JSON with achievements and stats.
-//  */
-// static void tracker_update_achievements_and_stats_mid(struct Tracker *t, const cJSON *player_stats_json) {
-//     if (!player_stats_json) return;
-//
-//     t->template_data->advancement_count = 0;
-//     t->template_data->completed_criteria_count = 0;
-//     t->template_data->play_time_ticks = 0;
-//
-//     // Update Achievements
-//     for (int i = 0; i < t->template_data->advancement_count; i++) {
-//         TrackableCategory *ach = t->template_data->advancements[i];
-//         ach->completed_criteria_count = 0;
-//         ach->done = false;
-//
-//         cJSON *ach_entry = cJSON_GetObjectItem(player_stats_json, ach->root_name);
-//         if (!ach_entry) continue;
-//
-//         if (cJSON_IsNumber(ach_entry)) {
-//             // Simple achievement
-//             ach->done = (ach_entry->valueint > 0);
-//         } else if (cJSON_IsObject(ach_entry)) {
-//             // Achievement with criteria
-//             cJSON *progress_array = cJSON_GetObjectItem(ach_entry, "progress");
-//             if (cJSON_IsArray(progress_array)) {
-//                 for (int j = 0; j < ach->criteria_count; j++) {
-//                     TrackableItem *crit = ach->criteria[j];
-//                     crit->done = false;
-//                     cJSON *progress_item;
-//                     cJSON_ArrayForEach(progress_item, progress_array) {
-//                         if (cJSON_IsString(progress_item) && strcmp(progress_item->valuestring, crit->root_name) == 0) {
-//                             crit->done = true;
-//                             ach->completed_criteria_count++;
-//                             break;
-//                         }
-//                     }
-//                 }
-//             }
-//             // Achievement is done if all criteria are done
-//             if (ach->criteria_count > 0 && ach->completed_criteria_count >= ach->criteria_count) {
-//                 ach->done = true;
-//             }
-//         }
-//         if (ach->done) {
-//             t->template_data->advancements_completed_count++;
-//         }
-//         t->template_data->completed_criteria_count += ach->completed_criteria_count;
-//     }
-//
-//     // Update Stats
-//     for (int i = 0; i < t->template_data->stat_count; i++) {
-//         TrackableItem *stat = t->template_data->stats[i];
-//         cJSON *stat_entry = cJSON_GetObjectItem(player_stats_json, stat->root_name);
-//         // take root name (from template) from player advancements
-//         stat->progress = cJSON_IsNumber(stat_entry) ? stat_entry->valueint : 0;
-//         stat->done = (stat->goal > 0 && stat->progress >= stat->goal);
-//     }
-//
-//     // Update Playtime
-//     cJSON *play_time_entry = cJSON_GetObjectItem(player_stats_json, "stat.playOneMinute");
-//     if (cJSON_IsNumber(play_time_entry)) {
-//         t->template_data->play_time_ticks = (long long) play_time_entry->valuedouble;
-//     }
-// }
 
 /**
  * @brief (Era 2: 1.7.2-1.11.2) Parses unified JSON with achievements and stats.
@@ -443,7 +365,7 @@ static void tracker_update_stats_legacy(struct Tracker *t, const cJSON *player_s
 static void tracker_update_achievements_and_stats_mid(struct Tracker *t, const cJSON *player_stats_json) {
     if (!player_stats_json) return;
 
-    t->template_data->advancements_completed_count = 0; // Corrected from advancement_count
+    t->template_data->advancements_completed_count = 0;
     t->template_data->completed_criteria_count = 0;
     t->template_data->play_time_ticks = 0;
 
@@ -481,46 +403,63 @@ static void tracker_update_achievements_and_stats_mid(struct Tracker *t, const c
         t->template_data->completed_criteria_count += ach->completed_criteria_count;
     }
 
-    // Stats logic supporting criteria
+    // Stats logic with sub-stats
     cJSON *settings_json = cJSON_from_file(SETTINGS_FILE_PATH);
     cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : NULL;
 
     t->template_data->stats_completed_count = 0;
+    t->template_data->stats_completed_criteria_count = 0;
+
     for (int i = 0; i < t->template_data->stat_count; i++) {
         // Iterate through stats
-        TrackableCategory *stat_cat = t->template_data->stats[i]; // Assign them to stat_cat
-        stat_cat->is_manually_completed = false;
-
-        // Check for manual override
-        if (override_obj && cJSON_IsTrue(cJSON_GetObjectItem(override_obj, stat_cat->root_name))) {
-            // root_name appears in settings.json
-            stat_cat->done = true;
-            stat_cat->is_manually_completed = true;
-            t->template_data->stats_completed_count++;
-            continue;
-        }
-
+        TrackableCategory *stat_cat = t->template_data->stats[i];
         stat_cat->completed_criteria_count = 0;
+
+        cJSON *parent_override = override_obj ? cJSON_GetObjectItem(override_obj, stat_cat->root_name) : NULL;
+        stat_cat->is_manually_completed = cJSON_IsBool(parent_override);
+        bool parent_forced_true = stat_cat->is_manually_completed && cJSON_IsTrue(parent_override);
+
+        // Iterate through sub-stats
         for (int j = 0; j < stat_cat->criteria_count; j++) {
-            TrackableItem *sub_stat = stat_cat->criteria[j]; // Assign them to sub_stat
+            TrackableItem *sub_stat = stat_cat->criteria[j];
+
             cJSON *stat_entry = cJSON_GetObjectItem(player_stats_json, sub_stat->root_name);
+            sub_stat->progress = cJSON_IsNumber(stat_entry) ? stat_entry->valueint : 0;
 
-            sub_stat->progress = cJSON_IsNumber(stat_entry) ? stat_entry->valueint : 0; // Update progress
-            sub_stat->done = (sub_stat->goal > 0 && sub_stat->progress >= sub_stat->goal); // Update done
+            // Determine natural completion
+            bool naturally_done = (sub_stat->goal > 0 && sub_stat->progress >= sub_stat->goal);
 
+            // Check for sub-stat override
+            cJSON *sub_override;
+            // If there are no sub-stats, use parent override (NO ".criteria." used for "regular" stats)
+            // Creates ONE criteria behind the scenes, even if template doesn't have "criteria" field
+            if (stat_cat->criteria_count == 1) {
+                sub_override = parent_override;
+                sub_stat->is_manually_completed = stat_cat->is_manually_completed;
+            } else {
+                char sub_stat_key[512];
+                snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name, sub_stat->root_name);
+                sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : NULL;
+                sub_stat->is_manually_completed = cJSON_IsBool(sub_override);
+            }
+
+            bool sub_forced_true = sub_stat->is_manually_completed && cJSON_IsTrue(sub_override);
+
+            // Either naturally done OR manually overridden to be true  (itself or by parent)
+            sub_stat->done = naturally_done || sub_forced_true || parent_forced_true;
+
+            // Increment completed count
             if (sub_stat->done) stat_cat->completed_criteria_count++;
         }
-        stat_cat->done = (stat_cat->criteria_count > 0 && stat_cat->completed_criteria_count >= stat_cat->
-                          criteria_count);
+
+        bool all_children_done = (stat_cat->criteria_count > 0 && stat_cat->completed_criteria_count >= stat_cat->criteria_count);
+
+        // Either all children done OR parent manually overridden to be true
+        stat_cat->done = all_children_done || parent_forced_true;
+
         if (stat_cat->done) t->template_data->stats_completed_count++;
+        t->template_data->stats_completed_criteria_count += stat_cat->completed_criteria_count;
     }
-    // TODO: Remove this once possible
-    // for (int i = 0; i < t->template_data->stat_count; i++) {
-    //     TrackableItem *stat = t->template_data->stats[i];
-    //     cJSON *stat_entry = cJSON_GetObjectItem(player_stats_json, stat->root_name);
-    //     stat->progress = cJSON_IsNumber(stat_entry) ? stat_entry->valueint : 0;
-    //     stat->done = (stat->goal > 0 && stat->progress >= stat->goal);
-    // }
 
     cJSON_Delete(settings_json);
 
@@ -528,13 +467,6 @@ static void tracker_update_achievements_and_stats_mid(struct Tracker *t, const c
     cJSON *play_time_entry = cJSON_GetObjectItem(player_stats_json, "stat.playOneMinute");
     if (cJSON_IsNumber(play_time_entry)) {
         t->template_data->play_time_ticks = (long long) play_time_entry->valuedouble;
-    }
-
-    // Make sure individual stat criteria count towards percentage progress
-    t->template_data->stats_completed_criteria_count = 0;
-    for (int i = 0; i < t->template_data->stat_count; i++) {
-        // Add individual stat criteria count to total
-        t->template_data->stats_completed_criteria_count += t->template_data->stats[i]->completed_criteria_count;
     }
 }
 
@@ -598,33 +530,29 @@ static void tracker_update_stats_modern(struct Tracker *t, const cJSON *player_s
     cJSON *custom_stats = cJSON_GetObjectItem(stats_obj, "minecraft:custom");
     if (custom_stats) {
         // Use play_one_minute for 1.12 -> 1.16.5 and play_time for 1.17+
-        cJSON *play_time = (version >= MC_VERSION_1_17)
-                               ? cJSON_GetObjectItem(custom_stats, "minecraft:play_time")
-                               : cJSON_GetObjectItem(custom_stats, "minecraft:play_one_minute");
+        const char *playtime_key = (version >= MC_VERSION_1_17) ? "minecraft:play_time" : "minecraft:play_one_minute";
+        cJSON *play_time = cJSON_GetObjectItem(custom_stats, playtime_key);
         if (cJSON_IsNumber(play_time)) {
             t->template_data->play_time_ticks = (long long) play_time->valuedouble;
         }
     }
 
-    t->template_data->stats_completed_count = 0;
-
     // Manually override the stat progress
     cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : NULL;
 
+    t->template_data->stats_completed_count = 0;
+    t->template_data->stats_completed_criteria_count = 0;
+
     for (int i = 0; i < t->template_data->stat_count; i++) {
         TrackableCategory *stat_cat = t->template_data->stats[i];
-        stat_cat->is_manually_completed = false;
+        stat_cat->completed_criteria_count = 0;
 
         // Override check
-        if (override_obj && cJSON_IsTrue(cJSON_GetObjectItem(override_obj, stat_cat->root_name))) {
-            stat_cat->done = true;
-            stat_cat->is_manually_completed = true;
-            for (int j = 0; j < stat_cat->criteria_count; j++) stat_cat->criteria[j]->done = true;
-            t->template_data->stats_completed_count++;
-            continue;
-        }
+        cJSON *parent_override = override_obj ? cJSON_GetObjectItem(override_obj, stat_cat->root_name) : NULL;
+        stat_cat->is_manually_completed = cJSON_IsBool(parent_override);
+        bool parent_forced_true = stat_cat->is_manually_completed && cJSON_IsTrue(parent_override);
 
-        stat_cat->completed_criteria_count = 0;
+        // Loop through all sub stats
         for (int j = 0; j < stat_cat->criteria_count; j++) {
             TrackableItem *sub_stat = stat_cat->criteria[j];
             sub_stat->progress = 0;
@@ -633,217 +561,55 @@ static void tracker_update_stats_modern(struct Tracker *t, const cJSON *player_s
             strncpy(root_name_copy, sub_stat->root_name, sizeof(root_name_copy) - 1);
             root_name_copy[sizeof(root_name_copy) - 1] = '\0';
 
+            // Null-terminating the first forward slash to create the language key so nether/create beacon
+            // becomes nether.create_beacon
+            char *category_key = root_name_copy;
             char *item_key = strchr(root_name_copy, '/');
             if (item_key) {
-                *item_key = '\0'; // Null-terminate any existing '/' in the root_name
-                item_key++; // Move to the next character after the '/'
-                cJSON *category_obj = cJSON_GetObjectItem(stats_obj, root_name_copy);
+                *item_key = '\0';
+                item_key++; // Move the pointer to the next character after the forward slash
+                cJSON *category_obj = cJSON_GetObjectItem(stats_obj, category_key);
                 if (category_obj) {
                     cJSON *stat_value = cJSON_GetObjectItem(category_obj, item_key);
                     if (cJSON_IsNumber(stat_value)) {
-                        sub_stat->progress = stat_value->valueint; // Set progress based on JSON from world file
+                        sub_stat->progress = stat_value->valueint;
                     }
                 }
             }
 
-            sub_stat->done = (sub_stat->goal > 0 && sub_stat->progress >= sub_stat->goal);
-            if (sub_stat->done) {
-                stat_cat->completed_criteria_count++;
-            }
-        }
-        stat_cat->done = (stat_cat->criteria_count > 0 && stat_cat->completed_criteria_count >= stat_cat->
-                          criteria_count);
-        if (stat_cat->done) {
-            t->template_data->stats_completed_count++;
-        }
-    }
+            // Determine natural completion
+            bool naturally_done = (sub_stat->goal > 0 && sub_stat->progress >= sub_stat->goal);
 
-    // Make sure individual stat criteria count towards percentage progress
-    t->template_data->stats_completed_criteria_count = 0;
-    for (int i = 0; i < t->template_data->stat_count; i++) {
-        // Add individual stat criteria count to total
-        t->template_data->stats_completed_criteria_count += t->template_data->stats[i]->completed_criteria_count;
+            cJSON *sub_override;
+            // If there are no sub stats, so "regular" stat doesn't use ".criteria.", then just counts as parent
+            // Creates ONE criteria behind the scenes, even if template doesn't have "criteria" field
+            if (stat_cat->criteria_count == 1) {
+                sub_override = parent_override;
+                sub_stat->is_manually_completed = stat_cat->is_manually_completed;
+            } else {
+                char sub_stat_key[512];
+                snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name,
+                         sub_stat->root_name);
+                sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : NULL;
+                sub_stat->is_manually_completed = cJSON_IsBool(sub_override);
+            }
+            bool sub_forced_true = sub_stat->is_manually_completed && cJSON_IsTrue(sub_override);
+
+            // Either naturally done OR manually overridden to true (itself OR parent)
+            sub_stat->done = naturally_done || sub_forced_true || parent_forced_true;
+
+            if (sub_stat->done) stat_cat->completed_criteria_count++;
+        }
+
+        bool all_children_done = (stat_cat->criteria_count > 0 && stat_cat->completed_criteria_count >= stat_cat->criteria_count);
+
+        stat_cat->done = all_children_done || parent_forced_true;
+
+        // Update the percentage progress properly
+        if (stat_cat->done) t->template_data->stats_completed_count++;
+        t->template_data->stats_completed_criteria_count += stat_cat->completed_criteria_count;
     }
 }
-
-// TODO: Remove once possible
-// /**
-//  * @brief (Era 3: 1.12+) Updates stat progress from modern JSON files.
-//  */
-// static void tracker_update_stats_modern(struct Tracker *t, const cJSON *player_stats_json, const cJSON *settings_json,
-//                                         MC_Version version) {
-//     if (!player_stats_json) return;
-//
-//     // TODO: DEBUG
-//     printf("\n--- FINAL PRE-UPDATE CHECK ---\n");
-//     printf("Found %d stat categories to update.\n", t->template_data->stat_count);
-//     for (int i = 0; i < t->template_data->stat_count; i++) {
-//         printf("Category '%s' has %d criteria:\n", t->template_data->stats[i]->display_name, t->template_data->stats[i]->criteria_count);
-//         for (int j = 0; j < t->template_data->stats[i]->criteria_count; j++) {
-//             printf("  - Will attempt to update: '%s'\n", t->template_data->stats[i]->criteria[j]->root_name);
-//         }
-//     }
-//     printf("----------------------------\n\n");
-//
-//     cJSON *stats_obj = cJSON_GetObjectItem(player_stats_json, "stats");
-//     if (!stats_obj) return;
-//
-//     // Get the playtime for display, when 1.17+ its minecraft:play_time below, below it's minecraft:play_one_minute
-//     cJSON *custom_stats = cJSON_GetObjectItem(stats_obj, "minecraft:custom");
-//     if (custom_stats) {
-//         // 1.17+
-//         cJSON *play_time = NULL;
-//         if (version >= MC_VERSION_1_17) {
-//             play_time = cJSON_GetObjectItem(custom_stats, "minecraft:play_time");
-//         } else {
-//             // 1.12 -> 1.16.5
-//             play_time = cJSON_GetObjectItem(custom_stats, "minecraft:play_one_minute");
-//         }
-//
-//         if (cJSON_IsNumber(play_time)) {
-//             t->template_data->play_time_ticks = (long long) play_time->valuedouble;
-//         }
-//     }
-//
-//     t->template_data->stats_completed_count = 0;
-//
-//     // Manually override the stat progress
-//     cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : NULL;
-//
-//     for (int i = 0; i < t->template_data->stat_count; i++) {
-//         TrackableCategory *stat_cat = t->template_data->stats[i];
-//         stat_cat->is_manually_completed = false; // Reset manually completed
-//
-//         // Override check
-//         if (override_obj) {
-//             cJSON *override_status = cJSON_GetObjectItem(override_obj, stat_cat->root_name);
-//             if (cJSON_IsTrue(override_status)) {
-//                 stat_cat->done = true;
-//                 stat_cat->is_manually_completed = true;
-//
-//                 // Mark all criteria as done for consistency
-//                 for (int j = 0; j < stat_cat->criteria_count; j++) {
-//                     stat_cat->criteria[j]->done = true;
-//                 }
-//                 t->template_data->stats_completed_count++;
-//                 continue; // Skip to the next stat category
-//             }
-//         }
-//
-//         // TODO: Is this here to stay?
-//         stat_cat->completed_criteria_count = 0;
-//
-//         // Loop through each sub-stat CRITERION within the category
-//         for (int j = 0; j < stat_cat->criteria_count; j++) {
-//             TrackableItem *sub_stat = stat_cat->criteria[j];
-//             sub_stat->progress = 0; // Reset progress
-//
-//
-//
-//
-//
-//             // --- DETAILED DIAGNOSTIC BLOCK ---
-//             printf("\nDEBUG UPDATE: Checking sub_stat with root_name: '%s'\n", sub_stat->root_name);
-//             char root_name_copy[192];
-//             strncpy(root_name_copy, sub_stat->root_name, sizeof(root_name_copy) - 1);
-//             root_name_copy[sizeof(root_name_copy) - 1] = '\0';
-//
-//             char *item_key = strchr(root_name_copy, '/');
-//             if (item_key) {
-//                 *item_key = '\0';
-//                 item_key++;
-//                 char *category_key = root_name_copy;
-//                 printf("    -> Split into category_key: '%s', item_key: '%s'\n", category_key, item_key);
-//
-//                 cJSON *category_obj = cJSON_GetObjectItem(stats_obj, category_key);
-//                 if (category_obj) {
-//                     printf("    -> SUCCESS: Found category object in player stats.\n");
-//                     cJSON *stat_value = cJSON_GetObjectItem(category_obj, item_key);
-//                     if (cJSON_IsNumber(stat_value)) {
-//                         printf("    -> SUCCESS: Found final stat value: %d\n", stat_value->valueint);
-//                         sub_stat->progress = stat_value->valueint;
-//                     } else {
-//                         printf("    -> FAILED: Could not find item_key '%s' within the category object. (stat file)\n", item_key);
-//                     }
-//                 } else {
-//                     printf("    -> FAILED: Could not find category_key '%s' in player stats.\n", category_key);
-//                 }
-//             } else {
-//                 printf("    -> FAILED: Could not find '/' separator in root_name.\n");
-//             }
-//             // --- END OF DETAILED DIAGNOSTIC BLOCK ---
-//
-//
-//
-//
-//
-//             // TODO: UNCOMMENT THIS ----------------------------------------------------------------
-//             // char root_name_copy[192];
-//             strncpy(root_name_copy, sub_stat->root_name, sizeof(root_name_copy) - 1);
-//             root_name_copy[sizeof(root_name_copy) - 1] = '\0';
-//
-//             // TODO: UNCOMMENT THIS ----------------------------------------------------------------
-//             // char *item_key = strchr(root_name_copy, '/');
-//             if (item_key) {
-//                 *item_key = '\0'; // Null-terminate any existing '/' in the root_name
-//                 item_key++;
-//                 char *category_key = root_name_copy;
-//
-//                 cJSON *category_obj = cJSON_GetObjectItem(stats_obj, category_key);
-//                 if (category_obj) {
-//                     cJSON *stat_value = cJSON_GetObjectItem(category_obj, item_key);
-//                     if (cJSON_IsNumber(stat_value)) {
-//                         sub_stat->progress = stat_value->valueint; // Set progress based on JSON from world file
-//                     }
-//                 }
-//             }
-//
-//             // Check if this sub-stat's goal is met
-//             sub_stat->done = (sub_stat->goal > 0 && sub_stat->progress >= sub_stat->goal);
-//             if (sub_stat->done) {
-//                 stat_cat->completed_criteria_count++;
-//             }
-//         }
-//
-//         // The parqent category is "done" if all its criteria are met
-//         stat_cat->done = (stat_cat->criteria_count > 0 && stat_cat->completed_criteria_count >= stat_cat->
-//                           criteria_count);
-//         if (stat_cat->done) {
-//             t->template_data->stats_completed_count++;
-//         }
-//
-//         // TODO: Remove this once possible
-//         // char root_name_copy[192];
-//         // strncpy(root_name_copy, stat->root_name, sizeof(root_name_copy) - 1);
-//         // root_name_copy[sizeof(root_name_copy) - 1] = '\0';
-//         //
-//         // char *item_key = strchr(root_name_copy, '/');
-//         // if (item_key) {
-//         //     *item_key = '\0'; // Null-terminate any existing '/' in the root_name
-//         //     item_key++;
-//         //     char *category_key = root_name_copy;
-//         //     cJSON *category_obj = cJSON_GetObjectItem(stats_obj, category_key);
-//         //     if (category_obj) {
-//         //         cJSON *stat_value = cJSON_GetObjectItem(category_obj, item_key);
-//         //         if (cJSON_IsNumber(stat_value)) {
-//         //             stat->progress = stat_value->valueint;
-//         //         }
-//         //     }
-//         // }
-//         //
-//         // if (override_obj) {
-//         //     cJSON *override_status = cJSON_GetObjectItem(override_obj, stat->root_name);
-//         //     if (cJSON_IsTrue(override_status)) {
-//         //         stat->done = true;
-//         //         stat->is_manually_completed = true;
-//         //     }
-//         // }
-//         //
-//         // if (!stat->is_manually_completed) {
-//         //     stat->done = (stat->goal > 0 && stat->progress >= stat->goal);
-//         // }
-//     }
-// }
 
 // HELPER FUNCTION FOR PARSING
 /**
@@ -1667,13 +1433,15 @@ static void tracker_update_multi_stage_progress(struct Tracker *t, const cJSON *
                     } else if (version >= MC_VERSION_1_7_2) {
                         // Mid Era: Check for the biome name in the 'progress' array of player_stats_json (player stats file)
                         if (player_stats_json) {
-                            cJSON *ach_entry = cJSON_GetObjectItem(player_stats_json, stage_to_check->parent_advancement);
+                            cJSON *ach_entry = cJSON_GetObjectItem(player_stats_json,
+                                                                   stage_to_check->parent_advancement);
                             if (ach_entry) {
                                 cJSON *progress_array = cJSON_GetObjectItem(ach_entry, "progress");
                                 if (cJSON_IsArray(progress_array)) {
                                     cJSON *progress_item;
                                     cJSON_ArrayForEach(progress_item, progress_array) {
-                                        if (cJSON_IsString(progress_item) && strcmp(progress_item->valuestring, stage_to_check->root_name) == 0) {
+                                        if (cJSON_IsString(progress_item) && strcmp(
+                                                progress_item->valuestring, stage_to_check->root_name) == 0) {
                                             stage_completed = true;
                                             break;
                                         }
@@ -1715,7 +1483,7 @@ static void tracker_update_multi_stage_progress(struct Tracker *t, const cJSON *
 /**
  * @brief Calculates the overall progress percentage based on all tracked items. Advancements are separately!!
  *
- * It first calculates the total number of "steps" (e.g., criteria, stats, unlocks, custom goals, and multi-stage goals),
+ * It first calculates the total number of "steps" (e.g., criteria, sub-stats or stat if no sub-stats, unlocks, custom goals, and multi-stage goals),
  * then the number of completed "steps", and finally calculates the overall progress percentage.
  *
  * @param t A pointer to the Tracker struct.
@@ -1726,36 +1494,49 @@ static void tracker_calculate_overall_progress(struct Tracker *t) {
 
     // calculate the total number of "steps"
     int total_steps = 0;
-    // INCLUDES SUB-CRITERIA PROGRESS
-    total_steps += t->template_data->total_criteria_count; // Total advancement criteria
-    total_steps += t->template_data->stat_total_criteria_count; // Total stat criteria, replaces stat_count
-    total_steps += t->template_data->unlock_count;
-    total_steps += t->template_data->custom_goal_count;
-    for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
-        // Each stage (except the last) is a step
-        total_steps += (t->template_data->multi_stage_goals[i]->stage_count - 1);
+    int completed_steps = 0;
+
+    // Advancements
+    total_steps += t->template_data->total_criteria_count;
+    completed_steps += t->template_data->completed_criteria_count;
+
+    // Stats:
+    // - For multi-criteria stats, each criterion is a step.
+    // - For single-criterion stats, the parent category itself is one step.
+    for (int i = 0; i < t->template_data->stat_count; i++) {
+        TrackableCategory *stat_cat = t->template_data->stats[i];
+        if (stat_cat->criteria_count > 1) {
+            // For multi-criteria stats, count each criterion
+            total_steps += stat_cat->criteria_count;
+            completed_steps += stat_cat->completed_criteria_count;
+        } else {
+            // For single-criterion stats, count the parent category as one step
+            total_steps += 1;
+            if (stat_cat->done) completed_steps += 1;
+        }
     }
 
-    // Calculate the number of completed "steps"
-    int completed_steps = 0;
-    completed_steps += t->template_data->completed_criteria_count; // Completed advancement criteria
-    completed_steps += t->template_data->stats_completed_criteria_count;
+    // Unlocks
+    total_steps += t->template_data->unlock_count;
     completed_steps += t->template_data->unlocks_completed_count;
-    for (int i = 0; i < t->template_data->stat_count; i++) {
-        if (t->template_data->stats[i]->done) completed_steps++;
-    }
+
+    // Custom goals
+    total_steps += t->template_data->custom_goal_count;
     for (int i = 0; i < t->template_data->custom_goal_count; i++) {
         if (t->template_data->custom_goals[i]->done) completed_steps++;
     }
+
+    // Multi-Stage Goals
     for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
+        total_steps += (t->template_data->multi_stage_goals[i]->stage_count - 1); // Final stage is not counted
         completed_steps += t->template_data->multi_stage_goals[i]->current_stage;
     }
 
-    // Calculate the overall progress percentage
+    // Set 100% if no steps are found
     if (total_steps > 0) {
         t->template_data->overall_progress_percentage = ((float) completed_steps / (float) total_steps) * 100.0f;
     } else {
-        t->template_data->overall_progress_percentage = 100.0f; // Display 100% if there are no steps
+        t->template_data->overall_progress_percentage = 100.0f; // Default to 100% if no trackable items
     }
 }
 
@@ -2276,7 +2057,8 @@ void tracker_update_title(struct Tracker *t, const AppSettings *settings) {
     if (version >= MC_VERSION_1_12) {
         // Creating the title buffer
         snprintf(title_buffer, sizeof(title_buffer),
-                 "Advancely    -    %s    -    %s    -    %s%s    |    Adv: %d/%d    |    Progress: %.2f%%    |    %s",
+                 "  Advancely  %s    |    %s    -    %s    -    %s%s    |    Adv: %d/%d    |    Progress: %.2f%%    |    %s IGT",
+                 ADVANCELY_VERSION,
                  t->world_name,
                  settings->version_str,
                  formatted_category,
@@ -2287,7 +2069,8 @@ void tracker_update_title(struct Tracker *t, const AppSettings *settings) {
                  formatted_time);
     } else {
         snprintf(title_buffer, sizeof(title_buffer),
-                 "Advancely    -    %s    -    %s    -    %s%s    |    Ach: %d/%d    |    Progress: %.2f%%    |    %s",
+                 "  Advancely  %s    |    %s    -    %s    -    %s%s    |    Ach: %d/%d    |    Progress: %.2f%%    |    %s IGT",
+                 ADVANCELY_VERSION,
                  t->world_name,
                  settings->version_str,
                  formatted_category,
@@ -2308,6 +2091,8 @@ void tracker_print_debug_status(struct Tracker *t) {
 
     AppSettings settings;
     settings_load(&settings);
+    cJSON *settings_json = cJSON_from_file(SETTINGS_FILE_PATH);
+    cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : NULL;
 
     // Also load the current game version used
     MC_Version version = settings_get_version_from_string(settings.version_str);
@@ -2342,7 +2127,7 @@ void tracker_print_debug_status(struct Tracker *t) {
         printf("                  Final Time: %s\n\n", formatted_time);
         printf("============================================================\n\n");
     } else {
-        // Advancements and Criteria
+        // Advancements or Achievements
         if (version >= MC_VERSION_1_12) {
             printf("[Advancements] %d / %d completed\n", t->template_data->advancements_completed_count,
                    t->template_data->advancement_count);
@@ -2365,10 +2150,16 @@ void tracker_print_debug_status(struct Tracker *t) {
                 status_text = adv->done ? "COMPLETED" : "INCOMPLETE";
             }
 
+            // Only print criteria count if there are more than 1
+            if (adv->criteria_count > 1) {
+                printf("  - %s (%d/%d criteria): %s\n", adv->display_name, adv->completed_criteria_count,
+                       adv->criteria_count,
+                       status_text);
+            } else {
+                printf("  - %s: %s\n", adv->display_name, status_text);
+            }
 
-            printf("  - %s (%d/%d criteria): %s\n", adv->display_name, adv->completed_criteria_count,
-                   adv->criteria_count,
-                   status_text);
+
             for (int j = 0; j < adv->criteria_count; j++) {
                 TrackableItem *crit = adv->criteria[j];
                 // takes translation from the language file otherwise root_name
@@ -2387,19 +2178,28 @@ void tracker_print_debug_status(struct Tracker *t) {
             // Hide a no-icon stat ONLY if the version is pre-1.7.2 (legacy)
             // With target value being 0 or NOT EXISTENT and legacy version it should act as hidden stat for multi-stage
             // It's a "tracker-only" stat with no goal, USED WITHIN MULTI-STAGE FOR LEGACY VERSIONS
-            if (version < MC_VERSION_1_6_4 && stat_cat->icon_path[0] == '\0') {
-                continue;
-            }
+            if (version < MC_VERSION_1_6_4 && stat_cat->icon_path[0] == '\0') continue;
 
-            const char *status = stat_cat->done
-                                     ? (stat_cat->is_manually_completed ? "COMPLETED (MANUAL)" : "COMPLETED")
-                                     : "INCOMPLETE";
+            const char *status_text;
+            cJSON *parent_override = override_obj ? cJSON_GetObjectItem(override_obj, stat_cat->root_name) : NULL;
+            if (stat_cat->done) {
+                status_text = (stat_cat->is_manually_completed && cJSON_IsTrue(parent_override)) ? "COMPLETED (MANUAL)" : "COMPLETED";
+            } else {
+                status_text = "INCOMPLETE";
+            }
 
             // Check if this is a single-criterion stat
             if (stat_cat->criteria_count == 1) {
                 // --- SINGLE-CRITERION PRINT FORMAT ---
                 TrackableItem *sub_stat = stat_cat->criteria[0];
 
+                // Status of the single criterion
+                const char *sub_status_text;
+                if (sub_stat->done) {
+                    sub_status_text = (sub_stat->is_manually_completed && cJSON_IsTrue(parent_override)) ? "DONE (MANUAL)" : "DONE";
+                } else {
+                    sub_status_text = "NOT DONE";
+                }
 
                 // Check if the single criterion has a target greater 0 or -1
                 if (sub_stat->goal > 0) {
@@ -2408,17 +2208,17 @@ void tracker_print_debug_status(struct Tracker *t) {
                            stat_cat->display_name,
                            sub_stat->progress,
                            sub_stat->goal,
-                           status);
+                           sub_status_text);
                 } else if (sub_stat->goal == -1) {
                     // When target is -1 it acts as infinte counter, then goal doesn't get printed
                     // It's a completable single-criterion stat
                     printf("[Stat] %s: %d - %s\n",
                            stat_cat->display_name,
                            sub_stat->progress,
-                           status);
-            } else if (sub_stat->goal == 0 && version <= MC_VERSION_1_6_4) {
+                           sub_status_text);
+                } else if (sub_stat->goal == 0 && version <= MC_VERSION_1_6_4) {
                     // When target value would be 0 or NOT EXISTENT, but "icon" key exists somehow
-                    // "icon" key for this stat SHOULD BE REMOVED to act as hidden stat for multi-stage for legacy
+                    // THE "icon" key for this stat SHOULD BE REMOVED to act as hidden stat for multi-stage for legacy
                     printf("[Stat Tracker] %s: %d\n",
                            stat_cat->display_name,
                            sub_stat->progress);
@@ -2431,23 +2231,32 @@ void tracker_print_debug_status(struct Tracker *t) {
                            sub_stat->goal);
                 }
             } else {
-                // --- MULTI-CRITERION PRINT FORMAT (your original code) ---
+                // Full stat category uses the status of the category, others use sub_status above
                 printf("[Stat Category] %s (%d/%d): %s\n",
                        stat_cat->display_name,
                        stat_cat->completed_criteria_count,
                        stat_cat->criteria_count,
-                       status);
+                       status_text);
 
                 // Print each sub-stat (criterion)
                 for (int j = 0; j < stat_cat->criteria_count; j++) {
                     TrackableItem *sub_stat = stat_cat->criteria[j];
+                    const char *sub_status_text;
+                    char sub_stat_key[512];
+                    snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name, sub_stat->root_name);
+                    cJSON *sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : NULL;
+                    if (sub_stat->done) {
+                        sub_status_text = (sub_stat->is_manually_completed && cJSON_IsTrue(sub_override)) ? "DONE (MANUAL)" : "DONE";
+                    } else {
+                        sub_status_text = "NOT DONE";
+                    }
                     // You could add a check here for sub_stat->goal != -1 if you don't want to print progress for untracked stats
                     printf("  - %s: %s%d / %d - %s\n",
                            sub_stat->display_name,
                            sub_stat->is_shared ? "SHARED - " : "",
                            sub_stat->progress,
                            sub_stat->goal,
-                           sub_stat->done ? "DONE" : "NOT DONE");
+                           sub_status_text);
                 }
             }
         }

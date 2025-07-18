@@ -31,42 +31,114 @@
     "achievement.exploreAllBiomes": {
       "icon": "items/placeholder.png",
       "criteria": {
-        "Beach": {},
-        "Birch Forest": {},
-        "Birch Forest Hills": {},
-        "Cold Beach": {},
-        "Cold Taiga": {},
-        "Cold Taiga Hills": {},
-        "Deep Ocean": {},
-        "Desert": {},
-        "DesertHills": {},
-        "Extreme Hills": {},
-        "Extreme Hills+": {},
-        "Forest": {},
-        "ForestHills": {},
-        "FrozenRiver": {},
-        "Ice Mountains": {},
-        "Ice Plains": {},
-        "Jungle": {},
-        "JungleEdge": {},
-        "JungleHills": {},
-        "Mega Taiga": {},
-        "Mega Taiga Hills": {},
-        "Mesa": {},
-        "Mesa Plateau": {},
-        "Mesa Plateau F": {},
-        "MushroomIsland": {},
-        "MushroomIslandShore": {},
-        "Ocean": {},
-        "Plains": {},
-        "River": {},
-        "Roofed Forest": {},
-        "Savanna": {},
-        "Savanna Plateau": {},
-        "Stone Beach": {},
-        "Swampland": {},
-        "Taiga": {},
-        "TaigaHills": {}
+        "Beach": {
+          "icon": "items/placeholder.png"
+        },
+        "Birch Forest": {
+          "icon": "items/placeholder.png"
+        },
+        "Birch Forest Hills": {
+          "icon": "items/placeholder.png"
+        },
+        "Cold Beach": {
+          "icon": "items/placeholder.png"
+        },
+        "Cold Taiga": {
+          "icon": "items/placeholder.png"
+        },
+        "Cold Taiga Hills": {
+          "icon": "items/placeholder.png"
+        },
+        "Deep Ocean": {
+          "icon": "items/placeholder.png"
+        },
+        "Desert": {
+          "icon": "items/placeholder.png"
+        },
+        "DesertHills": {
+          "icon": "items/placeholder.png"
+        },
+        "Extreme Hills": {
+          "icon": "items/placeholder.png"
+        },
+        "Extreme Hills+": {
+          "icon": "items/placeholder.png"
+        },
+        "Forest": {
+          "icon": "items/placeholder.png"
+        },
+        "ForestHills": {
+          "icon": "items/placeholder.png"
+        },
+        "FrozenRiver": {
+          "icon": "items/placeholder.png"
+        },
+        "Ice Mountains": {
+          "icon": "items/placeholder.png"
+        },
+        "Ice Plains": {
+          "icon": "items/placeholder.png"
+        },
+        "Jungle": {
+          "icon": "items/placeholder.png"
+        },
+        "JungleEdge": {
+          "icon": "items/placeholder.png"
+        },
+        "JungleHills": {
+          "icon": "items/placeholder.png"
+        },
+        "Mega Taiga": {
+          "icon": "items/placeholder.png"
+        },
+        "Mega Taiga Hills": {
+          "icon": "items/placeholder.png"
+        },
+        "Mesa": {
+          "icon": "items/placeholder.png"
+        },
+        "Mesa Plateau": {
+          "icon": "items/placeholder.png"
+        },
+        "Mesa Plateau F": {
+          "icon": "items/placeholder.png"
+        },
+        "MushroomIsland": {
+          "icon": "items/placeholder.png"
+        },
+        "MushroomIslandShore": {
+          "icon": "items/placeholder.png"
+        },
+        "Ocean": {
+          "icon": "items/placeholder.png"
+        },
+        "Plains": {
+          "icon": "items/placeholder.png"
+        },
+        "River": {
+          "icon": "items/placeholder.png"
+        },
+        "Roofed Forest": {
+          "icon": "items/placeholder.png"
+        },
+        "Savanna": {
+          "icon": "items/placeholder.png"
+        },
+        "Savanna Plateau": {
+          "icon": "items/placeholder.png"
+        },
+        "Stone Beach": {
+          "icon": "items/placeholder.png"
+        },
+        "Swampland": {
+          "icon": "items/placeholder.png"
+        },
+        "Taiga": {
+          "icon": "items/placeholder.png"
+        },
+        "TaigaHills": {
+          "icon": "items/placeholder.png"
+        }
       }
     },
     "achievement.overpowered": {
