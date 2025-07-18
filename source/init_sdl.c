@@ -26,6 +26,16 @@ bool tracker_init_sdl(struct Tracker *t, const AppSettings *settings) {
         return false;
     }
 
+    // Window Icon Cross-platform
+    SDL_Surface *icon_surface = IMG_Load(ADVANCELY_ICON_PATH);
+    if (icon_surface) {
+        SDL_SetWindowIcon(t->window, icon_surface);
+        SDL_DestroySurface(icon_surface);
+        printf("[INIT SDL] Tracker window icon set to %s\n", ADVANCELY_ICON_PATH);
+    } else {
+        fprintf(stderr, "[INIT SDL] Failed to load tracker window icon: %s\n", SDL_GetError());
+    }
+
     // Set position after creation to handle multi-monitor setups better
     SDL_SetWindowPosition(t->window, x, y);
 
@@ -61,6 +71,17 @@ bool overlay_init_sdl(struct Overlay *o, const AppSettings *settings) {
         fprintf(stderr, "[INIT SDL] Failed to create overlay window: %s\n", SDL_GetError());
         return false;
     }
+
+    // Window Icon Cross-platform
+    SDL_Surface *icon_surface = IMG_Load(ADVANCELY_ICON_PATH);
+    if (icon_surface) {
+        SDL_SetWindowIcon(o->window, icon_surface);
+        SDL_DestroySurface(icon_surface);
+        printf("[INIT SDL] Overlay window icon set to %s\n", ADVANCELY_ICON_PATH);
+    } else {
+        fprintf(stderr, "[INIT SDL] Failed to load overlay window icon: %s\n", SDL_GetError());
+    }
+
     SDL_SetWindowPosition(o->window, x, y);
 
     o->renderer = SDL_CreateRenderer(o->window, NULL);
@@ -95,6 +116,17 @@ bool settings_init_sdl(struct Settings *s, const AppSettings *settings) {
         fprintf(stderr, "[INIT SDL] Failed to create settings window: %s\n", SDL_GetError());
         return false;
     }
+
+    // Window Icon Cross-platform
+    SDL_Surface *icon_surface = IMG_Load(ADVANCELY_ICON_PATH);
+    if (icon_surface) {
+        SDL_SetWindowIcon(s->window, icon_surface);
+        SDL_DestroySurface(icon_surface);
+        printf("[INIT SDL] Settings window icon set to %s\n", ADVANCELY_ICON_PATH);
+    } else {
+        fprintf(stderr, "[INIT SDL] Failed to load settings window icon: %s\n", SDL_GetError());
+    }
+
     SDL_SetWindowPosition(s->window, x, y);
 
     s->renderer = SDL_CreateRenderer(s->window, NULL);

@@ -83,6 +83,7 @@ int main(int argc, char *argv[]) {
 
     // Expect the worst
     bool exit_status = EXIT_FAILURE;
+    bool dmon_initialized = false; // Make sure dmon is initialized
 
     // Load settings ONCE at the start and check if file was incomplete to use default values
     // settings_load() returns true if the file was incomplete and used default values
@@ -108,6 +109,7 @@ int main(int argc, char *argv[]) {
 
     if (tracker_new(&tracker, &app_settings) && overlay_new(&overlay, &app_settings)) {
         dmon_init();
+        dmon_initialized = true;
         SDL_SetAtomicInt(&g_needs_update, 1);
         SDL_SetAtomicInt(&g_settings_changed, 0);
 
@@ -263,7 +265,9 @@ int main(int argc, char *argv[]) {
         exit_status = EXIT_SUCCESS;
     }
 
-    dmon_deinit();
+    if (dmon_initialized) {
+        dmon_deinit();
+    }
     tracker_free(&tracker);
     overlay_free(&overlay);
     settings_free(&settings);
