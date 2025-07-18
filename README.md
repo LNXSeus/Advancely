@@ -48,8 +48,9 @@ This tracker supports **any full release** from Minecraft 1.0 upwards including 
 2.  **Configure**: Open `settings.json` to select your Minecraft version, category, and save path detection mode (`auto` or `manual`). You can also configure hotkeys there.
 3.  **Run**: Launch Advancely and speedrun Minecraft. The tracker will automatically find your most recent world and display your progress in real time.
 
-### Licenses
+### Licenses & Credits
 
 *This project uses dmon by Sepehr Taghdisian, licensed under the BSD 2-Clause License.*
 *This project also uses the SDL3 library suite and cJSON. More information can be found in the [LICENSES.txt](LICENSES.txt) file.*
-*Minecraft item .png files downloaded from [Minecraft Asset Clout](https://mcasset.cloud/1.0/) and block renders from the [Minecraft Wiki](https://www.minecraft.wiki)* (downloaded by [Dogmaster](https://www.twitch.tv/thedogmaster28))
+*Minecraft item .png files downloaded from [Minecraft Asset Clout](https://mcasset.cloud/1.0/) and block renders from the [Minecraft Wiki](https://www.minecraft.wiki) (downloaded by [Dogmaster](https://www.twitch.tv/thedogmaster28))*
+*Shoutout to [Oskar](https://github.com/Oskar3141) for providing me his project files (kAAmel) and Darwin Baker for creating [AATool](https://github.com/DarwinBaker/AATool), which served as inspiration!*

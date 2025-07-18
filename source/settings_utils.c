@@ -511,7 +511,7 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
     cJSON_ReplaceItemInObject(root, "category", cJSON_CreateString(settings->category));
     cJSON_ReplaceItemInObject(root, "optional_flag", cJSON_CreateString(settings->optional_flag));
 
-    // --- Update General Settings ---
+    // Update General Settings
     cJSON *general_obj = get_or_create_object(root, "general");
     cJSON_ReplaceItemInObject(general_obj, "fps", cJSON_CreateNumber(settings->fps));
     cJSON_ReplaceItemInObject(general_obj, "tracker_always_on_top", cJSON_CreateBool(settings->tracker_always_on_top));
@@ -520,7 +520,7 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
                               cJSON_CreateBool(settings->overlay_scroll_left_to_right));
     cJSON_ReplaceItemInObject(general_obj, "goal_align_left", cJSON_CreateBool(settings->goal_align_left));
 
-    // --- Update Visual Settings ---
+    // Update Visual Settings
     cJSON *visuals_obj = get_or_create_object(root, "visuals");
     save_window_rect(visuals_obj, "tracker_window", &settings->tracker_window);
     save_window_rect(visuals_obj, "overlay_window", &settings->overlay_window);
@@ -549,6 +549,32 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
             } else {
                 // Simple Toggle: Always save the boolean 'done' status.
                 cJSON_ReplaceItemInObject(progress_obj, item->root_name, cJSON_CreateBool(item->done));
+            }
+        }
+
+        // Update Stat Override Progress
+        cJSON *override_obj = get_or_create_object(root, "stat_progress_override");
+        for (int i = 0; i < td->stat_count; i++) {
+            TrackableCategory *stat_cat = td->stats[i];
+            if (stat_cat->is_manually_completed) {
+                cJSON_ReplaceItemInObject(override_obj, stat_cat->root_name, cJSON_CreateBool(stat_cat->done));
+            }
+
+            for (int j = 0; j < stat_cat->criteria_count; j++) {
+                TrackableItem *sub_stat = stat_cat->criteria[j];
+                char sub_stat_key[512];
+                snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name, sub_stat->root_name);
+
+                if (sub_stat->is_manually_completed) {
+                    cJSON_ReplaceItemInObject(override_obj, sub_stat_key, cJSON_CreateBool(sub_stat->done));
+                }
+
+                // If parent was manually completed, ensure sub-stat override reflects this if it exists
+                else if (stat_cat->is_manually_completed && stat_cat->done) {
+                    if (cJSON_HasObjectItem(override_obj, sub_stat_key)) {
+                        cJSON_ReplaceItemInObject(override_obj, sub_stat_key, cJSON_CreateBool(true));
+                    }
+                }
             }
         }
     }

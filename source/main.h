@@ -22,7 +22,9 @@
 // Set my own SDL_FLAGS
 #define SDL_FLAGS SDL_INIT_VIDEO // TODO: OR'd together with SDL_INIT_AUDIO
 
-#define TRACKER_TITLE "Advancely" // TODO: Dynamically update title based on progress
+#define TRACKER_TITLE "Advancely"
+#define ADVANCELY_VERSION "v0.5.0" // vMAJOR.MINOR.PATCH // TODO: Update this always
+#define ADVANCELY_ICON_PATH "resources/gui/Advancely_Icon.ico" // TODO: Use this in tracker_init_sdl()
 
 // Settings window is NOT USER CONFIGURABLE SO HARDCODED HERE, ONLY COLOR IS
 // Tracker window flags are in init_sdl.c in tracker_init_sdl()
