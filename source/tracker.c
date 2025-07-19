@@ -1890,9 +1890,14 @@ void tracker_load_and_parse_data(struct Tracker *t) {
 
     printf("[TRACKER] Initial template parsing complete.\n");
 
-    // LOADING SNAPSHOT FROM FILE
-    tracker_load_snapshot_from_file(t);
+    // LOADING SNAPSHOT FROM FILE - ONLY FOR VERSION 1.0-1.6.4
+    AppSettings settings;
+    settings_load(&settings);
+    MC_Version version = settings_get_version_from_string(settings.version_str);
 
+    if (version <= MC_VERSION_1_6_4) {
+        tracker_load_snapshot_from_file(t);
+    }
     cJSON_Delete(template_json);
     if (t->template_data->lang_json) {
         cJSON_Delete(t->template_data->lang_json);
@@ -2184,7 +2189,7 @@ void tracker_print_debug_status(struct Tracker *t) {
                 }
             } else if (custom_goal->goal > 0) {
                 // Case 2: Normal counter with a target goal.
-                printf("[Custom Goal] %s: %d / %d - %s\n",
+                printf("[Custom Counter] %s: %d / %d - %s\n",
                        custom_goal->display_name,
                        custom_goal->progress,
                        custom_goal->goal,

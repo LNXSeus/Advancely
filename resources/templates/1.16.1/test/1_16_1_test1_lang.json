@@ -238,5 +238,29 @@
   "advancement.minecraft.nether.create_beacon": "Bring Home the Beacon",
   "advancement.minecraft.nether.summon_wither": "Withering Heights",
   "advancement.minecraft.nether.get_wither_skull": "Spooky Scary Skeleton",
-  "advancement.minecraft.nether.ride_strider": "This Boat Has Legs"
+  "advancement.minecraft.nether.ride_strider": "This Boat Has Legs",
+
+  "stat.stat_cat:whatever": "WHATEVER!",
+  "stat.stat_cat:whatever.criteria.minecraft:custom/minecraft:open_chest": "Open 1 chest",
+  "stat.stat_cat:whatever.criteria.minecraft:used/minecraft:oak_door": "Place an oak door",
+  "stat.stat_cat:whatever.criteria.minecraft:custom/minecraft:sneak_time": "Sneak for 10 seconds",
+
+  "stat.stat_cat:whatever2": "WHATEVER 2.0!",
+  "stat.stat_cat:whatever2.criteria.minecraft:custom/minecraft:open_chest": "Open 3 chest",
+  "stat.stat_cat:whatever2.criteria.minecraft:custom/minecraft:sneak_time": "Sneak for 20 seconds",
+
+  "stat.stat_cat:mine_more_sand": "Mine unlimited sand!",
+  "stat.stat_cat:break_wooden_shovel": "Break A Wooden Shovel",
+
+  "custom.custom:good_view": "Get a Good View!",
+  "custom.custom:fun_counter": "Count Forever!",
+  "custom.custom:count_100": "Count to 100!",
+
+  "multi_stage_goal.ms_goal:even_more_basics.display_name": "Even More Basics!",
+  "multi_stage_goal.ms_goal:even_more_basics.stage.0": "Pickup 3 Oak Logs",
+  "multi_stage_goal.ms_goal:even_more_basics.stage.one": "Jump 17 times",
+  "multi_stage_goal.ms_goal:even_more_basics.stage.2": "Eat raw beef",
+  "multi_stage_goal.ms_goal:even_more_basics.stage.3": "Mine 64 dirt",
+  "multi_stage_goal.ms_goal:even_more_basics.stage.4": "Get 'A Seedy Place' Advancement",
+  "multi_stage_goal.ms_goal:even_more_basics.stage.final": "Done!"
 }
