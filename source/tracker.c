@@ -680,7 +680,13 @@ static void tracker_parse_categories(cJSON *category_json, cJSON *lang_json, Tra
         else strncpy(new_cat->display_name, new_cat->root_name, sizeof(new_cat->display_name) - 1);
 
         cJSON *icon = cJSON_GetObjectItem(cat_json, "icon");
-        if (cJSON_IsString(icon)) strncpy(new_cat->icon_path, icon->valuestring, sizeof(new_cat->icon_path) - 1);
+        if (cJSON_IsString(icon)) {
+            char full_icon_path[sizeof(new_cat->icon_path)];
+
+            // Put whatever is in "icon" into "resources/icons/"
+            snprintf(full_icon_path, sizeof(full_icon_path), "resources/icons/%s", icon->valuestring);
+            strncpy(new_cat->icon_path, full_icon_path, sizeof(new_cat->icon_path) - 1);
+        }
 
         cJSON *criteria_obj = cJSON_GetObjectItem(cat_json, "criteria");
         if (criteria_obj && cJSON_IsObject(criteria_obj)) {
@@ -737,125 +743,6 @@ static void tracker_parse_categories(cJSON *category_json, cJSON *lang_json, Tra
         }
         (*categories_array)[i++] = new_cat;
         cat_json = cat_json->next;
-        // if (new_cat) {
-        //     if (cat_json->string) {
-        //         strncpy(new_cat->root_name, cat_json->string, sizeof(new_cat->root_name) - 1);
-        //     } else {
-        //         fprintf(stderr, "[TRACKER] PARSE ERROR: Found a JSON item with a NULL kay. Skipping.\n");
-        //         free(new_cat);
-        //         cat_json = cat_json->next;
-        //         continue; // Skip the rest of the loop for this invalid item
-        //     }
-        //     // Language key lookup for the parent category
-        //     char cat_lang_key[256];
-        //
-        //     // ONLY FOR ADVANCEMENTS TRANSFORM THE NAME TO CREATE THE KEY
-        //     if (!is_stat_category) {
-        //         char temp_root_name[192];
-        //         strncpy(temp_root_name, new_cat->root_name, sizeof(temp_root_name) - 1);
-        //
-        //         // REPLACING ALL ':' WITH '.' AND '/' WITH '.'
-        //         // Replace the first ':' with a '.' (for namespace in lang file)
-        //         char *path_part = strchr(temp_root_name, ':');
-        //         if (path_part) {
-        //             *path_part = '.';
-        //         }
-        //
-        //         // Construct the full base key (e.g., "advancement.minecraft.story/smelt_iron")
-        //         snprintf(cat_lang_key, sizeof(cat_lang_key), "%s%s", lang_key_prefix, temp_root_name);
-        //
-        //         // Replace all slashes '/' with dots '.'
-        //         for (char *p = cat_lang_key; *p; p++) {
-        //             if (*p == '/') *p = '.';
-        //         }
-        //     } else {
-        //         // FOR STATS: Use the root_name directly without any transformation
-        //         snprintf(cat_lang_key, sizeof(cat_lang_key), "%s%s", lang_key_prefix, new_cat->root_name);
-        //     }
-        //
-        //     cJSON *lang_entry = cJSON_GetObjectItem(lang_json, cat_lang_key);
-        //     if (cJSON_IsString(lang_entry)) {
-        //         strncpy(new_cat->display_name, lang_entry->valuestring, sizeof(new_cat->display_name) - 1);
-        //     } else {
-        //         // No language entry found so take the root_name
-        //         strncpy(new_cat->display_name, new_cat->root_name, sizeof(new_cat->display_name) - 1);
-        //     }
-        //
-        //     cJSON *icon = cJSON_GetObjectItem(cat_json, "icon");
-        //     if (cJSON_IsString(icon)) {
-        //         // Set the icon path
-        //         strncpy(new_cat->icon_path, icon->valuestring, sizeof(new_cat->icon_path) - 1);
-        //     }
-        //
-        //     // Parse criteria (sub-items)
-        //     cJSON *criteria_obj = cJSON_GetObjectItem(cat_json, "criteria");
-        //
-        //     // Handle BOTH SINGLE and MULTI criteria stats and advancements
-        //     if (criteria_obj && cJSON_IsObject(criteria_obj)) {
-        //         // Count the number of criteria
-        //         for (cJSON *c = criteria_obj->child; c != NULL; c = c->next) new_cat->criteria_count++;
-        //         if (new_cat->criteria_count > 0) {
-        //             // Allocate memory for the criteria
-        //             new_cat->criteria = calloc(new_cat->criteria_count, sizeof(TrackableItem *));
-        //             *total_criteria_count += new_cat->criteria_count;
-        //             int k = 0;
-        //             for (cJSON *crit_item = criteria_obj->child; crit_item != NULL; crit_item = crit_item->next) {
-        //                 TrackableItem *new_crit = calloc(1, sizeof(TrackableItem));
-        //                 if (new_crit) {
-        //                     strncpy(new_crit->root_name, crit_item->string, sizeof(new_crit->root_name) - 1);
-        //
-        //                     // Parse target for stats
-        //                     if (is_stat_category) {
-        //                         cJSON *target = cJSON_GetObjectItem(crit_item, "target");
-        //                         if (cJSON_IsNumber(target)) new_crit->goal = target->valueint;
-        //                     }
-        //
-        //                     // Language key lookup for the criterion
-        //                     char crit_lang_key[256];
-        //                     snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", cat_lang_key,
-        //                              new_crit->root_name);
-        //                     lang_entry = cJSON_GetObjectItem(lang_json, crit_lang_key);
-        //                     if (cJSON_IsString(lang_entry)) {
-        //                         strncpy(new_crit->display_name, lang_entry->valuestring,
-        //                                 sizeof(new_crit->display_name) - 1);
-        //                     } else {
-        //                         strncpy(new_crit->display_name, new_crit->root_name,
-        //                                 sizeof(new_crit->display_name) - 1);
-        //                     }
-        //
-        //                     new_cat->criteria[k++] = new_crit; // Add to the category
-        //                 }
-        //             }
-        //         }
-        //     } else {
-        //         // SINGLE-CRITERION SPECIAL CASE
-        //         new_cat->criteria_count = 1;
-        //         *total_criteria_count += 1;
-        //         new_cat->criteria = calloc(1, sizeof(TrackableItem *));
-        //         if (new_cat->criteria) {
-        //             TrackableItem *the_criterion = calloc(1, sizeof(TrackableItem));
-        //             if (the_criterion) {
-        //                 cJSON *crit_root_name_json = cJSON_GetObjectItem(cat_json, "root_name");
-        //                 if (cJSON_IsString(crit_root_name_json)) {
-        //                     strncpy(the_criterion->root_name, crit_root_name_json->valuestring,
-        //                             sizeof(the_criterion->root_name) - 1);
-        //                 }
-        //                 // Single criterion can just inherit the parent's display name
-        //                 strncpy(the_criterion->display_name, new_cat->display_name,
-        //                         sizeof(the_criterion->display_name) - 1);
-        //
-        //                 if (is_stat_category) {
-        //                     // Parse target for stats
-        //                     cJSON *target = cJSON_GetObjectItem(cat_json, "target");
-        //                     if (cJSON_IsNumber(target)) the_criterion->goal = target->valueint;
-        //                 }
-        //                 new_cat->criteria[0] = the_criterion;
-        //             }
-        //         }
-        //     }
-        //     (*categories_array)[i++] = new_cat;
-        // }
-        // cat_json = cat_json->next; // Move to the next category
     }
 }
 
@@ -1006,7 +893,11 @@ static void tracker_parse_simple_trackables(cJSON *category_json, cJSON *lang_js
             // Get other properties from the template
             cJSON *icon = cJSON_GetObjectItem(item_json, "icon");
             if (cJSON_IsString(icon)) {
-                strncpy(new_item->icon_path, icon->valuestring, sizeof(new_item->icon_path) - 1);
+
+                // Append "icon" to "resources/icons/"
+                char full_icon_path[sizeof(new_item->icon_path)];
+                snprintf(full_icon_path, sizeof(full_icon_path), "resources/icons/%s", icon->valuestring);
+                strncpy(new_item->icon_path, full_icon_path, sizeof(new_item->icon_path) - 1);
             }
 
             cJSON *target = cJSON_GetObjectItem(item_json, "target");
@@ -1068,7 +959,11 @@ static void tracker_parse_multi_stage_goals(cJSON *goals_json, cJSON *lang_json,
         if (cJSON_IsString(root_name))
             strncpy(new_goal->root_name, root_name->valuestring,
                     sizeof(new_goal->root_name) - 1);
-        if (cJSON_IsString(icon)) strncpy(new_goal->icon_path, icon->valuestring, sizeof(new_goal->icon_path) - 1);
+        if (cJSON_IsString(icon)) {
+            char full_icon_path[sizeof(new_goal->icon_path)];
+            snprintf(full_icon_path, sizeof(full_icon_path), "resources/icons/%s", icon->valuestring);
+            strncpy(new_goal->icon_path, full_icon_path, sizeof(new_goal->icon_path) - 1);
+        }
 
 
         // "multi_stage_goal.<root_name>.display_name"
