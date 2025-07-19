@@ -1,9 +1,9 @@
 {
   "path_mode":	"manual",
-  "manual_saves_path":	"C:\\Users\\Linus\\AppData\\Roaming\\PrismLauncher\\instances\\1.16.1\\minecraft\\saves",
-  "version":	"1.16.1",
-  "category":	"test",
-  "optional_flag":	"1",
+  "manual_saves_path":	"C:\\Users\\Linus\\AppData\\Roaming\\PrismLauncher\\instances\\1.21.6\\minecraft\\saves",
+  "version":	"1.21.7",
+  "category":	"miku%",
+  "optional_flag":	"",
   "general":	{
     "fps":	60,
     "always_on_top":	true,
@@ -12,30 +12,14 @@
     "goal_align_left":	true
   },
   "stat_progress_override":	{
-    "stat_cat:whatever": false,
-    "stat_cat:whatever.criteria.minecraft:custom/minecraft:open_chest": false,
-    "stat_cat:whatever.criteria.minecraft:used/minecraft:oak_door": false,
-    "stat_cat:whatever.criteria.minecraft:custom/minecraft:sneak_time": false,
-    "stat_cat:whatever2": false,
-    "stat_cat:whatever2.criteria.minecraft:custom/minecraft:open_chest": false,
-    "stat_cat:whatever2.criteria.minecraft:custom/minecraft:sneak_time": false,
-    "stat_cat:mine_more_sand": false,
-    "stat_cat:break_wooden_shovel": false
+    "stat_cat:trims_crafting": false,
+    "stat_cat:trims_crafting.criteria.minecraft:crafted/minecraft:snout_armor_trim_smithing_template": false,
+    "stat_cat:trims_crafting.criteria.minecraft:crafted/minecraft:netherite_upgrade_smithing_template": false,
+    "stat_cat:get_27_diamonds": false,
+    "stat_cat:mine_16_debris": false
   },
-  "custom_progress":	{
-    "custom:good_view":	false,
-    "custom:fun_counter": 0,
-    "custom:count_100": 0
-  },
-  "hotkeys":	[{
-    "target_goal":	"custom:fun_counter",
-    "increment_key":	"O",
-    "decrement_key":	"L"
-  }, {
-    "target_goal":	"custom:count_100",
-    "increment_key":	"Home",
-    "decrement_key":	"End"
-  }],
+  "custom_progress":	{},
+  "hotkeys":	[{}],
   "visuals":	{
     "tracker_window":	{
       "x":	-2236,
