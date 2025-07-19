@@ -299,7 +299,7 @@
         "minecraft:evoker": {
           "icon": "items/placeholder.png"
         },
-        "minecraft:vex":{
+        "minecraft:vex": {
           "icon": "items/placeholder.png"
         },
         "minecraft:ravager": {
@@ -774,8 +774,107 @@
       "criteria": {}
     }
   },
-  "stats": {},
+  "stats": {
+    "stat_cat:whatever": {
+      "icon": "items/placeholder.png",
+      "criteria": {
+        "minecraft:custom/minecraft:open_chest": {
+          "target": 1,
+          "icon": "items/placeholder.png"
+        },
+        "minecraft:used/minecraft:oak_door": {
+          "target": 1,
+          "icon": "items/placeholder.png"
+        },
+        "minecraft:custom/minecraft:sneak_time": {
+          "target": 200,
+          "icon": "items/placeholder.png"
+        }
+      }
+    },
+    "stat_cat:whatever2": {
+      "icon": "items/placeholder.png",
+      "criteria": {
+        "minecraft:custom/minecraft:open_chest": {
+          "target": 3,
+          "icon": "items/placeholder.png"
+        },
+        "minecraft:custom/minecraft:sneak_time": {
+          "target": 400,
+          "icon": "items/placeholder.png"
+        }
+      }
+    },
+    "stat_cat:mine_more_sand": {
+      "icon": "items/sand.png",
+      "root_name": "minecraft:mined/minecraft:sand",
+      "target": -1
+    },
+    "stat_cat:break_wooden_shovel": {
+      "icon": "items/wooden_shovel.png",
+      "root_name": "minecraft:broken/minecraft:wooden_shovel",
+      "target": 1
+    }
+  },
   "unlocks": [],
-  "custom": [],
-  "multi_stage_goal": []
+  "custom": [
+    {
+      "root_name": "custom:good_view",
+      "icon": "items/eye_of_ender.png"
+    },
+    {
+      "root_name": "custom:fun_counter",
+      "icon": "items/cake.png",
+      "target": -1
+    },
+    {
+      "root_name": "custom:count_100",
+      "icon": "items/compass.png",
+      "target": 100
+    }
+  ],
+  "multi_stage_goals": [
+    {
+      "root_name": "ms_goal:even_more_basics",
+      "icon": "items/placeholder.png",
+      "stages": [
+        {
+          "stage_id": "0",
+          "type": "stat",
+          "root_name": "minecraft:picked_up/minecraft:oak_log",
+          "target": 3
+        },
+        {
+          "stage_id": "one",
+          "type": "stat",
+          "root_name": "minecraft:custom/minecraft:jump",
+          "target": 17
+        },
+        {
+          "stage_id": "2",
+          "type": "criterion",
+          "parent_advancement": "minecraft:husbandry/balanced_diet",
+          "root_name": "beef"
+        },
+        {
+          "stage_id": "3",
+          "type": "stat",
+          "root_name": "minecraft:mined/minecraft:dirt",
+          "target": 64
+        },
+        {
+          "stage_id": "4",
+          "type": "advancement",
+          "root_name": "minecraft:husbandry/plant_seed",
+          "target": 1
+        },
+        {
+          "stage_id": "final",
+          "type": "final",
+          "root_name": "",
+          "target": 0
+        }
+      ]
+    }
+  ]
 }

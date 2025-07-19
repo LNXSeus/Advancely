@@ -11,7 +11,7 @@
 #include "data_structures.h" // For TemplateData, MC_Version and PathMode enums
 
 #define SETTINGS_FILE_PATH "resources/config/settings.json"
-#define MAX_HOTKEYS 16 // Limit for amount of hotkeys
+#define MAX_HOTKEYS 32 // Limit for amount of hotkeys
 #define HOTKEY_PRESS_DELAY 100 // Handled by the event loop in "global_event_handler.c" // TODO: Should be removable soon
 
 // DEFAULT values
