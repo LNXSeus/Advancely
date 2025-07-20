@@ -504,7 +504,7 @@ _DMON_PRIVATE DWORD WINAPI _dmon_thread(LPVOID arg)
     GetSystemTime(&starttm);
     uint64_t msecs_elapsed = 0;
 
-    while (InterlockedCompareExchange(&_dmon.quit, 0, 0) == 0) {
+    while (InterlockedCompareExchange((volatile LONG*)&_dmon.quit, 0, 0) == 0) {
         Sleep(DMON_SLEEP_INTERVAL);
         if (!TryEnterCriticalSection(&_dmon.mutex)) {
             continue;
@@ -527,7 +527,8 @@ _DMON_PRIVATE DWORD WINAPI _dmon_thread(LPVOID arg)
 
         DWORD wait_result = WaitForMultipleObjects(active, wait_handles, FALSE, 10);
         DMON_ASSERT(wait_result != WAIT_FAILED);
-        if (wait_result >= WAIT_OBJECT_0 && wait_result < WAIT_OBJECT_0 + active) {
+        // if (wait_result >= WAIT_OBJECT_0 && wait_result < WAIT_OBJECT_0 + active) {
+        if (wait_result < WAIT_OBJECT_0 + active) {
             dmon__watch_state* watch = watch_states[wait_result - WAIT_OBJECT_0];
             DMON_ASSERT(HasOverlappedIoCompleted(&watch->overlapped));
 
@@ -562,7 +563,7 @@ _DMON_PRIVATE DWORD WINAPI _dmon_thread(LPVOID arg)
                     offset += notify->NextEntryOffset;
                 } while (notify->NextEntryOffset > 0);
 
-                if (InterlockedCompareExchange(&_dmon.quit, 0, 0) == 0) {
+                if (InterlockedCompareExchange((volatile LONG*)&_dmon.quit, 0, 0) == 0) {
                     _dmon_refresh_watch(watch);
                 }
             }
@@ -605,7 +606,7 @@ DMON_API_IMPL void dmon_init(void)
 DMON_API_IMPL void dmon_deinit(void)
 {
     DMON_ASSERT(_dmon_init);
-    InterlockedExchange(&_dmon.quit, 1);
+    InterlockedExchange((volatile LONG*)&_dmon.quit, 1);
     if (_dmon.thread_handle != INVALID_HANDLE_VALUE) {
         WaitForSingleObject(_dmon.thread_handle, INFINITE);
         CloseHandle(_dmon.thread_handle);

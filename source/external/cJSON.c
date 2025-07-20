@@ -57,7 +57,7 @@
 #endif
 
 // #include "../../include/cJSON.h"
-#include "include/cJSON.h"
+#include "cJSON.h"
 
 /* define our own boolean type */
 #ifdef true
