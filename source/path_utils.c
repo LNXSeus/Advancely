@@ -242,6 +242,7 @@ void find_player_data_files(
 #else // LINUX/MAC
 void find_player_data_files(
     const char *saves_path,
+    MC_Version version,
     char *out_world_name,
     char *out_adv_path,
     char *out_stats_path,
