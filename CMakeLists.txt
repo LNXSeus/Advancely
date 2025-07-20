@@ -29,15 +29,17 @@ set(SOURCE_FILES
         # dmon.h is header-only and included in main.c, so it doesn't need to be listed here.
         # Windows-specific resource file
         "icon.rc"
+
+        # --- Add all the ImGui source files ---
+        "source/imgui/cimgui.cpp"
+        "source/imgui/imgui.cpp"
+        "source/imgui/imgui_draw.cpp"
+        "source/imgui/imgui_tables.cpp"
+        "source/imgui/imgui_widgets.cpp"
+        "source/imgui/imgui_demo.cpp" # Recommended for development
+        "source/imgui/imgui_impl_sdl3.cpp"
+        "source/imgui/imgui_impl_sdlrenderer3.cpp"
 )
-
-# Define the path to your local libraries folder
-set(LOCAL_LIBS_PATH "${CMAKE_SOURCE_DIR}/external_libs")
-set(LOCAL_INCLUDE_PATH "${LOCAL_LIBS_PATH}/include")
-set(LOCAL_LIB_PATH "${LOCAL_LIBS_PATH}/lib")
-set(LOCAL_BIN_PATH "${LOCAL_LIBS_PATH}/bin")
-
-
 
 # --- 2. CREATE THE EXECUTABLE ---
 
@@ -53,25 +55,8 @@ target_include_directories(Advancely PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/source"
         # Add the path to your vendored libraries like cJSON and dmon
         "${CMAKE_CURRENT_SOURCE_DIR}/source/external"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/imgui"
 )
-
-
-# The WIN32 keyword is critical for graphical apps on Windows to solve the "WinMain" error.
-#add_executable(${EXECUTABLE_NAME} WIN32 ${SOURCE_FILES}) # This creates Advancely.exe
-#
-## Tell the compiler where to find header files for your project and external libs
-#target_include_directories(Advancely PRIVATE
-#        "${CMAKE_CURRENT_SOURCE_DIR}/source"
-#        "${CMAKE_CURRENT_SOURCE_DIR}/external_libs"  # Points to where cJSON.h is
-#)
-#
-## Give executable an icon
-#set_property(TARGET ${EXECUTABLE_NAME} PROPERTY WIN32_EXECUTABLE true)
-#
-## Set the icon file path
-#set_property(TARGET ${EXECUTABLE_NAME} PROPERTY
-#        WIN32_EXECUTABLE_ICON_VALUE "${CMAKE_SOURCE_DIR}/resources/gui/Advancely_Icon.ico")
-
 
 
 
