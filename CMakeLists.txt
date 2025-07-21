@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 # Project name and language
-project(Advancely C)
+project(Advancely C CXX) # ImGui uses C++
 
 # Enable the RC (Resource Compiler) language for Windows executables, IMPORTANT FOR EXE ICON, WORKS IN RELEASE MODE
 enable_language(RC)
