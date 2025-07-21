@@ -95,6 +95,9 @@ endif()
 
 # --- 5. POST-BUILD COMMANDS ---
 if(WIN32)
+    # Get the directory where the MinGW compiler is located
+    get_filename_component(MINGW_BIN_DIR ${CMAKE_C_COMPILER} DIRECTORY)
+
     # This copies the .dll files to the build folder so the .exe can run.
     # This is only needed if SDL was built as a shared library.
     add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
@@ -107,6 +110,20 @@ if(WIN32)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "$<TARGET_FILE:SDL3_ttf::SDL3_ttf>"
             $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+            # --- Copy MinGW Runtime DLLs (Add these lines) ---
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libgcc_s_seh-1.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libstdc++-6.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libwinpthread-1.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+
+
             COMMENT "[CMAKE] Copying DLLs to build directory"
     )
 endif()
