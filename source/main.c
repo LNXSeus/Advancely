@@ -15,6 +15,11 @@
 #include "path_utils.h" // Include for find_player_data_files
 #include "settings_utils.h" // Include for AppSettings and version checking
 
+#include <cJSON.h>
+
+// ImGui includes
+#include <cimgui.h>
+
 // Gloabal flag to signal that an update is needed
 // Set to true initially to perform the first update
 
