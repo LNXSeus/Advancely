@@ -31,25 +31,37 @@
 // Forward declarations and basic types
 //-----------------------------------------------------------------------------
 
-struct ImGuiIO;
-struct ImGuiStyle;
-struct ImDrawData;
-struct ImVec2;
-struct ImVec4;
-struct ImGuiInputTextCallbackData;
-struct ImGuiSizeCallbackData;
-struct ImDrawList;
-struct ImGuiStorage;
-struct ImFont;
-struct ImFontConfig;
-struct ImFontAtlas;
-struct ImDrawCmd;
-struct ImGuiListClipper;
-struct ImGuiTextFilter;
-struct ImGuiPayload;
-struct ImGuiContext;
-struct ImFontGlyph;
-struct ImGuiViewport;
+
+
+typedef struct ImGuiIO ImGuiIO;
+typedef struct ImGuiStyle ImGuiStyle;
+typedef struct ImDrawData ImDrawData;
+typedef struct ImVec2 ImVec2;
+typedef struct ImVec4 ImVec4;
+typedef struct ImGuiInputTextCallbackData ImGuiInputTextCallbackData;
+typedef struct ImGuiSizeCallbackData ImGuiSizeCallbackData;
+typedef struct ImDrawList ImDrawList;
+typedef struct ImGuiStorage ImGuiStorage;
+typedef struct ImFont ImFont;
+typedef struct ImFontConfig ImFontConfig;
+typedef struct ImFontAtlas ImFontAtlas;
+typedef struct ImDrawCmd ImDrawCmd;
+typedef struct ImGuiListClipper ImGuiListClipper;
+typedef struct ImGuiTextFilter ImGuiTextFilter;
+typedef struct ImGuiTextBuffer ImGuiTextBuffer;
+typedef struct ImGuiPayload ImGuiPayload;
+typedef struct ImGuiContext ImGuiContext;
+typedef struct ImFontGlyph ImFontGlyph;
+typedef struct ImGuiViewport ImGuiViewport;
+
+
+// Define as int for regular C code, enums in C++
+#if !defined(__cplusplus)
+typedef int ImGuiDir;
+typedef int ImGuiKey;
+typedef int ImGuiComboFlags;
+#endif
+
 
 typedef unsigned short ImDrawIdx;
 typedef unsigned int ImU32;

@@ -14,7 +14,6 @@
 #include <stdio.h> // For exit, EXIT_FAILURE, EXIT_SUCCESS, Memory Management
 #include <stdlib.h>
 
-#include <cJSON.h>
 
 // Not including any utility headers here
 
@@ -23,7 +22,7 @@
 #define SDL_FLAGS SDL_INIT_VIDEO // TODO: OR'd together with SDL_INIT_AUDIO
 
 #define TRACKER_TITLE "Advancely"
-#define ADVANCELY_VERSION "v0.6.2" // vMAJOR.MINOR.PATCH // TODO: Update this always
+#define ADVANCELY_VERSION "v0.6.3" // vMAJOR.MINOR.PATCH // TODO: Update this always
 #define ADVANCELY_ICON_PATH "resources/gui/Advancely_Logo_NoText.png" // TODO: Use this in tracker_init_sdl()
 
 // Settings window is NOT USER CONFIGURABLE SO HARDCODED HERE, ONLY COLOR IS
