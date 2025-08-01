@@ -7,13 +7,19 @@
 #ifndef DATA_STRUCTURES_H
 #define DATA_STRUCTURES_H
 
-#include <stdbool.h>
 #include <SDL3/SDL.h>
 
+extern "C" {
 #include <cJSON.h>
+}
+
+// If MAX_PATH_LENGTH is not defined, define it here
+#ifndef MAX_PATH_LENGTH
+#define MAX_PATH_LENGTH 1024
+#endif
 
 // A generic struct for a sub-item, like and advancement's criterion or a stat
-typedef struct TrackableItem {
+struct TrackableItem {
     char root_name[192]; // The unique ID, e.g., "minecraft:husbandry/balanced_diet"
     char display_name[192]; // The user-facing name, e.g., "A Balanced Diet"
     char icon_path[256]; // Relative path to the icon, e.g., "items/apple.png"
@@ -29,12 +35,12 @@ typedef struct TrackableItem {
     // Flag to allow "conflicting" criteria to overlay parent advancements icon (e.g., hoglin), init with false, cause of calloc
     bool is_shared;
     bool is_manually_completed; // Allow manually overriding sub-stats (NOT FOR ACHIEVEMENTS/ADVANCEMENTS)
-} TrackableItem;
+};
 
 
 // A struct to hold a category of trackable items (e.g., all Advancements).
 // This can be used for Advancements that have sub-criteria.
-typedef struct TrackableCategory {
+struct TrackableCategory {
     char root_name[192];
     char display_name[192];
     char icon_path[256];
@@ -49,22 +55,23 @@ typedef struct TrackableCategory {
     int criteria_count;
     int completed_criteria_count; // Track completed criteria for that advancement
     TrackableItem **criteria; // An array of sub-items
-} TrackableCategory;
+};
 
 
 // --------- MULTI-STAGE LONG-TERM GOALS ---------
 
-typedef enum {
+enum SubGoalType{
     SUBGOAL_STAT,
     SUBGOAL_ADVANCEMENT,
     SUBGOAL_UNLOCK, // Allows to also complete a stage based on a specific unlock
-    SUBGOAL_CRITERION, // Allows to complete a stage based on a specific advancement/achievement criterion, e.g., visit plains biome
+    SUBGOAL_CRITERION,
+    // Allows to complete a stage based on a specific advancement/achievement criterion, e.g., visit plains biome
     // For goals with no automatic trigger, used for final stages (displays once all previous stages are done)
     SUBGOAL_MANUAL // When it's not "stat" or "advancement"
-} SubGoalType;
+};
 
 // Represents one step in a multi-stage goal
-typedef struct SubGoal {
+struct SubGoal {
     char stage_id[64]; // Unique ID for every stage e.g., "0", "1", "final_stage"
     char display_text[192]; // e.g., "Awaiting thunder"
     SubGoalType type; // What kind of trigger to check for
@@ -72,10 +79,10 @@ typedef struct SubGoal {
     char root_name[192]; // The target, e.g., "minecraft:trident" or "minecraft:adventure/very_very_frightening"
     int required_progress; // The value to reach, e.g., 1
     int current_stat_progress; // Current value of stat within multi-stage goal
-} SubGoal;
+};
 
 // Represents a complete multi-stage goal
-typedef struct MultiStageGoal {
+struct MultiStageGoal {
     char root_name[192]; // Unique ID for every multi-stage goal e.g., "ms_goal:getting_started"
     char display_name[192]; // The overall name, e.g., "Thunder advancements"
     char icon_path[256]; // The icon for the entire goal
@@ -84,10 +91,10 @@ typedef struct MultiStageGoal {
     int current_stage; // Index of the currently active sub-goal
     int stage_count; // How many stages there are
     SubGoal **stages; // An array of the sub-goals
-} MultiStageGoal;
+};
 
 // The main container for all data loaded from the template files.
-typedef struct TemplateData {
+struct TemplateData {
     int advancement_count;
     int advancements_completed_count;
     TrackableCategory **advancements;
@@ -123,23 +130,23 @@ typedef struct TemplateData {
     char snapshot_world_name[MAX_PATH_LENGTH]; // The world the current snapshot belongs to
 
     cJSON *lang_json; // The loaded language file for display names
-} TemplateData;
+};
 
 // PATHMODE AND VERSION STUFF
 
 /**
  * @brief Enum to determine how the saves path is obtained.
  */
-typedef enum {
-    PATH_MODE_AUTO,   // Automatically detect the path from standard locations.
-    PATH_MODE_MANUAL  // Use a user-provided path.
-} PathMode;
+enum PathMode {
+    PATH_MODE_AUTO, // Automatically detect the path from standard locations.
+    PATH_MODE_MANUAL // Use a user-provided path.
+};
 
 // TODO: Define versions here and in VersionMapEntry in settings_utils.c
-typedef enum {
+enum  MC_Version {
     // Puts vaLue starting at 0, allows for comparisons
     // Era 1: Legacy Stats (.dat file), counts playtime in Ticks ID: 1100
-    // TODO: (102 versions + unknown as of 2025-07-08)
+    // TODO: (103 versions + unknown as of 2025-08-01)
     MC_VERSION_1_0,
     MC_VERSION_1_1,
     MC_VERSION_1_2_1,
@@ -245,7 +252,8 @@ typedef enum {
     MC_VERSION_25W14CRAFTMINE, // 2025 APRIL FOOLS VERSION, Craftmine Update
     MC_VERSION_1_21_6,
     MC_VERSION_1_21_7,
+    MC_VERSION_1_21_8,
     MC_VERSION_UNKNOWN // For error handling
-} MC_Version;
+};
 
 #endif //DATA_STRUCTURES_H

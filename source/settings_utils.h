@@ -5,14 +5,15 @@
 #ifndef SETTINGS_UTILS_H
 #define SETTINGS_UTILS_H
 
-#include <cJSON.h>
-
 #include "path_utils.h" // For MAX_PATH_LENGTH
-#include "data_structures.h" // For TemplateData, MC_Version and PathMode enums
+#include "data_structures.h" // For MC_Version and PathMode enums
+
+extern "C" {
+#include <cJSON.h>
+}
 
 #define SETTINGS_FILE_PATH "resources/config/settings.json"
 #define MAX_HOTKEYS 32 // Limit for amount of hotkeys
-#define HOTKEY_PRESS_DELAY 100 // Handled by the event loop in "global_event_handler.c" // TODO: Should be removable soon
 
 // DEFAULT values
 #define DEFAULT_FPS 60
@@ -22,14 +23,12 @@
 #define DEFAULT_GOAL_ALIGN_LEFT true
 
 // Default window positions/sizes. -1 means centered or default size.
-#define DEFAULT_WINDOW_POS -1
-#define DEFAULT_WINDOW_SIZE -1
+#define DEFAULT_WINDOW_POS (-1)
+#define DEFAULT_WINDOW_SIZE (-1)
 
-// Default colors when it's just {} in settings.json, so no r, g, b, a values
-#define DEFAULT_TRACKER_BG_COLOR (ColorRGBA){13, 17, 23, 255}
-#define DEFAULT_OVERLAY_BG_COLOR (ColorRGBA){0, 80, 255, 255}
-#define DEFAULT_SETTINGS_BG_COLOR (ColorRGBA){13, 17, 23, 255}
-#define DEFAULT_TEXT_COLOR (ColorRGBA){255, 255, 255, 255}
+
+
+struct TemplateData;
 
 typedef struct {
     char target_goal[192];
@@ -46,11 +45,17 @@ typedef struct {
     Uint8 r, g, b, a;
 } ColorRGBA;
 
+// Default colors when it's just {} in settings.json, so no r, g, b, a values
+extern const ColorRGBA DEFAULT_TRACKER_BG_COLOR;
+extern const ColorRGBA DEFAULT_OVERLAY_BG_COLOR;
+extern const ColorRGBA DEFAULT_SETTINGS_BG_COLOR;
+extern const ColorRGBA DEFAULT_TEXT_COLOR;
+
 // A Struct to hold all application settings in one place
 
 // A struct to hold all application settings in one place
 // TODO: Remember window position in settings.json
-typedef struct {
+struct AppSettings {
     // names should match json keys
     char version_str[64]; // Store version as string
     PathMode path_mode;
@@ -83,7 +88,7 @@ typedef struct {
     ColorRGBA overlay_bg_color;
     ColorRGBA settings_bg_color;
     ColorRGBA text_color;
-} AppSettings;
+};
 
 
 /**

@@ -6,7 +6,9 @@
 #define SETTINGS_H
 
 #include "main.h"
-#include "settings_utils.h" // For AppSettings
+
+// Avoid including the full header
+struct AppSettings;
 
 struct Settings { // TODO: Also needs to be defined in init_sdl.h
     SDL_Window *window;
@@ -27,7 +29,7 @@ struct Settings { // TODO: Also needs to be defined in init_sdl.h
  * @param parent A pointer to the main tracker window, used for positioning.
  * @return true if initialization was successful, false otherwise.
  */
-bool settings_new(struct Settings **settings, const AppSettings *app_settings, SDL_Window *parent);
+bool settings_new(Settings **settings, const AppSettings *app_settings, SDL_Window *parent);
 
 /**
  * @brief Handles SDL events specifically for the settings window.
@@ -39,7 +41,7 @@ bool settings_new(struct Settings **settings, const AppSettings *app_settings, S
  * @param is_running A pointer to the main application loop's running flag.
  * @param settings_opened A pointer to the flag that controls the settings window's visibility.
  */
-void settings_events(struct Settings *s, SDL_Event *event, bool *is_running, bool *settings_opened);
+void settings_events(Settings *s, SDL_Event *event, bool *is_running, bool *settings_opened);
 
 /**
  * @brief Updates the state of the settings window.
@@ -50,7 +52,7 @@ void settings_events(struct Settings *s, SDL_Event *event, bool *is_running, boo
  * @param s A pointer to the Settings struct.
  * @param deltaTime A pointer to the frame's delta time.
  */
-void settings_update(struct Settings *s, float *deltaTime);
+void settings_update(Settings *s, float *deltaTime);
 
 /**
  * @brief Renders the settings window's contents.
@@ -61,7 +63,7 @@ void settings_update(struct Settings *s, float *deltaTime);
  * @param s A pointer to the Settings struct.
  * @param settings A pointer to the application settings containing color information.
  */
-void settings_render(struct Settings *s, const AppSettings *settings);
+void settings_render(Settings *s, const AppSettings *settings);
 
 /**
  * @brief Frees all resources associated with the Settings instance.
@@ -71,6 +73,6 @@ void settings_render(struct Settings *s, const AppSettings *settings);
  *
  * @param settings A pointer to the Settings struct pointer to be freed.
  */
-void settings_free(struct Settings **settings);
+void settings_free(Settings **settings);
 
 #endif //SETTINGS_H

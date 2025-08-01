@@ -3,28 +3,28 @@
 //
 
 #include "file_utils.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 // function to read a JSON file
 cJSON* cJSON_from_file(const char* filename) {
-    char *buffer = NULL;
+    char *buffer = nullptr;
     long length;
 
     // Open the file in binary mode
     FILE *f = fopen(filename, "rb");
-    cJSON *json = NULL;
+    cJSON *json = nullptr;
 
     if (f) {
         // Get the file size
         fseek(f, 0, SEEK_END);
         length = ftell(f);
         fseek(f, 0, SEEK_SET);
-        buffer = malloc(length + 1);
+        buffer = (char*)malloc(length + 1);
         if (buffer) {
             fread(buffer, 1, length, f);
-            buffer[length] = '\0'; // Null-terminate the buffer
+            buffer[length] = '\0'; // nullptr-terminate the buffer
 
             // TODO: DEBUGGING - CHECKING FOR ANY CONTENT BEING READ
             // printf("\n--- FILE CONTENT FOR: %s ---\n", filename);
@@ -34,7 +34,7 @@ cJSON* cJSON_from_file(const char* filename) {
         fclose(f);
     } else {
         fprintf(stderr, "[FILE_UTILS] Could not open file: %s\n", filename);
-        return NULL;
+        return nullptr;
     }
 
     if (buffer) {
@@ -60,11 +60,11 @@ cJSON* cJSON_from_file(const char* filename) {
 
         // Allocate memory for the escaped buffer
         long escaped_len = original_len + backslash_count;
-        char *escaped_buffer = malloc(escaped_len + 1);
+        char *escaped_buffer = (char*)malloc(escaped_len + 1);
         if (!escaped_buffer) {
             fprintf(stderr, "[FILE_UTILS] Failed to allocate memory for escaped buffer.\n");
             free(buffer);
-            return NULL;
+            return nullptr;
         }
 
         // Process the buffer
@@ -94,9 +94,9 @@ cJSON* cJSON_from_file(const char* filename) {
         // Parse the processed buffer
         json = cJSON_Parse(escaped_buffer);
 
-        if (json == NULL) {
+        if (json == nullptr) {
             const char *error_ptr = cJSON_GetErrorPtr();
-            if (error_ptr != NULL) {
+            if (error_ptr != nullptr) {
                 fprintf(stderr, "[FILE UTILS] cJSON parse error: [%s] in file: %s\n", error_ptr, filename);
             }
         }

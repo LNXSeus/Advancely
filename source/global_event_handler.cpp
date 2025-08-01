@@ -3,8 +3,12 @@
 //
 
 #include "global_event_handler.h"
+#include "tracker.h"
+#include "overlay.h"
+#include "settings.h"
+#include "settings_utils.h" // For AppSettings
 
-void handle_global_events(struct Tracker *t, struct Overlay *o, struct Settings *s, AppSettings *app_settings,
+void handle_global_events(Tracker *t, Overlay *o, Settings *s, AppSettings *app_settings,
                           bool *is_running, bool *settings_opened, float *deltaTime) {
     // create one event out of tracker->event and overlay->event
     SDL_Event event;
@@ -15,8 +19,8 @@ void handle_global_events(struct Tracker *t, struct Overlay *o, struct Settings 
             *is_running = false;
             break;
         }
-        // Important saveguard to check for s to be not NULL, then settings were opened and can be closed
-        if (s != NULL && event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.key.windowID ==
+        // Important saveguard to check for s to be not nullptr, then settings were opened and can be closed
+        if (s != nullptr && event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.key.windowID ==
             SDL_GetWindowID(s->window)) {
             *settings_opened = false;
             continue; // Skip next event
@@ -30,7 +34,7 @@ void handle_global_events(struct Tracker *t, struct Overlay *o, struct Settings 
             if (t && t->template_data && t->template_data->custom_goals) {
                 for (int i = 0; i < app_settings->hotkey_count; i++) {
                     HotkeyBinding *hb = &app_settings->hotkeys[i];
-                    TrackableItem *target_goal = NULL;
+                    TrackableItem *target_goal = nullptr;
 
                     // Find the goal this hotkey is bound to
                     for (int j = 0; j < t->template_data->custom_goal_count; j++) {
@@ -66,7 +70,7 @@ void handle_global_events(struct Tracker *t, struct Overlay *o, struct Settings 
                 tracker_events(t, &event, is_running, settings_opened);
             } else if (event.key.windowID == SDL_GetWindowID(o->window)) {
                 overlay_events(o, &event, is_running, deltaTime, app_settings);
-            } else if (s != NULL && event.key.windowID == SDL_GetWindowID(s->window)) {
+            } else if (s != nullptr && event.key.windowID == SDL_GetWindowID(s->window)) {
                 settings_events(s, &event, is_running, settings_opened);
             }
         }
@@ -87,13 +91,13 @@ void handle_global_events(struct Tracker *t, struct Overlay *o, struct Settings 
                     settings_changed = true;
                 }
                 overlay_events(o, &event, is_running, deltaTime, app_settings);
-            } else if (s != NULL && event.window.windowID == SDL_GetWindowID(s->window)) {
+            } else if (s != nullptr && event.window.windowID == SDL_GetWindowID(s->window)) {
                 settings_events(s, &event, is_running, settings_opened);
             }
 
             if (settings_changed) {
-                // Save settings, passing NULL for TemplateData as we only changed window geometry
-                settings_save(app_settings, NULL);
+                // Save settings, passing nullptr for TemplateData as we only changed window geometry
+                settings_save(app_settings, nullptr);
             }
         }
     }

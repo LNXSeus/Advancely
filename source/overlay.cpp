@@ -4,18 +4,22 @@
 
 #include "overlay.h"
 #include "init_sdl.h"
+#include "settings_utils.h"
 
-bool overlay_new(struct Overlay **overlay, const AppSettings *settings) {
+#include <cstdio>
+#include <cstdlib>
+
+bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     // dereference once and use calloc
-    *overlay = calloc(1, sizeof(struct Overlay));
+    *overlay = (Overlay *)calloc(1, sizeof(Overlay));
     // Check here if calloc failed
-    if (*overlay == NULL) {
+    if (*overlay == nullptr) {
         fprintf(stderr, "[OVERLAY] Error allocating memory for overlay.\n");
         return false;
     }
 
     // temp variable to not dereference over and over again
-    struct Overlay *o = *overlay;
+    Overlay *o = *overlay;
 
     if (!overlay_init_sdl(o, settings)) {
         overlay_free(overlay);
@@ -25,7 +29,7 @@ bool overlay_new(struct Overlay **overlay, const AppSettings *settings) {
 }
 
 
-void overlay_events(struct Overlay *o, SDL_Event *event, bool *is_running, float *deltaTime,
+void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *deltaTime,
                     const AppSettings *settings) {
     (void) o;
     (void) settings;
@@ -63,7 +67,7 @@ void overlay_events(struct Overlay *o, SDL_Event *event, bool *is_running, float
     }
 }
 
-void overlay_update(struct Overlay *o, float *deltaTime, const AppSettings *settings) {
+void overlay_update(Overlay *o, float *deltaTime, const AppSettings *settings) {
     // Game logic here
     // Animate the scroll offset
     float scroll_speed = settings->overlay_scroll_speed;
@@ -78,7 +82,7 @@ void overlay_update(struct Overlay *o, float *deltaTime, const AppSettings *sett
 }
 
 
-void overlay_render(struct Overlay *o, const AppSettings *settings) {
+void overlay_render(Overlay *o, const AppSettings *settings) {
     SDL_SetRenderDrawColor(o->renderer, settings->overlay_bg_color.r, settings->overlay_bg_color.g,
                            settings->overlay_bg_color.b, settings->overlay_bg_color.a);
     // Clear the screen
@@ -98,30 +102,30 @@ void overlay_render(struct Overlay *o, const AppSettings *settings) {
     SDL_RenderPresent(o->renderer);
 }
 
-void overlay_free(struct Overlay **overlay) {
+void overlay_free(Overlay **overlay) {
     if (overlay && *overlay) {
-        struct Overlay *o = *overlay;
+        Overlay *o = *overlay;
 
         if (o->renderer) {
             SDL_DestroyRenderer(o->renderer);
 
             // We still have an address
-            o->renderer = NULL;
+            o->renderer = nullptr;
         }
 
         if (o->window) {
             SDL_DestroyWindow(o->window);
 
             // We still have an address
-            o->window = NULL;
+            o->window = nullptr;
         }
 
         // SDL_Quit(); // This is ONCE for all windows in the main loop
 
         // tracker is heap allocated so free it
         free(o);
-        o = NULL;
-        *overlay = NULL;
+        o = nullptr;
+        *overlay = nullptr;
 
         printf("[OVERLAY] Overlay freed!\n");
     }

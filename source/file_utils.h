@@ -5,7 +5,9 @@
 #ifndef FILE_UTILS_H_H
 #define FILE_UTILS_H_H
 
+extern "C" {
 #include <cJSON.h>
+}
 
 /**
  * @brief Reads a file from the given path and parses it into a cJSON object.

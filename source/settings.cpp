@@ -3,19 +3,23 @@
 //
 
 #include "settings.h"
+#include "settings_utils.h"
 #include "init_sdl.h"
 
-bool settings_new(struct Settings **settings, const AppSettings *app_settings, SDL_Window *parent) {
+#include <cstdio>
+#include <cstdlib>
+
+bool settings_new(Settings **settings, const AppSettings *app_settings, SDL_Window *parent) {
     // dereference once and use calloc
-    *settings = calloc(1, sizeof(struct Settings));
+    *settings = (Settings *)calloc(1, sizeof(Settings));
     // Check here if calloc failed
-    if (*settings == NULL) {
+    if (*settings == nullptr) {
         fprintf(stderr, "[SETTINGS] Error allocating memory for settings.\n");
         return false;
     }
 
     // temp variable to dereference over and over again
-    struct Settings *s = *settings;
+    Settings *s = *settings;
     s->parent_window = parent; // Store the parent window
 
     if (!settings_init_sdl(s, app_settings)) {
@@ -26,7 +30,7 @@ bool settings_new(struct Settings **settings, const AppSettings *app_settings, S
 }
 
 
-void settings_events(struct Settings *s, SDL_Event *event, bool *is_running, bool *settings_opened) {
+void settings_events(Settings *s, SDL_Event *event, bool *is_running, bool *settings_opened) {
     (void) s;
     (void) is_running;
 
@@ -59,14 +63,14 @@ void settings_events(struct Settings *s, SDL_Event *event, bool *is_running, boo
     }
 }
 
-void settings_update(struct Settings *s, float *deltaTime) {
+void settings_update(Settings *s, float *deltaTime) {
     // Game logic here
     (void) s;
     (void) deltaTime;
 }
 
 
-void settings_render(struct Settings *s, const AppSettings *app_settings) {
+void settings_render(Settings *s, const AppSettings *app_settings) {
     SDL_SetRenderDrawColor(s->renderer, app_settings->settings_bg_color.r, app_settings->settings_bg_color.g,
                            app_settings->settings_bg_color.b, app_settings->settings_bg_color.a);
     // Clear the screen
@@ -78,28 +82,28 @@ void settings_render(struct Settings *s, const AppSettings *app_settings) {
     SDL_RenderPresent(s->renderer);
 }
 
-void settings_free(struct Settings **settings) {
+void settings_free(Settings **settings) {
     if (settings && *settings) {
-        struct Settings *s = *settings;
+        Settings *s = *settings;
 
         if (s->renderer) {
             SDL_DestroyRenderer(s->renderer);
 
             // We still have an address
-            s->renderer = NULL;
+            s->renderer = nullptr;
         }
 
         if (s->window) {
             SDL_DestroyWindow(s->window);
 
             // We still have an address
-            s->window = NULL;
+            s->window = nullptr;
         }
 
         // settings is heap allocated so free it
         free(s);
-        s = NULL;
-        *settings = NULL;
+        s = nullptr;
+        *settings = nullptr;
 
         printf("[SETTINGS] Settings freed!\n");
     }

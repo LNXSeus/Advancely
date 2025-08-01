@@ -3,9 +3,9 @@
 //
 
 #include "path_utils.h" // includes main.h
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 
 // Platform-specific includes
@@ -29,7 +29,7 @@
  */
 void normalize_path(char *path) {
     // static because it's only used in this file
-    if (path == NULL) return; // In get_saves_path this function is only called on success (keeping it for safety)
+    if (path == nullptr) return; // In get_saves_path this function is only called on success (keeping it for safety)
     for (char *p = path; *p; p++) {
         // Convert backslash to forward slash
         if (*p == '\\') {
@@ -48,8 +48,8 @@ void normalize_path(char *path) {
  */
 static bool get_auto_saves_path(char *out_path, size_t max_len) {
 #ifdef _WIN32
-    PWSTR appdata_path_wide = NULL;
-    if (SUCCEEDED(SHGetKnownFolderPath(&FOLDERID_RoamingAppData, 0, NULL, &appdata_path_wide))) {
+    PWSTR appdata_path_wide = nullptr;
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &appdata_path_wide))) {
         char appdata_path[MAX_PATH];
         wcstombs(appdata_path, appdata_path_wide, MAX_PATH);
         CoTaskMemFree(appdata_path_wide);
@@ -85,7 +85,7 @@ bool get_saves_path(char *out_path, size_t max_len, PathMode mode, const char *m
     } else if (mode == PATH_MODE_MANUAL) {
         if (manual_path && strlen(manual_path) > 0) {
             strncpy(out_path, manual_path, max_len - 1);
-            out_path[max_len - 1] = '\0'; // Ensure null-termination
+            out_path[max_len - 1] = '\0'; // Ensure nullptr-termination
             success = true;
         } else {
             fprintf(stderr, "[PATH UTILS] Manual path is empty or invalid.\n");
@@ -182,7 +182,7 @@ void find_player_data_files(
 
         // Copy the found world name to the output buffer
         strncpy(out_world_name, latest_world_name, max_len - 1);
-        out_world_name[max_len - 1] = '\0'; // Ensure null-termination
+        out_world_name[max_len - 1] = '\0'; // Ensure nullptr-termination
         printf("[PATH UTILS] Found latest world: %s\n", out_world_name);
 
         char temp_path[MAX_PATH_LENGTH];
@@ -264,7 +264,7 @@ void find_player_data_files(
     }
     struct dirent *entry;
     time_t latest_time = 0;
-    while ((entry = readdir(saves_dir)) != NULL) {
+    while ((entry = readdir(saves_dir)) != nullptr) {
         if (entry->d_type == DT_DIR && strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
             char world_path[MAX_PATH_LENGTH];
             snprintf(world_path, sizeof(world_path), "%s/%s", saves_path, entry->d_name);
@@ -295,7 +295,7 @@ void find_player_data_files(
         snprintf(stats_path_dir, sizeof(stats_path_dir), "%s/stats", mc_root_path);
         DIR *stats_dir = opendir(stats_path_dir);
         if (stats_dir) {
-            while ((entry = readdir(stats_dir)) != NULL) {
+            while ((entry = readdir(stats_dir)) != nullptr) {
                 if (strstr(entry->d_name, ".dat")) {
                     snprintf(out_stats_path, max_len, "%s/%s", stats_path_dir, entry->d_name);
                     break;
@@ -315,7 +315,7 @@ void find_player_data_files(
         snprintf(folder_path, sizeof(folder_path), "%s/%s/stats", saves_path, latest_world_name);
         DIR *dir = opendir(folder_path);
         if (dir) {
-            while ((entry = readdir(dir)) != NULL) {
+            while ((entry = readdir(dir)) != nullptr) {
                 if (strstr(entry->d_name, ".json")) {
                     snprintf(out_stats_path, max_len, "%s/%s", folder_path, entry->d_name);
                     break;
@@ -329,7 +329,7 @@ void find_player_data_files(
             snprintf(folder_path, sizeof(folder_path), "%s/%s/advancements", saves_path, latest_world_name);
             dir = opendir(folder_path);
             if (dir) {
-                while ((entry = readdir(dir)) != NULL) {
+                while ((entry = readdir(dir)) != nullptr) {
                     if (strstr(entry->d_name, ".json")) {
                         snprintf(out_adv_path, max_len, "%s/%s", folder_path, entry->d_name);
                         break;
@@ -341,7 +341,7 @@ void find_player_data_files(
                 snprintf(folder_path, sizeof(folder_path), "%s/%s/unlocks", saves_path, latest_world_name);
                 dir = opendir(folder_path);
                 if (dir) {
-                    while ((entry = readdir(dir)) != NULL) {
+                    while ((entry = readdir(dir)) != nullptr) {
                         if (strstr(entry->d_name, ".json")) {
                             snprintf(out_unlocks_path, max_len, "%s/%s", folder_path, entry->d_name);
                             break;

@@ -5,13 +5,10 @@
 #ifndef PATH_UTILS_H
 #define PATH_UTILS_H
 
-#include <stdbool.h>
-#include <stddef.h>
+#include <cstddef>
 
-#include "main.h"
-#include "data_structures.h" // For MC_Version enum and PathMode
-
-#define MAX_PATH_LENGTH 1024 // Also defined in main.h
+#include "main.h" // For MAX_PATH_LENGTH
+#include "data_structures.h" // For MC_Version enum and PathMode enum
 
 /**
  * @brief Enum to determine how the saves path is obtained.
