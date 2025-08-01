@@ -5,12 +5,16 @@
 #ifndef GLOBAL_EVENT_HANDLER_H
 #define GLOBAL_EVENT_HANDLER_H
 
-#include "tracker.h"
-#include "settings.h"
-#include "overlay.h"
-#include "settings_utils.h" // For AppSettings
 #include <SDL3/SDL_atomic.h>
 
+// Forward declarations
+struct Tracker;
+struct Overlay;
+struct Settings;
+struct AppSettings;
+
+
+// This global variable is defined in main.cpp and made accessible here
 extern SDL_AtomicInt g_needs_update; // Global flag to signal that an update is needed initially in main.c
 
 /**
@@ -29,7 +33,7 @@ extern SDL_AtomicInt g_needs_update; // Global flag to signal that an update is 
  * @param deltaTime A pointer to the frame's delta time, passed to the overlay event handler.
  */
 
-void handle_global_events(struct Tracker *t, struct Overlay *o, struct Settings *s, AppSettings *app_settings, bool *is_running,
+void handle_global_events(Tracker *t, Overlay *o, Settings *s, AppSettings *app_settings, bool *is_running,
                           bool *settings_opened, float *deltaTime);
 
 #endif //GLOBAL_EVENT_HANDLER_H

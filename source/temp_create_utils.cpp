@@ -3,9 +3,9 @@
 //
 
 #include "temp_create_utils.h"
-#include <stdio.h>
-#include <stdlib.h> // For free()
-#include <string.h>
+#include <cstdio>
+#include <cstdlib> // For free()
+#include <cstring>
 #include <sys/stat.h> // For stat and mkdir
 
 #ifdef _WIN32
@@ -26,7 +26,8 @@ void fs_ensure_directory_exists(const char *path) {
             *p = '\0'; // Temporarily terminate the string
 
             // Check if directory exists, if not, create it
-            struct stat st = {0};
+            struct stat st;
+            memset(&st, 0, sizeof(st));
             if (stat(path_copy, &st) == -1) {
                 MKDIR(path_copy);
             }

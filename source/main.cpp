@@ -2,8 +2,11 @@
 // Created by Linus on 24.06.2025.
 //
 
+extern "C" {
 #define DMON_IMPL // Required for dmon
 #include "dmon.h"
+#include <cJSON.h>
+}
 
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_atomic.h>
@@ -15,21 +18,13 @@
 #include "path_utils.h" // Include for find_player_data_files
 #include "settings_utils.h" // Include for AppSettings and version checking
 
-#include <cJSON.h>
-
-// ImGui includes
-#include <cimgui.h>
-
-// Gloabal flag to signal that an update is needed
-// Set to true initially to perform the first update
-
 // global flag TODO: Should be set to true when custom goal is checked off (manual update) -> SDL_SetAtomicInt(&g_needs_update, 1);
 // We make g_needs_update available to global_event_handler.h with external linkage
 SDL_AtomicInt g_needs_update;
 static SDL_AtomicInt g_settings_changed; // Watching when settings.json is modified to re-init paths
 
 // Global mutex to protect the watcher and paths (see they don't break when called in close succession)
-static SDL_Mutex *g_watcher_mutex = NULL;
+static SDL_Mutex *g_watcher_mutex = nullptr;
 
 
 /**
@@ -95,13 +90,13 @@ int main(int argc, char *argv[]) {
     AppSettings app_settings;
     if (settings_load(&app_settings)) {
         printf("[MAIN] Settings file was incomplete or missing, saving with default values.\n");
-        settings_save(&app_settings, NULL); // Save complete settings back to the file
+        settings_save(&app_settings, nullptr); // Save complete settings back to the file
     }
 
 
-    struct Tracker *tracker = NULL; // pass address to function
-    struct Overlay *overlay = NULL;
-    struct Settings *settings = NULL;
+    Tracker *tracker = nullptr; // pass address to function
+    Overlay *overlay = nullptr;
+    Settings *settings = nullptr;
 
     // Variable to hold the ID of our saves watcher
     dmon_watch_id saves_watcher_id;
@@ -120,13 +115,14 @@ int main(int argc, char *argv[]) {
 
         // HARDCODED SETTINGS DIRECTORY
         printf("[DMON - MAIN] Watching config directory: resources/config/\n");
-        dmon_watch("resources/config/", settings_watch_callback, 0, NULL);
+        dmon_watch("resources/config/", settings_watch_callback, 0, nullptr);
 
         // Watch saves directory and store the watcher ID
         if (strlen(tracker->saves_path) > 0) {
             printf("[DMON - MAIN] Watching saves directory: %s\n", tracker->saves_path);
             // Watch saves directory and monitor child diretories
-            saves_watcher_id = dmon_watch(tracker->saves_path, global_watch_callback, DMON_WATCHFLAGS_RECURSIVE, NULL);
+            saves_watcher_id = dmon_watch(tracker->saves_path, global_watch_callback, DMON_WATCHFLAGS_RECURSIVE,
+                                          nullptr);
         } else {
             fprintf(stderr, "[DMON - MAIN] Failed to watch saves directory as it's empty: %s\n", tracker->saves_path);
         }
@@ -181,8 +177,10 @@ int main(int argc, char *argv[]) {
                     strcmp(old_category, app_settings.category) != 0 ||
                     strcmp(old_optional_flag, app_settings.optional_flag) != 0 ||
                     old_path_mode != app_settings.path_mode ||
-                    (app_settings.path_mode == PATH_MODE_MANUAL && strcmp(old_manual_path, app_settings.manual_saves_path) != 0)) {
-                    printf("[MAIN] Critical settings (saves path, version, category) changed. Re-initializing template and file watcher.\n");
+                    (app_settings.path_mode == PATH_MODE_MANUAL && strcmp(
+                         old_manual_path, app_settings.manual_saves_path) != 0)) {
+                    printf(
+                        "[MAIN] Critical settings (saves path, version, category) changed. Re-initializing template and file watcher.\n");
 
                     // Stop watching the old directory when critical changes were made to settings.json
                     dmon_unwatch(saves_watcher_id);
@@ -193,8 +191,9 @@ int main(int argc, char *argv[]) {
                     // Start watching the new directory when critical changes were made to settings.json
                     if (strlen(tracker->saves_path) > 0) {
                         printf("[MAIN] Now watching new saves directory: %s\n", tracker->saves_path);
-                        saves_watcher_id = dmon_watch(tracker->saves_path, global_watch_callback, DMON_WATCHFLAGS_RECURSIVE,
-                                                      NULL);
+                        saves_watcher_id = dmon_watch(tracker->saves_path, global_watch_callback,
+                                                      DMON_WATCHFLAGS_RECURSIVE,
+                                                      nullptr);
                     }
                 } else {
                     printf("[MAIN] Non-critical settings changed. Applying changes without full reload.\n");
@@ -240,18 +239,18 @@ int main(int argc, char *argv[]) {
             SDL_UnlockMutex(g_watcher_mutex);
 
             // Initialize settings when not opened
-            if (settings_opened && settings == NULL) {
+            if (settings_opened && settings == nullptr) {
                 // Disable always-on-top before opening settings
                 SDL_SetWindowAlwaysOnTop(tracker->window, false);
                 if (!settings_new(&settings, &app_settings, tracker->window)) settings_opened = false;
-            } else if (!settings_opened && settings != NULL) {
+            } else if (!settings_opened && settings != nullptr) {
                 // Restore always-on-top statues based on settings when closing settings
                 SDL_SetWindowAlwaysOnTop(tracker->window, app_settings.tracker_always_on_top);
                 settings_free(&settings);
             }
 
             // Freeze other windows when settings are opened
-            if (settings_opened && settings != NULL) {
+            if (settings_opened && settings != nullptr) {
                 settings_update(settings, &deltaTime);
                 settings_render(settings, &app_settings);
             } else {

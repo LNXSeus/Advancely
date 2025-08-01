@@ -4,8 +4,14 @@
 
 #include "settings_utils.h"
 #include "file_utils.h" // has the cJSON_from_file function
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
+
+// Define the actual constant values for the colors here in the .cpp file.
+const ColorRGBA DEFAULT_TRACKER_BG_COLOR = {13, 17, 23, 255};
+const ColorRGBA DEFAULT_OVERLAY_BG_COLOR = {0, 80, 255, 255};
+const ColorRGBA DEFAULT_SETTINGS_BG_COLOR = {13, 17, 23, 255};
+const ColorRGBA DEFAULT_TEXT_COLOR = {255, 255, 255, 255};
 
 // Helper Prototypes for Loading/Saving
 static cJSON *get_or_create_object(cJSON *parent, const char *key) {
@@ -154,8 +160,8 @@ typedef struct {
 } VersionMapEntry;
 
 // Create static lookup table with all supported versions
-// TODO: Versions need to be added in MCVersion enum and here
-// TODO: (102 versions + unknown as of 2025-07-08)
+// TODO: Versions need to be added in MCVersion enum and here -> data_structures.h
+// TODO: (103 versions + unknown as of 2025-08-01)
 static const VersionMapEntry version_map[] = {
     // Era 1: Legacy Stats (.dat file), counts playtime in Ticks ID: 1100
     {"1.0", MC_VERSION_1_0},
@@ -263,7 +269,8 @@ static const VersionMapEntry version_map[] = {
     {"25w14craftmine", MC_VERSION_25W14CRAFTMINE}, // 2025 APRIL FOOLS VERSION, Craftmine Update
     {"1.21.6", MC_VERSION_1_21_6},
     {"1.21.7", MC_VERSION_1_21_7},
-    {NULL, MC_VERSION_UNKNOWN} //Sentinel to mark end of the array
+    {"1.21.8", MC_VERSION_1_21_8},
+    {nullptr, MC_VERSION_UNKNOWN} //Sentinel to mark end of the array
 };
 
 /**
@@ -278,10 +285,10 @@ static SDL_Scancode scancode_from_string(const char *key_name) {
 }
 
 MC_Version settings_get_version_from_string(const char *version_str) {
-    if (version_str == NULL) return MC_VERSION_UNKNOWN;
+    if (version_str == nullptr) return MC_VERSION_UNKNOWN;
 
     // Loop through the map to find a matching string
-    for (int i = 0; version_map[i].str != NULL; i++) {
+    for (int i = 0; version_map[i].str != nullptr; i++) {
         if (strcmp(version_str, version_map[i].str) == 0) {
             return version_map[i].value; // Return the corresponding enum value
         }
@@ -299,27 +306,6 @@ PathMode settings_get_path_mode_from_string(const char *mode_str) {
 }
 
 // ------------------- SETTINGS UTILS -------------------
-
-// TODO: Remove this once possible
-// cJSON *settings_read_full() {
-//     return cJSON_from_file(SETTINGS_FILE_PATH);
-// }
-//
-// void settings_write_full(cJSON *json_to_write) {
-//     if (!json_to_write) return;
-//
-//     FILE *file = fopen(SETTINGS_FILE_PATH, "w");
-//     if (file) {
-//         char *json_str = cJSON_Print(json_to_write);
-//         if (json_str) {
-//             fputs(json_str, file);
-//             free(json_str);
-//         }
-//         fclose(file);
-//     } else {
-//         fprintf(stderr, "[SETTINGS UTILS] Failed to open settings file for writing: %s\n", SETTINGS_FILE_PATH);
-//     }
-// }
 
 bool settings_load(AppSettings *settings) {
     bool defaults_were_used = false;
@@ -354,7 +340,7 @@ bool settings_load(AppSettings *settings) {
 
     // Try to load and parse the settings file
     cJSON *json = cJSON_from_file(SETTINGS_FILE_PATH); // returns json object with corrected slashes from windows paste
-    if (json == NULL) {
+    if (json == nullptr) {
         fprintf(stderr, "[SETTINGS UTILS] Failed to load settings file: %s. Using default settings.\n",
                 SETTINGS_FILE_PATH);
         defaults_were_used = true; // The whole file is missing, so it needs to be created.

@@ -6,7 +6,8 @@
 #define OVERLAY_H
 
 #include "main.h"
-#include "settings_utils.h" // For AppSettings
+
+struct AppSettings;
 
 
 struct Overlay {
@@ -26,7 +27,7 @@ struct Overlay {
  * @param settings A pointer to the loaded application settings.
  * @return true if initialization was successful, false otherwise.
  */
-bool overlay_new(struct Overlay **overlay, const AppSettings *settings);
+bool overlay_new(Overlay **overlay, const AppSettings *settings);
 
 /**
  * @brief Handles SDL events specifically for the overlay window.
@@ -40,7 +41,7 @@ bool overlay_new(struct Overlay **overlay, const AppSettings *settings);
  * @param deltaTime A pointer to the frame's delta time, which can be modified by events.
  * @param settings A pointer to the loaded application settings.
  */
-void overlay_events(struct Overlay *o, SDL_Event *event, bool *is_running, float *deltaTime, const AppSettings *settings); // pass pointer so we can modify deltaTime
+void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *deltaTime, const AppSettings *settings); // pass pointer so we can modify deltaTime
 
 /**
  * @brief Updates the state of the overlay.
@@ -53,7 +54,7 @@ void overlay_events(struct Overlay *o, SDL_Event *event, bool *is_running, float
  * @param deltaTime A pointer to the frame's delta time.
  * @param settings A pointer to the loaded application settings.
  */
-void overlay_update(struct Overlay *o, float *deltaTime, const AppSettings *settings);
+void overlay_update(Overlay *o, float *deltaTime, const AppSettings *settings);
 
 /**
  * @brief Renders the overlay window's contents.
@@ -64,7 +65,7 @@ void overlay_update(struct Overlay *o, float *deltaTime, const AppSettings *sett
  * @param o A pointer to the Overlay struct.
  * @param settings A pointer to the application settings containing color information.
  */
-void overlay_render(struct Overlay *o, const AppSettings *settings);
+void overlay_render(Overlay *o, const AppSettings *settings);
 
 /**
  * @brief Frees all resources associated with the Overlay instance.
@@ -74,6 +75,6 @@ void overlay_render(struct Overlay *o, const AppSettings *settings);
  *
  * @param overlay A pointer to the Overlay struct pointer to be freed.
  */
-void overlay_free(struct Overlay **overlay);
+void overlay_free(Overlay **overlay);
 
 #endif //OVERLAY_H

@@ -5,14 +5,10 @@
 #ifndef INIT_H
 #define INIT_H
 
-#include "tracker.h" // includes main.h
-#include "settings.h"
-#include "overlay.h"
-#include "settings_utils.h" // For AppSettings
-
 struct Tracker;
 struct Overlay;
 struct Settings;
+struct AppSettings;
 
 /**
  * @brief Initializes SDL3 for the tracker window.
@@ -23,7 +19,7 @@ struct Settings;
  * @param settings A pointer to the loaded application settings.
  * @return true if initialization was successful, false otherwise.
  */
-bool tracker_init_sdl(struct Tracker *t, const AppSettings *settings);
+bool tracker_init_sdl(Tracker *t, const AppSettings *settings);
 
 /**
  * @brief Initializes SDL3 for the overlay window.
@@ -34,7 +30,7 @@ bool tracker_init_sdl(struct Tracker *t, const AppSettings *settings);
  * @param settings A pointer to the loaded application settings.
  * @return true if initialization was successful, false otherwise.
  */
-bool overlay_init_sdl(struct Overlay *o, const AppSettings *settings);
+bool overlay_init_sdl(Overlay *o, const AppSettings *settings);
 
 /**
  * @brief Initializes SDL3 for the settings window.
@@ -45,7 +41,7 @@ bool overlay_init_sdl(struct Overlay *o, const AppSettings *settings);
  * @param settings A pointer to the loaded application settings.
  * @return true if initialization was successful, false otherwise.
  */
-bool settings_init_sdl(struct Settings *s, const AppSettings *settings);
+bool settings_init_sdl(Settings *s, const AppSettings *settings);
 
 
 #endif //INIT_H

@@ -43,7 +43,7 @@ struct Tracker {
  * @param settings A pointer to the loaded application settings.
  * @return true if initialization was successful, false otherwise.
  */
-bool tracker_new(struct Tracker **tracker, const AppSettings *settings);
+bool tracker_new(Tracker **tracker, const AppSettings *settings);
 
 /**
  * @brief Handles SDL events specifically for the tracker window.
@@ -56,7 +56,7 @@ bool tracker_new(struct Tracker **tracker, const AppSettings *settings);
  * @param is_running A pointer to the main application loop's running flag.
  * @param settings_opened A pointer to the flag indicating if the settings window is open.
  */
-void tracker_events(struct Tracker *t, SDL_Event *event, bool *is_running, bool *settings_opened);
+void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settings_opened);
 
 /**
  * @brief Updates the state of the tracker.
@@ -68,7 +68,7 @@ void tracker_events(struct Tracker *t, SDL_Event *event, bool *is_running, bool 
  * @param t A pointer to the Tracker struct.
  * @param deltaTime A pointer to the frame's delta time, for future use in animations.
  */
-void tracker_update(struct Tracker *t, float *deltaTime);
+void tracker_update(Tracker *t, float *deltaTime);
 
 /**
  * @brief Renders the tracker window's contents.
@@ -79,7 +79,7 @@ void tracker_update(struct Tracker *t, float *deltaTime);
  * @param t A pointer to the Tracker struct.
  * @param settings A pointer to the application settings containing color information.
  */
-void tracker_render(struct Tracker *t, const AppSettings *settings);
+void tracker_render(Tracker *t, const AppSettings *settings);
 
 
 /**
@@ -91,7 +91,7 @@ void tracker_render(struct Tracker *t, const AppSettings *settings);
  * @param t A pointer to the Tracker struct.
  * @param settings A pointer to the application settings to use for re-initialization.
  */
-void tracker_reinit_template(struct Tracker *t, const AppSettings *settings);
+void tracker_reinit_template(Tracker *t, const AppSettings *settings);
 
 /**
  * @brief Reloads settings and re-initializes all relevant paths in the tracker struct.
@@ -102,7 +102,7 @@ void tracker_reinit_template(struct Tracker *t, const AppSettings *settings);
  * @param t A pointer to the Tracker struct.
  * @param settings A pointer to the application settings to use for path finding.
  */
-void tracker_reinit_paths(struct Tracker *t, const AppSettings *settings);
+void tracker_reinit_paths(Tracker *t, const AppSettings *settings);
 
 /**
  * @brief Loads and parses all data from template and language files.
@@ -113,7 +113,7 @@ void tracker_reinit_paths(struct Tracker *t, const AppSettings *settings);
  *
  * @param t A pointer to the Tracker struct containing the necessary paths.
  */
-void tracker_load_and_parse_data(struct Tracker *t);
+void tracker_load_and_parse_data(Tracker *t);
 
 /**
  * @brief Frees all resources associated with the Tracker instance.
@@ -124,7 +124,7 @@ void tracker_load_and_parse_data(struct Tracker *t);
  *
  * @param tracker A pointer to the Tracker struct pointer to be freed.
  */
-void tracker_free(struct Tracker **tracker);
+void tracker_free(Tracker **tracker);
 
 /**
  * @brief Updates the tracker window's title with dynamic information.
@@ -135,7 +135,7 @@ void tracker_free(struct Tracker **tracker);
  * @param t A pointer to the Tracker struct containing the live data.
  * @param settings A pointer to the application settings.
  */
-void tracker_update_title(struct Tracker *t, const AppSettings *settings);
+void tracker_update_title(Tracker *t, const AppSettings *settings);
 
 /**
  * @brief Prints the current advancement status to the console.
@@ -145,6 +145,6 @@ void tracker_update_title(struct Tracker *t, const AppSettings *settings);
  *
  * @param t A pointer to the Tracker struct.
  */
-void tracker_print_debug_status(struct Tracker *t);
+void tracker_print_debug_status(Tracker *t);
 
 #endif //TRACKER_H

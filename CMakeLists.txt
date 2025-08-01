@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 # Project name and language
-project(Advancely C CXX) # ImGui uses C++
+project(Advancely C CXX) # c for cJSON, C++ for the rest
 
 # Enable the RC (Resource Compiler) language for Windows executables
 if(WIN32)
@@ -12,28 +12,30 @@ endif()
 # Set C standard
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED True)
+set(CMAKE_CXX_STANDARD 26) # Use the latest C++ standard
+set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # --- 1. DEFINE PATHS & SOURCE FILES ---
 set(EXECUTABLE_NAME "Advancely")
 set(SOURCE_FILES
-        "source/main.c"
-        "source/init_sdl.c"
-        "source/tracker.c"
-        "source/overlay.c"
-        "source/global_event_handler.c"
-        "source/settings.c"
-        "source/path_utils.c"
-        "source/settings_utils.c"
-        "source/file_utils.c"
-        "source/temp_create_utils.c"
-        # External libraries included as source
+        "source/main.cpp"
+        "source/init_sdl.cpp"
+        "source/tracker.cpp"
+        "source/overlay.cpp"
+        "source/global_event_handler.cpp"
+        "source/settings.cpp"
+        "source/path_utils.cpp"
+        "source/settings_utils.cpp"
+        "source/file_utils.cpp"
+        "source/temp_create_utils.cpp"
+
+        # External libraries included as source and stay in C
         "source/external/cJSON.c"
-        # dmon.h is header-only and included in main.c, so it doesn't need to be listed here.
+        # dmon.h is header-only and included in main.cpp, so it doesn't need to be listed here.
         # Windows-specific resource file
         "icon.rc"
 
         # --- Add all the ImGui source files ---
-        "source/imgui/cimgui.cpp"
         "source/imgui/imgui.cpp"
         "source/imgui/imgui_draw.cpp"
         "source/imgui/imgui_tables.cpp"

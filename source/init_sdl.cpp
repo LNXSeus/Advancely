@@ -2,10 +2,16 @@
 // Created by Linus on 24.06.2025.
 //
 
-#include "init_sdl.h" //  includes tracker.h and then main.h through that
-#include <stdio.h> // For printf
+#include "init_sdl.h" //  C++ compatible header
 
-bool tracker_init_sdl(struct Tracker *t, const AppSettings *settings) {
+#include "tracker.h"
+#include "overlay.h"
+#include "settings.h"
+#include "settings_utils.h"
+
+#include <cstdio> // Standard I/O
+
+bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
     if (!SDL_Init(SDL_FLAGS)) {
         fprintf(stderr, "[INIT SDL] Failed to initialize SDL3: %s\n", SDL_GetError());
         return false;
@@ -45,7 +51,7 @@ bool tracker_init_sdl(struct Tracker *t, const AppSettings *settings) {
     // More reliable than SDL_WINDOW_ALWAYS_ON_TOP flag
     SDL_SetWindowAlwaysOnTop(t->window, settings->tracker_always_on_top); // TODO: settings->tracker_always_on_top
 
-    t->renderer = SDL_CreateRenderer(t->window, NULL);
+    t->renderer = SDL_CreateRenderer(t->window, nullptr);
 
     if (!t->renderer) {
         fprintf(stderr, "[INIT SDL] Failed to create tracker renderer: %s\n", SDL_GetError());
@@ -58,7 +64,7 @@ bool tracker_init_sdl(struct Tracker *t, const AppSettings *settings) {
 }
 
 
-bool overlay_init_sdl(struct Overlay *o, const AppSettings *settings) {
+bool overlay_init_sdl(Overlay *o, const AppSettings *settings) {
     Uint32 window_flags = SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
 
     int x = (settings->overlay_window.x == DEFAULT_WINDOW_POS) ? (int)SDL_WINDOWPOS_CENTERED : settings->overlay_window.x;
@@ -84,7 +90,7 @@ bool overlay_init_sdl(struct Overlay *o, const AppSettings *settings) {
 
     SDL_SetWindowPosition(o->window, x, y);
 
-    o->renderer = SDL_CreateRenderer(o->window, NULL);
+    o->renderer = SDL_CreateRenderer(o->window, nullptr);
 
     if (!o->renderer) {
         fprintf(stderr, "[INIT SDL] Failed to create overlay renderer: %s\n", SDL_GetError());
@@ -95,7 +101,7 @@ bool overlay_init_sdl(struct Overlay *o, const AppSettings *settings) {
     return true;
 }
 
-bool settings_init_sdl(struct Settings *s, const AppSettings *settings) {
+bool settings_init_sdl(Settings *s, const AppSettings *settings) {
     (void)settings;
     // Settings window opens relative to the tracker window
     int tracker_x, tracker_y;
@@ -129,7 +135,7 @@ bool settings_init_sdl(struct Settings *s, const AppSettings *settings) {
 
     SDL_SetWindowPosition(s->window, x, y);
 
-    s->renderer = SDL_CreateRenderer(s->window, NULL);
+    s->renderer = SDL_CreateRenderer(s->window, nullptr);
 
     if (!s->renderer) {
         fprintf(stderr, "[INIT SDL] Failed to create settings renderer: %s\n", SDL_GetError());

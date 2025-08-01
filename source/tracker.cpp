@@ -2,9 +2,10 @@
 // Created by Linus on 24.06.2025.
 //
 
-#include <stdio.h>
-#include <cJSON.h>
-#include <ctype.h>
+#include <cstdio>
+#include <cctype>
+#include <cstdlib>
+#include <cstring>
 
 #include "tracker.h"
 #include "init_sdl.h"
@@ -12,6 +13,10 @@
 #include "settings_utils.h"
 #include "file_utils.h" // has the cJSON_from_file function
 #include "temp_create_utils.h"
+
+extern "C" {
+#include <cJSON.h>
+}
 
 // FOR VERSION-SPECIFIC PARSERS
 
@@ -22,7 +27,7 @@
  *
  * @param t A pointer to the Tracker struct.
  */
-static void tracker_save_snapshot_to_file(struct Tracker *t) {
+static void tracker_save_snapshot_to_file(Tracker *t) {
     cJSON *root = cJSON_CreateObject();
     if (!root) return;
 
@@ -72,7 +77,7 @@ static void tracker_save_snapshot_to_file(struct Tracker *t) {
  *
  * @param t A pointer to the Tracker struct.
  */
-static void tracker_load_snapshot_from_file(struct Tracker *t) {
+static void tracker_load_snapshot_from_file(Tracker *t) {
     cJSON *snapshot_json = cJSON_from_file(t->snapshot_path);
     if (!snapshot_json) {
         printf("[TRACKER] No existing snapshot file found for this configuration.\n");
@@ -120,7 +125,7 @@ static void tracker_load_snapshot_from_file(struct Tracker *t) {
  * @brief (Era 1: 1.0-1.6.4) Takes a snapshot of the current global stats including achievements.
  * This is called when a new world is loaded to establish a baseline for progress.
  */
-static void tracker_snapshot_legacy_stats(struct Tracker *t) {
+static void tracker_snapshot_legacy_stats(Tracker *t) {
     cJSON *player_stats_json = cJSON_from_file(t->stats_path);
     if (!player_stats_json) {
         fprintf(stderr, "[TRACKER] Could not read stats file to create snapshot.\n");
@@ -245,7 +250,7 @@ static void tracker_snapshot_legacy_stats(struct Tracker *t) {
 /**
  * @brief (Era 1: 1.0-1.6.4) Parses legacy .dat stats files.
  */
-static void tracker_update_stats_legacy(struct Tracker *t, const cJSON *player_stats_json) {
+static void tracker_update_stats_legacy(Tracker *t, const cJSON *player_stats_json) {
     if (!player_stats_json) return;
 
     cJSON *stats_change = cJSON_GetObjectItem(player_stats_json, "stats-change");
@@ -275,7 +280,7 @@ static void tracker_update_stats_legacy(struct Tracker *t, const cJSON *player_s
     }
 
     cJSON *settings_json = cJSON_from_file(SETTINGS_FILE_PATH);
-    cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : NULL;
+    cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : nullptr;
 
     t->template_data->play_time_ticks = 0;
     t->template_data->stats_completed_count = 0;
@@ -286,7 +291,7 @@ static void tracker_update_stats_legacy(struct Tracker *t, const cJSON *player_s
         stat_cat->completed_criteria_count = 0;
 
         // Check for parent override
-        cJSON *parent_override = override_obj ? cJSON_GetObjectItem(override_obj, stat_cat->root_name) : NULL;
+        cJSON *parent_override = override_obj ? cJSON_GetObjectItem(override_obj, stat_cat->root_name) : nullptr;
         stat_cat->is_manually_completed = cJSON_IsBool(parent_override);
         bool parent_forced_true = stat_cat->is_manually_completed && cJSON_IsTrue(parent_override);
 
@@ -320,7 +325,7 @@ static void tracker_update_stats_legacy(struct Tracker *t, const cJSON *player_s
                 // Multi-criterion
                 char sub_stat_key[512];
                 snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name, sub_stat->root_name);
-                sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : NULL;
+                sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : nullptr;
                 sub_stat->is_manually_completed = cJSON_IsBool(sub_override);
             }
 
@@ -362,7 +367,7 @@ static void tracker_update_stats_legacy(struct Tracker *t, const cJSON *player_s
 /**
  * @brief (Era 2: 1.7.2-1.11.2) Parses unified JSON with achievements and stats.
  */
-static void tracker_update_achievements_and_stats_mid(struct Tracker *t, const cJSON *player_stats_json) {
+static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *player_stats_json) {
     if (!player_stats_json) return;
 
     t->template_data->advancements_completed_count = 0;
@@ -405,7 +410,7 @@ static void tracker_update_achievements_and_stats_mid(struct Tracker *t, const c
 
     // Stats logic with sub-stats
     cJSON *settings_json = cJSON_from_file(SETTINGS_FILE_PATH);
-    cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : NULL;
+    cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : nullptr;
 
     t->template_data->stats_completed_count = 0;
     t->template_data->stats_completed_criteria_count = 0;
@@ -415,7 +420,7 @@ static void tracker_update_achievements_and_stats_mid(struct Tracker *t, const c
         TrackableCategory *stat_cat = t->template_data->stats[i];
         stat_cat->completed_criteria_count = 0;
 
-        cJSON *parent_override = override_obj ? cJSON_GetObjectItem(override_obj, stat_cat->root_name) : NULL;
+        cJSON *parent_override = override_obj ? cJSON_GetObjectItem(override_obj, stat_cat->root_name) : nullptr;
         stat_cat->is_manually_completed = cJSON_IsBool(parent_override);
         bool parent_forced_true = stat_cat->is_manually_completed && cJSON_IsTrue(parent_override);
 
@@ -439,7 +444,7 @@ static void tracker_update_achievements_and_stats_mid(struct Tracker *t, const c
             } else {
                 char sub_stat_key[512];
                 snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name, sub_stat->root_name);
-                sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : NULL;
+                sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : nullptr;
                 sub_stat->is_manually_completed = cJSON_IsBool(sub_override);
             }
 
@@ -473,7 +478,7 @@ static void tracker_update_achievements_and_stats_mid(struct Tracker *t, const c
 /**
  * @brief (Era 3: 1.12+) Updates advancement progress from modern JSON files.
  */
-static void tracker_update_advancements_modern(struct Tracker *t, const cJSON *player_adv_json) {
+static void tracker_update_advancements_modern(Tracker *t, const cJSON *player_adv_json) {
     if (!player_adv_json) return;
 
     t->template_data->advancements_completed_count = 0;
@@ -519,7 +524,7 @@ static void tracker_update_advancements_modern(struct Tracker *t, const cJSON *p
 /**
  * @brief (Era 3: 1.12+) Updates stat progress from modern JSON files.
  */
-static void tracker_update_stats_modern(struct Tracker *t, const cJSON *player_stats_json, const cJSON *settings_json,
+static void tracker_update_stats_modern(Tracker *t, const cJSON *player_stats_json, const cJSON *settings_json,
                                         MC_Version version) {
     if (!player_stats_json) return;
 
@@ -538,7 +543,7 @@ static void tracker_update_stats_modern(struct Tracker *t, const cJSON *player_s
     }
 
     // Manually override the stat progress
-    cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : NULL;
+    cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : nullptr;
 
     t->template_data->stats_completed_count = 0;
     t->template_data->stats_completed_criteria_count = 0;
@@ -548,7 +553,7 @@ static void tracker_update_stats_modern(struct Tracker *t, const cJSON *player_s
         stat_cat->completed_criteria_count = 0;
 
         // Override check
-        cJSON *parent_override = override_obj ? cJSON_GetObjectItem(override_obj, stat_cat->root_name) : NULL;
+        cJSON *parent_override = override_obj ? cJSON_GetObjectItem(override_obj, stat_cat->root_name) : nullptr;
         stat_cat->is_manually_completed = cJSON_IsBool(parent_override);
         bool parent_forced_true = stat_cat->is_manually_completed && cJSON_IsTrue(parent_override);
 
@@ -590,7 +595,7 @@ static void tracker_update_stats_modern(struct Tracker *t, const cJSON *player_s
                 char sub_stat_key[512];
                 snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name,
                          sub_stat->root_name);
-                sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : NULL;
+                sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : nullptr;
                 sub_stat->is_manually_completed = cJSON_IsBool(sub_override);
             }
             bool sub_forced_true = sub_stat->is_manually_completed && cJSON_IsTrue(sub_override);
@@ -627,15 +632,15 @@ static void tracker_parse_categories(cJSON *category_json, cJSON *lang_json, Tra
                                      int *count, int *total_criteria_count, const char *lang_key_prefix,
                                      bool is_stat_category) {
     if (!category_json) {
-        printf("[TRACKER] tracker_parse_categories: category_json is NULL\n");
+        printf("[TRACKER] tracker_parse_categories: category_json is nullptr\n");
         return;
     }
 
     *count = 0;
-    for (cJSON *i = category_json->child; i != NULL; i = i->next) (*count)++;
+    for (cJSON *i = category_json->child; i != nullptr; i = i->next) (*count)++;
     if (*count == 0) return;
 
-    *categories_array = calloc(*count, sizeof(TrackableCategory *));
+    *categories_array = (TrackableCategory **)calloc(*count, sizeof(TrackableCategory *));
     if (!*categories_array) return;
 
     cJSON *cat_json = category_json->child;
@@ -643,7 +648,7 @@ static void tracker_parse_categories(cJSON *category_json, cJSON *lang_json, Tra
     *total_criteria_count = 0;
 
     while (cat_json) {
-        TrackableCategory *new_cat = calloc(1, sizeof(TrackableCategory));
+        TrackableCategory *new_cat = (TrackableCategory *)calloc(1, sizeof(TrackableCategory));
         if (!new_cat) {
             cat_json = cat_json->next;
             continue;
@@ -652,7 +657,7 @@ static void tracker_parse_categories(cJSON *category_json, cJSON *lang_json, Tra
         if (cat_json->string) {
             strncpy(new_cat->root_name, cat_json->string, sizeof(new_cat->root_name) - 1);
         } else {
-            fprintf(stderr, "[TRACKER] PARSE ERROR: Found a JSON item with a NULL key. Skipping.\n");
+            fprintf(stderr, "[TRACKER] PARSE ERROR: Found a JSON item with a nullptr key. Skipping.\n");
             free(new_cat);
             cat_json = cat_json->next;
             continue;
@@ -691,13 +696,13 @@ static void tracker_parse_categories(cJSON *category_json, cJSON *lang_json, Tra
         cJSON *criteria_obj = cJSON_GetObjectItem(cat_json, "criteria");
         if (criteria_obj && cJSON_IsObject(criteria_obj)) {
             // MULTI-CRITERION CASE
-            for (cJSON *c = criteria_obj->child; c != NULL; c = c->next) new_cat->criteria_count++;
+            for (cJSON *c = criteria_obj->child; c != nullptr; c = c->next) new_cat->criteria_count++;
             if (new_cat->criteria_count > 0) {
-                new_cat->criteria = calloc(new_cat->criteria_count, sizeof(TrackableItem *));
+                new_cat->criteria = (TrackableItem **)calloc(new_cat->criteria_count, sizeof(TrackableItem *));
                 *total_criteria_count += new_cat->criteria_count;
                 int k = 0;
-                for (cJSON *crit_item = criteria_obj->child; crit_item != NULL; crit_item = crit_item->next) {
-                    TrackableItem *new_crit = calloc(1, sizeof(TrackableItem));
+                for (cJSON *crit_item = criteria_obj->child; crit_item != nullptr; crit_item = crit_item->next) {
+                    TrackableItem *new_crit = (TrackableItem *)calloc(1, sizeof(TrackableItem));
                     if (new_crit) {
                         strncpy(new_crit->root_name, crit_item->string, sizeof(new_crit->root_name) - 1);
                         if (is_stat_category) {
@@ -722,9 +727,9 @@ static void tracker_parse_categories(cJSON *category_json, cJSON *lang_json, Tra
             // SINGLE-CRITERION SPECIAL CASE
             new_cat->criteria_count = 1;
             *total_criteria_count += 1;
-            new_cat->criteria = calloc(1, sizeof(TrackableItem *));
+            new_cat->criteria = (TrackableItem **)calloc(1, sizeof(TrackableItem *));
             if (new_cat->criteria) {
-                TrackableItem *the_criterion = calloc(1, sizeof(TrackableItem));
+                TrackableItem *the_criterion = (TrackableItem *)calloc(1, sizeof(TrackableItem));
                 if (the_criterion) {
                     cJSON *crit_root_name_json = cJSON_GetObjectItem(cat_json, "root_name");
                     if (cJSON_IsString(crit_root_name_json)) {
@@ -746,7 +751,7 @@ static void tracker_parse_categories(cJSON *category_json, cJSON *lang_json, Tra
     }
 }
 
-// Helper struct for counting
+// Helper for counting
 typedef struct {
     char root_name[192];
     int count;
@@ -809,16 +814,13 @@ static void flag_shared_sub_items(CriterionCounter *counts, int unique_count, Tr
  * logic to visually distinguish them, for example, by overlaying the parent
  * advancement's or stat's icon.
  *
- * @param cats1 An array of TrackableCategory pointers representing advancements or stats.
- * @param count1 The number of advancements or stats in the cats1 array.
- * @param cats2 An array of TrackableCategory pointers representing advancements or stats.
- * @param count2 The number of advancements or stats in the cats2 array.
+ * @param t The Tracker struct.
  */
-static void tracker_detect_shared_sub_items(struct Tracker *t) {
+static void tracker_detect_shared_sub_items(Tracker *t) {
     int total_criteria = t->template_data->total_criteria_count + t->template_data->stat_total_criteria_count;
     if (total_criteria == 0) return;
 
-    CriterionCounter *counts = calloc(total_criteria, sizeof(CriterionCounter));
+    CriterionCounter *counts = (CriterionCounter *)calloc(total_criteria, sizeof(CriterionCounter));
     if (!counts) return;
 
     int unique_count = 0;
@@ -831,7 +833,7 @@ static void tracker_detect_shared_sub_items(struct Tracker *t) {
     flag_shared_sub_items(counts, unique_count, t->template_data->stats, t->template_data->stat_count);
 
     free(counts);
-    counts = NULL;
+    counts = nullptr;
     printf("[TRACKER] Shared sub-item detection complete.\n");
 }
 
@@ -851,7 +853,7 @@ static void tracker_detect_shared_sub_items(struct Tracker *t) {
 static void tracker_parse_simple_trackables(cJSON *category_json, cJSON *lang_json, TrackableItem ***items_array,
                                             int *count, const char *lang_key_prefix) {
     if (!category_json) {
-        printf("[TRACKER] tracker_parse_simple_trackables: category_json is NULL\n");
+        printf("[TRACKER] tracker_parse_simple_trackables: category_json is nullptr\n");
         return;
     }
     *count = cJSON_GetArraySize(category_json);
@@ -860,13 +862,13 @@ static void tracker_parse_simple_trackables(cJSON *category_json, cJSON *lang_js
         return;
     }
 
-    *items_array = calloc(*count, sizeof(TrackableItem *));
+    *items_array = (TrackableItem **)calloc(*count, sizeof(TrackableItem *));
     if (!*items_array) return;
 
-    cJSON *item_json = NULL;
+    cJSON *item_json = nullptr;
     int i = 0;
     cJSON_ArrayForEach(item_json, category_json) {
-        TrackableItem *new_item = calloc(1, sizeof(TrackableItem));
+        TrackableItem *new_item = (TrackableItem *)calloc(1, sizeof(TrackableItem));
         if (new_item) {
             cJSON *root_name_json = cJSON_GetObjectItem(item_json, "root_name");
             if (cJSON_IsString(root_name_json)) {
@@ -877,7 +879,7 @@ static void tracker_parse_simple_trackables(cJSON *category_json, cJSON *lang_js
                 continue;
             }
 
-            // Construct the full language key with the prefix (for "stat." or "unlock.")
+            // Conthe full language key with the prefix (for "stat." or "unlock.")
             char lang_key[256];
             snprintf(lang_key, sizeof(lang_key), "%s%s", lang_key_prefix, new_item->root_name);
 
@@ -925,31 +927,31 @@ static void tracker_parse_multi_stage_goals(cJSON *goals_json, cJSON *lang_json,
                                             int *count) {
     (void) lang_json;
     if (!goals_json) {
-        printf("[TRACKER] tracker_parse_multi_stage_goals: goals_json is NULL\n");
+        printf("[TRACKER] tracker_parse_multi_stage_goals: goals_json is nullptr\n");
         *count = 0;
-        // goals_array = NULL;
+        // goals_array = nullptr;
         return;
     }
 
     *count = cJSON_GetArraySize(goals_json);
     if (*count == 0) {
         printf("[TRACKER] tracker_parse_multi_stage_goals: No goals found\n");
-        // goals_array = NULL;
+        // goals_array = nullptr;
         return;
     }
 
-    *goals_array = calloc(*count, sizeof(MultiStageGoal *));
+    *goals_array = (MultiStageGoal **)calloc(*count, sizeof(MultiStageGoal *));
     if (!*goals_array) {
         fprintf(stderr, "[TRACKER] Failed to allocate memory for MultiStageGoal array.\n");
         *count = 0;
         return;
     }
 
-    cJSON *goal_item_json = NULL;
+    cJSON *goal_item_json = nullptr;
     int i = 0;
     cJSON_ArrayForEach(goal_item_json, goals_json) {
         // Iterate through each goal
-        MultiStageGoal *new_goal = calloc(1, sizeof(MultiStageGoal));
+        MultiStageGoal *new_goal = (MultiStageGoal *)calloc(1, sizeof(MultiStageGoal));
         if (!new_goal) continue;
 
         // Parse root_name and icon
@@ -984,16 +986,16 @@ static void tracker_parse_multi_stage_goals(cJSON *goals_json, cJSON *lang_json,
         new_goal->stage_count = cJSON_GetArraySize(stages_json);
         if (new_goal->stage_count > 0) {
             // Allocate memory for the stages array
-            new_goal->stages = calloc(new_goal->stage_count, sizeof(SubGoal *));
+            new_goal->stages = (SubGoal **)calloc(new_goal->stage_count, sizeof(SubGoal *));
             if (!new_goal->stages) {
                 free(new_goal);
                 continue;
             }
 
-            cJSON *stage_item_json = NULL;
+            cJSON *stage_item_json = nullptr;
             int j = 0;
             cJSON_ArrayForEach(stage_item_json, stages_json) {
-                SubGoal *new_stage = calloc(1, sizeof(SubGoal));
+                SubGoal *new_stage = (SubGoal *)calloc(1, sizeof(SubGoal));
                 if (!new_stage) continue;
 
                 // parse stage_id and other properties
@@ -1057,7 +1059,7 @@ static void tracker_parse_multi_stage_goals(cJSON *goals_json, cJSON *lang_json,
 //  * @param t A pointer to the Tracker struct.
 //  * @param player_adv_json The parsed player advancements JSON file.
 //  */
-// static void tracker_update_advancement_progress(struct Tracker *t, const cJSON *player_adv_json) {
+// static void tracker_update_advancement_progress(Tracker *t, const cJSON *player_adv_json) {
 //     if (!player_adv_json) return;
 //
 //     t->template_data->advancements_completed_count = 0;
@@ -1109,7 +1111,7 @@ static void tracker_parse_multi_stage_goals(cJSON *goals_json, cJSON *lang_json,
  * @param t A pointer to the Tracker struct.
  * @param player_unlocks_json The parsed player unlocks JSON file.
  */
-static void tracker_update_unlock_progress(struct Tracker *t, const cJSON *player_unlocks_json) {
+static void tracker_update_unlock_progress(Tracker *t, const cJSON *player_unlocks_json) {
     if (!player_unlocks_json) return;
 
     // printf("[TRACKER] Reading player unlocks from: %s\n", t->unlocks_path);
@@ -1142,7 +1144,7 @@ static void tracker_update_unlock_progress(struct Tracker *t, const cJSON *playe
  * @param t A pointer to the Tracker struct.
  * @param settings_json A pointer to the parsed settings.json cJSON object.
  */
-static void tracker_update_custom_progress(struct Tracker *t, cJSON *settings_json) {
+static void tracker_update_custom_progress(Tracker *t, cJSON *settings_json) {
     if (!settings_json) {
         printf("[TRACKER] Failed to load or parse settings file.\n");
         return;
@@ -1197,7 +1199,7 @@ static void tracker_update_custom_progress(struct Tracker *t, cJSON *settings_js
  * @param player_unlocks_json The parsed player unlocks JSON file.
  * @param version The game version from the MC_Version enum.
  */
-static void tracker_update_multi_stage_progress(struct Tracker *t, const cJSON *player_adv_json,
+static void tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_adv_json,
                                                 const cJSON *player_stats_json, const cJSON *player_unlocks_json,
                                                 MC_Version version) {
     if (t->template_data->multi_stage_goal_count == 0) return;
@@ -1384,7 +1386,7 @@ static void tracker_update_multi_stage_progress(struct Tracker *t, const cJSON *
  * @param t A pointer to the Tracker struct.
  *
  */
-static void tracker_calculate_overall_progress(struct Tracker *t) {
+static void tracker_calculate_overall_progress(Tracker *t) {
     if (!t || !t->template_data) return; // || because we can't be sure if the template_data is initialized
 
     // calculate the total number of "steps"
@@ -1466,7 +1468,7 @@ static void free_trackable_categories(TrackableCategory **categories, int count)
             // First, free the inner criteria array using the other helper
             free_trackable_items(categories[i]->criteria, categories[i]->criteria_count);
 
-            // Then free the category struct itself
+            // Then free the category itself
             free(categories[i]);
         }
     }
@@ -1477,9 +1479,9 @@ static void free_trackable_categories(TrackableCategory **categories, int count)
  * @brief Frees all dynamically allocated memory within a TemplateData struct.
  *
  * To avoid memory leaks when switching templates during runtime.
- * It only frees the CONTENT of the TemplateData struct NOT the struct itself.
+ * It only frees the CONTENT of the TemplateData NOT the itself.
  *
- * @param td A pointer to the TemplateData struct to be freed.
+ * @param td A pointer to the TemplateData to be freed.
  */
 static void tracker_free_template_data(TemplateData *td) {
     if (!td) return;
@@ -1518,11 +1520,11 @@ static void tracker_free_template_data(TemplateData *td) {
         free(td->multi_stage_goals);
     }
 
-    td->advancements = NULL;
-    td->stats = NULL;
-    td->unlocks = NULL;
-    td->custom_goals = NULL;
-    td->multi_stage_goals = NULL;
+    td->advancements = nullptr;
+    td->stats = nullptr;
+    td->unlocks = nullptr;
+    td->custom_goals = nullptr;
+    td->multi_stage_goals = nullptr;
 }
 
 /**
@@ -1583,26 +1585,26 @@ static void format_time(long long ticks, char *output, size_t max_len) {
 // ----------------------------------------- END OF STATIC FUNCTIONS -----------------------------------------
 
 
-bool tracker_new(struct Tracker **tracker, const AppSettings *settings) {
-    // Allocate memory for the tracker struct itself
-    *tracker = calloc(1, sizeof(struct Tracker));
-    if (*tracker == NULL) {
+bool tracker_new(Tracker **tracker, const AppSettings *settings) {
+    // Allocate memory for the tracker itself
+    *tracker = (Tracker *)calloc(1, sizeof(Tracker));
+    if (*tracker == nullptr) {
         fprintf(stderr, "[TRACKER] Failed to allocate memory for tracker.\n");
         return false;
     }
 
-    struct Tracker *t = *tracker;
+    Tracker *t = *tracker;
 
     // Initialize SDL components for the tracker
     if (!tracker_init_sdl(t, settings)) {
         free(t);
-        *tracker = NULL;
-        tracker = NULL;
+        *tracker = nullptr;
+        tracker = nullptr;
         return false;
     }
 
     // Allocate the main data container
-    t->template_data = calloc(1, sizeof(TemplateData));
+    t->template_data = (TemplateData *)calloc(1, sizeof(TemplateData));
     if (!t->template_data) {
         fprintf(stderr, "[TRACKER] Failed to allocate memory for template data.\n");
         tracker_free(tracker);
@@ -1621,7 +1623,7 @@ bool tracker_new(struct Tracker **tracker, const AppSettings *settings) {
     return true; // Success
 }
 
-void tracker_events(struct Tracker *t, SDL_Event *event, bool *is_running, bool *settings_opened) {
+void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settings_opened) {
     (void) t; // Not directly used, but kept for consistency
 
     switch (event->type) {
@@ -1673,12 +1675,12 @@ void tracker_events(struct Tracker *t, SDL_Event *event, bool *is_running, bool 
 }
 
 // Periodically recheck file changes
-void tracker_update(struct Tracker *t, float *deltaTime) {
+void tracker_update(Tracker *t, float *deltaTime) {
     // Use deltaTime for animations
     // game logic goes here
     (void) deltaTime;
 
-    AppSettings settings;
+    struct AppSettings settings;
     settings_load(&settings);
     MC_Version version = settings_get_version_from_string(settings.version_str);
 
@@ -1691,9 +1693,9 @@ void tracker_update(struct Tracker *t, float *deltaTime) {
     }
 
     // Load all necessary player files ONCE
-    cJSON *player_adv_json = NULL; // (strlen(t->advancements_path) > 0) ? cJSON_from_file(t->advancements_path) : NULL;
-    cJSON *player_stats_json = (strlen(t->stats_path) > 0) ? cJSON_from_file(t->stats_path) : NULL;
-    cJSON *player_unlocks_json = (strlen(t->unlocks_path) > 0) ? cJSON_from_file(t->unlocks_path) : NULL;
+    cJSON *player_adv_json = nullptr; // (strlen(t->advancements_path) > 0) ? cJSON_from_file(t->advancements_path) : nullptr;
+    cJSON *player_stats_json = (strlen(t->stats_path) > 0) ? cJSON_from_file(t->stats_path) : nullptr;
+    cJSON *player_unlocks_json = (strlen(t->unlocks_path) > 0) ? cJSON_from_file(t->unlocks_path) : nullptr;
     cJSON *settings_json = cJSON_from_file(SETTINGS_FILE_PATH);
 
     // Version-based Dispatch
@@ -1702,7 +1704,7 @@ void tracker_update(struct Tracker *t, float *deltaTime) {
     } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_11_2) {
         tracker_update_achievements_and_stats_mid(t, player_stats_json);
     } else if (version >= MC_VERSION_1_12) {
-        player_adv_json = (strlen(t->advancements_path) > 0) ? cJSON_from_file(t->advancements_path) : NULL;
+        player_adv_json = (strlen(t->advancements_path) > 0) ? cJSON_from_file(t->advancements_path) : nullptr;
         tracker_update_advancements_modern(t, player_adv_json);
 
         // Needs version for playtime as 1.17 renames minecraft:play_one_minute into minecraft:play_time
@@ -1724,7 +1726,7 @@ void tracker_update(struct Tracker *t, float *deltaTime) {
     cJSON_Delete(settings_json);
 }
 
-void tracker_render(struct Tracker *t, const AppSettings *settings) {
+void tracker_render(Tracker *t, const AppSettings *settings) {
     // Set draw color and clear screen
     SDL_SetRenderDrawColor(t->renderer, settings->tracker_bg_color.r, settings->tracker_bg_color.g,
                            settings->tracker_bg_color.b, settings->tracker_bg_color.a);
@@ -1755,7 +1757,7 @@ void tracker_render(struct Tracker *t, const AppSettings *settings) {
     SDL_RenderPresent(t->renderer);
 }
 
-void tracker_reinit_template(struct Tracker *t, const AppSettings *settings) {
+void tracker_reinit_template(Tracker *t, const AppSettings *settings) {
     if (!t) return;
 
     printf("[TRACKER] Re-initializing template...\n");
@@ -1767,7 +1769,7 @@ void tracker_reinit_template(struct Tracker *t, const AppSettings *settings) {
     if (t->template_data) {
         tracker_free_template_data(t->template_data);
 
-        // Reset the entire struct to zero to clear dangling pointers and old counts.
+        // Reset the entire to zero to clear dangling pointers and old counts.
         memset(t->template_data, 0, sizeof(TemplateData));
 
         // After clearing, ensure the snapshot name is also cleared to force a new snapshot
@@ -1777,7 +1779,7 @@ void tracker_reinit_template(struct Tracker *t, const AppSettings *settings) {
     tracker_load_and_parse_data(t);
 }
 
-void tracker_reinit_paths(struct Tracker *t, const AppSettings *settings) {
+void tracker_reinit_paths(Tracker *t, const AppSettings *settings) {
     if (!t || !settings) return;
 
     // Copy the template and lang paths and snapshot path (for legacy snapshots if needed)
@@ -1816,7 +1818,7 @@ void tracker_reinit_paths(struct Tracker *t, const AppSettings *settings) {
     }
 }
 
-void tracker_load_and_parse_data(struct Tracker *t) {
+void tracker_load_and_parse_data(Tracker *t) {
     printf("[TRACKER] Loading advancement template from: %s\n", t->advancement_template_path);
     cJSON *template_json = cJSON_from_file(t->advancement_template_path);
 
@@ -1901,15 +1903,15 @@ void tracker_load_and_parse_data(struct Tracker *t) {
     cJSON_Delete(template_json);
     if (t->template_data->lang_json) {
         cJSON_Delete(t->template_data->lang_json);
-        t->template_data->lang_json = NULL;
+        t->template_data->lang_json = nullptr;
     }
     // No need to delete settings_json, because it's not parsed, handled in tracker_update()
 }
 
 
-void tracker_free(struct Tracker **tracker) {
+void tracker_free(Tracker **tracker) {
     if (tracker && *tracker) {
-        struct Tracker *t = *tracker;
+        Tracker *t = *tracker;
 
         if (t->template_data) {
             tracker_free_template_data(t->template_data); // This ONLY frees the CONTENT of the struct
@@ -1919,24 +1921,24 @@ void tracker_free(struct Tracker **tracker) {
         if (t->renderer) {
             SDL_DestroyRenderer(t->renderer);
             // We still have an address
-            t->renderer = NULL;
+            t->renderer = nullptr;
         }
 
         if (t->window) {
             SDL_DestroyWindow(t->window);
             // We still have an address
-            t->window = NULL;
+            t->window = nullptr;
         }
 
         // tracker is heap allocated so free it
         free(t);
-        *tracker = NULL;
-        tracker = NULL;
+        *tracker = nullptr;
+        tracker = nullptr;
         printf("[TRACKER] Tracker freed!\n");
     }
 }
 
-void tracker_update_title(struct Tracker *t, const AppSettings *settings) {
+void tracker_update_title(Tracker *t, const AppSettings *settings) {
     if (!t || !t->template_data || !settings) return;
 
     char title_buffer[512];
@@ -1986,13 +1988,13 @@ void tracker_update_title(struct Tracker *t, const AppSettings *settings) {
     SDL_SetWindowTitle(t->window, title_buffer);
 }
 
-void tracker_print_debug_status(struct Tracker *t) {
+void tracker_print_debug_status(Tracker *t) {
     if (!t || !t->template_data) return;
 
-    AppSettings settings;
+    struct AppSettings settings;
     settings_load(&settings);
     cJSON *settings_json = cJSON_from_file(SETTINGS_FILE_PATH);
-    cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : NULL;
+    cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : nullptr;
 
     // Also load the current game version used
     MC_Version version = settings_get_version_from_string(settings.version_str);
@@ -2081,7 +2083,7 @@ void tracker_print_debug_status(struct Tracker *t) {
             if (version < MC_VERSION_1_6_4 && stat_cat->icon_path[0] == '\0') continue;
 
             const char *status_text;
-            cJSON *parent_override = override_obj ? cJSON_GetObjectItem(override_obj, stat_cat->root_name) : NULL;
+            cJSON *parent_override = override_obj ? cJSON_GetObjectItem(override_obj, stat_cat->root_name) : nullptr;
             if (stat_cat->done) {
                 status_text = (stat_cat->is_manually_completed && cJSON_IsTrue(parent_override)) ? "COMPLETED (MANUAL)" : "COMPLETED";
             } else {
@@ -2144,7 +2146,7 @@ void tracker_print_debug_status(struct Tracker *t) {
                     const char *sub_status_text;
                     char sub_stat_key[512];
                     snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name, sub_stat->root_name);
-                    cJSON *sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : NULL;
+                    cJSON *sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : nullptr;
                     if (sub_stat->done) {
                         sub_status_text = (sub_stat->is_manually_completed && cJSON_IsTrue(sub_override)) ? "DONE (MANUAL)" : "DONE";
                     } else {
