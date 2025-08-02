@@ -82,7 +82,6 @@ target_link_libraries(${EXECUTABLE_NAME} PRIVATE
         SDL3::SDL3
         SDL3_image::SDL3_image
         SDL3_ttf::SDL3_ttf
-        # SDL2::mixer # If you were using SDL2_mixer
 )
 
 # Add platform-specific system libraries

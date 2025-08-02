@@ -7,13 +7,19 @@
 
 #include "main.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
+
 struct AppSettings;
 
 
 struct Overlay {
     SDL_Window *window;
     SDL_Renderer *renderer;
-    // SDL_Texture *texture;
+    TTF_Font *font; // For text on overlay window (sdl ttf)
     float scroll_offset; // For animation
 };
 
@@ -76,5 +82,9 @@ void overlay_render(Overlay *o, const AppSettings *settings);
  * @param overlay A pointer to the Overlay struct pointer to be freed.
  */
 void overlay_free(Overlay **overlay);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //OVERLAY_H

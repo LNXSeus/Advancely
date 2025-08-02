@@ -14,8 +14,39 @@
 #include "file_utils.h" // has the cJSON_from_file function
 #include "temp_create_utils.h"
 
-extern "C" {
 #include <cJSON.h>
+#include <cmath>
+
+
+/**
+ * @brief Loads an SDL_Texture from a file and sets its scale mode.
+ * @param renderer The SDL_Renderer to use.
+ * @param path The path to the image file.
+ * @param scale_mode The SDL_ScaleMode to apply (e.g., SDL_SCALEMODE_NEAREST).
+ * @return A pointer to the created SDL_Texture, or nullptr on failure.
+ */
+static SDL_Texture *load_texture_with_scale_mode(SDL_Renderer *renderer, const char *path, SDL_ScaleMode scale_mode) {
+    if (path == nullptr || path[0] == '\0') {
+        fprintf(stderr, "[TRACKER - TEXTURE LOAD] Invalid path for texture: %s\n", path);
+        return nullptr;
+    }
+
+    SDL_Surface *surface = IMG_Load(path);
+    if (!surface) {
+        fprintf(stderr, "[TRACKER - TEXTURE LOAD] Failed to load image %s: %s\n", path, SDL_GetError());
+        return nullptr;
+    }
+
+    SDL_Texture *new_texture = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_DestroySurface(surface); // Clean up the surface after creating the texture
+    if (!new_texture) {
+        fprintf(stderr, "[TRACKER - TEXTURE LOAD] Failed to create texture from surface %s: %s\n", path,
+                SDL_GetError());
+        return nullptr;
+    }
+
+    SDL_SetTextureScaleMode(new_texture, scale_mode);
+    return new_texture;
 }
 
 // FOR VERSION-SPECIFIC PARSERS
@@ -318,13 +349,15 @@ static void tracker_update_stats_legacy(Tracker *t, const cJSON *player_stats_js
             // For multi-criterion, it's the specific sub-stat key.
             // Creates ONE criteria behind the scenes, even if template doesn't have "criteria" field
             cJSON *sub_override;
-            if (stat_cat->criteria_count == 1) { // WHEN IT HAS NO SUB-STATS
+            if (stat_cat->criteria_count == 1) {
+                // WHEN IT HAS NO SUB-STATS
                 sub_override = parent_override;
                 sub_stat->is_manually_completed = stat_cat->is_manually_completed;
             } else {
                 // Multi-criterion
                 char sub_stat_key[512];
-                snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name, sub_stat->root_name);
+                snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name,
+                         sub_stat->root_name);
                 sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : nullptr;
                 sub_stat->is_manually_completed = cJSON_IsBool(sub_override);
             }
@@ -341,7 +374,8 @@ static void tracker_update_stats_legacy(Tracker *t, const cJSON *player_stats_js
         }
 
         // Determine final 'done' status for PARENT category
-        bool all_children_done = (stat_cat->criteria_count > 0 && stat_cat->completed_criteria_count >= stat_cat->criteria_count);
+        bool all_children_done = (stat_cat->criteria_count > 0 && stat_cat->completed_criteria_count >= stat_cat->
+                                  criteria_count);
 
         // A category is done if all its children are done OR it's manually forced to be true
         stat_cat->done = all_children_done || parent_forced_true;
@@ -443,7 +477,8 @@ static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *p
                 sub_stat->is_manually_completed = stat_cat->is_manually_completed;
             } else {
                 char sub_stat_key[512];
-                snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name, sub_stat->root_name);
+                snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name,
+                         sub_stat->root_name);
                 sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : nullptr;
                 sub_stat->is_manually_completed = cJSON_IsBool(sub_override);
             }
@@ -457,7 +492,8 @@ static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *p
             if (sub_stat->done) stat_cat->completed_criteria_count++;
         }
 
-        bool all_children_done = (stat_cat->criteria_count > 0 && stat_cat->completed_criteria_count >= stat_cat->criteria_count);
+        bool all_children_done = (stat_cat->criteria_count > 0 && stat_cat->completed_criteria_count >= stat_cat->
+                                  criteria_count);
 
         // Either all children done OR parent manually overridden to be true
         stat_cat->done = all_children_done || parent_forced_true;
@@ -606,7 +642,8 @@ static void tracker_update_stats_modern(Tracker *t, const cJSON *player_stats_js
             if (sub_stat->done) stat_cat->completed_criteria_count++;
         }
 
-        bool all_children_done = (stat_cat->criteria_count > 0 && stat_cat->completed_criteria_count >= stat_cat->criteria_count);
+        bool all_children_done = (stat_cat->criteria_count > 0 && stat_cat->completed_criteria_count >= stat_cat->
+                                  criteria_count);
 
         stat_cat->done = all_children_done || parent_forced_true;
 
@@ -620,6 +657,7 @@ static void tracker_update_stats_modern(Tracker *t, const cJSON *player_stats_js
 /**
  * @brief Parses advancement or stat categories and their criteria from the template, supporting modded advancements/stats.
  *
+ * @param t A pointer to the Tracker object.
  * @param category_json The JSON object containing the categories.
  * @param lang_json The JSON object containing the language keys.
  * @param categories_array A pointer to an array of TrackableCategory pointers to store the parsed categories.
@@ -628,7 +666,8 @@ static void tracker_update_stats_modern(Tracker *t, const cJSON *player_stats_js
  * @param lang_key_prefix The prefix for language keys. (e.g., "advancement." or "stat.")
  * @param is_stat_category A boolean indicating whether the categories are for stats. False means advancements.
  */
-static void tracker_parse_categories(cJSON *category_json, cJSON *lang_json, TrackableCategory ***categories_array,
+static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *lang_json,
+                                     TrackableCategory ***categories_array,
                                      int *count, int *total_criteria_count, const char *lang_key_prefix,
                                      bool is_stat_category) {
     if (!category_json) {
@@ -640,7 +679,7 @@ static void tracker_parse_categories(cJSON *category_json, cJSON *lang_json, Tra
     for (cJSON *i = category_json->child; i != nullptr; i = i->next) (*count)++;
     if (*count == 0) return;
 
-    *categories_array = (TrackableCategory **)calloc(*count, sizeof(TrackableCategory *));
+    *categories_array = (TrackableCategory **) calloc(*count, sizeof(TrackableCategory *));
     if (!*categories_array) return;
 
     cJSON *cat_json = category_json->child;
@@ -648,7 +687,7 @@ static void tracker_parse_categories(cJSON *category_json, cJSON *lang_json, Tra
     *total_criteria_count = 0;
 
     while (cat_json) {
-        TrackableCategory *new_cat = (TrackableCategory *)calloc(1, sizeof(TrackableCategory));
+        TrackableCategory *new_cat = (TrackableCategory *) calloc(1, sizeof(TrackableCategory));
         if (!new_cat) {
             cat_json = cat_json->next;
             continue;
@@ -691,6 +730,8 @@ static void tracker_parse_categories(cJSON *category_json, cJSON *lang_json, Tra
             // Put whatever is in "icon" into "resources/icons/"
             snprintf(full_icon_path, sizeof(full_icon_path), "resources/icons/%s", icon->valuestring);
             strncpy(new_cat->icon_path, full_icon_path, sizeof(new_cat->icon_path) - 1);
+
+            new_cat->texture = load_texture_with_scale_mode(t->renderer, new_cat->icon_path, SDL_SCALEMODE_NEAREST);
         }
 
         cJSON *criteria_obj = cJSON_GetObjectItem(cat_json, "criteria");
@@ -698,11 +739,11 @@ static void tracker_parse_categories(cJSON *category_json, cJSON *lang_json, Tra
             // MULTI-CRITERION CASE
             for (cJSON *c = criteria_obj->child; c != nullptr; c = c->next) new_cat->criteria_count++;
             if (new_cat->criteria_count > 0) {
-                new_cat->criteria = (TrackableItem **)calloc(new_cat->criteria_count, sizeof(TrackableItem *));
+                new_cat->criteria = (TrackableItem **) calloc(new_cat->criteria_count, sizeof(TrackableItem *));
                 *total_criteria_count += new_cat->criteria_count;
                 int k = 0;
                 for (cJSON *crit_item = criteria_obj->child; crit_item != nullptr; crit_item = crit_item->next) {
-                    TrackableItem *new_crit = (TrackableItem *)calloc(1, sizeof(TrackableItem));
+                    TrackableItem *new_crit = (TrackableItem *) calloc(1, sizeof(TrackableItem));
                     if (new_crit) {
                         strncpy(new_crit->root_name, crit_item->string, sizeof(new_crit->root_name) - 1);
                         if (is_stat_category) {
@@ -719,17 +760,31 @@ static void tracker_parse_categories(cJSON *category_json, cJSON *lang_json, Tra
                                     sizeof(new_crit->display_name) - 1);
                         else strncpy(new_crit->display_name, new_crit->root_name, sizeof(new_crit->display_name) - 1);
 
+                        cJSON *crit_icon = cJSON_GetObjectItem(crit_item, "icon");
+                        if (cJSON_IsString(crit_icon) && crit_icon->valuestring[0] != '\0') {
+                            char full_crit_icon_path[sizeof(new_crit->icon_path)];
+                            snprintf(full_crit_icon_path, sizeof(full_crit_icon_path), "resources/icons/%s",
+                                     crit_icon->valuestring);
+                            strncpy(new_crit->icon_path, full_crit_icon_path, sizeof(new_crit->icon_path) - 1);
+                            new_crit->texture = load_texture_with_scale_mode(
+                                t->renderer, new_crit->icon_path, SDL_SCALEMODE_NEAREST);
+                        }
+
                         new_cat->criteria[k++] = new_crit;
                     }
+
+                    // Load criteria texture
+                    new_crit->texture = load_texture_with_scale_mode(t->renderer, new_crit->icon_path,
+                                                                     SDL_SCALEMODE_NEAREST);
                 }
             }
         } else {
             // SINGLE-CRITERION SPECIAL CASE
             new_cat->criteria_count = 1;
             *total_criteria_count += 1;
-            new_cat->criteria = (TrackableItem **)calloc(1, sizeof(TrackableItem *));
+            new_cat->criteria = (TrackableItem **) calloc(1, sizeof(TrackableItem *));
             if (new_cat->criteria) {
-                TrackableItem *the_criterion = (TrackableItem *)calloc(1, sizeof(TrackableItem));
+                TrackableItem *the_criterion = (TrackableItem *) calloc(1, sizeof(TrackableItem));
                 if (the_criterion) {
                     cJSON *crit_root_name_json = cJSON_GetObjectItem(cat_json, "root_name");
                     if (cJSON_IsString(crit_root_name_json)) {
@@ -820,7 +875,7 @@ static void tracker_detect_shared_sub_items(Tracker *t) {
     int total_criteria = t->template_data->total_criteria_count + t->template_data->stat_total_criteria_count;
     if (total_criteria == 0) return;
 
-    CriterionCounter *counts = (CriterionCounter *)calloc(total_criteria, sizeof(CriterionCounter));
+    CriterionCounter *counts = (CriterionCounter *) calloc(total_criteria, sizeof(CriterionCounter));
     if (!counts) return;
 
     int unique_count = 0;
@@ -844,14 +899,17 @@ static void tracker_detect_shared_sub_items(Tracker *t) {
  * It extracts the root name, icon path, and goal value from the template and looks up the display name in the language file.
  * The language file uses "stat." and "unlock." prefixes now as well.
  *
+ *  @param t Pointer to the Tracker struct.
  * @param category_json The cJSON array for the "stats" or "unlocks" key from the template file.
  * @param lang_json The cJSON object from the language file to look up display names.
  * @param items_array A pointer to the array of TrackableItem pointers to be populated.
  * @param count A pointer to an integer that will store the number of items parsed.
  * @param lang_key_prefix The prefix to use when looking up display names in the language file.
  */
-static void tracker_parse_simple_trackables(cJSON *category_json, cJSON *lang_json, TrackableItem ***items_array,
+static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJSON *lang_json,
+                                            TrackableItem ***items_array,
                                             int *count, const char *lang_key_prefix) {
+    (void) t;
     if (!category_json) {
         printf("[TRACKER] tracker_parse_simple_trackables: category_json is nullptr\n");
         return;
@@ -862,13 +920,13 @@ static void tracker_parse_simple_trackables(cJSON *category_json, cJSON *lang_js
         return;
     }
 
-    *items_array = (TrackableItem **)calloc(*count, sizeof(TrackableItem *));
+    *items_array = (TrackableItem **) calloc(*count, sizeof(TrackableItem *));
     if (!*items_array) return;
 
     cJSON *item_json = nullptr;
     int i = 0;
     cJSON_ArrayForEach(item_json, category_json) {
-        TrackableItem *new_item = (TrackableItem *)calloc(1, sizeof(TrackableItem));
+        TrackableItem *new_item = (TrackableItem *) calloc(1, sizeof(TrackableItem));
         if (new_item) {
             cJSON *root_name_json = cJSON_GetObjectItem(item_json, "root_name");
             if (cJSON_IsString(root_name_json)) {
@@ -895,7 +953,6 @@ static void tracker_parse_simple_trackables(cJSON *category_json, cJSON *lang_js
             // Get other properties from the template
             cJSON *icon = cJSON_GetObjectItem(item_json, "icon");
             if (cJSON_IsString(icon)) {
-
                 // Append "icon" to "resources/icons/"
                 char full_icon_path[sizeof(new_item->icon_path)];
                 snprintf(full_icon_path, sizeof(full_icon_path), "resources/icons/%s", icon->valuestring);
@@ -918,13 +975,16 @@ static void tracker_parse_simple_trackables(cJSON *category_json, cJSON *lang_js
  * This function reads the multi_stage_goals array from the template, creating a
  * MultiStageGoal for each entry and parsing its corresponding sequence of sub-goal stages.
  *
+ *@param t Pointer to the Tracker struct.
  * @param goals_json The cJSON object for the "multi_stage_goals" key from the template file.
  * @param lang_json The cJSON object from the language file (not used here but kept for consistency).
  * @param goals_array A pointer to the array of MultiStageGoal pointers to be populated.
  * @param count A pointer to an integer that will store the number of goals parsed.
  */
-static void tracker_parse_multi_stage_goals(cJSON *goals_json, cJSON *lang_json, MultiStageGoal ***goals_array,
+static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON *lang_json,
+                                            MultiStageGoal ***goals_array,
                                             int *count) {
+    (void) t;
     (void) lang_json;
     if (!goals_json) {
         printf("[TRACKER] tracker_parse_multi_stage_goals: goals_json is nullptr\n");
@@ -940,7 +1000,7 @@ static void tracker_parse_multi_stage_goals(cJSON *goals_json, cJSON *lang_json,
         return;
     }
 
-    *goals_array = (MultiStageGoal **)calloc(*count, sizeof(MultiStageGoal *));
+    *goals_array = (MultiStageGoal **) calloc(*count, sizeof(MultiStageGoal *));
     if (!*goals_array) {
         fprintf(stderr, "[TRACKER] Failed to allocate memory for MultiStageGoal array.\n");
         *count = 0;
@@ -951,7 +1011,7 @@ static void tracker_parse_multi_stage_goals(cJSON *goals_json, cJSON *lang_json,
     int i = 0;
     cJSON_ArrayForEach(goal_item_json, goals_json) {
         // Iterate through each goal
-        MultiStageGoal *new_goal = (MultiStageGoal *)calloc(1, sizeof(MultiStageGoal));
+        MultiStageGoal *new_goal = (MultiStageGoal *) calloc(1, sizeof(MultiStageGoal));
         if (!new_goal) continue;
 
         // Parse root_name and icon
@@ -986,7 +1046,7 @@ static void tracker_parse_multi_stage_goals(cJSON *goals_json, cJSON *lang_json,
         new_goal->stage_count = cJSON_GetArraySize(stages_json);
         if (new_goal->stage_count > 0) {
             // Allocate memory for the stages array
-            new_goal->stages = (SubGoal **)calloc(new_goal->stage_count, sizeof(SubGoal *));
+            new_goal->stages = (SubGoal **) calloc(new_goal->stage_count, sizeof(SubGoal *));
             if (!new_goal->stages) {
                 free(new_goal);
                 continue;
@@ -995,7 +1055,7 @@ static void tracker_parse_multi_stage_goals(cJSON *goals_json, cJSON *lang_json,
             cJSON *stage_item_json = nullptr;
             int j = 0;
             cJSON_ArrayForEach(stage_item_json, stages_json) {
-                SubGoal *new_stage = (SubGoal *)calloc(1, sizeof(SubGoal));
+                SubGoal *new_stage = (SubGoal *) calloc(1, sizeof(SubGoal));
                 if (!new_stage) continue;
 
                 // parse stage_id and other properties
@@ -1587,13 +1647,32 @@ static void format_time(long long ticks, char *output, size_t max_len) {
 
 bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     // Allocate memory for the tracker itself
-    *tracker = (Tracker *)calloc(1, sizeof(Tracker));
+    *tracker = (Tracker *) malloc(sizeof(Tracker));
     if (*tracker == nullptr) {
         fprintf(stderr, "[TRACKER] Failed to allocate memory for tracker.\n");
         return false;
     }
 
     Tracker *t = *tracker;
+
+    // Explicitly initialize all members
+    t->window = nullptr;
+    t->renderer = nullptr;
+    t->template_data = nullptr;
+
+    // Initialize all string buffers to empty strings
+    t->advancement_template_path[0] = '\0';
+    t->lang_path[0] = '\0';
+    t->saves_path[0] = '\0';
+    t->world_name[0] = '\0';
+    t->advancements_path[0] = '\0';
+    t->unlocks_path[0] = '\0';
+    t->stats_path[0] = '\0';
+    t->snapshot_path[0] = '\0';
+
+    // Initialize camera and zoom
+    t->camera_offset = ImVec2(0.0f, 0.0f);
+    t->zoom_level = 1.0f;
 
     // Initialize SDL components for the tracker
     if (!tracker_init_sdl(t, settings)) {
@@ -1603,8 +1682,30 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
         return false;
     }
 
+    // Initialize SDL_ttf
+    t->minecraft_font = TTF_OpenFont("resources/fonts/Minecraft.ttf", 24);
+    if (!t->minecraft_font) {
+        fprintf(stderr, "[TRACKER] Failed to load Minecraft font: %s\n", SDL_GetError());
+        tracker_free(tracker);
+        return false;
+    }
+
+    // Load global background textures
+    t->adv_bg = load_texture_with_scale_mode(t->renderer, "resources/gui/advancement_background.png",
+                                             SDL_SCALEMODE_NEAREST);
+    t->adv_bg_half_done = load_texture_with_scale_mode(t->renderer,
+                                                       "resources/gui/advancement_background_half_done.png",
+                                                       SDL_SCALEMODE_NEAREST);
+    t->adv_bg_done = load_texture_with_scale_mode(t->renderer, "resources/gui/advancement_background_done.png",
+                                                  SDL_SCALEMODE_NEAREST);
+    if (!t->adv_bg || !t->adv_bg_half_done || !t->adv_bg_done) {
+        fprintf(stderr, "[TRACKER] Failed to load advancement background textures.\n");
+        tracker_free(tracker);
+        return false;
+    }
+
     // Allocate the main data container
-    t->template_data = (TemplateData *)calloc(1, sizeof(TemplateData));
+    t->template_data = (TemplateData *) calloc(1, sizeof(TemplateData));
     if (!t->template_data) {
         fprintf(stderr, "[TRACKER] Failed to allocate memory for template data.\n");
         tracker_free(tracker);
@@ -1693,7 +1794,8 @@ void tracker_update(Tracker *t, float *deltaTime) {
     }
 
     // Load all necessary player files ONCE
-    cJSON *player_adv_json = nullptr; // (strlen(t->advancements_path) > 0) ? cJSON_from_file(t->advancements_path) : nullptr;
+    cJSON *player_adv_json = nullptr;
+    // (strlen(t->advancements_path) > 0) ? cJSON_from_file(t->advancements_path) : nullptr;
     cJSON *player_stats_json = (strlen(t->stats_path) > 0) ? cJSON_from_file(t->stats_path) : nullptr;
     cJSON *player_unlocks_json = (strlen(t->unlocks_path) > 0) ? cJSON_from_file(t->unlocks_path) : nullptr;
     cJSON *settings_json = cJSON_from_file(SETTINGS_FILE_PATH);
@@ -1727,10 +1829,13 @@ void tracker_update(Tracker *t, float *deltaTime) {
 }
 
 void tracker_render(Tracker *t, const AppSettings *settings) {
+    (void) t;
+    (void) settings;
     // Set draw color and clear screen
-    SDL_SetRenderDrawColor(t->renderer, settings->tracker_bg_color.r, settings->tracker_bg_color.g,
-                           settings->tracker_bg_color.b, settings->tracker_bg_color.a);
-    SDL_RenderClear(t->renderer);
+    // SDL_SetRenderDrawColor(t->renderer, settings->tracker_bg_color.r, settings->tracker_bg_color.g,
+    //                        settings->tracker_bg_color.b, settings->tracker_bg_color.a);
+    // SDL_RenderClear(t->renderer); // TODO: Remove this, in main function directly
+
 
     // TODO: Draw the advancement icons
     // ... inside your loop for drawing advancements ...
@@ -1753,8 +1858,113 @@ void tracker_render(Tracker *t, const AppSettings *settings) {
     // }
     // Drawing happens here
 
+
     // present backbuffer
-    SDL_RenderPresent(t->renderer);
+    // SDL_RenderPresent(t->renderer);
+}
+
+void tracker_render_gui(Tracker *t, const AppSettings *settings) {
+    if (!t || !t->template_data) return;
+
+    // Draw the ImGui UI
+    ImGuiIO &io = ImGui::GetIO();
+
+    // Create a window that covers the whole main window
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(ImVec2(io.DisplaySize));
+    ImGui::Begin("TrackerMap", nullptr,
+                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoMove |
+                 ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+    // Pan and zoom logic
+    ImVec2 mouse_pos_in_window = ImGui::GetMousePos();
+    if (ImGui::IsWindowHovered()) {
+        // Zooming with Mouse Wheel
+        if (io.MouseWheel != 0) {
+            ImVec2 mouse_pos_before_zoom = ImVec2((mouse_pos_in_window.x - t->camera_offset.x) / t->zoom_level,
+                                                  (mouse_pos_in_window.y - t->camera_offset.y) / t->zoom_level);
+            float old_zoom = t->zoom_level;
+            t->zoom_level += io.MouseWheel * 0.1f * t->zoom_level; // Zoom exponentially
+            if (t->zoom_level < 0.1f) t->zoom_level = 0.1f; // Clamp zoom level to a minimum value
+            if (t->zoom_level > 10.0f) t->zoom_level = 10.0f; // Clamp zoom level to a maximum value (zoom in)
+            t->camera_offset.x += (mouse_pos_before_zoom.x * (old_zoom - t->zoom_level));
+            t->camera_offset.y += (mouse_pos_before_zoom.y * (old_zoom - t->zoom_level));
+        }
+        // Panning with Mouse Drag (right and middle mouse buttons)
+        if (ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
+            t->camera_offset.x += io.MouseDelta.x;
+            t->camera_offset.y += io.MouseDelta.y;
+        }
+    }
+
+
+    ImDrawList *draw_list = ImGui::GetWindowDrawList();
+    ImU32 text_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
+                                settings->text_color.a);
+
+    // Drawing Logic
+    // TODO: Simple  Grid layout for now, real layout algorithm will be a lot more complex
+    float padding = 50.0f;
+    float current_x = padding;
+    float current_y = padding;
+    float row_max_height = 0.0f;
+    float horizontal_spacing = 32.0f;
+    float vertical_spacing = 48.0f;
+
+    // Loop through all advancements, stats, etc.
+    for (int i = 0; i < t->template_data->advancement_count; i++) {
+        TrackableCategory *adv = t->template_data->advancements[i];
+        if (!adv || (adv->done && settings->remove_completed_goals)) {
+            continue;
+        }
+
+        // --- Calculate Item Dimensions ---
+        ImVec2 bg_size = ImVec2(96.0f, 96.0f);
+        ImVec2 text_size = ImGui::CalcTextSize(adv->display_name);
+        float item_width = fmaxf(bg_size.x, text_size.x);
+
+        float criteria_height = 0.0f;
+        if (adv->criteria_count > 1) {
+            criteria_height = (float)adv->criteria_count * 36.0f; // 36px per criterion
+        }
+        float item_height = bg_size.y + text_size.y + 4.0f + criteria_height;
+
+        // --- Handle Row Wrapping ---
+        if (current_x > padding && (current_x + item_width) > (io.DisplaySize.x / t->zoom_level) - padding) {
+            current_x = padding;
+            current_y += row_max_height;
+            row_max_height = 0.0f;
+        }
+
+        ImVec2 screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x, (current_y * t->zoom_level) + t->camera_offset.y);
+
+        // --- Draw Parent Advancement ---
+        SDL_Texture* bg_texture_to_use = adv->done ? t->adv_bg_done : (adv->completed_criteria_count > 0 ? t->adv_bg_half_done : t->adv_bg);
+        if (bg_texture_to_use) draw_list->AddImage((void*)bg_texture_to_use, screen_pos, ImVec2(screen_pos.x + bg_size.x * t->zoom_level, screen_pos.y + bg_size.y * t->zoom_level));
+        if (adv->texture) draw_list->AddImage((void*)adv->texture, ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level), ImVec2(screen_pos.x + 80.0f * t->zoom_level, screen_pos.y + 80.0f * t->zoom_level));
+        draw_list->AddText(nullptr, 16.0f * t->zoom_level, ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f, screen_pos.y + bg_size.y * t->zoom_level), text_color, adv->display_name);
+
+        // --- Draw Criteria Column (if they exist) ---
+        if (adv->criteria_count > 1) {
+            float sub_item_y_offset = current_y + bg_size.y + 20.0f;
+            for (int j = 0; j < adv->criteria_count; j++) {
+                TrackableItem* crit = adv->criteria[j];
+                if (crit) {
+                     ImVec2 crit_screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x, (sub_item_y_offset * t->zoom_level) + t->camera_offset.y);
+                     if (crit->texture) {
+                        draw_list->AddImage((void*)crit->texture, crit_screen_pos, ImVec2(crit_screen_pos.x + 32 * t->zoom_level, crit_screen_pos.y + 32 * t->zoom_level));
+                     }
+                     draw_list->AddText(nullptr, 14.0f * t->zoom_level, ImVec2(crit_screen_pos.x + 36 * t->zoom_level, crit_screen_pos.y + 8 * t->zoom_level), text_color, crit->display_name);
+                     sub_item_y_offset += 36.0f;
+                }
+            }
+        }
+
+        // --- Update Layout Position ---
+        current_x += item_width + horizontal_spacing;
+        row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
+    }
+    ImGui::End();
 }
 
 void tracker_reinit_template(Tracker *t, const AppSettings *settings) {
@@ -1866,24 +2076,24 @@ void tracker_load_and_parse_data(Tracker *t) {
 
     // Parse the 5 main categories
     // False as it's for advancements
-    tracker_parse_categories(advancements_json, t->template_data->lang_json, &t->template_data->advancements,
+    tracker_parse_categories(t, advancements_json, t->template_data->lang_json, &t->template_data->advancements,
                              &t->template_data->advancement_count, &t->template_data->total_criteria_count,
                              "advancement.", false);
 
     // True as it's for stats
-    tracker_parse_categories(stats_json, t->template_data->lang_json, &t->template_data->stats,
+    tracker_parse_categories(t, stats_json, t->template_data->lang_json, &t->template_data->stats,
                              &t->template_data->stat_count, &t->template_data->stat_total_criteria_count, "stat.",
                              true);
 
     // Parse "unlock." prefix for unlocks
-    tracker_parse_simple_trackables(unlocks_json, t->template_data->lang_json, &t->template_data->unlocks,
+    tracker_parse_simple_trackables(t, unlocks_json, t->template_data->lang_json, &t->template_data->unlocks,
                                     &t->template_data->unlock_count, "unlock.");
 
     // Parse "custom." prefix for custom goals
-    tracker_parse_simple_trackables(custom_json, t->template_data->lang_json, &t->template_data->custom_goals,
+    tracker_parse_simple_trackables(t, custom_json, t->template_data->lang_json, &t->template_data->custom_goals,
                                     &t->template_data->custom_goal_count, "custom.");
 
-    tracker_parse_multi_stage_goals(multi_stage_goals_json, t->template_data->lang_json,
+    tracker_parse_multi_stage_goals(t, multi_stage_goals_json, t->template_data->lang_json,
                                     &t->template_data->multi_stage_goals,
                                     &t->template_data->multi_stage_goal_count);
 
@@ -1912,6 +2122,14 @@ void tracker_load_and_parse_data(Tracker *t) {
 void tracker_free(Tracker **tracker) {
     if (tracker && *tracker) {
         Tracker *t = *tracker;
+
+        if (t->minecraft_font) {
+            TTF_CloseFont(t->minecraft_font);
+        }
+
+        if (t->adv_bg) SDL_DestroyTexture(t->adv_bg);
+        if (t->adv_bg_half_done) SDL_DestroyTexture(t->adv_bg_half_done);
+        if (t->adv_bg_done) SDL_DestroyTexture(t->adv_bg_done);
 
         if (t->template_data) {
             tracker_free_template_data(t->template_data); // This ONLY frees the CONTENT of the struct
@@ -2085,7 +2303,9 @@ void tracker_print_debug_status(Tracker *t) {
             const char *status_text;
             cJSON *parent_override = override_obj ? cJSON_GetObjectItem(override_obj, stat_cat->root_name) : nullptr;
             if (stat_cat->done) {
-                status_text = (stat_cat->is_manually_completed && cJSON_IsTrue(parent_override)) ? "COMPLETED (MANUAL)" : "COMPLETED";
+                status_text = (stat_cat->is_manually_completed && cJSON_IsTrue(parent_override))
+                                  ? "COMPLETED (MANUAL)"
+                                  : "COMPLETED";
             } else {
                 status_text = "INCOMPLETE";
             }
@@ -2098,7 +2318,9 @@ void tracker_print_debug_status(Tracker *t) {
                 // Status of the single criterion
                 const char *sub_status_text;
                 if (sub_stat->done) {
-                    sub_status_text = (sub_stat->is_manually_completed && cJSON_IsTrue(parent_override)) ? "DONE (MANUAL)" : "DONE";
+                    sub_status_text = (sub_stat->is_manually_completed && cJSON_IsTrue(parent_override))
+                                          ? "DONE (MANUAL)"
+                                          : "DONE";
                 } else {
                     sub_status_text = "NOT DONE";
                 }
@@ -2145,10 +2367,13 @@ void tracker_print_debug_status(Tracker *t) {
                     TrackableItem *sub_stat = stat_cat->criteria[j];
                     const char *sub_status_text;
                     char sub_stat_key[512];
-                    snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name, sub_stat->root_name);
+                    snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name,
+                             sub_stat->root_name);
                     cJSON *sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : nullptr;
                     if (sub_stat->done) {
-                        sub_status_text = (sub_stat->is_manually_completed && cJSON_IsTrue(sub_override)) ? "DONE (MANUAL)" : "DONE";
+                        sub_status_text = (sub_stat->is_manually_completed && cJSON_IsTrue(sub_override))
+                                              ? "DONE (MANUAL)"
+                                              : "DONE";
                     } else {
                         sub_status_text = "NOT DONE";
                     }

@@ -2,6 +2,7 @@
 // Created by Linus on 26.06.2025.
 //
 
+
 #include "settings.h"
 #include "settings_utils.h"
 #include "init_sdl.h"

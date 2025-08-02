@@ -5,6 +5,10 @@
 #ifndef INIT_H
 #define INIT_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct Tracker;
 struct Overlay;
 struct Settings;
@@ -43,5 +47,8 @@ bool overlay_init_sdl(Overlay *o, const AppSettings *settings);
  */
 bool settings_init_sdl(Settings *s, const AppSettings *settings);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif //INIT_H

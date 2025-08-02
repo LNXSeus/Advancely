@@ -2,11 +2,14 @@
 // Created by Linus on 26.06.2025.
 //
 
+
 #include "global_event_handler.h"
 #include "tracker.h"
 #include "overlay.h"
 #include "settings.h"
 #include "settings_utils.h" // For AppSettings
+
+#include "imgui_impl_sdl3.h"
 
 void handle_global_events(Tracker *t, Overlay *o, Settings *s, AppSettings *app_settings,
                           bool *is_running, bool *settings_opened, float *deltaTime) {
@@ -14,6 +17,7 @@ void handle_global_events(Tracker *t, Overlay *o, Settings *s, AppSettings *app_
     SDL_Event event;
 
     while (SDL_PollEvent(&event)) {
+        ImGui_ImplSDL3_ProcessEvent(&event);
         // TOP LEVEL QUIT when it's not the X on the settings window
         if (event.type == SDL_EVENT_QUIT) {
             *is_running = false;
@@ -27,7 +31,8 @@ void handle_global_events(Tracker *t, Overlay *o, Settings *s, AppSettings *app_
         }
 
         // Event-based HOTKEY HANDLING
-        if (event.type == SDL_EVENT_KEY_DOWN && event.key.repeat == 0) { // Only trigger on initial key press
+        if (event.type == SDL_EVENT_KEY_DOWN && event.key.repeat == 0) {
+            // Only trigger on initial key press
             bool hotkey_triggered = false;
 
             // Defensive check to prevent crash if data is not ready
@@ -61,7 +66,6 @@ void handle_global_events(Tracker *t, Overlay *o, Settings *s, AppSettings *app_
                     }
                 }
             }
-
         }
 
         // --- Dispatch keyboard/mouse events ---

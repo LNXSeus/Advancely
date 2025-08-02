@@ -18,11 +18,16 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
     }
 
     // First create without he ALWAYS_ON_TOP flag
-    Uint32 window_flags = SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE; // TODO: Look into SDL_WINDOW_HIGH_PIXEL_DENSITY
+    Uint32 window_flags = SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
+    // TODO: Look into SDL_WINDOW_HIGH_PIXEL_DENSITY
 
     // Use loaded settings for window creation, with SDL_WINDOWPOS_CENTERED as a fallback
-    int x = (settings->tracker_window.x == DEFAULT_WINDOW_POS) ? (int)SDL_WINDOWPOS_CENTERED : settings->tracker_window.x;
-    int y = (settings->tracker_window.y == DEFAULT_WINDOW_POS) ? (int)SDL_WINDOWPOS_CENTERED : settings->tracker_window.y;
+    int x = (settings->tracker_window.x == DEFAULT_WINDOW_POS)
+                ? (int) SDL_WINDOWPOS_CENTERED
+                : settings->tracker_window.x;
+    int y = (settings->tracker_window.y == DEFAULT_WINDOW_POS)
+                ? (int) SDL_WINDOWPOS_CENTERED
+                : settings->tracker_window.y;
     int w = (settings->tracker_window.w == DEFAULT_WINDOW_SIZE) ? 1440 : settings->tracker_window.w;
     int h = (settings->tracker_window.h == DEFAULT_WINDOW_SIZE) ? 900 : settings->tracker_window.h;
 
@@ -46,7 +51,8 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
     SDL_SetWindowPosition(t->window, x, y);
 
     // DEBUG: Print the value being set at initialization
-    printf("[INIT SDL] Settings initial AlwaysOnTop state to: %s\n", settings->tracker_always_on_top ? "true" : "false");
+    printf("[INIT SDL] Settings initial AlwaysOnTop state to: %s\n",
+           settings->tracker_always_on_top ? "true" : "false");
 
     // More reliable than SDL_WINDOW_ALWAYS_ON_TOP flag
     SDL_SetWindowAlwaysOnTop(t->window, settings->tracker_always_on_top); // TODO: settings->tracker_always_on_top
@@ -67,8 +73,12 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
 bool overlay_init_sdl(Overlay *o, const AppSettings *settings) {
     Uint32 window_flags = SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
 
-    int x = (settings->overlay_window.x == DEFAULT_WINDOW_POS) ? (int)SDL_WINDOWPOS_CENTERED : settings->overlay_window.x;
-    int y = (settings->overlay_window.y == DEFAULT_WINDOW_POS) ? (int)SDL_WINDOWPOS_CENTERED : settings->overlay_window.y;
+    int x = (settings->overlay_window.x == DEFAULT_WINDOW_POS)
+                ? (int) SDL_WINDOWPOS_CENTERED
+                : settings->overlay_window.x;
+    int y = (settings->overlay_window.y == DEFAULT_WINDOW_POS)
+                ? (int) SDL_WINDOWPOS_CENTERED
+                : settings->overlay_window.y;
     int w = (settings->overlay_window.w == DEFAULT_WINDOW_SIZE) ? 1440 : settings->overlay_window.w;
     int h = (settings->overlay_window.h == DEFAULT_WINDOW_SIZE) ? 420 : settings->overlay_window.h;
 
@@ -102,7 +112,7 @@ bool overlay_init_sdl(Overlay *o, const AppSettings *settings) {
 }
 
 bool settings_init_sdl(Settings *s, const AppSettings *settings) {
-    (void)settings;
+    (void) settings;
     // Settings window opens relative to the tracker window
     int tracker_x, tracker_y;
     SDL_GetWindowPosition(s->parent_window, &tracker_x, &tracker_y);
@@ -111,8 +121,8 @@ bool settings_init_sdl(Settings *s, const AppSettings *settings) {
     SDL_GetWindowSize(s->parent_window, &tracker_w, &tracker_h);
 
     // Center the settings window over the tracker window
-    int x = tracker_x + ((settings->tracker_window.w - SETTINGS_WIDTH)/2);
-    int y = tracker_y + ((settings->tracker_window.h- SETTINGS_HEIGHT)/2);
+    int x = tracker_x + ((settings->tracker_window.w - SETTINGS_WIDTH) / 2);
+    int y = tracker_y + ((settings->tracker_window.h - SETTINGS_HEIGHT) / 2);
 
     printf("[INIT SDL] Tracker W: %d, H: %d\n", settings->tracker_window.w, settings->tracker_window.h);
 

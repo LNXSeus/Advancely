@@ -7,13 +7,19 @@
 
 #include "main.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
+
 // Avoid including the full header
 struct AppSettings;
 
-struct Settings { // TODO: Also needs to be defined in init_sdl.h
+struct Settings {
     SDL_Window *window;
     SDL_Renderer *renderer;
-    // SDL_Texture *texture;
+    TTF_Font *font; // TODO: Is this needed? -> Settings window will be within tracker
 
      SDL_Window *parent_window; // Keep track of the tracker window to center the settings window
 };
@@ -74,5 +80,9 @@ void settings_render(Settings *s, const AppSettings *settings);
  * @param settings A pointer to the Settings struct pointer to be freed.
  */
 void settings_free(Settings **settings);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //SETTINGS_H

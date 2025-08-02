@@ -7,6 +7,13 @@
 
 #include <SDL3/SDL_atomic.h>
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
+
 // Forward declarations
 struct Tracker;
 struct Overlay;
@@ -35,5 +42,9 @@ extern SDL_AtomicInt g_needs_update; // Global flag to signal that an update is 
 
 void handle_global_events(Tracker *t, Overlay *o, Settings *s, AppSettings *app_settings, bool *is_running,
                           bool *settings_opened, float *deltaTime);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //GLOBAL_EVENT_HANDLER_H

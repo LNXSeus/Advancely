@@ -8,6 +8,10 @@ extern "C" {
 #include <cJSON.h>
 }
 
+#include <SDL3/SDL.h>
+#include <SDL3_image/SDL_image.h>
+#include <SDL3_ttf/SDL_ttf.h>
+
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_atomic.h>
 #include <SDL3/SDL_mutex.h>
@@ -17,6 +21,11 @@ extern "C" {
 #include "global_event_handler.h"
 #include "path_utils.h" // Include for find_player_data_files
 #include "settings_utils.h" // Include for AppSettings and version checking
+
+// ImGUI imports
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_sdl3.h"
+#include "imgui/imgui_impl_sdlrenderer3.h"
 
 // global flag TODO: Should be set to true when custom goal is checked off (manual update) -> SDL_SetAtomicInt(&g_needs_update, 1);
 // We make g_needs_update available to global_event_handler.h with external linkage
@@ -107,7 +116,37 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    // Initialize SDL ttf
+    if (!TTF_Init()) {
+        fprintf(stderr, "[MAIN] Failed to initialize SDL_ttf: %s\n", SDL_GetError());
+        return EXIT_FAILURE;
+    }
+
     if (tracker_new(&tracker, &app_settings) && overlay_new(&overlay, &app_settings)) {
+
+
+        // Initialize ImGUI
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO &io = ImGui::GetIO(); (void) io;
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+
+        ImGui::StyleColorsDark(); // Or ImGui::StyleColorsClassic()
+
+        // Setup Platform/Renderer backends
+        // TODO: Maybe integrate settings window into tracker window!!!
+        // THERE SHOULD BE ANOTHER WAY TO ONLY USE IMGUI for tracker window and SDL3 for overlay and settings
+        ImGui_ImplSDL3_InitForSDLRenderer(tracker->window, tracker->renderer);
+        ImGui_ImplSDLRenderer3_Init(tracker->renderer);
+
+        // Load Fonts
+        io.Fonts->AddFontFromFileTTF("resources/fonts/Minecraft.ttf", 16.0f);
+
+        // TODO: Remove this
+        // // Roboto Font is for the settings inside the tracker
+        // tracker->roboto_font = io.Fonts->AddFontFromFileTTF("resources/fonts/Roboto-Regular.ttf", 16.0f);
+        // IM_ASSERT(tracker->roboto_font != nullptr);
+
         dmon_init();
         dmon_initialized = true;
         SDL_SetAtomicInt(&g_needs_update, 1);
@@ -116,6 +155,7 @@ int main(int argc, char *argv[]) {
         // HARDCODED SETTINGS DIRECTORY
         printf("[DMON - MAIN] Watching config directory: resources/config/\n");
         dmon_watch("resources/config/", settings_watch_callback, 0, nullptr);
+
 
         // Watch saves directory and store the watcher ID
         if (strlen(tracker->saves_path) > 0) {
@@ -148,6 +188,8 @@ int main(int argc, char *argv[]) {
 
             // Close immediately if app not running
             if (!is_running) break;
+
+
 
             // Check if settings.json has been modified
             if (SDL_SetAtomicInt(&g_settings_changed, 0) == 1) {
@@ -250,14 +292,35 @@ int main(int argc, char *argv[]) {
             }
 
             // Freeze other windows when settings are opened
+            // TODO: Render settings window in tracker
             if (settings_opened && settings != nullptr) {
                 settings_update(settings, &deltaTime);
                 settings_render(settings, &app_settings);
             } else {
                 // Overlay animations should run every frame
                 overlay_update(overlay, &deltaTime, &app_settings);
-                tracker_render(tracker, &app_settings);
-                overlay_render(overlay, &app_settings);
+
+                // IMGUI RENDERING
+                ImGui_ImplSDLRenderer3_NewFrame();
+                ImGui_ImplSDL3_NewFrame();
+                ImGui::NewFrame();
+
+                // Render the tracker GUI USING ImGui
+                tracker_render_gui(tracker, &app_settings);
+
+                // THIS IS WHERE WE WILL BUILD THE MAP FOR TRACKER WINDOW
+                // TODO: Remove this demo thing
+                // ImGui::ShowDemoWindow(); // TODO: Remove this
+
+                ImGui::Render();
+
+                SDL_SetRenderDrawColor(tracker->renderer, (Uint8)(app_settings.tracker_bg_color.r), (Uint8)(app_settings.tracker_bg_color.g), (Uint8)(app_settings.tracker_bg_color.b), (Uint8)(app_settings.tracker_bg_color.a));
+                SDL_RenderClear(tracker->renderer);
+                ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), tracker->renderer);
+                SDL_RenderPresent(tracker->renderer);
+
+
+                overlay_render(overlay, &app_settings); // Does SDL_RenderPresent
             }
 
             // --- Frame limiting ---
@@ -272,6 +335,10 @@ int main(int argc, char *argv[]) {
     if (dmon_initialized) {
         dmon_deinit();
     }
+    ImGui_ImplSDLRenderer3_Shutdown();
+    ImGui_ImplSDL3_Shutdown();
+    ImGui::DestroyContext();
+
     tracker_free(&tracker);
     overlay_free(&overlay);
     settings_free(&settings);

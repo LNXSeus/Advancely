@@ -5,9 +5,12 @@
 #ifndef FILE_UTILS_H_H
 #define FILE_UTILS_H_H
 
+#ifdef __cplusplus
 extern "C" {
+#endif
+
 #include <cJSON.h>
-}
+
 
 /**
  * @brief Reads a file from the given path and parses it into a cJSON object.
@@ -19,5 +22,10 @@ extern "C" {
  * The caller is responsible for freeing the returned object with cJSON_Delete().
  */
 cJSON* cJSON_from_file(const char* filename);
+
+#ifdef __cplusplus
+}
+#endif
+
 
 #endif //FILE_UTILS_H_H

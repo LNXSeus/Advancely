@@ -10,6 +10,12 @@
 #include "main.h" // For MAX_PATH_LENGTH
 #include "data_structures.h" // For MC_Version enum and PathMode enum
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
+
 /**
  * @brief Enum to determine how the saves path is obtained.
  */
@@ -56,5 +62,9 @@ void find_player_data_files(
     char *out_unlocks_path,
     size_t max_len
 );
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //PATH_UTILS_H

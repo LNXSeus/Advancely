@@ -8,9 +8,12 @@
 #include "path_utils.h" // For MAX_PATH_LENGTH
 #include "data_structures.h" // For MC_Version and PathMode enums
 
+#ifdef __cplusplus
 extern "C" {
+#endif
+
 #include <cJSON.h>
-}
+
 
 #define SETTINGS_FILE_PATH "resources/config/settings.json"
 #define MAX_HOTKEYS 32 // Limit for amount of hotkeys
@@ -19,8 +22,9 @@ extern "C" {
 #define DEFAULT_FPS 60
 #define DEFAULT_TRACKER_ALWAYS_ON_TOP true
 #define DEFAULT_OVERLAY_SCROLL_SPEED 1.0f
-#define DEFAULT_OVERLAY_SCROLL_LEFT_TO_RIGHT true
+// #define DEFAULT_OVERLAY_SCROLL_LEFT_TO_RIGHT true  // TODO: Remove this later, sign of scroll speed controls direction
 #define DEFAULT_GOAL_ALIGN_LEFT true
+#define DEFAULT_REMOVE_COMPLETED_GOALS true
 
 // Default window positions/sizes. -1 means centered or default size.
 #define DEFAULT_WINDOW_POS (-1)
@@ -76,8 +80,8 @@ struct AppSettings {
     float fps;
     bool tracker_always_on_top;
     float overlay_scroll_speed;
-    bool overlay_scroll_left_to_right;
     bool goal_align_left;
+    bool remove_completed_goals;
 
     // Window Geometry
     WindowRect tracker_window;
@@ -137,5 +141,9 @@ void settings_save(const AppSettings *settings, const TemplateData *td);
  * and which will be updated with the constructed paths.
  */
 void construct_template_paths(AppSettings *settings);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //SETTINGS_UTILS_H

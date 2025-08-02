@@ -8,8 +8,8 @@
     "fps": 60,
     "always_on_top": true,
     "overlay_scroll_speed": 1,
-    "overlay_scroll_left_to_right": true,
-    "goal_align_left": true
+    "goal_align_left": true,
+    "remove_completed_goals": true
   },
   "stat_progress_override": {
     "stat_category:log_collection": false,
