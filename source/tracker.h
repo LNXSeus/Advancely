@@ -9,11 +9,27 @@
 #include "data_structures.h"
 #include "settings_utils.h" // For AppSettings
 
+#include "imgui.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
+
+
 struct Tracker {
-    // TODO: Also needs to be defined in init_sdl.h
     SDL_Window *window;
     SDL_Renderer *renderer;
-    // SDL_Texture *texture;
+
+    SDL_Texture *adv_bg;
+    SDL_Texture *adv_bg_half_done;
+    SDL_Texture *adv_bg_done;
+
+    ImVec2 camera_offset;
+    float zoom_level;
+
+    ImFont *roboto_font; // Font for settings/UI -> USED BY IMGUI
+    TTF_Font *minecraft_font; // USED BY SDL_TTF
 
     // Single pointer to all the parsed and tracked game data
     TemplateData *template_data;
@@ -28,6 +44,7 @@ struct Tracker {
     char unlocks_path[MAX_PATH_LENGTH];
     char stats_path[MAX_PATH_LENGTH];
     char snapshot_path[MAX_PATH_LENGTH]; // Path to the snapshot file for legacy snapshots
+
 };
 
 
@@ -74,13 +91,21 @@ void tracker_update(Tracker *t, float *deltaTime);
  * @brief Renders the tracker window's contents.
  *
  * This function clears the screen with the background color and will be responsible for drawing
- * all visual elements of the tracker, such as advancement icons, progress bars, and text.
+ * all visual elements of the tracker, such as advancement icons, and so on.
+ * Solely for non-ImGUI SDL rendering. Currently UNUSED! -> tracker_render_gui()
  *
  * @param t A pointer to the Tracker struct.
  * @param settings A pointer to the application settings containing color information.
  */
 void tracker_render(Tracker *t, const AppSettings *settings);
 
+/**
+ * @brief Renders the tracker window's contents using ImGui.
+ *
+ * @param t Tracker struct
+ * @param settings A pointer to the application settings containing color information
+ */
+void tracker_render_gui(Tracker *t, const AppSettings *settings);
 
 /**
  * @brief Reloads settings, frees all old template data, and loads a new template.
@@ -146,5 +171,9 @@ void tracker_update_title(Tracker *t, const AppSettings *settings);
  * @param t A pointer to the Tracker struct.
  */
 void tracker_print_debug_status(Tracker *t);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif // __cplusplus
 
 #endif //TRACKER_H

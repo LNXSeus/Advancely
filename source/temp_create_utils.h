@@ -5,6 +5,11 @@
 #ifndef TEMP_CREATE_UTILS_H
 #define TEMP_CREATE_UTILS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 /**
  * @brief Ensures that the directory for a given file path exists, creating it if necessary.
  * This function is cross-platform.
@@ -24,5 +29,8 @@ void fs_create_empty_template_file(const char *path);
  */
 void fs_create_empty_lang_file(const char *path);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif //TEMP_CREATE_UTILS_H

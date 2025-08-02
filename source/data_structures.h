@@ -7,11 +7,17 @@
 #ifndef DATA_STRUCTURES_H
 #define DATA_STRUCTURES_H
 
+
 #include <SDL3/SDL.h>
 
 extern "C" {
 #include <cJSON.h>
 }
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 // If MAX_PATH_LENGTH is not defined, define it here
 #ifndef MAX_PATH_LENGTH
@@ -44,7 +50,11 @@ struct TrackableCategory {
     char root_name[192];
     char display_name[192];
     char icon_path[256];
-    SDL_Texture *texture;
+    SDL_Texture *texture; // Main icon texture for category/advancement
+
+    SDL_Texture *texture_bg;
+    SDL_Texture *texture_bg_half_done;
+    SDL_Texture *texture_bg_done;
 
     bool done;
     bool is_manually_completed; // For manually overriding stats (as they have criteria now with sub-stats)
@@ -255,5 +265,9 @@ enum  MC_Version {
     MC_VERSION_1_21_8,
     MC_VERSION_UNKNOWN // For error handling
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //DATA_STRUCTURES_H

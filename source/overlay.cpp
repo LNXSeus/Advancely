@@ -11,7 +11,7 @@
 
 bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     // dereference once and use calloc
-    *overlay = (Overlay *)calloc(1, sizeof(Overlay));
+    *overlay = (Overlay *) calloc(1, sizeof(Overlay));
     // Check here if calloc failed
     if (*overlay == nullptr) {
         fprintf(stderr, "[OVERLAY] Error allocating memory for overlay.\n");
@@ -22,6 +22,13 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     Overlay *o = *overlay;
 
     if (!overlay_init_sdl(o, settings)) {
+        overlay_free(overlay);
+        return false;
+    }
+
+    o->font = TTF_OpenFont("resources/fonts/Minecraft.ttf", 24);
+    if (!o->font) {
+        fprintf(stderr, "[OVERLAY] Failed to load font: %s\n", SDL_GetError());
         overlay_free(overlay);
         return false;
     }
@@ -71,11 +78,10 @@ void overlay_update(Overlay *o, float *deltaTime, const AppSettings *settings) {
     // Game logic here
     // Animate the scroll offset
     float scroll_speed = settings->overlay_scroll_speed;
-    float direction = settings->overlay_scroll_left_to_right ? 1.0f : -1.0f;
 
-    // TODO: Adjust the 50.0f is just arbitrary multiplier
-    // Can be turned into a setting later
-    o->scroll_offset += scroll_speed * direction * (*deltaTime) * 50.0f;
+    // TODO: Adjust the 50.0f, it's just an arbitrary multiplier
+    // Can be turned into a setting later, scroll speed now has direction
+    o->scroll_offset += scroll_speed * (*deltaTime) * 50.0f;
 
     // TODO: Wrap scroll_offset based on the total width of rendered overlay content.
     // For example: if (o->scroll_offset > total_content_width) { o->scroll_offset = 0; }
@@ -99,12 +105,37 @@ void overlay_render(Overlay *o, const AppSettings *settings) {
     // For now, this just draws the bar.
 
     // present backbuffer
+    // SDL_RenderPresent(o->renderer);
+
+    // TODO: Expand this
+    // Example drawing one item
+    SDL_Color text_color = {
+        settings->text_color.r, settings->text_color.g, settings->text_color.b, settings->text_color.a
+    };
+    SDL_Surface *text_surface = TTF_RenderText_Solid(o->font, "Example Advancement", 0, text_color);
+    // 0 for null terminated text
+    if (text_surface) {
+        SDL_Texture *text_texture = SDL_CreateTextureFromSurface(o->renderer, text_surface);
+        if (text_texture) {
+            // TODO: Change size of advancement backgrounds and text for overlay here
+            SDL_FRect dest_rect = {100.0f, 100.0f, (float) text_surface->w, (float) text_surface->h};
+            SDL_RenderTexture(o->renderer, text_texture, nullptr, &dest_rect);
+            SDL_DestroyTexture(text_texture);
+        }
+        SDL_DestroySurface(text_surface);
+    }
+
     SDL_RenderPresent(o->renderer);
 }
 
 void overlay_free(Overlay **overlay) {
     if (overlay && *overlay) {
         Overlay *o = *overlay;
+
+        if (o->font) {
+            TTF_CloseFont(o->font);
+            o->font = nullptr;
+        }
 
         if (o->renderer) {
             SDL_DestroyRenderer(o->renderer);
