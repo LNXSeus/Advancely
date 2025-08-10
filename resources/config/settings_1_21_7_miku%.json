@@ -1,0 +1,61 @@
+{
+  "path_mode":	"manual",
+  "manual_saves_path":	"C:\\Users\\Linus\\AppData\\Roaming\\PrismLauncher\\instances\\1.21.6\\minecraft\\saves",
+  "version":	"1.21.7",
+  "category":	"miku%",
+  "optional_flag":	"",
+  "general":	{
+    "fps":	60,
+    "always_on_top":	true,
+    "overlay_scroll_speed":	1,
+    "goal_align_left":	true,
+    "remove_completed_goals": true
+  },
+  "stat_progress_override":	{
+    "stat_cat:trims_crafting": false,
+    "stat_cat:trims_crafting.criteria.minecraft:crafted/minecraft:snout_armor_trim_smithing_template": false,
+    "stat_cat:trims_crafting.criteria.minecraft:crafted/minecraft:netherite_upgrade_smithing_template": false,
+    "stat_cat:get_27_diamonds": false,
+    "stat_cat:mine_16_debris": false
+  },
+  "custom_progress":	{},
+  "hotkeys":	[{}],
+  "visuals":	{
+    "tracker_window":	{
+      "x":	-2236,
+      "y":	814,
+      "w":	1428,
+      "h":	866
+    },
+    "overlay_window":	{
+      "x":	26,
+      "y":	44,
+      "w":	1440,
+      "h":	420
+    },
+    "tracker_bg_color":	{
+      "r":	13,
+      "g":	17,
+      "b":	23,
+      "a":	255
+    },
+    "overlay_bg_color":	{
+      "r":	0,
+      "g":	80,
+      "b":	255,
+      "a":	255
+    },
+    "settings_bg_color":	{
+      "r":	13,
+      "g":	17,
+      "b":	23,
+      "a":	255
+    },
+    "text_color":	{
+      "r":	255,
+      "g":	255,
+      "b":	255,
+      "a":	255
+    }
+  }
+}

@@ -1863,6 +1863,8 @@ void tracker_render(Tracker *t, const AppSettings *settings) {
     // SDL_RenderPresent(t->renderer);
 }
 
+// TODO: Continue here, settings window integrated into tracker window
+// Animate overlay, display more than just advancements
 void tracker_render_gui(Tracker *t, const AppSettings *settings) {
     if (!t || !t->template_data) return;
 
@@ -1902,6 +1904,10 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
     ImU32 text_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
                                 settings->text_color.a);
 
+    // TODO: Make fade opacity adjustable (alpha value)
+    ImU32 text_color_faded = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b, 100);
+    ImU32 icon_tint_faded = IM_COL32(255, 255, 255, 100);
+
     // Drawing Logic
     // TODO: Simple  Grid layout for now, real layout algorithm will be a lot more complex
     float padding = 50.0f;
@@ -1918,15 +1924,21 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
             continue;
         }
 
+        // dynamically clear criteria when completed
+        int visible_criteria_count = 0;
+        if (adv->criteria_count > 1) {
+            for (int j = 0; j < adv->criteria_count; j++) {
+                if (adv->criteria[j] && (!adv->criteria[j]->done || !settings->remove_completed_goals)) {
+                    visible_criteria_count++;
+                }
+            }
+        }
+
         // --- Calculate Item Dimensions ---
         ImVec2 bg_size = ImVec2(96.0f, 96.0f);
         ImVec2 text_size = ImGui::CalcTextSize(adv->display_name);
         float item_width = fmaxf(bg_size.x, text_size.x);
-
-        float criteria_height = 0.0f;
-        if (adv->criteria_count > 1) {
-            criteria_height = (float)adv->criteria_count * 36.0f; // 36px per criterion
-        }
+        float criteria_height = (float)visible_criteria_count * 36.0f;
         float item_height = bg_size.y + text_size.y + 4.0f + criteria_height;
 
         // --- Handle Row Wrapping ---
@@ -1949,14 +1961,28 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
             float sub_item_y_offset = current_y + bg_size.y + 20.0f;
             for (int j = 0; j < adv->criteria_count; j++) {
                 TrackableItem* crit = adv->criteria[j];
-                if (crit) {
-                     ImVec2 crit_screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x, (sub_item_y_offset * t->zoom_level) + t->camera_offset.y);
-                     if (crit->texture) {
-                        draw_list->AddImage((void*)crit->texture, crit_screen_pos, ImVec2(crit_screen_pos.x + 32 * t->zoom_level, crit_screen_pos.y + 32 * t->zoom_level));
-                     }
-                     draw_list->AddText(nullptr, 14.0f * t->zoom_level, ImVec2(crit_screen_pos.x + 36 * t->zoom_level, crit_screen_pos.y + 8 * t->zoom_level), text_color, crit->display_name);
-                     sub_item_y_offset += 36.0f;
+                if (!crit) continue;
+
+                // Decide whether to draw this item at all.
+                if (crit->done && settings->remove_completed_goals) {
+                    continue; // Skip this iteration, effectively removing the item and tidying up.
                 }
+
+                // If we are here, we are drawing the item.
+                ImVec2 crit_screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x, (sub_item_y_offset * t->zoom_level) + t->camera_offset.y);
+                ImVec2 crit_icon_size = ImVec2(32 * t->zoom_level, 32 * t->zoom_level);
+                ImVec2 crit_text_pos = ImVec2(crit_screen_pos.x + 36 * t->zoom_level, crit_screen_pos.y + 8 * t->zoom_level);
+
+                // Determine color/opacity based on completion status
+                ImU32 current_text_color = crit->done ? text_color_faded : text_color;
+                ImU32 icon_tint = crit->done ? icon_tint_faded : IM_COL32_WHITE;
+
+                if (crit->texture) {
+                    draw_list->AddImage((void*)crit->texture, crit_screen_pos, ImVec2(crit_screen_pos.x + crit_icon_size.x, crit_screen_pos.y + crit_icon_size.y), ImVec2(0,0), ImVec2(1,1), icon_tint);
+                }
+                draw_list->AddText(nullptr, 14.0f * t->zoom_level, crit_text_pos, current_text_color, crit->display_name);
+
+                sub_item_y_offset += 36.0f;
             }
         }
 
