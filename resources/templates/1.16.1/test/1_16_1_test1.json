@@ -73,7 +73,7 @@
       "criteria": {}
     },
     "minecraft:adventure/adventuring_time": {
-      "icon": "items/1.21.7/diamond_boots.png",
+      "icon": "items/diamond_boots_20w14infinite.png",
       "criteria": {
         "minecraft:plains": {
           "icon": "ovBiomes/plains.png"
