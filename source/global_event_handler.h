@@ -17,12 +17,13 @@ extern "C" {
 // Forward declarations
 struct Tracker;
 struct Overlay;
-struct Settings;
+// struct Settings; // TODO: Remove this when possible
 struct AppSettings;
 
 
 // This global variable is defined in main.cpp and made accessible here
 extern SDL_AtomicInt g_needs_update; // Global flag to signal that an update is needed initially in main.c
+extern SDL_AtomicInt g_settings_changed;
 
 /**
  * @brief Processes the global SDL event queue.
@@ -33,14 +34,13 @@ extern SDL_AtomicInt g_needs_update; // Global flag to signal that an update is 
  *
  * @param t A pointer to the main tracker struct.
  * @param o A pointer to the overlay struct.
- * @param s A pointer to the settings struct.
  * @param app_settings A pointer to the loaded application settings to be modified and saved.
  * @param is_running A pointer to the main application loop's running flag.
  * @param settings_opened A pointer to the settings window's opened flag.
  * @param deltaTime A pointer to the frame's delta time, passed to the overlay event handler.
  */
 
-void handle_global_events(Tracker *t, Overlay *o, Settings *s, AppSettings *app_settings, bool *is_running,
+void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings, bool *is_running,
                           bool *settings_opened, float *deltaTime);
 
 #ifdef __cplusplus

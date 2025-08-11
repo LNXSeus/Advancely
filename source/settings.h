@@ -6,6 +6,7 @@
 #define SETTINGS_H
 
 #include "main.h"
+#include "tracker.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,70 +17,20 @@ extern "C" {
 // Avoid including the full header
 struct AppSettings;
 
-struct Settings {
-    SDL_Window *window;
-    SDL_Renderer *renderer;
-    TTF_Font *font; // TODO: Is this needed? -> Settings window will be within tracker
-
-     SDL_Window *parent_window; // Keep track of the tracker window to center the settings window
-};
-
 /**
- * @brief Initializes a new Settings window instance.
+ * @brief Renders the GUI for the settings window within the tracker window using ImGui.
+ * The controls stay the same with escape key to open and close.
+ * Also refers to temp_create_utils for template creator.
  *
- * Allocates memory for the Settings struct and initializes its corresponding
- * SDL window and renderer.
- *
- * @param settings A pointer to a Settings struct pointer that will be allocated.
- * @param app_settings A pointer to the loaded application settings.
- * @param parent A pointer to the main tracker window, used for positioning.
- * @return true if initialization was successful, false otherwise.
+ * @param p_open Provides the 'X' button to close the window.
+ * @param app_settings A pointer to the loaded application settings struct.
+ * @param roboto_font A pointer to the loaded Roboto font.
+ * @param t A pointer to the Tracker struct.
  */
-bool settings_new(Settings **settings, const AppSettings *app_settings, SDL_Window *parent);
+void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t);
 
-/**
- * @brief Handles SDL events specifically for the settings window.
- *
- * Processes events like closing the window via the ESCAPE key.
- *
- * @param s A pointer to the Settings struct.
- * @param event A pointer to the SDL_Event to process.
- * @param is_running A pointer to the main application loop's running flag.
- * @param settings_opened A pointer to the flag that controls the settings window's visibility.
- */
-void settings_events(Settings *s, SDL_Event *event, bool *is_running, bool *settings_opened);
 
-/**
- * @brief Updates the state of the settings window.
- *
- * This function is a placeholder for future logic, such as handling user input
- * from UI elements within the settings window.
- *
- * @param s A pointer to the Settings struct.
- * @param deltaTime A pointer to the frame's delta time.
- */
-void settings_update(Settings *s, float *deltaTime);
 
-/**
- * @brief Renders the settings window's contents.
- *
- * Clears the screen with the background color. This is where all UI elements
- * for the settings will be drawn.
- *
- * @param s A pointer to the Settings struct.
- * @param settings A pointer to the application settings containing color information.
- */
-void settings_render(Settings *s, const AppSettings *settings);
-
-/**
- * @brief Frees all resources associated with the Settings instance.
- *
- * This includes destroying the SDL renderer and window and deallocating
- * the memory for the Settings struct itself.
- *
- * @param settings A pointer to the Settings struct pointer to be freed.
- */
-void settings_free(Settings **settings);
 
 #ifdef __cplusplus
 }

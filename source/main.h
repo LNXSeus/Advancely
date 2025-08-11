@@ -15,6 +15,7 @@
 #include <SDL3_ttf/SDL_ttf.h> // TODO: Remove this later
 
 
+#include "imstb_truetype.h"
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_sdl3.h"
 #include "imgui/imgui_impl_sdlrenderer3.h"
@@ -29,17 +30,17 @@ extern "C" {
 #define SDL_FLAGS SDL_INIT_VIDEO // TODO: OR'd together with SDL_INIT_AUDIO
 
 #define TRACKER_TITLE "Advancely"
-#define ADVANCELY_VERSION "v0.7.5" // vMAJOR.MINOR.PATCH // TODO: Update this always
+#define ADVANCELY_VERSION "v0.7.6" // vMAJOR.MINOR.PATCH // TODO: Update this always
 #define ADVANCELY_ICON_PATH "resources/gui/Advancely_Logo_NoText.png" // TODO: Use this in tracker_init_sdl()
 
 // Settings window is NOT USER CONFIGURABLE SO HARDCODED HERE, ONLY COLOR IS
 // Settings window will be part of tracker window
 // Tracker window flags are in init_sdl.c in tracker_init_sdl()
-#define SDL_SETTINGS_WINDOW_FLAGS (SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_ALWAYS_ON_TOP)
-#define SETTINGS_TITLE "Advancely Settings"
-#define SETTINGS_WIDTH 1280
-#define SETTINGS_HEIGHT 720
 
+// TODO: Settings window flags are in settings.cpp
+// #define SETTINGS_TITLE "Advancely Settings"
+// #define SETTINGS_WIDTH 1280
+// #define SETTINGS_HEIGHT 720
 
 #define OVERLAY_TITLE "Advancely Overlay"
 

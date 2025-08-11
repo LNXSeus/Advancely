@@ -30,7 +30,7 @@ extern "C" {
 // global flag TODO: Should be set to true when custom goal is checked off (manual update) -> SDL_SetAtomicInt(&g_needs_update, 1);
 // We make g_needs_update available to global_event_handler.h with external linkage
 SDL_AtomicInt g_needs_update;
-static SDL_AtomicInt g_settings_changed; // Watching when settings.json is modified to re-init paths
+SDL_AtomicInt g_settings_changed; // Watching when settings.json is modified to re-init paths
 
 // Global mutex to protect the watcher and paths (see they don't break when called in close succession)
 static SDL_Mutex *g_watcher_mutex = nullptr;
@@ -105,7 +105,6 @@ int main(int argc, char *argv[]) {
 
     Tracker *tracker = nullptr; // pass address to function
     Overlay *overlay = nullptr;
-    Settings *settings = nullptr;
 
     // Variable to hold the ID of our saves watcher
     dmon_watch_id saves_watcher_id;
@@ -123,12 +122,11 @@ int main(int argc, char *argv[]) {
     }
 
     if (tracker_new(&tracker, &app_settings) && overlay_new(&overlay, &app_settings)) {
-
-
         // Initialize ImGUI
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
-        ImGuiIO &io = ImGui::GetIO(); (void) io;
+        ImGuiIO &io = ImGui::GetIO();
+        (void) io;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
 
         ImGui::StyleColorsDark(); // Or ImGui::StyleColorsClassic()
@@ -142,10 +140,11 @@ int main(int argc, char *argv[]) {
         // Load Fonts
         io.Fonts->AddFontFromFileTTF("resources/fonts/Minecraft.ttf", 16.0f);
 
-        // TODO: Remove this
-        // // Roboto Font is for the settings inside the tracker
-        // tracker->roboto_font = io.Fonts->AddFontFromFileTTF("resources/fonts/Roboto-Regular.ttf", 16.0f);
-        // IM_ASSERT(tracker->roboto_font != nullptr);
+        // Roboto Font is for the settings inside the tracker
+        tracker->roboto_font = io.Fonts->AddFontFromFileTTF("resources/fonts/Roboto-Regular.ttf", 16.0f);
+        if (tracker->roboto_font == nullptr) {
+            fprintf(stderr, "[MAIN - IMGUI] Failed to load font: resources/fonts/Roboto-Regular.ttf. Settings window will use default font.\n");
+        }
 
         dmon_init();
         dmon_initialized = true;
@@ -183,74 +182,41 @@ int main(int argc, char *argv[]) {
             // Lock mutex before touching watchers or paths
             SDL_LockMutex(g_watcher_mutex);
 
-            handle_global_events(tracker, overlay, settings, &app_settings, &is_running, &settings_opened, &deltaTime);
+            handle_global_events(tracker, overlay, &app_settings, &is_running, &settings_opened, &deltaTime);
 
 
             // Close immediately if app not running
             if (!is_running) break;
 
 
-
-            // Check if settings.json has been modified
+            // Check if settings.json has been modified (by UI or external editor)
+            // Single point of truth for tracker data, triggered by "Apply" button
             if (SDL_SetAtomicInt(&g_settings_changed, 0) == 1) {
-                printf("[MAIN] Settings changed. Re-initializing paths and file watcher.\n");
+                printf("[MAIN] Settings changed. Re-initializing template and file watcher.\n");
 
-                // Store old critical settings for comparison
-                // Making sure only NOT EVERY change in settings.json reloads game data (problem with legacy version
-                // resetting difference to snapshot when tracker window was moved)
-                char old_version[64];
-                char old_category[MAX_PATH_LENGTH];
-                PathMode old_path_mode = app_settings.path_mode;
-                char old_manual_path[MAX_PATH_LENGTH];
-                char old_optional_flag[MAX_PATH_LENGTH];
+                // Stop watching the old directory
+                dmon_unwatch(saves_watcher_id);
 
-                strncpy(old_version, app_settings.version_str, 64);
-                strncpy(old_category, app_settings.category, MAX_PATH_LENGTH);
-                strncpy(old_manual_path, app_settings.manual_saves_path, MAX_PATH_LENGTH);
-                strncpy(old_optional_flag, app_settings.optional_flag, MAX_PATH_LENGTH);
+                // Reload settings from file to get the latest changes
+                settings_load(&app_settings);
 
-                // Update hotkeys during runtime
-                settings_load(&app_settings); // Reload settings
+                // Update the tracker with the new paths and template data
+                tracker_reinit_template(tracker, &app_settings);
 
-                // ONLY RE-INIT IF A CRITICAL SETTING HAS CHANGED
-                // Not something like window position of the tracker
-                // Changes that need to be made in the settings.json to trigger a full reload
-                if (strcmp(old_version, app_settings.version_str) != 0 ||
-                    strcmp(old_category, app_settings.category) != 0 ||
-                    strcmp(old_optional_flag, app_settings.optional_flag) != 0 ||
-                    old_path_mode != app_settings.path_mode ||
-                    (app_settings.path_mode == PATH_MODE_MANUAL && strcmp(
-                         old_manual_path, app_settings.manual_saves_path) != 0)) {
-                    printf(
-                        "[MAIN] Critical settings (saves path, version, category) changed. Re-initializing template and file watcher.\n");
-
-                    // Stop watching the old directory when critical changes were made to settings.json
-                    dmon_unwatch(saves_watcher_id);
-
-                    // Update the tracker with the new paths and template data
-                    tracker_reinit_template(tracker, &app_settings);
-
-                    // Start watching the new directory when critical changes were made to settings.json
-                    if (strlen(tracker->saves_path) > 0) {
-                        printf("[MAIN] Now watching new saves directory: %s\n", tracker->saves_path);
-                        saves_watcher_id = dmon_watch(tracker->saves_path, global_watch_callback,
-                                                      DMON_WATCHFLAGS_RECURSIVE,
-                                                      nullptr);
-                    }
-                } else {
-                    printf("[MAIN] Non-critical settings changed. Applying changes without full reload.\n");
+                // Start watching the new directory
+                if (strlen(tracker->saves_path) > 0) {
+                    printf("[MAIN] Now watching new saves directory: %s\n", tracker->saves_path);
+                    saves_watcher_id = dmon_watch(tracker->saves_path, global_watch_callback,
+                                                  DMON_WATCHFLAGS_RECURSIVE,
+                                                  nullptr);
                 }
 
+                // Force a data update and apply non-critical changes
                 SDL_SetAtomicInt(&g_needs_update, 1);
-
-                // ALWAYS apply non-critical changes
-                frame_target_time = 1000.0f / app_settings.fps; // Update frame limiter if fps has changed in settings
-
-                // Change always on top flag during runtime in settings.json
-                if (!settings_opened) {
-                    SDL_SetWindowAlwaysOnTop(tracker->window, app_settings.tracker_always_on_top);
-                }
+                frame_target_time = 1000.0f / app_settings.fps;
+                SDL_SetWindowAlwaysOnTop(tracker->window, app_settings.tracker_always_on_top);
             }
+
 
             // Check if dmon (or manual update through custom goal) has requested an update
             // Atomically check if the flag is 1, and if so, set it to 0.
@@ -280,48 +246,37 @@ int main(int argc, char *argv[]) {
             // Unlock mutex after all updates are done
             SDL_UnlockMutex(g_watcher_mutex);
 
-            // Initialize settings when not opened
-            if (settings_opened && settings == nullptr) {
-                // Disable always-on-top before opening settings
-                SDL_SetWindowAlwaysOnTop(tracker->window, false);
-                if (!settings_new(&settings, &app_settings, tracker->window)) settings_opened = false;
-            } else if (!settings_opened && settings != nullptr) {
-                // Restore always-on-top statues based on settings when closing settings
-                SDL_SetWindowAlwaysOnTop(tracker->window, app_settings.tracker_always_on_top);
-                settings_free(&settings);
-            }
+            // Overlay animations should run every frame
+            overlay_update(overlay, &deltaTime, &app_settings);
 
-            // Freeze other windows when settings are opened
-            // TODO: Render settings window in tracker
-            if (settings_opened && settings != nullptr) {
-                settings_update(settings, &deltaTime);
-                settings_render(settings, &app_settings);
-            } else {
-                // Overlay animations should run every frame
-                overlay_update(overlay, &deltaTime, &app_settings);
+            // IMGUI RENDERING
+            ImGui_ImplSDLRenderer3_NewFrame();
+            ImGui_ImplSDL3_NewFrame();
+            ImGui::NewFrame();
 
-                // IMGUI RENDERING
-                ImGui_ImplSDLRenderer3_NewFrame();
-                ImGui_ImplSDL3_NewFrame();
-                ImGui::NewFrame();
+            // Render the tracker GUI USING ImGui
+            tracker_render_gui(tracker, &app_settings);
 
-                // Render the tracker GUI USING ImGui
-                tracker_render_gui(tracker, &app_settings);
-
-                // THIS IS WHERE WE WILL BUILD THE MAP FOR TRACKER WINDOW
-                // TODO: Remove this demo thing
-                // ImGui::ShowDemoWindow(); // TODO: Remove this
-
-                ImGui::Render();
-
-                SDL_SetRenderDrawColor(tracker->renderer, (Uint8)(app_settings.tracker_bg_color.r), (Uint8)(app_settings.tracker_bg_color.g), (Uint8)(app_settings.tracker_bg_color.b), (Uint8)(app_settings.tracker_bg_color.a));
-                SDL_RenderClear(tracker->renderer);
-                ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), tracker->renderer);
-                SDL_RenderPresent(tracker->renderer);
+            // Render settings window in tracker window
+            // settings_opened flag is triggered by Esc key -> tracker_events() and global event handler
+            settings_render_gui(&settings_opened, &app_settings, tracker->roboto_font, tracker);
 
 
-                overlay_render(overlay, &app_settings); // Does SDL_RenderPresent
-            }
+            // ImGui::ShowDemoWindow(); // TODO: Remove this
+
+            ImGui::Render();
+
+            SDL_SetRenderDrawColor(tracker->renderer, (Uint8) (app_settings.tracker_bg_color.r),
+                                   (Uint8) (app_settings.tracker_bg_color.g), (Uint8) (app_settings.tracker_bg_color.b),
+                                   (Uint8) (app_settings.tracker_bg_color.a));
+            SDL_RenderClear(tracker->renderer);
+            ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), tracker->renderer);
+            SDL_RenderPresent(tracker->renderer);
+
+
+            // Overlay window gets rendered using SDL
+            overlay_render(overlay, &app_settings);
+
 
             // --- Frame limiting ---
             const float frame_time = (float) SDL_GetTicks() - current_time;
@@ -341,7 +296,6 @@ int main(int argc, char *argv[]) {
 
     tracker_free(&tracker);
     overlay_free(&overlay);
-    settings_free(&settings);
     SDL_DestroyMutex(g_watcher_mutex); // Destroy the mutex
     SDL_Quit(); // This is ONCE for all windows
 

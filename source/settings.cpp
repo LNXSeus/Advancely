@@ -4,108 +4,145 @@
 
 
 #include "settings.h"
-#include "settings_utils.h"
-#include "init_sdl.h"
+#include "settings_utils.h" // ImGui imported through this
+#include "global_event_handler.h" // For global variables
 
-#include <cstdio>
-#include <cstdlib>
+// #include "init_sdl.h" // TODO: Remove this when possible
 
-bool settings_new(Settings **settings, const AppSettings *app_settings, SDL_Window *parent) {
-    // dereference once and use calloc
-    *settings = (Settings *)calloc(1, sizeof(Settings));
-    // Check here if calloc failed
-    if (*settings == nullptr) {
-        fprintf(stderr, "[SETTINGS] Error allocating memory for settings.\n");
-        return false;
+void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t) {
+    if (!*p_open) {
+        return;
     }
 
-    // temp variable to dereference over and over again
-    Settings *s = *settings;
-    s->parent_window = parent; // Store the parent window
+    // This static variable tracks the open state from the previous frame
+    static bool was_open_last_frame = false;
 
-    if (!settings_init_sdl(s, app_settings)) {
-        settings_free(settings);
-        return false;
+    // HOlds temporary copy of the settings for editing
+    static AppSettings temp_settings;
+
+    // If the window was just opened (i.e., it was closed last frame but is open now),
+    // we copy the current live settings into our temporary editing struct.
+    if (*p_open && !was_open_last_frame) {
+        memcpy(&temp_settings, app_settings, sizeof(AppSettings));
     }
-    return true;
-}
+    was_open_last_frame = *p_open;
 
 
-void settings_events(Settings *s, SDL_Event *event, bool *is_running, bool *settings_opened) {
-    (void) s;
-    (void) is_running;
+    // Begin an ImGui window. The 'p_open' parameter provides the 'X' button to close it.
+    ImGui::Begin("Advancely Settings", p_open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
 
-    switch (event->type) {
-        case SDL_EVENT_KEY_DOWN:
-            if (event->key.repeat == 0) {
-                switch (event->key.scancode) {
-                    case SDL_SCANCODE_ESCAPE:
-                        // Close settings
-                        printf("[SETTINGS] Settings Escape key pressed, closing settings.\n");
-                        *settings_opened = false;
-                        break;
-                    default:
-                        break;
-                }
-            }
-            break;
-        // TODO: Work with mouse events
-        case SDL_EVENT_MOUSE_BUTTON_DOWN:
-            // printf("[SETTINGS] Mouse button pressed in settings.\n");
-            break;
-        case SDL_EVENT_MOUSE_MOTION:
-            // printf("[SETTINGS] Mouse moved in settings.\n");
-            break;
-        case SDL_EVENT_MOUSE_BUTTON_UP:
-            // printf("[SETTINGS] Mouse button released in settings.\n");
-            break;
-        default:
-            break;
+    if (roboto_font) {
+        ImGui::PushFont(roboto_font);
     }
-}
 
-void settings_update(Settings *s, float *deltaTime) {
-    // Game logic here
-    (void) s;
-    (void) deltaTime;
-}
+    // --- Path Settings ---
+    ImGui::Text("Path Settings");
 
 
-void settings_render(Settings *s, const AppSettings *app_settings) {
-    SDL_SetRenderDrawColor(s->renderer, app_settings->settings_bg_color.r, app_settings->settings_bg_color.g,
-                           app_settings->settings_bg_color.b, app_settings->settings_bg_color.a);
-    // Clear the screen
-    SDL_RenderClear(s->renderer);
+    bool path_mode_is_auto = (temp_settings.path_mode == PATH_MODE_AUTO);
+    if (ImGui::Checkbox("Auto-detect saves path", &path_mode_is_auto)) {
+        temp_settings.path_mode = path_mode_is_auto ? PATH_MODE_AUTO : PATH_MODE_MANUAL;
+    }
 
-    // DRAWING HAPPENS HERE
+    if (temp_settings.path_mode == PATH_MODE_MANUAL) {
+        ImGui::Indent();
+        ImGui::InputText("Manual Saves Path", temp_settings.manual_saves_path, MAX_PATH_LENGTH);
+        ImGui::Unindent();
+    }
 
-    // present backbuffer
-    SDL_RenderPresent(s->renderer);
-}
+    ImGui::Separator();
+    ImGui::Spacing();
 
-void settings_free(Settings **settings) {
-    if (settings && *settings) {
-        Settings *s = *settings;
+    // --- Template Settings ---
+    ImGui::Text("Template Settings");
 
-        if (s->renderer) {
-            SDL_DestroyRenderer(s->renderer);
 
-            // We still have an address
-            s->renderer = nullptr;
+    int current_version_idx = -1;
+    for (int i = 0; i < VERSION_STRINGS_COUNT; i++) {
+        if (strcmp(VERSION_STRINGS[i], temp_settings.version_str) == 0) {
+            current_version_idx = i;
+            break;
         }
-
-        if (s->window) {
-            SDL_DestroyWindow(s->window);
-
-            // We still have an address
-            s->window = nullptr;
-        }
-
-        // settings is heap allocated so free it
-        free(s);
-        s = nullptr;
-        *settings = nullptr;
-
-        printf("[SETTINGS] Settings freed!\n");
     }
+
+    if (ImGui::Combo("Version", &current_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT)) {
+        if (current_version_idx >= 0) {
+            strncpy(temp_settings.version_str, VERSION_STRINGS[current_version_idx],
+                    sizeof(temp_settings.version_str) - 1);
+        }
+    }
+
+    ImGui::InputText("Category", temp_settings.category, MAX_PATH_LENGTH);
+    ImGui::InputText("Optional Flag", temp_settings.optional_flag, MAX_PATH_LENGTH);
+
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    // General Settings
+    ImGui::Text("General Settings");
+    ImGui::DragFloat("FPS Limit", &temp_settings.fps, 1.0f, 10.0f, 500.0f, "%.0f");
+    ImGui::DragFloat("Overlay Scroll Speed", &temp_settings.overlay_scroll_speed, 0.01f, -100.00f, 100.00f, "%.2f");
+
+    ImGui::Checkbox("Always on top", &temp_settings.tracker_always_on_top);
+    ImGui::SameLine();
+    ImGui::Checkbox("Goal align left", &temp_settings.goal_align_left);
+    ImGui::SameLine();
+    ImGui::Checkbox("Remove completed goals", &temp_settings.remove_completed_goals);
+
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    ImGui::Text("Visual Settings");
+
+    // Helper arrays to convert Uint8[0-255] to float[0-1] for ImGui color pickers
+    static float tracker_bg[4], overlay_bg[4], text_col[4];
+    tracker_bg[0] = (float) temp_settings.tracker_bg_color.r / 255.0f;
+    tracker_bg[1] = (float) temp_settings.tracker_bg_color.g / 255.0f;
+    tracker_bg[2] = (float) temp_settings.tracker_bg_color.b / 255.0f;
+    tracker_bg[3] = (float) temp_settings.tracker_bg_color.a / 255.0f;
+    overlay_bg[0] = (float) temp_settings.overlay_bg_color.r / 255.0f;
+    overlay_bg[1] = (float) temp_settings.overlay_bg_color.g / 255.0f;
+    overlay_bg[2] = (float) temp_settings.overlay_bg_color.b / 255.0f;
+    overlay_bg[3] = (float) temp_settings.overlay_bg_color.a / 255.0f;
+    text_col[0] = (float) temp_settings.text_color.r / 255.0f;
+    text_col[1] = (float) temp_settings.text_color.g / 255.0f;
+    text_col[2] = (float) temp_settings.text_color.b / 255.0f;
+    text_col[3] = (float) temp_settings.text_color.a / 255.0f;
+
+    if (ImGui::ColorEdit4("Tracker BG", tracker_bg)) {
+        temp_settings.tracker_bg_color = {(Uint8)(tracker_bg[0]*255), (Uint8)(tracker_bg[1]*255), (Uint8)(tracker_bg[2]*255), (Uint8)(tracker_bg[3]*255)};
+    }
+    if (ImGui::ColorEdit4("Overlay BG", overlay_bg)) {
+        temp_settings.overlay_bg_color = {(Uint8)(overlay_bg[0]*255), (Uint8)(overlay_bg[1]*255), (Uint8)(overlay_bg[2]*255), (Uint8)(overlay_bg[3]*255)};
+    }
+    if (ImGui::ColorEdit4("Text Color", text_col)) {
+        temp_settings.text_color = {(Uint8)(text_col[0]*255), (Uint8)(text_col[1]*255), (Uint8)(text_col[2]*255), (Uint8)(text_col[3]*255)};
+    }
+
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    // Apply the changes
+    if (ImGui::Button("Apply settings")) {
+        // When the button is clicked, copy temp settings to the real settings, save, and trigger a reload
+        memcpy(app_settings, &temp_settings, sizeof(AppSettings));
+        SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
+        settings_save(app_settings, nullptr);
+        SDL_SetAtomicInt(&g_settings_changed, 1); // Trigger a reload
+    }
+
+    // Place the next button on the same line
+    ImGui::SameLine();
+
+    if (ImGui::Button("Reset to Defaults")) {
+        // Reset the temporary settings struct to the default values
+        settings_set_defaults(&temp_settings);
+    }
+
+
+    if (roboto_font) {
+        ImGui::PopFont();
+    }
+
+    ImGui::End();
 }

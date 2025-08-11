@@ -95,13 +95,13 @@ struct AppSettings {
     // Colors
     ColorRGBA tracker_bg_color;
     ColorRGBA overlay_bg_color;
-    ColorRGBA settings_bg_color;
     ColorRGBA text_color;
 };
 
 
 /**
- * @brief Converts a version string (e.g., "1.12") to an MC_Version enum.
+ * @brief Converts a version string (e.g., "1.12") to an MC_Version enum (e.g., MC_VERSION_1_12).
+ *
  * @param version_str The string to convert.
  * @return The corresponding MC_Version enum, or MC_VERSION_UNKNOWN.
  */
@@ -113,6 +113,14 @@ MC_Version settings_get_version_from_string(const char *version_str);
  * @return The corresponding PathMode enum.
  */
 PathMode settings_get_path_mode_from_string(const char *mode_str);
+
+
+/**
+ * @brief Populates an AppSettings struct with the default application settings.
+ *
+ * @param settings A pointer to the AppSettings struct to be populated.
+ */
+void settings_set_defaults(AppSettings *settings);
 
 /**
  * @brief Loads settings from the settings.json file.
