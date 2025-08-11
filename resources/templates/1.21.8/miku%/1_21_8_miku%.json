@@ -1,11 +1,11 @@
 {
   "advancements": {
     "minecraft:story/smelt_iron": {
-      "icon": "items/1.21.7/iron_ingot.png",
+      "icon": "items/iron_ingot_25w14craftmine.png",
       "criteria": {}
     },
     "minecraft:story/enter_the_nether": {
-      "icon": "items/1.21.7/flint_and_steel.png",
+      "icon": "items/flint_and_steel_25w14craftmine.png",
       "criteria": {}
     },
     "minecraft:nether/find_bastion": {
@@ -21,15 +21,15 @@
       "criteria": {}
     },
     "minecraft:adventure/kill_a_mob": {
-      "icon": "items/1.21.7/iron_sword.png",
+      "icon": "items/iron_sword_25w14craftmine.png",
       "criteria": {}
     },
     "minecraft:nether/obtain_blaze_rod": {
-      "icon": "items/1.21.7/blaze_rod.png",
+      "icon": "items/blaze_rod_25w14craftmine.png",
       "criteria": {}
     },
     "minecraft:story/follow_ender_eye": {
-      "icon": "items/1.21.7/ender_eye.png",
+      "icon": "items/ender_eye_1.21.6.png",
       "criteria": {}
     },
     "minecraft:story/enter_the_end": {
@@ -37,7 +37,7 @@
       "criteria": {}
     },
     "minecraft:end/enter_end_gateway": {
-      "icon": "items/1.21.7/ender_pearl.png",
+      "icon": "items/ender_pearl_3d_shareware_v1.34.png",
       "criteria": {}
     },
     "minecraft:end/find_end_city": {
@@ -45,15 +45,15 @@
       "criteria": {}
     },
     "minecraft:end/elytra": {
-      "icon": "items/1.21.7/elytra.png",
+      "icon": "items/elytra_25w14craftmine.png",
       "criteria": {}
     },
     "minecraft:story/mine_diamond": {
-      "icon": "items/1.21.7/diamond.png",
+      "icon": "items/diamond_25w14craftmine.png",
       "criteria": {}
     },
     "minecraft:story/shiny_gear": {
-      "icon": "items/1.21.7/diamond_chestplate.png",
+      "icon": "items/diamond_chestplate_1.20.2.png",
       "criteria": {}
     },
     "minecraft:nether/obtain_ancient_debris": {
@@ -61,38 +61,38 @@
       "criteria": {}
     },
     "minecraft:adventure/trim_with_any_armor_pattern": {
-      "icon": "items/1.21.7/dune_armor_trim_smithing_template.png",
+      "icon": "items/dune_armor_trim_smithing_template_25w14craftmine.png",
       "criteria": {}
     },
     "minecraft:recipes/misc/vex_armor_trim_smithing_template": {
-      "icon": "items/1.21.7/vex_armor_trim_smithing_template.png",
+      "icon": "items/vex_armor_trim_smithing_template_25w14craftmine.png",
       "criteria": {}
     },
     "minecraft:recipes/misc/netherite_upgrade_smithing_template": {
-      "icon": "items/1.21.7/netherite_upgrade_smithing_template.png",
+      "icon": "items/netherite_upgrade_smithing_template_25w14craftmine.png",
       "criteria": {}
     },
     "minecraft:recipes/misc/snout_armor_trim_smithing_template": {
-      "icon": "items/1.21.7/snout_armor_trim_smithing_template.png",
+      "icon": "items/snout_armor_trim_smithing_template_25w14craftmine.png",
       "criteria": {}
     }
   },
   "stats": {
     "stat_cat:trims_crafting": {
-      "icon": "items/1.21.7/netherite_upgrade_smithing_template.png",
+      "icon": "items/netherite_upgrade_smithing_template_25w14craftmine.png",
       "criteria": {
         "minecraft:crafted/minecraft:snout_armor_trim_smithing_template": {
           "target": 4,
-          "icon": "items/1.21.7/snout_armor_trim_smithing_template.png"
+          "icon": "items/snout_armor_trim_smithing_template_25w14craftmine.png"
         },
         "minecraft:crafted/minecraft:netherite_upgrade_smithing_template": {
           "target": 6,
-          "icon": "items/1.21.7/netherite_upgrade_smithing_template.png"
+          "icon": "items/netherite_upgrade_smithing_template_25w14craftmine.png"
         }
       }
     },
     "stat_cat:get_27_diamonds": {
-      "icon": "items/1.21.7/diamond.png",
+      "icon": "items/diamond_25w14craftmine.png",
       "root_name": "minecraft:picked_up/minecraft:diamond",
       "target": 27
     },
@@ -107,7 +107,7 @@
   "multi_stage_goals": [
     {
       "root_name": "ms_goal:miku%_route",
-      "icon": "items/1.21.7/netherite_chestplate.png",
+      "icon": "items/netherite_chestplate_25w14craftmine.png",
       "stages": [
         {
           "stage_id": "1",

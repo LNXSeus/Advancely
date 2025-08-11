@@ -26,6 +26,11 @@ extern "C" {
 #define DEFAULT_GOAL_ALIGN_LEFT true
 #define DEFAULT_REMOVE_COMPLETED_GOALS true
 
+// DEFINE DEFAULT SETTINGS
+#define DEFAULT_VERSION "1.16.1"
+#define DEFAULT_CATEGORY "test"
+#define DEFAULT_OPTIONAL_FLAG "1"
+
 // Default window positions/sizes. -1 means centered or default size.
 #define DEFAULT_WINDOW_POS (-1)
 #define DEFAULT_WINDOW_SIZE (-1)

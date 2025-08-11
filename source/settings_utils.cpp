@@ -311,13 +311,13 @@ bool settings_load(AppSettings *settings) {
     bool defaults_were_used = false;
     // Flag to signal re-save when default values need to be written back to settings.json
 
-    // Set safe defaults first
-    strncpy(settings->version_str, "1.21.6", sizeof(settings->version_str) - 1);
+    // Set safe defaults first -> defined in settings_utils.h
+    strncpy(settings->version_str, DEFAULT_VERSION, sizeof(settings->version_str) - 1);
     settings->path_mode = PATH_MODE_AUTO;
     settings->manual_saves_path[0] = '\0';
-    strncpy(settings->category, "all_advancements", sizeof(settings->category) - 1);
-    strncpy(settings->optional_flag, "_optimized", sizeof(settings->optional_flag) - 1);
-    // TODO: Make default empty (also as template file)
+    strncpy(settings->category, DEFAULT_CATEGORY, sizeof(settings->category) - 1);
+    strncpy(settings->optional_flag, DEFAULT_OPTIONAL_FLAG, sizeof(settings->optional_flag) - 1);
+
     settings->hotkey_count = 0;
 
     // New visual/general defaults
