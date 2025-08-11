@@ -122,6 +122,42 @@ if(WIN32)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${MINGW_BIN_DIR}/libwinpthread-1.dll"
             $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libfreetype-6.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libharfbuzz-0.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libintl-8.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libbz2-1.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libiconv-2.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libbrotlidec.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libpng16-16.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libglib-2.0-0.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libgraphite2.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libpcre2-8-0.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libbrotlicommon.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
 
 
 
