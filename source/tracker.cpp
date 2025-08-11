@@ -735,7 +735,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
         }
 
         cJSON *criteria_obj = cJSON_GetObjectItem(cat_json, "criteria");
-        if (criteria_obj && cJSON_IsObject(criteria_obj)) {
+        if (criteria_obj && cJSON_IsObject(criteria_obj) && criteria_obj->child != nullptr) {
             // MULTI-CRITERION CASE
             for (cJSON *c = criteria_obj->child; c != nullptr; c = c->next) new_cat->criteria_count++;
             if (new_cat->criteria_count > 0) {
@@ -772,10 +772,6 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
 
                         new_cat->criteria[k++] = new_crit;
                     }
-
-                    // Load criteria texture
-                    new_crit->texture = load_texture_with_scale_mode(t->renderer, new_crit->icon_path,
-                                                                     SDL_SCALEMODE_NEAREST);
                 }
             }
         } else {
@@ -797,6 +793,9 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                         cJSON *target = cJSON_GetObjectItem(cat_json, "target");
                         if (cJSON_IsNumber(target)) the_criterion->goal = target->valueint;
                     }
+                    // Copy the parent's icon path and texture to the single criterion
+                    strncpy(the_criterion->icon_path, new_cat->icon_path, sizeof(the_criterion->icon_path) - 1);
+                    the_criterion->texture = new_cat->texture; // Reuse the already loaded texture
                     new_cat->criteria[0] = the_criterion;
                 }
             }
@@ -1908,8 +1907,35 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
     ImU32 text_color_faded = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b, 100);
     ImU32 icon_tint_faded = IM_COL32(255, 255, 255, 100);
 
-    // Drawing Logic
-    // TODO: Simple  Grid layout for now, real layout algorithm will be a lot more complex
+    // Pre-calculate a single, uniform width for all items
+    float uniform_item_width = 0.0f;
+    for (int i = 0; i < t->template_data->advancement_count; i++) {
+        TrackableCategory *adv = t->template_data->advancements[i];
+        if (!adv || (adv->done && settings->remove_completed_goals)) {
+            continue;
+        }
+
+        // Calculate the max width required by this specific advancement's text content
+        float required_width = ImGui::CalcTextSize(adv->display_name).x;
+        if (adv->criteria_count > 1) {
+            for (int j = 0; j < adv->criteria_count; j++) {
+                TrackableItem *crit = adv->criteria[j];
+                if (crit && (!crit->done || !settings->remove_completed_goals)) {
+                    // A criteria's width is its icon (32px), padding, plus its text width
+                    float crit_width = 36.0f + ImGui::CalcTextSize(crit->display_name).x;
+                    required_width = fmaxf(required_width, crit_width);
+                }
+            }
+        }
+
+        // The item's final width is either its content width or the background width, whichever is larger
+        float final_adv_width = fmaxf(96.0f, required_width);
+
+        // Update the global uniform width if this item is the widest found so far
+        uniform_item_width = fmaxf(uniform_item_width, final_adv_width);
+    }
+
+    // Drawing Logic with uniform width
     float padding = 50.0f;
     float current_x = padding;
     float current_y = padding;
@@ -1920,29 +1946,53 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
     // Loop through all advancements, stats, etc.
     for (int i = 0; i < t->template_data->advancement_count; i++) {
         TrackableCategory *adv = t->template_data->advancements[i];
-        if (!adv || (adv->done && settings->remove_completed_goals)) {
+
+        // Skip advancements that have sub-criteria, or those that are completed and hidden
+        if (!adv || adv->criteria_count > 1 || (adv->done && settings->remove_completed_goals)) {
             continue;
         }
 
-        // dynamically clear criteria when completed
-        int visible_criteria_count = 0;
-        if (adv->criteria_count > 1) {
-            for (int j = 0; j < adv->criteria_count; j++) {
-                if (adv->criteria[j] && (!adv->criteria[j]->done || !settings->remove_completed_goals)) {
-                    visible_criteria_count++;
-                }
-            }
+        float item_height = 96.0f + ImGui::CalcTextSize(adv->display_name).y + 4.0f;
+
+        if (current_x > padding && (current_x + uniform_item_width) > (io.DisplaySize.x / t->zoom_level) - padding) {
+            current_x = padding;
+            current_y += row_max_height;
+            row_max_height = 0.0f;
         }
 
-        // --- Calculate Item Dimensions ---
+        ImVec2 screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x, (current_y * t->zoom_level) + t->camera_offset.y);
+        ImVec2 bg_size = ImVec2(96.0f, 96.0f);
+
+        SDL_Texture* bg_texture_to_use = adv->done ? t->adv_bg_done : (adv->completed_criteria_count > 0 ? t->adv_bg_half_done : t->adv_bg);
+        if (bg_texture_to_use) draw_list->AddImage((void*)bg_texture_to_use, screen_pos, ImVec2(screen_pos.x + bg_size.x * t->zoom_level, screen_pos.y + bg_size.y * t->zoom_level));
+        if (adv->texture) draw_list->AddImage((void*)adv->texture, ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level), ImVec2(screen_pos.x + 80.0f * t->zoom_level, screen_pos.y + 80.0f * t->zoom_level));
+
+        ImVec2 text_size = ImGui::CalcTextSize(adv->display_name);
+        draw_list->AddText(nullptr, 16.0f * t->zoom_level, ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f, screen_pos.y + bg_size.y * t->zoom_level), text_color, adv->display_name);
+
+        current_x += uniform_item_width + horizontal_spacing;
+        row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
+    }
+
+    // Second Pass to render advancements with sub-criteria
+    for (int i = 0; i < t->template_data->advancement_count; i++) {
+        TrackableCategory *adv = t->template_data->advancements[i];
+        if (!adv || adv->criteria_count <= 1 || (adv->done && settings->remove_completed_goals)) {
+            continue;
+        }
+
         ImVec2 bg_size = ImVec2(96.0f, 96.0f);
         ImVec2 text_size = ImGui::CalcTextSize(adv->display_name);
-        float item_width = fmaxf(bg_size.x, text_size.x);
+        int visible_criteria_count = 0;
+        for (int j = 0; j < adv->criteria_count; j++) {
+            if (adv->criteria[j] && (!adv->criteria[j]->done || !settings->remove_completed_goals)) {
+                visible_criteria_count++;
+            }
+        }
         float criteria_height = (float)visible_criteria_count * 36.0f;
         float item_height = bg_size.y + text_size.y + 4.0f + criteria_height;
 
-        // --- Handle Row Wrapping ---
-        if (current_x > padding && (current_x + item_width) > (io.DisplaySize.x / t->zoom_level) - padding) {
+        if (current_x > padding && (current_x + uniform_item_width) > (io.DisplaySize.x / t->zoom_level) - padding) {
             current_x = padding;
             current_y += row_max_height;
             row_max_height = 0.0f;
@@ -1950,44 +2000,30 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
 
         ImVec2 screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x, (current_y * t->zoom_level) + t->camera_offset.y);
 
-        // --- Draw Parent Advancement ---
         SDL_Texture* bg_texture_to_use = adv->done ? t->adv_bg_done : (adv->completed_criteria_count > 0 ? t->adv_bg_half_done : t->adv_bg);
         if (bg_texture_to_use) draw_list->AddImage((void*)bg_texture_to_use, screen_pos, ImVec2(screen_pos.x + bg_size.x * t->zoom_level, screen_pos.y + bg_size.y * t->zoom_level));
         if (adv->texture) draw_list->AddImage((void*)adv->texture, ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level), ImVec2(screen_pos.x + 80.0f * t->zoom_level, screen_pos.y + 80.0f * t->zoom_level));
         draw_list->AddText(nullptr, 16.0f * t->zoom_level, ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f, screen_pos.y + bg_size.y * t->zoom_level), text_color, adv->display_name);
 
-        // --- Draw Criteria Column (if they exist) ---
-        if (adv->criteria_count > 1) {
-            float sub_item_y_offset = current_y + bg_size.y + 20.0f;
-            for (int j = 0; j < adv->criteria_count; j++) {
-                TrackableItem* crit = adv->criteria[j];
-                if (!crit) continue;
+        float sub_item_y_offset = current_y + bg_size.y + 20.0f;
+        for (int j = 0; j < adv->criteria_count; j++) {
+            TrackableItem* crit = adv->criteria[j];
+            if (!crit || (crit->done && settings->remove_completed_goals)) continue;
 
-                // Decide whether to draw this item at all.
-                if (crit->done && settings->remove_completed_goals) {
-                    continue; // Skip this iteration, effectively removing the item and tidying up.
-                }
+            ImVec2 crit_screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x, (sub_item_y_offset * t->zoom_level) + t->camera_offset.y);
+            ImVec2 crit_icon_size = ImVec2(32 * t->zoom_level, 32 * t->zoom_level);
+            ImVec2 crit_text_pos = ImVec2(crit_screen_pos.x + 36 * t->zoom_level, crit_screen_pos.y + 8 * t->zoom_level);
+            ImU32 current_text_color = crit->done ? text_color_faded : text_color;
+            ImU32 icon_tint = crit->done ? icon_tint_faded : IM_COL32_WHITE;
 
-                // If we are here, we are drawing the item.
-                ImVec2 crit_screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x, (sub_item_y_offset * t->zoom_level) + t->camera_offset.y);
-                ImVec2 crit_icon_size = ImVec2(32 * t->zoom_level, 32 * t->zoom_level);
-                ImVec2 crit_text_pos = ImVec2(crit_screen_pos.x + 36 * t->zoom_level, crit_screen_pos.y + 8 * t->zoom_level);
-
-                // Determine color/opacity based on completion status
-                ImU32 current_text_color = crit->done ? text_color_faded : text_color;
-                ImU32 icon_tint = crit->done ? icon_tint_faded : IM_COL32_WHITE;
-
-                if (crit->texture) {
-                    draw_list->AddImage((void*)crit->texture, crit_screen_pos, ImVec2(crit_screen_pos.x + crit_icon_size.x, crit_screen_pos.y + crit_icon_size.y), ImVec2(0,0), ImVec2(1,1), icon_tint);
-                }
-                draw_list->AddText(nullptr, 14.0f * t->zoom_level, crit_text_pos, current_text_color, crit->display_name);
-
-                sub_item_y_offset += 36.0f;
+            if (crit->texture) {
+                draw_list->AddImage((void*)crit->texture, crit_screen_pos, ImVec2(crit_screen_pos.x + crit_icon_size.x, crit_screen_pos.y + crit_icon_size.y), ImVec2(0,0), ImVec2(1,1), icon_tint);
             }
+            draw_list->AddText(nullptr, 14.0f * t->zoom_level, crit_text_pos, current_text_color, crit->display_name);
+            sub_item_y_offset += 36.0f;
         }
 
-        // --- Update Layout Position ---
-        current_x += item_width + horizontal_spacing;
+        current_x += uniform_item_width + horizontal_spacing;
         row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
     }
     ImGui::End();
