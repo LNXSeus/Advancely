@@ -8,6 +8,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <cmath> // Required for roundf()
 
 bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     // dereference once and use calloc
@@ -26,7 +27,14 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
         return false;
     }
 
-    o->font = TTF_OpenFont("resources/fonts/Minecraft.ttf", 24);
+    // Make font HiDPI aware
+    float scale = SDL_GetWindowDisplayScale(o->window);
+    if (scale == 0.0f) { // Handle potential errors where scale is 0
+        scale = 1.0f;
+    }
+    int font_size = (int)roundf(24.0f * scale); // Scale base font size
+
+    o->font = TTF_OpenFont("resources/fonts/Minecraft.ttf", font_size);
     if (!o->font) {
         fprintf(stderr, "[OVERLAY] Failed to load font: %s\n", SDL_GetError());
         overlay_free(overlay);

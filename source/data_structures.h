@@ -14,6 +14,118 @@ extern "C" {
 #include <cJSON.h>
 }
 
+// The X-Macro list of all supported Minecraft versions.
+// This is the single source of truth for versions.
+#define VERSION_LIST \
+    /* Era 1: Legacy Stats (.dat file), counts playtime in Ticks ID: 1100 */ \
+    X(MC_VERSION_1_0, "1.0") \
+    X(MC_VERSION_1_1, "1.1") \
+    X(MC_VERSION_1_2_1, "1.2.1") \
+    X(MC_VERSION_1_2_2, "1.2.2") \
+    X(MC_VERSION_1_2_3, "1.2.3") \
+    X(MC_VERSION_1_2_4, "1.2.4") \
+    X(MC_VERSION_1_2_5, "1.2.5") \
+    X(MC_VERSION_1_3_1, "1.3.1") \
+    X(MC_VERSION_1_3_2, "1.3.2") \
+    X(MC_VERSION_1_4_2, "1.4.2") \
+    X(MC_VERSION_1_4_4, "1.4.4") \
+    X(MC_VERSION_1_4_5, "1.4.5") \
+    X(MC_VERSION_1_4_6, "1.4.6") \
+    X(MC_VERSION_1_4_7, "1.4.7") \
+    X(MC_VERSION_1_5_1, "1.5.1") \
+    X(MC_VERSION_1_5_2, "1.5.2") \
+    X(MC_VERSION_1_6_1, "1.6.1") \
+    X(MC_VERSION_1_6_2, "1.6.2") \
+    X(MC_VERSION_1_6_4, "1.6.4") \
+    /* Era 2: Mid-era Achievements/Stats (per-world JSON), stat.playOneMinute is in ticks */ \
+    X(MC_VERSION_1_7_2, "1.7.2") \
+    X(MC_VERSION_1_7_3, "1.7.3") \
+    X(MC_VERSION_1_7_4, "1.7.4") \
+    X(MC_VERSION_1_7_5, "1.7.5") \
+    X(MC_VERSION_1_7_6, "1.7.6") \
+    X(MC_VERSION_1_7_7, "1.7.7") \
+    X(MC_VERSION_1_7_8, "1.7.8") \
+    X(MC_VERSION_1_7_9, "1.7.9") \
+    X(MC_VERSION_1_7_10, "1.7.10") \
+    X(MC_VERSION_1_8, "1.8") \
+    X(MC_VERSION_1_8_1, "1.8.1") \
+    X(MC_VERSION_1_8_2, "1.8.2") \
+    X(MC_VERSION_1_8_3, "1.8.3") \
+    X(MC_VERSION_15W14A, "15w14a") \
+    X(MC_VERSION_1_8_4, "1.8.4") \
+    X(MC_VERSION_1_8_5, "1.8.5") \
+    X(MC_VERSION_1_8_6, "1.8.6") \
+    X(MC_VERSION_1_8_7, "1.8.7") \
+    X(MC_VERSION_1_8_8, "1.8.8") \
+    X(MC_VERSION_1_8_9, "1.8.9") \
+    X(MC_VERSION_1_9, "1.9") \
+    X(MC_VERSION_1_9_1, "1.9.1") \
+    X(MC_VERSION_1_9_2, "1.9.2") \
+    X(MC_VERSION_1_RV_PRE1, "1.rv-pre1") \
+    X(MC_VERSION_1_9_3, "1.9.3") \
+    X(MC_VERSION_1_9_4, "1.9.4") \
+    X(MC_VERSION_1_10, "1.10") \
+    X(MC_VERSION_1_10_1, "1.10.1") \
+    X(MC_VERSION_1_10_2, "1.10.2") \
+    X(MC_VERSION_1_11, "1.11") \
+    X(MC_VERSION_1_11_1, "1.11.1") \
+    X(MC_VERSION_1_11_2, "1.11.2") \
+    /* Era 3: Modern Advancements/Stats (separate per-world JSONs), minecraft:play_one_minute is in ticks */ \
+    X(MC_VERSION_1_12, "1.12") \
+    X(MC_VERSION_1_12_1, "1.12.1") \
+    X(MC_VERSION_1_12_2, "1.12.2") \
+    X(MC_VERSION_1_13, "1.13") \
+    X(MC_VERSION_1_13_1, "1.13.1") \
+    X(MC_VERSION_1_13_2, "1.13.2") \
+    X(MC_VERSION_3D_SHAREWARE_V1_34, "3d_shareware_v1.34") \
+    X(MC_VERSION_1_14, "1.14") \
+    X(MC_VERSION_1_14_1, "1.14.1") \
+    X(MC_VERSION_1_14_2, "1.14.2") \
+    X(MC_VERSION_1_14_3, "1.14.3") \
+    X(MC_VERSION_1_14_4, "1.14.4") \
+    X(MC_VERSION_1_15, "1.15") \
+    X(MC_VERSION_1_15_1, "1.15.1") \
+    X(MC_VERSION_1_15_2, "1.15.2") \
+    X(MC_VERSION_20W14INFINITE, "20w14infinite") \
+    X(MC_VERSION_1_16, "1.16") \
+    X(MC_VERSION_1_16_1, "1.16.1") \
+    X(MC_VERSION_1_16_2, "1.16.2") \
+    X(MC_VERSION_1_16_3, "1.16.3") \
+    X(MC_VERSION_1_16_4, "1.16.4") \
+    X(MC_VERSION_1_16_5, "1.16.5") \
+    /* minecraft:play_one_minute FINALLY renamed to minecraft:play_time */ \
+    X(MC_VERSION_1_17, "1.17") \
+    X(MC_VERSION_1_17_1, "1.17.1") \
+    X(MC_VERSION_1_18, "1.18") \
+    X(MC_VERSION_1_18_1, "1.18.1") \
+    X(MC_VERSION_1_18_2, "1.18.2") \
+    X(MC_VERSION_22W13ONEBLOCKATATIME, "22w13oneblockatatime") \
+    X(MC_VERSION_1_19, "1.19") \
+    X(MC_VERSION_1_19_1, "1.19.1") \
+    X(MC_VERSION_1_19_2, "1.19.2") \
+    X(MC_VERSION_1_19_3, "1.19.3") \
+    X(MC_VERSION_1_19_4, "1.19.4") \
+    X(MC_VERSION_23W13A_OR_B, "23w13a_or_b") \
+    X(MC_VERSION_1_20, "1.20") \
+    X(MC_VERSION_1_20_1, "1.20.1") \
+    X(MC_VERSION_1_20_2, "1.20.2") \
+    X(MC_VERSION_1_20_3, "1.20.3") \
+    X(MC_VERSION_1_20_4, "1.20.4") \
+    X(MC_VERSION_24W14POTATO, "24w14potato") \
+    X(MC_VERSION_1_20_5, "1.20.5") \
+    X(MC_VERSION_1_20_6, "1.20.6") \
+    X(MC_VERSION_1_21, "1.21") \
+    X(MC_VERSION_1_21_1, "1.21.1") \
+    X(MC_VERSION_1_21_2, "1.21.2") \
+    X(MC_VERSION_1_21_3, "1.21.3") \
+    X(MC_VERSION_1_21_4, "1.21.4") \
+    X(MC_VERSION_1_21_5, "1.21.5") \
+    X(MC_VERSION_25W14CRAFTMINE, "25w14craftmine") \
+    X(MC_VERSION_1_21_6, "1.21.6") \
+    X(MC_VERSION_1_21_7, "1.21.7") \
+    X(MC_VERSION_1_21_8, "1.21.8") \
+    X(MC_VERSION_1_21_9, "1.21.9")
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -152,119 +264,18 @@ enum PathMode {
     PATH_MODE_MANUAL // Use a user-provided path.
 };
 
-// TODO: Define versions here and in VersionMapEntry in settings_utils.c
+
 enum  MC_Version {
-    // Puts vaLue starting at 0, allows for comparisons
-    // Era 1: Legacy Stats (.dat file), counts playtime in Ticks ID: 1100
-    // TODO: (103 versions + unknown as of 2025-08-01)
-    MC_VERSION_1_0,
-    MC_VERSION_1_1,
-    MC_VERSION_1_2_1,
-    MC_VERSION_1_2_2,
-    MC_VERSION_1_2_3,
-    MC_VERSION_1_2_4,
-    MC_VERSION_1_2_5,
-    MC_VERSION_1_3_1,
-    MC_VERSION_1_3_2,
-    MC_VERSION_1_4_2,
-    MC_VERSION_1_4_4,
-    MC_VERSION_1_4_5,
-    MC_VERSION_1_4_6,
-    MC_VERSION_1_4_7,
-    MC_VERSION_1_5_1,
-    MC_VERSION_1_5_2,
-    MC_VERSION_1_6_1,
-    MC_VERSION_1_6_2,
-    MC_VERSION_1_6_4,
-    // Era 2: Mid-era Achievements/Stats (per-world JSON), stat.playOneMinute is in ticks
-    MC_VERSION_1_7_2,
-    MC_VERSION_1_7_3,
-    MC_VERSION_1_7_4,
-    MC_VERSION_1_7_5,
-    MC_VERSION_1_7_6,
-    MC_VERSION_1_7_7,
-    MC_VERSION_1_7_8,
-    MC_VERSION_1_7_9,
-    MC_VERSION_1_7_10,
-    MC_VERSION_1_8,
-    MC_VERSION_1_8_1,
-    MC_VERSION_1_8_2,
-    MC_VERSION_1_8_3,
-    MC_VERSION_15W14A, // 2015 APRIL FOOLS VERSION, SNAPSHOT is a fork of 1.8.3, The Love and Hugs Update
-    MC_VERSION_1_8_4,
-    MC_VERSION_1_8_5,
-    MC_VERSION_1_8_6,
-    MC_VERSION_1_8_7,
-    MC_VERSION_1_8_8,
-    MC_VERSION_1_8_9,
-    MC_VERSION_1_9,
-    MC_VERSION_1_9_1,
-    MC_VERSION_1_9_2,
-    MC_VERSION_1_RV_PRE1, // 2016 APRIL FOOLS VERSION, Trendy Update
-    MC_VERSION_1_9_3,
-    MC_VERSION_1_9_4,
-    MC_VERSION_1_10,
-    MC_VERSION_1_10_1,
-    MC_VERSION_1_10_2,
-    MC_VERSION_1_11,
-    MC_VERSION_1_11_1,
-    MC_VERSION_1_11_2,
-    // Era 3: Modern Advancements/Stats (separate per-world JSONs), minecraft:play_one_minute is in ticks
-    MC_VERSION_1_12,
-    MC_VERSION_1_12_1,
-    MC_VERSION_1_12_2,
-    MC_VERSION_1_13,
-    MC_VERSION_1_13_1,
-    MC_VERSION_1_13_2,
-    MC_VERSION_3D_SHAREWARE_V1_34, // 2019 APRIL FOOLS VERSION, MineCraft [sic] 3D: Memory Block Edition
-    MC_VERSION_1_14,
-    MC_VERSION_1_14_1,
-    MC_VERSION_1_14_2,
-    MC_VERSION_1_14_3,
-    MC_VERSION_1_14_4,
-    MC_VERSION_1_15,
-    MC_VERSION_1_15_1,
-    MC_VERSION_1_15_2,
-    MC_VERSION_20W14INFINITE, // 2020 APRIL FOOLS VERSION, Java Edition 20w14∞, Infinity Snapshot
-    MC_VERSION_1_16,
-    MC_VERSION_1_16_1,
-    MC_VERSION_1_16_2,
-    MC_VERSION_1_16_3,
-    MC_VERSION_1_16_4,
-    MC_VERSION_1_16_5,
-    // minecraft:play_one_minute FINALLY renamed to minecraft:play_time
-    MC_VERSION_1_17,
-    MC_VERSION_1_17_1,
-    MC_VERSION_1_18,
-    MC_VERSION_1_18_1,
-    MC_VERSION_1_18_2,
-    MC_VERSION_22W13ONEBLOCKATATIME, // 2022 APRIL FOOLS VERSION, One Block at a Time Update
-    MC_VERSION_1_19,
-    MC_VERSION_1_19_1,
-    MC_VERSION_1_19_2,
-    MC_VERSION_1_19_3,
-    MC_VERSION_1_19_4,
-    MC_VERSION_23W13A_OR_B, // 2023 APRIL FOOLS VERSION, The Vote Update
-    MC_VERSION_1_20,
-    MC_VERSION_1_20_1,
-    MC_VERSION_1_20_2,
-    MC_VERSION_1_20_3,
-    MC_VERSION_1_20_4,
-    MC_VERSION_24W14POTATO, // 2024 APRIL FOOLS VERSION, Poisonous Potato Update
-    MC_VERSION_1_20_5,
-    MC_VERSION_1_20_6,
-    MC_VERSION_1_21,
-    MC_VERSION_1_21_1,
-    MC_VERSION_1_21_2,
-    MC_VERSION_1_21_3,
-    MC_VERSION_1_21_4,
-    MC_VERSION_1_21_5,
-    MC_VERSION_25W14CRAFTMINE, // 2025 APRIL FOOLS VERSION, Craftmine Update
-    MC_VERSION_1_21_6,
-    MC_VERSION_1_21_7,
-    MC_VERSION_1_21_8,
+    #define X(e, s) e,
+    VERSION_LIST
+    #undef X
+    MC_VERSION_COUNT, // Automatically corresponds to the number of versions
     MC_VERSION_UNKNOWN // For error handling
 };
+
+
+extern const char *VERSION_STRINGS[];
+extern const int VERSION_STRINGS_COUNT;
 
 #ifdef __cplusplus
 }

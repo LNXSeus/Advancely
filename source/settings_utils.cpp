@@ -10,8 +10,14 @@
 // Define the actual constant values for the colors here in the .cpp file.
 const ColorRGBA DEFAULT_TRACKER_BG_COLOR = {13, 17, 23, 255};
 const ColorRGBA DEFAULT_OVERLAY_BG_COLOR = {0, 80, 255, 255};
-const ColorRGBA DEFAULT_SETTINGS_BG_COLOR = {13, 17, 23, 255};
 const ColorRGBA DEFAULT_TEXT_COLOR = {255, 255, 255, 255};
+
+const char* VERSION_STRINGS[] = {
+    #define X(e, s) s,
+    VERSION_LIST
+    #undef X
+};
+const int VERSION_STRINGS_COUNT = sizeof(VERSION_STRINGS) / sizeof(char*);
 
 // Helper Prototypes for Loading/Saving
 static cJSON *get_or_create_object(cJSON *parent, const char *key) {
@@ -151,128 +157,6 @@ static void save_color(cJSON *parent, const char *key, const ColorRGBA *color) {
     cJSON_AddItemToObject(obj, "a", cJSON_CreateNumber(color->a));
 }
 
-// ------------------- VERSION AND PATH MODE CONVERTERS -------------------
-
-// Create lookup table to map version strings to enum values
-typedef struct {
-    const char *str;
-    MC_Version value;
-} VersionMapEntry;
-
-// Create static lookup table with all supported versions
-// TODO: Versions need to be added in MCVersion enum and here -> data_structures.h
-// TODO: (103 versions + unknown as of 2025-08-01)
-static const VersionMapEntry version_map[] = {
-    // Era 1: Legacy Stats (.dat file), counts playtime in Ticks ID: 1100
-    {"1.0", MC_VERSION_1_0},
-    {"1.1", MC_VERSION_1_1},
-    {"1.2.1", MC_VERSION_1_2_1},
-    {"1.2.2", MC_VERSION_1_2_2},
-    {"1.2.3", MC_VERSION_1_2_3},
-    {"1.2.4", MC_VERSION_1_2_4},
-    {"1.2.5", MC_VERSION_1_2_5},
-    {"1.3.1", MC_VERSION_1_3_1},
-    {"1.3.2", MC_VERSION_1_3_2},
-    {"1.4.2", MC_VERSION_1_4_2},
-    {"1.4.4", MC_VERSION_1_4_4},
-    {"1.4.5", MC_VERSION_1_4_5},
-    {"1.4.6", MC_VERSION_1_4_6},
-    {"1.4.7", MC_VERSION_1_4_7},
-    {"1.5.1", MC_VERSION_1_5_1},
-    {"1.5.2", MC_VERSION_1_5_2},
-    {"1.6.1", MC_VERSION_1_6_1},
-    {"1.6.2", MC_VERSION_1_6_2},
-    {"1.6.4", MC_VERSION_1_6_4},
-    // Era 2: Mid-era Achievements/Stats (per-world JSON), stat.playOneMinute is in ticks
-    {"1.7.2", MC_VERSION_1_7_2},
-    {"1.7.3", MC_VERSION_1_7_3},
-    {"1.7.4", MC_VERSION_1_7_4},
-    {"1.7.5", MC_VERSION_1_7_5},
-    {"1.7.6", MC_VERSION_1_7_6},
-    {"1.7.7", MC_VERSION_1_7_7},
-    {"1.7.8", MC_VERSION_1_7_8},
-    {"1.7.9", MC_VERSION_1_7_9},
-    {"1.7.10", MC_VERSION_1_7_10},
-    {"1.8", MC_VERSION_1_8},
-    {"1.8.1", MC_VERSION_1_8_1},
-    {"1.8.2", MC_VERSION_1_8_2},
-    {"1.8.3", MC_VERSION_1_8_3},
-    {"15w14a", MC_VERSION_15W14A}, // 2015 APRIL FOOLS VERSION, The Love and Hugs Update
-    {"1.8.4", MC_VERSION_1_8_4},
-    {"1.8.5", MC_VERSION_1_8_5},
-    {"1.8.6", MC_VERSION_1_8_6},
-    {"1.8.7", MC_VERSION_1_8_7},
-    {"1.8.8", MC_VERSION_1_8_8},
-    {"1.8.9", MC_VERSION_1_8_9},
-    {"1.9", MC_VERSION_1_9},
-    {"1.9.1", MC_VERSION_1_9_1},
-    {"1.9.2", MC_VERSION_1_9_2},
-    {"1.rv-pre1", MC_VERSION_1_RV_PRE1}, // 2016 APRIL FOOLS VERSION, Trendy Update
-    {"1.9.3", MC_VERSION_1_9_3},
-    {"1.9.4", MC_VERSION_1_9_4},
-    {"1.10", MC_VERSION_1_10},
-    {"1.10.1", MC_VERSION_1_10_1},
-    {"1.10.2", MC_VERSION_1_10_2},
-    {"1.11", MC_VERSION_1_11},
-    {"1.11.1", MC_VERSION_1_11_1},
-    {"1.11.2", MC_VERSION_1_11_2},
-    // Era 3: Modern Advancements/Stats (separate per-world JSONs), minecraft:play_one_minute is in ticks
-    {"1.12", MC_VERSION_1_12},
-    {"1.12.1", MC_VERSION_1_12_1},
-    {"1.12.2", MC_VERSION_1_12_2},
-    {"1.13", MC_VERSION_1_13},
-    {"1.13.1", MC_VERSION_1_13_1},
-    {"1.13.2", MC_VERSION_1_13_2},
-    {"3d_shareware_v1.34", MC_VERSION_3D_SHAREWARE_V1_34}, // 2019 APRIL FOOLS VERSION, Memory Block Edition
-    {"1.14", MC_VERSION_1_14},
-    {"1.14.1", MC_VERSION_1_14_1},
-    {"1.14.2", MC_VERSION_1_14_2},
-    {"1.14.3", MC_VERSION_1_14_3},
-    {"1.14.4", MC_VERSION_1_14_4},
-    {"1.15", MC_VERSION_1_15},
-    {"1.15.1", MC_VERSION_1_15_1},
-    {"1.15.2", MC_VERSION_1_15_2},
-    {"20w14infinite", MC_VERSION_20W14INFINITE}, // 2020 APRIL FOOLS VERSION, Infinity Snapshot
-    {"1.16", MC_VERSION_1_16},
-    {"1.16.1", MC_VERSION_1_16_1},
-    {"1.16.2", MC_VERSION_1_16_2},
-    {"1.16.3", MC_VERSION_1_16_3},
-    {"1.16.4", MC_VERSION_1_16_4},
-    {"1.16.5", MC_VERSION_1_16_5},
-    // minecraft:play_one_minute FINALLY renamed to minecraft:play_time
-    {"1.17", MC_VERSION_1_17},
-    {"1.17.1", MC_VERSION_1_17_1},
-    {"1.18", MC_VERSION_1_18},
-    {"1.18.1", MC_VERSION_1_18_1},
-    {"1.18.2", MC_VERSION_1_18_2},
-    {"22w13oneblockatatime", MC_VERSION_22W13ONEBLOCKATATIME}, // 2022 APRIL FOOLS VERSION
-    {"1.19", MC_VERSION_1_19},
-    {"1.19.1", MC_VERSION_1_19_1},
-    {"1.19.2", MC_VERSION_1_19_2},
-    {"1.19.3", MC_VERSION_1_19_3},
-    {"1.19.4", MC_VERSION_1_19_4},
-    {"23w13a_or_b", MC_VERSION_23W13A_OR_B}, // 2023 APRIL FOOLS VERSION, The Vote Update
-    {"1.20", MC_VERSION_1_20},
-    {"1.20.1", MC_VERSION_1_20_1},
-    {"1.20.2", MC_VERSION_1_20_2},
-    {"1.20.3", MC_VERSION_1_20_3},
-    {"1.20.4", MC_VERSION_1_20_4},
-    {"24w14potato", MC_VERSION_24W14POTATO}, // 2024 APRIL FOOLS VERSION, Poisonous Potato Update
-    {"1.20.5", MC_VERSION_1_20_5},
-    {"1.20.6", MC_VERSION_1_20_6},
-    {"1.21", MC_VERSION_1_21},
-    {"1.21.1", MC_VERSION_1_21_1},
-    {"1.21.2", MC_VERSION_1_21_2},
-    {"1.21.3", MC_VERSION_1_21_3},
-    {"1.21.4", MC_VERSION_1_21_4},
-    {"1.21.5", MC_VERSION_1_21_5},
-    {"25w14craftmine", MC_VERSION_25W14CRAFTMINE}, // 2025 APRIL FOOLS VERSION, Craftmine Update
-    {"1.21.6", MC_VERSION_1_21_6},
-    {"1.21.7", MC_VERSION_1_21_7},
-    {"1.21.8", MC_VERSION_1_21_8},
-    {nullptr, MC_VERSION_UNKNOWN} //Sentinel to mark end of the array
-};
-
 /**
  * @brief Converts key names from JSON file (like "PageUp") into SDL scancodes that the event handler can use
  * @param key_name
@@ -288,9 +172,9 @@ MC_Version settings_get_version_from_string(const char *version_str) {
     if (version_str == nullptr) return MC_VERSION_UNKNOWN;
 
     // Loop through the map to find a matching string
-    for (int i = 0; version_map[i].str != nullptr; i++) {
-        if (strcmp(version_str, version_map[i].str) == 0) {
-            return version_map[i].value; // Return the corresponding enum value
+    for (int i = 0; i < VERSION_STRINGS_COUNT; i++) {
+        if (strcmp(version_str, VERSION_STRINGS[i]) == 0) {
+            return (MC_Version)i; // Cast index to enum type
         }
     }
 
@@ -307,10 +191,7 @@ PathMode settings_get_path_mode_from_string(const char *mode_str) {
 
 // ------------------- SETTINGS UTILS -------------------
 
-bool settings_load(AppSettings *settings) {
-    bool defaults_were_used = false;
-    // Flag to signal re-save when default values need to be written back to settings.json
-
+void settings_set_defaults(AppSettings *settings) {
     // Set safe defaults first -> defined in settings_utils.h
     strncpy(settings->version_str, DEFAULT_VERSION, sizeof(settings->version_str) - 1);
     settings->path_mode = PATH_MODE_AUTO;
@@ -323,6 +204,7 @@ bool settings_load(AppSettings *settings) {
     // New visual/general defaults
     settings->fps = DEFAULT_FPS;
     settings->tracker_always_on_top = DEFAULT_TRACKER_ALWAYS_ON_TOP;
+    settings->overlay_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
     settings->goal_align_left = DEFAULT_GOAL_ALIGN_LEFT;
     settings->remove_completed_goals = DEFAULT_REMOVE_COMPLETED_GOALS;
 
@@ -334,8 +216,15 @@ bool settings_load(AppSettings *settings) {
     // Default colors
     settings->tracker_bg_color = DEFAULT_TRACKER_BG_COLOR;
     settings->overlay_bg_color = DEFAULT_OVERLAY_BG_COLOR;
-    settings->settings_bg_color = DEFAULT_SETTINGS_BG_COLOR;
     settings->text_color = DEFAULT_TEXT_COLOR;
+}
+
+bool settings_load(AppSettings *settings) {
+    bool defaults_were_used = false;
+    // Flag to signal re-save when default values need to be written back to settings.json
+
+    // Set safe defaults first by calling settings_set_defaults
+    settings_set_defaults(settings);
 
     // Try to load and parse the settings file
     cJSON *json = cJSON_from_file(SETTINGS_FILE_PATH); // returns json object with corrected slashes from windows paste
@@ -429,6 +318,7 @@ bool settings_load(AppSettings *settings) {
 
     cJSON *visual_settings = cJSON_GetObjectItem(json, "visuals");
     if (visual_settings) {
+        WindowRect default_window = {DEFAULT_WINDOW_POS, DEFAULT_WINDOW_POS, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE};
         if (load_window_rect(visual_settings, "tracker_window", &settings->tracker_window, &default_window))
             defaults_were_used = true;
         if (load_window_rect(visual_settings, "overlay_window", &settings->overlay_window, &default_window))
@@ -436,9 +326,6 @@ bool settings_load(AppSettings *settings) {
         if (load_color(visual_settings, "tracker_bg_color", &settings->tracker_bg_color, &DEFAULT_TRACKER_BG_COLOR))
             defaults_were_used = true;
         if (load_color(visual_settings, "overlay_bg_color", &settings->overlay_bg_color, &DEFAULT_OVERLAY_BG_COLOR))
-            defaults_were_used = true;
-        if (load_color(visual_settings, "settings_bg_color", &settings->settings_bg_color,
-                       &DEFAULT_SETTINGS_BG_COLOR))
             defaults_were_used = true;
         if (load_color(visual_settings, "text_color", &settings->text_color, &DEFAULT_TEXT_COLOR))
             defaults_were_used = true;
@@ -499,7 +386,7 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
     // Update General Settings
     cJSON *general_obj = get_or_create_object(root, "general");
     cJSON_ReplaceItemInObject(general_obj, "fps", cJSON_CreateNumber(settings->fps));
-    cJSON_ReplaceItemInObject(general_obj, "tracker_always_on_top", cJSON_CreateBool(settings->tracker_always_on_top));
+    cJSON_ReplaceItemInObject(general_obj, "always_on_top", cJSON_CreateBool(settings->tracker_always_on_top));
     cJSON_ReplaceItemInObject(general_obj, "overlay_scroll_speed", cJSON_CreateNumber(settings->overlay_scroll_speed));
     // cJSON_ReplaceItemInObject(general_obj, "overlay_scroll_left_to_right",
     //                           cJSON_CreateBool(settings->overlay_scroll_left_to_right)); // TODO: Remove this
@@ -512,7 +399,6 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
     save_window_rect(visuals_obj, "overlay_window", &settings->overlay_window);
     save_color(visuals_obj, "tracker_bg_color", &settings->tracker_bg_color);
     save_color(visuals_obj, "overlay_bg_color", &settings->overlay_bg_color);
-    save_color(visuals_obj, "settings_bg_color", &settings->settings_bg_color);
     save_color(visuals_obj, "text_color", &settings->text_color);
 
     // Update Custom Progress if provided

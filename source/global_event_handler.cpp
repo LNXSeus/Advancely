@@ -11,7 +11,7 @@
 
 #include "imgui_impl_sdl3.h"
 
-void handle_global_events(Tracker *t, Overlay *o, Settings *s, AppSettings *app_settings,
+void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                           bool *is_running, bool *settings_opened, float *deltaTime) {
     // create one event out of tracker->event and overlay->event
     SDL_Event event;
@@ -22,12 +22,6 @@ void handle_global_events(Tracker *t, Overlay *o, Settings *s, AppSettings *app_
         if (event.type == SDL_EVENT_QUIT) {
             *is_running = false;
             break;
-        }
-        // Important saveguard to check for s to be not nullptr, then settings were opened and can be closed
-        if (s != nullptr && event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.key.windowID ==
-            SDL_GetWindowID(s->window)) {
-            *settings_opened = false;
-            continue; // Skip next event
         }
 
         // Event-based HOTKEY HANDLING
@@ -74,8 +68,6 @@ void handle_global_events(Tracker *t, Overlay *o, Settings *s, AppSettings *app_
                 tracker_events(t, &event, is_running, settings_opened);
             } else if (event.key.windowID == SDL_GetWindowID(o->window)) {
                 overlay_events(o, &event, is_running, deltaTime, app_settings);
-            } else if (s != nullptr && event.key.windowID == SDL_GetWindowID(s->window)) {
-                settings_events(s, &event, is_running, settings_opened);
             }
         }
         // --- Dispatch window events (move, resize, etc.) ---
@@ -95,8 +87,6 @@ void handle_global_events(Tracker *t, Overlay *o, Settings *s, AppSettings *app_
                     settings_changed = true;
                 }
                 overlay_events(o, &event, is_running, deltaTime, app_settings);
-            } else if (s != nullptr && event.window.windowID == SDL_GetWindowID(s->window)) {
-                settings_events(s, &event, is_running, settings_opened);
             }
 
             if (settings_changed) {
