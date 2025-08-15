@@ -326,8 +326,8 @@ static void tracker_update_stats_legacy(Tracker *t, const cJSON *player_stats_js
 
         // Check for parent override
         cJSON *parent_override = override_obj ? cJSON_GetObjectItem(override_obj, stat_cat->root_name) : nullptr;
-        stat_cat->is_manually_completed = cJSON_IsBool(parent_override);
-        bool parent_forced_true = stat_cat->is_manually_completed && cJSON_IsTrue(parent_override);
+        bool parent_forced_true = cJSON_IsBool(parent_override) && cJSON_IsTrue(parent_override);
+        stat_cat->is_manually_completed = parent_forced_true;
 
         // Loop through each SUB-STAT
         for (int j = 0; j < stat_cat->criteria_count; j++) {
@@ -355,17 +355,17 @@ static void tracker_update_stats_legacy(Tracker *t, const cJSON *player_stats_js
             if (stat_cat->criteria_count == 1) {
                 // WHEN IT HAS NO SUB-STATS
                 sub_override = parent_override;
-                sub_stat->is_manually_completed = stat_cat->is_manually_completed;
             } else {
                 // Multi-criterion
                 char sub_stat_key[512];
                 snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name,
                          sub_stat->root_name);
                 sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : nullptr;
-                sub_stat->is_manually_completed = cJSON_IsBool(sub_override);
             }
 
-            bool sub_forced_true = sub_stat->is_manually_completed && cJSON_IsTrue(sub_override);
+            bool sub_forced_true = cJSON_IsBool(sub_override) && cJSON_IsTrue(sub_override);
+            sub_stat->is_manually_completed = sub_forced_true;
+
 
             // Sub-stat is done if it's naturally completed OR manually forced to be true (sub-stat or parent)
             sub_stat->done = naturally_done || sub_forced_true || parent_forced_true;
@@ -458,8 +458,8 @@ static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *p
         stat_cat->completed_criteria_count = 0;
 
         cJSON *parent_override = override_obj ? cJSON_GetObjectItem(override_obj, stat_cat->root_name) : nullptr;
-        stat_cat->is_manually_completed = cJSON_IsBool(parent_override);
-        bool parent_forced_true = stat_cat->is_manually_completed && cJSON_IsTrue(parent_override);
+        bool parent_forced_true = cJSON_IsBool(parent_override) && cJSON_IsTrue(parent_override);
+        stat_cat->is_manually_completed = parent_forced_true;
 
         // Iterate through sub-stats
         for (int j = 0; j < stat_cat->criteria_count; j++) {
@@ -477,16 +477,16 @@ static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *p
             // Creates ONE criteria behind the scenes, even if template doesn't have "criteria" field
             if (stat_cat->criteria_count == 1) {
                 sub_override = parent_override;
-                sub_stat->is_manually_completed = stat_cat->is_manually_completed;
             } else {
                 char sub_stat_key[512];
                 snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name,
                          sub_stat->root_name);
                 sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : nullptr;
-                sub_stat->is_manually_completed = cJSON_IsBool(sub_override);
             }
 
-            bool sub_forced_true = sub_stat->is_manually_completed && cJSON_IsTrue(sub_override);
+            bool sub_forced_true = cJSON_IsBool(sub_override) && cJSON_IsTrue(sub_override);
+            sub_stat->is_manually_completed = sub_forced_true;
+
 
             // Either naturally done OR manually overridden to be true  (itself or by parent)
             sub_stat->done = naturally_done || sub_forced_true || parent_forced_true;
@@ -593,8 +593,8 @@ static void tracker_update_stats_modern(Tracker *t, const cJSON *player_stats_js
 
         // Override check
         cJSON *parent_override = override_obj ? cJSON_GetObjectItem(override_obj, stat_cat->root_name) : nullptr;
-        stat_cat->is_manually_completed = cJSON_IsBool(parent_override);
-        bool parent_forced_true = stat_cat->is_manually_completed && cJSON_IsTrue(parent_override);
+        bool parent_forced_true = cJSON_IsBool(parent_override) && cJSON_IsTrue(parent_override);
+        stat_cat->is_manually_completed = parent_forced_true;
 
         // Loop through all sub stats
         for (int j = 0; j < stat_cat->criteria_count; j++) {
@@ -629,15 +629,14 @@ static void tracker_update_stats_modern(Tracker *t, const cJSON *player_stats_js
             // Creates ONE criteria behind the scenes, even if template doesn't have "criteria" field
             if (stat_cat->criteria_count == 1) {
                 sub_override = parent_override;
-                sub_stat->is_manually_completed = stat_cat->is_manually_completed;
             } else {
                 char sub_stat_key[512];
                 snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name,
                          sub_stat->root_name);
                 sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : nullptr;
-                sub_stat->is_manually_completed = cJSON_IsBool(sub_override);
             }
-            bool sub_forced_true = sub_stat->is_manually_completed && cJSON_IsTrue(sub_override);
+            bool sub_forced_true = cJSON_IsBool(sub_override) && cJSON_IsTrue(sub_override);
+            sub_stat->is_manually_completed = sub_forced_true;
 
             // Either naturally done OR manually overridden to true (itself OR parent)
             sub_stat->done = naturally_done || sub_forced_true || parent_forced_true;
