@@ -836,7 +836,7 @@
   "multi_stage_goals": [
     {
       "root_name": "ms_goal:even_more_basics",
-      "icon": "blocks/Dirt.png",
+      "icon": "items/compass_20_1.9.png",
       "stages": [
         {
           "stage_id": "0",
