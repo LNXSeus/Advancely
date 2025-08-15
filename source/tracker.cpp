@@ -1118,57 +1118,7 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
     }
 }
 
-// /**
-//  * @brief Updates advancement and criteria progress from a pre-loaded cJSON object.
-//  * @param t A pointer to the Tracker struct.
-//  * @param player_adv_json The parsed player advancements JSON file.
-//  */
-// static void tracker_update_advancement_progress(Tracker *t, const cJSON *player_adv_json) {
-//     if (!player_adv_json) return;
-//
-//     t->template_data->advancements_completed_count = 0;
-//     t->template_data->completed_criteria_count = 0;
-//
-//     // printf("[TRACKER] Reading player advancements from: %s\n", t->advancements_path);
-//
-//     for (int i = 0; i < t->template_data->advancement_count; i++) {
-//         TrackableCategory *adv = t->template_data->advancements[i]; // Get the current advancement
-//         adv->completed_criteria_count = 0; // Reset completed criteria count for this advancement
-//
-//         cJSON *player_entry = cJSON_GetObjectItem(player_adv_json, adv->root_name);
-//         // Get the entry for this advancement
-//         if (player_entry) {
-//             adv->done = cJSON_IsTrue(cJSON_GetObjectItem(player_entry, "done"));
-//             if (adv->done) {
-//                 t->template_data->advancements_completed_count++;
-//             }
-//
-//             // Criteria don't have a "done" field, so we just check if the entry exists
-//             cJSON *player_criteria = cJSON_GetObjectItem(player_entry, "criteria");
-//             if (player_criteria) {
-//                 // If the entry exists, we have criteria
-//                 for (int j = 0; j < adv->criteria_count; j++) {
-//                     TrackableItem *crit = adv->criteria[j];
-//                     // Check if the criteria exist -> meaning it's been completed
-//                     if (cJSON_HasObjectItem(player_criteria, crit->root_name)) {
-//                         crit->done = true;
-//                         adv->completed_criteria_count++;
-//                     } else {
-//                         crit->done = false;
-//                     }
-//                 }
-//             }
-//         } else {
-//             // If the entry doesn't exist, reset everything
-//             adv->done = false;
-//             for (int j = 0; j < adv->criteria_count; j++) {
-//                 adv->criteria[j]->done = false;
-//             }
-//         }
-//         // Update completed criteria count for this advancement
-//         t->template_data->completed_criteria_count += adv->completed_criteria_count;
-//     }
-// }
+
 
 /**
  * @brief Updates unlock progress from a pre-loaded cJSON object and counts completed unlocks.
@@ -1913,9 +1863,19 @@ static void render_section_separator(Tracker *t, const AppSettings *settings, fl
     current_y += 50.0f; // Padding after the separator
 }
 
+
 /**
  * @brief Renders a section of items that are TrackableCategories (e.g., Advancements, Stats).
  * This function handles the uniform grid layout and the two-pass rendering for simple vs. complex items.
+ * It distinguishes between advancements and stats with the bool flag and manages all the checkbox logic,
+ * communicating with the settings.json file.
+ * @param t The tracker instance.
+ * @param settings The app settings.
+ * @param current_y The current y position in the world.
+ * @param categories The array of TrackableCategory pointers.
+ * @param count The number of TrackableCategory pointers in the array.
+ * @param section_title The title of the section.
+ * @param is_stat_section True if the section is for stats, false if it's for advancements.
  */
 static void render_trackable_category_section(Tracker* t, const AppSettings* settings, float& current_y, TrackableCategory** categories, int count, const char* section_title, bool is_stat_section) {
     int visible_count = 0;
@@ -1949,8 +1909,12 @@ static void render_trackable_category_section(Tracker* t, const AppSettings* set
                 if (crit && (!crit->done || !settings->remove_completed_goals)) {
                     // FIX: Update width calculation for new layout: [Icon] [Checkbox] [Text] (Progress)
                     char crit_progress_text[32] = "";
-                    if (is_stat_section && crit->goal > 0) {
-                        snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d / %d)", crit->progress, crit->goal);
+                    if (is_stat_section) {
+                        if (crit->goal > 0) {
+                            snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d / %d)", crit->progress, crit->goal);
+                        } else if (crit->goal == -1) {
+                            snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d)", crit->progress);
+                        }
                     }
                     float crit_text_width = ImGui::CalcTextSize(crit->display_name).x;
                     float crit_progress_width = ImGui::CalcTextSize(crit_progress_text).x;
@@ -1974,8 +1938,16 @@ static void render_trackable_category_section(Tracker* t, const AppSettings* set
 
             char progress_text[32] = "";
             if (is_stat_section) {
-                if(is_complex) snprintf(progress_text, sizeof(progress_text), "(%d / %d)", cat->completed_criteria_count, cat->criteria_count);
-                else if (cat->criteria_count == 1 && cat->criteria[0]->goal > 0) snprintf(progress_text, sizeof(progress_text), "(%d / %d)", cat->criteria[0]->progress, cat->criteria[0]->goal);
+                if(is_complex) {
+                    snprintf(progress_text, sizeof(progress_text), "(%d / %d)", cat->completed_criteria_count, cat->criteria_count);
+                } else if (cat->criteria_count == 1) {
+                    TrackableItem* crit = cat->criteria[0];
+                    if (crit->goal > 0) {
+                        snprintf(progress_text, sizeof(progress_text), "(%d / %d)", crit->progress, crit->goal);
+                    } else if (crit->goal == -1) {
+                        snprintf(progress_text, sizeof(progress_text), "(%d)", crit->progress);
+                    }
+                }
             }
 
             ImVec2 text_size = ImGui::CalcTextSize(cat->display_name);
@@ -1995,7 +1967,22 @@ static void render_trackable_category_section(Tracker* t, const AppSettings* set
 
             ImVec2 screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x, (current_y * t->zoom_level) + t->camera_offset.y);
             ImVec2 bg_size = ImVec2(96.0f, 96.0f);
-            SDL_Texture* bg_texture_to_use = cat->done ? t->adv_bg_done : (cat->completed_criteria_count > 0 ? t->adv_bg_half_done : t->adv_bg);
+
+            SDL_Texture* bg_texture_to_use = t->adv_bg; // Default to normal background
+            if (cat->done) {
+                bg_texture_to_use = t->adv_bg_done;
+            } else {
+                bool has_progress = false;
+                if (is_complex) {
+                    has_progress = cat->completed_criteria_count > 0;
+                } else if (cat->criteria_count == 1) {
+                    has_progress = cat->criteria[0]->progress > 0;
+                }
+                if (has_progress) {
+                    bg_texture_to_use = t->adv_bg_half_done;
+                }
+            }
+
             if (bg_texture_to_use) draw_list->AddImage((void*)bg_texture_to_use, screen_pos, ImVec2(screen_pos.x + bg_size.x * t->zoom_level, screen_pos.y + bg_size.y * t->zoom_level));
             if (cat->texture) draw_list->AddImage((void*)cat->texture, ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level), ImVec2(screen_pos.x + 80.0f * t->zoom_level, screen_pos.y + 80.0f * t->zoom_level));
 
@@ -2058,9 +2045,15 @@ static void render_trackable_category_section(Tracker* t, const AppSettings* set
                     current_element_x += ImGui::CalcTextSize(crit->display_name).x * t->zoom_level + 4 * t->zoom_level;
 
                     char crit_progress_text[32] = "";
-                    if (is_stat_section && crit->goal > 0) {
-                        snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d / %d)", crit->progress, crit->goal);
-                        draw_list->AddText(nullptr, 14.0f * t->zoom_level, ImVec2(current_element_x, crit_base_pos.y + 8 * t->zoom_level), current_text_color, crit_progress_text);
+                    if (is_stat_section) {
+                        if (crit->goal > 0) {
+                            snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d / %d)", crit->progress, crit->goal);
+                        } else if (crit->goal == -1) {
+                            snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d)", crit->progress);
+                        }
+                        if (crit_progress_text[0] != '\0') {
+                            draw_list->AddText(nullptr, 14.0f * t->zoom_level, ImVec2(current_element_x, crit_base_pos.y + 8 * t->zoom_level), current_text_color, crit_progress_text);
+                        }
                     }
 
                     sub_item_y_offset += 36.0f;
@@ -2086,12 +2079,14 @@ static void render_trackable_category_section(Tracker* t, const AppSettings* set
 
                 if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
                     cat->is_manually_completed = !cat->is_manually_completed;
-                    bool is_naturally_done = cat->completed_criteria_count >= cat->criteria_count;
-                    cat->done = cat->is_manually_completed ? true : is_naturally_done;
+                    bool is_naturally_done = (cat->completed_criteria_count >= cat->criteria_count && cat->criteria_count > 0);
+                    cat->done = cat->is_manually_completed || is_naturally_done;
+
                     for (int j = 0; j < cat->criteria_count; ++j) {
-                        cat->criteria[j]->is_manually_completed = cat->is_manually_completed;
-                        bool crit_is_naturally_done = (cat->criteria[j]->goal > 0 && cat->criteria[j]->progress >= cat->criteria[j]->goal);
-                        cat->criteria[j]->done = cat->is_manually_completed ? true : crit_is_naturally_done;
+                        TrackableItem *crit = cat->criteria[j];
+                        bool crit_is_naturally_done = (crit->goal > 0 && crit->progress >= crit->goal);
+                        // Child is done if parent forces it, it forces itself, or it's naturally done
+                        crit->done = cat->is_manually_completed || crit->is_manually_completed || crit_is_naturally_done;
                     }
                     settings_save(settings, t->template_data);
                     SDL_SetAtomicInt(&g_needs_update, 1);
