@@ -354,3 +354,13 @@ void find_player_data_files(
     }
 }
 #endif
+
+bool path_exists(const char* path) {
+#ifdef _WIN32
+    DWORD file_attributes = GetFileAttributesA(path);
+    return (file_attributes != INVALID_FILE_ATTRIBUTES);
+#else
+    struct stat buffer;
+    return (stat(path, &buffer) == 0);
+#endif
+}

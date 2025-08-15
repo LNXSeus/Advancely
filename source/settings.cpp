@@ -6,6 +6,7 @@
 #include "settings.h"
 #include "settings_utils.h" // ImGui imported through this
 #include "global_event_handler.h" // For global variables
+#include "path_utils.h" // For path_exists()
 
 // #include "init_sdl.h" // TODO: Remove this when possible
 
@@ -124,6 +125,16 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // Apply the changes
     if (ImGui::Button("Apply settings")) {
+
+        // Validate the manual path before applying settings
+        if (temp_settings.path_mode == PATH_MODE_MANUAL) {
+            // Check if the path is empty or does not exist
+            if (strlen(temp_settings.manual_saves_path) == 0 || !path_exists(temp_settings.manual_saves_path)) {
+                // If invalid, revert to auto mode to prevent dmon errors
+                temp_settings.path_mode = PATH_MODE_AUTO;
+            }
+        }
+
         // When the button is clicked, copy temp settings to the real settings, save, and trigger a reload
         memcpy(app_settings, &temp_settings, sizeof(AppSettings));
         SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);

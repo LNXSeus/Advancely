@@ -63,6 +63,13 @@ void find_player_data_files(
     size_t max_len
 );
 
+    /**
+ * @brief Checks if a given file or directory path exists.
+ * @param path The path to check.
+ * @return true if the path exists, false otherwise.
+ */
+    bool path_exists(const char* path);
+
 #ifdef __cplusplus
 }
 #endif

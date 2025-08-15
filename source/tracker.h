@@ -102,6 +102,12 @@ void tracker_render(Tracker *t, const AppSettings *settings);
 /**
  * @brief Renders the tracker window's contents using ImGui.
  *
+ * Using render_section_separator, srender_trackable_category_section, render_simple_item_section,
+ * render_custom_goals_section and render_multi_stage_goals_section as helper functions it renders
+ * the five main sections of the tracker window: advancements, stats, unlocks, custom goals and
+ * multi-stage goals.
+ *
+ *
  * @param t Tracker struct
  * @param settings A pointer to the application settings containing color information
  */

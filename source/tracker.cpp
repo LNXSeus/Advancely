@@ -13,9 +13,12 @@
 #include "settings_utils.h"
 #include "file_utils.h" // has the cJSON_from_file function
 #include "temp_create_utils.h"
+#include "global_event_handler.h"
 
 #include <cJSON.h>
 #include <cmath>
+
+#include "imgui_internal.h"
 
 
 /**
@@ -956,6 +959,8 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
                 char full_icon_path[sizeof(new_item->icon_path)];
                 snprintf(full_icon_path, sizeof(full_icon_path), "resources/icons/%s", icon->valuestring);
                 strncpy(new_item->icon_path, full_icon_path, sizeof(new_item->icon_path) - 1);
+                new_item->texture = load_texture_with_scale_mode(t->renderer, new_item->icon_path,
+                                                                 SDL_SCALEMODE_NEAREST);
             }
 
             cJSON *target = cJSON_GetObjectItem(item_json, "target");
@@ -1024,6 +1029,7 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
             char full_icon_path[sizeof(new_goal->icon_path)];
             snprintf(full_icon_path, sizeof(full_icon_path), "resources/icons/%s", icon->valuestring);
             strncpy(new_goal->icon_path, full_icon_path, sizeof(new_goal->icon_path) - 1);
+            new_goal->texture = load_texture_with_scale_mode(t->renderer, new_goal->icon_path, SDL_SCALEMODE_NEAREST);
         }
 
 
@@ -1862,172 +1868,583 @@ void tracker_render(Tracker *t, const AppSettings *settings) {
     // SDL_RenderPresent(t->renderer);
 }
 
-// TODO: Continue here, settings window integrated into tracker window
+
+// -------------------------------------------- TRACKER RENDERING START --------------------------------------------
+
+
+/**
+ * @brief Helper to draw a separator line with a title for a new section.
+ *
+ * @param t The tracker instance.
+ * @param current_y The current y position in the world.
+ * @param title The title of the section.
+ * @param text_color The text color for the title.
+ */
+static void render_section_separator(Tracker *t, const AppSettings *settings, float &current_y, const char *title, ImU32 text_color) {
+
+    ImGuiIO& io = ImGui::GetIO();
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    float zoom = t->zoom_level;
+
+    current_y += 40.0f; // Padding before the separator
+
+    // Measure the text
+    ImVec2 text_size = ImGui::CalcTextSize(title);
+    float screen_width_in_world = io.DisplaySize.x / zoom;
+
+    // Center text in screen space (ignore camera_offset.x so it doesn't shift with the world)
+    float text_pos_x_in_world = (screen_width_in_world - text_size.x) / 2.0f;
+    ImVec2 final_text_pos = ImVec2(text_pos_x_in_world * zoom,
+                                   current_y * zoom + t->camera_offset.y);
+
+    draw_list->AddText(nullptr, 18.0f * zoom, final_text_pos, text_color, title);
+
+    // Draw a shorter, centered line (40% of the visible width)
+    float line_width_in_world = screen_width_in_world * TRACKER_SEPARATOR_LINE_WIDTH;
+    float line_start_x_in_world = (screen_width_in_world - line_width_in_world) / 2.0f;
+    float line_end_x_in_world = line_start_x_in_world + line_width_in_world;
+
+    ImVec2 line_start = ImVec2(line_start_x_in_world * zoom,
+                               (current_y + 30) * zoom + t->camera_offset.y);
+    ImVec2 line_end   = ImVec2(line_end_x_in_world * zoom,
+                               (current_y + 30) * zoom + t->camera_offset.y);
+
+    draw_list->AddLine(line_start, line_end, IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b, ADVANCELY_FADED_ALPHA), 1.0f * zoom);
+
+    current_y += 50.0f; // Padding after the separator
+}
+
+/**
+ * @brief Renders a section of items that are TrackableCategories (e.g., Advancements, Stats).
+ * This function handles the uniform grid layout and the two-pass rendering for simple vs. complex items.
+ */
+static void render_trackable_category_section(Tracker* t, const AppSettings* settings, float& current_y, TrackableCategory** categories, int count, const char* section_title, bool is_stat_section) {
+    int visible_count = 0;
+    for(int i = 0; i < count; ++i) {
+        if (categories[i] && (!categories[i]->done || !settings->remove_completed_goals)) {
+            visible_count++;
+            break;
+        }
+    }
+    if (visible_count == 0) return;
+
+    ImGuiIO& io = ImGui::GetIO();
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    ImU32 text_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b, settings->text_color.a);
+    ImU32 text_color_faded = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b, 100);
+    ImU32 icon_tint_faded = IM_COL32(255, 255, 255, 100);
+
+    ImU32 checkmark_color = text_color;
+
+    render_section_separator(t, settings, current_y, section_title, text_color);
+
+    float uniform_item_width = 0.0f;
+    for (int i = 0; i < count; i++) {
+        TrackableCategory* cat = categories[i];
+        if (!cat || (cat->done && settings->remove_completed_goals)) continue;
+
+        float required_width = ImGui::CalcTextSize(cat->display_name).x;
+        if (cat->criteria_count > 1) {
+            for (int j = 0; j < cat->criteria_count; j++) {
+                TrackableItem* crit = cat->criteria[j];
+                if (crit && (!crit->done || !settings->remove_completed_goals)) {
+                    // FIX: Update width calculation for new layout: [Icon] [Checkbox] [Text] (Progress)
+                    char crit_progress_text[32] = "";
+                    if (is_stat_section && crit->goal > 0) {
+                        snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d / %d)", crit->progress, crit->goal);
+                    }
+                    float crit_text_width = ImGui::CalcTextSize(crit->display_name).x;
+                    float crit_progress_width = ImGui::CalcTextSize(crit_progress_text).x;
+                    // Icon(32) + pad + Checkbox(20) + pad + Text + pad + Progress
+                    float total_crit_width = 32 + 4 + 20 + 4 + crit_text_width + (crit_progress_width > 0 ? 4 + crit_progress_width : 0);
+                    required_width = fmaxf(required_width, total_crit_width);
+                }
+            }
+        }
+        uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, required_width));
+    }
+
+    float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
+    const float horizontal_spacing = 32.0f, vertical_spacing = 48.0f;
+
+    auto render_pass = [&](bool complex_pass) {
+        for (int i = 0; i < count; i++) {
+            TrackableCategory *cat = categories[i];
+            bool is_complex = cat && cat->criteria_count > 1;
+            if (!cat || (is_complex != complex_pass) || (cat->done && settings->remove_completed_goals)) continue;
+
+            char progress_text[32] = "";
+            if (is_stat_section) {
+                if(is_complex) snprintf(progress_text, sizeof(progress_text), "(%d / %d)", cat->completed_criteria_count, cat->criteria_count);
+                else if (cat->criteria_count == 1 && cat->criteria[0]->goal > 0) snprintf(progress_text, sizeof(progress_text), "(%d / %d)", cat->criteria[0]->progress, cat->criteria[0]->goal);
+            }
+
+            ImVec2 text_size = ImGui::CalcTextSize(cat->display_name);
+            ImVec2 progress_text_size = ImGui::CalcTextSize(progress_text);
+            int visible_criteria = 0;
+            if (is_complex) {
+                for (int j = 0; j < cat->criteria_count; j++) if (cat->criteria[j] && (!cat->criteria[j]->done || !settings->remove_completed_goals)) visible_criteria++;
+            }
+            float item_height = 96.0f + text_size.y + 4.0f + (visible_criteria * 36.0f);
+            if(progress_text[0] != '\0') item_height += progress_text_size.y + 4.0f;
+
+            if (current_x > padding && (current_x + uniform_item_width) > (io.DisplaySize.x / t->zoom_level) - padding) {
+                current_x = padding;
+                current_y += row_max_height;
+                row_max_height = 0.0f;
+            }
+
+            ImVec2 screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x, (current_y * t->zoom_level) + t->camera_offset.y);
+            ImVec2 bg_size = ImVec2(96.0f, 96.0f);
+            SDL_Texture* bg_texture_to_use = cat->done ? t->adv_bg_done : (cat->completed_criteria_count > 0 ? t->adv_bg_half_done : t->adv_bg);
+            if (bg_texture_to_use) draw_list->AddImage((void*)bg_texture_to_use, screen_pos, ImVec2(screen_pos.x + bg_size.x * t->zoom_level, screen_pos.y + bg_size.y * t->zoom_level));
+            if (cat->texture) draw_list->AddImage((void*)cat->texture, ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level), ImVec2(screen_pos.x + 80.0f * t->zoom_level, screen_pos.y + 80.0f * t->zoom_level));
+
+            float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level;
+            draw_list->AddText(nullptr, 16.0f * t->zoom_level, ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f, text_y_pos), text_color, cat->display_name);
+
+            if (progress_text[0] != '\0') {
+                text_y_pos += text_size.y * t->zoom_level + 4.0f;
+                draw_list->AddText(nullptr, 14.0f * t->zoom_level, ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level) * 0.5f, text_y_pos), text_color, progress_text);
+            }
+
+            if (is_complex) {
+                float sub_item_y_offset = current_y + bg_size.y + text_size.y + 4.0f;
+                if(progress_text[0] != '\0') sub_item_y_offset += progress_text_size.y + 4.0f;
+                sub_item_y_offset += 12.0f;
+
+                for (int j = 0; j < cat->criteria_count; j++) {
+                    TrackableItem* crit = cat->criteria[j];
+                    if (!crit || (crit->done && settings->remove_completed_goals)) continue;
+
+                    ImVec2 crit_base_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x, (sub_item_y_offset * t->zoom_level) + t->camera_offset.y);
+                    float current_element_x = crit_base_pos.x;
+
+                    // Draw Icon
+                    if (crit->texture) {
+                        ImU32 icon_tint = crit->done ? icon_tint_faded : IM_COL32_WHITE;
+                        draw_list->AddImage((void*)crit->texture, crit_base_pos, ImVec2(crit_base_pos.x + 32 * t->zoom_level, crit_base_pos.y + 32 * t->zoom_level), ImVec2(0,0), ImVec2(1,1), icon_tint);
+                    }
+                    current_element_x += 32 * t->zoom_level + 4 * t->zoom_level;
+
+                    // Draw Checkbox for Sub-Stat
+                    if (is_stat_section) {
+                         ImVec2 check_pos = ImVec2(current_element_x, crit_base_pos.y + 6 * t->zoom_level);
+                         ImRect checkbox_rect(check_pos, ImVec2(check_pos.x + 20*t->zoom_level, check_pos.y + 20*t->zoom_level));
+                         bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
+                         ImU32 check_bg_color = is_hovered ? IM_COL32(80,80,80,255):IM_COL32(50,50,50,255);
+                         draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_bg_color, 3.0f * t->zoom_level);
+                         draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, IM_COL32(255,255,255,255), 3.0f * t->zoom_level);
+
+                        if(crit->is_manually_completed) {
+                            ImVec2 p1 = ImVec2(check_pos.x + 5*t->zoom_level, check_pos.y+10*t->zoom_level);
+                            ImVec2 p2 = ImVec2(check_pos.x + 9*t->zoom_level, check_pos.y+15*t->zoom_level);
+                            ImVec2 p3 = ImVec2(check_pos.x + 15*t->zoom_level, check_pos.y+6*t->zoom_level);
+                            draw_list->AddLine(p1, p2, checkmark_color, 2.0f * t->zoom_level);
+                            draw_list->AddLine(p2, p3, checkmark_color, 2.0f * t->zoom_level);
+                        }
+
+                         if(is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                             crit->is_manually_completed = !crit->is_manually_completed;
+                             crit->done = crit->is_manually_completed ? true : (crit->progress >= crit->goal && crit->goal > 0);
+                             settings_save(settings, t->template_data);
+                             SDL_SetAtomicInt(&g_needs_update, 1);
+                         }
+                         current_element_x += 20 * t->zoom_level + 4 * t->zoom_level;
+                    }
+
+                    // Draw Text and Progress
+                    ImU32 current_text_color = crit->done ? text_color_faded : text_color;
+                    draw_list->AddText(nullptr, 14.0f * t->zoom_level, ImVec2(current_element_x, crit_base_pos.y + 8 * t->zoom_level), current_text_color, crit->display_name);
+                    current_element_x += ImGui::CalcTextSize(crit->display_name).x * t->zoom_level + 4 * t->zoom_level;
+
+                    char crit_progress_text[32] = "";
+                    if (is_stat_section && crit->goal > 0) {
+                        snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d / %d)", crit->progress, crit->goal);
+                        draw_list->AddText(nullptr, 14.0f * t->zoom_level, ImVec2(current_element_x, crit_base_pos.y + 8 * t->zoom_level), current_text_color, crit_progress_text);
+                    }
+
+                    sub_item_y_offset += 36.0f;
+                }
+            }
+
+            if (is_stat_section) {
+                ImVec2 check_pos = ImVec2(screen_pos.x + 70 * t->zoom_level, screen_pos.y + 5 * t->zoom_level);
+                ImRect checkbox_rect(check_pos, ImVec2(check_pos.x + 20 * t->zoom_level, check_pos.y + 20 * t->zoom_level));
+                bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
+                ImU32 check_bg_color = is_hovered ? IM_COL32(80, 80, 80, 255) : IM_COL32(50, 50, 50, 255);
+                draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_bg_color, 3.0f * t->zoom_level);
+                draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, IM_COL32(255, 255, 255, 255), 3.0f * t->zoom_level);
+
+                // Only draw checkmark if manually completed
+                if (cat->is_manually_completed) {
+                    ImVec2 p1 = ImVec2(check_pos.x + 5*t->zoom_level, check_pos.y + 10*t->zoom_level);
+                    ImVec2 p2 = ImVec2(check_pos.x + 9*t->zoom_level, check_pos.y + 15*t->zoom_level);
+                    ImVec2 p3 = ImVec2(check_pos.x + 15*t->zoom_level, check_pos.y + 6*t->zoom_level);
+                    draw_list->AddLine(p1, p2, checkmark_color, 2.0f * t->zoom_level);
+                    draw_list->AddLine(p2, p3, checkmark_color, 2.0f * t->zoom_level);
+                }
+
+                if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                    cat->is_manually_completed = !cat->is_manually_completed;
+                    bool is_naturally_done = cat->completed_criteria_count >= cat->criteria_count;
+                    cat->done = cat->is_manually_completed ? true : is_naturally_done;
+                    for (int j = 0; j < cat->criteria_count; ++j) {
+                        cat->criteria[j]->is_manually_completed = cat->is_manually_completed;
+                        bool crit_is_naturally_done = (cat->criteria[j]->goal > 0 && cat->criteria[j]->progress >= cat->criteria[j]->goal);
+                        cat->criteria[j]->done = cat->is_manually_completed ? true : crit_is_naturally_done;
+                    }
+                    settings_save(settings, t->template_data);
+                    SDL_SetAtomicInt(&g_needs_update, 1);
+                }
+            }
+            current_x += uniform_item_width + horizontal_spacing;
+            row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
+        }
+    };
+
+    render_pass(false);
+    render_pass(true);
+    current_y += row_max_height;
+}
+
+/**
+ * @brief Renders a section of items that are simple TrackableItems (e.g., Unlocks).
+ */
+static void render_simple_item_section(Tracker *t, const AppSettings *settings, float &current_y, TrackableItem **items,
+                                       int count, const char *section_title) {
+    int visible_count = 0;
+    for (int i = 0; i < count; ++i) {
+        if (items[i] && (!items[i]->done || !settings->remove_completed_goals)) {
+            visible_count++;
+            break;
+        }
+    }
+    if (visible_count == 0) return;
+
+    ImGuiIO &io = ImGui::GetIO();
+    ImDrawList *draw_list = ImGui::GetWindowDrawList();
+    ImU32 text_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
+                                settings->text_color.a);
+
+    render_section_separator(t, settings, current_y, section_title, text_color);
+
+    float uniform_item_width = 0.0f;
+    for (int i = 0; i < count; i++) {
+        TrackableItem *item = items[i];
+        if (!item || (item->done && settings->remove_completed_goals)) continue;
+        uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, ImGui::CalcTextSize(item->display_name).x));
+    }
+
+    float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
+    const float horizontal_spacing = 32.0f, vertical_spacing = 48.0f;
+
+    for (int i = 0; i < count; i++) {
+        TrackableItem *item = items[i];
+        if (!item || (item->done && settings->remove_completed_goals)) continue;
+
+        float item_height = 96.0f + ImGui::CalcTextSize(item->display_name).y + 4.0f;
+        if (current_x > padding && (current_x + uniform_item_width) > (io.DisplaySize.x / t->zoom_level) - padding) {
+            current_x = padding;
+            current_y += row_max_height;
+            row_max_height = 0.0f;
+        }
+
+        ImVec2 screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
+                                   (current_y * t->zoom_level) + t->camera_offset.y);
+        ImVec2 bg_size = ImVec2(96.0f, 96.0f);
+        SDL_Texture *bg_texture = item->done ? t->adv_bg_done : t->adv_bg;
+        if (bg_texture)
+            draw_list->AddImage((void *) bg_texture, screen_pos,
+                                ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
+                                       screen_pos.y + bg_size.y * t->zoom_level));
+        if (item->texture)
+            draw_list->AddImage((void *) item->texture,
+                                ImVec2(screen_pos.x + 16.0f * t->zoom_level,
+                                       screen_pos.y + 16.0f * t->zoom_level),
+                                ImVec2(screen_pos.x + 80.0f * t->zoom_level,
+                                       screen_pos.y + 80.0f * t->zoom_level));
+        ImVec2 text_size = ImGui::CalcTextSize(item->display_name);
+        draw_list->AddText(nullptr, 16.0f * t->zoom_level,
+                           ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
+                                  screen_pos.y + bg_size.y * t->zoom_level), text_color, item->display_name);
+
+        current_x += uniform_item_width + horizontal_spacing;
+        row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
+    }
+    current_y += row_max_height;
+}
+
+/**
+ * @brief Renders the Custom Goals section with interactive checkboxes.
+ */
+static void render_custom_goals_section(Tracker *t, const AppSettings *settings, float &current_y, const char *section_title) {
+    int count = t->template_data->custom_goal_count;
+    // Pre-check for visible items
+    int visible_count = 0;
+    for (int i = 0; i < count; ++i) {
+        if (t->template_data->custom_goals[i] && (
+                !t->template_data->custom_goals[i]->done || !settings->remove_completed_goals)) {
+            visible_count++;
+            break;
+        }
+    }
+    if (visible_count == 0) return;
+
+    ImGuiIO &io = ImGui::GetIO();
+    ImDrawList *draw_list = ImGui::GetWindowDrawList();
+    ImU32 text_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
+                                settings->text_color.a);
+
+    ImU32 checkmark_color = text_color;
+
+    render_section_separator(t, settings, current_y, section_title, text_color);
+
+    float uniform_item_width = 0.0f;
+    for (int i = 0; i < count; i++) {
+        TrackableItem *item = t->template_data->custom_goals[i];
+        if (!item || (item->done && settings->remove_completed_goals)) continue;
+        uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, ImGui::CalcTextSize(item->display_name).x));
+    }
+
+    float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
+    const float horizontal_spacing = 32.0f, vertical_spacing = 48.0f;
+
+    for (int i = 0; i < count; i++) {
+        TrackableItem *item = t->template_data->custom_goals[i];
+        if (!item || (item->done && settings->remove_completed_goals)) continue;
+
+        char progress_text[32] = "";
+        if (item->goal > 0) snprintf(progress_text, sizeof(progress_text), "(%d / %d)", item->progress, item->goal);
+        else if (item->goal == -1) snprintf(progress_text, sizeof(progress_text), "(%d)", item->progress);
+
+        ImVec2 text_size = ImGui::CalcTextSize(item->display_name);
+        ImVec2 progress_text_size = ImGui::CalcTextSize(progress_text);
+        float item_height = 96.0f + text_size.y + 4.0f + (item->goal != 0 ? progress_text_size.y + 4.0f : 0);
+
+        if (current_x > padding && (current_x + uniform_item_width) > (io.DisplaySize.x / t->zoom_level) - padding) {
+            current_x = padding;
+            current_y += row_max_height;
+            row_max_height = 0.0f;
+        }
+
+        ImVec2 screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
+                                   (current_y * t->zoom_level) + t->camera_offset.y);
+        ImVec2 bg_size = ImVec2(96.0f, 96.0f);
+        SDL_Texture *bg_texture = item->done ? t->adv_bg_done : t->adv_bg;
+
+        // Select background based on progress for counters, half-done when in between
+        if (item->done) {
+            bg_texture = t->adv_bg_done;
+        } else if ((item->goal > 0 || item->goal == -1) && item->progress > 0) { // Specifically checking for -1 as well
+            bg_texture = t->adv_bg_half_done;
+        } else {
+            bg_texture = t->adv_bg;
+        }
+
+        if (bg_texture)
+            draw_list->AddImage((void *) bg_texture, screen_pos,
+                                ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
+                                       screen_pos.y + bg_size.y * t->zoom_level));
+        if (item->texture)
+            draw_list->AddImage((void *) item->texture,
+                                ImVec2(screen_pos.x + 16.0f * t->zoom_level,
+                                       screen_pos.y + 16.0f * t->zoom_level),
+                                ImVec2(screen_pos.x + 80.0f * t->zoom_level,
+                                       screen_pos.y + 80.0f * t->zoom_level));
+
+        draw_list->AddText(nullptr, 16.0f * t->zoom_level,
+                           ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
+                                  screen_pos.y + bg_size.y * t->zoom_level), text_color, item->display_name);
+        if (progress_text[0] != '\0') {
+            draw_list->AddText(nullptr, 14.0f * t->zoom_level,
+                               ImVec2(
+                                   screen_pos.x + (bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level) *
+                                   0.5f, screen_pos.y + (bg_size.y + text_size.y + 4.0f) * t->zoom_level), text_color,
+                               progress_text);
+        }
+
+        // Checkbox logic for manual override
+        bool can_be_overridden = (item->goal <= 0 || item->goal == -1);
+        if (can_be_overridden) {
+            ImVec2 check_pos = ImVec2(screen_pos.x + 70 * t->zoom_level, screen_pos.y + 5 * t->zoom_level);
+            ImVec2 check_size = ImVec2(20 * t->zoom_level, 20 * t->zoom_level);
+            ImRect checkbox_rect(check_pos, ImVec2(check_pos.x + check_size.x, check_pos.y + check_size.y));
+
+            bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
+            ImU32 check_bg_color = is_hovered ? IM_COL32(80, 80, 80, 255) : IM_COL32(50, 50, 50, 255);
+            draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_bg_color, 3.0f * t->zoom_level);
+            draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, checkmark_color,
+                               3.0f * t->zoom_level);
+
+            if (item->done) {
+                draw_list->AddLine(ImVec2(check_pos.x + 5 * t->zoom_level, check_pos.y + 10 * t->zoom_level),
+                                   ImVec2(check_pos.x + 9 * t->zoom_level, check_pos.y + 15 * t->zoom_level),
+                                   checkmark_color, 2.0f * t->zoom_level);
+                draw_list->AddLine(ImVec2(check_pos.x + 9 * t->zoom_level, check_pos.y + 15 * t->zoom_level),
+                                   ImVec2(check_pos.x + 15 * t->zoom_level, check_pos.y + 6 * t->zoom_level),
+                                   checkmark_color, 2.0f * t->zoom_level);
+            }
+
+            if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                item->done = !item->done;
+                item->is_manually_completed = true;
+                settings_save(settings, t->template_data);
+                SDL_SetAtomicInt(&g_needs_update, 1);
+            }
+        }
+
+        current_x += uniform_item_width + horizontal_spacing;
+        row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
+    }
+    current_y += row_max_height;
+}
+
+/**
+ * @brief Renders the Multi-Stage Goals section.
+ */
+static void render_multistage_goals_section(Tracker *t, const AppSettings *settings, float &current_y, const char *section_title) {
+    int count = t->template_data->multi_stage_goal_count;
+    // Pre-check for visible items
+    int visible_count = 0;
+    for (int i = 0; i < count; ++i) {
+        MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+        bool is_done = goal && (goal->current_stage >= goal->stage_count - 1);
+        if (goal && (!is_done || !settings->remove_completed_goals)) {
+            visible_count++;
+            break;
+        }
+    }
+    if (visible_count == 0) return;
+
+    ImGuiIO &io = ImGui::GetIO();
+    ImDrawList *draw_list = ImGui::GetWindowDrawList();
+    ImU32 text_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
+                                settings->text_color.a);
+
+    render_section_separator(t, settings, current_y, section_title, text_color);
+
+    float uniform_item_width = 0.0f;
+    for (int i = 0; i < count; i++) {
+        MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+        if (!goal) continue;
+        uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, ImGui::CalcTextSize(goal->display_name).x));
+    }
+
+    float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
+    const float horizontal_spacing = 32.0f, vertical_spacing = 48.0f;
+
+    for (int i = 0; i < count; i++) {
+        MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+        bool is_done = goal && (goal->current_stage >= goal->stage_count - 1);
+
+        // Filter out completed goals if the setting is enabled
+        if (!goal || (is_done && settings->remove_completed_goals)) continue;
+
+        SubGoal *active_stage = goal->stages[goal->current_stage];
+        char stage_text[256];
+        if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress > 0) {
+            snprintf(stage_text, sizeof(stage_text), "%s (%d/%d)", active_stage->display_text,
+                     active_stage->current_stat_progress, active_stage->required_progress);
+        } else {
+            strncpy(stage_text, active_stage->display_text, sizeof(stage_text));
+        }
+
+        ImVec2 text_size = ImGui::CalcTextSize(goal->display_name);
+        ImVec2 stage_text_size = ImGui::CalcTextSize(stage_text);
+        float item_height = 96.0f + text_size.y + 4.0f + stage_text_size.y + 4.0f;
+
+        if (current_x > padding && (current_x + uniform_item_width) > (io.DisplaySize.x / t->zoom_level) - padding) {
+            current_x = padding;
+            current_y += row_max_height;
+            row_max_height = 0.0f;
+        }
+
+        ImVec2 screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
+                                   (current_y * t->zoom_level) + t->camera_offset.y);
+        ImVec2 bg_size = ImVec2(96.0f, 96.0f);
+
+        SDL_Texture *bg_texture;
+        if (goal->current_stage >= goal->stage_count - 1) bg_texture = t->adv_bg_done;
+        else if (goal->current_stage > 0) bg_texture = t->adv_bg_half_done;
+        else bg_texture = t->adv_bg;
+
+        if (bg_texture)
+            draw_list->AddImage((void *) bg_texture, screen_pos,
+                                ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
+                                       screen_pos.y + bg_size.y * t->zoom_level));
+        if (goal->texture)
+            draw_list->AddImage((void *) goal->texture,
+                                ImVec2(screen_pos.x + 16.0f * t->zoom_level,
+                                       screen_pos.y + 16.0f * t->zoom_level),
+                                ImVec2(screen_pos.x + 80.0f * t->zoom_level,
+                                       screen_pos.y + 80.0f * t->zoom_level));
+
+        draw_list->AddText(nullptr, 16.0f * t->zoom_level,
+                           ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
+                                  screen_pos.y + bg_size.y * t->zoom_level), text_color, goal->display_name);
+        draw_list->AddText(nullptr, 14.0f * t->zoom_level,
+                           ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - stage_text_size.x * t->zoom_level) * 0.5f,
+                                  screen_pos.y + (bg_size.y + text_size.y + 4.0f) * t->zoom_level), text_color,
+                           stage_text);
+
+        current_x += uniform_item_width + horizontal_spacing;
+        row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
+    }
+    current_y += row_max_height;
+}
+
+
 // Animate overlay, display more than just advancements
 void tracker_render_gui(Tracker *t, const AppSettings *settings) {
     if (!t || !t->template_data) return;
 
-    // Draw the ImGui UI
     ImGuiIO &io = ImGui::GetIO();
-
-    // Create a window that covers the whole main window
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(ImVec2(io.DisplaySize));
     ImGui::Begin("TrackerMap", nullptr,
                  ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoMove |
                  ImGuiWindowFlags_NoBringToFrontOnFocus);
 
-    // Pan and zoom logic
-    ImVec2 mouse_pos_in_window = ImGui::GetMousePos();
+    // Pan and zoom logic (unchanged)
     if (ImGui::IsWindowHovered()) {
-        // Zooming with Mouse Wheel
         if (io.MouseWheel != 0) {
+            ImVec2 mouse_pos_in_window = ImGui::GetMousePos();
             ImVec2 mouse_pos_before_zoom = ImVec2((mouse_pos_in_window.x - t->camera_offset.x) / t->zoom_level,
                                                   (mouse_pos_in_window.y - t->camera_offset.y) / t->zoom_level);
             float old_zoom = t->zoom_level;
-            t->zoom_level += io.MouseWheel * 0.1f * t->zoom_level; // Zoom exponentially
-            if (t->zoom_level < 0.1f) t->zoom_level = 0.1f; // Clamp zoom level to a minimum value
-            if (t->zoom_level > 10.0f) t->zoom_level = 10.0f; // Clamp zoom level to a maximum value (zoom in)
+            t->zoom_level += io.MouseWheel * 0.1f * t->zoom_level;
+            if (t->zoom_level < 0.1f) t->zoom_level = 0.1f;
+            if (t->zoom_level > 10.0f) t->zoom_level = 10.0f;
             t->camera_offset.x += (mouse_pos_before_zoom.x * (old_zoom - t->zoom_level));
             t->camera_offset.y += (mouse_pos_before_zoom.y * (old_zoom - t->zoom_level));
         }
-        // Panning with Mouse Drag (right and middle mouse buttons)
         if (ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
             t->camera_offset.x += io.MouseDelta.x;
             t->camera_offset.y += io.MouseDelta.y;
         }
     }
 
+    // This is the starting Y position for all rendering.
+    // Each section will render itself and update this value for the next section.
+    float current_y = 50.0f;
 
-    ImDrawList *draw_list = ImGui::GetWindowDrawList();
-    ImU32 text_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
-                                settings->text_color.a);
+    //  Render All Sections in Order
+    render_trackable_category_section(t, settings, current_y, t->template_data->advancements,
+                                      t->template_data->advancement_count, "Advancements", false);
+    render_simple_item_section(t, settings, current_y, t->template_data->unlocks, t->template_data->unlock_count,
+                               "Unlocks");
+    render_trackable_category_section(t, settings, current_y, t->template_data->stats, t->template_data->stat_count,
+                                      "Statistics", true);
+    render_custom_goals_section(t, settings, current_y, "Custom Goals");
+    render_multistage_goals_section(t, settings, current_y, "Multi-Stage Goals");
 
-    // TODO: Make fade opacity adjustable (alpha value)
-    ImU32 text_color_faded = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b, 100);
-    ImU32 icon_tint_faded = IM_COL32(255, 255, 255, 100);
-
-    // Pre-calculate a single, uniform width for all items
-    float uniform_item_width = 0.0f;
-    for (int i = 0; i < t->template_data->advancement_count; i++) {
-        TrackableCategory *adv = t->template_data->advancements[i];
-        if (!adv || (adv->done && settings->remove_completed_goals)) {
-            continue;
-        }
-
-        // Calculate the max width required by this specific advancement's text content
-        float required_width = ImGui::CalcTextSize(adv->display_name).x;
-        if (adv->criteria_count > 1) {
-            for (int j = 0; j < adv->criteria_count; j++) {
-                TrackableItem *crit = adv->criteria[j];
-                if (crit && (!crit->done || !settings->remove_completed_goals)) {
-                    // A criteria's width is its icon (32px), padding, plus its text width
-                    float crit_width = 36.0f + ImGui::CalcTextSize(crit->display_name).x;
-                    required_width = fmaxf(required_width, crit_width);
-                }
-            }
-        }
-
-        // The item's final width is either its content width or the background width, whichever is larger
-        float final_adv_width = fmaxf(96.0f, required_width);
-
-        // Update the global uniform width if this item is the widest found so far
-        uniform_item_width = fmaxf(uniform_item_width, final_adv_width);
-    }
-
-    // Drawing Logic with uniform width
-    float padding = 50.0f;
-    float current_x = padding;
-    float current_y = padding;
-    float row_max_height = 0.0f;
-    float horizontal_spacing = 32.0f;
-    float vertical_spacing = 48.0f;
-
-    // Loop through all advancements, stats, etc.
-    for (int i = 0; i < t->template_data->advancement_count; i++) {
-        TrackableCategory *adv = t->template_data->advancements[i];
-
-        // Skip advancements that have sub-criteria, or those that are completed and hidden
-        if (!adv || adv->criteria_count > 1 || (adv->done && settings->remove_completed_goals)) {
-            continue;
-        }
-
-        float item_height = 96.0f + ImGui::CalcTextSize(adv->display_name).y + 4.0f;
-
-        if (current_x > padding && (current_x + uniform_item_width) > (io.DisplaySize.x / t->zoom_level) - padding) {
-            current_x = padding;
-            current_y += row_max_height;
-            row_max_height = 0.0f;
-        }
-
-        ImVec2 screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x, (current_y * t->zoom_level) + t->camera_offset.y);
-        ImVec2 bg_size = ImVec2(96.0f, 96.0f);
-
-        SDL_Texture* bg_texture_to_use = adv->done ? t->adv_bg_done : (adv->completed_criteria_count > 0 ? t->adv_bg_half_done : t->adv_bg);
-        if (bg_texture_to_use) draw_list->AddImage((void*)bg_texture_to_use, screen_pos, ImVec2(screen_pos.x + bg_size.x * t->zoom_level, screen_pos.y + bg_size.y * t->zoom_level));
-        if (adv->texture) draw_list->AddImage((void*)adv->texture, ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level), ImVec2(screen_pos.x + 80.0f * t->zoom_level, screen_pos.y + 80.0f * t->zoom_level));
-
-        ImVec2 text_size = ImGui::CalcTextSize(adv->display_name);
-        draw_list->AddText(nullptr, 16.0f * t->zoom_level, ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f, screen_pos.y + bg_size.y * t->zoom_level), text_color, adv->display_name);
-
-        current_x += uniform_item_width + horizontal_spacing;
-        row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
-    }
-
-    // Second Pass to render advancements with sub-criteria
-    for (int i = 0; i < t->template_data->advancement_count; i++) {
-        TrackableCategory *adv = t->template_data->advancements[i];
-        if (!adv || adv->criteria_count <= 1 || (adv->done && settings->remove_completed_goals)) {
-            continue;
-        }
-
-        ImVec2 bg_size = ImVec2(96.0f, 96.0f);
-        ImVec2 text_size = ImGui::CalcTextSize(adv->display_name);
-        int visible_criteria_count = 0;
-        for (int j = 0; j < adv->criteria_count; j++) {
-            if (adv->criteria[j] && (!adv->criteria[j]->done || !settings->remove_completed_goals)) {
-                visible_criteria_count++;
-            }
-        }
-        float criteria_height = (float)visible_criteria_count * 36.0f;
-        float item_height = bg_size.y + text_size.y + 4.0f + criteria_height;
-
-        if (current_x > padding && (current_x + uniform_item_width) > (io.DisplaySize.x / t->zoom_level) - padding) {
-            current_x = padding;
-            current_y += row_max_height;
-            row_max_height = 0.0f;
-        }
-
-        ImVec2 screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x, (current_y * t->zoom_level) + t->camera_offset.y);
-
-        SDL_Texture* bg_texture_to_use = adv->done ? t->adv_bg_done : (adv->completed_criteria_count > 0 ? t->adv_bg_half_done : t->adv_bg);
-        if (bg_texture_to_use) draw_list->AddImage((void*)bg_texture_to_use, screen_pos, ImVec2(screen_pos.x + bg_size.x * t->zoom_level, screen_pos.y + bg_size.y * t->zoom_level));
-        if (adv->texture) draw_list->AddImage((void*)adv->texture, ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level), ImVec2(screen_pos.x + 80.0f * t->zoom_level, screen_pos.y + 80.0f * t->zoom_level));
-        draw_list->AddText(nullptr, 16.0f * t->zoom_level, ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f, screen_pos.y + bg_size.y * t->zoom_level), text_color, adv->display_name);
-
-        float sub_item_y_offset = current_y + bg_size.y + 20.0f;
-        for (int j = 0; j < adv->criteria_count; j++) {
-            TrackableItem* crit = adv->criteria[j];
-            if (!crit || (crit->done && settings->remove_completed_goals)) continue;
-
-            ImVec2 crit_screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x, (sub_item_y_offset * t->zoom_level) + t->camera_offset.y);
-            ImVec2 crit_icon_size = ImVec2(32 * t->zoom_level, 32 * t->zoom_level);
-            ImVec2 crit_text_pos = ImVec2(crit_screen_pos.x + 36 * t->zoom_level, crit_screen_pos.y + 8 * t->zoom_level);
-            ImU32 current_text_color = crit->done ? text_color_faded : text_color;
-            ImU32 icon_tint = crit->done ? icon_tint_faded : IM_COL32_WHITE;
-
-            if (crit->texture) {
-                draw_list->AddImage((void*)crit->texture, crit_screen_pos, ImVec2(crit_screen_pos.x + crit_icon_size.x, crit_screen_pos.y + crit_icon_size.y), ImVec2(0,0), ImVec2(1,1), icon_tint);
-            }
-            draw_list->AddText(nullptr, 14.0f * t->zoom_level, crit_text_pos, current_text_color, crit->display_name);
-            sub_item_y_offset += 36.0f;
-        }
-
-        current_x += uniform_item_width + horizontal_spacing;
-        row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
-    }
     ImGui::End();
 }
+
+
+// -------------------------------------------- TRACKER RENDERING END --------------------------------------------
+
 
 void tracker_reinit_template(Tracker *t, const AppSettings *settings) {
     if (!t) return;
@@ -2239,7 +2656,7 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
     if (version >= MC_VERSION_1_12) {
         // Creating the title buffer
         snprintf(title_buffer, sizeof(title_buffer),
-                 "  Advancely  %s    |    %s    -    %s    -    %s%s    |    Adv: %d/%d    |    Progress: %.2f%%    |    %s IGT",
+                 "  Advancely  %s    |    %s    -    %s    -    %s%s    |    Adv: %d/%d    -    Progress: %.2f%%    |    %s IGT",
                  ADVANCELY_VERSION,
                  t->world_name,
                  settings->version_str,
@@ -2251,7 +2668,7 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
                  formatted_time);
     } else {
         snprintf(title_buffer, sizeof(title_buffer),
-                 "  Advancely  %s    |    %s    -    %s    -    %s%s    |    Ach: %d/%d    |    Progress: %.2f%%    |    %s IGT",
+                 "  Advancely  %s    |    %s    -    %s    -    %s%s    |    Ach: %d/%d    -    Progress: %.2f%%    |    %s IGT",
                  ADVANCELY_VERSION,
                  t->world_name,
                  settings->version_str,
