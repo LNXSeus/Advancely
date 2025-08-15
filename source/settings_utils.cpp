@@ -428,24 +428,21 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
         cJSON *override_obj = get_or_create_object(root, "stat_progress_override");
         for (int i = 0; i < td->stat_count; i++) {
             TrackableCategory *stat_cat = td->stats[i];
-            if (stat_cat->is_manually_completed) {
-                cJSON_ReplaceItemInObject(override_obj, stat_cat->root_name, cJSON_CreateBool(stat_cat->done));
+
+            // Save if we are forcing it true, OR if an override key already exists (to update it to false)
+            if (stat_cat->is_manually_completed || cJSON_HasObjectItem(override_obj, stat_cat->root_name)) {
+                cJSON_ReplaceItemInObject(override_obj, stat_cat->root_name, cJSON_CreateBool(stat_cat->is_manually_completed));
             }
+
 
             for (int j = 0; j < stat_cat->criteria_count; j++) {
                 TrackableItem *sub_stat = stat_cat->criteria[j];
                 char sub_stat_key[512];
                 snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name, sub_stat->root_name);
 
-                if (sub_stat->is_manually_completed) {
-                    cJSON_ReplaceItemInObject(override_obj, sub_stat_key, cJSON_CreateBool(sub_stat->done));
-                }
-
-                // If parent was manually completed, ensure sub-stat override reflects this if it exists
-                else if (stat_cat->is_manually_completed && stat_cat->done) {
-                    if (cJSON_HasObjectItem(override_obj, sub_stat_key)) {
-                        cJSON_ReplaceItemInObject(override_obj, sub_stat_key, cJSON_CreateBool(true));
-                    }
+                // Save if we are forcing it true, OR if an override key already exists (to update it to false)
+                if (sub_stat->is_manually_completed || cJSON_HasObjectItem(override_obj, sub_stat_key)) {
+                    cJSON_ReplaceItemInObject(override_obj, sub_stat_key, cJSON_CreateBool(sub_stat->is_manually_completed));
                 }
             }
         }
