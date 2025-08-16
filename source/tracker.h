@@ -16,7 +16,6 @@ extern "C" {
 #endif // __cplusplus
 
 
-
 struct Tracker {
     SDL_Window *window;
     SDL_Renderer *renderer;
@@ -27,6 +26,7 @@ struct Tracker {
 
     ImVec2 camera_offset;
     float zoom_level;
+    float time_since_last_update; // Timer displaying when the last update happened
 
     bool layout_locked; // Used for lock layout button
     float locked_layout_width; // Used for lock layout button to save the width
@@ -47,9 +47,7 @@ struct Tracker {
     char unlocks_path[MAX_PATH_LENGTH];
     char stats_path[MAX_PATH_LENGTH];
     char snapshot_path[MAX_PATH_LENGTH]; // Path to the snapshot file for legacy snapshots
-
 };
-
 
 
 /**

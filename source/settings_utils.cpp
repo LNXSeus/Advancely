@@ -178,7 +178,8 @@ MC_Version settings_get_version_from_string(const char *version_str) {
         }
     }
 
-    return MC_VERSION_UNKNOWN; // Return if no match was found
+    // Return if no match was found (shouldn't happen as it's a drop-down menu)
+    return MC_VERSION_UNKNOWN;
 }
 
 PathMode settings_get_path_mode_from_string(const char *mode_str) {

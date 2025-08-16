@@ -177,6 +177,9 @@ int main(int argc, char *argv[]) {
             float deltaTime = (float) (current_time - last_frame_time) / 1000.0f;
             last_frame_time = current_time;
 
+            // Increment the time since the last update every frame
+            tracker->time_since_last_update += deltaTime;
+
             // --- Per-Frame Logic ---
 
             // Lock mutex before touching watchers or paths
@@ -241,6 +244,9 @@ int main(int argc, char *argv[]) {
 
                 // Update TITLE of the tracker window with some info, similar to the debug print
                 tracker_update_title(tracker, &app_settings);
+
+                // Reset the timer as the update has happened
+                tracker->time_since_last_update = 0.0f;
             }
 
             // Unlock mutex after all updates are done
