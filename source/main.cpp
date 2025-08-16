@@ -121,7 +121,13 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (tracker_new(&tracker, &app_settings) && overlay_new(&overlay, &app_settings)) {
+    if (tracker_new(&tracker, &app_settings)) {
+        // Conditionally create the overlay at startup, based on settings
+        if (app_settings.enable_overlay) {
+            if (!overlay_new(&overlay, &app_settings)) {
+                fprintf(stderr, "[MAIN] Failed to create overlay, continuing without it.\n");
+            }
+        }
         // Initialize ImGUI
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -203,6 +209,22 @@ int main(int argc, char *argv[]) {
                 // Reload settings from file to get the latest changes
                 settings_load(&app_settings);
 
+                // Logic to enable/disable overlay at runtime
+                bool overlay_should_be_enabled = app_settings.enable_overlay;
+                bool overlay_is_currently_enabled = (overlay != nullptr);
+
+                if (overlay_should_be_enabled && !overlay_is_currently_enabled) {
+                    // It was disabled, now enable it
+                    printf("[MAIN] Enabling overlay.\n");
+                    if (!overlay_new(&overlay, &app_settings)) {
+                        fprintf(stderr, "[MAIN] Failed to create overlay at runtime.\n");
+                    }
+                } else if (!overlay_should_be_enabled && overlay_is_currently_enabled) {
+                    // It was enabled, now disable it
+                    printf("[MAIN] Disabling overlay.\n");
+                    overlay_free(&overlay);
+                }
+
                 // Update the tracker with the new paths and template data
                 tracker_reinit_template(tracker, &app_settings);
 
@@ -252,9 +274,10 @@ int main(int argc, char *argv[]) {
             // Unlock mutex after all updates are done
             SDL_UnlockMutex(g_watcher_mutex);
 
-            // Overlay animations should run every frame
-            overlay_update(overlay, &deltaTime, &app_settings);
-
+            // Overlay animations should run every frame, if it exists
+            if (overlay) {
+                overlay_update(overlay, &deltaTime, &app_settings);
+            }
             // IMGUI RENDERING
             ImGui_ImplSDLRenderer3_NewFrame();
             ImGui_ImplSDL3_NewFrame();
@@ -280,9 +303,10 @@ int main(int argc, char *argv[]) {
             SDL_RenderPresent(tracker->renderer);
 
 
-            // Overlay window gets rendered using SDL
-            overlay_render(overlay, &app_settings);
-
+            // Overlay window gets rendered using SDL, if it exists
+            if (overlay) {
+                overlay_render(overlay, &app_settings);
+            }
 
             // --- Frame limiting ---
             const float frame_time = (float) SDL_GetTicks() - current_time;

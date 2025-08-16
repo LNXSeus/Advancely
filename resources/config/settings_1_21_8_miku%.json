@@ -5,6 +5,7 @@
   "category":	"miku%",
   "optional_flag":	"",
   "general":	{
+    "enable_overlay": false,
     "fps":	60,
     "always_on_top":	true,
     "overlay_scroll_speed":	1,
