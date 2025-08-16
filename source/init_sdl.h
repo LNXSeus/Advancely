@@ -11,7 +11,7 @@ extern "C" {
 
 struct Tracker;
 struct Overlay;
-struct Settings; // TODO: Remove this when possible
+struct Settings;
 struct AppSettings;
 
 /**
@@ -35,18 +35,6 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings);
  * @return true if initialization was successful, false otherwise.
  */
 bool overlay_init_sdl(Overlay *o, const AppSettings *settings);
-
-// TODO: Remove this when possible
-// /**
-//  * @brief Initializes SDL3 for the settings window.
-//  *
-//  * This function sets up the SDL3 library and creates a window for the settings application.
-//  *
-//  * @param s A pointer to the Settings struct.
-//  * @param settings A pointer to the loaded application settings.
-//  * @return true if initialization was successful, false otherwise.
-//  */
-// bool settings_init_sdl(Settings *s, const AppSettings *settings);
 
 #ifdef __cplusplus
 }

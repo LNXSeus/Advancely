@@ -28,6 +28,9 @@ struct Tracker {
     ImVec2 camera_offset;
     float zoom_level;
 
+    bool layout_locked; // Used for lock layout button
+    float locked_layout_width; // Used for lock layout button to save the width
+
     ImFont *roboto_font; // Font for settings/UI -> USED BY IMGUI
     TTF_Font *minecraft_font; // USED BY SDL_TTF
 
@@ -52,9 +55,10 @@ struct Tracker {
 /**
  * @brief Initializes a new Tracker instance.
  *
- * This function allocates memory for the Tracker struct, initializes its SDL components (window and renderer),
- * loads application settings, determines the correct paths for game and template files, and allocates the
- * main 'template_data' container.
+ * This function allocates memory for the Tracker struct, initializes SDL components for the overlay window,
+ * initializes the minecraft font, loads the background textures, allocates memory for template data,
+ * re-initializes the paths in the tracker struct, and loads and parses all game data (advancements, stats, etc.)
+ * from the template and player save files.
  *
  * @param tracker A pointer to a Tracker struct pointer that will be allocated.
  * @param settings A pointer to the loaded application settings.
