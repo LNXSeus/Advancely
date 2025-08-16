@@ -1594,6 +1594,29 @@ static void format_time(long long ticks, char *output, size_t max_len) {
     }
 }
 
+/**
+ * @brief Formats a duration in seconds into a Hh Mm Ss string.
+ * @param total_seconds The total number of seconds.
+ * @param output The buffer to write the formatted time string to.
+ * @param max_len The size of the output buffer.
+ */
+static void format_time_since_update(float total_seconds, char *output, size_t max_len) {
+    if (!output || max_len == 0) return;
+
+    int total_sec_int = (int)total_seconds;
+    int hours = total_sec_int / 3600;
+    int minutes = (total_sec_int % 3600) / 60;
+    int seconds = total_sec_int % 60;
+
+    if (hours > 0) {
+        snprintf(output, max_len, "%dh %dm %ds ago", hours, minutes, seconds);
+    } else if (minutes > 0) {
+        snprintf(output, max_len, "%dm %ds ago", minutes, seconds);
+    } else {
+        snprintf(output, max_len, "%ds ago", seconds);
+    }
+}
+
 
 // ----------------------------------------- END OF STATIC FUNCTIONS -----------------------------------------
 
@@ -2526,6 +2549,7 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
     char info_buffer[512];
     char formatted_category[128];
     char formatted_time[64];
+    char formatted_update_time[64];
 
     format_category_string(settings->category, formatted_category, sizeof(formatted_category));
     // Optional flag DOESN'T get formatted
@@ -2535,9 +2559,10 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
     const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
 
     float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f; // Round to nearest 5 seconds
+    format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time));
 
     snprintf(info_buffer, sizeof(info_buffer),
-                 "%s  |  %s - %s%s%s  |  %s: %d/%d  -  Prog: %.2f%%  |  %s IGT  |  Upd: %.0fs ago",
+                 "%s  |  %s - %s%s%s  |  %s: %d/%d  -  Prog: %.2f%%  |  %s IGT  |  Upd: %s",
                  t->world_name,
                  settings->version_str,
                  formatted_category,
@@ -2548,7 +2573,7 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
                  t->template_data->advancement_count,
                  t->template_data->overall_progress_percentage,
                  formatted_time,
-                 last_update_time_5_seconds);
+                 formatted_update_time);
 
     ImGui::TextUnformatted(info_buffer);
     ImGui::End();
