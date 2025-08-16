@@ -1877,6 +1877,10 @@ static void render_section_separator(Tracker *t, const AppSettings *settings, fl
  * @param section_title The title of the section.
  * @param is_stat_section True if the section is for stats, false if it's for advancements.
  */
+/**
+ * @brief Renders a section of items that are TrackableCategories (e.g., Advancements, Stats).
+ * This function handles the uniform grid layout and the two-pass rendering for simple vs. complex items.
+ */
 static void render_trackable_category_section(Tracker* t, const AppSettings* settings, float& current_y, TrackableCategory** categories, int count, const char* section_title, bool is_stat_section) {
     int visible_count = 0;
     for(int i = 0; i < count; ++i) {
@@ -1893,7 +1897,10 @@ static void render_trackable_category_section(Tracker* t, const AppSettings* set
     ImU32 text_color_faded = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b, 100);
     ImU32 icon_tint_faded = IM_COL32(255, 255, 255, 100);
 
+    // Define checkbox colors from settings
     ImU32 checkmark_color = text_color;
+    ImU32 checkbox_fill_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b, ADVANCELY_FADED_ALPHA);
+    ImU32 checkbox_hover_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b, (int)fminf(255.0f, ADVANCELY_FADED_ALPHA + 60));
 
     render_section_separator(t, settings, current_y, section_title, text_color);
 
@@ -2014,13 +2021,14 @@ static void render_trackable_category_section(Tracker* t, const AppSettings* set
                     current_element_x += 32 * t->zoom_level + 4 * t->zoom_level;
 
                     // Draw Checkbox for Sub-Stat
+                    // Draw Checkbox for Sub-Stat
                     if (is_stat_section) {
-                         ImVec2 check_pos = ImVec2(current_element_x, crit_base_pos.y + 6 * t->zoom_level);
-                         ImRect checkbox_rect(check_pos, ImVec2(check_pos.x + 20*t->zoom_level, check_pos.y + 20*t->zoom_level));
-                         bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
-                         ImU32 check_bg_color = is_hovered ? IM_COL32(80,80,80,255):IM_COL32(50,50,50,255);
-                         draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_bg_color, 3.0f * t->zoom_level);
-                         draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, IM_COL32(255,255,255,255), 3.0f * t->zoom_level);
+                        ImVec2 check_pos = ImVec2(current_element_x, crit_base_pos.y + 6 * t->zoom_level);
+                        ImRect checkbox_rect(check_pos, ImVec2(check_pos.x + 20*t->zoom_level, check_pos.y + 20*t->zoom_level));
+                        bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
+                        ImU32 check_fill_color = is_hovered ? checkbox_hover_color : checkbox_fill_color;
+                        draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill_color, 3.0f * t->zoom_level);
+                        draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, text_color, 3.0f * t->zoom_level);
 
                         if(crit->is_manually_completed) {
                             ImVec2 p1 = ImVec2(check_pos.x + 5*t->zoom_level, check_pos.y+10*t->zoom_level);
@@ -2064,9 +2072,9 @@ static void render_trackable_category_section(Tracker* t, const AppSettings* set
                 ImVec2 check_pos = ImVec2(screen_pos.x + 70 * t->zoom_level, screen_pos.y + 5 * t->zoom_level);
                 ImRect checkbox_rect(check_pos, ImVec2(check_pos.x + 20 * t->zoom_level, check_pos.y + 20 * t->zoom_level));
                 bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
-                ImU32 check_bg_color = is_hovered ? IM_COL32(80, 80, 80, 255) : IM_COL32(50, 50, 50, 255);
-                draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_bg_color, 3.0f * t->zoom_level);
-                draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, IM_COL32(255, 255, 255, 255), 3.0f * t->zoom_level);
+                ImU32 check_fill_color = is_hovered ? checkbox_hover_color : checkbox_fill_color;
+                draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill_color, 3.0f * t->zoom_level);
+                draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, text_color, 3.0f * t->zoom_level);
 
                 // Only draw checkmark if manually completed
                 if (cat->is_manually_completed) {
@@ -2172,6 +2180,9 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 /**
  * @brief Renders the Custom Goals section with interactive checkboxes.
  */
+/**
+ * @brief Renders the Custom Goals section with interactive checkboxes.
+ */
 static void render_custom_goals_section(Tracker *t, const AppSettings *settings, float &current_y, const char *section_title) {
     int count = t->template_data->custom_goal_count;
     // Pre-check for visible items
@@ -2190,7 +2201,10 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
     ImU32 text_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
                                 settings->text_color.a);
 
+    // Define checkbox colors from settings
     ImU32 checkmark_color = text_color;
+    ImU32 checkbox_fill_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b, ADVANCELY_FADED_ALPHA);
+    ImU32 checkbox_hover_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b, (int)fminf(255.0f, ADVANCELY_FADED_ALPHA + 60));
 
     render_section_separator(t, settings, current_y, section_title, text_color);
 
@@ -2266,9 +2280,9 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             ImRect checkbox_rect(check_pos, ImVec2(check_pos.x + check_size.x, check_pos.y + check_size.y));
 
             bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
-            ImU32 check_bg_color = is_hovered ? IM_COL32(80, 80, 80, 255) : IM_COL32(50, 50, 50, 255);
-            draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_bg_color, 3.0f * t->zoom_level);
-            draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, checkmark_color,
+            ImU32 check_fill_color = is_hovered ? checkbox_hover_color : checkbox_fill_color;
+            draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill_color, 3.0f * t->zoom_level);
+            draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, text_color,
                                3.0f * t->zoom_level);
 
             if (item->done) {
