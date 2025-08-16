@@ -1627,6 +1627,8 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     // Initialize camera and zoom
     t->camera_offset = ImVec2(0.0f, 0.0f);
     t->zoom_level = 1.0f;
+    t->layout_locked = false;
+    t->locked_layout_width = 0.0f;
 
     // Initialize SDL components for the tracker
     if (!tracker_init_sdl(t, settings)) {
@@ -1877,10 +1879,6 @@ static void render_section_separator(Tracker *t, const AppSettings *settings, fl
  * @param section_title The title of the section.
  * @param is_stat_section True if the section is for stats, false if it's for advancements.
  */
-/**
- * @brief Renders a section of items that are TrackableCategories (e.g., Advancements, Stats).
- * This function handles the uniform grid layout and the two-pass rendering for simple vs. complex items.
- */
 static void render_trackable_category_section(Tracker* t, const AppSettings* settings, float& current_y, TrackableCategory** categories, int count, const char* section_title, bool is_stat_section) {
     int visible_count = 0;
     for(int i = 0; i < count; ++i) {
@@ -1892,6 +1890,11 @@ static void render_trackable_category_section(Tracker* t, const AppSettings* set
     if (visible_count == 0) return;
 
     ImGuiIO& io = ImGui::GetIO();
+
+    // Use the locked width if layout is locked
+    float wrapping_width = t->layout_locked ? t->locked_layout_width : (io.DisplaySize.x / t->zoom_level);
+
+
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     ImU32 text_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b, settings->text_color.a);
     ImU32 text_color_faded = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b, 100);
@@ -1963,10 +1966,10 @@ static void render_trackable_category_section(Tracker* t, const AppSettings* set
             if (is_complex) {
                 for (int j = 0; j < cat->criteria_count; j++) if (cat->criteria[j] && (!cat->criteria[j]->done || !settings->remove_completed_goals)) visible_criteria++;
             }
-            float item_height = 96.0f + text_size.y + 4.0f + (visible_criteria * 36.0f);
+            float item_height = 96.0f + text_size.y + 4.0f + ((float)visible_criteria * 36.0f);
             if(progress_text[0] != '\0') item_height += progress_text_size.y + 4.0f;
 
-            if (current_x > padding && (current_x + uniform_item_width) > (io.DisplaySize.x / t->zoom_level) - padding) {
+            if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
                 current_x = padding;
                 current_y += row_max_height;
                 row_max_height = 0.0f;
@@ -2125,6 +2128,11 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
     if (visible_count == 0) return;
 
     ImGuiIO &io = ImGui::GetIO();
+
+    // Use locked width if layout is locked
+    float wrapping_width = t->layout_locked ? t->locked_layout_width : (io.DisplaySize.x / t->zoom_level);
+
+
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     ImU32 text_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
                                 settings->text_color.a);
@@ -2146,7 +2154,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         if (!item || (item->done && settings->remove_completed_goals)) continue;
 
         float item_height = 96.0f + ImGui::CalcTextSize(item->display_name).y + 4.0f;
-        if (current_x > padding && (current_x + uniform_item_width) > (io.DisplaySize.x / t->zoom_level) - padding) {
+        if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
             current_x = padding;
             current_y += row_max_height;
             row_max_height = 0.0f;
@@ -2180,9 +2188,6 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 /**
  * @brief Renders the Custom Goals section with interactive checkboxes.
  */
-/**
- * @brief Renders the Custom Goals section with interactive checkboxes.
- */
 static void render_custom_goals_section(Tracker *t, const AppSettings *settings, float &current_y, const char *section_title) {
     int count = t->template_data->custom_goal_count;
     // Pre-check for visible items
@@ -2197,6 +2202,12 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
     if (visible_count == 0) return;
 
     ImGuiIO &io = ImGui::GetIO();
+
+
+    // Use locked width if layout is locked
+    float wrapping_width = t->layout_locked ? t->locked_layout_width : (io.DisplaySize.x / t->zoom_level);
+
+
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     ImU32 text_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
                                 settings->text_color.a);
@@ -2230,7 +2241,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         ImVec2 progress_text_size = ImGui::CalcTextSize(progress_text);
         float item_height = 96.0f + text_size.y + 4.0f + (item->goal != 0 ? progress_text_size.y + 4.0f : 0);
 
-        if (current_x > padding && (current_x + uniform_item_width) > (io.DisplaySize.x / t->zoom_level) - padding) {
+        if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
             current_x = padding;
             current_y += row_max_height;
             row_max_height = 0.0f;
@@ -2326,6 +2337,11 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
     if (visible_count == 0) return;
 
     ImGuiIO &io = ImGui::GetIO();
+
+    // Use locked width if layout is locked
+    float wrapping_width = t->layout_locked ? t->locked_layout_width : (io.DisplaySize.x / t->zoom_level);
+
+
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     ImU32 text_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
                                 settings->text_color.a);
@@ -2362,7 +2378,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         ImVec2 stage_text_size = ImGui::CalcTextSize(stage_text);
         float item_height = 96.0f + text_size.y + 4.0f + stage_text_size.y + 4.0f;
 
-        if (current_x > padding && (current_x + uniform_item_width) > (io.DisplaySize.x / t->zoom_level) - padding) {
+        if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
             current_x = padding;
             current_y += row_max_height;
             row_max_height = 0.0f;
@@ -2447,7 +2463,56 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
     render_custom_goals_section(t, settings, current_y, "Custom Goals");
     render_multistage_goals_section(t, settings, current_y, "Multi-Stage Goals");
 
-    ImGui::End();
+    // Layout Control Buttons
+    const float button_padding = 10.0f;
+    ImVec2 lock_button_text_size = ImGui::CalcTextSize("Lock Layout");
+    ImVec2 reset_button_text_size = ImGui::CalcTextSize("Reset Layout");
+
+    // Add padding and space for the checkbox square
+    ImVec2 lock_button_size = ImVec2(lock_button_text_size.x + 25.0f, lock_button_text_size.y + 8.0f);
+    ImVec2 reset_button_size = ImVec2(reset_button_text_size.x + 25.0f, reset_button_text_size.y + 8.0f);
+    float buttons_total_width = lock_button_size.x + reset_button_size.x + button_padding; // TODO: Adjust this for more buttons
+
+    // Position a new transparent window in the bottom right to hold the buttons
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - buttons_total_width - button_padding, io.DisplaySize.y - lock_button_size.y - button_padding));
+    ImGui::SetNextWindowSize(ImVec2(buttons_total_width, lock_button_size.y));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+
+    // ImGuiWindowFlags_NoMove could be defined here
+    ImGui::Begin("Controls", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground);
+    ImGui::PopStyleVar();
+
+    // Style for transparent buttons and checkbox
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4((float)settings->text_color.r / 255.f, (float)settings->text_color.g / 255.f, (float)settings->text_color.b / 255.f, (float)settings->text_color.a / 255.f));
+    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4((float)settings->text_color.r / 255.f, (float)settings->text_color.g / 255.f, (float)settings->text_color.b / 255.f, (float)settings->text_color.a / 255.f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.0f, 0.0f, 0.0f, (float)ADVANCELY_FADED_ALPHA / 255.0f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.2f, 0.2f, 0.2f, (float)ADVANCELY_FADED_ALPHA / 255.0f));
+    ImGui::PushStyleColor(ImGuiCol_CheckMark, ImVec4((float)settings->text_color.r / 255.f, (float)settings->text_color.g / 255.f, (float)settings->text_color.b / 255.f, 1.0f));
+
+    ImGui::SetWindowFontScale(0.9f); // Slightly smaller text for buttons
+
+    // "Lock Layout" checkbox
+    if (ImGui::Checkbox("Lock Layout", &t->layout_locked)) {
+        if (t->layout_locked) {
+            // When locking, store the current scroll position
+            t->locked_layout_width = io.DisplaySize.x / t->zoom_level; // Store the current width
+        }
+    }
+
+    ImGui::SameLine();
+
+    // "Reset Layout" checkbox (acts as a button), it turns off the lock layout
+    static bool reset_dummy = false;
+    if (ImGui::Checkbox("Reset Layout", &reset_dummy)) {
+        t->camera_offset = ImVec2(0.0f, 0.0f);
+        t->zoom_level = 1.0f;
+        t->layout_locked = false; // Unlocks the layout
+        reset_dummy = false; // Ensure it's getting unchecked
+    }
+
+    ImGui::PopStyleColor(5); // Pop the style colors, there's 5 of them
+    ImGui::End(); // End Layout Controls Window
+    ImGui::End(); // End TrackerMap window
 }
 
 

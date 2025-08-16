@@ -19,7 +19,6 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
 
     // First create without he ALWAYS_ON_TOP flag
     Uint32 window_flags = SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
-    // TODO: Look into SDL_WINDOW_HIGH_PIXEL_DENSITY
 
     // Use loaded settings for window creation, with SDL_WINDOWPOS_CENTERED as a fallback
     int x = (settings->tracker_window.x == DEFAULT_WINDOW_POS)
@@ -55,7 +54,7 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
            settings->tracker_always_on_top ? "true" : "false");
 
     // More reliable than SDL_WINDOW_ALWAYS_ON_TOP flag
-    SDL_SetWindowAlwaysOnTop(t->window, settings->tracker_always_on_top); // TODO: settings->tracker_always_on_top
+    SDL_SetWindowAlwaysOnTop(t->window, settings->tracker_always_on_top);
 
     t->renderer = SDL_CreateRenderer(t->window, nullptr);
 
