@@ -81,14 +81,18 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // General Settings
     ImGui::Text("General Settings");
+    ImGui::Checkbox("Enable Overlay", &temp_settings.enable_overlay);
     ImGui::DragFloat("FPS Limit", &temp_settings.fps, 1.0f, 10.0f, 500.0f, "%.0f");
-    ImGui::DragFloat("Overlay Scroll Speed", &temp_settings.overlay_scroll_speed, 0.01f, -100.00f, 100.00f, "%.2f");
+
+    // Conditionally display overlay related settings
+    if (temp_settings.enable_overlay) {
+        ImGui::DragFloat("Overlay Scroll Speed", &temp_settings.overlay_scroll_speed, 0.01f, -100.00f, 100.00f, "%.2f");
+        ImGui::Checkbox("Goal align left", &temp_settings.goal_align_left);
+        ImGui::SameLine();
+        ImGui::Checkbox("Remove completed goals", &temp_settings.remove_completed_goals);
+    }
 
     ImGui::Checkbox("Always on top", &temp_settings.tracker_always_on_top);
-    ImGui::SameLine();
-    ImGui::Checkbox("Goal align left", &temp_settings.goal_align_left);
-    ImGui::SameLine();
-    ImGui::Checkbox("Remove completed goals", &temp_settings.remove_completed_goals);
 
     ImGui::Separator();
     ImGui::Spacing();
@@ -113,9 +117,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::ColorEdit4("Tracker BG", tracker_bg)) {
         temp_settings.tracker_bg_color = {(Uint8)(tracker_bg[0]*255), (Uint8)(tracker_bg[1]*255), (Uint8)(tracker_bg[2]*255), (Uint8)(tracker_bg[3]*255)};
     }
-    if (ImGui::ColorEdit4("Overlay BG", overlay_bg)) {
-        temp_settings.overlay_bg_color = {(Uint8)(overlay_bg[0]*255), (Uint8)(overlay_bg[1]*255), (Uint8)(overlay_bg[2]*255), (Uint8)(overlay_bg[3]*255)};
+
+    // Conditionally display overlay background color picker
+    if (temp_settings.enable_overlay) {
+        if (ImGui::ColorEdit4("Overlay BG", overlay_bg)) {
+            temp_settings.overlay_bg_color = {(Uint8)(overlay_bg[0]*255), (Uint8)(overlay_bg[1]*255), (Uint8)(overlay_bg[2]*255), (Uint8)(overlay_bg[3]*255)};
+        }
     }
+
     if (ImGui::ColorEdit4("Text Color", text_col)) {
         temp_settings.text_color = {(Uint8)(text_col[0]*255), (Uint8)(text_col[1]*255), (Uint8)(text_col[2]*255), (Uint8)(text_col[3]*255)};
     }

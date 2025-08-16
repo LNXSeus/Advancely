@@ -80,7 +80,7 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                     settings_changed = true;
                 }
                 tracker_events(t, &event, is_running, settings_opened); // still pass other window events
-            } else if (event.window.windowID == SDL_GetWindowID(o->window)) {
+            } else if (o && event.window.windowID == SDL_GetWindowID(o->window)) { // o might be nullptr, then skip
                 if (event.type == SDL_EVENT_WINDOW_MOVED || event.type == SDL_EVENT_WINDOW_RESIZED) {
                     SDL_GetWindowPosition(o->window, &app_settings->overlay_window.x, &app_settings->overlay_window.y);
                     SDL_GetWindowSize(o->window, &app_settings->overlay_window.w, &app_settings->overlay_window.h);

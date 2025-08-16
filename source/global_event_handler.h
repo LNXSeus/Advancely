@@ -17,7 +17,6 @@ extern "C" {
 // Forward declarations
 struct Tracker;
 struct Overlay;
-// struct Settings; // TODO: Remove this when possible
 struct AppSettings;
 
 

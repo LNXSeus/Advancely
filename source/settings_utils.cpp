@@ -203,6 +203,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->hotkey_count = 0;
 
     // New visual/general defaults
+    settings->enable_overlay = DEFAULT_ENABLE_OVERLAY;
     settings->fps = DEFAULT_FPS;
     settings->tracker_always_on_top = DEFAULT_TRACKER_ALWAYS_ON_TOP;
     settings->overlay_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
@@ -235,7 +236,7 @@ bool settings_load(AppSettings *settings) {
         defaults_were_used = true; // The whole file is missing, so it needs to be created.
     }
 
-    // --- Load settings, explicitly applying defaults if a key is missing or invalid ---
+    // Load settings, explicitly applying defaults if a key is missing or invalid
     const cJSON *path_mode_json = cJSON_GetObjectItem(json, "path_mode");
     if (path_mode_json && cJSON_IsString(path_mode_json)) settings->path_mode = settings_get_path_mode_from_string(
                                             path_mode_json->valuestring);
@@ -276,9 +277,18 @@ bool settings_load(AppSettings *settings) {
         defaults_were_used = true;
     }
 
-    // --- Load general settings, explicitly applying defaults if a key is missing or invalid ---
+    // Load general settings, explicitly applying defaults if a key is missing or invalid
     cJSON *general_settings = cJSON_GetObjectItem(json, "general");
     if (general_settings) {
+
+        // Toggling the overlay window
+        const cJSON *enable_overlay = cJSON_GetObjectItem(general_settings, "enable_overlay");
+        if (enable_overlay && cJSON_IsBool(enable_overlay)) settings->enable_overlay = cJSON_IsTrue(enable_overlay);
+        else {
+            settings->enable_overlay = DEFAULT_ENABLE_OVERLAY; // Default value, is false
+            defaults_were_used = true;
+        }
+
         const cJSON *fps = cJSON_GetObjectItem(general_settings, "fps");
         if (fps && cJSON_IsNumber(fps) && fps->valueint != -1) settings->fps = fps->valueint;
         else {
@@ -386,6 +396,7 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
 
     // Update General Settings
     cJSON *general_obj = get_or_create_object(root, "general");
+    cJSON_ReplaceItemInObject(general_obj, "enable_overlay", cJSON_CreateBool(settings->enable_overlay));
     cJSON_ReplaceItemInObject(general_obj, "fps", cJSON_CreateNumber(settings->fps));
     cJSON_ReplaceItemInObject(general_obj, "always_on_top", cJSON_CreateBool(settings->tracker_always_on_top));
     cJSON_ReplaceItemInObject(general_obj, "overlay_scroll_speed", cJSON_CreateNumber(settings->overlay_scroll_speed));

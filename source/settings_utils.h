@@ -19,6 +19,7 @@ extern "C" {
 #define MAX_HOTKEYS 32 // Limit for amount of hotkeys
 
 // DEFAULT values
+#define DEFAULT_ENABLE_OVERLAY false // Stream overlay will be off by default
 #define DEFAULT_FPS 60
 #define DEFAULT_TRACKER_ALWAYS_ON_TOP true
 #define DEFAULT_OVERLAY_SCROLL_SPEED 1.0f
@@ -82,6 +83,7 @@ struct AppSettings {
     HotkeyBinding hotkeys[MAX_HOTKEYS]; // Array of hotkey bindings
 
     // General and Visual Settings
+    bool enable_overlay;
     float fps;
     bool tracker_always_on_top;
     float overlay_scroll_speed;
