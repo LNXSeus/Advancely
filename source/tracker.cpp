@@ -2512,8 +2512,16 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
     render_multistage_goals_section(t, settings, current_y, "Multi-Stage Goals");
 
     // Info Bar
+
+    // Push thhe user-defined text color before drawing the info bar
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4((float)settings->text_color.r / 255.f, (float)settings->text_color.g / 255.f, (float)settings->text_color.b / 255.f, (float)settings->text_color.a / 255.f));
     // You can remove ImGuiWindowFlags_AlwaysAutoResize if you want to be able to resize this window
-    ImGui::Begin("Tracker Info", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing);
+    ImGui::Begin("Info | ESC: Settings | Pan: RMB/MMB Drag | Zoom: Wheel | Click: LMB", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing);
+
+    ImGui::Separator(); // Draw a separator line
+    ImGui::Spacing();
+    ImGui::Spacing();
+    ImGui::Spacing();
 
     char info_buffer[512];
     char formatted_category[128];
@@ -2544,6 +2552,9 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
 
     ImGui::TextUnformatted(info_buffer);
     ImGui::End();
+
+    // Pop the text color style so it no longer applies to subsequent UI elements
+    ImGui::PopStyleColor();
 
     // Layout Control Buttons
     const float button_padding = 10.0f;
