@@ -47,7 +47,7 @@
   "multi_stage_goal.ms_goal:get_playin_MC.stage.0": "Mine 3 Logs",
   "multi_stage_goal.ms_goal:get_playin_MC.stage.1": "Craft a Pickaxe",
   "multi_stage_goal.ms_goal:get_playin_MC.stage.2": "Mine 3 stone!",
-  "multi_stage_goal.ms_goal:get_playin_MC.stage.3": "Craft cobble slab!",
+  "multi_stage_goal.ms_goal:get_playin_MC.stage.3": "Craft stone pick!",
   "multi_stage_goal.ms_goal:get_playin_MC.stage.final": "Done!"
 
 

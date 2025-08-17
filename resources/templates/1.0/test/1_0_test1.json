@@ -160,7 +160,7 @@
       "root_name": "16777217"
     },
     "stat_category:hidden_ms_craft_cobble_slab": {
-      "root_name": "16842796"
+      "root_name": "16843026"
     }
   },
   "unlocks": [],
@@ -206,7 +206,7 @@
         {
           "stage_id": "3",
           "type": "stat",
-          "root_name": "16842796",
+          "root_name": "16843026",
           "target": 1
         },
         {

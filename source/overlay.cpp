@@ -125,6 +125,9 @@ void overlay_render(Overlay *o, const AppSettings *settings) {
     if (text_surface) {
         SDL_Texture *text_texture = SDL_CreateTextureFromSurface(o->renderer, text_surface);
         if (text_texture) {
+            // Keep text sharp when scaled (on overlay window, probably won't be scaled)
+            SDL_SetTextureScaleMode(text_texture, SDL_SCALEMODE_NEAREST);
+
             // TODO: Change size of advancement backgrounds and text for overlay here
             SDL_FRect dest_rect = {100.0f, 100.0f, (float) text_surface->w, (float) text_surface->h};
             SDL_RenderTexture(o->renderer, text_texture, nullptr, &dest_rect);

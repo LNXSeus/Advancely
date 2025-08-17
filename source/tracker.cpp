@@ -2007,23 +2007,22 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             TrackableCategory *cat = categories[i];
 
             // Skip rendering hidden legacy stats, no target value or set to 0
-            if (is_stat_section && version <= MC_VERSION_1_6_4 && cat && cat->criteria_count == 1 && cat->criteria[0]->goal == 0) {
+            if (is_stat_section && version <= MC_VERSION_1_6_4 && cat && cat->criteria_count == 1 && cat->criteria[0]->
+                goal == 0) {
                 continue;
             }
 
             bool is_complex = cat && cat->criteria_count > 1;
             if (!cat || (is_complex != complex_pass) || (cat->done && settings->remove_completed_goals)) continue;
 
-            // Prepare display name with snapshot status for legacy achievements
-            char final_display_name[sizeof(cat->display_name) + 8];
-            strncpy(final_display_name, cat->display_name, sizeof(final_display_name) - 1);
-
-            // Display (Old) and (New) as in the debug print
-            if (!is_stat_section && version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy) {
+            // Prepare snapshot status text for legacy achievements (without mod)
+            char snapshot_text[8] = "";
+            if (!is_stat_section && version <= MC_VERSION_1_6_4) {
                 if (cat->done && !cat->done_in_snapshot) {
-                    strncat(final_display_name, " (New)", sizeof(final_display_name) - strlen(final_display_name) - 1);
+                    // If just completed and not true in snapshot file
+                    strcpy(snapshot_text, "(New)");
                 } else if (cat->done) {
-                    strncat(final_display_name, " (Old)", sizeof(final_display_name) - strlen(final_display_name) - 1);
+                    strcpy(snapshot_text, "(Old)");
                 }
             }
 
@@ -2042,8 +2041,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 }
             }
 
-            ImVec2 text_size = ImGui::CalcTextSize(final_display_name);
+            ImVec2 text_size = ImGui::CalcTextSize(cat->display_name);
             ImVec2 progress_text_size = ImGui::CalcTextSize(progress_text);
+            ImVec2 snapshot_text_size = ImGui::CalcTextSize(snapshot_text);
             int visible_criteria = 0;
             if (is_complex) {
                 for (int j = 0; j < cat->criteria_count; j++)
@@ -2054,6 +2054,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             }
             float item_height = 96.0f + text_size.y + 4.0f + ((float) visible_criteria * 36.0f);
             if (progress_text[0] != '\0') item_height += progress_text_size.y + 4.0f;
+            if (snapshot_text[0] != '\0') item_height += snapshot_text_size.y + 4.0f; // Add height for snapshot text
 
             if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
                 current_x = padding;
@@ -2094,7 +2095,16 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level;
             draw_list->AddText(nullptr, 16.0f * t->zoom_level,
                                ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
-                                      text_y_pos), text_color, final_display_name);
+                                      text_y_pos), text_color, cat->display_name);
+
+            // Render snapshot text on a new line
+            if (snapshot_text[0] != '\0') {
+                text_y_pos += text_size.y * t->zoom_level + 4.0f;
+                draw_list->AddText(nullptr, 14.0f * t->zoom_level,
+                                   ImVec2(
+                                       screen_pos.x + (bg_size.x * t->zoom_level - snapshot_text_size.x * t->zoom_level)
+                                       * 0.5f, text_y_pos), text_color, snapshot_text);
+            }
 
             if (progress_text[0] != '\0') {
                 text_y_pos += text_size.y * t->zoom_level + 4.0f;
@@ -2354,7 +2364,9 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
         char progress_text[32] = "";
         if (item->goal > 0) snprintf(progress_text, sizeof(progress_text), "(%d / %d)", item->progress, item->goal);
-        else if (item->goal == -1) snprintf(progress_text, sizeof(progress_text), "(%d)", item->progress);
+            // For infinite counters, only show progress if not manually overridden
+        else if (item->goal == -1 && !item->done)
+            snprintf(progress_text, sizeof(progress_text), "(%d)", item->progress);
 
         ImVec2 text_size = ImGui::CalcTextSize(item->display_name);
         ImVec2 progress_text_size = ImGui::CalcTextSize(progress_text);
@@ -2761,7 +2773,7 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings) {
         find_player_data_files(
             t->saves_path,
             version,
-            settings->using_stats_per_world_legacy,  // This toggles if StatsPerWorld mod is enabled, see above
+            settings->using_stats_per_world_legacy, // This toggles if StatsPerWorld mod is enabled, see above
             t->world_name,
             t->advancements_path,
             t->stats_path,
@@ -2827,7 +2839,6 @@ void tracker_load_and_parse_data(Tracker *t) {
     cJSON *unlocks_json = cJSON_GetObjectItem(template_json, "unlocks");
     cJSON *custom_json = cJSON_GetObjectItem(template_json, "custom"); // Custom goals, manually checked of by user
     cJSON *multi_stage_goals_json = cJSON_GetObjectItem(template_json, "multi_stage_goals");
-
 
 
     MC_Version version = settings_get_version_from_string(settings.version_str);
