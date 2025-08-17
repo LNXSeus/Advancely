@@ -667,11 +667,12 @@ static void tracker_update_stats_modern(Tracker *t, const cJSON *player_stats_js
  * @param total_criteria_count A pointer to an integer to store the total number of criteria across all categories.
  * @param lang_key_prefix The prefix for language keys. (e.g., "advancement." or "stat.")
  * @param is_stat_category A boolean indicating whether the categories are for stats. False means advancements.
+ * @param version The Minecraft version.
  */
 static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *lang_json,
                                      TrackableCategory ***categories_array,
                                      int *count, int *total_criteria_count, const char *lang_key_prefix,
-                                     bool is_stat_category) {
+                                     bool is_stat_category, MC_Version version) {
     if (!category_json) {
         printf("[TRACKER] tracker_parse_categories: category_json is nullptr\n");
         return;
@@ -725,8 +726,23 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                     sizeof(new_cat->display_name) - 1);
         else strncpy(new_cat->display_name, new_cat->root_name, sizeof(new_cat->display_name) - 1);
 
+
+        // Determine if this is a "hidden" legacy stat used only for multi-stage goal tracking
+        bool is_hidden_legacy_stat = false;
+        if (is_stat_category && version <= MC_VERSION_1_6_4) {
+            cJSON *criteria_obj_check = cJSON_GetObjectItem(cat_json, "criteria");
+            cJSON *target = cJSON_GetObjectItem(cat_json, "target");
+
+            // A stat is hidden if it has no criteria and a target of 0 or not present
+            if ((!criteria_obj_check || !criteria_obj_check->child) && (!target || target->valueint == 0)) {
+                is_hidden_legacy_stat = true;
+            }
+        }
+
         cJSON *icon = cJSON_GetObjectItem(cat_json, "icon");
-        if (cJSON_IsString(icon)) {
+        // Only load an icon if one is defined AND it's not a hidden legacy stat
+        // If hidden legacy stat, don't load icon as it's a mistake in the template file
+        if (cJSON_IsString(icon) && !is_hidden_legacy_stat) {
             char full_icon_path[sizeof(new_cat->icon_path)];
 
             // Put whatever is in "icon" into "resources/icons/"
@@ -1399,7 +1415,7 @@ static void tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
  * @param t A pointer to the Tracker struct.
  *
  */
-static void tracker_calculate_overall_progress(Tracker *t) {
+static void tracker_calculate_overall_progress(Tracker *t, MC_Version version) {
     if (!t || !t->template_data) return; // || because we can't be sure if the template_data is initialized
 
     // calculate the total number of "steps"
@@ -1413,8 +1429,14 @@ static void tracker_calculate_overall_progress(Tracker *t) {
     // Stats:
     // - For multi-criteria stats, each criterion is a step.
     // - For single-criterion stats, the parent category itself is one step.
+    // - For hidden helper stats for legacy versions ms-goals, they DON'T count towards the progress at all
     for (int i = 0; i < t->template_data->stat_count; i++) {
         TrackableCategory *stat_cat = t->template_data->stats[i];
+
+        // Skip hidden legacy helper stats from progress calculation
+        if (version <= MC_VERSION_1_6_4 && stat_cat->criteria_count == 1 && stat_cat->criteria[0]->goal == 0) {
+            continue;
+        }
         if (stat_cat->criteria_count > 1) {
             // For multi-criteria stats, count each criterion
             total_steps += stat_cat->criteria_count;
@@ -1805,7 +1827,7 @@ void tracker_update(Tracker *t, float *deltaTime) {
     // tracker_update_stat_progress(t, player_stats_json, settings_json); // TODO: Remove once possible
     tracker_update_custom_progress(t, settings_json);
     tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json, player_unlocks_json, version);
-    tracker_calculate_overall_progress(t); //THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
+    tracker_calculate_overall_progress(t, version); //THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
 
     // Clean up the parsed JSON objects
     cJSON_Delete(player_adv_json);
@@ -1913,7 +1935,7 @@ static void render_section_separator(Tracker *t, const AppSettings *settings, fl
  */
 static void render_trackable_category_section(Tracker *t, const AppSettings *settings, float &current_y,
                                               TrackableCategory **categories, int count, const char *section_title,
-                                              bool is_stat_section) {
+                                              bool is_stat_section, MC_Version version) {
     int visible_count = 0;
     for (int i = 0; i < count; ++i) {
         if (categories[i] && (!categories[i]->done || !settings->remove_completed_goals)) {
@@ -1983,8 +2005,27 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
     auto render_pass = [&](bool complex_pass) {
         for (int i = 0; i < count; i++) {
             TrackableCategory *cat = categories[i];
+
+            // Skip rendering hidden legacy stats, no target value or set to 0
+            if (is_stat_section && version <= MC_VERSION_1_6_4 && cat && cat->criteria_count == 1 && cat->criteria[0]->goal == 0) {
+                continue;
+            }
+
             bool is_complex = cat && cat->criteria_count > 1;
             if (!cat || (is_complex != complex_pass) || (cat->done && settings->remove_completed_goals)) continue;
+
+            // Prepare display name with snapshot status for legacy achievements
+            char final_display_name[sizeof(cat->display_name) + 8];
+            strncpy(final_display_name, cat->display_name, sizeof(final_display_name) - 1);
+
+            // Display (Old) and (New) as in the debug print
+            if (!is_stat_section && version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy) {
+                if (cat->done && !cat->done_in_snapshot) {
+                    strncat(final_display_name, " (New)", sizeof(final_display_name) - strlen(final_display_name) - 1);
+                } else if (cat->done) {
+                    strncat(final_display_name, " (Old)", sizeof(final_display_name) - strlen(final_display_name) - 1);
+                }
+            }
 
             char progress_text[32] = "";
             if (is_stat_section) {
@@ -2001,7 +2042,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 }
             }
 
-            ImVec2 text_size = ImGui::CalcTextSize(cat->display_name);
+            ImVec2 text_size = ImGui::CalcTextSize(final_display_name);
             ImVec2 progress_text_size = ImGui::CalcTextSize(progress_text);
             int visible_criteria = 0;
             if (is_complex) {
@@ -2053,7 +2094,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level;
             draw_list->AddText(nullptr, 16.0f * t->zoom_level,
                                ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
-                                      text_y_pos), text_color, cat->display_name);
+                                      text_y_pos), text_color, final_display_name);
 
             if (progress_text[0] != '\0') {
                 text_y_pos += text_size.y * t->zoom_level + 4.0f;
@@ -2533,25 +2574,28 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
     // Each section will render itself and update this value for the next section.
     float current_y = 50.0f;
 
+    // Get the current game version
+    MC_Version version = settings_get_version_from_string(settings->version_str);
+
     //  Render All Sections in Order
     render_trackable_category_section(t, settings, current_y, t->template_data->advancements,
-                                      t->template_data->advancement_count, "Advancements", false);
+                                      t->template_data->advancement_count, "Advancements", false, version);
     render_simple_item_section(t, settings, current_y, t->template_data->unlocks, t->template_data->unlock_count,
                                "Unlocks");
     render_trackable_category_section(t, settings, current_y, t->template_data->stats, t->template_data->stat_count,
-                                      "Statistics", true);
+                                      "Statistics", true, version);
     render_custom_goals_section(t, settings, current_y, "Custom Goals");
     render_multistage_goals_section(t, settings, current_y, "Multi-Stage Goals");
 
     // Info Bar
 
-    // Push thhe user-defined text color before drawing the info bar
+    // Push the user-defined text color before drawing the info bar
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4((float) settings->text_color.r / 255.f,
                                                 (float) settings->text_color.g / 255.f,
                                                 (float) settings->text_color.b / 255.f,
                                                 (float) settings->text_color.a / 255.f));
     // You can remove ImGuiWindowFlags_AlwaysAutoResize if you want to be able to resize this window
-    ImGui::Begin("Info | ESC: Settings | Pan: RMB/MMB Drag | Zoom: Wheel | Click: LMB", nullptr,
+    ImGui::Begin("Info | ESC: Settings | Pan: RMB/MMB Drag | Zoom: Wheel | Click: LMB | Move Win: LMB Drag", nullptr,
                  ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing);
 
     ImGui::Separator(); // Draw a separator line
@@ -2567,12 +2611,23 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
     format_category_string(settings->category, formatted_category, sizeof(formatted_category));
     // Optional flag DOESN'T get formatted
     format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
-    MC_Version version = settings_get_version_from_string(settings->version_str);
 
     const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
 
     float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f; // Round to nearest 5 seconds
     format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time));
+
+    // Determine the correct total for the achievement counter info bar whenever global legacy stats are tracked
+    int total_ach_to_display = t->template_data->advancement_count;
+    if (version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy) {
+        int obtainable_count = 0;
+        for (int i = 0; i < t->template_data->advancement_count; i++) {
+            if (!t->template_data->advancements[i]->done_in_snapshot) {
+                obtainable_count++;
+            }
+        }
+        total_ach_to_display = obtainable_count;
+    }
 
     snprintf(info_buffer, sizeof(info_buffer),
              "%s  |  %s - %s%s%s  |  %s: %d/%d  -  Prog: %.2f%%  |  %s IGT  |  Upd: %s",
@@ -2583,7 +2638,7 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
              settings->optional_flag,
              adv_ach_label,
              t->template_data->advancements_completed_count,
-             t->template_data->advancement_count,
+             total_ach_to_display,
              t->template_data->overall_progress_percentage,
              formatted_time,
              formatted_update_time);
@@ -2728,6 +2783,9 @@ void tracker_load_and_parse_data(Tracker *t) {
     printf("[TRACKER] Loading advancement template from: %s\n", t->advancement_template_path);
     cJSON *template_json = cJSON_from_file(t->advancement_template_path);
 
+    struct AppSettings settings;
+    settings_load(&settings);
+
     // Check if template file exists otherwise create it using temp_create_utils.c
     if (!template_json) {
         fprintf(stderr, "[TRACKER] Template file not found: %s\n", t->advancement_template_path);
@@ -2770,16 +2828,19 @@ void tracker_load_and_parse_data(Tracker *t) {
     cJSON *custom_json = cJSON_GetObjectItem(template_json, "custom"); // Custom goals, manually checked of by user
     cJSON *multi_stage_goals_json = cJSON_GetObjectItem(template_json, "multi_stage_goals");
 
+
+
+    MC_Version version = settings_get_version_from_string(settings.version_str);
     // Parse the 5 main categories
     // False as it's for advancements
     tracker_parse_categories(t, advancements_json, t->template_data->lang_json, &t->template_data->advancements,
                              &t->template_data->advancement_count, &t->template_data->total_criteria_count,
-                             "advancement.", false);
+                             "advancement.", false, version);
 
     // True as it's for stats
     tracker_parse_categories(t, stats_json, t->template_data->lang_json, &t->template_data->stats,
                              &t->template_data->stat_count, &t->template_data->stat_total_criteria_count, "stat.",
-                             true);
+                             true, version);
 
     // Parse "unlock." prefix for unlocks
     tracker_parse_simple_trackables(t, unlocks_json, t->template_data->lang_json, &t->template_data->unlocks,
@@ -2799,9 +2860,6 @@ void tracker_load_and_parse_data(Tracker *t) {
     printf("[TRACKER] Initial template parsing complete.\n");
 
     // LOADING SNAPSHOT FROM FILE - ONLY FOR VERSION 1.0-1.6.4 WITHOUT StatsPerWorld MOD
-    AppSettings settings;
-    settings_load(&settings);
-    MC_Version version = settings_get_version_from_string(settings.version_str);
 
     if (version <= MC_VERSION_1_6_4 && !settings.using_stats_per_world_legacy) {
         tracker_load_snapshot_from_file(t);
@@ -2869,6 +2927,18 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
     MC_Version version = settings_get_version_from_string(settings->version_str);
     const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
 
+    // Determine the correct total for the achievement counter
+    int total_ach_to_display = t->template_data->advancement_count;
+    if (version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy) {
+        int obtainable_count = 0;
+        for (int i = 0; i < t->template_data->advancement_count; i++) {
+            if (!t->template_data->advancements[i]->done_in_snapshot) {
+                obtainable_count++;
+            }
+        }
+        total_ach_to_display = obtainable_count;
+    }
+
     // Creating the title buffer
     // Displaying last update time doesn't make sense here, so only done in Tracker Info window in tracker_render_gui()
     snprintf(title_buffer, sizeof(title_buffer),
@@ -2881,7 +2951,7 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
              settings->optional_flag,
              adv_ach_label,
              t->template_data->advancements_completed_count,
-             t->template_data->advancement_count,
+             total_ach_to_display,
              t->template_data->overall_progress_percentage,
              formatted_time);
 
@@ -3025,8 +3095,10 @@ void tracker_print_debug_status(Tracker *t) {
                            sub_stat->progress,
                            sub_status_text);
                 } else if (sub_stat->goal == 0 && version <= MC_VERSION_1_6_4) {
-                    // When target value would be 0 or NOT EXISTENT, but "icon" key exists somehow
-                    // THE "icon" key for this stat SHOULD BE REMOVED to act as hidden stat for multi-stage for legacy
+                    // When target value would be 0 or NOT EXISTENT, but "icon" key exists, then "icon" key should be removed
+                    // NO STAT SHOULD EVER HAVE A GOAL OF 0
+                    // HERE WE'RE HANDLING GOAL OF 0 AND NO ICON KEY
+                    // THEN it's a hidden stat for multi-stage for legacy
                     printf("[Stat Tracker] %s: %d\n",
                            stat_cat->display_name,
                            sub_stat->progress);
