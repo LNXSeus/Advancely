@@ -41,7 +41,9 @@ bool get_saves_path(char *out_path, size_t max_len, PathMode mode, const char* m
  *
  * This function contains version-specific logic to locate the correct statistics
  * and advancement/achievement files.
- * - For MC < 1.7.2, it finds the global .dat stats file.
+ * - For MC < 1.7.2:
+ *   -´If StatsPerWorld mod is enabled: It looks for per-world .dat stats file.
+ *   - If StatsPerWorld mod is disabled: it finds the global .dat stats file.
  * - For MC 1.7.2-1.11.2, it finds the per-world stats JSON containing achievements.
  * - For MC 1.12+, it finds the separate per-world advancements and stats JSONs.
  *
@@ -56,6 +58,7 @@ bool get_saves_path(char *out_path, size_t max_len, PathMode mode, const char* m
 void find_player_data_files(
     const char *saves_path,
     MC_Version version,
+    bool use_stats_per_world_mod, // When StatsPerWorld mod is enabled for legacy versions
     char *out_world_name,
     char *out_adv_path,
     char *out_stats_path,

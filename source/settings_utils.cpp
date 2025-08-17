@@ -204,6 +204,7 @@ void settings_set_defaults(AppSettings *settings) {
 
     // New visual/general defaults
     settings->enable_overlay = DEFAULT_ENABLE_OVERLAY;
+    settings->using_stats_per_world_legacy = DEFAULT_USING_STATS_PER_WORLD_LEGACY;
     settings->fps = DEFAULT_FPS;
     settings->tracker_always_on_top = DEFAULT_TRACKER_ALWAYS_ON_TOP;
     settings->overlay_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
@@ -286,6 +287,13 @@ bool settings_load(AppSettings *settings) {
         if (enable_overlay && cJSON_IsBool(enable_overlay)) settings->enable_overlay = cJSON_IsTrue(enable_overlay);
         else {
             settings->enable_overlay = DEFAULT_ENABLE_OVERLAY; // Default value, is false
+            defaults_were_used = true;
+        }
+
+        const cJSON *stats_per_world_legacy = cJSON_GetObjectItem(general_settings, "using_stats_per_world_legacy");
+        if (stats_per_world_legacy && cJSON_IsBool(stats_per_world_legacy)) settings->using_stats_per_world_legacy = cJSON_IsTrue(stats_per_world_legacy);
+        else {
+            settings->using_stats_per_world_legacy = DEFAULT_USING_STATS_PER_WORLD_LEGACY;
             defaults_were_used = true;
         }
 
@@ -397,6 +405,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
     // Update General Settings
     cJSON *general_obj = get_or_create_object(root, "general");
     cJSON_ReplaceItemInObject(general_obj, "enable_overlay", cJSON_CreateBool(settings->enable_overlay));
+    cJSON_ReplaceItemInObject(general_obj, "using_stats_per_world_legacy",
+                              cJSON_CreateBool(settings->using_stats_per_world_legacy));
     cJSON_ReplaceItemInObject(general_obj, "fps", cJSON_CreateNumber(settings->fps));
     cJSON_ReplaceItemInObject(general_obj, "always_on_top", cJSON_CreateBool(settings->tracker_always_on_top));
     cJSON_ReplaceItemInObject(general_obj, "overlay_scroll_speed", cJSON_CreateNumber(settings->overlay_scroll_speed));

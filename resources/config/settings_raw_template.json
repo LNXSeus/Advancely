@@ -6,6 +6,7 @@
   "optional_flag":	"1",
   "general":	{
     "enable_overlay": false,
+    "using_stats_per_world_legacy": true,
     "fps":	60,
     "always_on_top":	true,
     "overlay_scroll_speed":	1,

@@ -66,7 +66,7 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
         if (event.type >= SDL_EVENT_KEY_DOWN && event.type <= SDL_EVENT_MOUSE_WHEEL) {
             if (event.key.windowID == SDL_GetWindowID(t->window)) {
                 tracker_events(t, &event, is_running, settings_opened);
-            } else if (event.key.windowID == SDL_GetWindowID(o->window)) {
+            } else if (o && event.key.windowID == SDL_GetWindowID(o->window)) {
                 overlay_events(o, &event, is_running, deltaTime, app_settings);
             }
         }

@@ -1603,7 +1603,7 @@ static void format_time(long long ticks, char *output, size_t max_len) {
 static void format_time_since_update(float total_seconds, char *output, size_t max_len) {
     if (!output || max_len == 0) return;
 
-    int total_sec_int = (int)total_seconds;
+    int total_sec_int = (int) total_seconds;
     int hours = total_sec_int / 3600;
     int minutes = (total_sec_int % 3600) / 60;
     int seconds = total_sec_int % 60;
@@ -1767,11 +1767,15 @@ void tracker_update(Tracker *t, float *deltaTime) {
     MC_Version version = settings_get_version_from_string(settings.version_str);
 
     // Legacy Snapshot Logic
+    // ONLY USING SNAPSHOTTING LOGIC IF *NOT* USING StatsPerWorld MOD
+    // If StatsPerWorld is enabled, we don't need to take snapshots, but read directly from the
+    // per-world stat files, like mid-era versions, but still reading with IDs and not strings
     // If the version is legacy and the current world name doesn't match the snapshot's world name,
     // it means we've loaded a new world and need to take a new snapshot of the global stats
-    if (version <= MC_VERSION_1_6_4 && strcmp(t->world_name, t->template_data->snapshot_world_name) != 0) {
+    if (version <= MC_VERSION_1_6_4 && !settings.using_stats_per_world_legacy && strcmp(
+            t->world_name, t->template_data->snapshot_world_name) != 0) {
         printf("[TRACKER] Legacy world change detected. Taking new stat snapshot for world: %s\n", t->world_name);
-        tracker_snapshot_legacy_stats(t);
+        tracker_snapshot_legacy_stats(t); // Take a new snapshot when StatsPerWorld is disabled in legacy version
     }
 
     // Load all necessary player files ONCE
@@ -1783,6 +1787,7 @@ void tracker_update(Tracker *t, float *deltaTime) {
 
     // Version-based Dispatch
     if (version <= MC_VERSION_1_6_4) {
+        // If StatsPerWorld mod is enabled, stats file is per-world, still using IDs
         tracker_update_stats_legacy(t, player_stats_json);
     } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_11_2) {
         tracker_update_achievements_and_stats_mid(t, player_stats_json);
@@ -2000,9 +2005,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             ImVec2 progress_text_size = ImGui::CalcTextSize(progress_text);
             int visible_criteria = 0;
             if (is_complex) {
-                for (int j = 0; j < cat->criteria_count; j++) if (
-                    cat->criteria[j] && (!cat->criteria[j]->done || !settings->remove_completed_goals)) visible_criteria
-                        ++;
+                for (int j = 0; j < cat->criteria_count; j++)
+                    if (
+                        cat->criteria[j] && (!cat->criteria[j]->done || !settings->remove_completed_goals))
+                        visible_criteria
+                                ++;
             }
             float item_height = 96.0f + text_size.y + 4.0f + ((float) visible_criteria * 36.0f);
             if (progress_text[0] != '\0') item_height += progress_text_size.y + 4.0f;
@@ -2032,14 +2039,16 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 }
             }
 
-            if (bg_texture_to_use) draw_list->AddImage((void *) bg_texture_to_use, screen_pos,
-                                                       ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
-                                                              screen_pos.y + bg_size.y * t->zoom_level));
-            if (cat->texture) draw_list->AddImage((void *) cat->texture,
-                                                  ImVec2(screen_pos.x + 16.0f * t->zoom_level,
-                                                         screen_pos.y + 16.0f * t->zoom_level),
-                                                  ImVec2(screen_pos.x + 80.0f * t->zoom_level,
-                                                         screen_pos.y + 80.0f * t->zoom_level));
+            if (bg_texture_to_use)
+                draw_list->AddImage((void *) bg_texture_to_use, screen_pos,
+                                    ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
+                                           screen_pos.y + bg_size.y * t->zoom_level));
+            if (cat->texture)
+                draw_list->AddImage((void *) cat->texture,
+                                    ImVec2(screen_pos.x + 16.0f * t->zoom_level,
+                                           screen_pos.y + 16.0f * t->zoom_level),
+                                    ImVec2(screen_pos.x + 80.0f * t->zoom_level,
+                                           screen_pos.y + 80.0f * t->zoom_level));
 
             float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level;
             draw_list->AddText(nullptr, 16.0f * t->zoom_level,
@@ -2537,9 +2546,13 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
     // Info Bar
 
     // Push thhe user-defined text color before drawing the info bar
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4((float)settings->text_color.r / 255.f, (float)settings->text_color.g / 255.f, (float)settings->text_color.b / 255.f, (float)settings->text_color.a / 255.f));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4((float) settings->text_color.r / 255.f,
+                                                (float) settings->text_color.g / 255.f,
+                                                (float) settings->text_color.b / 255.f,
+                                                (float) settings->text_color.a / 255.f));
     // You can remove ImGuiWindowFlags_AlwaysAutoResize if you want to be able to resize this window
-    ImGui::Begin("Info | ESC: Settings | Pan: RMB/MMB Drag | Zoom: Wheel | Click: LMB", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing);
+    ImGui::Begin("Info | ESC: Settings | Pan: RMB/MMB Drag | Zoom: Wheel | Click: LMB", nullptr,
+                 ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing);
 
     ImGui::Separator(); // Draw a separator line
     ImGui::Spacing();
@@ -2562,18 +2575,18 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
     format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time));
 
     snprintf(info_buffer, sizeof(info_buffer),
-                 "%s  |  %s - %s%s%s  |  %s: %d/%d  -  Prog: %.2f%%  |  %s IGT  |  Upd: %s",
-                 t->world_name,
-                 settings->version_str,
-                 formatted_category,
-                 *settings->optional_flag ? " - " : "",
-                 settings->optional_flag,
-                 adv_ach_label,
-                 t->template_data->advancements_completed_count,
-                 t->template_data->advancement_count,
-                 t->template_data->overall_progress_percentage,
-                 formatted_time,
-                 formatted_update_time);
+             "%s  |  %s - %s%s%s  |  %s: %d/%d  -  Prog: %.2f%%  |  %s IGT  |  Upd: %s",
+             t->world_name,
+             settings->version_str,
+             formatted_category,
+             *settings->optional_flag ? " - " : "",
+             settings->optional_flag,
+             adv_ach_label,
+             t->template_data->advancements_completed_count,
+             t->template_data->advancement_count,
+             t->template_data->overall_progress_percentage,
+             formatted_time,
+             formatted_update_time);
 
     ImGui::TextUnformatted(info_buffer);
     ImGui::End();
@@ -2683,14 +2696,17 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings) {
 
     MC_Version version = settings_get_version_from_string(settings->version_str);
 
-    // Get the final, normalized saves path using the loaded settings
     if (get_saves_path(t->saves_path, MAX_PATH_LENGTH, settings->path_mode, settings->manual_saves_path)) {
         printf("[TRACKER] Using saves path: %s\n", t->saves_path);
 
         // Find the specific world files using the correct flag
+
+        // If using StatsPerWorld Mod on a legacy version trick the path finder
+        // into looking for the stats file per world, still looking for IDs though in .dat file
         find_player_data_files(
             t->saves_path,
             version,
+            settings->using_stats_per_world_legacy,  // This toggles if StatsPerWorld mod is enabled, see above
             t->world_name,
             t->advancements_path,
             t->stats_path,
@@ -2782,12 +2798,12 @@ void tracker_load_and_parse_data(Tracker *t) {
 
     printf("[TRACKER] Initial template parsing complete.\n");
 
-    // LOADING SNAPSHOT FROM FILE - ONLY FOR VERSION 1.0-1.6.4
+    // LOADING SNAPSHOT FROM FILE - ONLY FOR VERSION 1.0-1.6.4 WITHOUT StatsPerWorld MOD
     AppSettings settings;
     settings_load(&settings);
     MC_Version version = settings_get_version_from_string(settings.version_str);
 
-    if (version <= MC_VERSION_1_6_4) {
+    if (version <= MC_VERSION_1_6_4 && !settings.using_stats_per_world_legacy) {
         tracker_load_snapshot_from_file(t);
     }
     cJSON_Delete(template_json);

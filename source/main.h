@@ -30,19 +30,11 @@ extern "C" {
 #define SDL_FLAGS SDL_INIT_VIDEO // TODO: OR'd together with SDL_INIT_AUDIO
 
 #define TRACKER_TITLE "Advancely"
-#define ADVANCELY_VERSION "v0.8.9" // vMAJOR.MINOR.PATCH // TODO: Update this always
+#define ADVANCELY_VERSION "v0.8.10" // vMAJOR.MINOR.PATCH // TODO: Update this always
 #define ADVANCELY_ICON_PATH "resources/gui/Advancely_Logo_NoText.png" // TODO: Use this in tracker_init_sdl()
 #define ADVANCELY_FADED_ALPHA 100
 #define TRACKER_SEPARATOR_LINE_WIDTH 0.80f
 
-// Settings window is NOT USER CONFIGURABLE SO HARDCODED HERE, ONLY COLOR IS
-// Settings window will be part of tracker window
-// Tracker window flags are in init_sdl.c in tracker_init_sdl()
-
-// TODO: Settings window flags are in settings.cpp
-// #define SETTINGS_TITLE "Advancely Settings"
-// #define SETTINGS_WIDTH 1280
-// #define SETTINGS_HEIGHT 720
 
 #define OVERLAY_TITLE "Advancely Overlay"
 

@@ -36,7 +36,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::PushFont(roboto_font);
     }
 
-    // --- Path Settings ---
+    // Path Settings
     ImGui::Text("Path Settings");
 
 
@@ -54,7 +54,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::Separator();
     ImGui::Spacing();
 
-    // --- Template Settings ---
+    // Template Settings
     ImGui::Text("Template Settings");
 
 
@@ -73,6 +73,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         }
     }
 
+    // Only show the StatsPerWorld checkbox for legacy versions
+    MC_Version selected_version = settings_get_version_from_string(temp_settings.version_str);
+    if (selected_version <= MC_VERSION_1_6_4) {
+        ImGui::Checkbox("Using StatsPerWorld Mod", &temp_settings.using_stats_per_world_legacy);
+    }
+
     ImGui::InputText("Category", temp_settings.category, MAX_PATH_LENGTH);
     ImGui::InputText("Optional Flag", temp_settings.optional_flag, MAX_PATH_LENGTH);
 
@@ -87,12 +93,16 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Conditionally display overlay related settings
     if (temp_settings.enable_overlay) {
         ImGui::DragFloat("Overlay Scroll Speed", &temp_settings.overlay_scroll_speed, 0.01f, -100.00f, 100.00f, "%.2f");
-        ImGui::Checkbox("Goal align left", &temp_settings.goal_align_left);
-        ImGui::SameLine();
-        ImGui::Checkbox("Remove completed goals", &temp_settings.remove_completed_goals);
     }
 
     ImGui::Checkbox("Always on top", &temp_settings.tracker_always_on_top);
+    ImGui::SameLine();
+    ImGui::Checkbox("Remove completed goals", &temp_settings.remove_completed_goals);
+
+    if (temp_settings.enable_overlay) {
+        ImGui::SameLine();
+        ImGui::Checkbox("Goal align left", &temp_settings.goal_align_left);
+    }
 
     ImGui::Separator();
     ImGui::Spacing();
