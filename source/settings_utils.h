@@ -20,6 +20,7 @@ extern "C" {
 
 // DEFAULT values
 #define DEFAULT_ENABLE_OVERLAY false // Stream overlay will be off by default
+#define DEFAULT_USING_STATS_PER_WORLD_LEGACY true
 #define DEFAULT_FPS 60
 #define DEFAULT_TRACKER_ALWAYS_ON_TOP true
 #define DEFAULT_OVERLAY_SCROLL_SPEED 1.0f
@@ -84,6 +85,7 @@ struct AppSettings {
 
     // General and Visual Settings
     bool enable_overlay;
+    bool using_stats_per_world_legacy; // For StatsPerWorld mod, moving global stats into each world
     float fps;
     bool tracker_always_on_top;
     float overlay_scroll_speed;

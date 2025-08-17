@@ -149,7 +149,9 @@ int main(int argc, char *argv[]) {
         // Roboto Font is for the settings inside the tracker
         tracker->roboto_font = io.Fonts->AddFontFromFileTTF("resources/fonts/Roboto-Regular.ttf", 16.0f);
         if (tracker->roboto_font == nullptr) {
-            fprintf(stderr, "[MAIN - IMGUI] Failed to load font: resources/fonts/Roboto-Regular.ttf. Settings window will use default font.\n");
+            fprintf(
+                stderr,
+                "[MAIN - IMGUI] Failed to load font: resources/fonts/Roboto-Regular.ttf. Settings window will use default font.\n");
         }
 
         dmon_init();
@@ -253,6 +255,8 @@ int main(int argc, char *argv[]) {
                 find_player_data_files(
                     tracker->saves_path,
                     version,
+                    // This toggles if StatsPerWorld mod is enabled (local stats for legacy)
+                    current_settings.using_stats_per_world_legacy,
                     tracker->world_name,
                     tracker->advancements_path,
                     tracker->stats_path,

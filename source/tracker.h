@@ -143,6 +143,8 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings);
  * It reads the main template JSON to get the structure of advancements, stats, and unlocks.
  * It also loads the corresponding language file for display names and then updates the progress
  * of each item by reading the player's actual save files.
+ * For legacy versions it now only tries to read the snapshot file if the
+ * StatsPerWorld Mod isn't used, otherwise it reads from the stats folder per-world.
  *
  * @param t A pointer to the Tracker struct containing the necessary paths.
  */
