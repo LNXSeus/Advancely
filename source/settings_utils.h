@@ -24,7 +24,6 @@ extern "C" {
 #define DEFAULT_FPS 60
 #define DEFAULT_TRACKER_ALWAYS_ON_TOP true
 #define DEFAULT_OVERLAY_SCROLL_SPEED 1.0f
-// #define DEFAULT_OVERLAY_SCROLL_LEFT_TO_RIGHT true  // TODO: Remove this later, sign of scroll speed controls direction
 #define DEFAULT_GOAL_ALIGN_LEFT true
 #define DEFAULT_REMOVE_COMPLETED_GOALS true
 
