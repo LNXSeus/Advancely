@@ -138,7 +138,6 @@ int main(int argc, char *argv[]) {
         ImGui::StyleColorsDark(); // Or ImGui::StyleColorsClassic()
 
         // Setup Platform/Renderer backends
-        // TODO: Maybe integrate settings window into tracker window!!!
         // THERE SHOULD BE ANOTHER WAY TO ONLY USE IMGUI for tracker window and SDL3 for overlay and settings
         ImGui_ImplSDL3_InitForSDLRenderer(tracker->window, tracker->renderer);
         ImGui_ImplSDLRenderer3_Init(tracker->renderer);
@@ -266,6 +265,8 @@ int main(int argc, char *argv[]) {
 
                 // Now update progress with the correct paths
                 tracker_update(tracker, &deltaTime);
+
+                // TODO: Print debug info to console based on settings
                 tracker_print_debug_status(tracker);
 
                 // Update TITLE of the tracker window with some info, similar to the debug print
