@@ -143,6 +143,10 @@ struct TrackableItem {
     char icon_path[256]; // Relative path to the icon, e.g., "items/apple.png"
     SDL_Texture *texture; // The loaded texture for the icon.
 
+    // Pre-parsed keys for modern stat lookups
+    char stat_category_key[192]; // e.g., "minecraft:custom"
+    char stat_item_key[192]; // e.g., "minecraft:jump"
+
     bool done; // For advancements/unlocks: Is it completed?
     int progress; // For stats: The current value, e.g., 5.
     int goal; // For stats: The target value, e.g., 40.

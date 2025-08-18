@@ -15,10 +15,10 @@ extern "C" {
 #endif
 
 
-
 /**
- * @brief Enum to determine how the saves path is obtained.
- */
+* @brief Converts backslashes in a path to forward slashes for consistency.
+* @param path The path string to modify in-place.
+*/
 void normalize_path(char *path);
 
 /**

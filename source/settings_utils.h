@@ -62,43 +62,40 @@ extern const ColorRGBA DEFAULT_SETTINGS_BG_COLOR;
 extern const ColorRGBA DEFAULT_TEXT_COLOR;
 
 // A Struct to hold all application settings in one place
-
-// A struct to hold all application settings in one place
-// TODO: Remember window position in settings.json
 struct AppSettings {
-    // names should match json keys
-    char version_str[64]; // Store version as string
-    PathMode path_mode;
-    char manual_saves_path[MAX_PATH_LENGTH]; // path length from path_utils.h
-    char category[MAX_PATH_LENGTH]; // New field to store speedrunning category
-    char optional_flag[MAX_PATH_LENGTH]; // New field to store optional flag (any string or empty) (e.g.,"_optimized")
+    // --- Template Configuration ---
+    char version_str[64];                     // The selected Minecraft version string, e.g., "1.16.1".
+    PathMode path_mode;                       // The mode for finding the saves path (auto or manual).
+    char manual_saves_path[MAX_PATH_LENGTH];  // The user-defined path to the saves folder if path_mode is manual.
+    char category[MAX_PATH_LENGTH];           // The speedrun or goal category, used to build the template file name.
+    char optional_flag[MAX_PATH_LENGTH];      // An optional string appended to the template file name for variants.
 
-    // These paths are constructed from the above fields
-    char template_path[MAX_PATH_LENGTH];
-    char lang_path[MAX_PATH_LENGTH];
-    char snapshot_path[MAX_PATH_LENGTH]; // For legacy snapshots
+    // --- Constructed Paths (from above settings) ---
+    char template_path[MAX_PATH_LENGTH];      // The final, constructed path to the template .json file.
+    char lang_path[MAX_PATH_LENGTH];          // The final, constructed path to the language .json file.
+    char snapshot_path[MAX_PATH_LENGTH];      // The final, constructed path to the legacy snapshot .json file.
 
-    // Hotkeys
-    int hotkey_count;
-    HotkeyBinding hotkeys[MAX_HOTKEYS]; // Array of hotkey bindings
+    // --- Hotkeys ---
+    int hotkey_count;                         // The number of active hotkey bindings.
+    HotkeyBinding hotkeys[MAX_HOTKEYS];       // Array of hotkey bindings for custom goals.
 
-    // General and Visual Settings
-    bool enable_overlay;
-    bool using_stats_per_world_legacy; // For StatsPerWorld mod, moving global stats into each world
-    float fps;
-    bool tracker_always_on_top;
-    float overlay_scroll_speed;
-    bool goal_align_left;
-    bool remove_completed_goals;
+    // --- General Settings ---
+    bool enable_overlay;                      // If true, the overlay window is created and rendered.
+    bool using_stats_per_world_legacy;        // If true, legacy versions look for per-world .dat files (for StatsPerWorld mod).
+    float fps;                                // The target frames per second for the application loop.
+    bool tracker_always_on_top;               // If true, the main tracker window stays above other windows.
+    float overlay_scroll_speed;               // The speed and direction of the scrolling animation in the overlay.
+    bool goal_align_left;                     // If true, items in the overlay are aligned to the left.
+    bool remove_completed_goals;              // If true, completed goals are hidden from the tracker view.
 
-    // Window Geometry
-    WindowRect tracker_window;
-    WindowRect overlay_window;
+    // --- Window Geometry ---
+    WindowRect tracker_window;                // The saved position and size of the main tracker window.
+    WindowRect overlay_window;                // The saved position and size of the overlay window.
 
-    // Colors
-    ColorRGBA tracker_bg_color;
-    ColorRGBA overlay_bg_color;
-    ColorRGBA text_color;
+    // --- Colors ---
+    ColorRGBA tracker_bg_color;               // Background color for the main tracker window.
+    ColorRGBA overlay_bg_color;               // Background color for the overlay window.
+    ColorRGBA text_color;                     // Global text color for UI elements.
 };
 
 
