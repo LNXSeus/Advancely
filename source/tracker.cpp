@@ -414,17 +414,18 @@ static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *p
     for (int i = 0; i < t->template_data->advancement_count; i++) {
         TrackableCategory *ach = t->template_data->advancements[i];
         ach->completed_criteria_count = 0;
-        ach->done = false;
+        ach->done = false; // Reset done status
+
         cJSON *ach_entry = cJSON_GetObjectItem(player_stats_json, ach->root_name);
         if (!ach_entry) continue;
-        if (cJSON_IsNumber(ach_entry)) {
-            ach->done = (ach_entry->valueint > 0);
-        } else if (cJSON_IsObject(ach_entry)) {
+
+        // First, update the progress of all criteria defined in the template
+        if (ach->criteria_count > 0) {
             cJSON *progress_array = cJSON_GetObjectItem(ach_entry, "progress");
             if (cJSON_IsArray(progress_array)) {
                 for (int j = 0; j < ach->criteria_count; j++) {
                     TrackableItem *crit = ach->criteria[j];
-                    crit->done = false;
+                    crit->done = false; // Reset criteria status
                     cJSON *progress_item;
                     cJSON_ArrayForEach(progress_item, progress_array) {
                         if (cJSON_IsString(progress_item) && strcmp(progress_item->valuestring, crit->root_name) == 0) {
@@ -435,13 +436,29 @@ static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *p
                     }
                 }
             }
-            if (ach->criteria_count > 0 && ach->completed_criteria_count >= ach->criteria_count) {
-                ach->done = true;
-            }
         }
-        if (ach->done) {
-            t->template_data->advancements_completed_count++;
+
+        // Determine if the game file considers the achievement done
+        bool game_is_done = false;
+        if (cJSON_IsNumber(ach_entry)) {
+            // Case for simple achievements, e.g. "achievement.buildHoe": 1
+            game_is_done = (ach_entry->valueint >= 1);
+        } else if (cJSON_IsObject(ach_entry)) {
+            // Casse for complex achievements, e.g. "achievement.exploreAllBiomes": {"value": 1, "progress":["Forest", ...]}
+            cJSON *value_item = cJSON_GetObjectItem(ach_entry, "value");
+            game_is_done = (cJSON_IsNumber(value_item) && value_item->valueint >= 1);
         }
+
+        // Determine final 'done' status either when all criteria from template are done or game says so
+        if (ach->criteria_count > 0) {
+            bool template_is_done = (ach->completed_criteria_count >= ach->criteria_count);
+            ach->done = game_is_done || template_is_done;
+        } else {
+            ach->done = game_is_done;
+        }
+
+        // Increment completed achievement count
+        if (ach->done) t->template_data->advancements_completed_count++;
         t->template_data->completed_criteria_count += ach->completed_criteria_count;
     }
 
@@ -516,6 +533,9 @@ static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *p
 
 /**
  * @brief (Era 3: 1.12+) Updates advancement progress from modern JSON files.
+ * It marks an advancement as completed if all of its criteria within the template are completed.
+ * @param t Pointer to the tracker struct.
+ * @param player_adv_json Pointer to the player advancements cJSON object.
  */
 static void tracker_update_advancements_modern(Tracker *t, const cJSON *player_adv_json) {
     if (!player_adv_json) return;
@@ -526,22 +546,18 @@ static void tracker_update_advancements_modern(Tracker *t, const cJSON *player_a
     for (int i = 0; i < t->template_data->advancement_count; i++) {
         TrackableCategory *adv = t->template_data->advancements[i];
         adv->completed_criteria_count = 0;
+        adv->done = false; // Reset done status before re-evaluating
 
         cJSON *player_entry = cJSON_GetObjectItem(player_adv_json, adv->root_name);
         // take root name (from template) from player advancements
         if (player_entry) {
-            adv->done = cJSON_IsTrue(cJSON_GetObjectItem(player_entry, "done"));
-            if (adv->done) {
-                t->template_data->advancements_completed_count++;
-            }
 
+            // Always update criteria progress first
             cJSON *player_criteria = cJSON_GetObjectItem(player_entry, "criteria");
-            if (player_criteria) {
-                // If advancement has criteria
+            if (player_criteria && adv->criteria_count > 0) {
+                // If the template has criteria, check them against player data
                 for (int j = 0; j < adv->criteria_count; j++) {
                     TrackableItem *crit = adv->criteria[j];
-
-                    // Set to done if the entry exists
                     if (cJSON_HasObjectItem(player_criteria, crit->root_name)) {
                         crit->done = true;
                         adv->completed_criteria_count++;
@@ -550,12 +566,29 @@ static void tracker_update_advancements_modern(Tracker *t, const cJSON *player_a
                     }
                 }
             }
+
+            // Determine 'done' status when all criteria within the template are done OR the game file marks it as done
+            bool game_is_done = cJSON_IsTrue(cJSON_GetObjectItem(player_entry, "done"));
+            if (adv->criteria_count > 0) {
+                // If template has criteria, it's done if the game says so OR all criteria are done
+                bool template_is_done (adv->completed_criteria_count >= adv->criteria_count);
+                adv->done = game_is_done || template_is_done;
+            } else {
+                // If no criteria are in the template, fall back to the game file's "done" status
+                adv->done = game_is_done;
+            }
+
+            // Increment completed advancement count
+            if (adv->done) t->template_data->advancements_completed_count++;
+
         } else {
+            // If the advancement doesn't exist in the player file, it's not done and neither are its criteria
             adv->done = false;
             for (int j = 0; j < adv->criteria_count; j++) {
                 adv->criteria[j]->done = false;
             }
         }
+        // Add completed criteria count for progress calculation
         t->template_data->completed_criteria_count += adv->completed_criteria_count;
     }
 }
@@ -792,8 +825,8 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                     }
                 }
             }
-        } else {
-            // SINGLE-CRITERION SPECIAL CASE
+        } else if (is_stat_category) {
+            // SINGLE-CRITERION SPECIAL CASE (ONLY FOR STATS, SO "criteria": {} DOESN'T GET COUNTED FOR PROGRESS)
             new_cat->criteria_count = 1;
             *total_criteria_count += 1;
             new_cat->criteria = (TrackableItem **) calloc(1, sizeof(TrackableItem *));
@@ -1416,6 +1449,7 @@ static void tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
  *
  */
 static void tracker_calculate_overall_progress(Tracker *t, MC_Version version) {
+    (void) version;
     if (!t || !t->template_data) return; // || because we can't be sure if the template_data is initialized
 
     // calculate the total number of "steps"
@@ -1426,26 +1460,20 @@ static void tracker_calculate_overall_progress(Tracker *t, MC_Version version) {
     total_steps += t->template_data->total_criteria_count;
     completed_steps += t->template_data->completed_criteria_count;
 
+    printf("Total criteria count: %d\n", t->template_data->total_criteria_count);
+    printf("Completed criteria count: %d\n", t->template_data->completed_criteria_count);
+
     // Stats:
     // - For multi-criteria stats, each criterion is a step.
     // - For single-criterion stats, the parent category itself is one step.
     // - For hidden helper stats for legacy versions ms-goals, they DON'T count towards the progress at all
     for (int i = 0; i < t->template_data->stat_count; i++) {
         TrackableCategory *stat_cat = t->template_data->stats[i];
-
-        // Skip hidden legacy helper stats from progress calculation
-        if (version <= MC_VERSION_1_6_4 && stat_cat->criteria_count == 1 && stat_cat->criteria[0]->goal == 0) {
-            continue;
+        if (version <= MC_VERSION_1_6_4 && stat_cat->criteria_count == 1 && stat_cat->criteria[0]->goal <= 0) {
+            continue; // Skip hidden legacy stats
         }
-        if (stat_cat->criteria_count > 1) {
-            // For multi-criteria stats, count each criterion
-            total_steps += stat_cat->criteria_count;
-            completed_steps += stat_cat->completed_criteria_count;
-        } else {
-            // For single-criterion stats, count the parent category as one step
-            total_steps += 1;
-            if (stat_cat->done) completed_steps += 1;
-        }
+        total_steps += stat_cat->criteria_count;
+        completed_steps += stat_cat->completed_criteria_count;
     }
 
     // Unlocks
@@ -1932,6 +1960,7 @@ static void render_section_separator(Tracker *t, const AppSettings *settings, fl
  * @param count The number of TrackableCategory pointers in the array.
  * @param section_title The title of the section.
  * @param is_stat_section True if the section is for stats, false if it's for advancements.
+ * @param version The game version (MC_Version).
  */
 static void render_trackable_category_section(Tracker *t, const AppSettings *settings, float &current_y,
                                               TrackableCategory **categories, int count, const char *section_title,
@@ -2002,18 +2031,45 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
     float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
     const float horizontal_spacing = 32.0f, vertical_spacing = 48.0f;
 
+    // complex_pass = false -> Render all advancements/stats with no criteria or sub-stats (simple items)
+    // complex_pass = true -> Render all advancements/stats with criteria or sub-stats (complex items)
     auto render_pass = [&](bool complex_pass) {
         for (int i = 0; i < count; i++) {
             TrackableCategory *cat = categories[i];
 
-            // Skip rendering hidden legacy stats, no target value or set to 0
+            // Skip rendering hidden legacy stats (helper for multi-stage goals in legacy), no target value or set to 0
             if (is_stat_section && version <= MC_VERSION_1_6_4 && cat && cat->criteria_count == 1 && cat->criteria[0]->
                 goal == 0) {
                 continue;
             }
 
-            bool is_complex = cat && cat->criteria_count > 1;
-            if (!cat || (is_complex != complex_pass) || (cat->done && settings->remove_completed_goals)) continue;
+            // Determine if the item should be hidden by "Remove completed goals"
+            // DOES NOT HIDE when advancement has wrong criteria, that are not in the game (modern versions)
+            // DOES NOT HIDE when achievement value is 1 or higher and some template criteria are not met (mid-era versions)
+            // this can act as a way to debug wrong criteria in template file that can be removed
+            bool should_hide = false;
+            if (cat && settings->remove_completed_goals) {
+                if (is_stat_section) {
+                    // Stats are simple: hide them if they are marked as done
+                    if (cat->done)  should_hide = true;
+                } else { // It's an advancement
+                    bool template_criteria_are_met = (cat->completed_criteria_count >= cat->criteria_count);
+                    // Hide only if it has criteria AND they are all met, OR if it has NO criteria AND it's done
+                    if ((cat->criteria_count > 0 && template_criteria_are_met) || (cat->criteria_count == 0 && cat->done)) {
+                        should_hide = true;
+                    }
+                }
+            }
+
+            // Render advancement criteria if count is > 0, render stat-category sub-stats if count is > 1
+            bool is_complex = false;
+            if (!is_stat_section) {
+                is_complex = cat && cat->criteria_count > 0;
+            } else {
+                is_complex = cat && cat->criteria_count > 1;
+            }
+
+            if (!cat || (is_complex != complex_pass) || should_hide) continue;
 
             // Prepare snapshot status text for legacy achievements (without mod)
             char snapshot_text[8] = "";
@@ -2038,6 +2094,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     } else if (crit->goal == -1) {
                         snprintf(progress_text, sizeof(progress_text), "(%d)", crit->progress);
                     }
+                }
+            } else { // It's an advancement section, display criteria count
+                if (cat->criteria_count > 0) {
+                    snprintf(progress_text, sizeof(progress_text), "(%d / %d)", cat->completed_criteria_count, cat->criteria_count);
                 }
             }
 
@@ -2234,6 +2294,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         }
     };
 
+    // complex_pass = false -> Render all advancements/stats with no criteria or sub-stats (simple items)
+    // complex_pass = true -> Render all advancements/stats with criteria or sub-stats (complex items)
     render_pass(false);
     render_pass(true);
     current_y += row_max_height;
