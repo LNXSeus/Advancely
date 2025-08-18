@@ -52,6 +52,51 @@ static SDL_Texture *load_texture_with_scale_mode(SDL_Renderer *renderer, const c
     return new_texture;
 }
 
+/**
+ * @brief Gets an SDL_Texture from a path, utilizing a cache to avoid redundant loads.
+ * @param t A pointer to the Tracker struct which contains the cache.
+ * @param path The path to the image file.
+ * @return A pointer to the cached or newly loaded SDL_Texture, or nullptr on failure.
+ */
+static SDL_Texture *tracker_get_texture(Tracker *t, const char *path) {
+    if (path == nullptr || path[0] == '\0') return nullptr;
+
+    // Check if the texture is already in the cache
+    for (int i = 0; i < t->texture_cache_count; i++) {
+        if (strcmp(t->texture_cache[i].path, path) == 0) {
+            return t->texture_cache[i].texture;
+        }
+    }
+
+    // If not in cache, load it
+    SDL_Texture *new_texture = load_texture_with_scale_mode(t->renderer, path, SDL_SCALEMODE_NEAREST);
+    if (!new_texture) {
+        return nullptr; // Loading failed.
+    }
+
+    // Add the new texture to the cache
+    // Check if we need to grow the cache array.
+    if (t->texture_cache_count >= t->texture_cache_capacity) {
+        int new_capacity = t->texture_cache_capacity == 0 ? 16 : t->texture_cache_capacity * 2;
+        TextureCacheEntry *new_cache = (TextureCacheEntry *) realloc(t->texture_cache, new_capacity * sizeof(TextureCacheEntry));
+        if (!new_cache) {
+            fprintf(stderr, "[TRACKER] Failed to reallocate texture cache!\n");
+            SDL_DestroyTexture(new_texture);
+            return nullptr;
+        }
+        t->texture_cache = new_cache;
+        t->texture_cache_capacity = new_capacity;
+    }
+
+    // Add to cache
+    strncpy(t->texture_cache[t->texture_cache_count].path, path, MAX_PATH_LENGTH - 1);
+    t->texture_cache[t->texture_cache_count].texture = new_texture;
+    t->texture_cache_count++;
+
+    return new_texture;
+}
+
+
 // FOR VERSION-SPECIFIC PARSERS
 
 /**
@@ -638,21 +683,33 @@ static void tracker_update_stats_modern(Tracker *t, const cJSON *player_stats_js
             strncpy(root_name_copy, sub_stat->root_name, sizeof(root_name_copy) - 1);
             root_name_copy[sizeof(root_name_copy) - 1] = '\0';
 
-            // Null-terminating the first forward slash to create the language key so nether/create beacon
-            // becomes nether.create_beacon
-            char *category_key = root_name_copy;
-            char *item_key = strchr(root_name_copy, '/');
-            if (item_key) {
-                *item_key = '\0';
-                item_key++; // Move the pointer to the next character after the forward slash
-                cJSON *category_obj = cJSON_GetObjectItem(stats_obj, category_key);
+            // Use pre-parsed keys for lookup
+            if (sub_stat->stat_category_key[0] != '\0') {
+                cJSON *category_obj = cJSON_GetObjectItem(stats_obj, sub_stat->stat_category_key);
                 if (category_obj) {
-                    cJSON *stat_value = cJSON_GetObjectItem(category_obj, item_key);
+                    cJSON *stat_value = cJSON_GetObjectItem(category_obj, sub_stat->stat_item_key);
                     if (cJSON_IsNumber(stat_value)) {
                         sub_stat->progress = stat_value->valueint;
                     }
                 }
             }
+
+            // TODO: Remove this when possible
+            // // Null-terminating the first forward slash to create the language key so nether/create beacon
+            // // becomes nether.create_beacon
+            // char *category_key = root_name_copy;
+            // char *item_key = strchr(root_name_copy, '/');
+            // if (item_key) {
+            //     *item_key = '\0';
+            //     item_key++; // Move the pointer to the next character after the forward slash
+            //     cJSON *category_obj = cJSON_GetObjectItem(stats_obj, category_key);
+            //     if (category_obj) {
+            //         cJSON *stat_value = cJSON_GetObjectItem(category_obj, item_key);
+            //         if (cJSON_IsNumber(stat_value)) {
+            //             sub_stat->progress = stat_value->valueint;
+            //         }
+            //     }
+            // }
 
             // Determine natural completion
             bool naturally_done = (sub_stat->goal > 0 && sub_stat->progress >= sub_stat->goal);
@@ -782,7 +839,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
             snprintf(full_icon_path, sizeof(full_icon_path), "resources/icons/%s", icon->valuestring);
             strncpy(new_cat->icon_path, full_icon_path, sizeof(new_cat->icon_path) - 1);
 
-            new_cat->texture = load_texture_with_scale_mode(t->renderer, new_cat->icon_path, SDL_SCALEMODE_NEAREST);
+            new_cat->texture = tracker_get_texture(t, new_cat->icon_path);
         }
 
         cJSON *criteria_obj = cJSON_GetObjectItem(cat_json, "criteria");
@@ -797,6 +854,19 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                     TrackableItem *new_crit = (TrackableItem *) calloc(1, sizeof(TrackableItem));
                     if (new_crit) {
                         strncpy(new_crit->root_name, crit_item->string, sizeof(new_crit->root_name) - 1);
+
+                        // Add pre-parsing for multi-criteria stats
+                        if (is_stat_category) {
+                            const char* slash = strchr(new_crit->root_name, '/');
+                            if (slash) {
+                                ptrdiff_t len = slash - new_crit->root_name;
+                                strncpy(new_crit->stat_category_key, new_crit->root_name, len);
+                                new_crit->stat_category_key[len] = '\0';
+                                strncpy(new_crit->stat_item_key, slash + 1, sizeof(new_crit->stat_item_key) - 1);
+                            }
+                        }
+
+                        // Read the goal value
                         if (is_stat_category) {
                             cJSON *target = cJSON_GetObjectItem(crit_item, "target");
                             if (cJSON_IsNumber(target)) new_crit->goal = target->valueint;
@@ -817,8 +887,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                             snprintf(full_crit_icon_path, sizeof(full_crit_icon_path), "resources/icons/%s",
                                      crit_icon->valuestring);
                             strncpy(new_crit->icon_path, full_crit_icon_path, sizeof(new_crit->icon_path) - 1);
-                            new_crit->texture = load_texture_with_scale_mode(
-                                t->renderer, new_crit->icon_path, SDL_SCALEMODE_NEAREST);
+                            new_crit->texture = tracker_get_texture(t, new_crit->icon_path);
                         }
 
                         new_cat->criteria[k++] = new_crit;
@@ -837,9 +906,20 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                     if (cJSON_IsString(crit_root_name_json)) {
                         strncpy(the_criterion->root_name, crit_root_name_json->valuestring,
                                 sizeof(the_criterion->root_name) - 1);
+
+                        // Pre-parse stat keys
+                        const char *slash = strchr(the_criterion->root_name, '/');
+                        if (slash) {
+                            ptrdiff_t len = slash - the_criterion->root_name;
+                            strncpy(the_criterion->stat_category_key, the_criterion->root_name, len);
+                            the_criterion->stat_category_key[len] = '\0';
+                            strncpy(the_criterion->stat_item_key, slash + 1, sizeof(the_criterion->stat_item_key) - 1);
+                        }
                     }
                     strncpy(the_criterion->display_name, new_cat->display_name,
                             sizeof(the_criterion->display_name) - 1);
+
+                    // Read the goal value
                     if (is_stat_category) {
                         cJSON *target = cJSON_GetObjectItem(cat_json, "target");
                         if (cJSON_IsNumber(target)) the_criterion->goal = target->valueint;
@@ -1007,8 +1087,7 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
                 char full_icon_path[sizeof(new_item->icon_path)];
                 snprintf(full_icon_path, sizeof(full_icon_path), "resources/icons/%s", icon->valuestring);
                 strncpy(new_item->icon_path, full_icon_path, sizeof(new_item->icon_path) - 1);
-                new_item->texture = load_texture_with_scale_mode(t->renderer, new_item->icon_path,
-                                                                 SDL_SCALEMODE_NEAREST);
+                new_item->texture = tracker_get_texture(t, new_item->icon_path);
             }
 
             cJSON *target = cJSON_GetObjectItem(item_json, "target");
@@ -1077,7 +1156,7 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
             char full_icon_path[sizeof(new_goal->icon_path)];
             snprintf(full_icon_path, sizeof(full_icon_path), "resources/icons/%s", icon->valuestring);
             strncpy(new_goal->icon_path, full_icon_path, sizeof(new_goal->icon_path) - 1);
-            new_goal->texture = load_texture_with_scale_mode(t->renderer, new_goal->icon_path, SDL_SCALEMODE_NEAREST);
+            new_goal->texture = tracker_get_texture(t, new_goal->icon_path);
         }
 
 
@@ -1686,6 +1765,11 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     t->renderer = nullptr;
     t->template_data = nullptr;
 
+    // Initialize texture cache
+    t->texture_cache = nullptr;
+    t->texture_cache_count = 0;
+    t->texture_cache_capacity = 0;
+
     // Initialize all string buffers to empty strings
     t->advancement_template_path[0] = '\0';
     t->lang_path[0] = '\0';
@@ -1722,6 +1806,8 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     }
 
     // Load global background textures
+    // It's fine that this is calling load_texture_with_scale_mode directly instead of tracker_get_texture
+    // as this texture doesn't run risk of being loaded multiple times
     t->adv_bg = load_texture_with_scale_mode(t->renderer, "resources/gui/advancement_background.png",
                                              SDL_SCALEMODE_NEAREST);
     t->adv_bg_half_done = load_texture_with_scale_mode(t->renderer,
@@ -1807,14 +1893,12 @@ void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settin
 }
 
 // Periodically recheck file changes
-void tracker_update(Tracker *t, float *deltaTime) {
+void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
     // Use deltaTime for animations
     // game logic goes here
     (void) deltaTime;
 
-    struct AppSettings settings;
-    settings_load(&settings);
-    MC_Version version = settings_get_version_from_string(settings.version_str);
+    MC_Version version = settings_get_version_from_string(settings->version_str);
 
     // Legacy Snapshot Logic
     // ONLY USING SNAPSHOTTING LOGIC IF *NOT* USING StatsPerWorld MOD
@@ -1822,7 +1906,7 @@ void tracker_update(Tracker *t, float *deltaTime) {
     // per-world stat files, like mid-era versions, but still reading with IDs and not strings
     // If the version is legacy and the current world name doesn't match the snapshot's world name,
     // it means we've loaded a new world and need to take a new snapshot of the global stats
-    if (version <= MC_VERSION_1_6_4 && !settings.using_stats_per_world_legacy && strcmp(
+    if (version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy && strcmp(
             t->world_name, t->template_data->snapshot_world_name) != 0) {
         printf("[TRACKER] Legacy world change detected. Taking new stat snapshot for world: %s\n", t->world_name);
         tracker_snapshot_legacy_stats(t); // Take a new snapshot when StatsPerWorld is disabled in legacy version
@@ -2950,6 +3034,16 @@ void tracker_free(Tracker **tracker) {
     if (tracker && *tracker) {
         Tracker *t = *tracker;
 
+        // Free all textures in the cache
+        if (t->texture_cache) {
+            for (int i = 0; i < t->texture_cache_count; i++) {
+                if (t->texture_cache[i].texture) {
+                    SDL_DestroyTexture(t->texture_cache[i].texture);
+                }
+            }
+            free(t->texture_cache);
+        }
+
         if (t->minecraft_font) {
             TTF_CloseFont(t->minecraft_font);
         }
@@ -3033,19 +3127,17 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
     SDL_SetWindowTitle(t->window, title_buffer);
 }
 
-void tracker_print_debug_status(Tracker *t) {
+void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
     if (!t || !t->template_data) return;
 
-    struct AppSettings settings;
-    settings_load(&settings);
     cJSON *settings_json = cJSON_from_file(SETTINGS_FILE_PATH);
     cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : nullptr;
 
     // Also load the current game version used
-    MC_Version version = settings_get_version_from_string(settings.version_str);
+    MC_Version version = settings_get_version_from_string(settings->version_str);
 
     char formatted_category[128];
-    format_category_string(settings.category, formatted_category, sizeof(formatted_category));
+    format_category_string(settings->category, formatted_category, sizeof(formatted_category));
 
     // Format the time to DD:HH:MM:SS.MS
     char formatted_time[128];
@@ -3053,15 +3145,15 @@ void tracker_print_debug_status(Tracker *t) {
 
     printf("\n============================================================\n");
     printf(" World:      %s\n", t->world_name);
-    printf(" Version:    %s\n", settings.version_str);
+    printf(" Version:    %s\n", settings->version_str);
 
     // When category isn't empty
-    if (settings.category[0] != '\0') {
+    if (settings->category[0] != '\0') {
         printf(" Category:   %s\n", formatted_category);
     }
     // When flag isn't empty
-    if (settings.optional_flag[0] != '\0') {
-        printf(" Flag:       %s\n", settings.optional_flag);
+    if (settings->optional_flag[0] != '\0') {
+        printf(" Flag:       %s\n", settings->optional_flag);
     }
     printf(" Play Time:  %s\n", formatted_time);
     printf("============================================================\n");

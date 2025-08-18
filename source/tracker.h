@@ -15,38 +15,50 @@
 extern "C" {
 #endif // __cplusplus
 
+// A simple structure for a texture cache entry
+// To prevent loading the same SDL texture multiple times
+typedef struct {
+    char path[MAX_PATH_LENGTH];     // The path to the texture file
+    SDL_Texture *texture;           // The SDL_Texture object
+} TextureCacheEntry;
 
 struct Tracker {
-    SDL_Window *window;
-    SDL_Renderer *renderer;
+    SDL_Window *window;             // The main overlay window
+    SDL_Renderer *renderer;         // The main overlay renderer
 
-    SDL_Texture *adv_bg;
-    SDL_Texture *adv_bg_half_done;
-    SDL_Texture *adv_bg_done;
+    // --- Texture Cache ---
+    TextureCacheEntry *texture_cache; // Array of texture cache entries
+    int texture_cache_count;          // Number of entries in the cache
+    int texture_cache_capacity;       // Maximum capacity of the cache
 
-    ImVec2 camera_offset;
-    float zoom_level;
-    float time_since_last_update; // Timer displaying when the last update happened
+    // --- Global Textures ---
+    SDL_Texture *adv_bg;            // Texture for the default advancement background.
+    SDL_Texture *adv_bg_half_done;  // Texture for partially completed advancement/stat backgrounds.
+    SDL_Texture *adv_bg_done;       // Texture for completed advancement/stat backgrounds.
 
-    bool layout_locked; // Used for lock layout button
-    float locked_layout_width; // Used for lock layout button to save the width
+    // --- UI & Camera ---
+    ImVec2 camera_offset;           // The current panning offset of the main view.
+    float zoom_level;               // The current zoom level of the main view.
+    float time_since_last_update;   // Timer tracking seconds since the last data file update.
+    bool layout_locked;             // Flag to lock the grid layout width, preventing reflow on window resize.
+    float locked_layout_width;      // The saved width of the layout when it was locked.
 
-    ImFont *roboto_font; // Font for settings/UI -> USED BY IMGUI
-    TTF_Font *minecraft_font; // USED BY SDL_TTF
+    // --- Fonts ---
+    ImFont *roboto_font;            // ImGui font for the settings window UI.
+    TTF_Font *minecraft_font;       // SDL_TTF font for the overlay window.
 
-    // Single pointer to all the parsed and tracked game data
-    TemplateData *template_data;
+    // --- Core Data ---
+    TemplateData *template_data;    // A pointer to the struct holding all parsed template and progress data.
 
-    char advancement_template_path[MAX_PATH_LENGTH];
-    char lang_path[MAX_PATH_LENGTH];
-
-    // Path to the actual saves folder
-    char saves_path[MAX_PATH_LENGTH];
-    char world_name[MAX_PATH_LENGTH]; // To store the name of the current world for display
-    char advancements_path[MAX_PATH_LENGTH];
-    char unlocks_path[MAX_PATH_LENGTH];
-    char stats_path[MAX_PATH_LENGTH];
-    char snapshot_path[MAX_PATH_LENGTH]; // Path to the snapshot file for legacy snapshots
+    // --- File Paths ---
+    char advancement_template_path[MAX_PATH_LENGTH]; // Full path to the current template .json file.
+    char lang_path[MAX_PATH_LENGTH];                 // Full path to the current language .json file.
+    char saves_path[MAX_PATH_LENGTH];                // Path to the .minecraft/saves directory.
+    char world_name[MAX_PATH_LENGTH];                // Name of the most recently played world.
+    char advancements_path[MAX_PATH_LENGTH];         // Full path to the player's advancements .json file for the current world.
+    char unlocks_path[MAX_PATH_LENGTH];              // Full path to the player's unlocks .json file (if applicable).
+    char stats_path[MAX_PATH_LENGTH];                // Full path to the player's stats file (.json or .dat) for the current world.
+    char snapshot_path[MAX_PATH_LENGTH];             // Full path to the snapshot file for legacy stat tracking.
 };
 
 
@@ -86,15 +98,17 @@ void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settin
  *
  * @param t A pointer to the Tracker struct.
  * @param deltaTime A pointer to the frame's delta time, for future use in animations.
+ * @param settings A pointer to the loaded application settings.
  */
-void tracker_update(Tracker *t, float *deltaTime);
+void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings);
 
 /**
  * @brief Renders the tracker window's contents.
  *
+ * Currently UNUSED! -> tracker_render_gui()
  * This function clears the screen with the background color and will be responsible for drawing
  * all visual elements of the tracker, such as advancement icons, and so on.
- * Solely for non-ImGUI SDL rendering. Currently UNUSED! -> tracker_render_gui()
+ * Solely for non-ImGUI SDL rendering.
  *
  * @param t A pointer to the Tracker struct.
  * @param settings A pointer to the application settings containing color information.
@@ -141,6 +155,7 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings);
  * @brief Loads and parses all data from template and language files.
  *
  * It reads the main template JSON to get the structure of advancements, stats, and unlocks.
+ * If the template or language file does not exist, it will create empty skeleton files.
  * It also loads the corresponding language file for display names and then updates the progress
  * of each item by reading the player's actual save files.
  * For legacy versions it now only tries to read the snapshot file if the
@@ -176,11 +191,13 @@ void tracker_update_title(Tracker *t, const AppSettings *settings);
  * @brief Prints the current advancement status to the console.
  *
  * This function is for debugging and prints progress on advancements, stats, unlocks,
- * custom goals and multi-stage goals.
+ * custom goals and multi-stage goals. This function is only called when debug print
+ * is turned on in the settings.
  *
  * @param t A pointer to the Tracker struct.
+ * @param settings A pointer to the application settings.
  */
-void tracker_print_debug_status(Tracker *t);
+void tracker_print_debug_status(Tracker *t, const AppSettings *settings);
 
 #ifdef __cplusplus
 } // extern "C"
