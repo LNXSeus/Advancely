@@ -460,6 +460,7 @@ static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *p
         TrackableCategory *ach = t->template_data->advancements[i];
         ach->completed_criteria_count = 0;
         ach->done = false; // Reset done status
+        ach->all_template_criteria_met = false;
 
         cJSON *ach_entry = cJSON_GetObjectItem(player_stats_json, ach->root_name);
         if (!ach_entry) continue;
@@ -496,11 +497,22 @@ static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *p
 
         // Determine final 'done' status either when all criteria from template are done or game says so
         if (ach->criteria_count > 0) {
-            bool template_is_done = (ach->completed_criteria_count >= ach->criteria_count);
-            ach->done = game_is_done || template_is_done;
+            // Explicitly set the new flag for hiding logic
+            ach->all_template_criteria_met = (ach->completed_criteria_count >= ach->criteria_count);
+            ach->done = game_is_done || ach->all_template_criteria_met;
         } else {
+            ach->all_template_criteria_met = game_is_done;
             ach->done = game_is_done;
         }
+
+        // TODO: Remove this
+        // // Determine final 'done' status either when all criteria from template are done or game says so
+        // if (ach->criteria_count > 0) {
+        //     bool template_is_done = (ach->completed_criteria_count >= ach->criteria_count);
+        //     ach->done = game_is_done || template_is_done;
+        // } else {
+        //     ach->done = game_is_done;
+        // }
 
         // Increment completed achievement count
         if (ach->done) t->template_data->advancements_completed_count++;
@@ -592,6 +604,7 @@ static void tracker_update_advancements_modern(Tracker *t, const cJSON *player_a
         TrackableCategory *adv = t->template_data->advancements[i];
         adv->completed_criteria_count = 0;
         adv->done = false; // Reset done status before re-evaluating
+        adv->all_template_criteria_met = false;
 
         cJSON *player_entry = cJSON_GetObjectItem(player_adv_json, adv->root_name);
         // take root name (from template) from player advancements
@@ -616,10 +629,12 @@ static void tracker_update_advancements_modern(Tracker *t, const cJSON *player_a
             bool game_is_done = cJSON_IsTrue(cJSON_GetObjectItem(player_entry, "done"));
             if (adv->criteria_count > 0) {
                 // If template has criteria, it's done if the game says so OR all criteria are done
-                bool template_is_done (adv->completed_criteria_count >= adv->criteria_count);
-                adv->done = game_is_done || template_is_done;
+                // Explicitly set the new flag for hiding logic
+                adv->all_template_criteria_met = (adv->completed_criteria_count >= adv->criteria_count);
+                adv->done = game_is_done || adv->all_template_criteria_met;
             } else {
                 // If no criteria are in the template, fall back to the game file's "done" status
+                adv->all_template_criteria_met = game_is_done;
                 adv->done = game_is_done;
             }
 
@@ -1935,8 +1950,6 @@ void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
     }
 
     // Pass the parsed data to the update functions
-    // tracker_update_advancement_progress(t, player_adv_json); // TODO: Remove once possible
-    // tracker_update_stat_progress(t, player_stats_json, settings_json); // TODO: Remove once possible
     tracker_update_custom_progress(t, settings_json);
     tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json, player_unlocks_json, version);
     tracker_calculate_overall_progress(t, version); //THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
@@ -2049,14 +2062,41 @@ static void render_section_separator(Tracker *t, const AppSettings *settings, fl
 static void render_trackable_category_section(Tracker *t, const AppSettings *settings, float &current_y,
                                               TrackableCategory **categories, int count, const char *section_title,
                                               bool is_stat_section, MC_Version version) {
+
+    // Pre-computation and Filtering
     int visible_count = 0;
     for (int i = 0; i < count; ++i) {
-        if (categories[i] && (!categories[i]->done || !settings->remove_completed_goals)) {
+        TrackableCategory *cat = categories[i];
+        if (!cat) continue;
+
+        // Use the correct and complete hiding logic for the pre-filter
+        // Don't ever hide an advancement/achievement if it has incomplete criteria (wrongly added, but adv/ach would be done)
+        bool is_hidden = false;
+        if (settings->remove_completed_goals) {
+            if (is_stat_section) {
+                if (cat->done) is_hidden = true;
+            } else { // It's an advancement
+                if ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (cat->criteria_count == 0 && cat->done)) {
+                    is_hidden = true;
+                }
+            }
+        }
+
+        if (!is_hidden) {
             visible_count++;
-            break;
         }
     }
     if (visible_count == 0) return;
+
+    // TODO: Remove this
+    // int visible_count = 0;
+    // for (int i = 0; i < count; ++i) {
+    //     if (categories[i] && (!categories[i]->done || !settings->remove_completed_goals)) {
+    //         visible_count++;
+    //         break;
+    //     }
+    // }
+    // if (visible_count == 0) return;
 
     ImGuiIO &io = ImGui::GetIO();
 
@@ -2127,6 +2167,23 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 continue;
             }
 
+
+
+            // Render advancement criteria if count is > 0, render stat-category sub-stats if count is > 1
+            bool is_complex = false;
+            if (!is_stat_section) {
+                is_complex = cat && cat->criteria_count > 0;
+            } else {
+                is_complex = cat && cat->criteria_count > 1;
+            }
+
+            // TODO: Remove this
+            // if (!cat || (is_complex != complex_pass) || should_hide) continue;
+
+            // Check for the correct pass BEfORE checking if we should hide
+            // If it's not the right pass for this item, skip it immediately
+            if (!cat || (is_complex != complex_pass)) continue;
+
             // Determine if the item should be hidden by "Remove completed goals"
             // DOES NOT HIDE when advancement has wrong criteria, that are not in the game (modern versions)
             // DOES NOT HIDE when achievement value is 1 or higher and some template criteria are not met (mid-era versions)
@@ -2137,23 +2194,16 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     // Stats are simple: hide them if they are marked as done
                     if (cat->done)  should_hide = true;
                 } else { // It's an advancement
-                    bool template_criteria_are_met = (cat->completed_criteria_count >= cat->criteria_count);
+                    // Use unambiguous flag for hiding -> all_template_criteria_met
                     // Hide only if it has criteria AND they are all met, OR if it has NO criteria AND it's done
-                    if ((cat->criteria_count > 0 && template_criteria_are_met) || (cat->criteria_count == 0 && cat->done)) {
+                    if ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (cat->criteria_count == 0 && cat->done)) {
                         should_hide = true;
                     }
                 }
             }
 
-            // Render advancement criteria if count is > 0, render stat-category sub-stats if count is > 1
-            bool is_complex = false;
-            if (!is_stat_section) {
-                is_complex = cat && cat->criteria_count > 0;
-            } else {
-                is_complex = cat && cat->criteria_count > 1;
-            }
-
-            if (!cat || (is_complex != complex_pass) || should_hide) continue;
+            // If we should hide it, skip the rendering
+            if (should_hide) continue;
 
             // Prepare snapshot status text for legacy achievements (without mod)
             char snapshot_text[8] = "";
@@ -2885,8 +2935,9 @@ void tracker_reinit_template(Tracker *t, const AppSettings *settings) {
     if (t->template_data) {
         tracker_free_template_data(t->template_data);
 
+        // TODO: Remove this
         // Reset the entire to zero to clear dangling pointers and old counts.
-        memset(t->template_data, 0, sizeof(TemplateData));
+        // memset(t->template_data, 0, sizeof(TemplateData));
 
         // After clearing, ensure the snapshot name is also cleared to force a new snapshot
         t->template_data->snapshot_world_name[0] = '\0';
@@ -2966,10 +3017,11 @@ void tracker_load_and_parse_data(Tracker *t) {
         }
     }
 
-    t->template_data->lang_json = cJSON_from_file(t->lang_path);
-    if (!t->template_data->lang_json) {
+    // Declare lang_json as a local variable, this prevents memory leaks
+    cJSON *lang_json = cJSON_from_file(t->lang_path);
+    if (!lang_json) {
         // Handle case where lang file might still be missing for some reason
-        t->template_data->lang_json = cJSON_CreateObject();
+        lang_json = cJSON_CreateObject();
     }
 
     // Load settings.json to check for custom progress
@@ -2990,24 +3042,24 @@ void tracker_load_and_parse_data(Tracker *t) {
     MC_Version version = settings_get_version_from_string(settings.version_str);
     // Parse the 5 main categories
     // False as it's for advancements
-    tracker_parse_categories(t, advancements_json, t->template_data->lang_json, &t->template_data->advancements,
+    tracker_parse_categories(t, advancements_json, lang_json, &t->template_data->advancements,
                              &t->template_data->advancement_count, &t->template_data->total_criteria_count,
                              "advancement.", false, version);
 
     // True as it's for stats
-    tracker_parse_categories(t, stats_json, t->template_data->lang_json, &t->template_data->stats,
+    tracker_parse_categories(t, stats_json, lang_json, &t->template_data->stats,
                              &t->template_data->stat_count, &t->template_data->stat_total_criteria_count, "stat.",
                              true, version);
 
     // Parse "unlock." prefix for unlocks
-    tracker_parse_simple_trackables(t, unlocks_json, t->template_data->lang_json, &t->template_data->unlocks,
+    tracker_parse_simple_trackables(t, unlocks_json, lang_json, &t->template_data->unlocks,
                                     &t->template_data->unlock_count, "unlock.");
 
     // Parse "custom." prefix for custom goals
-    tracker_parse_simple_trackables(t, custom_json, t->template_data->lang_json, &t->template_data->custom_goals,
+    tracker_parse_simple_trackables(t, custom_json, lang_json, &t->template_data->custom_goals,
                                     &t->template_data->custom_goal_count, "custom.");
 
-    tracker_parse_multi_stage_goals(t, multi_stage_goals_json, t->template_data->lang_json,
+    tracker_parse_multi_stage_goals(t, multi_stage_goals_json, lang_json,
                                     &t->template_data->multi_stage_goals,
                                     &t->template_data->multi_stage_goal_count);
 
@@ -3021,10 +3073,10 @@ void tracker_load_and_parse_data(Tracker *t) {
     if (version <= MC_VERSION_1_6_4 && !settings.using_stats_per_world_legacy) {
         tracker_load_snapshot_from_file(t);
     }
+
     cJSON_Delete(template_json);
-    if (t->template_data->lang_json) {
-        cJSON_Delete(t->template_data->lang_json);
-        t->template_data->lang_json = nullptr;
+    if (lang_json) {
+        cJSON_Delete(lang_json);
     }
     // No need to delete settings_json, because it's not parsed, handled in tracker_update()
 }

@@ -174,6 +174,12 @@ struct TrackableCategory {
 
     bool done;
     bool is_manually_completed; // For manually overriding stats (as they have criteria now with sub-stats)
+    // To set an advancement/achievement to done when all the template criteria are met.
+    // When game says advancement is done, then the advancement gets visually marked as done with the done background.
+    // There could be a mistake in the template file, that an advancement has criteria that don't exist in the game,
+    // then it should keep the advancement completed, but still display it even if "remove completed goals" is on.
+    // It will then continue displaying with the other incorrect criteria for debugging.
+    bool all_template_criteria_met;
     bool done_in_snapshot; // For legacy stat snapshotting (for achievements)
     int progress;
     int goal;
@@ -255,7 +261,8 @@ struct TemplateData {
     long long playtime_snapshot; // Stores playtime at world load for legacy versions
     char snapshot_world_name[MAX_PATH_LENGTH]; // The world the current snapshot belongs to
 
-    cJSON *lang_json; // The loaded language file for display names
+    // TODO: Remove this later
+    // cJSON *lang_json; // The loaded language file for display names
 };
 
 // PATHMODE AND VERSION STUFF
