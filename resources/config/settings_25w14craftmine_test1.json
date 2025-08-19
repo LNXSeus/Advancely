@@ -11,7 +11,8 @@
     "always_on_top": true,
     "overlay_scroll_speed": 1,
     "goal_align_left": true,
-    "remove_completed_goals": true
+    "remove_completed_goals": true,
+    "print_debug_status": false
   },
   "stat_progress_override": {
     "stat_category:3_armor_trims": false,

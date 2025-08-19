@@ -266,8 +266,8 @@ int main(int argc, char *argv[]) {
                 // Now update progress with the correct paths
                 tracker_update(tracker, &deltaTime, &app_settings);
 
-                // TODO: Print debug info to console based on settings
-                tracker_print_debug_status(tracker, &app_settings);
+                // Print debug status based on settings
+                if (app_settings.print_debug_status) tracker_print_debug_status(tracker, &app_settings);
 
                 // Update TITLE of the tracker window with some info, similar to the debug print
                 tracker_update_title(tracker, &app_settings);

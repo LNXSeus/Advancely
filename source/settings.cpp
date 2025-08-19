@@ -45,6 +45,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         temp_settings.path_mode = path_mode_is_auto ? PATH_MODE_AUTO : PATH_MODE_MANUAL;
     }
 
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Automatically finds the default Minecraft saves path for your OS:\n"
+                          "Windows: %%APPDATA%%\\.minecraft\\saves\n"
+                          "Linux: ~/.minecraft/saves\n"
+                          "macOS: ~/Library/Application Support/minecraft/saves");
+    }
+
     if (temp_settings.path_mode == PATH_MODE_MANUAL) {
         ImGui::Indent();
         ImGui::InputText("Manual Saves Path", temp_settings.manual_saves_path, MAX_PATH_LENGTH);
@@ -77,6 +84,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     MC_Version selected_version = settings_get_version_from_string(temp_settings.version_str);
     if (selected_version <= MC_VERSION_1_6_4) {
         ImGui::Checkbox("Using StatsPerWorld Mod", &temp_settings.using_stats_per_world_legacy);
+
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("The StatsPerWorld Mod in combination with Legacy Fabric allows legacy versions of Minecraft\n"
+                              "to track stats locally per world and not globally. Check this if you're using this mod.\n"
+                              "If unchecked, the tracker will use a snapshotting system to simulate per-world achievements/stats.\n"
+                              "Then, achievements will even indicate if they have been completed on a previous world or on your current one.");
+        }
     }
 
     ImGui::InputText("Category", temp_settings.category, MAX_PATH_LENGTH);
@@ -88,7 +102,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // General Settings
     ImGui::Text("General Settings");
     ImGui::Checkbox("Enable Overlay", &temp_settings.enable_overlay);
-    ImGui::DragFloat("FPS Limit", &temp_settings.fps, 1.0f, 10.0f, 500.0f, "%.0f");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Enables a separate window for streaming.\n"
+                          "Use a color key filter in your streaming software on the 'Overlay BG' hex color.\n"
+                          "A negative scroll speed animates from right-to-left.");
+    }
+
+    // This toggles the framerate of everything
+    ImGui::DragFloat("FPS Limit", &temp_settings.fps, 1.0f, 10.0f, 540.0f, "%.0f");
 
     // Conditionally display overlay related settings
     if (temp_settings.enable_overlay) {
@@ -96,12 +117,21 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     ImGui::Checkbox("Always on top", &temp_settings.tracker_always_on_top);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Forces the tracker window to always display above any other window.");
+    }
     ImGui::SameLine();
     ImGui::Checkbox("Remove completed goals", &temp_settings.remove_completed_goals);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Hides fully completed goals and sub-goals to tidy up the view.");
+    }
 
     if (temp_settings.enable_overlay) {
         ImGui::SameLine();
         ImGui::Checkbox("Goal align left", &temp_settings.goal_align_left);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("When enabled, multi-stage goals and custom goals will fill in from the left, otherwise from the right.");
+        }
     }
 
     ImGui::Separator();
@@ -142,6 +172,16 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::Separator();
     ImGui::Spacing();
 
+    ImGui::Text("Debug Settings");
+
+    ImGui::Checkbox("Print Debug To Console", &temp_settings.print_debug_status);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Requires running the application from a console (like MSYS2 MINGW64)\nto see the output. Just navigate to the path and execute with \"./Advancely\".");
+    }
+
+    ImGui::Separator();
+    ImGui::Spacing();
+
     // Apply the changes
     if (ImGui::Button("Apply settings")) {
 
@@ -168,7 +208,24 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         // Reset the temporary settings struct to the default values
         settings_set_defaults(&temp_settings);
     }
-
+    // TODO: Add default values always to this tooltip here
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Resets all settings in this window to their default values.\n"
+                          "This does not modify your template files.\n\n"
+                          "Defaults:\n"
+                          "  - Path Mode: Auto-detect\n"
+                          "  - Version: 1.16.1\n"
+                          "  - Category: test\n"
+                          "  - Optional Flag: 1\n"
+                          "  - Overlay: Disabled\n"
+                          "  - StatsPerWorld Mod: Enabled\n"
+                          "  - Always on top: Enabled\n"
+                          "  - Remove completed: Enabled\n"
+                          "  - Goal align left: Enabled\n"
+                          "  - Print Debug To Console: Disabled\n"
+                          "  - FPS Limit: 60\n"
+                          "  - Overlay Scroll Speed: 1.00");
+    }
 
     if (roboto_font) {
         ImGui::PopFont();

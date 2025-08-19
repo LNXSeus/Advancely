@@ -2865,8 +2865,10 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
     // Add padding and space for the checkbox square
     ImVec2 lock_button_size = ImVec2(lock_button_text_size.x + 25.0f, lock_button_text_size.y + 8.0f);
     ImVec2 reset_button_size = ImVec2(reset_button_text_size.x + 25.0f, reset_button_text_size.y + 8.0f);
+
+    // TODO: Adjust this for more buttons, with 3 buttons it's padding * 2.0f, 4 buttons is 3.0f and so on (in addition to button)
     float buttons_total_width = lock_button_size.x + reset_button_size.x + button_padding;
-    // TODO: Adjust this for more buttons
+
 
     // Position a new transparent window in the bottom right to hold the buttons
     ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - buttons_total_width - button_padding,
@@ -2903,6 +2905,10 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
         }
     }
 
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Prevents the layout from rearranging when zooming or resizing the window.");
+    }
+
     ImGui::SameLine();
 
     // "Reset Layout" checkbox (acts as a button), it turns off the lock layout
@@ -2912,6 +2918,10 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
         t->zoom_level = 1.0f;
         t->layout_locked = false; // Unlocks the layout
         reset_dummy = false; // Ensure it's getting unchecked
+    }
+
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Resets camera position and zoom level to their defaults.");
     }
 
     ImGui::PopStyleColor(5); // Pop the style colors, there's 5 of them
