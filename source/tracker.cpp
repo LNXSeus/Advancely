@@ -120,6 +120,7 @@ static SDL_Texture *tracker_get_texture(Tracker *t, const char *path) {
 /**
  * @brief Loads a GIF, converting its frames into an AnimatedTexture struct.
  * If the GIF has no frame timing information, a default delay is applied to each frame.
+ * If the GIF isn't square-shaped, it is scaled to be square, that it renders properly.
  * @param renderer The SDL_Renderer to create textures with.
  * @param path The path to the .gif file.
  * @return A pointer to a newly allocated AnimatedTexture, or nullptr on failure.
@@ -153,7 +154,161 @@ static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *pa
     Uint32 total_duration = 0;
     for (int i = 0; i < anim->count; i++) {
         SDL_Surface *frame_surface = anim->frames[i];
-        anim_texture->frames[i] = SDL_CreateTextureFromSurface(renderer, frame_surface);
+        SDL_Texture *final_frame_texture = NULL;
+
+        const int w = frame_surface->w;
+        const int h = frame_surface->h;
+
+        // If the frame is not square, use the renderer to create a new padded square texture.
+        if (w != h) {
+            const int side = (w > h) ? w : h;
+
+            // 1. Create a temporary texture from the original non-square surface.
+            SDL_Texture* temp_texture = SDL_CreateTextureFromSurface(renderer, frame_surface);
+            if (!temp_texture) {
+                SDL_Log("Failed to create temporary texture from GIF frame: %s", SDL_GetError());
+                anim_texture->frames[i] = NULL; // Mark as failed
+                continue; // Skip to next frame
+            }
+
+            // 2. Create the new, blank square texture. It must be a "render target".
+            final_frame_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, side, side);
+            if (final_frame_texture) {
+                // Make the texture support transparency
+                SDL_SetTextureBlendMode(final_frame_texture, SDL_BLENDMODE_BLEND);
+
+                // 3. Set the renderer to draw onto our new texture instead of the window.
+                SDL_SetRenderTarget(renderer, final_frame_texture);
+
+                // 4. Clear the new texture with a fully transparent color.
+                SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+                SDL_RenderClear(renderer);
+
+                // 5. Define where the original image will be drawn on the new texture.
+                SDL_FRect dest_rect = { (float)(side - w) / 2.0f, (float)(side - h) / 2.0f, (float)w, (float)h };
+
+                // 6. Render the temporary texture onto our new square texture.
+                SDL_RenderTexture(renderer, temp_texture, NULL, &dest_rect);
+
+                // 7. Reset the renderer to draw back to the window.
+                SDL_SetRenderTarget(renderer, NULL);
+            }
+
+            // 8. Clean up the temporary texture.
+            SDL_DestroyTexture(temp_texture);
+        } else {
+            // If the frame was already square, just create the texture directly.
+            final_frame_texture = SDL_CreateTextureFromSurface(renderer, frame_surface);
+        }
+
+        anim_texture->frames[i] = final_frame_texture;
+
+        if (!anim_texture->frames[i]) {
+            fprintf(stderr, "[TRACKER - GIF LOAD] Failed to create texture for frame %d from %s\n", i, path);
+            // Cleanup if a frame texture fails to create
+            free(anim_texture->frames);
+            free(anim_texture->delays);
+            free(anim_texture);
+            IMG_FreeAnimation(anim);
+            return nullptr;
+        }
+    // TODO: Remove
+    // Uint32 total_duration = 0;
+    // for (int i = 0; i < anim->count; i++) {
+    //     SDL_Surface *frame_surface = anim->frames[i];
+    //     SDL_Surface *surface_for_texture = NULL;
+    //
+    //     const int w = frame_surface->w;
+    //     const int h = frame_surface->h;
+    //
+    //     // If the frame is not square, create a new square canvas and center it.
+    //     if (w != h) {
+    //         const int side = (w > h) ? w : h; // The new dimension is the larger of the two sides.
+    //
+    //         // Define where the original image will be placed on the new canvas.
+    //         SDL_Rect dest_rect = { (side - w) / 2, (side - h) / 2, w, h };
+    //
+    //         // Create the new square canvas with a format that supports transparency.
+    //         SDL_Surface* square_canvas = SDL_CreateSurface(side, side, SDL_PIXELFORMAT_RGBA32);
+    //         if (square_canvas) {
+    //             // Fill the canvas with a fully transparent color (R=0,G=0,B=0,A=0).
+    //             SDL_FillSurfaceRect(square_canvas, NULL, 0x00000000);
+    //
+    //             // For a clean copy, we ensure the source frame is in the same format before blitting.
+    //             SDL_Surface* converted_frame = SDL_ConvertSurface(frame_surface, SDL_PIXELFORMAT_RGBA32);
+    //             if (converted_frame) {
+    //                 // Use SDL_BLENDMODE_NONE for a direct pixel copy with blending.
+    //                 SDL_SetSurfaceBlendMode(converted_frame, SDL_BLENDMODE_BLEND);
+    //                 SDL_BlitSurface(converted_frame, NULL, square_canvas, &dest_rect);
+    //                 SDL_DestroySurface(converted_frame);
+    //             }
+    //
+    //             // This new square canvas is what we'll use to create the texture.
+    //             surface_for_texture = square_canvas;
+    //         }
+    //     }
+    //
+    //     // If the image was already square, or if creating the padded version failed,
+    //     // we just convert the original surface to the standard format.
+    //     if (!surface_for_texture) {
+    //         surface_for_texture = SDL_ConvertSurface(frame_surface, SDL_PIXELFORMAT_RGBA32);
+    //     }
+    //
+    //     // Create the final texture from our processed surface.
+    //     if (surface_for_texture) {
+    //
+    //         // TODO: DEBUG CODE
+    //         // --- START DEBUGGING CODE ---
+    //         // This will save the intermediate surface to a PNG file if it was non-square.
+    //         // Check the folder where Advancely.exe is located for "debug_frame_X.png".
+    //         if (w != h) {
+    //             static int debug_frame_count = 0; // Use a static counter for unique filenames
+    //             char debug_filename[256];
+    //             snprintf(debug_filename, sizeof(debug_filename), "debug_frame_%d.png", debug_frame_count++);
+    //
+    //             printf("DEBUG: Saving non-square frame to %s (Original: %dx%d, Padded: %dx%d)\n",
+    //                    debug_filename, w, h, surface_for_texture->w, surface_for_texture->h);
+    //
+    //             IMG_SavePNG(surface_for_texture, debug_filename);
+    //         }
+    //         // --- END DEBUGGING CODE ---
+    //
+    //         anim_texture->frames[i] = SDL_CreateTextureFromSurface(renderer, surface_for_texture);
+    //         SDL_DestroySurface(surface_for_texture); // Clean up the intermediate surface.
+    //     } else {
+    //         SDL_Log("Could not create intermediate surface for GIF frame: %s", SDL_GetError());
+    //         anim_texture->frames[i] = NULL;
+    //     }
+    //
+    //     if (!anim_texture->frames[i]) {
+    //         fprintf(stderr, "[TRACKER - GIF LOAD] Failed to create texture for frame %d from %s\n", i, path);
+    //         // Cleanup if a frame texture fails to create
+    //         free(anim_texture->frames);
+    //         free(anim_texture->delays);
+    //         free(anim_texture);
+    //         IMG_FreeAnimation(anim);
+    //         return nullptr;
+    //     }
+
+    // TODO: Remove this
+    // Uint32 total_duration = 0;
+    // for (int i = 0; i < anim->count; i++) {
+    //     SDL_Surface *frame_surface = anim->frames[i];
+    //
+    //     // Create a new surface with a consistent pixel format to ensure correct dimensions
+    //     // This prevents scaling issues with GIF frames by normalizing them before creating a texture,
+    //     // mirroring the process used for PNG files.
+    //
+    //     SDL_Surface *formatted_surface = SDL_CreateSurface(frame_surface->w, frame_surface->h, SDL_PIXELFORMAT_RGBA32);
+    //     if (formatted_surface) {
+    //         SDL_BlitSurface(frame_surface, nullptr, formatted_surface, nullptr);
+    //         anim_texture->frames[i] = SDL_CreateTextureFromSurface(renderer, formatted_surface);
+    //         SDL_DestroySurface(formatted_surface); // Clean up the intermediate surface
+    //     } else {
+    //         // Fallback to original method on format failure
+    //         anim_texture->frames[i] = SDL_CreateTextureFromSurface(renderer, frame_surface);
+    //     }
+
         SDL_SetTextureBlendMode(anim_texture->frames[i], SDL_BLENDMODE_BLEND);
         SDL_SetTextureScaleMode(anim_texture->frames[i], SDL_SCALEMODE_NEAREST);
         anim_texture->delays[i] = anim->delays[i];
@@ -1687,9 +1842,6 @@ static void tracker_calculate_overall_progress(Tracker *t, MC_Version version) {
     total_steps += t->template_data->total_criteria_count;
     completed_steps += t->template_data->completed_criteria_count;
 
-    printf("Total criteria count: %d\n", t->template_data->total_criteria_count);
-    printf("Completed criteria count: %d\n", t->template_data->completed_criteria_count);
-
     // Stats:
     // - For multi-criteria stats, each criterion is a step.
     // - For single-criterion stats, the parent category itself is one step.
@@ -1719,11 +1871,16 @@ static void tracker_calculate_overall_progress(Tracker *t, MC_Version version) {
         completed_steps += t->template_data->multi_stage_goals[i]->current_stage;
     }
 
+    printf("Completed steps for progress: %d\n", completed_steps);
+    printf("Total step for progress: %d\n", total_steps);
+
+
     // Set 100% if no steps are found
     if (total_steps > 0) {
         t->template_data->overall_progress_percentage = ((float) completed_steps / (float) total_steps) * 100.0f;
     } else {
-        t->template_data->overall_progress_percentage = 100.0f; // Default to 100% if no trackable items
+        // Default to 100% if no criteria, stats, unlocks, custom goals or stages
+        t->template_data->overall_progress_percentage = 100.0f;
     }
 }
 
@@ -2440,18 +2597,22 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 // Get texture dimensions to calculate aspect ratio
                 float tex_w = 0.0f, tex_h = 0.0f;
                 SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
-                float aspect_ratio = (tex_h != 0) ? (tex_w / tex_h) : 1.0f;
 
                 // Define the target box size (64x64 for parent icons)
                 ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
 
-                // Calculate scaled dimensions to fit inside the box
-                ImVec2 scaled_size = target_box_size;
-                if (aspect_ratio > 1.0f) { // Wider than tall
-                    scaled_size.y = scaled_size.x / aspect_ratio;
-                } else { // Taller than wide or square
-                    scaled_size.x = scaled_size.y * aspect_ratio;
-                }
+                // Calculate scaled dimensions to fit inside the box while maintaining aspect ratio
+                float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
+                ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
+
+                // TODO: Remove
+                // // Calculate scaled dimensions to fit inside the box
+                // ImVec2 scaled_size = target_box_size;
+                // if (aspect_ratio > 1.0f) { // Wider than tall
+                //     scaled_size.y = scaled_size.x / aspect_ratio;
+                // } else { // Taller than wide or square
+                //     scaled_size.x = scaled_size.y * aspect_ratio;
+                // }
 
                 // Center the image within the 16,16 to 80,80 space
                 // Define the top-left of the icon box area (inside the 96x96 background)
@@ -2538,15 +2699,13 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                          // Get texture dimensions as floats
                          float tex_w = 0.0f, tex_h = 0.0f;
                          SDL_GetTextureSize(crit_texture_to_draw, &tex_w, &tex_h);
-                         float aspect_ratio = (tex_h != 0) ? (tex_w / tex_h) : 1.0f;
 
                          // Define the target box size (32x32 for criteria)
                          ImVec2 target_box_size = ImVec2(32.0f * t->zoom_level, 32.0f * t->zoom_level);
 
-                         // Calculate scaled dimensions to fit inside the box
-                         ImVec2 scaled_size = target_box_size;
-                         if (aspect_ratio > 1.0f) { scaled_size.y = scaled_size.x / aspect_ratio; }
-                         else { scaled_size.x = scaled_size.y * aspect_ratio; }
+                         // Calculate scaled dimensions to fit inside the box while maintaining aspect ratio
+                         float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
+                         ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
 
                          // Center the scaled image within the 32x32 area
                          ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f, (target_box_size.y - scaled_size.y) * 0.5f);
@@ -2559,61 +2718,6 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                          // Draw the final image with correct scaling, centering, and tint
                          draw_list->AddImage((void *)crit_texture_to_draw, p_min, p_max, ImVec2(0, 0), ImVec2(1, 1), icon_tint);
                      }
-
-                    // TODO: Remove this
-                    // SDL_Texture *crit_texture_to_draw = nullptr;
-                    // if (crit->anim_texture && crit->anim_texture->frame_count > 0) {
-                    //     // also making a NULL check for the 'delays' pointer
-                    //     if (crit->anim_texture->delays && crit->anim_texture->total_duration > 0) {
-                    //         Uint32 current_time = SDL_GetTicks();
-                    //         Uint32 elapsed_time = current_time % crit->anim_texture->total_duration;
-                    //
-                    //         int current_frame = 0;
-                    //         Uint32 time_sum = 0;
-                    //         for (int frame_idx = 0; frame_idx < crit->anim_texture->frame_count; ++frame_idx) {
-                    //             time_sum += crit->anim_texture->delays[frame_idx];
-                    //             if (elapsed_time < time_sum) {
-                    //                 current_frame = frame_idx;
-                    //                 break;
-                    //             }
-                    //         }
-                    //         crit_texture_to_draw = crit->anim_texture->frames[current_frame];
-                    //     } else {
-                    //         crit_texture_to_draw = crit->anim_texture->frames[0];
-                    //     }
-                    // } else if (crit->texture) {
-                    //     crit_texture_to_draw = crit->texture;
-                    // }
-                    //
-                    // if (crit_texture_to_draw) {
-                    //     // Get texture dimensions to calculate aspect ratio
-                    //     float tex_w = 0.0f, tex_h = 0.0f;
-                    //     SDL_GetTextureSize(crit_texture_to_draw, &tex_w, &tex_h);
-                    //     float aspect_ratio = (tex_h != 0) ? (tex_w / tex_h) : 1.0f;
-                    //
-                    //     // Define the target box size (64x64 for parent icons)
-                    //     ImVec2 target_box_size = ImVec2(32.0f * t->zoom_level, 32.0f * t->zoom_level);
-                    //
-                    //     // Calculate scaled dimensions to fit inside the box
-                    //     ImVec2 scaled_size = target_box_size;
-                    //     if (aspect_ratio > 1.0f) { // Wider than tall
-                    //         scaled_size.y = scaled_size.x / aspect_ratio;
-                    //     } else { // Taller than wide or square
-                    //         scaled_size.x = scaled_size.y * aspect_ratio;
-                    //     }
-                    //
-                    //     // Center the image within the 16,16 to 80,80 space
-                    //     // Define the top-left of the icon box area (inside the 96x96 background)
-                    //     ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
-                    //     // Calculate padding needed to center the scaled image within the box
-                    //     ImVec2 padding_to_center = ImVec2((target_box_size.x - scaled_size.x) * 0.5f, (target_box_size.y - scaled_size.y) * 0.5f);
-                    //
-                    //     // The final top-left and bottom-right corners for drawing
-                    //     ImVec2 p_min = ImVec2(box_p_min.x + padding_to_center.x, box_p_min.y + padding_to_center.y);
-                    //     ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
-                    //
-                    //     draw_list->AddImage((void *)crit_texture_to_draw, p_min, p_max);
-                    // }
 
                     // TODO: Remove this
                     // // Draw Icon
@@ -2818,19 +2922,12 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
             // Call the function directly without casting ---
             SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
 
-            // --- FIX: No need to cast here as variables are already floats
-            float aspect_ratio = (tex_h != 0) ? (tex_w / tex_h) : 1.0f;
-
             // Define the target box size (64x64 for parent icons)
             ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
 
-            // Calculate scaled dimensions to fit inside the box
-            ImVec2 scaled_size = target_box_size;
-            if (aspect_ratio > 1.0f) { // Wider than tall
-                scaled_size.y = scaled_size.x / aspect_ratio;
-            } else { // Taller than wide or square
-                scaled_size.x = scaled_size.y * aspect_ratio;
-            }
+            // Calculate scaled dimensions to fit inside the box while maintaining aspect ratio
+            float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
+            ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
 
             // Define the top-left of the icon box area (inside the 96x96 background)
             ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
@@ -2980,19 +3077,12 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             // Call the function directly without casting ---
             SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
 
-            // --- FIX: No need to cast here as variables are already floats
-            float aspect_ratio = (tex_h != 0) ? (tex_w / tex_h) : 1.0f;
-
             // Define the target box size (64x64 for parent icons)
             ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
 
-            // Calculate scaled dimensions to fit inside the box
-            ImVec2 scaled_size = target_box_size;
-            if (aspect_ratio > 1.0f) { // Wider than tall
-                scaled_size.y = scaled_size.x / aspect_ratio;
-            } else { // Taller than wide or square
-                scaled_size.x = scaled_size.y * aspect_ratio;
-            }
+            // Calculate scaled dimensions to fit inside the box while maintaining aspect ratio
+            float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
+            ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
 
             // Define the top-left of the icon box area (inside the 96x96 background)
             ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
@@ -3171,19 +3261,12 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             // Call the function directly without casting ---
             SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
 
-            // --- FIX: No need to cast here as variables are already floats
-            float aspect_ratio = (tex_h != 0) ? (tex_w / tex_h) : 1.0f;
-
             // Define the target box size (64x64 for parent icons)
             ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
 
-            // Calculate scaled dimensions to fit inside the box
-            ImVec2 scaled_size = target_box_size;
-            if (aspect_ratio > 1.0f) { // Wider than tall
-                scaled_size.y = scaled_size.x / aspect_ratio;
-            } else { // Taller than wide or square
-                scaled_size.x = scaled_size.y * aspect_ratio;
-            }
+            // Calculate scaled dimensions to fit inside the box while maintaining aspect ratio
+            float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
+            ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
 
             // Define the top-left of the icon box area (inside the 96x96 background)
             ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
