@@ -210,21 +210,36 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
     // TODO: Add default values always to this tooltip here
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Resets all settings in this window to their default values.\n"
-                          "This does not modify your template files.\n\n"
-                          "Defaults:\n"
-                          "  - Path Mode: Auto-detect\n"
-                          "  - Version: 1.16.1\n"
-                          "  - Category: test\n"
-                          "  - Optional Flag: 1\n"
-                          "  - Overlay: Disabled\n"
-                          "  - StatsPerWorld Mod: Enabled\n"
-                          "  - Always on top: Enabled\n"
-                          "  - Remove completed: Enabled\n"
-                          "  - Goal align left: Enabled\n"
-                          "  - Print Debug To Console: Disabled\n"
-                          "  - FPS Limit: 60\n"
-                          "  - Overlay Scroll Speed: 1.00");
+        char tooltip_buffer[1024];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+            "Resets all settings in this window to their default values.\n"
+            "This does not modify your template files.\n\n"
+            "Defaults:\n"
+            "  - Path Mode: Auto-detect\n"
+            "  - Version: %s\n"
+            "  - Category: %s\n"
+            "  - Optional Flag: %s\n"
+            "  - Overlay: %s\n"
+            "  - StatsPerWorld Mod (1.0-1.6.4): %s\n"
+            "  - Always on top: %s\n"
+            "  - Remove completed: %s\n"
+            "  - Goal align left: %s\n"
+            "  - Print Debug To Console: %s\n"
+            "  - FPS Limit: %d\n"
+            "  - Overlay Scroll Speed: %.2f",
+            DEFAULT_VERSION,
+            DEFAULT_CATEGORY,
+            DEFAULT_OPTIONAL_FLAG,
+            DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
+            DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
+            DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
+            DEFAULT_REMOVE_COMPLETED_GOALS ? "Enabled" : "Disabled",
+            DEFAULT_GOAL_ALIGN_LEFT ? "Enabled" : "Disabled",
+            DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled",
+            DEFAULT_FPS,
+            DEFAULT_OVERLAY_SCROLL_SPEED
+        );
+        ImGui::SetTooltip(tooltip_buffer);
     }
 
     if (roboto_font) {
