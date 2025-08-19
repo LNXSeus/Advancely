@@ -2346,7 +2346,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
     }
 
     float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
-    const float horizontal_spacing = 32.0f, vertical_spacing = 48.0f;
+
+    // Adjust vertical spacing or horizontal spacing -> need to do this for all render_*_section functions
+    // Originally 32.0f and 48.0f
+    const float horizontal_spacing = 8.0f, vertical_spacing = 16.0f;
 
     // complex_pass = false -> Render all advancements/stats with no criteria or sub-stats (simple items)
     // complex_pass = true -> Render all advancements/stats with criteria or sub-stats (complex items)
@@ -2509,15 +2512,6 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
                 ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
 
-                // TODO: Remove
-                // // Calculate scaled dimensions to fit inside the box
-                // ImVec2 scaled_size = target_box_size;
-                // if (aspect_ratio > 1.0f) { // Wider than tall
-                //     scaled_size.y = scaled_size.x / aspect_ratio;
-                // } else { // Taller than wide or square
-                //     scaled_size.x = scaled_size.y * aspect_ratio;
-                // }
-
                 // Center the image within the 16,16 to 80,80 space
                 // Define the top-left of the icon box area (inside the 96x96 background)
                 ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
@@ -2531,15 +2525,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 draw_list->AddImage((void *)texture_to_draw, p_min, p_max);
             }
 
-            // TODO: Remove this
-            // if (cat->texture)
-            //     draw_list->AddImage((void *) cat->texture,
-            //                         ImVec2(screen_pos.x + 16.0f * t->zoom_level,
-            //                                screen_pos.y + 16.0f * t->zoom_level),
-            //                         ImVec2(screen_pos.x + 80.0f * t->zoom_level,
-            //                                screen_pos.y + 80.0f * t->zoom_level));
-
-            float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level;
+            // TODO: Here you can adjust the padding between goal background texture and text, change the float value
+            // You need to apply it to all four rendering functions render_*_section
+            float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
             draw_list->AddText(nullptr, 16.0f * t->zoom_level,
                                ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
                                       text_y_pos), text_color, cat->display_name);
@@ -2623,16 +2611,6 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                          draw_list->AddImage((void *)crit_texture_to_draw, p_min, p_max, ImVec2(0, 0), ImVec2(1, 1), icon_tint);
                      }
 
-                    // TODO: Remove this
-                    // // Draw Icon
-                    // if (crit->texture) {
-                    //     ImU32 icon_tint = crit->done ? icon_tint_faded : IM_COL32_WHITE;
-                    //
-                    //     draw_list->AddImage((void *) crit->texture, crit_base_pos,
-                    //                         ImVec2(crit_base_pos.x + 32 * t->zoom_level,
-                    //                                crit_base_pos.y + 32 * t->zoom_level), ImVec2(0, 0), ImVec2(1, 1),
-                    //                         icon_tint);
-                    // }
                     current_element_x += 32 * t->zoom_level + 4 * t->zoom_level;
 
                     // Draw Checkbox for Sub-Stat
@@ -2772,7 +2750,10 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
     }
 
     float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
-    const float horizontal_spacing = 32.0f, vertical_spacing = 48.0f;
+
+    // Adjust vertical spacing or horizontal spacing -> need to do this for all render_*_section functions
+    // Originally 32.0f and 48.0f
+    const float horizontal_spacing = 8.0f, vertical_spacing = 16.0f;
 
     for (int i = 0; i < count; i++) {
         TrackableItem *item = items[i];
@@ -2845,17 +2826,12 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
             draw_list->AddImage((void *)texture_to_draw, p_min, p_max);
         }
 
-        // TODO: Remove this
-        // if (item->texture)
-        //     draw_list->AddImage((void *) item->texture,
-        //                         ImVec2(screen_pos.x + 16.0f * t->zoom_level,
-        //                                screen_pos.y + 16.0f * t->zoom_level),
-        //                         ImVec2(screen_pos.x + 80.0f * t->zoom_level,
-        //                                screen_pos.y + 80.0f * t->zoom_level));
         ImVec2 text_size = ImGui::CalcTextSize(item->display_name);
+
+        // The 4.0f is for padding between the text and the background
         draw_list->AddText(nullptr, 16.0f * t->zoom_level,
-                           ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
-                                  screen_pos.y + bg_size.y * t->zoom_level), text_color, item->display_name);
+                          ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
+                                 screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level)), text_color, item->display_name);
 
         current_x += uniform_item_width + horizontal_spacing;
         row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
@@ -2908,7 +2884,10 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
     }
 
     float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
-    const float horizontal_spacing = 32.0f, vertical_spacing = 48.0f;
+
+    // Adjust vertical spacing or horizontal spacing -> need to do this for all render_*_section functions
+    // Originally 32.0f and 48.0f
+    const float horizontal_spacing = 8.0f, vertical_spacing = 16.0f;
 
     for (int i = 0; i < count; i++) {
         TrackableItem *item = t->template_data->custom_goals[i];
@@ -3000,22 +2979,16 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             draw_list->AddImage((void *)texture_to_draw, p_min, p_max);
         }
 
-        // TODO: Remove this
-        // if (item->texture)
-        //     draw_list->AddImage((void *) item->texture,
-        //                         ImVec2(screen_pos.x + 16.0f * t->zoom_level,
-        //                                screen_pos.y + 16.0f * t->zoom_level),
-        //                         ImVec2(screen_pos.x + 80.0f * t->zoom_level,
-        //                                screen_pos.y + 80.0f * t->zoom_level));
 
+        // The 4.0f is for padding, can be adjusted
         draw_list->AddText(nullptr, 16.0f * t->zoom_level,
                            ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
-                                  screen_pos.y + bg_size.y * t->zoom_level), text_color, item->display_name);
+                                  screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level)), text_color, item->display_name);
         if (progress_text[0] != '\0') {
             draw_list->AddText(nullptr, 14.0f * t->zoom_level,
                                ImVec2(
                                    screen_pos.x + (bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level) *
-                                   0.5f, screen_pos.y + (bg_size.y + text_size.y + 4.0f) * t->zoom_level), text_color,
+                                   0.5f, screen_pos.y + (bg_size.y + text_size.y + 4.0f) * t->zoom_level + (4.0f * t->zoom_level)), text_color,
                                progress_text);
         }
 
@@ -3093,7 +3066,9 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
     }
 
     float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
-    const float horizontal_spacing = 32.0f, vertical_spacing = 48.0f;
+    // Adjust vertical spacing or horizontal spacing -> need to do this for all render_*_section functions
+    // Originally 32.0f and 48.0f
+    const float horizontal_spacing = 8.0f, vertical_spacing = 16.0f;
 
     for (int i = 0; i < count; i++) {
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
@@ -3184,20 +3159,13 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             draw_list->AddImage((void *)texture_to_draw, p_min, p_max);
         }
 
-        // TODO: Remove this
-        // if (goal->texture)
-        //     draw_list->AddImage((void *) goal->texture,
-        //                         ImVec2(screen_pos.x + 16.0f * t->zoom_level,
-        //                                screen_pos.y + 16.0f * t->zoom_level),
-        //                         ImVec2(screen_pos.x + 80.0f * t->zoom_level,
-        //                                screen_pos.y + 80.0f * t->zoom_level));
-
+        // The 4.0f is for padding, can be adjusted
         draw_list->AddText(nullptr, 16.0f * t->zoom_level,
-                           ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
-                                  screen_pos.y + bg_size.y * t->zoom_level), text_color, goal->display_name);
+                                   ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
+                                          screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level)), text_color, goal->display_name);
         draw_list->AddText(nullptr, 14.0f * t->zoom_level,
                            ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - stage_text_size.x * t->zoom_level) * 0.5f,
-                                  screen_pos.y + (bg_size.y + text_size.y + 4.0f) * t->zoom_level), text_color,
+                                  screen_pos.y + (bg_size.y + text_size.y + 4.0f) * t->zoom_level + (4.0f * t->zoom_level)), text_color,
                            stage_text);
 
         current_x += uniform_item_width + horizontal_spacing;
