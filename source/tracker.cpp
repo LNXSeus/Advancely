@@ -3222,67 +3222,96 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
     render_custom_goals_section(t, settings, current_y, "Custom Goals");
     render_multistage_goals_section(t, settings, current_y, "Multi-Stage Goals");
 
-    // Info Bar
+    // --- Info Bar ---
 
-    // Push the user-defined text color before drawing the info bar
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4((float) settings->text_color.r / 255.f,
-                                                (float) settings->text_color.g / 255.f,
-                                                (float) settings->text_color.b / 255.f,
-                                                (float) settings->text_color.a / 255.f));
-    // You can remove ImGuiWindowFlags_AlwaysAutoResize if you want to be able to resize this window
+    // Set the background color to match the tracker, with slight opacity.
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4((float)settings->tracker_bg_color.r / 255.f,
+                                                   (float)settings->tracker_bg_color.g / 255.f,
+                                                   (float)settings->tracker_bg_color.b / 255.f,
+                                                   230.0f / 255.f));
+
+    // Determine the color for the WINDOW TITLE BAR text using the luminance check.
+    ImVec4 title_text_color = ImVec4((float)settings->text_color.r / 255.f,
+                                     (float)settings->text_color.g / 255.f,
+                                     (float)settings->text_color.b / 255.f,
+                                     (float)settings->text_color.a / 255.f);
+    float luminance = (0.299f * settings->text_color.r + 0.587f * settings->text_color.g + 0.114f * settings->text_color.b);
+    if (luminance < 50) { // If the color is very dark, override with white for the title.
+        title_text_color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+    }
+    ImGui::PushStyleColor(ImGuiCol_Text, title_text_color);
+
+    // This Begin() call draws the window frame and title bar using the styles we just pushed.
     ImGui::Begin("Info | ESC: Settings | Pan: RMB/MMB Drag | Zoom: Wheel | Click: LMB | Move Win: LMB Drag", nullptr,
                  ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing);
 
-    ImGui::Separator(); // Draw a separator line
+    // Now that the title bar is drawn, we pop its text color and push the user's
+    // original text color to use for the content inside the window.
+    ImGui::PopStyleColor();
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4((float)settings->text_color.r / 255.f,
+                                               (float)settings->text_color.g / 255.f,
+                                               (float)settings->text_color.b / 255.f,
+                                               (float)settings->text_color.a / 255.f));
+
+    ImGui::Separator();
     ImGui::Spacing();
     ImGui::Spacing();
     ImGui::Spacing();
 
     char info_buffer[512];
-    char formatted_category[128];
     char formatted_time[64];
-    char formatted_update_time[64];
-
-    format_category_string(settings->category, formatted_category, sizeof(formatted_category));
-    // Optional flag DOESN'T get formatted
     format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
 
-    const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
+    // Check if the run is 100% complete.
+    bool is_run_complete = t->template_data->advancements_completed_count >= t->template_data->advancement_count &&
+                           t->template_data->overall_progress_percentage >= 100.0f;
 
-    float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f; // Round to nearest 5 seconds
-    format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time));
+    if (is_run_complete) {
+        snprintf(info_buffer, sizeof(info_buffer),
+                 "*** RUN COMPLETE! *** |   Final Time: %s",
+                 formatted_time);
+    } else {
+        // This is the original info string for when the run is in progress.
+        char formatted_category[128];
+        char formatted_update_time[64];
+        format_category_string(settings->category, formatted_category, sizeof(formatted_category));
+        MC_Version version = settings_get_version_from_string(settings->version_str);
+        const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
+        float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
+        format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time));
 
-    // Determine the correct total for the achievement counter info bar whenever global legacy stats are tracked
-    int total_ach_to_display = t->template_data->advancement_count;
-    if (version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy) {
-        int obtainable_count = 0;
-        for (int i = 0; i < t->template_data->advancement_count; i++) {
-            if (!t->template_data->advancements[i]->done_in_snapshot) {
-                obtainable_count++;
+        int total_ach_to_display = t->template_data->advancement_count;
+        if (version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy) {
+            int obtainable_count = 0;
+            for (int i = 0; i < t->template_data->advancement_count; i++) {
+                if (!t->template_data->advancements[i]->done_in_snapshot) {
+                    obtainable_count++;
+                }
             }
+            total_ach_to_display = obtainable_count;
         }
-        total_ach_to_display = obtainable_count;
+
+        snprintf(info_buffer, sizeof(info_buffer),
+                 "%s  |  %s - %s%s%s  |  %s: %d/%d  -  Prog: %.2f%%  |  %s IGT  |  Upd: %s",
+                 t->world_name,
+                 settings->version_str,
+                 formatted_category,
+                 *settings->optional_flag ? " - " : "",
+                 settings->optional_flag,
+                 adv_ach_label,
+                 t->template_data->advancements_completed_count,
+                 total_ach_to_display,
+                 t->template_data->overall_progress_percentage,
+                 formatted_time,
+                 formatted_update_time);
     }
 
-    snprintf(info_buffer, sizeof(info_buffer),
-             "%s  |  %s - %s%s%s  |  %s: %d/%d  -  Prog: %.2f%%  |  %s IGT  |  Upd: %s",
-             t->world_name,
-             settings->version_str,
-             formatted_category,
-             *settings->optional_flag ? " - " : "",
-             settings->optional_flag,
-             adv_ach_label,
-             t->template_data->advancements_completed_count,
-             total_ach_to_display,
-             t->template_data->overall_progress_percentage,
-             formatted_time,
-             formatted_update_time);
-
+    // This text will now be drawn using the user's selected color.
     ImGui::TextUnformatted(info_buffer);
     ImGui::End();
 
-    // Pop the text color style so it no longer applies to subsequent UI elements
-    ImGui::PopStyleColor();
+    // Pop the two style colors still on the stack (WindowBg and the content's Text color).
+    ImGui::PopStyleColor(2);
 
     // Layout Control Buttons
     const float button_padding = 10.0f;
