@@ -22,6 +22,11 @@ typedef struct {
     SDL_Texture *texture;           // The SDL_Texture object
 } TextureCacheEntry;
 
+typedef struct {
+    char path[MAX_PATH_LENGTH];     // The path to the texture file
+    AnimatedTexture *anim;       // The SDL_Texture object
+} AnimatedTextureCacheEntry;
+
 struct Tracker {
     SDL_Window *window;             // The main overlay window
     SDL_Renderer *renderer;         // The main overlay renderer
@@ -30,6 +35,9 @@ struct Tracker {
     TextureCacheEntry *texture_cache; // Array of texture cache entries
     int texture_cache_count;          // Number of entries in the cache
     int texture_cache_capacity;       // Maximum capacity of the cache
+    AnimatedTextureCacheEntry *anim_cache; // Array of animated texture cache entries
+    int anim_cache_count;             // Number of entries in the cache
+    int anim_cache_capacity;          // Maximum capacity of the cache
 
     // --- Global Textures ---
     SDL_Texture *adv_bg;            // Texture for the default advancement background.
@@ -168,9 +176,10 @@ void tracker_load_and_parse_data(Tracker *t);
 /**
  * @brief Frees all resources associated with the Tracker instance.
  *
- * This includes destroying the SDL renderer and window, and deallocating all dynamically
+ * This includes destroying the SDL renderer (including cached textures and animations)
+ * and window, and deallocating all dynamically
  * allocated memory for template data, including advancements, stats, unlocks,
- * (NOT custom, as that is saved in settings.json) and their sub-items.
+ * (NOT custom, as that is saved in settings.json), multi-stage goals and their sub-items.
  *
  * @param tracker A pointer to the Tracker struct pointer to be freed.
  */

@@ -34,20 +34,40 @@ static SDL_Texture *load_texture_with_scale_mode(SDL_Renderer *renderer, const c
         return nullptr;
     }
 
-    SDL_Surface *surface = IMG_Load(path);
-    if (!surface) {
+    // Load original surfaces
+    SDL_Surface *loaded_surface = IMG_Load(path);
+    if (!loaded_surface) {
         fprintf(stderr, "[TRACKER - TEXTURE LOAD] Failed to load image %s: %s\n", path, SDL_GetError());
         return nullptr;
     }
 
-    SDL_Texture *new_texture = SDL_CreateTextureFromSurface(renderer, surface);
-    SDL_DestroySurface(surface); // Clean up the surface after creating the texture
+    // Convert the surface to a consistent format that supports alpha blending
+    // Create a new surface with a standard 32-bit RGBA pixel format
+    SDL_Surface *formatted_surface = SDL_CreateSurface(loaded_surface->w, loaded_surface->h, SDL_PIXELFORMAT_RGBA32);
+    if (formatted_surface) {
+        // Copy the pixels from the loaded surface to the new, correctly formatted surface
+        SDL_BlitSurface(loaded_surface, nullptr, formatted_surface, nullptr);
+    }
+
+    // We are done with the original surface, free it
+    SDL_DestroySurface(loaded_surface);
+
+    if (!formatted_surface) {
+        fprintf(stderr, "[TRACKER - TEXTURE LOAD] Failed to create formatted surface for image %s: %s\n", path,
+                SDL_GetError());
+        return nullptr;
+    }
+
+    SDL_Texture *new_texture = SDL_CreateTextureFromSurface(renderer, formatted_surface);
+    SDL_DestroySurface(formatted_surface); // Clean up the surface after creating the texture
     if (!new_texture) {
         fprintf(stderr, "[TRACKER - TEXTURE LOAD] Failed to create texture from surface %s: %s\n", path,
                 SDL_GetError());
         return nullptr;
     }
 
+    // Explicitly enable blending for the texture
+    SDL_SetTextureBlendMode(new_texture, SDL_BLENDMODE_BLEND);
     SDL_SetTextureScaleMode(new_texture, scale_mode);
     return new_texture;
 }
@@ -78,7 +98,8 @@ static SDL_Texture *tracker_get_texture(Tracker *t, const char *path) {
     // Check if we need to grow the cache array.
     if (t->texture_cache_count >= t->texture_cache_capacity) {
         int new_capacity = t->texture_cache_capacity == 0 ? 16 : t->texture_cache_capacity * 2;
-        TextureCacheEntry *new_cache = (TextureCacheEntry *) realloc(t->texture_cache, new_capacity * sizeof(TextureCacheEntry));
+        TextureCacheEntry *new_cache = (TextureCacheEntry *) realloc(t->texture_cache,
+                                                                     new_capacity * sizeof(TextureCacheEntry));
         if (!new_cache) {
             fprintf(stderr, "[TRACKER] Failed to reallocate texture cache!\n");
             SDL_DestroyTexture(new_texture);
@@ -94,6 +115,126 @@ static SDL_Texture *tracker_get_texture(Tracker *t, const char *path) {
     t->texture_cache_count++;
 
     return new_texture;
+}
+
+/**
+ * @brief Loads a GIF, converting its frames into an AnimatedTexture struct.
+ * If the GIF has no frame timing information, a default delay is applied to each frame.
+ * @param renderer The SDL_Renderer to create textures with.
+ * @param path The path to the .gif file.
+ * @return A pointer to a newly allocated AnimatedTexture, or nullptr on failure.
+ */
+static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *path) {
+    IMG_Animation *anim = IMG_LoadAnimation(path);
+    if (!anim) {
+        fprintf(stderr, "[TRACKER - GIF LOAD] Failed to load animation %s: %s\n", path, SDL_GetError());
+        return nullptr;
+    }
+
+    AnimatedTexture *anim_texture = (AnimatedTexture *) calloc(1, sizeof(AnimatedTexture));
+    if (!anim_texture) {
+        IMG_FreeAnimation(anim);
+        return nullptr;
+    }
+
+    anim_texture->frame_count = anim->count;
+    anim_texture->frames = (SDL_Texture **) calloc(anim->count, sizeof(SDL_Texture *));
+    anim_texture->delays = (int *) calloc(anim->count, sizeof(int));
+
+    if (!anim_texture->frames || !anim_texture->delays) {
+        // Allocation failed
+        free(anim_texture->frames);
+        free(anim_texture->delays);
+        free(anim_texture);
+        IMG_FreeAnimation(anim);
+        return nullptr;
+    }
+
+    Uint32 total_duration = 0;
+    for (int i = 0; i < anim->count; i++) {
+        SDL_Surface *frame_surface = anim->frames[i];
+        anim_texture->frames[i] = SDL_CreateTextureFromSurface(renderer, frame_surface);
+        SDL_SetTextureBlendMode(anim_texture->frames[i], SDL_BLENDMODE_BLEND);
+        SDL_SetTextureScaleMode(anim_texture->frames[i], SDL_SCALEMODE_NEAREST);
+        anim_texture->delays[i] = anim->delays[i];
+        total_duration += anim->delays[i];
+    }
+    anim_texture->total_duration = total_duration;
+
+    // If the GIF has no timing info, calculate a default animation speed
+    if (anim_texture->total_duration == 0 && anim_texture->frame_count > 0) {
+        printf("[TRACKER - GIF LOAD] GIF at '%s' has no timing info. Applying default %dms delay.\n", path,
+               DEFAULT_GIF_DELAY_MS);
+        total_duration = 0; // Reset to recalculate
+        for (int i = 0; i < anim_texture->frame_count; i++) {
+            anim_texture->delays[i] = DEFAULT_GIF_DELAY_MS;
+            total_duration += DEFAULT_GIF_DELAY_MS;
+        }
+        anim_texture->total_duration = total_duration;
+    }
+
+    IMG_FreeAnimation(anim);
+    return anim_texture;
+}
+
+/**
+ * @brief Frees all memory associated with an AnimatedTexture, including all its frame textures.
+ *
+ * Used within tracker_free_template_data(). Used for any .gif textures.
+ *
+ * @param anim The AnimatedTexture to be freed.
+ */
+static void free_animated_texture(AnimatedTexture *anim) {
+    if (!anim) return;
+    for (int i = 0; i < anim->frame_count; i++) {
+        if (anim->frames[i]) {
+            SDL_DestroyTexture(anim->frames[i]);
+        }
+    }
+    free(anim->frames);
+    free(anim->delays);
+    free(anim);
+}
+
+/**
+ * @brief Gets an AnimatedTexture from a path, utilizing a cache to avoid redundant loads.
+ * @param t A pointer to the Tracker struct which contains the cache.
+ * @param path The path to the .gif file.
+ * @return A pointer to the cached or newly loaded AnimatedTexture, or nullptr on failure.
+ */
+static AnimatedTexture* tracker_get_animated_texture(Tracker *t, const char *path) {
+    if (path == nullptr || path[0] == '\0') return nullptr;
+
+    // 1. Check if the animation is already in the cache.
+    for (int i = 0; i < t->anim_cache_count; i++) {
+        if (strcmp(t->anim_cache[i].path, path) == 0) {
+            return t->anim_cache[i].anim;
+        }
+    }
+
+    // 2. If not in cache, load it.
+    AnimatedTexture *new_anim = load_animated_gif(t->renderer, path);
+    if (!new_anim) return nullptr;
+
+    // 3. Add the new animation to the cache.
+    if (t->anim_cache_count >= t->anim_cache_capacity) {
+        int new_capacity = t->anim_cache_capacity == 0 ? 8 : t->anim_cache_capacity * 2;
+        AnimatedTextureCacheEntry *new_cache = (AnimatedTextureCacheEntry*) realloc(t->anim_cache, new_capacity * sizeof(AnimatedTextureCacheEntry));
+        if (!new_cache) {
+            fprintf(stderr, "[TRACKER] Failed to reallocate animation cache!\n");
+            free_animated_texture(new_anim); // Clean up the loaded anim if we can't cache it
+            return nullptr;
+        }
+        t->anim_cache = new_cache;
+        t->anim_cache_capacity = new_capacity;
+    }
+
+    // Add to cache
+    strncpy(t->anim_cache[t->anim_cache_count].path, path, MAX_PATH_LENGTH - 1);
+    t->anim_cache[t->anim_cache_count].anim = new_anim;
+    t->anim_cache_count++;
+
+    return new_anim;
 }
 
 
@@ -505,15 +646,6 @@ static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *p
             ach->done = game_is_done;
         }
 
-        // TODO: Remove this
-        // // Determine final 'done' status either when all criteria from template are done or game says so
-        // if (ach->criteria_count > 0) {
-        //     bool template_is_done = (ach->completed_criteria_count >= ach->criteria_count);
-        //     ach->done = game_is_done || template_is_done;
-        // } else {
-        //     ach->done = game_is_done;
-        // }
-
         // Increment completed achievement count
         if (ach->done) t->template_data->advancements_completed_count++;
         t->template_data->completed_criteria_count += ach->completed_criteria_count;
@@ -609,7 +741,6 @@ static void tracker_update_advancements_modern(Tracker *t, const cJSON *player_a
         cJSON *player_entry = cJSON_GetObjectItem(player_adv_json, adv->root_name);
         // take root name (from template) from player advancements
         if (player_entry) {
-
             // Always update criteria progress first
             cJSON *player_criteria = cJSON_GetObjectItem(player_entry, "criteria");
             if (player_criteria && adv->criteria_count > 0) {
@@ -640,7 +771,6 @@ static void tracker_update_advancements_modern(Tracker *t, const cJSON *player_a
 
             // Increment completed advancement count
             if (adv->done) t->template_data->advancements_completed_count++;
-
         } else {
             // If the advancement doesn't exist in the player file, it's not done and neither are its criteria
             adv->done = false;
@@ -709,23 +839,6 @@ static void tracker_update_stats_modern(Tracker *t, const cJSON *player_stats_js
                 }
             }
 
-            // TODO: Remove this when possible
-            // // Null-terminating the first forward slash to create the language key so nether/create beacon
-            // // becomes nether.create_beacon
-            // char *category_key = root_name_copy;
-            // char *item_key = strchr(root_name_copy, '/');
-            // if (item_key) {
-            //     *item_key = '\0';
-            //     item_key++; // Move the pointer to the next character after the forward slash
-            //     cJSON *category_obj = cJSON_GetObjectItem(stats_obj, category_key);
-            //     if (category_obj) {
-            //         cJSON *stat_value = cJSON_GetObjectItem(category_obj, item_key);
-            //         if (cJSON_IsNumber(stat_value)) {
-            //             sub_stat->progress = stat_value->valueint;
-            //         }
-            //     }
-            // }
-
             // Determine natural completion
             bool naturally_done = (sub_stat->goal > 0 && sub_stat->progress >= sub_stat->goal);
 
@@ -763,6 +876,7 @@ static void tracker_update_stats_modern(Tracker *t, const cJSON *player_stats_js
 // HELPER FUNCTION FOR PARSING
 /**
  * @brief Parses advancement or stat categories and their criteria from the template, supporting modded advancements/stats.
+ * It supports .gif and .png files.
  *
  * @param t A pointer to the Tracker object.
  * @param category_json The JSON object containing the categories.
@@ -854,7 +968,11 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
             snprintf(full_icon_path, sizeof(full_icon_path), "resources/icons/%s", icon->valuestring);
             strncpy(new_cat->icon_path, full_icon_path, sizeof(new_cat->icon_path) - 1);
 
-            new_cat->texture = tracker_get_texture(t, new_cat->icon_path);
+            if (strstr(full_icon_path, ".gif")) {
+                new_cat->anim_texture = tracker_get_animated_texture(t, new_cat->icon_path);
+            } else {
+                new_cat->texture = tracker_get_texture(t, new_cat->icon_path);
+            }
         }
 
         cJSON *criteria_obj = cJSON_GetObjectItem(cat_json, "criteria");
@@ -872,7 +990,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
 
                         // Add pre-parsing for multi-criteria stats
                         if (is_stat_category) {
-                            const char* slash = strchr(new_crit->root_name, '/');
+                            const char *slash = strchr(new_crit->root_name, '/');
                             if (slash) {
                                 ptrdiff_t len = slash - new_crit->root_name;
                                 strncpy(new_crit->stat_category_key, new_crit->root_name, len);
@@ -902,7 +1020,12 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                             snprintf(full_crit_icon_path, sizeof(full_crit_icon_path), "resources/icons/%s",
                                      crit_icon->valuestring);
                             strncpy(new_crit->icon_path, full_crit_icon_path, sizeof(new_crit->icon_path) - 1);
-                            new_crit->texture = tracker_get_texture(t, new_crit->icon_path);
+
+                            if (strstr(full_crit_icon_path, ".gif")) {
+                                new_crit->anim_texture = tracker_get_animated_texture(t, new_crit->icon_path);
+                            } else {
+                                new_crit->texture = tracker_get_texture(t, new_crit->icon_path);
+                            }
                         }
 
                         new_cat->criteria[k++] = new_crit;
@@ -939,9 +1062,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                         cJSON *target = cJSON_GetObjectItem(cat_json, "target");
                         if (cJSON_IsNumber(target)) the_criterion->goal = target->valueint;
                     }
-                    // Copy the parent's icon path and texture to the single criterion
-                    strncpy(the_criterion->icon_path, new_cat->icon_path, sizeof(the_criterion->icon_path) - 1);
-                    the_criterion->texture = new_cat->texture; // Reuse the already loaded texture
+
                     new_cat->criteria[0] = the_criterion;
                 }
             }
@@ -1042,7 +1163,8 @@ static void tracker_detect_shared_sub_items(Tracker *t) {
  *
  * This function iterates through a JSON array, allocating and populating a TrackableItem for each entry.
  * It extracts the root name, icon path, and goal value from the template and looks up the display name in the language file.
- * The language file uses "stat." and "unlock." prefixes now as well.
+ * The language file uses "unlock." and "custom." prefixes now as well.
+ * It supports .gif and .png files.
  *
  *  @param t Pointer to the Tracker struct.
  * @param category_json The cJSON array for the "stats" or "unlocks" key from the template file.
@@ -1102,7 +1224,12 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
                 char full_icon_path[sizeof(new_item->icon_path)];
                 snprintf(full_icon_path, sizeof(full_icon_path), "resources/icons/%s", icon->valuestring);
                 strncpy(new_item->icon_path, full_icon_path, sizeof(new_item->icon_path) - 1);
-                new_item->texture = tracker_get_texture(t, new_item->icon_path);
+
+                if (strstr(full_icon_path, ".gif")) {
+                    new_item->anim_texture = tracker_get_animated_texture(t, new_item->icon_path);
+                } else {
+                    new_item->texture = tracker_get_texture(t, new_item->icon_path);
+                }
             }
 
             cJSON *target = cJSON_GetObjectItem(item_json, "target");
@@ -1120,6 +1247,7 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
  *
  * This function reads the multi_stage_goals array from the template, creating a
  * MultiStageGoal for each entry and parsing its corresponding sequence of sub-goal stages.
+ * It supports .gif and .png files.
  *
  *@param t Pointer to the Tracker struct.
  * @param goals_json The cJSON object for the "multi_stage_goals" key from the template file.
@@ -1171,7 +1299,12 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
             char full_icon_path[sizeof(new_goal->icon_path)];
             snprintf(full_icon_path, sizeof(full_icon_path), "resources/icons/%s", icon->valuestring);
             strncpy(new_goal->icon_path, full_icon_path, sizeof(new_goal->icon_path) - 1);
-            new_goal->texture = tracker_get_texture(t, new_goal->icon_path);
+
+            if (strstr(full_icon_path, ".gif")) {
+                new_goal->anim_texture = tracker_get_animated_texture(t, new_goal->icon_path);
+            } else {
+                new_goal->texture = tracker_get_texture(t, new_goal->icon_path);
+            }
         }
 
 
@@ -1597,7 +1730,7 @@ static void tracker_calculate_overall_progress(Tracker *t, MC_Version version) {
 /**
  * @brief Frees an array of TrackableItem pointers.
  *
- * This is used in tracker_free_template_data(). Used for stats, unlocks and custom goals.
+ * This is used in tracker_free_template_data(). Used for unlocks and custom goals.
  *
  * @param items The array of TrackableItem pointers to be freed.
  * @param count The number of elements in the array.
@@ -1605,13 +1738,16 @@ static void tracker_calculate_overall_progress(Tracker *t, MC_Version version) {
 static void free_trackable_items(TrackableItem **items, int count) {
     if (!items) return;
     for (int i = 0; i < count; i++) {
-        free(items[i]);
+        // Cleanup for animated textures
+        if (items[i]) {
+            free(items[i]);
+        }
     }
     free(items);
 }
 
 /**
- * @brief Frees an array of TrackableCategory pointers.
+ * @brief Frees an array of TrackableCategory pointers. Frees advancements and stats.
  *
  * Used within tracker_free_template_data().
  *
@@ -1622,6 +1758,7 @@ static void free_trackable_categories(TrackableCategory **categories, int count)
     if (!categories) return;
     for (int i = 0; i < count; i++) {
         if (categories[i]) {
+
             // First, free the inner criteria array using the other helper
             free_trackable_items(categories[i]->criteria, categories[i]->criteria_count);
 
@@ -1633,10 +1770,10 @@ static void free_trackable_categories(TrackableCategory **categories, int count)
 }
 
 /**
- * @brief Frees all dynamically allocated memory within a TemplateData struct.
+ * @brief Frees all dynamically allocated memory within a TemplateData struct. Multi-stage goals are freed here.
  *
  * To avoid memory leaks when switching templates during runtime.
- * It only frees the CONTENT of the TemplateData NOT the itself.
+ * It only frees the CONTENT of the TemplateData NOT the TemplateData itself.
  *
  * @param td A pointer to the TemplateData to be freed.
  */
@@ -1671,6 +1808,7 @@ static void tracker_free_template_data(TemplateData *td) {
                     free(goal->stages[j]);
                 }
                 free(goal->stages);
+
                 free(goal);
             }
         }
@@ -1784,6 +1922,9 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     t->texture_cache = nullptr;
     t->texture_cache_count = 0;
     t->texture_cache_capacity = 0;
+    t->anim_cache = nullptr;
+    t->anim_cache_count = 0;
+    t->anim_cache_capacity = 0;
 
     // Initialize all string buffers to empty strings
     t->advancement_template_path[0] = '\0';
@@ -2062,7 +2203,6 @@ static void render_section_separator(Tracker *t, const AppSettings *settings, fl
 static void render_trackable_category_section(Tracker *t, const AppSettings *settings, float &current_y,
                                               TrackableCategory **categories, int count, const char *section_title,
                                               bool is_stat_section, MC_Version version) {
-
     // Pre-computation and Filtering
     int visible_count = 0;
     for (int i = 0; i < count; ++i) {
@@ -2075,8 +2215,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         if (settings->remove_completed_goals) {
             if (is_stat_section) {
                 if (cat->done) is_hidden = true;
-            } else { // It's an advancement
-                if ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (cat->criteria_count == 0 && cat->done)) {
+            } else {
+                // It's an advancement
+                if ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (
+                        cat->criteria_count == 0 && cat->done)) {
                     is_hidden = true;
                 }
             }
@@ -2088,16 +2230,6 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
     }
     if (visible_count == 0) return;
 
-    // TODO: Remove this
-    // int visible_count = 0;
-    // for (int i = 0; i < count; ++i) {
-    //     if (categories[i] && (!categories[i]->done || !settings->remove_completed_goals)) {
-    //         visible_count++;
-    //         break;
-    //     }
-    // }
-    // if (visible_count == 0) return;
-
     ImGuiIO &io = ImGui::GetIO();
 
     // Use the locked width if layout is locked
@@ -2107,8 +2239,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     ImU32 text_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
                                 settings->text_color.a);
-    ImU32 text_color_faded = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b, 100);
-    ImU32 icon_tint_faded = IM_COL32(255, 255, 255, 100);
+    ImU32 text_color_faded = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b, ADVANCELY_FADED_ALPHA);
+    ImU32 icon_tint_faded = IM_COL32(255, 255, 255, ADVANCELY_FADED_ALPHA);
 
     // Define checkbox colors from settings
     ImU32 checkmark_color = text_color;
@@ -2129,7 +2261,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             for (int j = 0; j < cat->criteria_count; j++) {
                 TrackableItem *crit = cat->criteria[j];
                 if (crit && (!crit->done || !settings->remove_completed_goals)) {
-                    // FIX: Update width calculation for new layout: [Icon] [Checkbox] [Text] (Progress)
+                    // Update width calculation for new layout: [Icon] [Checkbox] [Text] (Progress)
                     char crit_progress_text[32] = "";
                     if (is_stat_section) {
                         if (crit->goal > 0) {
@@ -2168,7 +2300,6 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             }
 
 
-
             // Render advancement criteria if count is > 0, render stat-category sub-stats if count is > 1
             bool is_complex = false;
             if (!is_stat_section) {
@@ -2176,9 +2307,6 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             } else {
                 is_complex = cat && cat->criteria_count > 1;
             }
-
-            // TODO: Remove this
-            // if (!cat || (is_complex != complex_pass) || should_hide) continue;
 
             // Check for the correct pass BEfORE checking if we should hide
             // If it's not the right pass for this item, skip it immediately
@@ -2192,11 +2320,13 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             if (cat && settings->remove_completed_goals) {
                 if (is_stat_section) {
                     // Stats are simple: hide them if they are marked as done
-                    if (cat->done)  should_hide = true;
-                } else { // It's an advancement
+                    if (cat->done) should_hide = true;
+                } else {
+                    // It's an advancement
                     // Use unambiguous flag for hiding -> all_template_criteria_met
                     // Hide only if it has criteria AND they are all met, OR if it has NO criteria AND it's done
-                    if ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (cat->criteria_count == 0 && cat->done)) {
+                    if ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (
+                            cat->criteria_count == 0 && cat->done)) {
                         should_hide = true;
                     }
                 }
@@ -2229,9 +2359,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         snprintf(progress_text, sizeof(progress_text), "(%d)", crit->progress);
                     }
                 }
-            } else { // It's an advancement section, display criteria count
+            } else {
+                // It's an advancement section, display criteria count
                 if (cat->criteria_count > 0) {
-                    snprintf(progress_text, sizeof(progress_text), "(%d / %d)", cat->completed_criteria_count, cat->criteria_count);
+                    snprintf(progress_text, sizeof(progress_text), "(%d / %d)", cat->completed_criteria_count,
+                             cat->criteria_count);
                 }
             }
 
@@ -2275,16 +2407,72 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 }
             }
 
+            // For the large 96x96 icon
             if (bg_texture_to_use)
                 draw_list->AddImage((void *) bg_texture_to_use, screen_pos,
                                     ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
                                            screen_pos.y + bg_size.y * t->zoom_level));
-            if (cat->texture)
-                draw_list->AddImage((void *) cat->texture,
-                                    ImVec2(screen_pos.x + 16.0f * t->zoom_level,
-                                           screen_pos.y + 16.0f * t->zoom_level),
-                                    ImVec2(screen_pos.x + 80.0f * t->zoom_level,
-                                           screen_pos.y + 80.0f * t->zoom_level));
+            SDL_Texture *texture_to_draw = nullptr;
+            if (cat->anim_texture && cat->anim_texture->frame_count > 0) {
+                // also making a NULL check for the 'delays' pointer
+                if (cat->anim_texture->delays && cat->anim_texture->total_duration > 0) {
+                    Uint32 current_time = SDL_GetTicks();
+                    Uint32 elapsed_time = current_time % cat->anim_texture->total_duration;
+
+                    int current_frame = 0;
+                    Uint32 time_sum = 0;
+                    for (int frame_idx = 0; frame_idx < cat->anim_texture->frame_count; ++frame_idx) {
+                        time_sum += cat->anim_texture->delays[frame_idx];
+                        if (elapsed_time < time_sum) {
+                            current_frame = frame_idx;
+                            break;
+                        }
+                    }
+                    texture_to_draw = cat->anim_texture->frames[current_frame];
+                } else {
+                    texture_to_draw = cat->anim_texture->frames[0];
+                }
+            } else if (cat->texture) {
+                texture_to_draw = cat->texture;
+            }
+
+            if (texture_to_draw) {
+                // Get texture dimensions to calculate aspect ratio
+                float tex_w = 0.0f, tex_h = 0.0f;
+                SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
+                float aspect_ratio = (tex_h != 0) ? (tex_w / tex_h) : 1.0f;
+
+                // Define the target box size (64x64 for parent icons)
+                ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
+
+                // Calculate scaled dimensions to fit inside the box
+                ImVec2 scaled_size = target_box_size;
+                if (aspect_ratio > 1.0f) { // Wider than tall
+                    scaled_size.y = scaled_size.x / aspect_ratio;
+                } else { // Taller than wide or square
+                    scaled_size.x = scaled_size.y * aspect_ratio;
+                }
+
+                // Center the image within the 16,16 to 80,80 space
+                // Define the top-left of the icon box area (inside the 96x96 background)
+                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
+                // Calculate padding needed to center the scaled image within the box
+                ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f, (target_box_size.y - scaled_size.y) * 0.5f);
+
+                // The final top-left and bottom-right corners for drawing
+                ImVec2 p_min = ImVec2(box_p_min.x + padding.x, box_p_min.y + padding.y);
+                ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
+
+                draw_list->AddImage((void *)texture_to_draw, p_min, p_max);
+            }
+
+            // TODO: Remove this
+            // if (cat->texture)
+            //     draw_list->AddImage((void *) cat->texture,
+            //                         ImVec2(screen_pos.x + 16.0f * t->zoom_level,
+            //                                screen_pos.y + 16.0f * t->zoom_level),
+            //                         ImVec2(screen_pos.x + 80.0f * t->zoom_level,
+            //                                screen_pos.y + 80.0f * t->zoom_level));
 
             float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level;
             draw_list->AddText(nullptr, 16.0f * t->zoom_level,
@@ -2321,17 +2509,124 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                   (sub_item_y_offset * t->zoom_level) + t->camera_offset.y);
                     float current_element_x = crit_base_pos.x;
 
-                    // Draw Icon
-                    if (crit->texture) {
-                        ImU32 icon_tint = crit->done ? icon_tint_faded : IM_COL32_WHITE;
-                        draw_list->AddImage((void *) crit->texture, crit_base_pos,
-                                            ImVec2(crit_base_pos.x + 32 * t->zoom_level,
-                                                   crit_base_pos.y + 32 * t->zoom_level), ImVec2(0, 0), ImVec2(1, 1),
-                                            icon_tint);
-                    }
+
+                    // For the small 32x32 icons
+
+                    SDL_Texture* crit_texture_to_draw = nullptr;
+                     if (crit->anim_texture && crit->anim_texture->frame_count > 0) {
+                         if (crit->anim_texture->delays && crit->anim_texture->total_duration > 0) {
+                             Uint32 current_time = SDL_GetTicks();
+                             Uint32 elapsed_time = current_time % crit->anim_texture->total_duration;
+                             int current_frame = 0;
+                             Uint32 time_sum = 0;
+                             for (int frame_idx = 0; frame_idx < crit->anim_texture->frame_count; ++frame_idx) {
+                                 time_sum += crit->anim_texture->delays[frame_idx];
+                                 if (elapsed_time < time_sum) {
+                                     current_frame = frame_idx;
+                                     break;
+                                 }
+                             }
+                             crit_texture_to_draw = crit->anim_texture->frames[current_frame];
+                         } else {
+                             crit_texture_to_draw = crit->anim_texture->frames[0];
+                         }
+                     } else if (crit->texture) {
+                         crit_texture_to_draw = crit->texture;
+                     }
+
+                     if (crit_texture_to_draw) {
+                         // Get texture dimensions as floats
+                         float tex_w = 0.0f, tex_h = 0.0f;
+                         SDL_GetTextureSize(crit_texture_to_draw, &tex_w, &tex_h);
+                         float aspect_ratio = (tex_h != 0) ? (tex_w / tex_h) : 1.0f;
+
+                         // Define the target box size (32x32 for criteria)
+                         ImVec2 target_box_size = ImVec2(32.0f * t->zoom_level, 32.0f * t->zoom_level);
+
+                         // Calculate scaled dimensions to fit inside the box
+                         ImVec2 scaled_size = target_box_size;
+                         if (aspect_ratio > 1.0f) { scaled_size.y = scaled_size.x / aspect_ratio; }
+                         else { scaled_size.x = scaled_size.y * aspect_ratio; }
+
+                         // Center the scaled image within the 32x32 area
+                         ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f, (target_box_size.y - scaled_size.y) * 0.5f);
+                         ImVec2 p_min = ImVec2(crit_base_pos.x + padding.x, crit_base_pos.y + padding.y);
+                         ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
+
+                         // Choose the tint color for fading completed icons
+                         ImU32 icon_tint = crit->done ? icon_tint_faded : IM_COL32_WHITE;
+
+                         // Draw the final image with correct scaling, centering, and tint
+                         draw_list->AddImage((void *)crit_texture_to_draw, p_min, p_max, ImVec2(0, 0), ImVec2(1, 1), icon_tint);
+                     }
+
+                    // TODO: Remove this
+                    // SDL_Texture *crit_texture_to_draw = nullptr;
+                    // if (crit->anim_texture && crit->anim_texture->frame_count > 0) {
+                    //     // also making a NULL check for the 'delays' pointer
+                    //     if (crit->anim_texture->delays && crit->anim_texture->total_duration > 0) {
+                    //         Uint32 current_time = SDL_GetTicks();
+                    //         Uint32 elapsed_time = current_time % crit->anim_texture->total_duration;
+                    //
+                    //         int current_frame = 0;
+                    //         Uint32 time_sum = 0;
+                    //         for (int frame_idx = 0; frame_idx < crit->anim_texture->frame_count; ++frame_idx) {
+                    //             time_sum += crit->anim_texture->delays[frame_idx];
+                    //             if (elapsed_time < time_sum) {
+                    //                 current_frame = frame_idx;
+                    //                 break;
+                    //             }
+                    //         }
+                    //         crit_texture_to_draw = crit->anim_texture->frames[current_frame];
+                    //     } else {
+                    //         crit_texture_to_draw = crit->anim_texture->frames[0];
+                    //     }
+                    // } else if (crit->texture) {
+                    //     crit_texture_to_draw = crit->texture;
+                    // }
+                    //
+                    // if (crit_texture_to_draw) {
+                    //     // Get texture dimensions to calculate aspect ratio
+                    //     float tex_w = 0.0f, tex_h = 0.0f;
+                    //     SDL_GetTextureSize(crit_texture_to_draw, &tex_w, &tex_h);
+                    //     float aspect_ratio = (tex_h != 0) ? (tex_w / tex_h) : 1.0f;
+                    //
+                    //     // Define the target box size (64x64 for parent icons)
+                    //     ImVec2 target_box_size = ImVec2(32.0f * t->zoom_level, 32.0f * t->zoom_level);
+                    //
+                    //     // Calculate scaled dimensions to fit inside the box
+                    //     ImVec2 scaled_size = target_box_size;
+                    //     if (aspect_ratio > 1.0f) { // Wider than tall
+                    //         scaled_size.y = scaled_size.x / aspect_ratio;
+                    //     } else { // Taller than wide or square
+                    //         scaled_size.x = scaled_size.y * aspect_ratio;
+                    //     }
+                    //
+                    //     // Center the image within the 16,16 to 80,80 space
+                    //     // Define the top-left of the icon box area (inside the 96x96 background)
+                    //     ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
+                    //     // Calculate padding needed to center the scaled image within the box
+                    //     ImVec2 padding_to_center = ImVec2((target_box_size.x - scaled_size.x) * 0.5f, (target_box_size.y - scaled_size.y) * 0.5f);
+                    //
+                    //     // The final top-left and bottom-right corners for drawing
+                    //     ImVec2 p_min = ImVec2(box_p_min.x + padding_to_center.x, box_p_min.y + padding_to_center.y);
+                    //     ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
+                    //
+                    //     draw_list->AddImage((void *)crit_texture_to_draw, p_min, p_max);
+                    // }
+
+                    // TODO: Remove this
+                    // // Draw Icon
+                    // if (crit->texture) {
+                    //     ImU32 icon_tint = crit->done ? icon_tint_faded : IM_COL32_WHITE;
+                    //
+                    //     draw_list->AddImage((void *) crit->texture, crit_base_pos,
+                    //                         ImVec2(crit_base_pos.x + 32 * t->zoom_level,
+                    //                                crit_base_pos.y + 32 * t->zoom_level), ImVec2(0, 0), ImVec2(1, 1),
+                    //                         icon_tint);
+                    // }
                     current_element_x += 32 * t->zoom_level + 4 * t->zoom_level;
 
-                    // Draw Checkbox for Sub-Stat
                     // Draw Checkbox for Sub-Stat
                     if (is_stat_section) {
                         ImVec2 check_pos = ImVec2(current_element_x, crit_base_pos.y + 6 * t->zoom_level);
@@ -2486,16 +2781,76 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                                    (current_y * t->zoom_level) + t->camera_offset.y);
         ImVec2 bg_size = ImVec2(96.0f, 96.0f);
         SDL_Texture *bg_texture = item->done ? t->adv_bg_done : t->adv_bg;
+
         if (bg_texture)
             draw_list->AddImage((void *) bg_texture, screen_pos,
                                 ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
                                        screen_pos.y + bg_size.y * t->zoom_level));
-        if (item->texture)
-            draw_list->AddImage((void *) item->texture,
-                                ImVec2(screen_pos.x + 16.0f * t->zoom_level,
-                                       screen_pos.y + 16.0f * t->zoom_level),
-                                ImVec2(screen_pos.x + 80.0f * t->zoom_level,
-                                       screen_pos.y + 80.0f * t->zoom_level));
+
+        // Asure proper rendering for .gif files
+        SDL_Texture *texture_to_draw = nullptr;
+        if (item->anim_texture && item->anim_texture->frame_count > 0) {
+            // also making a NULL check for the 'delays' pointer
+            if (item->anim_texture->delays && item->anim_texture->total_duration > 0) {
+                Uint32 current_time = SDL_GetTicks();
+                Uint32 elapsed_time = current_time % item->anim_texture->total_duration;
+
+                int current_frame = 0;
+                Uint32 time_sum = 0;
+                for (int frame_idx = 0; frame_idx < item->anim_texture->frame_count; ++frame_idx) {
+                    time_sum += item->anim_texture->delays[frame_idx];
+                    if (elapsed_time < time_sum) {
+                        current_frame = frame_idx;
+                        break;
+                    }
+                }
+                texture_to_draw = item->anim_texture->frames[current_frame];
+            } else {
+                texture_to_draw = item->anim_texture->frames[0];
+            }
+        } else if (item->texture) {
+            texture_to_draw = item->texture;
+        }
+
+        if (texture_to_draw) {
+            // Declare as float to match the function's requirements
+            float tex_w = 0.0f, tex_h = 0.0f;
+            // Call the function directly without casting ---
+            SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
+
+            // --- FIX: No need to cast here as variables are already floats
+            float aspect_ratio = (tex_h != 0) ? (tex_w / tex_h) : 1.0f;
+
+            // Define the target box size (64x64 for parent icons)
+            ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
+
+            // Calculate scaled dimensions to fit inside the box
+            ImVec2 scaled_size = target_box_size;
+            if (aspect_ratio > 1.0f) { // Wider than tall
+                scaled_size.y = scaled_size.x / aspect_ratio;
+            } else { // Taller than wide or square
+                scaled_size.x = scaled_size.y * aspect_ratio;
+            }
+
+            // Define the top-left of the icon box area (inside the 96x96 background)
+            ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
+            // Calculate padding needed to center the scaled image within the box
+            ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f, (target_box_size.y - scaled_size.y) * 0.5f);
+
+            // The final top-left and bottom-right corners for drawing
+            ImVec2 p_min = ImVec2(box_p_min.x + padding.x, box_p_min.y + padding.y);
+            ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
+
+            draw_list->AddImage((void *)texture_to_draw, p_min, p_max);
+        }
+
+        // TODO: Remove this
+        // if (item->texture)
+        //     draw_list->AddImage((void *) item->texture,
+        //                         ImVec2(screen_pos.x + 16.0f * t->zoom_level,
+        //                                screen_pos.y + 16.0f * t->zoom_level),
+        //                         ImVec2(screen_pos.x + 80.0f * t->zoom_level,
+        //                                screen_pos.y + 80.0f * t->zoom_level));
         ImVec2 text_size = ImGui::CalcTextSize(item->display_name);
         draw_list->AddText(nullptr, 16.0f * t->zoom_level,
                            ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
@@ -2593,12 +2948,71 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             draw_list->AddImage((void *) bg_texture, screen_pos,
                                 ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
                                        screen_pos.y + bg_size.y * t->zoom_level));
-        if (item->texture)
-            draw_list->AddImage((void *) item->texture,
-                                ImVec2(screen_pos.x + 16.0f * t->zoom_level,
-                                       screen_pos.y + 16.0f * t->zoom_level),
-                                ImVec2(screen_pos.x + 80.0f * t->zoom_level,
-                                       screen_pos.y + 80.0f * t->zoom_level));
+
+        // Asure proper rendering of .gif files
+        SDL_Texture *texture_to_draw = nullptr;
+        if (item->anim_texture && item->anim_texture->frame_count > 0) {
+            // also making a NULL check for the 'delays' pointer
+            if (item->anim_texture->delays && item->anim_texture->total_duration > 0) {
+                Uint32 current_time = SDL_GetTicks();
+                Uint32 elapsed_time = current_time % item->anim_texture->total_duration;
+
+                int current_frame = 0;
+                Uint32 time_sum = 0;
+                for (int frame_idx = 0; frame_idx < item->anim_texture->frame_count; ++frame_idx) {
+                    time_sum += item->anim_texture->delays[frame_idx];
+                    if (elapsed_time < time_sum) {
+                        current_frame = frame_idx;
+                        break;
+                    }
+                }
+                texture_to_draw = item->anim_texture->frames[current_frame];
+            } else {
+                texture_to_draw = item->anim_texture->frames[0];
+            }
+        } else if (item->texture) {
+            texture_to_draw = item->texture;
+        }
+
+        if (texture_to_draw) {
+            // Declare as float to match the function's requirements
+            float tex_w = 0.0f, tex_h = 0.0f;
+            // Call the function directly without casting ---
+            SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
+
+            // --- FIX: No need to cast here as variables are already floats
+            float aspect_ratio = (tex_h != 0) ? (tex_w / tex_h) : 1.0f;
+
+            // Define the target box size (64x64 for parent icons)
+            ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
+
+            // Calculate scaled dimensions to fit inside the box
+            ImVec2 scaled_size = target_box_size;
+            if (aspect_ratio > 1.0f) { // Wider than tall
+                scaled_size.y = scaled_size.x / aspect_ratio;
+            } else { // Taller than wide or square
+                scaled_size.x = scaled_size.y * aspect_ratio;
+            }
+
+            // Define the top-left of the icon box area (inside the 96x96 background)
+            ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
+            // Calculate padding needed to center the scaled image within the box
+            ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f, (target_box_size.y - scaled_size.y) * 0.5f);
+
+            // The final top-left and bottom-right corners for drawing
+            ImVec2 p_min = ImVec2(box_p_min.x + padding.x, box_p_min.y + padding.y);
+            ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
+
+            draw_list->AddImage((void *)texture_to_draw, p_min, p_max);
+        }
+
+        // TODO: Remove this
+        // if (item->texture)
+        //     draw_list->AddImage((void *) item->texture,
+        //                         ImVec2(screen_pos.x + 16.0f * t->zoom_level,
+        //                                screen_pos.y + 16.0f * t->zoom_level),
+        //                         ImVec2(screen_pos.x + 80.0f * t->zoom_level,
+        //                                screen_pos.y + 80.0f * t->zoom_level));
 
         draw_list->AddText(nullptr, 16.0f * t->zoom_level,
                            ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
@@ -2726,12 +3140,70 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             draw_list->AddImage((void *) bg_texture, screen_pos,
                                 ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
                                        screen_pos.y + bg_size.y * t->zoom_level));
-        if (goal->texture)
-            draw_list->AddImage((void *) goal->texture,
-                                ImVec2(screen_pos.x + 16.0f * t->zoom_level,
-                                       screen_pos.y + 16.0f * t->zoom_level),
-                                ImVec2(screen_pos.x + 80.0f * t->zoom_level,
-                                       screen_pos.y + 80.0f * t->zoom_level));
+
+        SDL_Texture *texture_to_draw = nullptr;
+        if (goal->anim_texture && goal->anim_texture->frame_count > 0) {
+            // also making a NULL check for the 'delays' pointer
+            if (goal->anim_texture->delays && goal->anim_texture->total_duration > 0) {
+                Uint32 current_time = SDL_GetTicks();
+                Uint32 elapsed_time = current_time % goal->anim_texture->total_duration;
+
+                int current_frame = 0;
+                Uint32 time_sum = 0;
+                for (int frame_idx = 0; frame_idx < goal->anim_texture->frame_count; ++frame_idx) {
+                    time_sum += goal->anim_texture->delays[frame_idx];
+                    if (elapsed_time < time_sum) {
+                        current_frame = frame_idx;
+                        break;
+                    }
+                }
+                texture_to_draw = goal->anim_texture->frames[current_frame];
+            } else {
+                texture_to_draw = goal->anim_texture->frames[0];
+            }
+        } else if (goal->texture) {
+            texture_to_draw = goal->texture;
+        }
+
+        if (texture_to_draw) {
+            // Declare as float to match the function's requirements
+            float tex_w = 0.0f, tex_h = 0.0f;
+            // Call the function directly without casting ---
+            SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
+
+            // --- FIX: No need to cast here as variables are already floats
+            float aspect_ratio = (tex_h != 0) ? (tex_w / tex_h) : 1.0f;
+
+            // Define the target box size (64x64 for parent icons)
+            ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
+
+            // Calculate scaled dimensions to fit inside the box
+            ImVec2 scaled_size = target_box_size;
+            if (aspect_ratio > 1.0f) { // Wider than tall
+                scaled_size.y = scaled_size.x / aspect_ratio;
+            } else { // Taller than wide or square
+                scaled_size.x = scaled_size.y * aspect_ratio;
+            }
+
+            // Define the top-left of the icon box area (inside the 96x96 background)
+            ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
+            // Calculate padding needed to center the scaled image within the box
+            ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f, (target_box_size.y - scaled_size.y) * 0.5f);
+
+            // The final top-left and bottom-right corners for drawing
+            ImVec2 p_min = ImVec2(box_p_min.x + padding.x, box_p_min.y + padding.y);
+            ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
+
+            draw_list->AddImage((void *)texture_to_draw, p_min, p_max);
+        }
+
+        // TODO: Remove this
+        // if (goal->texture)
+        //     draw_list->AddImage((void *) goal->texture,
+        //                         ImVec2(screen_pos.x + 16.0f * t->zoom_level,
+        //                                screen_pos.y + 16.0f * t->zoom_level),
+        //                         ImVec2(screen_pos.x + 80.0f * t->zoom_level,
+        //                                screen_pos.y + 80.0f * t->zoom_level));
 
         draw_list->AddText(nullptr, 16.0f * t->zoom_level,
                            ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
@@ -2945,10 +3417,6 @@ void tracker_reinit_template(Tracker *t, const AppSettings *settings) {
     if (t->template_data) {
         tracker_free_template_data(t->template_data);
 
-        // TODO: Remove this
-        // Reset the entire to zero to clear dangling pointers and old counts.
-        // memset(t->template_data, 0, sizeof(TemplateData));
-
         // After clearing, ensure the snapshot name is also cleared to force a new snapshot
         t->template_data->snapshot_world_name[0] = '\0';
     }
@@ -3106,6 +3574,17 @@ void tracker_free(Tracker **tracker) {
             free(t->texture_cache);
         }
 
+        // Free all animations in the cache
+        if (t->anim_cache) {
+            for (int i = 0; i < t->anim_cache_count; i++) {
+                if (t->anim_cache[i].anim) {
+                    // THE ONLY PLACE WHERE ANIMATIONS ARE FREED
+                    free_animated_texture(t->anim_cache[i].anim);
+                }
+            }
+            free(t->anim_cache);
+        }
+
         if (t->minecraft_font) {
             TTF_CloseFont(t->minecraft_font);
         }
@@ -3115,8 +3594,9 @@ void tracker_free(Tracker **tracker) {
         if (t->adv_bg_done) SDL_DestroyTexture(t->adv_bg_done);
 
         if (t->template_data) {
-            tracker_free_template_data(t->template_data); // This ONLY frees the CONTENT of the struct
-            free(t->template_data); // This frees the struct
+            tracker_free_template_data(t->template_data);
+            // This ONLY frees the CONTENT of the struct, not the struct itself
+            free(t->template_data); // This frees the struct, STRUCT FREED HERE
         }
 
         if (t->renderer) {

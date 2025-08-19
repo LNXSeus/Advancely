@@ -136,12 +136,20 @@ extern "C" {
 #define MAX_PATH_LENGTH 1024
 #endif
 
+typedef struct {
+    int frame_count;          // How many frames are in the animation
+    SDL_Texture **frames;     // An array of textures, one for each frame
+    int *delays;              // An array of delays (in ms) for each frame
+    Uint32 total_duration;    // The sum of all delays, for looping
+} AnimatedTexture;
+
 // A generic struct for a sub-item, like and advancement's criterion or a stat
 struct TrackableItem {
     char root_name[192]; // The unique ID, e.g., "minecraft:husbandry/balanced_diet"
     char display_name[192]; // The user-facing name, e.g., "A Balanced Diet"
     char icon_path[256]; // Relative path to the icon, e.g., "items/apple.png"
     SDL_Texture *texture; // The loaded texture for the icon.
+    AnimatedTexture *anim_texture; // To support .gif files
 
     // Pre-parsed keys for modern stat lookups
     char stat_category_key[192]; // e.g., "minecraft:custom"
@@ -167,6 +175,7 @@ struct TrackableCategory {
     char display_name[192];
     char icon_path[256];
     SDL_Texture *texture; // Main icon texture for category/advancement
+    AnimatedTexture *anim_texture; // To support .gif files
 
     SDL_Texture *texture_bg;
     SDL_Texture *texture_bg_half_done;
@@ -219,6 +228,7 @@ struct MultiStageGoal {
     char display_name[192]; // The overall name, e.g., "Thunder advancements"
     char icon_path[256]; // The icon for the entire goal
     SDL_Texture *texture; // The loaded icon texture
+    AnimatedTexture *anim_texture; // To support .gif files
 
     int current_stage; // Index of the currently active sub-goal
     int stage_count; // How many stages there are
