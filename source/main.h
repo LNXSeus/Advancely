@@ -30,14 +30,14 @@ extern "C" {
 #define SDL_FLAGS SDL_INIT_VIDEO // TODO: OR'd together with SDL_INIT_AUDIO
 
 #define TRACKER_TITLE "Advancely"
-#define ADVANCELY_VERSION "v0.8.18" // vMAJOR.MINOR.PATCH // TODO: Update this always
+#define ADVANCELY_VERSION "v0.8.19" // vMAJOR.MINOR.PATCH // TODO: Update this always
 #define ADVANCELY_ICON_PATH "resources/gui/Advancely_Logo_NoText.png" // TODO: Use this in tracker_init_sdl()
 #define ADVANCELY_FADED_ALPHA 100
 #define TRACKER_SEPARATOR_LINE_WIDTH 0.80f
 
 // Framewise delay for GIFs if they have no timing information
 // Used in load_animated_gif() function in tracker.cpp
-#define DEFAULT_GIF_DELAY_MS 100
+#define DEFAULT_GIF_DELAY_MS 100 // (10 frames per second)
 
 
 #define OVERLAY_TITLE "Advancely Overlay"

@@ -154,7 +154,7 @@ static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *pa
     Uint32 total_duration = 0;
     for (int i = 0; i < anim->count; i++) {
         SDL_Surface *frame_surface = anim->frames[i];
-        SDL_Texture *final_frame_texture = NULL;
+        SDL_Texture *final_frame_texture = nullptr;
 
         const int w = frame_surface->w;
         const int h = frame_surface->h;
@@ -167,7 +167,7 @@ static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *pa
             SDL_Texture* temp_texture = SDL_CreateTextureFromSurface(renderer, frame_surface);
             if (!temp_texture) {
                 SDL_Log("Failed to create temporary texture from GIF frame: %s", SDL_GetError());
-                anim_texture->frames[i] = NULL; // Mark as failed
+                anim_texture->frames[i] = nullptr; // Mark as failed
                 continue; // Skip to next frame
             }
 
@@ -188,10 +188,10 @@ static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *pa
                 SDL_FRect dest_rect = { (float)(side - w) / 2.0f, (float)(side - h) / 2.0f, (float)w, (float)h };
 
                 // 6. Render the temporary texture onto our new square texture.
-                SDL_RenderTexture(renderer, temp_texture, NULL, &dest_rect);
+                SDL_RenderTexture(renderer, temp_texture, nullptr, &dest_rect);
 
                 // 7. Reset the renderer to draw back to the window.
-                SDL_SetRenderTarget(renderer, NULL);
+                SDL_SetRenderTarget(renderer, nullptr);
             }
 
             // 8. Clean up the temporary texture.
@@ -212,102 +212,6 @@ static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *pa
             IMG_FreeAnimation(anim);
             return nullptr;
         }
-    // TODO: Remove
-    // Uint32 total_duration = 0;
-    // for (int i = 0; i < anim->count; i++) {
-    //     SDL_Surface *frame_surface = anim->frames[i];
-    //     SDL_Surface *surface_for_texture = NULL;
-    //
-    //     const int w = frame_surface->w;
-    //     const int h = frame_surface->h;
-    //
-    //     // If the frame is not square, create a new square canvas and center it.
-    //     if (w != h) {
-    //         const int side = (w > h) ? w : h; // The new dimension is the larger of the two sides.
-    //
-    //         // Define where the original image will be placed on the new canvas.
-    //         SDL_Rect dest_rect = { (side - w) / 2, (side - h) / 2, w, h };
-    //
-    //         // Create the new square canvas with a format that supports transparency.
-    //         SDL_Surface* square_canvas = SDL_CreateSurface(side, side, SDL_PIXELFORMAT_RGBA32);
-    //         if (square_canvas) {
-    //             // Fill the canvas with a fully transparent color (R=0,G=0,B=0,A=0).
-    //             SDL_FillSurfaceRect(square_canvas, NULL, 0x00000000);
-    //
-    //             // For a clean copy, we ensure the source frame is in the same format before blitting.
-    //             SDL_Surface* converted_frame = SDL_ConvertSurface(frame_surface, SDL_PIXELFORMAT_RGBA32);
-    //             if (converted_frame) {
-    //                 // Use SDL_BLENDMODE_NONE for a direct pixel copy with blending.
-    //                 SDL_SetSurfaceBlendMode(converted_frame, SDL_BLENDMODE_BLEND);
-    //                 SDL_BlitSurface(converted_frame, NULL, square_canvas, &dest_rect);
-    //                 SDL_DestroySurface(converted_frame);
-    //             }
-    //
-    //             // This new square canvas is what we'll use to create the texture.
-    //             surface_for_texture = square_canvas;
-    //         }
-    //     }
-    //
-    //     // If the image was already square, or if creating the padded version failed,
-    //     // we just convert the original surface to the standard format.
-    //     if (!surface_for_texture) {
-    //         surface_for_texture = SDL_ConvertSurface(frame_surface, SDL_PIXELFORMAT_RGBA32);
-    //     }
-    //
-    //     // Create the final texture from our processed surface.
-    //     if (surface_for_texture) {
-    //
-    //         // TODO: DEBUG CODE
-    //         // --- START DEBUGGING CODE ---
-    //         // This will save the intermediate surface to a PNG file if it was non-square.
-    //         // Check the folder where Advancely.exe is located for "debug_frame_X.png".
-    //         if (w != h) {
-    //             static int debug_frame_count = 0; // Use a static counter for unique filenames
-    //             char debug_filename[256];
-    //             snprintf(debug_filename, sizeof(debug_filename), "debug_frame_%d.png", debug_frame_count++);
-    //
-    //             printf("DEBUG: Saving non-square frame to %s (Original: %dx%d, Padded: %dx%d)\n",
-    //                    debug_filename, w, h, surface_for_texture->w, surface_for_texture->h);
-    //
-    //             IMG_SavePNG(surface_for_texture, debug_filename);
-    //         }
-    //         // --- END DEBUGGING CODE ---
-    //
-    //         anim_texture->frames[i] = SDL_CreateTextureFromSurface(renderer, surface_for_texture);
-    //         SDL_DestroySurface(surface_for_texture); // Clean up the intermediate surface.
-    //     } else {
-    //         SDL_Log("Could not create intermediate surface for GIF frame: %s", SDL_GetError());
-    //         anim_texture->frames[i] = NULL;
-    //     }
-    //
-    //     if (!anim_texture->frames[i]) {
-    //         fprintf(stderr, "[TRACKER - GIF LOAD] Failed to create texture for frame %d from %s\n", i, path);
-    //         // Cleanup if a frame texture fails to create
-    //         free(anim_texture->frames);
-    //         free(anim_texture->delays);
-    //         free(anim_texture);
-    //         IMG_FreeAnimation(anim);
-    //         return nullptr;
-    //     }
-
-    // TODO: Remove this
-    // Uint32 total_duration = 0;
-    // for (int i = 0; i < anim->count; i++) {
-    //     SDL_Surface *frame_surface = anim->frames[i];
-    //
-    //     // Create a new surface with a consistent pixel format to ensure correct dimensions
-    //     // This prevents scaling issues with GIF frames by normalizing them before creating a texture,
-    //     // mirroring the process used for PNG files.
-    //
-    //     SDL_Surface *formatted_surface = SDL_CreateSurface(frame_surface->w, frame_surface->h, SDL_PIXELFORMAT_RGBA32);
-    //     if (formatted_surface) {
-    //         SDL_BlitSurface(frame_surface, nullptr, formatted_surface, nullptr);
-    //         anim_texture->frames[i] = SDL_CreateTextureFromSurface(renderer, formatted_surface);
-    //         SDL_DestroySurface(formatted_surface); // Clean up the intermediate surface
-    //     } else {
-    //         // Fallback to original method on format failure
-    //         anim_texture->frames[i] = SDL_CreateTextureFromSurface(renderer, frame_surface);
-    //     }
 
         SDL_SetTextureBlendMode(anim_texture->frames[i], SDL_BLENDMODE_BLEND);
         SDL_SetTextureScaleMode(anim_texture->frames[i], SDL_SCALEMODE_NEAREST);
