@@ -193,6 +193,7 @@ PathMode settings_get_path_mode_from_string(const char *mode_str) {
 // ------------------- SETTINGS UTILS -------------------
 
 void settings_set_defaults(AppSettings *settings) {
+    // TODO: Make sure to add any new default values here and to the tooltip in settings_render_gui() ---------
     // Set safe defaults first -> defined in settings_utils.h
     strncpy(settings->version_str, DEFAULT_VERSION, sizeof(settings->version_str) - 1);
     settings->path_mode = PATH_MODE_AUTO;
@@ -210,6 +211,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
     settings->goal_align_left = DEFAULT_GOAL_ALIGN_LEFT;
     settings->remove_completed_goals = DEFAULT_REMOVE_COMPLETED_GOALS;
+    settings->print_debug_status = DEFAULT_PRINT_DEBUG_STATUS;
 
     // Default Geometry
     WindowRect default_window = {DEFAULT_WINDOW_POS, DEFAULT_WINDOW_POS, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE};
@@ -331,6 +333,13 @@ bool settings_load(AppSettings *settings) {
             settings->remove_completed_goals = DEFAULT_REMOVE_COMPLETED_GOALS;
             defaults_were_used = true;
         }
+
+        const cJSON *print_debug = cJSON_GetObjectItem(general_settings, "print_debug_status");
+        if (print_debug && cJSON_IsBool(print_debug)) settings->print_debug_status = cJSON_IsTrue(print_debug);
+        else {
+            settings->print_debug_status = DEFAULT_PRINT_DEBUG_STATUS;
+            defaults_were_used = true;
+        }
     } else {
         defaults_were_used = true;
     }
@@ -414,6 +423,7 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
     //                           cJSON_CreateBool(settings->overlay_scroll_left_to_right)); // TODO: Remove this
     cJSON_ReplaceItemInObject(general_obj, "goal_align_left", cJSON_CreateBool(settings->goal_align_left));
     cJSON_ReplaceItemInObject(general_obj, "remove_completed_goals", cJSON_CreateBool(settings->remove_completed_goals));
+    cJSON_ReplaceItemInObject(general_obj, "print_debug_status", cJSON_CreateBool(settings->print_debug_status));
 
     // Update Visual Settings
     cJSON *visuals_obj = get_or_create_object(root, "visuals");

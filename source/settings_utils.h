@@ -26,6 +26,7 @@ extern "C" {
 #define DEFAULT_OVERLAY_SCROLL_SPEED 1.0f
 #define DEFAULT_GOAL_ALIGN_LEFT true
 #define DEFAULT_REMOVE_COMPLETED_GOALS true
+#define DEFAULT_PRINT_DEBUG_STATUS false
 
 // DEFINE DEFAULT SETTINGS
 #define DEFAULT_VERSION "1.16.1"
@@ -84,6 +85,7 @@ struct AppSettings {
     bool using_stats_per_world_legacy;        // If true, legacy versions look for per-world .dat files (for StatsPerWorld mod).
     float fps;                                // The target frames per second for the application loop.
     bool tracker_always_on_top;               // If true, the main tracker window stays above other windows.
+    bool print_debug_status;                  // If true, tracker_print_debug_status() function gets called.
     float overlay_scroll_speed;               // The speed and direction of the scrolling animation in the overlay.
     bool goal_align_left;                     // If true, items in the overlay are aligned to the left.
     bool remove_completed_goals;              // If true, completed goals are hidden from the tracker view.
