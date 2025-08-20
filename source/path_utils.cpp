@@ -183,7 +183,9 @@ void find_player_data_files(
             HANDLE h_find_file = FindFirstFileA(stats_search_path, &find_file_data);
             if (h_find_file != INVALID_HANDLE_VALUE) {
                 snprintf(out_stats_path, max_len, "%s/stats/%s", mc_root_path, find_file_data.cFileName);
-                printf("[PATH UTILS] Found legacy global stats file: %s\n", out_stats_path);
+                if (settings && settings->print_debug_status) {
+                    printf("[PATH UTILS] Found legacy global stats file: %s\n", out_stats_path);
+                }
                 FindClose(h_find_file);
             }
         }
