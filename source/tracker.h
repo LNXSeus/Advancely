@@ -172,8 +172,9 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings);
  * Hotkeys are handled in settings_utils.cpp in the settings_save() function.
  *
  * @param t A pointer to the Tracker struct containing the necessary paths.
+ * @param settings A pointer to the application settings.
  */
-void tracker_load_and_parse_data(Tracker *t);
+void tracker_load_and_parse_data(Tracker *t, const AppSettings *settings);
 
 /**
  * @brief Frees all resources associated with the Tracker instance.
@@ -184,8 +185,9 @@ void tracker_load_and_parse_data(Tracker *t);
  * (NOT custom, as that is saved in settings.json), multi-stage goals and their sub-items.
  *
  * @param tracker A pointer to the Tracker struct pointer to be freed.
+ * @param settings A pointer to the application settings.
  */
-void tracker_free(Tracker **tracker);
+void tracker_free(Tracker **tracker, const AppSettings *settings);
 
 /**
  * @brief Updates the tracker window's title with dynamic information.

@@ -375,7 +375,9 @@ bool settings_load(AppSettings *settings) {
 
     cJSON_Delete(json);
     construct_template_paths(settings);
-    printf("[SETTINGS UTILS] Settings loaded successfully!\n");
+    if (settings->print_debug_status) {
+        printf("[SETTINGS UTILS] Settings loaded successfully!\n");
+    }
     return defaults_were_used;
 }
 

@@ -179,7 +179,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     ImGui::Checkbox("Print Debug To Console", &temp_settings.print_debug_status);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("This toggles printing debug information to the console.\nAny other prints including errors are unaffected by this setting.\nRequires running the application from a console (like MSYS2 MINGW64)\nto see the output. Just navigate to the path and execute with \"./Advancely\".");
+        ImGui::SetTooltip("This toggles printing debug information to the console (only printf, fprintf are excluded). \nAny other prints including errors are unaffected by this setting.\nRequires running the application from a console (like MSYS2 MINGW64)\nto see the output. Just navigate to the path and execute with \"./Advancely\".");
     }
 
     ImGui::Separator();
