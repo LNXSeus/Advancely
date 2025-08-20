@@ -2433,7 +2433,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
             // Prepare snapshot status text for legacy achievements (without mod)
             char snapshot_text[8] = "";
-            if (!is_stat_section && version <= MC_VERSION_1_6_4) {
+            if (!is_stat_section && version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy) {
                 if (cat->done && !cat->done_in_snapshot) {
                     // If just completed and not true in snapshot file
                     strcpy(snapshot_text, "(New)");

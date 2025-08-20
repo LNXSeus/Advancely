@@ -55,7 +55,8 @@ static void global_watch_callback(dmon_watch_id watch_id, dmon_action action, co
         if (ext && (strcmp(ext, ".json") == 0) | (strcmp(ext, ".dat") == 0)) {
             // Check for .json or .dat
             // Check if file extension is .json, IMPORTANT: This triggers for useless .json files as well
-            printf("[DMON - MAIN] File modified: %s. Triggering update.\n", filepath);
+            // printf("[DMON - MAIN] File modified: %s. Triggering update.\n", filepath);
+
             // Automatically set the flag to 1. Safe to call from any thread.
             SDL_SetAtomicInt(&g_needs_update, 1);
         }
