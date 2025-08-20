@@ -66,7 +66,16 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // Template Settings
     ImGui::Text("Template Settings");
-
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip(
+            "Select the Version, Category, and an Optional Flag to construct the path to your template files.\n"
+            "The final path will look like: resources/templates/Version/Category/Version_CategoryOptionalFlag.json\n"
+            "The corresponding language file must end in _lang.json and holds all the formatted text that displays in the UI.\n\n"
+            "You can create new categories and templates by creating new folders and files that follow this structure.\n"
+            "Feel free to modify the .json files to customize your goals.\n"
+            "(Template creator built into this tracker coming soon!)"
+        );
+    }
 
     int current_version_idx = -1;
     for (int i = 0; i < VERSION_STRINGS_COUNT; i++) {
@@ -98,6 +107,19 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     ImGui::InputText("Category", temp_settings.category, MAX_PATH_LENGTH);
     ImGui::InputText("Optional Flag", temp_settings.optional_flag, MAX_PATH_LENGTH);
+
+    if (ImGui::Button("Open Template Folder")) {
+#ifdef _WIN32
+        system("explorer resources\\templates");
+#elif __APPLE__
+        system("open resources/templates");
+#else
+        system("xdg-open resources/templates");
+#endif
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Opens the 'resources/templates' folder in your file explorer.");
+    }
 
     ImGui::Separator();
     ImGui::Spacing();
