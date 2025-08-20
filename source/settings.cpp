@@ -143,7 +143,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::Text("Visual Settings");
 
     // Helper arrays to convert Uint8[0-255] to float[0-1] for ImGui color pickers
-    static float tracker_bg[4], overlay_bg[4], text_col[4];
+    static float tracker_bg[4], overlay_bg[4], text_col[4], overlay_text_col[4];
     tracker_bg[0] = (float) temp_settings.tracker_bg_color.r / 255.0f;
     tracker_bg[1] = (float) temp_settings.tracker_bg_color.g / 255.0f;
     tracker_bg[2] = (float) temp_settings.tracker_bg_color.b / 255.0f;
@@ -156,6 +156,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     text_col[1] = (float) temp_settings.text_color.g / 255.0f;
     text_col[2] = (float) temp_settings.text_color.b / 255.0f;
     text_col[3] = (float) temp_settings.text_color.a / 255.0f;
+    overlay_text_col[0] = (float) temp_settings.overlay_text_color.r / 255.0f;
+    overlay_text_col[1] = (float) temp_settings.overlay_text_color.g / 255.0f;
+    overlay_text_col[2] = (float) temp_settings.overlay_text_color.b / 255.0f;
+    overlay_text_col[3] = (float) temp_settings.overlay_text_color.a / 255.0f;
 
     if (ImGui::ColorEdit4("Tracker BG", tracker_bg)) {
         temp_settings.tracker_bg_color = {(Uint8)(tracker_bg[0]*255), (Uint8)(tracker_bg[1]*255), (Uint8)(tracker_bg[2]*255), (Uint8)(tracker_bg[3]*255)};
@@ -170,6 +174,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     if (ImGui::ColorEdit4("Text Color", text_col)) {
         temp_settings.text_color = {(Uint8)(text_col[0]*255), (Uint8)(text_col[1]*255), (Uint8)(text_col[2]*255), (Uint8)(text_col[3]*255)};
+    }
+
+    if (temp_settings.enable_overlay) {
+        if (ImGui::ColorEdit4("Overlay Text Color", overlay_text_col)) {
+            temp_settings.overlay_text_color = {(Uint8)(overlay_text_col[0]*255), (Uint8)(overlay_text_col[1]*255), (Uint8)(overlay_text_col[2]*255), (Uint8)(overlay_text_col[3]*255)};
+        }
     }
 
     ImGui::Separator();

@@ -11,6 +11,7 @@
 const ColorRGBA DEFAULT_TRACKER_BG_COLOR = {13, 17, 23, 255};
 const ColorRGBA DEFAULT_OVERLAY_BG_COLOR = {0, 80, 255, 255};
 const ColorRGBA DEFAULT_TEXT_COLOR = {255, 255, 255, 255};
+const ColorRGBA DEFAULT_OVERLAY_TEXT_COLOR = {255, 255, 255, 255};
 
 const char* VERSION_STRINGS[] = {
     #define X(e, s) s,
@@ -211,6 +212,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->tracker_bg_color = DEFAULT_TRACKER_BG_COLOR;
     settings->overlay_bg_color = DEFAULT_OVERLAY_BG_COLOR;
     settings->text_color = DEFAULT_TEXT_COLOR;
+    settings->overlay_text_color = DEFAULT_OVERLAY_TEXT_COLOR;
 }
 
 bool settings_load(AppSettings *settings) {
@@ -346,6 +348,8 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         if (load_color(visual_settings, "text_color", &settings->text_color, &DEFAULT_TEXT_COLOR))
             defaults_were_used = true;
+        if (load_color(visual_settings, "overlay_text_color", &settings->overlay_text_color, &DEFAULT_OVERLAY_TEXT_COLOR))
+            defaults_were_used = true;
     } else {
         defaults_were_used = true;
     }
@@ -419,6 +423,7 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
     save_color(visuals_obj, "tracker_bg_color", &settings->tracker_bg_color);
     save_color(visuals_obj, "overlay_bg_color", &settings->overlay_bg_color);
     save_color(visuals_obj, "text_color", &settings->text_color);
+    save_color(visuals_obj, "overlay_text_color", &settings->overlay_text_color);
 
     // Update Custom Progress if provided
     if (td) {

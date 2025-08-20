@@ -120,7 +120,7 @@ void overlay_render(Overlay *o, const AppSettings *settings) {
     // TODO: Expand this
     // Example drawing one item
     SDL_Color text_color = {
-        settings->text_color.r, settings->text_color.g, settings->text_color.b, settings->text_color.a
+        settings->overlay_text_color.r, settings->overlay_text_color.g, settings->overlay_text_color.b, settings->overlay_text_color.a
     };
     SDL_Surface *text_surface = TTF_RenderText_Solid(o->font, "Example Advancement", 0, text_color);
     // 0 for null terminated text

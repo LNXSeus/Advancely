@@ -64,6 +64,17 @@
       "icon": "items/dune_armor_trim_smithing_template_25w14craftmine.png",
       "criteria": {}
     },
+    "minecraft:adventure/trim_with_all_exclusive_armor_patterns": {
+      "icon": "items/silence_armor_trim_smithing_template_1.20.2.png",
+      "criteria": {
+        "armor_trimmed_minecraft:vex_armor_trim_smithing_template_smithing_trim": {
+          "icon": "items/vex_armor_trim_smithing_template_25w14craftmine.png"
+        },
+        "armor_trimmed_minecraft:snout_armor_trim_smithing_template_smithing_trim": {
+          "icon": "items/snout_armor_trim_smithing_template_25w14craftmine.png"
+        }
+      }
+    },
     "minecraft:recipes/misc/vex_armor_trim_smithing_template": {
       "icon": "items/vex_armor_trim_smithing_template_25w14craftmine.png",
       "criteria": {}
