@@ -61,6 +61,7 @@ extern const ColorRGBA DEFAULT_TRACKER_BG_COLOR;
 extern const ColorRGBA DEFAULT_OVERLAY_BG_COLOR;
 extern const ColorRGBA DEFAULT_SETTINGS_BG_COLOR;
 extern const ColorRGBA DEFAULT_TEXT_COLOR;
+extern const ColorRGBA DEFAULT_OVERLAY_TEXT_COLOR;
 
 // A Struct to hold all application settings in one place
 struct AppSettings {
@@ -98,6 +99,7 @@ struct AppSettings {
     ColorRGBA tracker_bg_color;               // Background color for the main tracker window.
     ColorRGBA overlay_bg_color;               // Background color for the overlay window.
     ColorRGBA text_color;                     // Global text color for UI elements.
+    ColorRGBA overlay_text_color;             // Text color for the overlay window.
 };
 
 

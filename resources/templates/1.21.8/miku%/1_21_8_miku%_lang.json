@@ -16,6 +16,10 @@
   "advancement.minecraft.nether.obtain_ancient_debris": "Hidden in the Depths",
   "advancement.minecraft.adventure.trim_with_any_armor_pattern": "Crafting a New Look",
 
+  "advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns": "Smithing With Style (25%)",
+  "advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:vex_armor_trim_smithing_template_smithing_trim": "Vex Trim",
+  "advancement.minecraft.adventure.trim_with_all_exclusive_armor_patterns.criteria.armor_trimmed_minecraft:snout_armor_trim_smithing_template_smithing_trim": "Snout Trim",
+
   "advancement.minecraft.recipes.misc.vex_armor_trim_smithing_template": "Get Vex Trim",
   "advancement.minecraft.recipes.misc.netherite_upgrade_smithing_template": "Get Upgrade Trim",
   "advancement.minecraft.recipes.misc.snout_armor_trim_smithing_template": "Get Snout Trim",
