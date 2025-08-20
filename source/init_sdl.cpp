@@ -84,8 +84,8 @@ bool overlay_init_sdl(Overlay *o, const AppSettings *settings) {
     int y = (settings->overlay_window.y == DEFAULT_WINDOW_POS)
                 ? (int) SDL_WINDOWPOS_CENTERED
                 : settings->overlay_window.y;
-    int w = (settings->overlay_window.w == DEFAULT_WINDOW_SIZE) ? 1440 : settings->overlay_window.w;
-    int h = (settings->overlay_window.h == DEFAULT_WINDOW_SIZE) ? 420 : settings->overlay_window.h;
+    int w = (settings->overlay_window.w == DEFAULT_WINDOW_SIZE) ? OVERLAY_DEFAULT_WIDTH : settings->overlay_window.w;
+    int h = (settings->overlay_window.h == DEFAULT_WINDOW_SIZE) ? OVERLAY_FIXED_HEIGHT : settings->overlay_window.h;
 
     o->window = SDL_CreateWindow(OVERLAY_TITLE, w, h, window_flags);
     if (!o->window) {

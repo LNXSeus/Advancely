@@ -241,6 +241,11 @@ int main(int argc, char *argv[]) {
                     overlay_free(&overlay, &app_settings);
                 }
 
+                // If the overlay is active, apply any potential geometry changes from settings
+                if (overlay) {
+                    SDL_SetWindowSize(overlay->window, app_settings.overlay_window.w, OVERLAY_FIXED_HEIGHT);
+                }
+
                 // Update the tracker with the new paths and template data
                 tracker_reinit_template(tracker, &app_settings);
 

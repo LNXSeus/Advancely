@@ -202,6 +202,18 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (ImGui::ColorEdit4("Overlay Text Color", overlay_text_col)) {
             temp_settings.overlay_text_color = {(Uint8)(overlay_text_col[0]*255), (Uint8)(overlay_text_col[1]*255), (Uint8)(overlay_text_col[2]*255), (Uint8)(overlay_text_col[3]*255)};
         }
+
+        // Slider for overlay width
+        static int overlay_width;
+        overlay_width = temp_settings.overlay_window.w;
+        if (ImGui::DragInt("Overlay Width", &overlay_width, 10.0f, 200, 7680)) {
+            if (overlay_width > 0) { // Basic validation
+                temp_settings.overlay_window.w = overlay_width;
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Adjusts the width of the overlay window.\nDefault: %dpx", OVERLAY_DEFAULT_WIDTH);
+        }
     }
 
     ImGui::Separator();
@@ -320,14 +332,22 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::SameLine();
 
     if (ImGui::Button("Reset to Defaults")) {
+        // Preserve current window geometry before resetting other settings
+        WindowRect current_tracker_window = temp_settings.tracker_window;
+        WindowRect current_overlay_window = temp_settings.overlay_window;
+
         // Reset the temporary settings struct to the default values
         settings_set_defaults(&temp_settings);
+
+        // Restore the preserved window geometry
+        temp_settings.tracker_window = current_tracker_window;
+        temp_settings.overlay_window = current_overlay_window;
     }
     // TODO: Add default values always to this tooltip here
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[1024];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-            "Resets all settings in this window to their default values.\n"
+            "Resets all settings (besides window size/position) in this window to their default values.\n"
             "This does not modify your template files.\n\n"
             "Defaults:\n"
             "  - Path Mode: Auto-detect\n"

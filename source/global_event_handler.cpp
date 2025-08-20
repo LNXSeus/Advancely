@@ -68,7 +68,7 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
 
         // --- Dispatch keyboard/mouse events ---
         if (event.type >= SDL_EVENT_KEY_DOWN && event.type <= SDL_EVENT_MOUSE_WHEEL) {
-            if (event.key.windowID == SDL_GetWindowID(t->window)) {
+            if (t && event.key.windowID == SDL_GetWindowID(t->window)) {
                 tracker_events(t, &event, is_running, settings_opened);
             } else if (o && event.key.windowID == SDL_GetWindowID(o->window)) {
                 overlay_events(o, &event, is_running, deltaTime, app_settings);
@@ -77,7 +77,7 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
         // --- Dispatch window events (move, resize, etc.) ---
         else if (event.type >= SDL_EVENT_WINDOW_FIRST && event.type <= SDL_EVENT_WINDOW_LAST) {
             bool settings_changed = false;
-            if (event.window.windowID == SDL_GetWindowID(t->window)) {
+            if (t && event.window.windowID == SDL_GetWindowID(t->window)) {
                 if (event.type == SDL_EVENT_WINDOW_MOVED || event.type == SDL_EVENT_WINDOW_RESIZED) {
                     SDL_GetWindowPosition(t->window, &app_settings->tracker_window.x, &app_settings->tracker_window.y);
                     SDL_GetWindowSize(t->window, &app_settings->tracker_window.w, &app_settings->tracker_window.h);
@@ -87,8 +87,19 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
             } else if (o && event.window.windowID == SDL_GetWindowID(o->window)) { // o might be nullptr, then skip
                 if (event.type == SDL_EVENT_WINDOW_MOVED || event.type == SDL_EVENT_WINDOW_RESIZED) {
                     SDL_GetWindowPosition(o->window, &app_settings->overlay_window.x, &app_settings->overlay_window.y);
-                    SDL_GetWindowSize(o->window, &app_settings->overlay_window.w, &app_settings->overlay_window.h);
+                    int w, h;
+                    SDL_GetWindowSize(o->window, &w, &h);
+
+                    // Always save the current width and the required fixed height
+                    app_settings->overlay_window.w = w;
+                    app_settings->overlay_window.h = OVERLAY_FIXED_HEIGHT;
                     settings_changed = true;
+
+                    // If the resize event resulted in a different height, force it back.
+                    // This creates a "sticky" height that can't be changed by the user dragging the window frame.
+                    if (event.type == SDL_EVENT_WINDOW_RESIZED && h != OVERLAY_FIXED_HEIGHT) {
+                        SDL_SetWindowSize(o->window, w, OVERLAY_FIXED_HEIGHT);
+                    }
                 }
                 overlay_events(o, &event, is_running, deltaTime, app_settings);
             }
