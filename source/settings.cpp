@@ -4,6 +4,9 @@
 
 
 #include "settings.h"
+
+#include <vector>
+
 #include "settings_utils.h" // ImGui imported through this
 #include "global_event_handler.h" // For global variables
 #include "path_utils.h" // For path_exists()
@@ -174,9 +177,89 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     ImGui::Text("Debug Settings");
 
-    ImGui::Checkbox("Print Progress To Console", &temp_settings.print_debug_status);
+    ImGui::Checkbox("Print Debug To Console", &temp_settings.print_debug_status);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("This only toggles printing progress information to the console.\nAny other prints including errors are unaffected by this setting.\nRequires running the application from a console (like MSYS2 MINGW64)\nto see the output. Just navigate to the path and execute with \"./Advancely\".");
+        ImGui::SetTooltip("This toggles printing debug information to the console.\nAny other prints including errors are unaffected by this setting.\nRequires running the application from a console (like MSYS2 MINGW64)\nto see the output. Just navigate to the path and execute with \"./Advancely\".");
+    }
+
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    // --- Hotkey Settings ---
+
+    // This section is only displayed if the current template has custom counters.
+    static const char* key_names[] = {
+        "None", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
+        "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
+        "PrintScreen", "ScrollLock", "Pause", "Insert", "Home", "PageUp", "Delete", "End", "PageDown",
+        "Right", "Left", "Down", "Up", "Numlock", "Keypad /", "Keypad *", "Keypad -", "Keypad +", "Keypad Enter",
+        "Keypad 1", "Keypad 2", "Keypad 3", "Keypad 4", "Keypad 5", "Keypad 6", "Keypad 7", "Keypad 8", "Keypad 9", "Keypad 0", "Keypad ."
+    };
+
+    const int key_names_count = sizeof(key_names) / sizeof(char*);
+
+    // Create a temporary vector of counters to display
+    std::vector<TrackableItem*> custom_counters;
+    if (t && t->template_data) {
+        for (int i = 0; i < t->template_data->custom_goal_count; ++i) {
+            TrackableItem* item = t->template_data->custom_goals[i];
+            if (item && (item->goal > 0 || item->goal == -1)) {
+                custom_counters.push_back(item);
+            }
+        }
+    }
+
+        if (!custom_counters.empty()) {
+        ImGui::Text("Hotkey Settings");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Assign keys to increment/decrement custom counters\n(only work when tabbed into the tracker). Maximum of %d hotkeys are supported.", MAX_HOTKEYS);
+        }
+
+        // Ensure the temp_settings has space for all potential hotkeys
+        temp_settings.hotkey_count = custom_counters.size();
+
+        for (int i = 0; i < (int)custom_counters.size(); ++i) {
+            TrackableItem* counter = custom_counters[i];
+            HotkeyBinding* binding = &temp_settings.hotkeys[i];
+
+            // Set the target goal for this binding
+            strncpy(binding->target_goal, counter->root_name, sizeof(binding->target_goal) - 1);
+
+            ImGui::Text("%s", counter->display_name);
+            ImGui::SameLine();
+
+            // Find current index for the increment key
+            int current_inc_key_idx = 0;
+            for (int k = 0; k < key_names_count; ++k) {
+                if (strcmp(binding->increment_key, key_names[k]) == 0) {
+                    current_inc_key_idx = k;
+                    break;
+                }
+            }
+
+            // Find current index for the decrement key
+            int current_dec_key_idx = 0;
+            for (int k = 0; k < key_names_count; ++k) {
+                if (strcmp(binding->decrement_key, key_names[k]) == 0) {
+                    current_dec_key_idx = k;
+                    break;
+                }
+            }
+
+            // Render dropdowns
+            char inc_label[64];
+            snprintf(inc_label, sizeof(inc_label), "##inc_%s", counter->root_name);
+            if (ImGui::Combo(inc_label, &current_inc_key_idx, key_names, key_names_count)) {
+                strncpy(binding->increment_key, key_names[current_inc_key_idx], sizeof(binding->increment_key) - 1);
+            }
+
+            ImGui::SameLine();
+            char dec_label[64];
+            snprintf(dec_label, sizeof(dec_label), "##dec_%s", counter->root_name);
+            if (ImGui::Combo(dec_label, &current_dec_key_idx, key_names, key_names_count)) {
+                 strncpy(binding->decrement_key, key_names[current_dec_key_idx], sizeof(binding->decrement_key) - 1);
+            }
+        }
     }
 
     ImGui::Separator();

@@ -63,19 +63,21 @@ static void global_watch_callback(dmon_watch_id watch_id, dmon_action action, co
 }
 
 /**
- * @brief Callback for dmon watching the CONFIG directory.
+ * @brief Callback for dmon watching the CONFIG directory for settings.json.
  */
 static void settings_watch_callback(dmon_watch_id watch_id, dmon_action action, const char *rootdir,
                                     const char *filepath, const char *oldfilepath, void *user) {
     (void) watch_id;
     (void) rootdir;
     (void) oldfilepath;
-    (void) user;
+
+    AppSettings *settings = (AppSettings*)user;
 
     if (action == DMON_ACTION_MODIFY) {
-        // Check if the modified file is our settings file
         if (strcmp(filepath, "settings.json") == 0) {
-            printf("[DMON - MAIN] settings.json modified. Triggering update.\n");
+            if (settings && settings->print_debug_status) {
+                printf("[DMON - MAIN] settings.json modified. Triggering update.\n");
+            }
             SDL_SetAtomicInt(&g_settings_changed, 1);
         }
     }
@@ -168,7 +170,7 @@ int main(int argc, char *argv[]) {
             printf("[DMON - MAIN] Watching saves directory: %s\n", tracker->saves_path);
             // Watch saves directory and monitor child diretories
             saves_watcher_id = dmon_watch(tracker->saves_path, global_watch_callback, DMON_WATCHFLAGS_RECURSIVE,
-                                          nullptr);
+                                          &app_settings);
         } else {
             fprintf(stderr, "[DMON - MAIN] Failed to watch saves directory as it's empty: %s\n", tracker->saves_path);
         }
@@ -202,7 +204,9 @@ int main(int argc, char *argv[]) {
             // Check if settings.json has been modified (by UI or external editor)
             // Single point of truth for tracker data, triggered by "Apply" button
             if (SDL_SetAtomicInt(&g_settings_changed, 0) == 1) {
-                printf("[MAIN] Settings changed. Re-initializing template and file watcher.\n");
+                if (app_settings.print_debug_status) {
+                    printf("[MAIN] Settings changed. Re-initializing template and file watcher.\n");
+                }
 
                 // Stop watching the old directory
                 dmon_unwatch(saves_watcher_id);

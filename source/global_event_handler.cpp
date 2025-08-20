@@ -44,11 +44,15 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                     }
                     if (!target_goal) continue;
 
+                    // Convert key names from settings to scancodes for comparison
+                    SDL_Scancode inc_scancode = SDL_GetScancodeFromName(hb->increment_key);
+                    SDL_Scancode dec_scancode = SDL_GetScancodeFromName(hb->decrement_key);
+
                     // Check if the pressed key matches a hotkey
-                    if (event.key.scancode == hb->increment_scancode) {
+                    if (event.key.scancode == inc_scancode) {
                         target_goal->progress++;
                         hotkey_triggered = true;
-                    } else if (event.key.scancode == hb->decrement_scancode) {
+                    } else if (event.key.scancode == dec_scancode) {
                         target_goal->progress--;
                         hotkey_triggered = true;
                     }

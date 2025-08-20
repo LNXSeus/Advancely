@@ -404,7 +404,7 @@ static void tracker_load_snapshot_from_file(Tracker *t) {
  * @brief (Era 1: 1.0-1.6.4) Takes a snapshot of the current global stats including achievements.
  * This is called when a new world is loaded to establish a baseline for progress.
  */
-static void tracker_snapshot_legacy_stats(Tracker *t) {
+static void tracker_snapshot_legacy_stats(Tracker *t, const AppSettings *settings) {
     cJSON *player_stats_json = cJSON_from_file(t->stats_path);
     if (!player_stats_json) {
         fprintf(stderr, "[TRACKER] Could not read stats file to create snapshot.\n");
@@ -471,43 +471,45 @@ static void tracker_snapshot_legacy_stats(Tracker *t) {
     // SAVE TO SNAPSHOT FILE
     tracker_save_snapshot_to_file(t);
 
-    // TODO: DEBUGGING CODE TO PRINT WHAT THE SNAPSHOT LOOKS LIKE
-    // --- ADD THIS EXPANDED DEBUGGING CODE ---
-    printf("\n--- STARTING SNAPSHOT FOR WORLD: %s ---\n", t->template_data->snapshot_world_name);
+    if (settings->print_debug_status) {
+        // TODO: DEBUGGING CODE TO PRINT WHAT THE SNAPSHOT LOOKS LIKE
+        // --- ADD THIS EXPANDED DEBUGGING CODE ---
+        printf("\n--- STARTING SNAPSHOT FOR WORLD: %s ---\n", t->template_data->snapshot_world_name);
 
-    // Re-load the JSON file just for this debug print (this is inefficient but simple for debugging)
-    cJSON *debug_json = cJSON_from_file(t->stats_path);
-    if (debug_json) {
-        cJSON *stats_change = cJSON_GetObjectItem(debug_json, "stats-change");
-        if (cJSON_IsArray(stats_change)) {
-            printf("\n--- LEGACY ACHIEVEMENT CHECK ---\n");
-            // Loop through achievements from the template
-            for (int i = 0; i < t->template_data->advancement_count; i++) {
-                TrackableCategory *ach = t->template_data->advancements[i];
-                bool found = false;
-                int value = 0;
+        // Re-load the JSON file just for this debug print (this is inefficient but simple for debugging)
+        cJSON *debug_json = cJSON_from_file(t->stats_path);
+        if (debug_json) {
+            cJSON *stats_change = cJSON_GetObjectItem(debug_json, "stats-change");
+            if (cJSON_IsArray(stats_change)) {
+                printf("\n--- LEGACY ACHIEVEMENT CHECK ---\n");
+                // Loop through achievements from the template
+                for (int i = 0; i < t->template_data->advancement_count; i++) {
+                    TrackableCategory *ach = t->template_data->advancements[i];
+                    bool found = false;
+                    int value = 0;
 
-                // Search for this achievement in the player's stats data
-                cJSON *stat_entry;
-                cJSON_ArrayForEach(stat_entry, stats_change) {
-                    cJSON *item = stat_entry->child;
-                    if (item && strcmp(item->string, ach->root_name) == 0) {
-                        found = true;
-                        value = item->valueint;
-                        break;
+                    // Search for this achievement in the player's stats data
+                    cJSON *stat_entry;
+                    cJSON_ArrayForEach(stat_entry, stats_change) {
+                        cJSON *item = stat_entry->child;
+                        if (item && strcmp(item->string, ach->root_name) == 0) {
+                            found = true;
+                            value = item->valueint;
+                            break;
+                        }
+                    }
+
+                    if (found) {
+                        printf("  - Achievement '%s' (ID: %s): FOUND with value: %d\n", ach->display_name, ach->root_name,
+                               value);
+                    } else {
+                        printf("  - Achievement '%s' (ID: %s): NOT FOUND in player data\n", ach->display_name,
+                               ach->root_name);
                     }
                 }
-
-                if (found) {
-                    printf("  - Achievement '%s' (ID: %s): FOUND with value: %d\n", ach->display_name, ach->root_name,
-                           value);
-                } else {
-                    printf("  - Achievement '%s' (ID: %s): NOT FOUND in player data\n", ach->display_name,
-                           ach->root_name);
-                }
             }
+            cJSON_Delete(debug_json);
         }
-        cJSON_Delete(debug_json);
     }
 
     printf("\n--- LEGACY STAT SNAPSHOT ---\n");
@@ -2125,8 +2127,10 @@ void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
     // it means we've loaded a new world and need to take a new snapshot of the global stats
     if (version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy && strcmp(
             t->world_name, t->template_data->snapshot_world_name) != 0) {
-        printf("[TRACKER] Legacy world change detected. Taking new stat snapshot for world: %s\n", t->world_name);
-        tracker_snapshot_legacy_stats(t); // Take a new snapshot when StatsPerWorld is disabled in legacy version
+        if (settings->print_debug_status) {
+            printf("[TRACKER] Legacy world change detected. Taking new stat snapshot for world: %s\n", t->world_name);
+        }
+        tracker_snapshot_legacy_stats(t, settings); // Take a new snapshot when StatsPerWorld is disabled in legacy version
     }
 
     // Load all necessary player files ONCE
@@ -2478,7 +2482,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                            screen_pos.y + bg_size.y * t->zoom_level));
             SDL_Texture *texture_to_draw = nullptr;
             if (cat->anim_texture && cat->anim_texture->frame_count > 0) {
-                // also making a NULL check for the 'delays' pointer
+                // also making a nullptr check for the 'delays' pointer
                 if (cat->anim_texture->delays && cat->anim_texture->total_duration > 0) {
                     Uint32 current_time = SDL_GetTicks();
                     Uint32 elapsed_time = current_time % cat->anim_texture->total_duration;
@@ -2779,7 +2783,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         // Asure proper rendering for .gif files
         SDL_Texture *texture_to_draw = nullptr;
         if (item->anim_texture && item->anim_texture->frame_count > 0) {
-            // also making a NULL check for the 'delays' pointer
+            // also making a nullptr check for the 'delays' pointer
             if (item->anim_texture->delays && item->anim_texture->total_duration > 0) {
                 Uint32 current_time = SDL_GetTicks();
                 Uint32 elapsed_time = current_time % item->anim_texture->total_duration;
@@ -2932,7 +2936,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         // Asure proper rendering of .gif files
         SDL_Texture *texture_to_draw = nullptr;
         if (item->anim_texture && item->anim_texture->frame_count > 0) {
-            // also making a NULL check for the 'delays' pointer
+            // also making a nullptr check for the 'delays' pointer
             if (item->anim_texture->delays && item->anim_texture->total_duration > 0) {
                 Uint32 current_time = SDL_GetTicks();
                 Uint32 elapsed_time = current_time % item->anim_texture->total_duration;
@@ -3112,7 +3116,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
         SDL_Texture *texture_to_draw = nullptr;
         if (goal->anim_texture && goal->anim_texture->frame_count > 0) {
-            // also making a NULL check for the 'delays' pointer
+            // also making a nullptr check for the 'delays' pointer
             if (goal->anim_texture->delays && goal->anim_texture->total_duration > 0) {
                 Uint32 current_time = SDL_GetTicks();
                 Uint32 elapsed_time = current_time % goal->anim_texture->total_duration;
@@ -3528,10 +3532,99 @@ void tracker_load_and_parse_data(Tracker *t) {
     // Detect and flag criteria that are shared between multiple advancements
     tracker_detect_shared_sub_items(t);
 
-    printf("[TRACKER] Initial template parsing complete.\n");
+    // Automatically synchronize settings.json with the newly loaded template
+    cJSON* settings_root = cJSON_from_file(SETTINGS_FILE_PATH);
+    if (!settings_root) settings_root = cJSON_CreateObject();
+
+    // Sync custom_progress
+    cJSON* old_custom_progress = cJSON_GetObjectItem(settings_root, "custom_progress");
+    cJSON* new_custom_progress = cJSON_CreateObject();
+    for (int i = 0; i < t->template_data->custom_goal_count; i++) {
+        TrackableItem* item = t->template_data->custom_goals[i];
+        cJSON* old_item = old_custom_progress ? cJSON_GetObjectItem(old_custom_progress, item->root_name) : nullptr;
+        if (old_item) { // Preserve old value if it exists
+            cJSON_AddItemToObject(new_custom_progress, item->root_name, cJSON_Duplicate(old_item, 1));
+        } else { // Add new item with default value
+            if (item->goal > 0 || item->goal == -1) cJSON_AddNumberToObject(new_custom_progress, item->root_name, 0);
+            else cJSON_AddBoolToObject(new_custom_progress, item->root_name, false);
+        }
+    }
+    cJSON_ReplaceItemInObject(settings_root, "custom_progress", new_custom_progress);
+
+    // Sync stat_progress_override
+    cJSON* old_stat_override = cJSON_GetObjectItem(settings_root, "stat_progress_override");
+    cJSON* new_stat_override = cJSON_CreateObject();
+    for (int i = 0; i < t->template_data->stat_count; i++) {
+        TrackableCategory* stat_cat = t->template_data->stats[i];
+        cJSON* old_cat_item = old_stat_override ? cJSON_GetObjectItem(old_stat_override, stat_cat->root_name) : nullptr;
+
+        // Always add the parent entry (e.g., "stat_cat:mine_more_sand")
+        if (old_cat_item) cJSON_AddItemToObject(new_stat_override, stat_cat->root_name, cJSON_Duplicate(old_cat_item, 1));
+        else cJSON_AddBoolToObject(new_stat_override, stat_cat->root_name, false);
+
+        // Only add ".criteria." entries if the template defines multiple sub-stats for this category.
+        if (stat_cat->criteria_count > 1) {
+            for (int j = 0; j < stat_cat->criteria_count; j++) {
+                TrackableItem* sub_stat = stat_cat->criteria[j];
+                char sub_stat_key[512];
+                // Use the sub-stat's actual root_name for the key
+                snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name, sub_stat->root_name);
+                cJSON* old_sub_item = old_stat_override ? cJSON_GetObjectItem(old_stat_override, sub_stat_key) : nullptr;
+                if (old_sub_item) cJSON_AddItemToObject(new_stat_override, sub_stat_key, cJSON_Duplicate(old_sub_item, 1));
+                else cJSON_AddBoolToObject(new_stat_override, sub_stat_key, false);
+            }
+        }
+    }
+    cJSON_ReplaceItemInObject(settings_root, "stat_progress_override", new_stat_override);
+
+    // Sync hotkeys based on their order in the list, not by name
+    cJSON* old_hotkeys_array = cJSON_GetObjectItem(settings_root, "hotkeys");
+    cJSON* new_hotkeys_array = cJSON_CreateArray();
+
+    int counter_index = 0; // This will track their order in the list
+    for (int i = 0; i < t->template_data->custom_goal_count; i++) {
+        TrackableItem *item = t->template_data->custom_goals[i];
+        if (item && (item->goal > 0 || item->goal ==  -1)) { // It's a counter
+            cJSON *new_hotkey_obj = cJSON_CreateObject();
+            // The target is always the new counter from the current template
+            // put name of counter in target_goal
+            cJSON_AddStringToObject(new_hotkey_obj, "target_goal", item->root_name);
+
+            const char *inc_key = "None";
+            const char *dec_key = "None";
+
+            // Try to get the hotkey from the OLD settings at the SAME index
+            if (cJSON_IsArray(old_hotkeys_array)) {
+                cJSON *old_hotkey_item = cJSON_GetArrayItem(old_hotkeys_array, counter_index);
+                if (old_hotkey_item) {
+                    // If a binding exists at this index, preserve its keys.
+                    cJSON *old_inc_key = cJSON_GetObjectItem(old_hotkey_item, "increment_key");
+                    cJSON *old_dec_key = cJSON_GetObjectItem(old_hotkey_item, "decrement_key");
+                    if (old_inc_key) inc_key = old_inc_key->valuestring;
+                    if (old_dec_key) dec_key = old_dec_key->valuestring;
+                }
+            }
+
+            cJSON_AddStringToObject(new_hotkey_obj, "increment_key", inc_key);
+            cJSON_AddStringToObject(new_hotkey_obj, "decrement_key", dec_key);
+            cJSON_AddItemToArray(new_hotkeys_array, new_hotkey_obj);
+
+            counter_index++; // Move to the next counter index
+        }
+    }
+    cJSON_ReplaceItemInObject(settings_root, "hotkeys", new_hotkeys_array);
+
+    // Write the synchronized settings back to the file
+    FILE *file = fopen(SETTINGS_FILE_PATH, "w");
+    if (file) {
+        char *json_str = cJSON_Print(settings_root);
+        fputs(json_str, file);
+        fclose(file);
+        free(json_str);
+    }
+    cJSON_Delete(settings_root);
 
     // LOADING SNAPSHOT FROM FILE - ONLY FOR VERSION 1.0-1.6.4 WITHOUT StatsPerWorld MOD
-
     if (version <= MC_VERSION_1_6_4 && !settings.using_stats_per_world_legacy) {
         tracker_load_snapshot_from_file(t);
     }
@@ -3540,6 +3633,8 @@ void tracker_load_and_parse_data(Tracker *t) {
     if (lang_json) {
         cJSON_Delete(lang_json);
     }
+
+    printf("[TRACKER] Initial template parsing complete.\n");
     // No need to delete settings_json, because it's not parsed, handled in tracker_update()
 }
 

@@ -43,8 +43,8 @@ struct TemplateData;
 
 typedef struct {
     char target_goal[192];
-    SDL_Scancode increment_scancode;
-    SDL_Scancode decrement_scancode;
+    char increment_key[32];
+    char decrement_key[32];
 } HotkeyBinding;
 
 // Data structures for settings
