@@ -100,7 +100,9 @@ int main(int argc, char *argv[]) {
     // settings_load() returns true if the file was incomplete and used default values
     AppSettings app_settings;
     if (settings_load(&app_settings)) {
-        printf("[MAIN] Settings file was incomplete or missing, saving with default values.\n");
+        if (app_settings.print_debug_status) {
+            printf("[MAIN] Settings file was incomplete or missing, saving with default values.\n");
+        }
         settings_save(&app_settings, nullptr); // Save complete settings back to the file
     }
 
@@ -161,13 +163,17 @@ int main(int argc, char *argv[]) {
         SDL_SetAtomicInt(&g_settings_changed, 0);
 
         // HARDCODED SETTINGS DIRECTORY
-        printf("[DMON - MAIN] Watching config directory: resources/config/\n");
+        if (app_settings.print_debug_status) {
+            printf("[DMON - MAIN] Watching config directory: resources/config/\n");
+        }
         dmon_watch("resources/config/", settings_watch_callback, 0, nullptr);
 
 
         // Watch saves directory and store the watcher ID
         if (strlen(tracker->saves_path) > 0) {
-            printf("[DMON - MAIN] Watching saves directory: %s\n", tracker->saves_path);
+            if (app_settings.print_debug_status) {
+                printf("[DMON - MAIN] Watching saves directory: %s\n", tracker->saves_path);
+            }
             // Watch saves directory and monitor child diretories
             saves_watcher_id = dmon_watch(tracker->saves_path, global_watch_callback, DMON_WATCHFLAGS_RECURSIVE,
                                           &app_settings);
@@ -220,14 +226,18 @@ int main(int argc, char *argv[]) {
 
                 if (overlay_should_be_enabled && !overlay_is_currently_enabled) {
                     // It was disabled, now enable it
-                    printf("[MAIN] Enabling overlay.\n");
+                    if (app_settings.print_debug_status) {
+                        printf("[MAIN] Enabling overlay.\n");
+                    }
                     if (!overlay_new(&overlay, &app_settings)) {
                         fprintf(stderr, "[MAIN] Failed to create overlay at runtime.\n");
                     }
                 } else if (!overlay_should_be_enabled && overlay_is_currently_enabled) {
                     // It was enabled, now disable it
-                    printf("[MAIN] Disabling overlay.\n");
-                    overlay_free(&overlay);
+                    if (app_settings.print_debug_status) {
+                        printf("[MAIN] Disabling overlay.\n");
+                    }
+                    overlay_free(&overlay, &app_settings);
                 }
 
                 // Update the tracker with the new paths and template data
@@ -235,7 +245,9 @@ int main(int argc, char *argv[]) {
 
                 // Start watching the new directory
                 if (strlen(tracker->saves_path) > 0) {
-                    printf("[MAIN] Now watching new saves directory: %s\n", tracker->saves_path);
+                    if (app_settings.print_debug_status) {
+                        printf("[MAIN] Now watching new saves directory: %s\n", tracker->saves_path);
+                    }
                     saves_watcher_id = dmon_watch(tracker->saves_path, global_watch_callback,
                                                   DMON_WATCHFLAGS_RECURSIVE,
                                                   nullptr);
@@ -260,6 +272,7 @@ int main(int argc, char *argv[]) {
                     version,
                     // This toggles if StatsPerWorld mod is enabled (local stats for legacy)
                     current_settings.using_stats_per_world_legacy,
+                    &current_settings,
                     tracker->world_name,
                     tracker->advancements_path,
                     tracker->stats_path,
@@ -333,8 +346,8 @@ int main(int argc, char *argv[]) {
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
 
-    tracker_free(&tracker);
-    overlay_free(&overlay);
+    tracker_free(&tracker, &app_settings);
+    overlay_free(&overlay, &app_settings);
     SDL_DestroyMutex(g_watcher_mutex); // Destroy the mutex
     SDL_Quit(); // This is ONCE for all windows
 

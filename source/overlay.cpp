@@ -23,7 +23,7 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     Overlay *o = *overlay;
 
     if (!overlay_init_sdl(o, settings)) {
-        overlay_free(overlay);
+        overlay_free(overlay, settings);
         return false;
     }
 
@@ -37,7 +37,7 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     o->font = TTF_OpenFont("resources/fonts/Minecraft.ttf", font_size);
     if (!o->font) {
         fprintf(stderr, "[OVERLAY] Failed to load font: %s\n", SDL_GetError());
-        overlay_free(overlay);
+        overlay_free(overlay, settings);
         return false;
     }
     return true;
@@ -58,7 +58,9 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
             // Allowing repeats here
             switch (event->key.scancode) {
                 case SDL_SCANCODE_SPACE:
-                    printf("[OVERLAY] Overlay Space key pressed, speeding up tracker.\n");
+                    if (settings->print_debug_status) {
+                        printf("[OVERLAY] Overlay Space key pressed, speeding up tracker.\n");
+                    }
                     // speed up tracker
                     // The speedup is applied to deltaTime, which affect the update rate of the animation in overlay_update()
                     *deltaTime *= OVERLAY_SPEEDUP_FACTOR;
@@ -67,7 +69,7 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
                     break;
             }
             break;
-        // TODO: Work with mouse events
+        // TODO: Work with mouse events (HANDLED by ImGui)
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
             // printf("[OVERLAY] Mouse button pressed in overlay.\n");
             break;
@@ -139,7 +141,7 @@ void overlay_render(Overlay *o, const AppSettings *settings) {
     SDL_RenderPresent(o->renderer);
 }
 
-void overlay_free(Overlay **overlay) {
+void overlay_free(Overlay **overlay, const AppSettings *settings) {
     if (overlay && *overlay) {
         Overlay *o = *overlay;
 
@@ -169,6 +171,8 @@ void overlay_free(Overlay **overlay) {
         o = nullptr;
         *overlay = nullptr;
 
-        printf("[OVERLAY] Overlay freed!\n");
+        if (settings->print_debug_status) {
+            printf("[OVERLAY] Overlay freed!\n");
+        }
     }
 }

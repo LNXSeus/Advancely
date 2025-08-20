@@ -80,8 +80,9 @@ void overlay_render(Overlay *o, const AppSettings *settings);
  * the memory for the Overlay struct itself.
  *
  * @param overlay A pointer to the Overlay struct pointer to be freed.
+ * @param settings A pointer to the loaded application settings.
  */
-void overlay_free(Overlay **overlay);
+void overlay_free(Overlay **overlay, const AppSettings *settings);
 
 #ifdef __cplusplus
 }

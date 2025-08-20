@@ -3,6 +3,7 @@
 //
 
 #include "path_utils.h" // includes main.h
+#include "settings_utils.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -21,7 +22,6 @@
 #endif
 
 // LOCAL HELPER FUNCTIONS
-
 /**
  * @brief Converts DOUBLE backslashes in a path to SINGLE forward slashes.
  * This is a local helper function to ensure consistent path formats internally.
@@ -107,6 +107,7 @@ void find_player_data_files(
     const char *saves_path,
     MC_Version version,
     bool use_stats_per_world_mod,
+    const AppSettings *settings,
     char *out_world_name,
     char *out_adv_path,
     char *out_stats_path,
@@ -143,7 +144,9 @@ void find_player_data_files(
 
     if (strlen(latest_world_name) > 0) {
         strncpy(out_world_name, latest_world_name, max_len - 1);
-        printf("[PATH UTILS] Found latest world: %s\n", out_world_name);
+        if (settings && settings->print_debug_status) {
+            printf("[PATH UTILS] Found latest world: %s\n", out_world_name);
+        }
     } else {
         strncpy(out_world_name, "No Worlds Found", max_len - 1);
     }
@@ -160,7 +163,9 @@ void find_player_data_files(
                 HANDLE h_find_file = FindFirstFileA(stats_search_path, &find_file_data);
                 if (h_find_file != INVALID_HANDLE_VALUE) {
                     snprintf(out_stats_path, max_len, "%s/%s/stats/%s", saves_path, latest_world_name, find_file_data.cFileName);
-                    printf("[PATH UTILS] Found legacy per-world stats file: %s\n", out_stats_path);
+                    if (settings && settings->print_debug_status) {
+                        printf("[PATH UTILS] Found legacy per-world stats file: %s\n", out_stats_path);
+                    }
                     FindClose(h_find_file);
                 }
             }
@@ -197,7 +202,9 @@ void find_player_data_files(
         h_find_file = FindFirstFileA(sub_search_path, &find_file_data);
         if (h_find_file != INVALID_HANDLE_VALUE) {
             snprintf(out_stats_path, max_len, "%s/%s", temp_path, find_file_data.cFileName);
-            printf("[PATH UTILS] Found mid/modern era stats file: %s\n", out_stats_path);
+            if (settings && settings->print_debug_status) {
+                printf("[PATH UTILS] Found mid/modern era stats file: %s\n", out_stats_path);
+            }
             FindClose(h_find_file);
         }
 
@@ -232,6 +239,7 @@ void find_player_data_files(
     const char *saves_path,
     MC_Version version,
     bool use_stats_per_world_mod,
+    const AppSettings *settings,
     char *out_world_name,
     char *out_adv_path,
     char *out_stats_path,
@@ -270,7 +278,9 @@ void find_player_data_files(
 
     if (strlen(latest_world_name) > 0) {
         strncpy(out_world_name, latest_world_name, max_len - 1);
-        printf("[PATH UTILS] Found latest world: %s\n", out_world_name);
+        if (settings && settings->print_debug_status) {
+            printf("[PATH UTILS] Found latest world: %s\n", out_world_name);
+        }
     } else {
         strncpy(out_world_name, "No Worlds Found", max_len - 1);
     }
@@ -287,7 +297,9 @@ void find_player_data_files(
                     while ((entry = readdir(stats_dir)) != nullptr) {
                         if (strstr(entry->d_name, ".dat")) {
                             snprintf(out_stats_path, max_len, "%s/%s", stats_path_dir, entry->d_name);
-                             printf("[PATH UTILS] Found legacy per-world stats file: %s\n", out_stats_path);
+                            if (settings && settings->print_debug_status) {
+                                printf("[PATH UTILS] Found legacy per-world stats file: %s\n", out_stats_path);
+                            }
                             break;
                         }
                     }
@@ -308,7 +320,9 @@ void find_player_data_files(
                 while ((entry = readdir(stats_dir)) != nullptr) {
                     if (strstr(entry->d_name, ".dat")) {
                         snprintf(out_stats_path, max_len, "%s/%s", stats_path_dir, entry->d_name);
-                        printf("[PATH UTILS] Found legacy global stats file: %s\n", out_stats_path);
+                        if (settings && settings->print_debug_status) {
+                            printf("[PATH UTILS] Found legacy global stats file: %s\n", out_stats_path);
+                        }
                         break;
                     }
                 }
@@ -329,7 +343,9 @@ void find_player_data_files(
             while ((entry = readdir(dir)) != nullptr) {
                 if (strstr(entry->d_name, ".json")) {
                     snprintf(out_stats_path, max_len, "%s/%s", folder_path, entry->d_name);
-                    printf("[PATH UTILS] Found mid/modern era stats file: %s\n", out_stats_path);
+                    if (settings && settings->print_debug_status) {
+                        printf("[PATH UTILS] Found mid/modern era stats file: %s\n", out_stats_path);
+                    }
                     break;
                 }
             }
@@ -366,273 +382,6 @@ void find_player_data_files(
     }
 }
 #endif
-
-// TODO: Remove this once possible
-//
-// #ifdef _WIN32
-// void find_player_data_files(
-//     const char *saves_path,
-//     MC_Version version,
-//     bool use_stats_per_world_mod,
-//     char *out_world_name,
-//     char *out_adv_path,
-//     char *out_stats_path,
-//     char *out_unlocks_path,
-//     size_t max_len) {
-//     // Clear output paths initially
-//     out_world_name[0] = '\0';
-//     out_adv_path[0] = '\0';
-//     out_stats_path[0] = '\0';
-//     out_unlocks_path[0] = '\0';
-//
-//     // Always find the most recently modified world directoy first
-//     char latest_world_name[MAX_PATH_LENGTH] = {0};
-//     char search_path[MAX_PATH_LENGTH];
-//     snprintf(search_path, sizeof(search_path), "%s/*", saves_path);
-//
-//     WIN32_FIND_DATAA find_world_data;
-//     HANDLE h_find_world = FindFirstFileA(search_path, &find_world_data);
-//     if (h_find_world == INVALID_HANDLE_VALUE) {
-//         fprintf(stderr, "[PATH UTILS] Cannot find files in saves directory: %s/n", saves_path);
-//         return;
-//     }
-//     FILETIME latest_time = {0, 0};
-//     do {
-//         // Find the latest world
-//         if ((find_world_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && strcmp(find_world_data.cFileName, ".") != 0
-//             && strcmp(find_world_data.cFileName, "..") != 0) {
-//             if (CompareFileTime(&find_world_data.ftLastWriteTime, &latest_time) > 0) {
-//                 latest_time = find_world_data.ftLastWriteTime;
-//                 strncpy(latest_world_name, find_world_data.cFileName, sizeof(latest_world_name) - 1);
-//             }
-//         }
-//     } while (FindNextFileA(h_find_world, &find_world_data) != 0);
-//     FindClose(h_find_world);
-//
-//     if (strlen(latest_world_name) > 0) {
-//         strncpy(out_world_name, latest_world_name, max_len - 1);
-//         printf("[PATH UTILS] Found latest world: %s\n", out_world_name);
-//     } else {
-//         // Even if no worlds are found, we might need to find a global legacy file.
-//         // Set a placeholder name for display.
-//         strncpy(out_world_name, "No Worlds Found", max_len - 1);
-//     }
-//
-//     // Era 1: Legacy Stats (MC 1.0 - 1.6.4)
-//     if (version <= MC_VERSION_1_6_4) {
-//         if (use_stats_per_world_mod) {
-//             // LEGACY WITH StatsPerWorld MOD, look for .dat file inside the latest world's stats folder
-//             if (strlen(latest_world_name) > 0) {
-//                 char stats_search_path[MAX_PATH_LENGTH];
-//                 snprintf(stats_search_path, sizeof(stats_search_path), "%s/%s/stats/*.dat", saves_path, latest_world_name);
-//
-//                 WIN32_FIND_DATAA find_file_data;
-//                 HANDLE h_find_file = FindFirstFileA(stats_search_path, &find_file_data);
-//                 if (h_find_file != INVALID_HANDLE_VALUE) {
-//                     snprintf(out_stats_path, max_len, "%s/%s/stats/%s", saves_path, latest_world_name, find_file_data.cFileName);
-//                     printf("[PATH UTILS] Found legacy per-world stats file: %s\n", out_stats_path);
-//                     FindClose(h_find_file);
-//                 }
-//             }
-//         } else {
-//             // STANDARD LEGACY: Look for global .dat file
-//             char mc_root_path[MAX_PATH_LENGTH];
-//             strncpy(mc_root_path, saves_path, sizeof(mc_root_path) - 1);
-//             char *last_slash = strrchr(mc_root_path, '/');
-//             if (last_slash) *last_slash = '\0';
-//
-//             char stats_search_path[MAX_PATH_LENGTH];
-//             snprintf(stats_search_path, sizeof(stats_search_path), "%s/stats/*.dat", mc_root_path);
-//
-//             WIN32_FIND_DATAA find_file_data;
-//             HANDLE h_find_file = FindFirstFileA(stats_search_path, &find_file_data);
-//             if (h_find_file != INVALID_HANDLE_VALUE) {
-//                 snprintf(out_stats_path, max_len, "%s/stats/%s", mc_root_path, find_file_data.cFileName);
-//                 printf("[PATH UTILS] Found legacy global stats file: %s\n", out_stats_path);
-//                 FindClose(h_find_file);
-//             }
-//         }
-//     } else {
-//         // Modern & Mid-era: Stats and advancements are per-world .json files
-//         if (strlen(latest_world_name) == 0) {
-//             fprintf(stderr, "[PATH UTILS] Could not find legacy stats .dat file in %s/stats/\n", saves_path);
-//             return;
-//         }
-//
-//         // Copy the found world name to the output buffer
-//         strncpy(out_world_name, latest_world_name, max_len - 1);
-//         out_world_name[max_len - 1] = '\0'; // Ensure nullptr-termination
-//         printf("[PATH UTILS] Found latest world: %s\n", out_world_name);
-//
-//         char temp_path[MAX_PATH_LENGTH];
-//         char sub_search_path[MAX_PATH_LENGTH];
-//         WIN32_FIND_DATAA find_file_data;
-//         HANDLE h_find_file;
-//
-//         // Find stats file for both mid and modern eras
-//
-//         snprintf(temp_path, max_len, "%s/%s/stats", saves_path, latest_world_name);
-//         normalize_path(temp_path);
-//         snprintf(sub_search_path, sizeof(sub_search_path), "%s/*.json", temp_path);
-//         normalize_path(sub_search_path);
-//         h_find_file = FindFirstFileA(sub_search_path, &find_file_data);
-//         if (h_find_file != INVALID_HANDLE_VALUE) {
-//             snprintf(out_stats_path, max_len, "%s/%s", temp_path, find_file_data.cFileName);
-//             normalize_path(out_stats_path);
-//             printf("[PATH UTILS] Found mid/modern era stats file: %s\n", out_stats_path);
-//             FindClose(h_find_file);
-//         }
-//
-//         // Era 3: Modern Advancements/Unlocks (MC 1.12+)
-//         if (version >= MC_VERSION_1_12) {
-//             // Advancements search
-//             snprintf(temp_path, max_len, "%s/%s/advancements", saves_path, latest_world_name);
-//             normalize_path(temp_path);
-//             snprintf(sub_search_path, sizeof(sub_search_path), "%s/*.json", temp_path);
-//             normalize_path(sub_search_path);
-//             // search for any .json files
-//             h_find_file = FindFirstFileA(sub_search_path, &find_file_data);
-//             if (h_find_file != INVALID_HANDLE_VALUE) {
-//                 // if file was found
-//                 snprintf(out_adv_path, max_len, "%s/%s", temp_path, find_file_data.cFileName);
-//                 normalize_path(out_adv_path);
-//                 // printf("[PATH UTILS] Set advancements path to: %s\n", out_adv_path);
-//                 FindClose(h_find_file); // Close the file handle
-//             }
-//
-//             // UNLOCKS SEARCH for 25w14craftmine
-//             if (version == MC_VERSION_25W14CRAFTMINE) {
-//                 snprintf(temp_path, max_len, "%s/%s/unlocks", saves_path, latest_world_name);
-//                 normalize_path(temp_path);
-//                 snprintf(sub_search_path, sizeof(sub_search_path), "%s/*.json", temp_path);
-//                 normalize_path(sub_search_path);
-//                 // search for any .json files in temp path
-//                 h_find_file = FindFirstFileA(sub_search_path, &find_file_data);
-//                 if (h_find_file != INVALID_HANDLE_VALUE) {
-//                     snprintf(out_unlocks_path, max_len, "%s/%s", temp_path, find_file_data.cFileName);
-//                     normalize_path(out_unlocks_path);
-//                     // printf("[PATH UTILS] Set unlocks path to: %s\n", out_unlocks_path);
-//                     FindClose(h_find_file); // Close the file handle
-//                 }
-//             }
-//         }
-//     }
-// }
-// #else // LINUX/MAC
-// void find_player_data_files(
-//     const char *saves_path,
-//     MC_Version version,
-//     char *out_world_name,
-//     char *out_adv_path,
-//     char *out_stats_path,
-//     char *out_unlocks_path,
-//     size_t max_len
-// ) {
-//     // Clear output paths initially
-//     out_world_name[0] = '\0';
-//     out_adv_path[0] = '\0';
-//     out_stats_path[0] = '\0';
-//     out_unlocks_path[0] = '\0';
-//
-//     // Always find the most recently modified world directoy first
-//     char latest_world_name[MAX_PATH_LENGTH] = {0};
-//     DIR *saves_dir = opendir(saves_path);
-//     if (!saves_dir) {
-//         fprintf(stderr, "[PATH UTILS] Cannot open saves directoRy: %s\n", saves_path);
-//         return;
-//     }
-//     struct dirent *entry;
-//     time_t latest_time = 0;
-//     while ((entry = readdir(saves_dir)) != nullptr) {
-//         if (entry->d_type == DT_DIR && strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
-//             char world_path[MAX_PATH_LENGTH];
-//             snprintf(world_path, sizeof(world_path), "%s/%s", saves_path, entry->d_name);
-//             struct stat stat_buf;
-//             if (stat(world_path, &stat_buf) == 0) {
-//                 if (stat_buf.st_mtime > latest_time) {
-//                     latest_time = stat_buf.st_mtime;
-//                     strncpy(latest_world_name, entry->d_name, sizeof(latest_world_name) - 1);
-//                 }
-//             }
-//         }
-//     }
-//     closedir(saves_dir);
-//
-//     if (strlen(latest_world_name) > 0) {
-//         strncpy(out_world_name, latest_world_name, max_len - 1);
-//         fprintf(stderr, "[PATH UTILS] No world directories found in saves path: %s\n", saves_path);
-//     }
-//
-// // Step 2: Based on version, determine where to look for files.
-//     if (version <= MC_VERSION_1_6_4) {
-//         char mc_root_path[MAX_PATH_LENGTH];
-//         strncpy(mc_root_path, saves_path, sizeof(mc_root_path) - 1);
-//         char *last_slash = strrchr(mc_root_path, '/');
-//         if (last_slash) *last_slash = '\0';
-//
-//         char stats_path_dir[MAX_PATH_LENGTH];
-//         snprintf(stats_path_dir, sizeof(stats_path_dir), "%s/stats", mc_root_path);
-//         DIR *stats_dir = opendir(stats_path_dir);
-//         if (stats_dir) {
-//             while ((entry = readdir(stats_dir)) != nullptr) {
-//                 if (strstr(entry->d_name, ".dat")) {
-//                     snprintf(out_stats_path, max_len, "%s/%s", stats_path_dir, entry->d_name);
-//                     break;
-//                 }
-//             }
-//             closedir(stats_dir);
-//         }
-//     } else {
-//         if (strlen(latest_world_name) == 0) {
-//             fprintf(stderr, "[PATH UTILS] No world directories found in saves path: %s\n", saves_path);
-//             return;
-//         }
-//
-//         char folder_path[MAX_PATH_LENGTH];
-//
-//         // Find stats file
-//         snprintf(folder_path, sizeof(folder_path), "%s/%s/stats", saves_path, latest_world_name);
-//         DIR *dir = opendir(folder_path);
-//         if (dir) {
-//             while ((entry = readdir(dir)) != nullptr) {
-//                 if (strstr(entry->d_name, ".json")) {
-//                     snprintf(out_stats_path, max_len, "%s/%s", folder_path, entry->d_name);
-//                     break;
-//                 }
-//             }
-//             closedir(dir);
-//         }
-//
-//         // Find advancements/unlocks for modern era
-//         if (version >= MC_VERSION_1_12) {
-//             snprintf(folder_path, sizeof(folder_path), "%s/%s/advancements", saves_path, latest_world_name);
-//             dir = opendir(folder_path);
-//             if (dir) {
-//                 while ((entry = readdir(dir)) != nullptr) {
-//                     if (strstr(entry->d_name, ".json")) {
-//                         snprintf(out_adv_path, max_len, "%s/%s", folder_path, entry->d_name);
-//                         break;
-//                     }
-//                 }
-//                 closedir(dir);
-//             }
-//             if (version == MC_VERSION_25W14CRAFTMINE) {
-//                 snprintf(folder_path, sizeof(folder_path), "%s/%s/unlocks", saves_path, latest_world_name);
-//                 dir = opendir(folder_path);
-//                 if (dir) {
-//                     while ((entry = readdir(dir)) != nullptr) {
-//                         if (strstr(entry->d_name, ".json")) {
-//                             snprintf(out_unlocks_path, max_len, "%s/%s", folder_path, entry->d_name);
-//                             break;
-//                         }
-//                     }
-//                     closedir(dir);
-//                 }
-//             }
-//         }
-//     }
-// }
-// #endif
 
 bool path_exists(const char* path) {
 #ifdef _WIN32

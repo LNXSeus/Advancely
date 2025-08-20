@@ -6,7 +6,6 @@
 #define PATH_UTILS_H
 
 #include <cstddef>
-
 #include "main.h" // For MAX_PATH_LENGTH
 #include "data_structures.h" // For MC_Version enum and PathMode enum
 
@@ -14,6 +13,7 @@
 extern "C" {
 #endif
 
+struct AppSettings;
 
 /**
 * @brief Converts backslashes in a path to forward slashes for consistency.
@@ -59,6 +59,7 @@ void find_player_data_files(
     const char *saves_path,
     MC_Version version,
     bool use_stats_per_world_mod, // When StatsPerWorld mod is enabled for legacy versions
+    const struct AppSettings *settings, // For debug prints
     char *out_world_name,
     char *out_adv_path,
     char *out_stats_path,
@@ -71,7 +72,7 @@ void find_player_data_files(
  * @param path The path to check.
  * @return true if the path exists, false otherwise.
  */
-    bool path_exists(const char* path);
+bool path_exists(const char* path);
 
 #ifdef __cplusplus
 }

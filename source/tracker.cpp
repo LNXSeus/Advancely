@@ -356,10 +356,12 @@ static void tracker_save_snapshot_to_file(Tracker *t) {
  *
  * @param t A pointer to the Tracker struct.
  */
-static void tracker_load_snapshot_from_file(Tracker *t) {
+static void tracker_load_snapshot_from_file(Tracker *t, const AppSettings *settings) {
     cJSON *snapshot_json = cJSON_from_file(t->snapshot_path);
     if (!snapshot_json) {
-        printf("[TRACKER] No existing snapshot file found for this configuration.\n");
+        if (settings->print_debug_status) {
+            printf("[TRACKER] No existing snapshot file found for this configuration.\n");
+        }
         return;
     }
 
@@ -397,7 +399,9 @@ static void tracker_load_snapshot_from_file(Tracker *t) {
         }
     }
     cJSON_Delete(snapshot_json);
-    printf("[TRACKER] Snapshot successfully loaded from %s\n", t->snapshot_path);
+    if (settings->print_debug_status) {
+        printf("[TRACKER] Snapshot successfully loaded from %s\n", t->snapshot_path);
+    }
 }
 
 /**
@@ -512,20 +516,22 @@ static void tracker_snapshot_legacy_stats(Tracker *t, const AppSettings *setting
         }
     }
 
-    printf("\n--- LEGACY STAT SNAPSHOT ---\n");
-    printf("Playtime Snapshot: %lld ticks\n", t->template_data->playtime_snapshot);
+    if (settings->print_debug_status) {
+        printf("\n--- LEGACY STAT SNAPSHOT ---\n");
+        printf("Playtime Snapshot: %lld ticks\n", t->template_data->playtime_snapshot);
 
-    // Use a nested loop to print the stats
-    for (int i = 0; i < t->template_data->stat_count; i++) {
-        TrackableCategory *stat_cat = t->template_data->stats[i];
-        printf("  - Category '%s':\n", stat_cat->display_name);
-        for (int j = 0; j < stat_cat->criteria_count; j++) {
-            TrackableItem *sub_stat = stat_cat->criteria[j];
-            printf("    - Sub-Stat '%s' (ID: %s): Snapshot Value = %d\n",
-                   sub_stat->display_name, sub_stat->root_name, sub_stat->initial_progress);
+        // Use a nested loop to print the stats
+        for (int i = 0; i < t->template_data->stat_count; i++) {
+            TrackableCategory *stat_cat = t->template_data->stats[i];
+            printf("  - Category '%s':\n", stat_cat->display_name);
+            for (int j = 0; j < stat_cat->criteria_count; j++) {
+                TrackableItem *sub_stat = stat_cat->criteria[j];
+                printf("    - Sub-Stat '%s' (ID: %s): Snapshot Value = %d\n",
+                       sub_stat->display_name, sub_stat->root_name, sub_stat->initial_progress);
+            }
         }
+        printf("--- END OF SNAPSHOT ---\n\n");
     }
-    printf("--- END OF SNAPSHOT ---\n\n");
 }
 
 /**
@@ -948,13 +954,16 @@ static void tracker_update_stats_modern(Tracker *t, const cJSON *player_stats_js
  * @param lang_key_prefix The prefix for language keys. (e.g., "advancement." or "stat.")
  * @param is_stat_category A boolean indicating whether the categories are for stats. False means advancements.
  * @param version The Minecraft version.
+ * @param settings A pointer to the AppSettings object.
  */
 static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *lang_json,
                                      TrackableCategory ***categories_array,
                                      int *count, int *total_criteria_count, const char *lang_key_prefix,
-                                     bool is_stat_category, MC_Version version) {
+                                     bool is_stat_category, MC_Version version, const AppSettings *settings) {
     if (!category_json) {
-        printf("[TRACKER] tracker_parse_categories: category_json is nullptr\n");
+        if (settings->print_debug_status) {
+            printf("[TRACKER] tracker_parse_categories: category_json is nullptr\n");
+        }
         return;
     }
 
@@ -1198,7 +1207,7 @@ static void flag_shared_sub_items(CriterionCounter *counts, int unique_count, Tr
  *
  * @param t The Tracker struct.
  */
-static void tracker_detect_shared_sub_items(Tracker *t) {
+static void tracker_detect_shared_sub_items(Tracker *t, const AppSettings *settings) {
     int total_criteria = t->template_data->total_criteria_count + t->template_data->stat_total_criteria_count;
     if (total_criteria == 0) return;
 
@@ -1216,7 +1225,9 @@ static void tracker_detect_shared_sub_items(Tracker *t) {
 
     free(counts);
     counts = nullptr;
-    printf("[TRACKER] Shared sub-item detection complete.\n");
+    if (settings->print_debug_status) {
+        printf("[TRACKER] Shared sub-item detection complete.\n");
+    }
 }
 
 /**
@@ -1233,18 +1244,23 @@ static void tracker_detect_shared_sub_items(Tracker *t) {
  * @param items_array A pointer to the array of TrackableItem pointers to be populated.
  * @param count A pointer to an integer that will store the number of items parsed.
  * @param lang_key_prefix The prefix to use when looking up display names in the language file.
+ * @param settings Pointer to the AppSettings struct.
  */
 static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJSON *lang_json,
                                             TrackableItem ***items_array,
-                                            int *count, const char *lang_key_prefix) {
+                                            int *count, const char *lang_key_prefix, const AppSettings *settings) {
     (void) t;
     if (!category_json) {
-        printf("[TRACKER] tracker_parse_simple_trackables: category_json is nullptr\n");
+        if (settings->print_debug_status) {
+            printf("[TRACKER] tracker_parse_simple_trackables: category_json is nullptr\n");
+        }
         return;
     }
     *count = cJSON_GetArraySize(category_json);
     if (*count == 0) {
-        printf("[TRACKER] tracker_parse_simple_trackables: No items found\n");
+        if (settings->print_debug_status) {
+            printf("[TRACKER] tracker_parse_simple_trackables: No items found\n");
+        }
         return;
     }
 
@@ -1315,14 +1331,17 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
  * @param lang_json The cJSON object from the language file (not used here but kept for consistency).
  * @param goals_array A pointer to the array of MultiStageGoal pointers to be populated.
  * @param count A pointer to an integer that will store the number of goals parsed.
+ * @param settings Pointer to the AppSettings struct.
  */
 static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON *lang_json,
                                             MultiStageGoal ***goals_array,
-                                            int *count) {
+                                            int *count, const AppSettings *settings) {
     (void) t;
     (void) lang_json;
     if (!goals_json) {
-        printf("[TRACKER] tracker_parse_multi_stage_goals: goals_json is nullptr\n");
+        if (settings->print_debug_status) {
+            printf("[TRACKER] tracker_parse_multi_stage_goals: goals_json is nullptr\n");
+        }
         *count = 0;
         // goals_array = nullptr;
         return;
@@ -1330,7 +1349,9 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
 
     *count = cJSON_GetArraySize(goals_json);
     if (*count == 0) {
-        printf("[TRACKER] tracker_parse_multi_stage_goals: No goals found\n");
+        if (settings->print_debug_status) {
+            printf("[TRACKER] tracker_parse_multi_stage_goals: No goals found\n");
+        }
         // goals_array = nullptr;
         return;
     }
@@ -1494,9 +1515,11 @@ static void tracker_update_unlock_progress(Tracker *t, const cJSON *player_unloc
  * @param t A pointer to the Tracker struct.
  * @param settings_json A pointer to the parsed settings.json cJSON object.
  */
-static void tracker_update_custom_progress(Tracker *t, cJSON *settings_json) {
+static void tracker_update_custom_progress(Tracker *t, cJSON *settings_json, const AppSettings *settings) {
     if (!settings_json) {
-        printf("[TRACKER] Failed to load or parse settings file.\n");
+        if (settings->print_debug_status) {
+            printf("[TRACKER] Failed to load or parse settings file.\n");
+        }
         return;
     }
 
@@ -1551,12 +1574,14 @@ static void tracker_update_custom_progress(Tracker *t, cJSON *settings_json) {
  */
 static void tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_adv_json,
                                                 const cJSON *player_stats_json, const cJSON *player_unlocks_json,
-                                                MC_Version version) {
+                                                MC_Version version, const AppSettings *settings) {
     if (t->template_data->multi_stage_goal_count == 0) return;
 
     if (!player_adv_json && !player_stats_json) {
-        printf(
-            "[TRACKER] Failed to load or parse player advancements or player stats file to update multi-stage goal progress.\n");
+        if (settings->print_debug_status) {
+            printf(
+                "[TRACKER] Failed to load or parse player advancements or player stats file to update multi-stage goal progress.\n");
+        }
         return;
     }
 
@@ -1736,7 +1761,7 @@ static void tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
  * @param t A pointer to the Tracker struct.
  *
  */
-static void tracker_calculate_overall_progress(Tracker *t, MC_Version version) {
+static void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const AppSettings *settings) {
     (void) version;
     if (!t || !t->template_data) return; // || because we can't be sure if the template_data is initialized
 
@@ -1777,8 +1802,11 @@ static void tracker_calculate_overall_progress(Tracker *t, MC_Version version) {
         completed_steps += t->template_data->multi_stage_goals[i]->current_stage;
     }
 
-    printf("Completed steps for progress: %d\n", completed_steps);
-    printf("Total step for progress: %d\n", total_steps);
+
+    if (settings->print_debug_status) {
+        printf("Completed steps for progress: %d\n", completed_steps);
+        printf("Total step for progress: %d\n", total_steps);
+    }
 
 
     // Set 100% if no steps are found
@@ -2020,7 +2048,7 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     t->minecraft_font = TTF_OpenFont("resources/fonts/Minecraft.ttf", 24);
     if (!t->minecraft_font) {
         fprintf(stderr, "[TRACKER] Failed to load Minecraft font: %s\n", SDL_GetError());
-        tracker_free(tracker);
+        tracker_free(tracker, settings);
         return false;
     }
 
@@ -2036,7 +2064,7 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
                                                   SDL_SCALEMODE_NEAREST);
     if (!t->adv_bg || !t->adv_bg_half_done || !t->adv_bg_done) {
         fprintf(stderr, "[TRACKER] Failed to load advancement background textures.\n");
-        tracker_free(tracker);
+        tracker_free(tracker, settings);
         return false;
     }
 
@@ -2044,7 +2072,7 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     t->template_data = (TemplateData *) calloc(1, sizeof(TemplateData));
     if (!t->template_data) {
         fprintf(stderr, "[TRACKER] Failed to allocate memory for template data.\n");
-        tracker_free(tracker);
+        tracker_free(tracker, settings);
         return false;
     }
 
@@ -2055,7 +2083,7 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     tracker_reinit_paths(t, settings);
 
     // Parse the advancement template JSON file
-    tracker_load_and_parse_data(t);
+    tracker_load_and_parse_data(t, settings);
 
     return true; // Success
 }
@@ -2156,9 +2184,9 @@ void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
     }
 
     // Pass the parsed data to the update functions
-    tracker_update_custom_progress(t, settings_json);
-    tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json, player_unlocks_json, version);
-    tracker_calculate_overall_progress(t, version); //THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
+    tracker_update_custom_progress(t, settings_json, settings);
+    tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json, player_unlocks_json, version, settings);
+    tracker_calculate_overall_progress(t, version, settings); //THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
 
     // Clean up the parsed JSON objects
     cJSON_Delete(player_adv_json);
@@ -3396,7 +3424,9 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
 void tracker_reinit_template(Tracker *t, const AppSettings *settings) {
     if (!t) return;
 
-    printf("[TRACKER] Re-initializing template...\n");
+    if (settings->print_debug_status) {
+        printf("[TRACKER] Re-initializing template...\n");
+    }
 
     // Update the paths from settings.json
     tracker_reinit_paths(t, settings);
@@ -3409,7 +3439,7 @@ void tracker_reinit_template(Tracker *t, const AppSettings *settings) {
         t->template_data->snapshot_world_name[0] = '\0';
     }
     // Load and parse data from the new template files
-    tracker_load_and_parse_data(t);
+    tracker_load_and_parse_data(t, settings);
 }
 
 void tracker_reinit_paths(Tracker *t, const AppSettings *settings) {
@@ -3427,7 +3457,9 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings) {
     MC_Version version = settings_get_version_from_string(settings->version_str);
 
     if (get_saves_path(t->saves_path, MAX_PATH_LENGTH, settings->path_mode, settings->manual_saves_path)) {
-        printf("[TRACKER] Using saves path: %s\n", t->saves_path);
+        if (settings->print_debug_status) {
+            printf("[TRACKER] Using saves path: %s\n", t->saves_path);
+        }
 
         // Find the specific world files using the correct flag
 
@@ -3437,6 +3469,7 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings) {
             t->saves_path,
             version,
             settings->using_stats_per_world_legacy, // This toggles if StatsPerWorld mod is enabled, see above
+            settings,
             t->world_name,
             t->advancements_path,
             t->stats_path,
@@ -3454,12 +3487,13 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings) {
     }
 }
 
-void tracker_load_and_parse_data(Tracker *t) {
-    printf("[TRACKER] Loading advancement template from: %s\n", t->advancement_template_path);
+void tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
+    if (settings->print_debug_status) {
+        printf("[TRACKER] Loading advancement template from: %s\n", t->advancement_template_path);
+    }
     cJSON *template_json = cJSON_from_file(t->advancement_template_path);
 
-    struct AppSettings settings;
-    settings_load(&settings);
+    settings_load((AppSettings*)settings);
 
     // Check if template file exists otherwise create it using temp_create_utils.c
     if (!template_json) {
@@ -3505,32 +3539,32 @@ void tracker_load_and_parse_data(Tracker *t) {
     cJSON *multi_stage_goals_json = cJSON_GetObjectItem(template_json, "multi_stage_goals");
 
 
-    MC_Version version = settings_get_version_from_string(settings.version_str);
+    MC_Version version = settings_get_version_from_string(settings->version_str);
     // Parse the 5 main categories
     // False as it's for advancements
     tracker_parse_categories(t, advancements_json, lang_json, &t->template_data->advancements,
                              &t->template_data->advancement_count, &t->template_data->total_criteria_count,
-                             "advancement.", false, version);
+                             "advancement.", false, version, settings);
 
     // True as it's for stats
     tracker_parse_categories(t, stats_json, lang_json, &t->template_data->stats,
                              &t->template_data->stat_count, &t->template_data->stat_total_criteria_count, "stat.",
-                             true, version);
+                             true, version, settings);
 
     // Parse "unlock." prefix for unlocks
     tracker_parse_simple_trackables(t, unlocks_json, lang_json, &t->template_data->unlocks,
-                                    &t->template_data->unlock_count, "unlock.");
+                                    &t->template_data->unlock_count, "unlock.", settings);
 
     // Parse "custom." prefix for custom goals
     tracker_parse_simple_trackables(t, custom_json, lang_json, &t->template_data->custom_goals,
-                                    &t->template_data->custom_goal_count, "custom.");
+                                    &t->template_data->custom_goal_count, "custom.", settings);
 
     tracker_parse_multi_stage_goals(t, multi_stage_goals_json, lang_json,
                                     &t->template_data->multi_stage_goals,
-                                    &t->template_data->multi_stage_goal_count);
+                                    &t->template_data->multi_stage_goal_count, settings);
 
     // Detect and flag criteria that are shared between multiple advancements
-    tracker_detect_shared_sub_items(t);
+    tracker_detect_shared_sub_items(t, settings);
 
     // Automatically synchronize settings.json with the newly loaded template
     cJSON* settings_root = cJSON_from_file(SETTINGS_FILE_PATH);
@@ -3625,8 +3659,8 @@ void tracker_load_and_parse_data(Tracker *t) {
     cJSON_Delete(settings_root);
 
     // LOADING SNAPSHOT FROM FILE - ONLY FOR VERSION 1.0-1.6.4 WITHOUT StatsPerWorld MOD
-    if (version <= MC_VERSION_1_6_4 && !settings.using_stats_per_world_legacy) {
-        tracker_load_snapshot_from_file(t);
+    if (version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy) {
+        tracker_load_snapshot_from_file(t, settings);
     }
 
     cJSON_Delete(template_json);
@@ -3634,12 +3668,14 @@ void tracker_load_and_parse_data(Tracker *t) {
         cJSON_Delete(lang_json);
     }
 
-    printf("[TRACKER] Initial template parsing complete.\n");
+    if (settings->print_debug_status) {
+        printf("[TRACKER] Initial template parsing complete.\n");
+    }
     // No need to delete settings_json, because it's not parsed, handled in tracker_update()
 }
 
 
-void tracker_free(Tracker **tracker) {
+void tracker_free(Tracker **tracker, const AppSettings *settings) {
     if (tracker && *tracker) {
         Tracker *t = *tracker;
 
@@ -3694,7 +3730,9 @@ void tracker_free(Tracker **tracker) {
         free(t);
         *tracker = nullptr;
         tracker = nullptr;
-        printf("[TRACKER] Tracker freed!\n");
+        if (settings->print_debug_status) {
+            printf("[TRACKER] Tracker freed!\n");
+        }
     }
 }
 
