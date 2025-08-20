@@ -157,17 +157,6 @@ static void save_color(cJSON *parent, const char *key, const ColorRGBA *color) {
     cJSON_AddItemToObject(obj, "a", cJSON_CreateNumber(color->a));
 }
 
-/**
- * @brief Converts key names from JSON file (like "PageUp") into SDL scancodes that the event handler can use
- * @param key_name
- * @return SDL_Scancode or SDL_SCANCODE_UNKNOWN if not found
- */
-static SDL_Scancode scancode_from_string(const char *key_name) {
-    if (!key_name || key_name[0] == '\0') return SDL_SCANCODE_UNKNOWN;
-
-    return SDL_GetScancodeFromName(key_name);
-}
-
 MC_Version settings_get_version_from_string(const char *version_str) {
     if (version_str == nullptr) return MC_VERSION_UNKNOWN;
 
@@ -365,24 +354,20 @@ bool settings_load(AppSettings *settings) {
     const cJSON *hotkeys_json = cJSON_GetObjectItem(json, "hotkeys");
     if (cJSON_IsArray(hotkeys_json)) {
         cJSON *hotkey_item;
+        settings->hotkey_count = 0; // Reset count before loading
 
-        // Parse each hotkey
         cJSON_ArrayForEach(hotkey_item, hotkeys_json) {
             if (settings->hotkey_count >= MAX_HOTKEYS) break;
 
-            // Takes the string within the settings.json
             const cJSON *target = cJSON_GetObjectItem(hotkey_item, "target_goal");
             const cJSON *inc_key = cJSON_GetObjectItem(hotkey_item, "increment_key");
             const cJSON *dec_key = cJSON_GetObjectItem(hotkey_item, "decrement_key");
 
             if (cJSON_IsString(target) && cJSON_IsString(inc_key) && cJSON_IsString(dec_key)) {
-                // Create a new hotkey binding
                 HotkeyBinding *hb = &settings->hotkeys[settings->hotkey_count];
                 strncpy(hb->target_goal, target->valuestring, sizeof(hb->target_goal) - 1);
-
-                hb->increment_scancode = scancode_from_string(inc_key->valuestring);
-                hb->decrement_scancode = scancode_from_string(dec_key->valuestring);
-
+                strncpy(hb->increment_key, inc_key->valuestring, sizeof(hb->increment_key) - 1);
+                strncpy(hb->decrement_key, dec_key->valuestring, sizeof(hb->decrement_key) - 1);
                 settings->hotkey_count++;
             }
         }
@@ -479,6 +464,21 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
             }
         }
     }
+
+    // Update Hotkeys
+    cJSON_DeleteItemFromObject(root, "hotkeys");
+    cJSON* hotkeys_array = cJSON_CreateArray();
+    for (int i = 0; i < settings->hotkey_count; ++i) {
+        const HotkeyBinding* hb = &settings->hotkeys[i];
+        if (strlen(hb->target_goal) > 0) { // Only save if it's a valid binding
+            cJSON* hotkey_obj = cJSON_CreateObject();
+            cJSON_AddStringToObject(hotkey_obj, "target_goal", hb->target_goal);
+            cJSON_AddStringToObject(hotkey_obj, "increment_key", hb->increment_key);
+            cJSON_AddStringToObject(hotkey_obj, "decrement_key", hb->decrement_key);
+            cJSON_AddItemToArray(hotkeys_array, hotkey_obj);
+        }
+    }
+    cJSON_AddItemToObject(root, "hotkeys", hotkeys_array);
 
     // Write the modified JSON object to the file
     FILE *file = fopen(SETTINGS_FILE_PATH, "w");

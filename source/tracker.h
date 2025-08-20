@@ -168,6 +168,8 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings);
  * of each item by reading the player's actual save files.
  * For legacy versions it now only tries to read the snapshot file if the
  * StatsPerWorld Mod isn't used, otherwise it reads from the stats folder per-world.
+ * This function now writes the stat_progress_override and custom_progress into the settings file.
+ * Hotkeys are handled in settings_utils.cpp in the settings_save() function.
  *
  * @param t A pointer to the Tracker struct containing the necessary paths.
  */
