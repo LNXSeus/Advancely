@@ -9,38 +9,58 @@
 
 // function to read a JSON file
 cJSON* cJSON_from_file(const char* filename) {
-    char *buffer = nullptr;
-    long length;
-
     // Open the file in binary mode
     FILE *f = fopen(filename, "rb");
-    cJSON *json = nullptr;
 
-    if (f) {
-        // Get the file size
-        fseek(f, 0, SEEK_END);
-        length = ftell(f);
-        fseek(f, 0, SEEK_SET);
-        buffer = (char*)malloc(length + 1);
-        if (buffer) {
-            fread(buffer, 1, length, f);
-            buffer[length] = '\0'; // nullptr-terminate the buffer
-
-            // TODO: DEBUGGING - CHECKING FOR ANY CONTENT BEING READ
-            // printf("\n--- FILE CONTENT FOR: %s ---\n", filename);
-            // printf("%s\n", buffer);
-            // printf("--- END OF FILE CONTENT ---\n\n");
-        }
-        fclose(f);
-    } else {
+    if (!f) {
         fprintf(stderr, "[FILE_UTILS] Could not open file: %s\n", filename);
         return nullptr;
     }
 
+    // Safer chunk-based file reading to prevent race conditions
+    char *buffer = nullptr;
+    char *tmp = nullptr;
+    size_t total_read = 0;
+    size_t chunk_size = 4096; // Read in 4KB chunks
+    size_t bytes_read;
+
+    while (true) {
+        // Grow the buffer
+        tmp = (char*)realloc(buffer, total_read + chunk_size + 1);
+        if (!tmp) {
+            fprintf(stderr, "[FILE_UTILS] Failed to reallocate buffer for file: %s\n", filename);
+            free(buffer);
+            fclose(f);
+            return nullptr;
+        }
+        buffer = tmp;
+
+        // Read the next chunk
+        bytes_read = fread(buffer + total_read, 1, chunk_size, f);
+        total_read += bytes_read;
+
+        // If we read less than a full chunk, we've either hit the end of the file or an error
+        if (bytes_read < chunk_size) {
+            if (feof(f)) {
+                // End of file, break loop
+                break;
+            } else if (ferror(f)) {
+                // A read error occurred
+                fprintf(stderr, "[FILE_UTILS] Error reading file: %s\n", filename);
+                free(buffer);
+                fclose(f);
+                return nullptr;
+            }
+        }
+    }
+    fclose(f);
+    buffer[total_read] = '\0'; // Null-terminate the final buffer
+
+    cJSON *json = nullptr;
     if (buffer) {
         // Pre-process buffer to escape single backslashes to double backslashes
         // This allows users to paste Windows paths directly into settings.json
-        long original_len = strlen(buffer);
+        long original_len = total_read;
         long backslash_count = 0;
         long i = 0;
         while (i < original_len) {

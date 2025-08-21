@@ -16,6 +16,9 @@ extern "C" {
  * @brief Reads a file from the given path and parses it into a cJSON object.
  *
  * This function handles opening, reading, and closing the file.
+ * The function even has safer chunk-based file reading to prevent race conditions.
+ * This function also allows the saves path to be a windows path as it immediately escapes the backslashes
+ * to prevent .json related errors.
  *
  * @param filename The path to the JSON file.
  * @return A pointer to a cJSON object on success, or NULL on failure.

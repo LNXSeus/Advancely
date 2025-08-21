@@ -437,7 +437,7 @@
           "icon": "animals/strider.png"
         },
         "minecraft:hoglin": {
-          "icon": "animals/hoglin.png"
+          "icon": "monsters/hoglin.png"
         }
       }
     },
