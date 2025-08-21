@@ -14,6 +14,7 @@
 #include "file_utils.h" // has the cJSON_from_file function
 #include "temp_create_utils.h"
 #include "global_event_handler.h"
+#include "format_utils.h"
 
 #include <cJSON.h>
 #include <cmath>
@@ -1911,83 +1912,6 @@ static void tracker_free_template_data(TemplateData *td) {
     td->unlocks = nullptr;
     td->custom_goals = nullptr;
     td->multi_stage_goals = nullptr;
-}
-
-/**
- * @brief Formats a string like "acquire_hardware" into "Acquire Hardware".
- * It replaces underscores with spaces and capitalizes the first letter of each word.
- * @param input The source string.
- * @param output The buffer to write the formatted string to.
- * @param max_len The size of the output buffer.
- */
-static void format_category_string(const char *input, char *output, size_t max_len) {
-    if (!input || !output || max_len == 0) return;
-
-    size_t i = 0;
-    bool capitalize_next = true;
-
-    while (*input && i < max_len - 1) {
-        if (*input == '_') {
-            output[i++] = ' ';
-            capitalize_next = true;
-        } else {
-            output[i++] = capitalize_next ? (char) toupper(*input) : *input;
-            capitalize_next = false;
-        }
-        input++;
-    }
-    output[i] = '\0';
-}
-
-/**
- * @brief Formats a time in Minecraft ticks into a DD:HH:MM:SS.MS string.
- * @param ticks The total number of ticks (20 ticks per second).
- * @param output The buffer to write the formatted time string to.
- * @param max_len The size of the output buffer.
- */
-static void format_time(long long ticks, char *output, size_t max_len) {
-    if (!output || max_len == 0) return;
-
-    long long total_seconds = ticks / 20;
-    long long days = total_seconds / 86400;
-    long long hours = total_seconds / 3600;
-    long long minutes = (total_seconds % 3600) / 60;
-    long long seconds = total_seconds % 60;
-    long long milliseconds = ticks % 20 * 50;
-
-    // Use a more compact format for the title bar
-    if (days > 0) {
-        snprintf(output, max_len, "%lld %02lld:%02lld:%02lld.%03lld", days, hours, minutes, seconds, milliseconds);
-    } else if (hours > 0) {
-        snprintf(output, max_len, "%02lld:%02lld:%02lld.%03lld", hours, minutes, seconds, milliseconds);
-    } else if (minutes > 0) {
-        snprintf(output, max_len, "%02lld:%02lld.%03lld", minutes, seconds, milliseconds);
-    } else {
-        snprintf(output, max_len, "%02lld.%03lld", seconds, milliseconds);
-    }
-}
-
-/**
- * @brief Formats a duration in seconds into a Hh Mm Ss string.
- * @param total_seconds The total number of seconds.
- * @param output The buffer to write the formatted time string to.
- * @param max_len The size of the output buffer.
- */
-static void format_time_since_update(float total_seconds, char *output, size_t max_len) {
-    if (!output || max_len == 0) return;
-
-    int total_sec_int = (int) total_seconds;
-    int hours = total_sec_int / 3600;
-    int minutes = (total_sec_int % 3600) / 60;
-    int seconds = total_sec_int % 60;
-
-    if (hours > 0) {
-        snprintf(output, max_len, "%dh %dm %ds ago", hours, minutes, seconds);
-    } else if (minutes > 0) {
-        snprintf(output, max_len, "%dm %ds ago", minutes, seconds);
-    } else {
-        snprintf(output, max_len, "%ds ago", seconds);
-    }
 }
 
 

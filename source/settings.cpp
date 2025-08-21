@@ -162,6 +162,17 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::Separator();
     ImGui::Spacing();
 
+    if (temp_settings.enable_overlay) {
+        ImGui::Text("Overlay Title Alignment:");
+        ImGui::SameLine();
+        ImGui::RadioButton("Left", (int*)&temp_settings.overlay_progress_text_align, OVERLAY_PROGRESS_TEXT_ALIGN_LEFT);
+        ImGui::SameLine();
+        ImGui::RadioButton("Center", (int*)&temp_settings.overlay_progress_text_align, OVERLAY_PROGRESS_TEXT_ALIGN_CENTER);
+        ImGui::SameLine();
+        ImGui::RadioButton("Right", (int*)&temp_settings.overlay_progress_text_align, OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT);
+        ImGui::Spacing();
+    }
+
     ImGui::Text("Visual Settings");
 
     // Helper arrays to convert Uint8[0-255] to float[0-1] for ImGui color pickers

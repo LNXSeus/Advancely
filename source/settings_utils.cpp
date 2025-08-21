@@ -20,6 +20,22 @@ const char* VERSION_STRINGS[] = {
 };
 const int VERSION_STRINGS_COUNT = sizeof(VERSION_STRINGS) / sizeof(char*);
 
+static const char* overlay_text_align_to_string(OverlayProgressTextAlignment align) {
+    switch (align) {
+        case OVERLAY_PROGRESS_TEXT_ALIGN_CENTER: return "center";
+        case OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT: return "right";
+        case OVERLAY_PROGRESS_TEXT_ALIGN_LEFT:
+        default: return "left";
+    }
+}
+
+static OverlayProgressTextAlignment string_to_overlay_text_align(const char* str) {
+    if (!str) return OVERLAY_PROGRESS_TEXT_ALIGN_LEFT;
+    if (strcmp(str, "center") == 0) return OVERLAY_PROGRESS_TEXT_ALIGN_CENTER;
+    if (strcmp(str, "right") == 0) return OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT;
+    return OVERLAY_PROGRESS_TEXT_ALIGN_LEFT;
+}
+
 // Helper Prototypes for Loading/Saving
 static cJSON *get_or_create_object(cJSON *parent, const char *key) {
     cJSON *obj = cJSON_GetObjectItem(parent, key);
@@ -202,6 +218,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->goal_align_left = DEFAULT_GOAL_ALIGN_LEFT;
     settings->remove_completed_goals = DEFAULT_REMOVE_COMPLETED_GOALS;
     settings->print_debug_status = DEFAULT_PRINT_DEBUG_STATUS;
+    settings->overlay_progress_text_align = DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN;
 
     // Default Geometry
     WindowRect default_window = {DEFAULT_WINDOW_POS, DEFAULT_WINDOW_POS, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE};
@@ -331,6 +348,13 @@ bool settings_load(AppSettings *settings) {
             settings->print_debug_status = DEFAULT_PRINT_DEBUG_STATUS;
             defaults_were_used = true;
         }
+
+        const cJSON *align_text = cJSON_GetObjectItem(general_settings, "overlay_progress_text_align");
+        if (align_text && cJSON_IsString(align_text)) settings->overlay_progress_text_align = string_to_overlay_text_align(align_text->valuestring);
+        else {
+            settings->overlay_progress_text_align = DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN;
+            defaults_were_used = true;
+        }
     } else {
         defaults_were_used = true;
     }
@@ -415,6 +439,9 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
     cJSON_ReplaceItemInObject(general_obj, "goal_align_left", cJSON_CreateBool(settings->goal_align_left));
     cJSON_ReplaceItemInObject(general_obj, "remove_completed_goals", cJSON_CreateBool(settings->remove_completed_goals));
     cJSON_ReplaceItemInObject(general_obj, "print_debug_status", cJSON_CreateBool(settings->print_debug_status));
+    cJSON_ReplaceItemInObject(general_obj, "overlay_progress_text_align",
+                              cJSON_CreateString(overlay_text_align_to_string(settings->overlay_progress_text_align)));
+
 
     // Update Visual Settings
     cJSON *visuals_obj = get_or_create_object(root, "visuals");
