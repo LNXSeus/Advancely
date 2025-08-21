@@ -165,7 +165,7 @@ static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *pa
             const int side = (w > h) ? w : h;
 
             // 1. Create a temporary texture from the original non-square surface.
-            SDL_Texture* temp_texture = SDL_CreateTextureFromSurface(renderer, frame_surface);
+            SDL_Texture *temp_texture = SDL_CreateTextureFromSurface(renderer, frame_surface);
             if (!temp_texture) {
                 SDL_Log("Failed to create temporary texture from GIF frame: %s", SDL_GetError());
                 anim_texture->frames[i] = nullptr; // Mark as failed
@@ -173,7 +173,8 @@ static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *pa
             }
 
             // 2. Create the new, blank square texture. It must be a "render target".
-            final_frame_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, side, side);
+            final_frame_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, side,
+                                                    side);
             if (final_frame_texture) {
                 // Make the texture support transparency
                 SDL_SetTextureBlendMode(final_frame_texture, SDL_BLENDMODE_BLEND);
@@ -186,7 +187,7 @@ static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *pa
                 SDL_RenderClear(renderer);
 
                 // 5. Define where the original image will be drawn on the new texture.
-                SDL_FRect dest_rect = { (float)(side - w) / 2.0f, (float)(side - h) / 2.0f, (float)w, (float)h };
+                SDL_FRect dest_rect = {(float) (side - w) / 2.0f, (float) (side - h) / 2.0f, (float) w, (float) h};
 
                 // 6. Render the temporary texture onto our new square texture.
                 SDL_RenderTexture(renderer, temp_texture, nullptr, &dest_rect);
@@ -262,7 +263,7 @@ static void free_animated_texture(AnimatedTexture *anim) {
  * @param path The path to the .gif file.
  * @return A pointer to the cached or newly loaded AnimatedTexture, or nullptr on failure.
  */
-static AnimatedTexture* tracker_get_animated_texture(Tracker *t, const char *path) {
+static AnimatedTexture *tracker_get_animated_texture(Tracker *t, const char *path) {
     if (path == nullptr || path[0] == '\0') return nullptr;
 
     // 1. Check if the animation is already in the cache.
@@ -279,7 +280,8 @@ static AnimatedTexture* tracker_get_animated_texture(Tracker *t, const char *pat
     // 3. Add the new animation to the cache.
     if (t->anim_cache_count >= t->anim_cache_capacity) {
         int new_capacity = t->anim_cache_capacity == 0 ? 8 : t->anim_cache_capacity * 2;
-        AnimatedTextureCacheEntry *new_cache = (AnimatedTextureCacheEntry*) realloc(t->anim_cache, new_capacity * sizeof(AnimatedTextureCacheEntry));
+        AnimatedTextureCacheEntry *new_cache = (AnimatedTextureCacheEntry *) realloc(
+            t->anim_cache, new_capacity * sizeof(AnimatedTextureCacheEntry));
         if (!new_cache) {
             fprintf(stderr, "[TRACKER] Failed to reallocate animation cache!\n");
             free_animated_texture(new_anim); // Clean up the loaded anim if we can't cache it
@@ -505,7 +507,8 @@ static void tracker_snapshot_legacy_stats(Tracker *t, const AppSettings *setting
                     }
 
                     if (found) {
-                        printf("  - Achievement '%s' (ID: %s): FOUND with value: %d\n", ach->display_name, ach->root_name,
+                        printf("  - Achievement '%s' (ID: %s): FOUND with value: %d\n", ach->display_name,
+                               ach->root_name,
                                value);
                     } else {
                         printf("  - Achievement '%s' (ID: %s): NOT FOUND in player data\n", ach->display_name,
@@ -1151,7 +1154,7 @@ typedef struct {
 
 // helper function to process and count all sub-items from a list of categories
 static int count_all_icon_paths(IconPathCounter **counts, int capacity, int current_unique_count,
-                               TrackableCategory **categories, int cat_count) {
+                                TrackableCategory **categories, int cat_count) {
     if (!categories) return current_unique_count;
 
     for (int i = 0; i < cat_count; i++) {
@@ -1185,7 +1188,7 @@ static int count_all_icon_paths(IconPathCounter **counts, int capacity, int curr
 
 // Helper function to flag the items that are shared
 static void flag_shared_icons(IconPathCounter *counts, int unique_count, TrackableCategory **categories,
-                                  int cat_count) {
+                              int cat_count) {
     if (!categories) return;
 
     for (int i = 0; i < cat_count; i++) {
@@ -1228,9 +1231,9 @@ static void tracker_detect_shared_icons(Tracker *t, const AppSettings *settings)
 
     int unique_count = 0;
     unique_count = count_all_icon_paths(&counts, total_criteria, unique_count, t->template_data->advancements,
-                                       t->template_data->advancement_count);
+                                        t->template_data->advancement_count);
     unique_count = count_all_icon_paths(&counts, total_criteria, unique_count, t->template_data->stats,
-                                       t->template_data->stat_count);
+                                        t->template_data->stat_count);
 
     flag_shared_icons(counts, unique_count, t->template_data->advancements, t->template_data->advancement_count);
     flag_shared_icons(counts, unique_count, t->template_data->stats, t->template_data->stat_count);
@@ -1241,95 +1244,6 @@ static void tracker_detect_shared_icons(Tracker *t, const AppSettings *settings)
         printf("[TRACKER] Shared icon detection complete.\n");
     }
 }
-
-// TODO: Remove
-// // Helper for counting
-// typedef struct {
-//     char root_name[192];
-//     int count;
-// } CriterionCounter;
-//
-// // helper function to process and count all sub-items from a list of categories
-// static int count_all_sub_items(CriterionCounter **counts, int capacity, int current_unique_count,
-//                                TrackableCategory **categories, int cat_count) {
-//     if (!categories) return current_unique_count;
-//
-//     for (int i = 0; i < cat_count; i++) {
-//         for (int j = 0; j < categories[i]->criteria_count; j++) {
-//             TrackableItem *crit = categories[i]->criteria[j];
-//             bool found = false;
-//             for (int k = 0; k < current_unique_count; k++) {
-//                 if (strcmp((*counts)[k].root_name, crit->root_name) == 0) {
-//                     (*counts)[k].count++;
-//                     found = true;
-//                     break;
-//                 }
-//             }
-//
-//             // If the criterion is not found in the counts array, add it
-//             if (!found && current_unique_count < capacity) {
-//                 strncpy((*counts)[current_unique_count].root_name, crit->root_name, 191);
-//                 (*counts)[current_unique_count].count = 1;
-//                 current_unique_count++;
-//             }
-//         }
-//     }
-//     return current_unique_count;
-// }
-//
-// // Helper function to flag the items that are shared
-// static void flag_shared_sub_items(CriterionCounter *counts, int unique_count, TrackableCategory **categories,
-//                                   int cat_count) {
-//     if (!categories) return;
-//
-//     for (int i = 0; i < cat_count; i++) {
-//         for (int j = 0; j < categories[i]->criteria_count; j++) {
-//             TrackableItem *crit = categories[i]->criteria[j];
-//             crit->is_shared = false; // Reset first
-//             for (int k = 0; k < unique_count; k++) {
-//                 // If the criterion is found in more than one advancement or stat
-//                 if (strcmp(counts[k].root_name, crit->root_name) == 0 && counts[k].count > 1) {
-//                     crit->is_shared = true;
-//                     break;
-//                 }
-//             }
-//         }
-//     }
-// }
-//
-// /**
-//  * @brief Detects criteria that are shared across multiple advancements or stats and flags them.
-//  *
-//  * This function iterates through all parsed advancements or stats and their criteria to identify
-//  * criteria that have the same root_name. If a criterion is found in more than one
-//  * advancement or stat, its 'is_shared' flag is set to true. This allows the rendering
-//  * logic to visually distinguish them, for example, by overlaying the parent
-//  * advancement's or stat's icon.
-//  *
-//  * @param t The Tracker struct.
-//  */
-// static void tracker_detect_shared_sub_items(Tracker *t, const AppSettings *settings) {
-//     int total_criteria = t->template_data->total_criteria_count + t->template_data->stat_total_criteria_count;
-//     if (total_criteria == 0) return;
-//
-//     CriterionCounter *counts = (CriterionCounter *) calloc(total_criteria, sizeof(CriterionCounter));
-//     if (!counts) return;
-//
-//     int unique_count = 0;
-//     unique_count = count_all_sub_items(&counts, total_criteria, unique_count, t->template_data->advancements,
-//                                        t->template_data->advancement_count);
-//     unique_count = count_all_sub_items(&counts, total_criteria, unique_count, t->template_data->stats,
-//                                        t->template_data->stat_count);
-//
-//     flag_shared_sub_items(counts, unique_count, t->template_data->advancements, t->template_data->advancement_count);
-//     flag_shared_sub_items(counts, unique_count, t->template_data->stats, t->template_data->stat_count);
-//
-//     free(counts);
-//     counts = nullptr;
-//     if (settings->print_debug_status) {
-//         printf("[TRACKER] Shared sub-item detection complete.\n");
-//     }
-// }
 
 /**
  * @brief Parses a cJSON array of simple trackable items (like unlocks or custom goals) into an array of TrackableItem structs.
@@ -1950,7 +1864,6 @@ static void free_trackable_categories(TrackableCategory **categories, int count)
     if (!categories) return;
     for (int i = 0; i < count; i++) {
         if (categories[i]) {
-
             // First, free the inner criteria array using the other helper
             free_trackable_items(categories[i]->criteria, categories[i]->criteria_count);
 
@@ -2182,7 +2095,8 @@ void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
         if (settings->print_debug_status) {
             printf("[TRACKER] Legacy world change detected. Taking new stat snapshot for world: %s\n", t->world_name);
         }
-        tracker_snapshot_legacy_stats(t, settings); // Take a new snapshot when StatsPerWorld is disabled in legacy version
+        tracker_snapshot_legacy_stats(t, settings);
+        // Take a new snapshot when StatsPerWorld is disabled in legacy version
     }
 
     // Load all necessary player files ONCE
@@ -2356,7 +2270,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     ImU32 text_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
                                 settings->text_color.a);
-    ImU32 text_color_faded = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b, ADVANCELY_FADED_ALPHA);
+    ImU32 text_color_faded = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
+                                      ADVANCELY_FADED_ALPHA);
     ImU32 icon_tint_faded = IM_COL32(255, 255, 255, ADVANCELY_FADED_ALPHA);
 
     // Define checkbox colors from settings
@@ -2572,13 +2487,14 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 // Define the top-left of the icon box area (inside the 96x96 background)
                 ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
                 // Calculate padding needed to center the scaled image within the box
-                ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f, (target_box_size.y - scaled_size.y) * 0.5f);
+                ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
+                                        (target_box_size.y - scaled_size.y) * 0.5f);
 
                 // The final top-left and bottom-right corners for drawing
                 ImVec2 p_min = ImVec2(box_p_min.x + padding.x, box_p_min.y + padding.y);
                 ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
 
-                draw_list->AddImage((void *)texture_to_draw, p_min, p_max);
+                draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
             }
 
             // TODO: Here you can adjust the padding between goal background texture and text, change the float value
@@ -2621,51 +2537,53 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                     // For the small 32x32 icons
 
-                    SDL_Texture* crit_texture_to_draw = nullptr;
-                     if (crit->anim_texture && crit->anim_texture->frame_count > 0) {
-                         if (crit->anim_texture->delays && crit->anim_texture->total_duration > 0) {
-                             Uint32 current_time = SDL_GetTicks();
-                             Uint32 elapsed_time = current_time % crit->anim_texture->total_duration;
-                             int current_frame = 0;
-                             Uint32 time_sum = 0;
-                             for (int frame_idx = 0; frame_idx < crit->anim_texture->frame_count; ++frame_idx) {
-                                 time_sum += crit->anim_texture->delays[frame_idx];
-                                 if (elapsed_time < time_sum) {
-                                     current_frame = frame_idx;
-                                     break;
-                                 }
-                             }
-                             crit_texture_to_draw = crit->anim_texture->frames[current_frame];
-                         } else {
-                             crit_texture_to_draw = crit->anim_texture->frames[0];
-                         }
-                     } else if (crit->texture) {
-                         crit_texture_to_draw = crit->texture;
-                     }
+                    SDL_Texture *crit_texture_to_draw = nullptr;
+                    if (crit->anim_texture && crit->anim_texture->frame_count > 0) {
+                        if (crit->anim_texture->delays && crit->anim_texture->total_duration > 0) {
+                            Uint32 current_time = SDL_GetTicks();
+                            Uint32 elapsed_time = current_time % crit->anim_texture->total_duration;
+                            int current_frame = 0;
+                            Uint32 time_sum = 0;
+                            for (int frame_idx = 0; frame_idx < crit->anim_texture->frame_count; ++frame_idx) {
+                                time_sum += crit->anim_texture->delays[frame_idx];
+                                if (elapsed_time < time_sum) {
+                                    current_frame = frame_idx;
+                                    break;
+                                }
+                            }
+                            crit_texture_to_draw = crit->anim_texture->frames[current_frame];
+                        } else {
+                            crit_texture_to_draw = crit->anim_texture->frames[0];
+                        }
+                    } else if (crit->texture) {
+                        crit_texture_to_draw = crit->texture;
+                    }
 
-                     if (crit_texture_to_draw) {
-                         // Get texture dimensions as floats
-                         float tex_w = 0.0f, tex_h = 0.0f;
-                         SDL_GetTextureSize(crit_texture_to_draw, &tex_w, &tex_h);
+                    if (crit_texture_to_draw) {
+                        // Get texture dimensions as floats
+                        float tex_w = 0.0f, tex_h = 0.0f;
+                        SDL_GetTextureSize(crit_texture_to_draw, &tex_w, &tex_h);
 
-                         // Define the target box size (32x32 for criteria)
-                         ImVec2 target_box_size = ImVec2(32.0f * t->zoom_level, 32.0f * t->zoom_level);
+                        // Define the target box size (32x32 for criteria)
+                        ImVec2 target_box_size = ImVec2(32.0f * t->zoom_level, 32.0f * t->zoom_level);
 
-                         // Calculate scaled dimensions to fit inside the box while maintaining aspect ratio
-                         float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
-                         ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
+                        // Calculate scaled dimensions to fit inside the box while maintaining aspect ratio
+                        float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
+                        ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
 
-                         // Center the scaled image within the 32x32 area
-                         ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f, (target_box_size.y - scaled_size.y) * 0.5f);
-                         ImVec2 p_min = ImVec2(crit_base_pos.x + padding.x, crit_base_pos.y + padding.y);
-                         ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
+                        // Center the scaled image within the 32x32 area
+                        ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
+                                                (target_box_size.y - scaled_size.y) * 0.5f);
+                        ImVec2 p_min = ImVec2(crit_base_pos.x + padding.x, crit_base_pos.y + padding.y);
+                        ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
 
-                         // Choose the tint color for fading completed icons
-                         ImU32 icon_tint = crit->done ? icon_tint_faded : IM_COL32_WHITE;
+                        // Choose the tint color for fading completed icons
+                        ImU32 icon_tint = crit->done ? icon_tint_faded : IM_COL32_WHITE;
 
-                         // Draw the final image with correct scaling, centering, and tint
-                         draw_list->AddImage((void *)crit_texture_to_draw, p_min, p_max, ImVec2(0, 0), ImVec2(1, 1), icon_tint);
-                     }
+                        // Draw the final image with correct scaling, centering, and tint
+                        draw_list->AddImage((void *) crit_texture_to_draw, p_min, p_max, ImVec2(0, 0), ImVec2(1, 1),
+                                            icon_tint);
+                    }
 
                     current_element_x += 32 * t->zoom_level + 4 * t->zoom_level;
 
@@ -2726,7 +2644,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             }
 
             if (is_stat_section) {
-                ImVec2 check_pos = ImVec2(screen_pos.x + 70 * t->zoom_level, screen_pos.y + 5 * t->zoom_level);
+                // Change first 5 to 70 to display checkbox in top right
+                ImVec2 check_pos = ImVec2(screen_pos.x + 5 * t->zoom_level, screen_pos.y + 5 * t->zoom_level);
                 ImRect checkbox_rect(check_pos, ImVec2(check_pos.x + 20 * t->zoom_level,
                                                        check_pos.y + 20 * t->zoom_level));
                 bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
@@ -2873,21 +2792,23 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
             // Define the top-left of the icon box area (inside the 96x96 background)
             ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
             // Calculate padding needed to center the scaled image within the box
-            ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f, (target_box_size.y - scaled_size.y) * 0.5f);
+            ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
+                                    (target_box_size.y - scaled_size.y) * 0.5f);
 
             // The final top-left and bottom-right corners for drawing
             ImVec2 p_min = ImVec2(box_p_min.x + padding.x, box_p_min.y + padding.y);
             ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
 
-            draw_list->AddImage((void *)texture_to_draw, p_min, p_max);
+            draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
         }
 
         ImVec2 text_size = ImGui::CalcTextSize(item->display_name);
 
         // The 4.0f is for padding between the text and the background
         draw_list->AddText(nullptr, 16.0f * t->zoom_level,
-                          ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
-                                 screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level)), text_color, item->display_name);
+                           ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
+                                  screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level)), text_color,
+                           item->display_name);
 
         current_x += uniform_item_width + horizontal_spacing;
         row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
@@ -3026,32 +2947,36 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             // Define the top-left of the icon box area (inside the 96x96 background)
             ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
             // Calculate padding needed to center the scaled image within the box
-            ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f, (target_box_size.y - scaled_size.y) * 0.5f);
+            ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
+                                    (target_box_size.y - scaled_size.y) * 0.5f);
 
             // The final top-left and bottom-right corners for drawing
             ImVec2 p_min = ImVec2(box_p_min.x + padding.x, box_p_min.y + padding.y);
             ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
 
-            draw_list->AddImage((void *)texture_to_draw, p_min, p_max);
+            draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
         }
 
 
         // The 4.0f is for padding, can be adjusted
         draw_list->AddText(nullptr, 16.0f * t->zoom_level,
                            ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
-                                  screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level)), text_color, item->display_name);
+                                  screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level)), text_color,
+                           item->display_name);
         if (progress_text[0] != '\0') {
             draw_list->AddText(nullptr, 14.0f * t->zoom_level,
                                ImVec2(
                                    screen_pos.x + (bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level) *
-                                   0.5f, screen_pos.y + (bg_size.y + text_size.y + 4.0f) * t->zoom_level + (4.0f * t->zoom_level)), text_color,
+                                   0.5f, screen_pos.y + (bg_size.y + text_size.y + 4.0f) * t->zoom_level + (
+                                             4.0f * t->zoom_level)), text_color,
                                progress_text);
         }
 
         // Checkbox logic for manual override
         bool can_be_overridden = (item->goal <= 0 || item->goal == -1);
         if (can_be_overridden) {
-            ImVec2 check_pos = ImVec2(screen_pos.x + 70 * t->zoom_level, screen_pos.y + 5 * t->zoom_level);
+            // Change first 5 to 70 to move the checkbox to the right
+            ImVec2 check_pos = ImVec2(screen_pos.x + 5 * t->zoom_level, screen_pos.y + 5 * t->zoom_level);
             ImVec2 check_size = ImVec2(20 * t->zoom_level, 20 * t->zoom_level);
             ImRect checkbox_rect(check_pos, ImVec2(check_pos.x + check_size.x, check_pos.y + check_size.y));
 
@@ -3206,22 +3131,25 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             // Define the top-left of the icon box area (inside the 96x96 background)
             ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
             // Calculate padding needed to center the scaled image within the box
-            ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f, (target_box_size.y - scaled_size.y) * 0.5f);
+            ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
+                                    (target_box_size.y - scaled_size.y) * 0.5f);
 
             // The final top-left and bottom-right corners for drawing
             ImVec2 p_min = ImVec2(box_p_min.x + padding.x, box_p_min.y + padding.y);
             ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
 
-            draw_list->AddImage((void *)texture_to_draw, p_min, p_max);
+            draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
         }
 
         // The 4.0f is for padding, can be adjusted
         draw_list->AddText(nullptr, 16.0f * t->zoom_level,
-                                   ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
-                                          screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level)), text_color, goal->display_name);
+                           ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
+                                  screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level)), text_color,
+                           goal->display_name);
         draw_list->AddText(nullptr, 14.0f * t->zoom_level,
                            ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - stage_text_size.x * t->zoom_level) * 0.5f,
-                                  screen_pos.y + (bg_size.y + text_size.y + 4.0f) * t->zoom_level + (4.0f * t->zoom_level)), text_color,
+                                  screen_pos.y + (bg_size.y + text_size.y + 4.0f) * t->zoom_level + (
+                                      4.0f * t->zoom_level)), text_color,
                            stage_text);
 
         current_x += uniform_item_width + horizontal_spacing;
@@ -3281,18 +3209,20 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
     // --- Info Bar ---
 
     // Set the background color to match the tracker, with slight opacity.
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4((float)settings->tracker_bg_color.r / 255.f,
-                                                   (float)settings->tracker_bg_color.g / 255.f,
-                                                   (float)settings->tracker_bg_color.b / 255.f,
-                                                   230.0f / 255.f));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4((float) settings->tracker_bg_color.r / 255.f,
+                                                    (float) settings->tracker_bg_color.g / 255.f,
+                                                    (float) settings->tracker_bg_color.b / 255.f,
+                                                    230.0f / 255.f));
 
     // Determine the color for the WINDOW TITLE BAR text using the luminance check.
-    ImVec4 title_text_color = ImVec4((float)settings->text_color.r / 255.f,
-                                     (float)settings->text_color.g / 255.f,
-                                     (float)settings->text_color.b / 255.f,
-                                     (float)settings->text_color.a / 255.f);
-    float luminance = (0.299f * settings->text_color.r + 0.587f * settings->text_color.g + 0.114f * settings->text_color.b);
-    if (luminance < 50) { // If the color is very dark, override with white for the title.
+    ImVec4 title_text_color = ImVec4((float) settings->text_color.r / 255.f,
+                                     (float) settings->text_color.g / 255.f,
+                                     (float) settings->text_color.b / 255.f,
+                                     (float) settings->text_color.a / 255.f);
+    float luminance = (0.299f * settings->text_color.r + 0.587f * settings->text_color.g + 0.114f * settings->text_color
+                       .b);
+    if (luminance < 50) {
+        // If the color is very dark, override with white for the title.
         title_text_color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
     }
     ImGui::PushStyleColor(ImGuiCol_Text, title_text_color);
@@ -3304,10 +3234,10 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
     // Now that the title bar is drawn, we pop its text color and push the user's
     // original text color to use for the content inside the window.
     ImGui::PopStyleColor();
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4((float)settings->text_color.r / 255.f,
-                                               (float)settings->text_color.g / 255.f,
-                                               (float)settings->text_color.b / 255.f,
-                                               (float)settings->text_color.a / 255.f));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4((float) settings->text_color.r / 255.f,
+                                                (float) settings->text_color.g / 255.f,
+                                                (float) settings->text_color.b / 255.f,
+                                                (float) settings->text_color.a / 255.f));
 
     ImGui::Separator();
     ImGui::Spacing();
@@ -3517,7 +3447,7 @@ void tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
     }
     cJSON *template_json = cJSON_from_file(t->advancement_template_path);
 
-    settings_load((AppSettings*)settings);
+    settings_load((AppSettings *) settings);
 
     // Check if template file exists otherwise create it using temp_create_utils.c
     if (!template_json) {
@@ -3587,26 +3517,25 @@ void tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
                                     &t->template_data->multi_stage_goals,
                                     &t->template_data->multi_stage_goal_count, settings);
 
-    // TODO: Remove
-    // Detect and flag criteria that are shared between multiple advancements
-    //tracker_detect_shared_sub_items(t, settings);
 
     // Detect and flag criteria that are shared between multiple advancements
     tracker_detect_shared_icons(t, settings);
 
     // Automatically synchronize settings.json with the newly loaded template
-    cJSON* settings_root = cJSON_from_file(SETTINGS_FILE_PATH);
+    cJSON *settings_root = cJSON_from_file(SETTINGS_FILE_PATH);
     if (!settings_root) settings_root = cJSON_CreateObject();
 
     // Sync custom_progress
-    cJSON* old_custom_progress = cJSON_GetObjectItem(settings_root, "custom_progress");
-    cJSON* new_custom_progress = cJSON_CreateObject();
+    cJSON *old_custom_progress = cJSON_GetObjectItem(settings_root, "custom_progress");
+    cJSON *new_custom_progress = cJSON_CreateObject();
     for (int i = 0; i < t->template_data->custom_goal_count; i++) {
-        TrackableItem* item = t->template_data->custom_goals[i];
-        cJSON* old_item = old_custom_progress ? cJSON_GetObjectItem(old_custom_progress, item->root_name) : nullptr;
-        if (old_item) { // Preserve old value if it exists
+        TrackableItem *item = t->template_data->custom_goals[i];
+        cJSON *old_item = old_custom_progress ? cJSON_GetObjectItem(old_custom_progress, item->root_name) : nullptr;
+        if (old_item) {
+            // Preserve old value if it exists
             cJSON_AddItemToObject(new_custom_progress, item->root_name, cJSON_Duplicate(old_item, 1));
-        } else { // Add new item with default value
+        } else {
+            // Add new item with default value
             if (item->goal > 0 || item->goal == -1) cJSON_AddNumberToObject(new_custom_progress, item->root_name, 0);
             else cJSON_AddBoolToObject(new_custom_progress, item->root_name, false);
         }
@@ -3614,25 +3543,30 @@ void tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
     cJSON_ReplaceItemInObject(settings_root, "custom_progress", new_custom_progress);
 
     // Sync stat_progress_override
-    cJSON* old_stat_override = cJSON_GetObjectItem(settings_root, "stat_progress_override");
-    cJSON* new_stat_override = cJSON_CreateObject();
+    cJSON *old_stat_override = cJSON_GetObjectItem(settings_root, "stat_progress_override");
+    cJSON *new_stat_override = cJSON_CreateObject();
     for (int i = 0; i < t->template_data->stat_count; i++) {
-        TrackableCategory* stat_cat = t->template_data->stats[i];
-        cJSON* old_cat_item = old_stat_override ? cJSON_GetObjectItem(old_stat_override, stat_cat->root_name) : nullptr;
+        TrackableCategory *stat_cat = t->template_data->stats[i];
+        cJSON *old_cat_item = old_stat_override ? cJSON_GetObjectItem(old_stat_override, stat_cat->root_name) : nullptr;
 
         // Always add the parent entry (e.g., "stat_cat:mine_more_sand")
-        if (old_cat_item) cJSON_AddItemToObject(new_stat_override, stat_cat->root_name, cJSON_Duplicate(old_cat_item, 1));
+        if (old_cat_item) cJSON_AddItemToObject(new_stat_override, stat_cat->root_name,
+                                                cJSON_Duplicate(old_cat_item, 1));
         else cJSON_AddBoolToObject(new_stat_override, stat_cat->root_name, false);
 
         // Only add ".criteria." entries if the template defines multiple sub-stats for this category.
         if (stat_cat->criteria_count > 1) {
             for (int j = 0; j < stat_cat->criteria_count; j++) {
-                TrackableItem* sub_stat = stat_cat->criteria[j];
+                TrackableItem *sub_stat = stat_cat->criteria[j];
                 char sub_stat_key[512];
                 // Use the sub-stat's actual root_name for the key
-                snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name, sub_stat->root_name);
-                cJSON* old_sub_item = old_stat_override ? cJSON_GetObjectItem(old_stat_override, sub_stat_key) : nullptr;
-                if (old_sub_item) cJSON_AddItemToObject(new_stat_override, sub_stat_key, cJSON_Duplicate(old_sub_item, 1));
+                snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name,
+                         sub_stat->root_name);
+                cJSON *old_sub_item = old_stat_override
+                                          ? cJSON_GetObjectItem(old_stat_override, sub_stat_key)
+                                          : nullptr;
+                if (old_sub_item) cJSON_AddItemToObject(new_stat_override, sub_stat_key,
+                                                        cJSON_Duplicate(old_sub_item, 1));
                 else cJSON_AddBoolToObject(new_stat_override, sub_stat_key, false);
             }
         }
@@ -3640,13 +3574,14 @@ void tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
     cJSON_ReplaceItemInObject(settings_root, "stat_progress_override", new_stat_override);
 
     // Sync hotkeys based on their order in the list, not by name
-    cJSON* old_hotkeys_array = cJSON_GetObjectItem(settings_root, "hotkeys");
-    cJSON* new_hotkeys_array = cJSON_CreateArray();
+    cJSON *old_hotkeys_array = cJSON_GetObjectItem(settings_root, "hotkeys");
+    cJSON *new_hotkeys_array = cJSON_CreateArray();
 
     int counter_index = 0; // This will track their order in the list
     for (int i = 0; i < t->template_data->custom_goal_count; i++) {
         TrackableItem *item = t->template_data->custom_goals[i];
-        if (item && (item->goal > 0 || item->goal ==  -1)) { // It's a counter
+        if (item && (item->goal > 0 || item->goal == -1)) {
+            // It's a counter
             cJSON *new_hotkey_obj = cJSON_CreateObject();
             // The target is always the new counter from the current template
             // put name of counter in target_goal
