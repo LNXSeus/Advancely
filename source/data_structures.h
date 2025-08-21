@@ -167,6 +167,11 @@ struct TrackableItem {
     // Flag to allow "conflicting" criteria to overlay parent advancements icon (e.g., hoglin), init with false, cause of calloc
     bool is_shared;
     bool is_manually_completed; // Allow manually overriding sub-stats (NOT FOR ACHIEVEMENTS/ADVANCEMENTS)
+
+    // Animation State
+    float alpha;                 // Current transparency (1.0f = opaque, 0.0f = transparent)
+    bool is_visible_on_overlay;  // Tracks if the item should be rendered
+    float fade_timer;            // Timer for the fade-out animation
 };
 
 
@@ -198,6 +203,11 @@ struct TrackableCategory {
     int criteria_count;
     int completed_criteria_count; // Track completed criteria for that advancement
     TrackableItem **criteria; // An array of sub-items
+
+    // Animation State
+    float alpha; // Current transparency (1.0f = opaque, 0.0f = transparent)
+    bool is_visible_on_overlay; // Tracks if the category should be rendered
+    float fade_timer; // Timer for the fade-out animation
 };
 
 
@@ -235,6 +245,11 @@ struct MultiStageGoal {
     int current_stage; // Index of the currently active sub-goal
     int stage_count; // How many stages there are
     SubGoal **stages; // An array of the sub-goals
+
+    // Animation State
+    float alpha; // Current transparency (1.0f = opaque, 0.0f = transparent)
+    bool is_visible_on_overlay; // Tracks if the item should be rendered
+    float fade_timer; // Timer for the fade-out animation
 };
 
 // The main container for all data loaded from the template files.

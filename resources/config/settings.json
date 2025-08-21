@@ -5,15 +5,16 @@
   "category":	"test",
   "optional_flag":	"1",
   "general":	{
-    "enable_overlay": false,
     "using_stats_per_world_legacy": true,
+    "enable_overlay": false,
     "fps":	60,
-    "always_on_top":	true,
     "overlay_scroll_speed":	1,
-    "goal_align_left":	true,
+    "overlay_animation_speedup": false,
+    "always_on_top":	true,
     "remove_completed_goals": true,
-    "print_debug_status": false,
-    "overlay_progress_text_align": "OVERLAY_PROGRESS_TEXT_ALIGN_LEFT"
+    "goal_align_left":	true,
+    "overlay_progress_text_align": "left",
+    "print_debug_status": false
   },
   "stat_progress_override":	{
     "stat_cat:whatever": false,

@@ -44,15 +44,15 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
 
     bool path_mode_is_auto = (temp_settings.path_mode == PATH_MODE_AUTO);
-    if (ImGui::Checkbox("Auto-detect saves path", &path_mode_is_auto)) {
+    if (ImGui::Checkbox("Auto-Detect Saves Path", &path_mode_is_auto)) {
         temp_settings.path_mode = path_mode_is_auto ? PATH_MODE_AUTO : PATH_MODE_MANUAL;
     }
 
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Automatically finds the default Minecraft saves path for your OS:\n"
-                          "Windows: %%APPDATA%%\\.minecraft\\saves\n"
-                          "Linux: ~/.minecraft/saves\n"
-                          "macOS: ~/Library/Application Support/minecraft/saves");
+            "Windows: %%APPDATA%%\\.minecraft\\saves\n"
+            "Linux: ~/.minecraft/saves\n"
+            "macOS: ~/Library/Application Support/minecraft/saves");
     }
 
     if (temp_settings.path_mode == PATH_MODE_MANUAL) {
@@ -98,10 +98,11 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::Checkbox("Using StatsPerWorld Mod", &temp_settings.using_stats_per_world_legacy);
 
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("The StatsPerWorld Mod in combination with Legacy Fabric allows legacy versions of Minecraft\n"
-                              "to track stats locally per world and not globally. Check this if you're using this mod.\n"
-                              "If unchecked, the tracker will use a snapshotting system to simulate per-world achievements/stats.\n"
-                              "Then, achievements will even indicate if they have been completed on a previous world or on your current one.");
+            ImGui::SetTooltip(
+                "The StatsPerWorld Mod in combination with Legacy Fabric allows legacy versions of Minecraft\n"
+                "to track stats locally per world and not globally. Check this if you're using this mod.\n"
+                "If unchecked, the tracker will use a snapshotting system to simulate per-world achievements/stats.\n"
+                "Then, achievements will even indicate if they have been completed on a previous world or on your current one.");
         }
     }
 
@@ -129,8 +130,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::Checkbox("Enable Overlay", &temp_settings.enable_overlay);
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Enables a separate window for streaming.\n"
-                          "Use a color key filter in your streaming software on the 'Overlay BG' hex color.\n"
-                          "A negative scroll speed animates from right-to-left.");
+            "Use a color key filter in your streaming software on the 'Overlay BG' hex color.\n"
+            "A negative scroll speed animates from right-to-left.");
     }
 
     // This toggles the framerate of everything
@@ -138,24 +139,37 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // Conditionally display overlay related settings
     if (temp_settings.enable_overlay) {
-        ImGui::DragFloat("Overlay Scroll Speed", &temp_settings.overlay_scroll_speed, 0.01f, -100.00f, 100.00f, "%.2f");
+        ImGui::DragFloat("Overlay Scroll Speed", &temp_settings.overlay_scroll_speed, 0.001f, -25.00f, 25.00f, "%.3f");
+
+        if (ImGui::Checkbox("Speed Up Animation", &temp_settings.overlay_animation_speedup)) {
+
+        }
+        if (ImGui::IsItemHovered()) {
+            char speed_up_tooltip_buffer[1024];
+            snprintf(speed_up_tooltip_buffer, sizeof(speed_up_tooltip_buffer),
+                     "Toggles speeding up the overlay animation by a factor of %.1f. Don't forget to hit apply!\nOn top of that you can also hold SPACE when tabbed into the overlay window.",
+                     OVERLAY_SPEEDUP_FACTOR);
+
+            ImGui::SetTooltip(speed_up_tooltip_buffer);
+        }
     }
 
-    ImGui::Checkbox("Always on top", &temp_settings.tracker_always_on_top);
+    ImGui::Checkbox("Always On Top", &temp_settings.tracker_always_on_top);
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Forces the tracker window to always display above any other window.");
     }
     ImGui::SameLine();
-    ImGui::Checkbox("Remove completed goals", &temp_settings.remove_completed_goals);
+    ImGui::Checkbox("Remove Completed Goals", &temp_settings.remove_completed_goals);
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Hides fully completed goals and sub-goals to tidy up the view.");
     }
 
     if (temp_settings.enable_overlay) {
         ImGui::SameLine();
-        ImGui::Checkbox("Goal align left", &temp_settings.goal_align_left);
+        ImGui::Checkbox("Goal Align Left", &temp_settings.goal_align_left);
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("When enabled, multi-stage goals and custom goals will fill in from the left, otherwise from the right.");
+            ImGui::SetTooltip(
+                "When enabled, multi-stage goals and custom goals will fill in from the left, otherwise from the right.");
         }
     }
 
@@ -165,11 +179,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (temp_settings.enable_overlay) {
         ImGui::Text("Overlay Title Alignment:");
         ImGui::SameLine();
-        ImGui::RadioButton("Left", (int*)&temp_settings.overlay_progress_text_align, OVERLAY_PROGRESS_TEXT_ALIGN_LEFT);
+        ImGui::RadioButton("Left", (int *) &temp_settings.overlay_progress_text_align,
+                           OVERLAY_PROGRESS_TEXT_ALIGN_LEFT);
         ImGui::SameLine();
-        ImGui::RadioButton("Center", (int*)&temp_settings.overlay_progress_text_align, OVERLAY_PROGRESS_TEXT_ALIGN_CENTER);
+        ImGui::RadioButton("Center", (int *) &temp_settings.overlay_progress_text_align,
+                           OVERLAY_PROGRESS_TEXT_ALIGN_CENTER);
         ImGui::SameLine();
-        ImGui::RadioButton("Right", (int*)&temp_settings.overlay_progress_text_align, OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT);
+        ImGui::RadioButton("Right", (int *) &temp_settings.overlay_progress_text_align,
+                           OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT);
         ImGui::Spacing();
     }
 
@@ -195,30 +212,43 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     overlay_text_col[3] = (float) temp_settings.overlay_text_color.a / 255.0f;
 
     if (ImGui::ColorEdit4("Tracker BG", tracker_bg)) {
-        temp_settings.tracker_bg_color = {(Uint8)(tracker_bg[0]*255), (Uint8)(tracker_bg[1]*255), (Uint8)(tracker_bg[2]*255), (Uint8)(tracker_bg[3]*255)};
+        temp_settings.tracker_bg_color = {
+            (Uint8) (tracker_bg[0] * 255), (Uint8) (tracker_bg[1] * 255), (Uint8) (tracker_bg[2] * 255),
+            (Uint8) (tracker_bg[3] * 255)
+        };
     }
 
     // Conditionally display overlay background color picker
     if (temp_settings.enable_overlay) {
         if (ImGui::ColorEdit4("Overlay BG", overlay_bg)) {
-            temp_settings.overlay_bg_color = {(Uint8)(overlay_bg[0]*255), (Uint8)(overlay_bg[1]*255), (Uint8)(overlay_bg[2]*255), (Uint8)(overlay_bg[3]*255)};
+            temp_settings.overlay_bg_color = {
+                (Uint8) (overlay_bg[0] * 255), (Uint8) (overlay_bg[1] * 255), (Uint8) (overlay_bg[2] * 255),
+                (Uint8) (overlay_bg[3] * 255)
+            };
         }
     }
 
     if (ImGui::ColorEdit4("Text Color", text_col)) {
-        temp_settings.text_color = {(Uint8)(text_col[0]*255), (Uint8)(text_col[1]*255), (Uint8)(text_col[2]*255), (Uint8)(text_col[3]*255)};
+        temp_settings.text_color = {
+            (Uint8) (text_col[0] * 255), (Uint8) (text_col[1] * 255), (Uint8) (text_col[2] * 255),
+            (Uint8) (text_col[3] * 255)
+        };
     }
 
     if (temp_settings.enable_overlay) {
         if (ImGui::ColorEdit4("Overlay Text Color", overlay_text_col)) {
-            temp_settings.overlay_text_color = {(Uint8)(overlay_text_col[0]*255), (Uint8)(overlay_text_col[1]*255), (Uint8)(overlay_text_col[2]*255), (Uint8)(overlay_text_col[3]*255)};
+            temp_settings.overlay_text_color = {
+                (Uint8) (overlay_text_col[0] * 255), (Uint8) (overlay_text_col[1] * 255),
+                (Uint8) (overlay_text_col[2] * 255), (Uint8) (overlay_text_col[3] * 255)
+            };
         }
 
         // Slider for overlay width
         static int overlay_width;
         overlay_width = temp_settings.overlay_window.w;
         if (ImGui::DragInt("Overlay Width", &overlay_width, 10.0f, 200, 7680)) {
-            if (overlay_width > 0) { // Basic validation
+            if (overlay_width > 0) {
+                // Basic validation
                 temp_settings.overlay_window.w = overlay_width;
             }
         }
@@ -234,7 +264,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     ImGui::Checkbox("Print Debug To Console", &temp_settings.print_debug_status);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("This toggles printing debug information to the console (only printf, fprintf are excluded). \nAny other prints including errors are unaffected by this setting.\nRequires running the application from a console (like MSYS2 MINGW64)\nto see the output. Just navigate to the path and execute with \"./Advancely\".");
+        ImGui::SetTooltip(
+            "This toggles printing debug information to the console (only printf, fprintf are excluded). \nAny other prints including errors are unaffected by this setting.\nRequires running the application from a console (like MSYS2 MINGW64)\nto see the output. Just navigate to the path and execute with \"./Advancely\".");
     }
 
     ImGui::Separator();
@@ -243,39 +274,44 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // --- Hotkey Settings ---
 
     // This section is only displayed if the current template has custom counters.
-    static const char* key_names[] = {
-        "None", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
-        "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
+    static const char *key_names[] = {
+        "None", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U",
+        "V", "W", "X", "Y", "Z",
+        "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10",
+        "F11", "F12",
         "PrintScreen", "ScrollLock", "Pause", "Insert", "Home", "PageUp", "Delete", "End", "PageDown",
         "Right", "Left", "Down", "Up", "Numlock", "Keypad /", "Keypad *", "Keypad -", "Keypad +", "Keypad Enter",
-        "Keypad 1", "Keypad 2", "Keypad 3", "Keypad 4", "Keypad 5", "Keypad 6", "Keypad 7", "Keypad 8", "Keypad 9", "Keypad 0", "Keypad ."
+        "Keypad 1", "Keypad 2", "Keypad 3", "Keypad 4", "Keypad 5", "Keypad 6", "Keypad 7", "Keypad 8", "Keypad 9",
+        "Keypad 0", "Keypad ."
     };
 
-    const int key_names_count = sizeof(key_names) / sizeof(char*);
+    const int key_names_count = sizeof(key_names) / sizeof(char *);
 
     // Create a temporary vector of counters to display
-    std::vector<TrackableItem*> custom_counters;
+    std::vector<TrackableItem *> custom_counters;
     if (t && t->template_data) {
         for (int i = 0; i < t->template_data->custom_goal_count; ++i) {
-            TrackableItem* item = t->template_data->custom_goals[i];
+            TrackableItem *item = t->template_data->custom_goals[i];
             if (item && (item->goal > 0 || item->goal == -1)) {
                 custom_counters.push_back(item);
             }
         }
     }
 
-        if (!custom_counters.empty()) {
+    if (!custom_counters.empty()) {
         ImGui::Text("Hotkey Settings");
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Assign keys to increment/decrement custom counters\n(only work when tabbed into the tracker). Maximum of %d hotkeys are supported.", MAX_HOTKEYS);
+            ImGui::SetTooltip(
+                "Assign keys to increment/decrement custom counters\n(only work when tabbed into the tracker). Maximum of %d hotkeys are supported.",
+                MAX_HOTKEYS);
         }
 
         // Ensure the temp_settings has space for all potential hotkeys
         temp_settings.hotkey_count = custom_counters.size();
 
-        for (int i = 0; i < (int)custom_counters.size(); ++i) {
-            TrackableItem* counter = custom_counters[i];
-            HotkeyBinding* binding = &temp_settings.hotkeys[i];
+        for (int i = 0; i < (int) custom_counters.size(); ++i) {
+            TrackableItem *counter = custom_counters[i];
+            HotkeyBinding *binding = &temp_settings.hotkeys[i];
 
             // Set the target goal for this binding
             strncpy(binding->target_goal, counter->root_name, sizeof(binding->target_goal) - 1);
@@ -312,7 +348,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             char dec_label[64];
             snprintf(dec_label, sizeof(dec_label), "##dec_%s", counter->root_name);
             if (ImGui::Combo(dec_label, &current_dec_key_idx, key_names, key_names_count)) {
-                 strncpy(binding->decrement_key, key_names[current_dec_key_idx], sizeof(binding->decrement_key) - 1);
+                strncpy(binding->decrement_key, key_names[current_dec_key_idx], sizeof(binding->decrement_key) - 1);
             }
         }
     }
@@ -321,8 +357,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::Spacing();
 
     // Apply the changes
-    if (ImGui::Button("Apply settings")) {
-
+    if (ImGui::Button("Apply Settings")) {
         // Validate the manual path before applying settings
         if (temp_settings.path_mode == PATH_MODE_MANUAL) {
             // Check if the path is empty or does not exist
@@ -342,7 +377,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Place the next button on the same line
     ImGui::SameLine();
 
-    if (ImGui::Button("Reset to Defaults")) {
+    if (ImGui::Button("Reset To Defaults")) {
         // Preserve current window geometry before resetting other settings
         WindowRect current_tracker_window = temp_settings.tracker_window;
         WindowRect current_overlay_window = temp_settings.overlay_window;
@@ -357,34 +392,40 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // TODO: Add default values always to this tooltip here
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[1024];
+
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-            "Resets all settings (besides window size/position) in this window to their default values.\n"
-            "This does not modify your template files.\n\n"
-            "Defaults:\n"
-            "  - Path Mode: Auto-detect\n"
-            "  - Version: %s\n"
-            "  - Category: %s\n"
-            "  - Optional Flag: %s\n"
-            "  - Overlay: %s\n"
-            "  - StatsPerWorld Mod (1.0-1.6.4): %s\n"
-            "  - Always on top: %s\n"
-            "  - Remove completed: %s\n"
-            "  - Goal align left: %s\n"
-            "  - Print Debug To Console: %s\n"
-            "  - FPS Limit: %d\n"
-            "  - Overlay Scroll Speed: %.2f",
-            DEFAULT_VERSION,
-            DEFAULT_CATEGORY,
-            DEFAULT_OPTIONAL_FLAG,
-            DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
-            DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
-            DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
-            DEFAULT_REMOVE_COMPLETED_GOALS ? "Enabled" : "Disabled",
-            DEFAULT_GOAL_ALIGN_LEFT ? "Enabled" : "Disabled",
-            DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled",
-            DEFAULT_FPS,
-            DEFAULT_OVERLAY_SCROLL_SPEED
-        );
+         "Resets all settings (besides window size/position & hotkeys) in this window to their default values.\n"
+         "This does not modify your template files.\n\n"
+         "Defaults:\n"
+         "  - Path Mode: Auto-Detect\n"
+         "  - Version: %s\n"
+         "  - StatsPerWorld Mod (1.0-1.6.4): %s\n"
+         "  - Category: %s\n"
+         "  - Optional Flag: %s\n"
+         "  - Overlay: %s\n"
+         "  - FPS Limit: %d\n"
+         "  - Overlay Scroll Speed: %.2f\n"
+         "  - Speed Up Animation: %s\n"
+         "  - Always On Top: %s\n"
+         "  - Remove Completed: %s\n"
+         "  - Goal Align Left: %s\n"
+         "  - Overlay Width: %s\n"
+         "  - Print Debug To Console: %s",
+
+         DEFAULT_VERSION,
+         DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
+         DEFAULT_CATEGORY,
+         DEFAULT_OPTIONAL_FLAG,
+         DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
+         DEFAULT_FPS,
+         DEFAULT_OVERLAY_SCROLL_SPEED,
+         DEFAULT_OVERLAY_SPEED_UP ? "Enabled" : "Disabled",
+         DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
+         DEFAULT_REMOVE_COMPLETED_GOALS ? "Enabled" : "Disabled",
+         DEFAULT_GOAL_ALIGN_LEFT ? "Enabled" : "Disabled",
+         "1440px",
+         DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled"
+         );
         ImGui::SetTooltip(tooltip_buffer);
     }
 

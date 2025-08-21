@@ -64,6 +64,12 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                     }
                 }
             }
+            // TODO: Spacebar probably only used in overlay_events in overlay.cpp
+            // Global hotkey for animation speedup
+            if (event.key.scancode == SDL_SCANCODE_SPACE) {
+                // Spacebar acts as a toggle
+                // app_settings->overlay_animation_speedup = !app_settings->overlay_animation_speedup;
+            }
         }
 
         // --- Dispatch keyboard/mouse events ---

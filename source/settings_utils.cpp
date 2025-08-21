@@ -219,6 +219,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->remove_completed_goals = DEFAULT_REMOVE_COMPLETED_GOALS;
     settings->print_debug_status = DEFAULT_PRINT_DEBUG_STATUS;
     settings->overlay_progress_text_align = DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN;
+    settings->overlay_animation_speedup = DEFAULT_OVERLAY_SPEED_UP;
 
     // Default Geometry
     WindowRect default_window = {DEFAULT_WINDOW_POS, DEFAULT_WINDOW_POS, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE};
@@ -355,6 +356,15 @@ bool settings_load(AppSettings *settings) {
             settings->overlay_progress_text_align = DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN;
             defaults_were_used = true;
         }
+
+        const cJSON *overlay_speedup = cJSON_GetObjectItem(general_settings, "overlay_animation_speedup");
+        if (overlay_speedup && cJSON_IsBool(overlay_speedup)) settings->overlay_animation_speedup = cJSON_IsTrue(overlay_speedup);
+        else {
+            settings->overlay_animation_speedup = DEFAULT_OVERLAY_SPEED_UP;
+            defaults_were_used = true;
+        }
+
+
     } else {
         defaults_were_used = true;
     }
@@ -434,13 +444,12 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
     cJSON_ReplaceItemInObject(general_obj, "fps", cJSON_CreateNumber(settings->fps));
     cJSON_ReplaceItemInObject(general_obj, "always_on_top", cJSON_CreateBool(settings->tracker_always_on_top));
     cJSON_ReplaceItemInObject(general_obj, "overlay_scroll_speed", cJSON_CreateNumber(settings->overlay_scroll_speed));
-    // cJSON_ReplaceItemInObject(general_obj, "overlay_scroll_left_to_right",
-    //                           cJSON_CreateBool(settings->overlay_scroll_left_to_right)); // TODO: Remove this
     cJSON_ReplaceItemInObject(general_obj, "goal_align_left", cJSON_CreateBool(settings->goal_align_left));
     cJSON_ReplaceItemInObject(general_obj, "remove_completed_goals", cJSON_CreateBool(settings->remove_completed_goals));
     cJSON_ReplaceItemInObject(general_obj, "print_debug_status", cJSON_CreateBool(settings->print_debug_status));
     cJSON_ReplaceItemInObject(general_obj, "overlay_progress_text_align",
                               cJSON_CreateString(overlay_text_align_to_string(settings->overlay_progress_text_align)));
+    cJSON_ReplaceItemInObject(general_obj, "overlay_animation_speedup", cJSON_CreateBool(settings->overlay_animation_speedup));
 
 
     // Update Visual Settings

@@ -18,8 +18,11 @@ struct AppSettings;
 struct Overlay {
     SDL_Window *window;
     SDL_Renderer *renderer;
+    TTF_TextEngine *text_engine;
     TTF_Font *font; // For text on overlay window (sdl ttf)
-    float scroll_offset; // For animation
+    float scroll_offset_row1; // For animation of the first row (criteria and sub-stats)
+    float scroll_offset_row2; // For animation of the second row (advancements, stat-cats and unlocks)
+    float scroll_offset_row3; // For animation of the third row (custom goals and ms-goals)
     float social_media_timer; // Timer for cycling promotional text
     int current_social_index; // Index of the current promotional text
 };
