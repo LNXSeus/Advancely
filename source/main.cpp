@@ -333,11 +333,11 @@ int main(int argc, char *argv[]) {
 
             // Overlay window gets rendered using SDL, if it exists
             if (overlay) {
-                overlay_render(overlay, &app_settings);
+                overlay_render(overlay, tracker, &app_settings);
             }
 
             // --- Frame limiting ---
-            const float frame_time = (float) SDL_GetTicks() - current_time;
+            const float frame_time = (float) SDL_GetTicks() - (float)current_time;
             if (frame_time < frame_target_time) {
                 SDL_Delay((Uint32) (frame_target_time - frame_time));
             }

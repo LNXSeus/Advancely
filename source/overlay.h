@@ -5,12 +5,11 @@
 #ifndef OVERLAY_H
 #define OVERLAY_H
 
-#include "main.h"
+#include "tracker.h" // Has main.h
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 
 
 struct AppSettings;
@@ -21,6 +20,8 @@ struct Overlay {
     SDL_Renderer *renderer;
     TTF_Font *font; // For text on overlay window (sdl ttf)
     float scroll_offset; // For animation
+    float social_media_timer; // Timer for cycling promotional text
+    int current_social_index; // Index of the current promotional text
 };
 
 /**
@@ -47,7 +48,7 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings);
  * @param deltaTime A pointer to the frame's delta time, which can be modified by events.
  * @param settings A pointer to the loaded application settings.
  */
-void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *deltaTime, const AppSettings *settings); // pass pointer so we can modify deltaTime
+void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *deltaTime, const AppSettings *settings);
 
 /**
  * @brief Updates the state of the overlay.
@@ -63,15 +64,15 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
 void overlay_update(Overlay *o, float *deltaTime, const AppSettings *settings);
 
 /**
- * @brief Renders the overlay window's contents.
- *
+ * @brief Initializes a new Overlay instance.
  * Clears the screen with the background color. This is where all visual elements
  * for the overlay will be drawn.
  *
  * @param o A pointer to the Overlay struct.
+ * @param t A pointer to the Tracker struct to get progress data from.
  * @param settings A pointer to the application settings containing color information.
  */
-void overlay_render(Overlay *o, const AppSettings *settings);
+void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings);
 
 /**
  * @brief Frees all resources associated with the Overlay instance.

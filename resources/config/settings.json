@@ -12,7 +12,8 @@
     "overlay_scroll_speed":	1,
     "goal_align_left":	true,
     "remove_completed_goals": true,
-    "print_debug_status": false
+    "print_debug_status": false,
+    "overlay_progress_text_align": "OVERLAY_PROGRESS_TEXT_ALIGN_LEFT"
   },
   "stat_progress_override":	{
     "stat_cat:whatever": false,

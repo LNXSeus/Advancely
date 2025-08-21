@@ -27,6 +27,7 @@ extern "C" {
 #define DEFAULT_GOAL_ALIGN_LEFT true
 #define DEFAULT_REMOVE_COMPLETED_GOALS true
 #define DEFAULT_PRINT_DEBUG_STATUS false
+#define DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_LEFT
 
 // DEFINE DEFAULT SETTINGS
 #define DEFAULT_VERSION "1.16.1"
@@ -55,6 +56,13 @@ typedef struct {
 typedef struct {
     Uint8 r, g, b, a;
 } ColorRGBA;
+
+// Enum for overlay progress text alignment (always fully at the top)
+enum OverlayProgressTextAlignment {
+    OVERLAY_PROGRESS_TEXT_ALIGN_LEFT,
+    OVERLAY_PROGRESS_TEXT_ALIGN_CENTER,
+    OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT
+};
 
 // Default colors when it's just {} in settings.json, so no r, g, b, a values
 extern const ColorRGBA DEFAULT_TRACKER_BG_COLOR;
@@ -90,6 +98,7 @@ struct AppSettings {
     float overlay_scroll_speed;               // The speed and direction of the scrolling animation in the overlay.
     bool goal_align_left;                     // If true, items in the overlay are aligned to the left.
     bool remove_completed_goals;              // If true, completed goals are hidden from the tracker view.
+    OverlayProgressTextAlignment overlay_progress_text_align; // Alignment for the progress text in the overlay.
 
     // --- Window Geometry ---
     WindowRect tracker_window;                // The saved position and size of the main tracker window.

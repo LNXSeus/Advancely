@@ -14,6 +14,8 @@ extern "C" {
 #include <cJSON.h>
 }
 
+// TODO: Modify socials (or timing) at the top of overlay.cpp
+
 // The X-Macro list of all supported Minecraft versions.
 // This is the single source of truth for versions.
 #define VERSION_LIST \
