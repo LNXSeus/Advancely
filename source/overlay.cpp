@@ -117,11 +117,6 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     // temp variable to not dereference over and over again
     Overlay *o = *overlay;
 
-    if (!overlay_init_sdl(o, settings)) {
-        overlay_free(overlay, settings);
-        return false;
-    }
-
     o->scroll_offset_row1 = 0.0f;
     o->scroll_offset_row2 = 0.0f;
     o->scroll_offset_row3 = 0.0f;
@@ -136,28 +131,8 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     o->anim_cache_count = 0;
     o->anim_cache_capacity = 0;
 
-    // Load global background textures using the overlay's renderer
-    o->adv_bg = load_texture_with_scale_mode(o->renderer, "resources/gui/advancement_background.png", SDL_SCALEMODE_NEAREST);
-    o->adv_bg_half_done = load_texture_with_scale_mode(o->renderer, "resources/gui/advancement_background_half_done.png", SDL_SCALEMODE_NEAREST);
-    o->adv_bg_done = load_texture_with_scale_mode(o->renderer, "resources/gui/advancement_background_done.png", SDL_SCALEMODE_NEAREST);
-    if (!o->adv_bg || !o->adv_bg_half_done || !o->adv_bg_done) {
-        fprintf(stderr, "[OVERLAY] Failed to load advancement background textures.\n");
-        overlay_free(overlay, settings);
-        return false;
-    }
-
-    // Make font HiDPI aware
-    float scale = SDL_GetWindowDisplayScale(o->window);
-    if (scale == 0.0f) {
-        // Handle potential errors where scale is 0
-        scale = 1.0f;
-    }
-
-    int font_size = (int) roundf(24.0f * scale); // Scale base font size
-
-    o->font = TTF_OpenFont("resources/fonts/Minecraft.ttf", (float) font_size);
-    if (!o->font) {
-        fprintf(stderr, "[OVERLAY] Failed to load font: %s\n", SDL_GetError());
+    // Create the SDL window and renderer
+    if (!overlay_init_sdl(o, settings)) {
         overlay_free(overlay, settings);
         return false;
     }
@@ -169,6 +144,25 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
         return false;
     }
 
+    // Load global background textures using the overlay's renderer
+    o->adv_bg = load_texture_with_scale_mode(o->renderer, "resources/gui/advancement_background.png", SDL_SCALEMODE_NEAREST);
+    o->adv_bg_half_done = load_texture_with_scale_mode(o->renderer, "resources/gui/advancement_background_half_done.png", SDL_SCALEMODE_NEAREST);
+    o->adv_bg_done = load_texture_with_scale_mode(o->renderer, "resources/gui/advancement_background_done.png", SDL_SCALEMODE_NEAREST);
+    if (!o->adv_bg || !o->adv_bg_half_done || !o->adv_bg_done) {
+        fprintf(stderr, "[OVERLAY] Failed to load advancement background textures.\n");
+        overlay_free(overlay, settings);
+        return false;
+    }
+
+    // Make font HiDPI aware by loading it at a base point size (e.g., 24).
+    // SDL_ttf will automatically scale it correctly on any monitor at render time.
+    const float base_font_size = 24.0f;
+    o->font = TTF_OpenFont("resources/fonts/Minecraft.ttf", base_font_size);
+    if (!o->font) {
+        fprintf(stderr, "[OVERLAY] Failed to load font: %s\n", SDL_GetError());
+        overlay_free(overlay, settings);
+        return false;
+    }
     return true;
 }
 
