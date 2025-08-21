@@ -322,7 +322,7 @@ bool settings_load(AppSettings *settings) {
         }
 
         const cJSON *scroll_speed = cJSON_GetObjectItem(general_settings, "overlay_scroll_speed");
-        if (scroll_speed && cJSON_IsNumber(scroll_speed) && scroll_speed->valuedouble != -1.0)
+        if (scroll_speed && cJSON_IsNumber(scroll_speed)) // Scroll speed CAN be negative (right to left)
             settings->overlay_scroll_speed = (float) scroll_speed->valuedouble;
         else {
             settings->overlay_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
