@@ -1145,21 +1145,26 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
 
 // Helper for counting
 typedef struct {
-    char root_name[192];
+    char icon_path[256];
     int count;
-} CriterionCounter;
+} IconPathCounter;
 
 // helper function to process and count all sub-items from a list of categories
-static int count_all_sub_items(CriterionCounter **counts, int capacity, int current_unique_count,
+static int count_all_icon_paths(IconPathCounter **counts, int capacity, int current_unique_count,
                                TrackableCategory **categories, int cat_count) {
     if (!categories) return current_unique_count;
 
     for (int i = 0; i < cat_count; i++) {
         for (int j = 0; j < categories[i]->criteria_count; j++) {
             TrackableItem *crit = categories[i]->criteria[j];
+            // Only count items that have a valid icon path
+            if (crit->icon_path[0] == '\0') {
+                continue;
+            }
+
             bool found = false;
             for (int k = 0; k < current_unique_count; k++) {
-                if (strcmp((*counts)[k].root_name, crit->root_name) == 0) {
+                if (strcmp((*counts)[k].icon_path, crit->icon_path) == 0) {
                     (*counts)[k].count++;
                     found = true;
                     break;
@@ -1168,7 +1173,8 @@ static int count_all_sub_items(CriterionCounter **counts, int capacity, int curr
 
             // If the criterion is not found in the counts array, add it
             if (!found && current_unique_count < capacity) {
-                strncpy((*counts)[current_unique_count].root_name, crit->root_name, 191);
+                strncpy((*counts)[current_unique_count].icon_path, crit->icon_path, 255);
+                (*counts)[current_unique_count].icon_path[255] = '\0';
                 (*counts)[current_unique_count].count = 1;
                 current_unique_count++;
             }
@@ -1178,7 +1184,7 @@ static int count_all_sub_items(CriterionCounter **counts, int capacity, int curr
 }
 
 // Helper function to flag the items that are shared
-static void flag_shared_sub_items(CriterionCounter *counts, int unique_count, TrackableCategory **categories,
+static void flag_shared_icons(IconPathCounter *counts, int unique_count, TrackableCategory **categories,
                                   int cat_count) {
     if (!categories) return;
 
@@ -1186,9 +1192,15 @@ static void flag_shared_sub_items(CriterionCounter *counts, int unique_count, Tr
         for (int j = 0; j < categories[i]->criteria_count; j++) {
             TrackableItem *crit = categories[i]->criteria[j];
             crit->is_shared = false; // Reset first
+
+            // Cannot be shared if it doesn't have an icon path
+            if (crit->icon_path[0] == '\0') {
+                continue;
+            }
+
             for (int k = 0; k < unique_count; k++) {
-                // If the criterion is found in more than one advancement or stat
-                if (strcmp(counts[k].root_name, crit->root_name) == 0 && counts[k].count > 1) {
+                // If the criterion's icon path is found in the list and is used more than once
+                if (strcmp(counts[k].icon_path, crit->icon_path) == 0 && counts[k].count > 1) {
                     crit->is_shared = true;
                     break;
                 }
@@ -1198,38 +1210,126 @@ static void flag_shared_sub_items(CriterionCounter *counts, int unique_count, Tr
 }
 
 /**
- * @brief Detects criteria that are shared across multiple advancements or stats and flags them.
+ * @brief Detects criteria that share the same icon path across multiple advancements or stats and flags them.
  *
  * This function iterates through all parsed advancements or stats and their criteria to identify
- * criteria that have the same root_name. If a criterion is found in more than one
- * advancement or stat, its 'is_shared' flag is set to true. This allows the rendering
- * logic to visually distinguish them, for example, by overlaying the parent
- * advancement's or stat's icon.
+ * criteria that have the same icon_path. If a criterion's icon is found in more than one
+ * place, its 'is_shared' flag is set to true. This allows the rendering
+ * logic to visually distinguish them.
  *
  * @param t The Tracker struct.
  */
-static void tracker_detect_shared_sub_items(Tracker *t, const AppSettings *settings) {
+static void tracker_detect_shared_icons(Tracker *t, const AppSettings *settings) {
     int total_criteria = t->template_data->total_criteria_count + t->template_data->stat_total_criteria_count;
     if (total_criteria == 0) return;
 
-    CriterionCounter *counts = (CriterionCounter *) calloc(total_criteria, sizeof(CriterionCounter));
+    IconPathCounter *counts = (IconPathCounter *) calloc(total_criteria, sizeof(IconPathCounter));
     if (!counts) return;
 
     int unique_count = 0;
-    unique_count = count_all_sub_items(&counts, total_criteria, unique_count, t->template_data->advancements,
+    unique_count = count_all_icon_paths(&counts, total_criteria, unique_count, t->template_data->advancements,
                                        t->template_data->advancement_count);
-    unique_count = count_all_sub_items(&counts, total_criteria, unique_count, t->template_data->stats,
+    unique_count = count_all_icon_paths(&counts, total_criteria, unique_count, t->template_data->stats,
                                        t->template_data->stat_count);
 
-    flag_shared_sub_items(counts, unique_count, t->template_data->advancements, t->template_data->advancement_count);
-    flag_shared_sub_items(counts, unique_count, t->template_data->stats, t->template_data->stat_count);
+    flag_shared_icons(counts, unique_count, t->template_data->advancements, t->template_data->advancement_count);
+    flag_shared_icons(counts, unique_count, t->template_data->stats, t->template_data->stat_count);
 
     free(counts);
     counts = nullptr;
     if (settings->print_debug_status) {
-        printf("[TRACKER] Shared sub-item detection complete.\n");
+        printf("[TRACKER] Shared icon detection complete.\n");
     }
 }
+
+// TODO: Remove
+// // Helper for counting
+// typedef struct {
+//     char root_name[192];
+//     int count;
+// } CriterionCounter;
+//
+// // helper function to process and count all sub-items from a list of categories
+// static int count_all_sub_items(CriterionCounter **counts, int capacity, int current_unique_count,
+//                                TrackableCategory **categories, int cat_count) {
+//     if (!categories) return current_unique_count;
+//
+//     for (int i = 0; i < cat_count; i++) {
+//         for (int j = 0; j < categories[i]->criteria_count; j++) {
+//             TrackableItem *crit = categories[i]->criteria[j];
+//             bool found = false;
+//             for (int k = 0; k < current_unique_count; k++) {
+//                 if (strcmp((*counts)[k].root_name, crit->root_name) == 0) {
+//                     (*counts)[k].count++;
+//                     found = true;
+//                     break;
+//                 }
+//             }
+//
+//             // If the criterion is not found in the counts array, add it
+//             if (!found && current_unique_count < capacity) {
+//                 strncpy((*counts)[current_unique_count].root_name, crit->root_name, 191);
+//                 (*counts)[current_unique_count].count = 1;
+//                 current_unique_count++;
+//             }
+//         }
+//     }
+//     return current_unique_count;
+// }
+//
+// // Helper function to flag the items that are shared
+// static void flag_shared_sub_items(CriterionCounter *counts, int unique_count, TrackableCategory **categories,
+//                                   int cat_count) {
+//     if (!categories) return;
+//
+//     for (int i = 0; i < cat_count; i++) {
+//         for (int j = 0; j < categories[i]->criteria_count; j++) {
+//             TrackableItem *crit = categories[i]->criteria[j];
+//             crit->is_shared = false; // Reset first
+//             for (int k = 0; k < unique_count; k++) {
+//                 // If the criterion is found in more than one advancement or stat
+//                 if (strcmp(counts[k].root_name, crit->root_name) == 0 && counts[k].count > 1) {
+//                     crit->is_shared = true;
+//                     break;
+//                 }
+//             }
+//         }
+//     }
+// }
+//
+// /**
+//  * @brief Detects criteria that are shared across multiple advancements or stats and flags them.
+//  *
+//  * This function iterates through all parsed advancements or stats and their criteria to identify
+//  * criteria that have the same root_name. If a criterion is found in more than one
+//  * advancement or stat, its 'is_shared' flag is set to true. This allows the rendering
+//  * logic to visually distinguish them, for example, by overlaying the parent
+//  * advancement's or stat's icon.
+//  *
+//  * @param t The Tracker struct.
+//  */
+// static void tracker_detect_shared_sub_items(Tracker *t, const AppSettings *settings) {
+//     int total_criteria = t->template_data->total_criteria_count + t->template_data->stat_total_criteria_count;
+//     if (total_criteria == 0) return;
+//
+//     CriterionCounter *counts = (CriterionCounter *) calloc(total_criteria, sizeof(CriterionCounter));
+//     if (!counts) return;
+//
+//     int unique_count = 0;
+//     unique_count = count_all_sub_items(&counts, total_criteria, unique_count, t->template_data->advancements,
+//                                        t->template_data->advancement_count);
+//     unique_count = count_all_sub_items(&counts, total_criteria, unique_count, t->template_data->stats,
+//                                        t->template_data->stat_count);
+//
+//     flag_shared_sub_items(counts, unique_count, t->template_data->advancements, t->template_data->advancement_count);
+//     flag_shared_sub_items(counts, unique_count, t->template_data->stats, t->template_data->stat_count);
+//
+//     free(counts);
+//     counts = nullptr;
+//     if (settings->print_debug_status) {
+//         printf("[TRACKER] Shared sub-item detection complete.\n");
+//     }
+// }
 
 /**
  * @brief Parses a cJSON array of simple trackable items (like unlocks or custom goals) into an array of TrackableItem structs.
@@ -3487,8 +3587,12 @@ void tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
                                     &t->template_data->multi_stage_goals,
                                     &t->template_data->multi_stage_goal_count, settings);
 
+    // TODO: Remove
     // Detect and flag criteria that are shared between multiple advancements
-    tracker_detect_shared_sub_items(t, settings);
+    //tracker_detect_shared_sub_items(t, settings);
+
+    // Detect and flag criteria that are shared between multiple advancements
+    tracker_detect_shared_icons(t, settings);
 
     // Automatically synchronize settings.json with the newly loaded template
     cJSON* settings_root = cJSON_from_file(SETTINGS_FILE_PATH);
