@@ -347,6 +347,13 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
             if (total_row_width > 0) {
                 float start_pos = fmod(o->scroll_offset_row1, total_row_width);
+                if (start_pos < 0) {
+                    start_pos += total_row_width;
+                }
+
+                // Calculate how many blocks to draw to always fill the screen
+                int blocks_to_draw = (int)ceil((float)window_w / total_row_width) + 1;
+
                 auto render_block = [&](float block_offset) {
                     for (size_t i = 0; i < items.size(); ++i) {
                         float current_x = block_offset + (i * item_full_width);
@@ -401,9 +408,11 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     }
                 };
 
-                render_block(start_pos);
-                render_block(start_pos - total_row_width);
-                if (total_row_width < window_w) render_block(start_pos + total_row_width);
+                // Loop to draw as many blocks as needed
+                for (int i = 0; i < blocks_to_draw; ++i) {
+                    render_block(start_pos + (i * total_row_width));
+                    render_block(start_pos - ((i + 1) * total_row_width));
+                }
             }
         }
     }
@@ -470,6 +479,11 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
         if (total_row_width > 0) {
             float start_pos = fmod(scroll_offset, total_row_width);
+
+            if (start_pos < 0) {
+                start_pos += total_row_width;
+            }
+
             auto render_block = [&](float block_offset) {
                 for (size_t i = 0; i < items.size(); ++i) {
                     const RenderItem& item = items[i];
@@ -519,9 +533,11 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     }
                 }
             };
-            render_block(start_pos);
-            render_block(start_pos - total_row_width);
-            if (total_row_width < window_w) render_block(start_pos + total_row_width);
+            int blocks_to_draw = (int)ceil((float)window_w / total_row_width) + 1;
+            for (int i = 0; i < blocks_to_draw; ++i) {
+                render_block(start_pos + (i * total_row_width));
+                render_block(start_pos - ((i + 1) * total_row_width));
+            }
         }
 
         for (auto& entry : text_cache) {
@@ -544,9 +560,6 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 RenderItem item;
                 item.display_name = adv->display_name;
                 item.icon_path = adv->icon_path;
-                // TODO: Remove
-                // item.texture = adv->texture;
-                // item.anim_texture = adv->anim_texture;
                 item.alpha = adv->alpha;
                 // Use overlay background textures
                 if (adv->done) item.bg_texture = o->adv_bg_done;
@@ -567,9 +580,6 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 RenderItem item;
                 item.display_name = unlock->display_name;
                 item.icon_path = unlock->icon_path;
-                // TODO: Remove
-                // item.texture = unlock->texture;
-                // item.anim_texture = unlock->anim_texture;
                 item.alpha = unlock->alpha;
                 item.bg_texture = unlock->done ? o->adv_bg_done : o->adv_bg;
                 items.push_back(item);
@@ -580,22 +590,23 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             TrackableCategory *stat = t->template_data->stats[i];
             bool is_hidden_legacy = (version <= MC_VERSION_1_6_4 && stat->criteria_count == 1 && stat->criteria[0]->goal
                                      <= 0);
-            if (stat->alpha > 0.0f && !is_hidden_legacy) {
+            if (stat->alpha > 0.0f && !is_hidden_legacy && !stat->done) {
                 RenderItem item;
                 item.display_name = stat->display_name;
                 item.icon_path = stat->icon_path;
-                // TODO: Remove
-                // item.texture = stat->texture;
-                // item.anim_texture = stat->anim_texture;
+                item.alpha = stat->alpha;
+
                 if (stat->done) item.bg_texture = o->adv_bg_done;
                 else if (stat->completed_criteria_count > 0 || (stat->criteria_count == 1 && stat->criteria[0]->progress > 0)) item.bg_texture = o->adv_bg_half_done;
                 else item.bg_texture = o->adv_bg;
+
+                // This logic correctly creates the progress text, same as the tracker
                 if (stat->criteria_count > 1) {
                     char buf[32];
                     snprintf(buf, sizeof(buf), "(%d / %d)", stat->completed_criteria_count, stat->criteria_count);
                     item.progress_text = buf;
                 } else if (stat->criteria_count == 1) {
-                    TrackableItem *crit = stat->criteria[0];
+                    TrackableItem* crit = stat->criteria[0];
                     if (crit->goal > 0) {
                         char buf[32];
                         snprintf(buf, sizeof(buf), "(%d / %d)", crit->progress, crit->goal);
