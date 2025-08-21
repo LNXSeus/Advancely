@@ -58,6 +58,8 @@ static void render_texture_with_alpha(SDL_Renderer *renderer, SDL_Texture *textu
     }
 
     if (texture_to_render) {
+        // Reset texture color modulation to white (no tint)
+        SDL_SetTextureColorMod(texture_to_render, 255, 255, 255);
         SDL_SetTextureAlphaMod(texture_to_render, alpha);
         SDL_RenderTexture(renderer, texture_to_render, nullptr, dest);
         SDL_SetTextureAlphaMod(texture_to_render, 255); // Reset for other render calls
@@ -262,7 +264,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
     // --- ROW 1: Criteria & Sub-stats Icons ---
     {
-        const float ROW1_Y_POS = 60.0f;
+        const float ROW1_Y_POS = 52.0f; // Initially was 60.0f
         const float ROW1_ICON_SIZE = 48.0f;
         const float ROW1_SPACING = 8.0f;
         const float ROW1_SHARED_ICON_SIZE = 24.0f;
@@ -353,8 +355,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         struct TextCacheEntry {
             TTF_Text* name_text = nullptr;
             TTF_Text* progress_text = nullptr;
-            int name_w = 0, name_h = 0;
-            int progress_w = 0, progress_h = 0;
+            float name_w = 0, name_h = 0;
+            float progress_w = 0, progress_h = 0;
         };
         std::vector<TextCacheEntry> text_cache;
         text_cache.reserve(items.size());
@@ -362,19 +364,28 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         float max_cell_width = ITEM_WIDTH;
         for (const auto& item : items) {
             TextCacheEntry entry;
+            // TODO: Where is text_color handled?
+            // SDL_Color text_color = { settings->overlay_text_color.r, settings->overlay_text_color.g, settings->overlay_text_color.b, 255 };
 
-            // --- CORRECTED: TTF_CreateText now uses the text_engine and has a different signature ---
+
             entry.name_text = TTF_CreateText(o->text_engine, o->font, item.display_name.c_str(), 0);
             if (entry.name_text) {
-                TTF_GetTextSize(entry.name_text, &entry.name_w, &entry.name_h);
-                max_cell_width = fmaxf(max_cell_width, (float)entry.name_w);
+                // Get size as int, but store as float
+                int w, h;
+                TTF_GetTextSize(entry.name_text, &w, &h);
+                entry.name_w = (float)w;
+                entry.name_h = (float)h;
+                max_cell_width = fmaxf(max_cell_width, entry.name_w);
             }
 
             if (!item.progress_text.empty()) {
                 entry.progress_text = TTF_CreateText(o->text_engine, o->font, item.progress_text.c_str(), 0);
                 if (entry.progress_text) {
-                    TTF_GetTextSize(entry.progress_text, &entry.progress_w, &entry.progress_h);
-                    max_cell_width = fmaxf(max_cell_width, (float)entry.progress_w);
+                    int w, h;
+                    TTF_GetTextSize(entry.progress_text, &w, &h);
+                    entry.progress_w = (float)w;
+                    entry.progress_h = (float)h;
+                    max_cell_width = fmaxf(max_cell_width, entry.progress_w);
                 }
             }
             text_cache.push_back(entry);
@@ -388,7 +399,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             auto render_block = [&](float block_offset) {
                 for (size_t i = 0; i < items.size(); ++i) {
                     const RenderItem& item = items[i];
-                    const TextCacheEntry& cached_text = text_cache[i];
+                    const TextCacheEntry &cached_text = text_cache[i];
                     float current_x = block_offset + (i * item_full_width);
 
                     if (current_x + max_cell_width < 0 || current_x > window_w) continue;
@@ -414,7 +425,6 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     render_texture_with_alpha(o->renderer, item.texture, item.anim_texture, &icon_rect, final_alpha_byte);
 
                     if (cached_text.name_text) {
-                        // --- CORRECTED: Use TTF_SetTextColorFloat for alpha and color, then TTF_DrawRendererText ---
                         TTF_SetTextColorFloat(cached_text.name_text, (float)settings->overlay_text_color.r / 255.0f, (float)settings->overlay_text_color.g / 255.0f, (float)settings->overlay_text_color.b / 255.0f, final_alpha_float);
                         TTF_DrawRendererText(cached_text.name_text, current_x + (max_cell_width - cached_text.name_w) / 2.0f, y_pos + ITEM_WIDTH + TEXT_Y_OFFSET);
 
@@ -505,7 +515,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 items.push_back(item);
             }
         }
-        render_item_row(110.0f, o->scroll_offset_row2, items);
+        // Initially was 110.0f
+        render_item_row(108.0f, o->scroll_offset_row2, items);
     }
 
     // --- ROW 3 Data Collection ---
@@ -558,7 +569,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 items.push_back(item);
             }
         }
-        render_item_row(270.0f, o->scroll_offset_row3, items);
+        // Float value controls how much row is pushed down, initially was 270.0f
+        render_item_row(260.0f, o->scroll_offset_row3, items);
     }
 
     SDL_RenderPresent(o->renderer);

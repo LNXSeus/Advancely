@@ -142,7 +142,7 @@
       }
     },
     "achievement.overpowered": {
-      "icon": "items/Enchanted_Golden_Apple_JE2_BE2.gif",
+      "icon": "items/Enchanted_Golden_Apple_unoptimized.gif",
       "criteria": {}
     },
     "achievement.onARail": {
