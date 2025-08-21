@@ -71,6 +71,48 @@ struct Tracker {
 
 
 /**
+ * @brief Loads an SDL_Texture from a file and sets its scale mode.
+ * @param renderer The SDL_Renderer to use.
+ * @param path The path to the image file.
+ * @param scale_mode The SDL_ScaleMode to apply (e.g., SDL_SCALEMODE_NEAREST).
+ * @return A pointer to the created SDL_Texture, or nullptr on failure.
+ */
+SDL_Texture *load_texture_with_scale_mode(SDL_Renderer *renderer, const char *path, SDL_ScaleMode scale_mode);
+
+/**
+* @brief Gets an SDL_Texture from a path, utilizing a specific cache to avoid redundant loads.
+* @param renderer The renderer to create the texture with.
+* @param cache A pointer to the cache array.
+* @param cache_count A pointer to the current number of items in the cache.
+* @param cache_capacity A pointer to the cache's current capacity.
+* @param path The path to the image file.
+* @return A pointer to the cached or newly loaded SDL_Texture, or nullptr on failure.
+*/
+SDL_Texture *get_texture_from_cache(SDL_Renderer *renderer, TextureCacheEntry **cache, int *cache_count, int *cache_capacity, const char *path);
+
+
+/**
+ * @brief Frees all memory associated with an AnimatedTexture, including all its frame textures.
+ *
+ * Used within tracker_free_template_data(). Used for any .gif textures.
+ *
+ * @param anim The AnimatedTexture to be freed.
+ */
+void free_animated_texture(AnimatedTexture *anim);
+
+/**
+ * @brief Gets an AnimatedTexture from a path, utilizing a cache to avoid redundant loads.
+ * @param renderer The SDL_Renderer to use for texture creation.
+ * @param cache A pointer to the cache array.
+ * @param cache_count A pointer to the current number of items in the cache.
+ * @param cache_capacity A pointer to the cache's current capacity.
+ * @param path The path to the GIF file.
+ * @return A pointer to the cached or newly loaded AnimatedTexture, or nullptr on failure.
+ */
+AnimatedTexture *get_animated_texture_from_cache(SDL_Renderer *renderer, AnimatedTextureCacheEntry **cache, int *cache_count, int *cache_capacity, const char* path);
+
+
+/**
  * @brief Initializes a new Tracker instance.
  *
  * This function allocates memory for the Tracker struct, initializes SDL components for the overlay window,

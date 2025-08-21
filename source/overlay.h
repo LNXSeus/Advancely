@@ -20,6 +20,18 @@ struct Overlay {
     SDL_Renderer *renderer;
     TTF_TextEngine *text_engine;
     TTF_Font *font; // For text on overlay window (sdl ttf)
+
+    SDL_Texture *adv_bg;
+    SDL_Texture *adv_bg_half_done;
+    SDL_Texture *adv_bg_done;
+
+    TextureCacheEntry *texture_cache;
+    int texture_cache_count;
+    int texture_cache_capacity;
+    AnimatedTextureCacheEntry *anim_cache;
+    int anim_cache_count;
+    int anim_cache_capacity;
+
     float scroll_offset_row1; // For animation of the first row (criteria and sub-stats)
     float scroll_offset_row2; // For animation of the second row (advancements, stat-cats and unlocks)
     float scroll_offset_row3; // For animation of the third row (custom goals and ms-goals)
