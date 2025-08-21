@@ -269,16 +269,13 @@ int main(int argc, char *argv[]) {
             // Check if dmon (or manual update through custom goal) has requested an update
             // Atomically check if the flag is 1, and if so, set it to 0.
             if (SDL_SetAtomicInt(&g_needs_update, 0) == 1) {
-                // Re-scan for the latest world to handle world switching
-                AppSettings current_settings;
-                settings_load(&current_settings); // Also constructs the template paths
-                MC_Version version = settings_get_version_from_string(current_settings.version_str);
+                MC_Version version = settings_get_version_from_string(app_settings.version_str);
                 find_player_data_files(
                     tracker->saves_path,
                     version,
                     // This toggles if StatsPerWorld mod is enabled (local stats for legacy)
-                    current_settings.using_stats_per_world_legacy,
-                    &current_settings,
+                    app_settings.using_stats_per_world_legacy,
+                    &app_settings,
                     tracker->world_name,
                     tracker->advancements_path,
                     tracker->stats_path,
