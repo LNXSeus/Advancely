@@ -76,7 +76,7 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
 
 
 bool overlay_init_sdl(Overlay *o, const AppSettings *settings) {
-    Uint32 window_flags = SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
+    Uint32 window_flags = SDL_WINDOW_HIGH_PIXEL_DENSITY; // TODO: Removed SDL_WINDOW_RESIZABLE
 
     int x = (settings->overlay_window.x == DEFAULT_WINDOW_POS)
                 ? (int) SDL_WINDOWPOS_CENTERED
