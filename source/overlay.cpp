@@ -32,12 +32,23 @@ const char *SOCIALS[] = {
 };
 const int NUM_SOCIALS = sizeof(SOCIALS) / sizeof(char *);
 
-// Helper function to render a texture (static or animated) with alpha modulation
+/** @brief Helper function to render a texture (static or animated) with alpha modulation
+ * It also corrects the aspect ratio of the .png textures.
+ *
+ * @param renderer The SDL_Renderer to render the texture on.
+ * @param texture The SDL_Texture to render.
+ * @param anim_texture The AnimatedTexture to render.
+ * @param dest The destination rectangle for the texture.
+ * @param alpha The alpha value to apply to the texture.
+ *
+ */
 static void render_texture_with_alpha(SDL_Renderer *renderer, SDL_Texture *texture, AnimatedTexture *anim_texture,
                                       const SDL_FRect *dest, Uint8 alpha) {
     SDL_Texture *texture_to_render = nullptr;
+    bool is_animated = false;
 
     if (anim_texture && anim_texture->frame_count > 0) {
+        is_animated = true;
         if (anim_texture->delays && anim_texture->total_duration > 0) {
             Uint32 elapsed_time = SDL_GetTicks() % anim_texture->total_duration;
             int current_frame = 0;
@@ -61,7 +72,34 @@ static void render_texture_with_alpha(SDL_Renderer *renderer, SDL_Texture *textu
         // Reset texture color modulation to white (no tint)
         SDL_SetTextureColorMod(texture_to_render, 255, 255, 255);
         SDL_SetTextureAlphaMod(texture_to_render, alpha);
-        SDL_RenderTexture(renderer, texture_to_render, nullptr, dest);
+
+        // Aspect ratio correction for .png files
+        if (!is_animated) {
+            // This is a static texture (.png), so we correct its aspect ratio.
+            // Animated textures (.gif) are already padded to be square at load time.
+            float tex_w, tex_h;
+            SDL_GetTextureSize(texture_to_render, &tex_w, &tex_h);
+
+            // Calculate the best scale to fit the texture within the destination box
+            float scale_factor = fminf(dest->w / tex_w, dest->h / tex_h);
+
+            // Calculate the new dimensions of the texture
+            float scaled_w = tex_w * scale_factor;
+            float scaled_h = tex_h * scale_factor;
+
+            // Calculate padding to center the texture inside the destination box
+            float pad_x = (dest->w - scaled_w) / 2.0f;
+            float pad_y = (dest->h - scaled_h) / 2.0f;
+
+            // Create the final, centered, and correctly scaled destination rectangle
+            SDL_FRect final_dest = { dest->x + pad_x, dest->y + pad_y, scaled_w, scaled_h };
+            SDL_RenderTexture(renderer, texture_to_render, nullptr, &final_dest);
+
+        } else {
+            // For animated textures, render stretched as before, since they are pre-padded.
+            SDL_RenderTexture(renderer, texture_to_render, nullptr, dest);
+        }
+
         SDL_SetTextureAlphaMod(texture_to_render, 255); // Reset for other render calls
     }
 }
@@ -285,7 +323,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         const float ROW1_Y_POS = 52.0f; // Initially was 60.0f
         const float ROW1_ICON_SIZE = 48.0f;
         const float ROW1_SPACING = 8.0f;
-        const float ROW1_SHARED_ICON_SIZE = 24.0f;
+        const float ROW1_SHARED_ICON_SIZE = 30.0f; // Size of shared icons, intially was 24.0f
 
         std::vector<TrackableItem *> items;
         std::vector<TrackableCategory *> parents;
@@ -333,8 +371,14 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         // SDL_RenderFillRect(o->renderer, &dest_rect);
 
 
-                        SDL_Texture* tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count, &o->texture_cache_capacity, item->icon_path);
-                        AnimatedTexture* anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity, item->icon_path);
+                        // Separate .gif and .png textures
+                        SDL_Texture* tex = nullptr;
+                        AnimatedTexture* anim_tex = nullptr;
+                        if (strstr(item->icon_path, ".gif")) {
+                            anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity, item->icon_path);
+                        } else {
+                            tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count, &o->texture_cache_capacity, item->icon_path);
+                        }
                         render_texture_with_alpha(o->renderer, tex, anim_tex, &dest_rect, final_alpha);
 
                         // TODO: Remove
@@ -343,8 +387,13 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
                         if (item->is_shared) {
 
-                            SDL_Texture* parent_tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count, &o->texture_cache_capacity, parent->icon_path);
-                            AnimatedTexture* parent_anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity, parent->icon_path);
+                            SDL_Texture* parent_tex = nullptr;
+                            AnimatedTexture* parent_anim_tex = nullptr;
+                            if (strstr(parent->icon_path, ".gif")) {
+                                parent_anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity, parent->icon_path);
+                            } else {
+                                parent_tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count, &o->texture_cache_capacity, parent->icon_path);
+                            }
                             SDL_FRect shared_dest_rect = { current_x, ROW1_Y_POS, ROW1_SHARED_ICON_SIZE, ROW1_SHARED_ICON_SIZE };
                             render_texture_with_alpha(o->renderer, parent_tex, parent_anim_tex, &shared_dest_rect, final_alpha);
 
@@ -455,8 +504,14 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     // SDL_RenderFillRect(o->renderer, &icon_rect);
 
 
-                    SDL_Texture* tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count, &o->texture_cache_capacity, item.icon_path.c_str());
-                    AnimatedTexture* anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity, item.icon_path.c_str());
+                    // Separate .gif and .png texture loading
+                    SDL_Texture* tex = nullptr;
+                    AnimatedTexture* anim_tex = nullptr;
+                    if (strstr(item.icon_path.c_str(), ".gif")) {
+                        anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity, item.icon_path.c_str());
+                    } else {
+                        tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count, &o->texture_cache_capacity, item.icon_path.c_str());
+                    }
                     render_texture_with_alpha(o->renderer, tex, anim_tex, &icon_rect, final_alpha_byte);
 
                     if (cached_text.name_text) {
@@ -500,9 +555,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 // item.anim_texture = adv->anim_texture;
                 item.alpha = adv->alpha;
                 // Use overlay background textures
-                if (adv->done) item.bg_texture = t->adv_bg_done;
-                else if (adv->completed_criteria_count > 0) item.bg_texture = t->adv_bg_half_done;
-                else item.bg_texture = t->adv_bg;
+                if (adv->done) item.bg_texture = o->adv_bg_done;
+                else if (adv->completed_criteria_count > 0) item.bg_texture = o->adv_bg_half_done;
+                else item.bg_texture = o->adv_bg;
                 if (adv->criteria_count > 0) {
                     char buf[32];
                     snprintf(buf, sizeof(buf), "(%d / %d)", adv->completed_criteria_count, adv->criteria_count);
@@ -522,7 +577,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 // item.texture = unlock->texture;
                 // item.anim_texture = unlock->anim_texture;
                 item.alpha = unlock->alpha;
-                item.bg_texture = unlock->done ? t->adv_bg_done : t->adv_bg;
+                item.bg_texture = unlock->done ? o->adv_bg_done : o->adv_bg;
                 items.push_back(item);
             }
         }
@@ -538,12 +593,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 // TODO: Remove
                 // item.texture = stat->texture;
                 // item.anim_texture = stat->anim_texture;
-                item.alpha = stat->alpha;
-                if (stat->done) item.bg_texture = t->adv_bg_done;
-                else if (stat->completed_criteria_count > 0 || (
-                             stat->criteria_count == 1 && stat->criteria[0]->progress > 0))
-                    item.bg_texture = t->adv_bg_half_done;
-                else item.bg_texture = t->adv_bg;
+                if (stat->done) item.bg_texture = o->adv_bg_done;
+                else if (stat->completed_criteria_count > 0 || (stat->criteria_count == 1 && stat->criteria[0]->progress > 0)) item.bg_texture = o->adv_bg_half_done;
+                else item.bg_texture = o->adv_bg;
                 if (stat->criteria_count > 1) {
                     char buf[32];
                     snprintf(buf, sizeof(buf), "(%d / %d)", stat->completed_criteria_count, stat->criteria_count);
@@ -577,9 +629,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 // item.texture = goal->texture;
                 // item.anim_texture = goal->anim_texture;
                 item.alpha = goal->alpha;
-                if (goal->done) item.bg_texture = t->adv_bg_done;
-                else if (goal->progress > 0) item.bg_texture = t->adv_bg_half_done;
-                else item.bg_texture = t->adv_bg;
+                if (goal->done) item.bg_texture = o->adv_bg_done;
+                else if (goal->progress > 0) item.bg_texture = o->adv_bg_half_done;
+                else item.bg_texture = o->adv_bg;
                 char buf[32];
                 if (goal->goal > 0) {
                     snprintf(buf, sizeof(buf), "(%d / %d)", goal->progress, goal->goal);
@@ -602,9 +654,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 // item.texture = goal->texture;
                 // item.anim_texture = goal->anim_texture;
                 item.alpha = goal->alpha;
-                if (goal->current_stage >= goal->stage_count - 1) item.bg_texture = t->adv_bg_done;
-                else if (goal->current_stage > 0) item.bg_texture = t->adv_bg_half_done;
-                else item.bg_texture = t->adv_bg;
+                if (goal->current_stage >= goal->stage_count - 1) item.bg_texture = o->adv_bg_done;
+                else if (goal->current_stage > 0) item.bg_texture = o->adv_bg_half_done;
+                else item.bg_texture = o->adv_bg;
                 if (goal->current_stage < goal->stage_count) {
                     SubGoal *active_stage = goal->stages[goal->current_stage];
                     char buf[256];

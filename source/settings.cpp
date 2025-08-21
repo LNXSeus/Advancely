@@ -129,9 +129,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::Text("General Settings");
     ImGui::Checkbox("Enable Overlay", &temp_settings.enable_overlay);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Enables a separate window for streaming.\n"
+        ImGui::SetTooltip("Enables a separate window to show your progress in your stream.\n"
             "Use a color key filter in your streaming software on the 'Overlay BG' hex color.\n"
-            "A negative scroll speed animates from right-to-left.");
+            "A negative scroll speed animates from right-to-left.\n"
+            "To turn off the overlay, disable this checkbox and hit 'Apply Settings'!");
     }
 
     // This toggles the framerate of everything
