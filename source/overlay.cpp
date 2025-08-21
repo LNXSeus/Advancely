@@ -79,6 +79,11 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     // temp variable to not dereference over and over again
     Overlay *o = *overlay;
 
+    if (!overlay_init_sdl(o, settings)) {
+        overlay_free(overlay, settings);
+        return false;
+    }
+
     o->scroll_offset_row1 = 0.0f;
     o->scroll_offset_row2 = 0.0f;
     o->scroll_offset_row3 = 0.0f;
@@ -86,7 +91,19 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     o->current_social_index = 0;
     o->text_engine = nullptr;
 
-    if (!overlay_init_sdl(o, settings)) {
+    o->texture_cache = nullptr;
+    o->texture_cache_count = 0;
+    o->texture_cache_capacity = 0;
+    o->anim_cache = nullptr;
+    o->anim_cache_count = 0;
+    o->anim_cache_capacity = 0;
+
+    // Load global background textures using the overlay's renderer
+    o->adv_bg = load_texture_with_scale_mode(o->renderer, "resources/gui/advancement_background.png", SDL_SCALEMODE_NEAREST);
+    o->adv_bg_half_done = load_texture_with_scale_mode(o->renderer, "resources/gui/advancement_background_half_done.png", SDL_SCALEMODE_NEAREST);
+    o->adv_bg_done = load_texture_with_scale_mode(o->renderer, "resources/gui/advancement_background_done.png", SDL_SCALEMODE_NEAREST);
+    if (!o->adv_bg || !o->adv_bg_half_done || !o->adv_bg_done) {
+        fprintf(stderr, "[OVERLAY] Failed to load advancement background textures.\n");
         overlay_free(overlay, settings);
         return false;
     }
@@ -97,6 +114,7 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
         // Handle potential errors where scale is 0
         scale = 1.0f;
     }
+
     int font_size = (int) roundf(24.0f * scale); // Scale base font size
 
     o->font = TTF_OpenFont("resources/fonts/Minecraft.ttf", (float) font_size);
@@ -311,18 +329,31 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         SDL_FRect dest_rect = {current_x, ROW1_Y_POS, ROW1_ICON_SIZE, ROW1_ICON_SIZE};
 
                         // TODO: Debug Placeholder Pink Squares for Criteria and Sub-Stats
-                        SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, 50); // Bright semi-transparent pink
-                        SDL_RenderFillRect(o->renderer, &dest_rect);
+                        // SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, 50); // Bright semi-transparent pink
+                        // SDL_RenderFillRect(o->renderer, &dest_rect);
 
-                        render_texture_with_alpha(o->renderer, item->texture, item->anim_texture, &dest_rect,
-                                                  final_alpha);
+
+                        SDL_Texture* tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count, &o->texture_cache_capacity, item->icon_path);
+                        AnimatedTexture* anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity, item->icon_path);
+                        render_texture_with_alpha(o->renderer, tex, anim_tex, &dest_rect, final_alpha);
+
+                        // TODO: Remove
+                        // render_texture_with_alpha(o->renderer, item->texture, item->anim_texture, &dest_rect,
+                        //                           final_alpha);
 
                         if (item->is_shared) {
-                            SDL_FRect shared_dest_rect = {
-                                current_x, ROW1_Y_POS, ROW1_SHARED_ICON_SIZE, ROW1_SHARED_ICON_SIZE
-                            };
-                            render_texture_with_alpha(o->renderer, parent->texture, parent->anim_texture,
-                                                      &shared_dest_rect, final_alpha);
+
+                            SDL_Texture* parent_tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count, &o->texture_cache_capacity, parent->icon_path);
+                            AnimatedTexture* parent_anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity, parent->icon_path);
+                            SDL_FRect shared_dest_rect = { current_x, ROW1_Y_POS, ROW1_SHARED_ICON_SIZE, ROW1_SHARED_ICON_SIZE };
+                            render_texture_with_alpha(o->renderer, parent_tex, parent_anim_tex, &shared_dest_rect, final_alpha);
+
+                            // TODO: Remove
+                            // SDL_FRect shared_dest_rect = {
+                            //     current_x, ROW1_Y_POS, ROW1_SHARED_ICON_SIZE, ROW1_SHARED_ICON_SIZE
+                            // };
+                            // render_texture_with_alpha(o->renderer, parent->texture, parent->anim_texture,
+                            //                           &shared_dest_rect, final_alpha);
                         }
                     }
                 };
@@ -337,13 +368,13 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
     struct RenderItem {
         std::string display_name;
         std::string progress_text;
+        std::string icon_path;
         SDL_Texture *texture = nullptr;
         AnimatedTexture *anim_texture = nullptr;
         SDL_Texture *bg_texture = nullptr;
         float alpha = 0.0f;
     };
 
-    // --- ROW 2 & 3 (Generalized Logic) ---
     // --- GENERALIZED RENDER LOGIC FOR ROW 2 & 3 ---
     auto render_item_row = [&](float y_pos, float scroll_offset, const std::vector<RenderItem>& items) {
         if (items.empty()) return;
@@ -419,10 +450,14 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
                     SDL_FRect icon_rect = { current_x + bg_x_offset + 16.0f, y_pos + 16.0f, 64.0f, 64.0f };
 
-                    SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, 50);
-                    SDL_RenderFillRect(o->renderer, &icon_rect);
+                    // TODO: DEBUG PLACEHOLDER
+                    // SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, 50);
+                    // SDL_RenderFillRect(o->renderer, &icon_rect);
 
-                    render_texture_with_alpha(o->renderer, item.texture, item.anim_texture, &icon_rect, final_alpha_byte);
+
+                    SDL_Texture* tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count, &o->texture_cache_capacity, item.icon_path.c_str());
+                    AnimatedTexture* anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity, item.icon_path.c_str());
+                    render_texture_with_alpha(o->renderer, tex, anim_tex, &icon_rect, final_alpha_byte);
 
                     if (cached_text.name_text) {
                         TTF_SetTextColorFloat(cached_text.name_text, (float)settings->overlay_text_color.r / 255.0f, (float)settings->overlay_text_color.g / 255.0f, (float)settings->overlay_text_color.b / 255.0f, final_alpha_float);
@@ -446,6 +481,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         }
     };
 
+
+
     // --- ROW 2 Data Collection ---
     {
         std::vector<RenderItem> items;
@@ -457,9 +494,12 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                            adv->criteria_count == 0 && adv->done))) {
                 RenderItem item;
                 item.display_name = adv->display_name;
-                item.texture = adv->texture;
-                item.anim_texture = adv->anim_texture;
+                item.icon_path = adv->icon_path;
+                // TODO: Remove
+                // item.texture = adv->texture;
+                // item.anim_texture = adv->anim_texture;
                 item.alpha = adv->alpha;
+                // Use overlay background textures
                 if (adv->done) item.bg_texture = t->adv_bg_done;
                 else if (adv->completed_criteria_count > 0) item.bg_texture = t->adv_bg_half_done;
                 else item.bg_texture = t->adv_bg;
@@ -477,8 +517,10 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             if (unlock->alpha > 0.0f) {
                 RenderItem item;
                 item.display_name = unlock->display_name;
-                item.texture = unlock->texture;
-                item.anim_texture = unlock->anim_texture;
+                item.icon_path = unlock->icon_path;
+                // TODO: Remove
+                // item.texture = unlock->texture;
+                // item.anim_texture = unlock->anim_texture;
                 item.alpha = unlock->alpha;
                 item.bg_texture = unlock->done ? t->adv_bg_done : t->adv_bg;
                 items.push_back(item);
@@ -492,8 +534,10 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             if (stat->alpha > 0.0f && !is_hidden_legacy) {
                 RenderItem item;
                 item.display_name = stat->display_name;
-                item.texture = stat->texture;
-                item.anim_texture = stat->anim_texture;
+                item.icon_path = stat->icon_path;
+                // TODO: Remove
+                // item.texture = stat->texture;
+                // item.anim_texture = stat->anim_texture;
                 item.alpha = stat->alpha;
                 if (stat->done) item.bg_texture = t->adv_bg_done;
                 else if (stat->completed_criteria_count > 0 || (
@@ -528,8 +572,10 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             if (goal->alpha > 0.0f) {
                 RenderItem item;
                 item.display_name = goal->display_name;
-                item.texture = goal->texture;
-                item.anim_texture = goal->anim_texture;
+                item.icon_path = goal->icon_path;
+                // TODO: Remove
+                // item.texture = goal->texture;
+                // item.anim_texture = goal->anim_texture;
                 item.alpha = goal->alpha;
                 if (goal->done) item.bg_texture = t->adv_bg_done;
                 else if (goal->progress > 0) item.bg_texture = t->adv_bg_half_done;
@@ -551,8 +597,10 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             if (goal->alpha > 0.0f) {
                 RenderItem item;
                 item.display_name = goal->display_name;
-                item.texture = goal->texture;
-                item.anim_texture = goal->anim_texture;
+                item.icon_path = goal->icon_path;
+                // TODO: Remove
+                // item.texture = goal->texture;
+                // item.anim_texture = goal->anim_texture;
                 item.alpha = goal->alpha;
                 if (goal->current_stage >= goal->stage_count - 1) item.bg_texture = t->adv_bg_done;
                 else if (goal->current_stage > 0) item.bg_texture = t->adv_bg_half_done;
@@ -580,6 +628,28 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 void overlay_free(Overlay **overlay, const AppSettings *settings) {
     if (overlay && *overlay) {
         Overlay *o = *overlay;
+
+        if (o->adv_bg) SDL_DestroyTexture(o->adv_bg);
+        if (o->adv_bg_half_done) SDL_DestroyTexture(o->adv_bg_half_done);
+        if (o->adv_bg_done) SDL_DestroyTexture(o->adv_bg_done);
+
+        // Free the caches
+        if (o->texture_cache) {
+            for (int i = 0; i < o->texture_cache_count; i++) {
+                if (o->texture_cache[i].texture) {
+                    SDL_DestroyTexture(o->texture_cache[i].texture);
+                }
+            }
+            free(o->texture_cache);
+        }
+        if (o->anim_cache) {
+            for (int i = 0; i < o->anim_cache_count; i++) {
+                if (o->anim_cache[i].anim) {
+                    free_animated_texture(o->anim_cache[i].anim);
+                }
+            }
+            free(o->anim_cache);
+        }
 
         if (o->text_engine) {
             TTF_DestroyRendererTextEngine(o->text_engine);

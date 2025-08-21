@@ -22,101 +22,55 @@
 #include "imgui_internal.h"
 
 
-/**
- * @brief Loads an SDL_Texture from a file and sets its scale mode.
- * @param renderer The SDL_Renderer to use.
- * @param path The path to the image file.
- * @param scale_mode The SDL_ScaleMode to apply (e.g., SDL_SCALEMODE_NEAREST).
- * @return A pointer to the created SDL_Texture, or nullptr on failure.
- */
-static SDL_Texture *load_texture_with_scale_mode(SDL_Renderer *renderer, const char *path, SDL_ScaleMode scale_mode) {
-    if (path == nullptr || path[0] == '\0') {
-        fprintf(stderr, "[TRACKER - TEXTURE LOAD] Invalid path for texture: %s\n", path);
-        return nullptr;
-    }
 
-    // Load original surfaces
-    SDL_Surface *loaded_surface = IMG_Load(path);
-    if (!loaded_surface) {
-        fprintf(stderr, "[TRACKER - TEXTURE LOAD] Failed to load image %s: %s\n", path, SDL_GetError());
-        return nullptr;
-    }
 
-    // Convert the surface to a consistent format that supports alpha blending
-    // Create a new surface with a standard 32-bit RGBA pixel format
-    SDL_Surface *formatted_surface = SDL_CreateSurface(loaded_surface->w, loaded_surface->h, SDL_PIXELFORMAT_RGBA32);
-    if (formatted_surface) {
-        // Copy the pixels from the loaded surface to the new, correctly formatted surface
-        SDL_BlitSurface(loaded_surface, nullptr, formatted_surface, nullptr);
-    }
 
-    // We are done with the original surface, free it
-    SDL_DestroySurface(loaded_surface);
 
-    if (!formatted_surface) {
-        fprintf(stderr, "[TRACKER - TEXTURE LOAD] Failed to create formatted surface for image %s: %s\n", path,
-                SDL_GetError());
-        return nullptr;
-    }
-
-    SDL_Texture *new_texture = SDL_CreateTextureFromSurface(renderer, formatted_surface);
-    SDL_DestroySurface(formatted_surface); // Clean up the surface after creating the texture
-    if (!new_texture) {
-        fprintf(stderr, "[TRACKER - TEXTURE LOAD] Failed to create texture from surface %s: %s\n", path,
-                SDL_GetError());
-        return nullptr;
-    }
-
-    // Explicitly enable blending for the texture
-    SDL_SetTextureBlendMode(new_texture, SDL_BLENDMODE_BLEND);
-    SDL_SetTextureScaleMode(new_texture, scale_mode);
-    return new_texture;
-}
-
-/**
- * @brief Gets an SDL_Texture from a path, utilizing a cache to avoid redundant loads.
- * @param t A pointer to the Tracker struct which contains the cache.
- * @param path The path to the image file.
- * @return A pointer to the cached or newly loaded SDL_Texture, or nullptr on failure.
- */
-static SDL_Texture *tracker_get_texture(Tracker *t, const char *path) {
-    if (path == nullptr || path[0] == '\0') return nullptr;
-
-    // Check if the texture is already in the cache
-    for (int i = 0; i < t->texture_cache_count; i++) {
-        if (strcmp(t->texture_cache[i].path, path) == 0) {
-            return t->texture_cache[i].texture;
-        }
-    }
-
-    // If not in cache, load it
-    SDL_Texture *new_texture = load_texture_with_scale_mode(t->renderer, path, SDL_SCALEMODE_NEAREST);
-    if (!new_texture) {
-        return nullptr; // Loading failed.
-    }
-
-    // Add the new texture to the cache
-    // Check if we need to grow the cache array.
-    if (t->texture_cache_count >= t->texture_cache_capacity) {
-        int new_capacity = t->texture_cache_capacity == 0 ? 16 : t->texture_cache_capacity * 2;
-        TextureCacheEntry *new_cache = (TextureCacheEntry *) realloc(t->texture_cache,
-                                                                     new_capacity * sizeof(TextureCacheEntry));
-        if (!new_cache) {
-            fprintf(stderr, "[TRACKER] Failed to reallocate texture cache!\n");
-            SDL_DestroyTexture(new_texture);
-            return nullptr;
-        }
-        t->texture_cache = new_cache;
-        t->texture_cache_capacity = new_capacity;
-    }
-
-    // Add to cache
-    strncpy(t->texture_cache[t->texture_cache_count].path, path, MAX_PATH_LENGTH - 1);
-    t->texture_cache[t->texture_cache_count].texture = new_texture;
-    t->texture_cache_count++;
-
-    return new_texture;
-}
+// TODO: Remove
+// /**
+//  * @brief Gets an SDL_Texture from a path, utilizing a cache to avoid redundant loads.
+//  * @param t A pointer to the Tracker struct which contains the cache.
+//  * @param path The path to the image file.
+//  * @return A pointer to the cached or newly loaded SDL_Texture, or nullptr on failure.
+//  */
+// static SDL_Texture *tracker_get_texture(Tracker *t, const char *path) {
+//     if (path == nullptr || path[0] == '\0') return nullptr;
+//
+//     // Check if the texture is already in the cache
+//     for (int i = 0; i < t->texture_cache_count; i++) {
+//         if (strcmp(t->texture_cache[i].path, path) == 0) {
+//             return t->texture_cache[i].texture;
+//         }
+//     }
+//
+//     // If not in cache, load it
+//     SDL_Texture *new_texture = load_texture_with_scale_mode(t->renderer, path, SDL_SCALEMODE_NEAREST);
+//     if (!new_texture) {
+//         return nullptr; // Loading failed.
+//     }
+//
+//     // Add the new texture to the cache
+//     // Check if we need to grow the cache array.
+//     if (t->texture_cache_count >= t->texture_cache_capacity) {
+//         int new_capacity = t->texture_cache_capacity == 0 ? 16 : t->texture_cache_capacity * 2;
+//         TextureCacheEntry *new_cache = (TextureCacheEntry *) realloc(t->texture_cache,
+//                                                                      new_capacity * sizeof(TextureCacheEntry));
+//         if (!new_cache) {
+//             fprintf(stderr, "[TRACKER] Failed to reallocate texture cache!\n");
+//             SDL_DestroyTexture(new_texture);
+//             return nullptr;
+//         }
+//         t->texture_cache = new_cache;
+//         t->texture_cache_capacity = new_capacity;
+//     }
+//
+//     // Add to cache
+//     strncpy(t->texture_cache[t->texture_cache_count].path, path, MAX_PATH_LENGTH - 1);
+//     t->texture_cache[t->texture_cache_count].texture = new_texture;
+//     t->texture_cache_count++;
+//
+//     return new_texture;
+// }
 
 /**
  * @brief Loads a GIF, converting its frames into an AnimatedTexture struct.
@@ -238,66 +192,48 @@ static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *pa
     return anim_texture;
 }
 
-/**
- * @brief Frees all memory associated with an AnimatedTexture, including all its frame textures.
- *
- * Used within tracker_free_template_data(). Used for any .gif textures.
- *
- * @param anim The AnimatedTexture to be freed.
- */
-static void free_animated_texture(AnimatedTexture *anim) {
-    if (!anim) return;
-    for (int i = 0; i < anim->frame_count; i++) {
-        if (anim->frames[i]) {
-            SDL_DestroyTexture(anim->frames[i]);
-        }
-    }
-    free(anim->frames);
-    free(anim->delays);
-    free(anim);
-}
-
-/**
- * @brief Gets an AnimatedTexture from a path, utilizing a cache to avoid redundant loads.
- * @param t A pointer to the Tracker struct which contains the cache.
- * @param path The path to the .gif file.
- * @return A pointer to the cached or newly loaded AnimatedTexture, or nullptr on failure.
- */
-static AnimatedTexture *tracker_get_animated_texture(Tracker *t, const char *path) {
-    if (path == nullptr || path[0] == '\0') return nullptr;
-
-    // 1. Check if the animation is already in the cache.
-    for (int i = 0; i < t->anim_cache_count; i++) {
-        if (strcmp(t->anim_cache[i].path, path) == 0) {
-            return t->anim_cache[i].anim;
-        }
-    }
-
-    // 2. If not in cache, load it.
-    AnimatedTexture *new_anim = load_animated_gif(t->renderer, path);
-    if (!new_anim) return nullptr;
-
-    // 3. Add the new animation to the cache.
-    if (t->anim_cache_count >= t->anim_cache_capacity) {
-        int new_capacity = t->anim_cache_capacity == 0 ? 8 : t->anim_cache_capacity * 2;
-        AnimatedTextureCacheEntry *new_cache = (AnimatedTextureCacheEntry *) realloc(
-            t->anim_cache, new_capacity * sizeof(AnimatedTextureCacheEntry));
-        if (!new_cache) {
-            fprintf(stderr, "[TRACKER] Failed to reallocate animation cache!\n");
-            free_animated_texture(new_anim); // Clean up the loaded anim if we can't cache it
-            return nullptr;
-        }
-        t->anim_cache = new_cache;
-        t->anim_cache_capacity = new_capacity;
-    }
-
-    // Add to cache
-    strncpy(t->anim_cache[t->anim_cache_count].path, path, MAX_PATH_LENGTH - 1);
-    t->anim_cache[t->anim_cache_count].anim = new_anim;
-    t->anim_cache_count++;
-
-    return new_anim;
-}
+// TODO: Remove
+// /**
+//  * @brief Gets an AnimatedTexture from a path, utilizing a cache to avoid redundant loads.
+//  * @param t A pointer to the Tracker struct which contains the cache.
+//  * @param path The path to the .gif file.
+//  * @return A pointer to the cached or newly loaded AnimatedTexture, or nullptr on failure.
+//  */
+// static AnimatedTexture *tracker_get_animated_texture(Tracker *t, const char *path) {
+//     if (path == nullptr || path[0] == '\0') return nullptr;
+//
+//     // 1. Check if the animation is already in the cache.
+//     for (int i = 0; i < t->anim_cache_count; i++) {
+//         if (strcmp(t->anim_cache[i].path, path) == 0) {
+//             return t->anim_cache[i].anim;
+//         }
+//     }
+//
+//     // 2. If not in cache, load it.
+//     AnimatedTexture *new_anim = load_animated_gif(t->renderer, path);
+//     if (!new_anim) return nullptr;
+//
+//     // 3. Add the new animation to the cache.
+//     if (t->anim_cache_count >= t->anim_cache_capacity) {
+//         int new_capacity = t->anim_cache_capacity == 0 ? 8 : t->anim_cache_capacity * 2;
+//         AnimatedTextureCacheEntry *new_cache = (AnimatedTextureCacheEntry *) realloc(
+//             t->anim_cache, new_capacity * sizeof(AnimatedTextureCacheEntry));
+//         if (!new_cache) {
+//             fprintf(stderr, "[TRACKER] Failed to reallocate animation cache!\n");
+//             free_animated_texture(new_anim); // Clean up the loaded anim if we can't cache it
+//             return nullptr;
+//         }
+//         t->anim_cache = new_cache;
+//         t->anim_cache_capacity = new_capacity;
+//     }
+//
+//     // Add to cache
+//     strncpy(t->anim_cache[t->anim_cache_count].path, path, MAX_PATH_LENGTH - 1);
+//     t->anim_cache[t->anim_cache_count].anim = new_anim;
+//     t->anim_cache_count++;
+//
+//     return new_anim;
+// }
 
 
 // FOR VERSION-SPECIFIC PARSERS
@@ -1047,9 +983,9 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
             strncpy(new_cat->icon_path, full_icon_path, sizeof(new_cat->icon_path) - 1);
 
             if (strstr(full_icon_path, ".gif")) {
-                new_cat->anim_texture = tracker_get_animated_texture(t, new_cat->icon_path);
+                new_cat->anim_texture = get_animated_texture_from_cache(t->renderer, &t->anim_cache, &t->anim_cache_count, &t->anim_cache_capacity, new_cat->icon_path);
             } else {
-                new_cat->texture = tracker_get_texture(t, new_cat->icon_path);
+                new_cat->texture = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, new_cat->icon_path);
             }
         }
 
@@ -1106,9 +1042,9 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                             strncpy(new_crit->icon_path, full_crit_icon_path, sizeof(new_crit->icon_path) - 1);
 
                             if (strstr(full_crit_icon_path, ".gif")) {
-                                new_crit->anim_texture = tracker_get_animated_texture(t, new_crit->icon_path);
+                                new_crit->anim_texture = get_animated_texture_from_cache(t->renderer, &t->anim_cache, &t->anim_cache_count, &t->anim_cache_capacity, new_crit->icon_path);
                             } else {
-                                new_crit->texture = tracker_get_texture(t, new_crit->icon_path);
+                                new_crit->texture = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, new_crit->icon_path);
                             }
                         }
 
@@ -1333,9 +1269,9 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
                 strncpy(new_item->icon_path, full_icon_path, sizeof(new_item->icon_path) - 1);
 
                 if (strstr(full_icon_path, ".gif")) {
-                    new_item->anim_texture = tracker_get_animated_texture(t, new_item->icon_path);
+                    new_item->anim_texture = get_animated_texture_from_cache(t->renderer, &t->anim_cache, &t->anim_cache_count, &t->anim_cache_capacity, new_item->icon_path);
                 } else {
-                    new_item->texture = tracker_get_texture(t, new_item->icon_path);
+                    new_item->texture = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, new_item->icon_path);
                 }
             }
 
@@ -1418,9 +1354,9 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
             strncpy(new_goal->icon_path, full_icon_path, sizeof(new_goal->icon_path) - 1);
 
             if (strstr(full_icon_path, ".gif")) {
-                new_goal->anim_texture = tracker_get_animated_texture(t, new_goal->icon_path);
+                new_goal->anim_texture = get_animated_texture_from_cache(t->renderer, &t->anim_cache, &t->anim_cache_count, &t->anim_cache_capacity, new_goal->icon_path);
             } else {
-                new_goal->texture = tracker_get_texture(t, new_goal->icon_path);
+                new_goal->texture = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, new_goal->icon_path);
             }
         }
 
@@ -1948,8 +1884,140 @@ static void tracker_free_template_data(TemplateData *td) {
 }
 
 
+
+
 // ----------------------------------------- END OF STATIC FUNCTIONS -----------------------------------------
 
+// START OF NON-STATIC FUNCTIONS ------------------------------------
+
+SDL_Texture *load_texture_with_scale_mode(SDL_Renderer *renderer, const char *path, SDL_ScaleMode scale_mode) {
+    if (path == nullptr || path[0] == '\0') {
+        fprintf(stderr, "[TRACKER - TEXTURE LOAD] Invalid path for texture: %s\n", path);
+        return nullptr;
+    }
+
+    // Load original surfaces
+    SDL_Surface *loaded_surface = IMG_Load(path);
+    if (!loaded_surface) {
+        fprintf(stderr, "[TRACKER - TEXTURE LOAD] Failed to load image %s: %s\n", path, SDL_GetError());
+        return nullptr;
+    }
+
+    // Convert the surface to a consistent format that supports alpha blending
+    // Create a new surface with a standard 32-bit RGBA pixel format
+    SDL_Surface *formatted_surface = SDL_CreateSurface(loaded_surface->w, loaded_surface->h, SDL_PIXELFORMAT_RGBA32);
+    if (formatted_surface) {
+        // Copy the pixels from the loaded surface to the new, correctly formatted surface
+        SDL_BlitSurface(loaded_surface, nullptr, formatted_surface, nullptr);
+    }
+
+    // We are done with the original surface, free it
+    SDL_DestroySurface(loaded_surface);
+
+    if (!formatted_surface) {
+        fprintf(stderr, "[TRACKER - TEXTURE LOAD] Failed to create formatted surface for image %s: %s\n", path,
+                SDL_GetError());
+        return nullptr;
+    }
+
+    SDL_Texture *new_texture = SDL_CreateTextureFromSurface(renderer, formatted_surface);
+    SDL_DestroySurface(formatted_surface); // Clean up the surface after creating the texture
+    if (!new_texture) {
+        fprintf(stderr, "[TRACKER - TEXTURE LOAD] Failed to create texture from surface %s: %s\n", path,
+                SDL_GetError());
+        return nullptr;
+    }
+
+    // Explicitly enable blending for the texture
+    SDL_SetTextureBlendMode(new_texture, SDL_BLENDMODE_BLEND);
+    SDL_SetTextureScaleMode(new_texture, scale_mode);
+    return new_texture;
+}
+
+SDL_Texture *get_texture_from_cache(SDL_Renderer *renderer, TextureCacheEntry **cache, int *cache_count, int *cache_capacity, const char *path) {
+    if (path == nullptr || path[0] == '\0') return nullptr;
+
+    // Check if the texture is already in the cache
+    for (int i = 0; i < *cache_count; i++) {
+        if (strcmp((*cache)[i].path, path) == 0) {
+            return (*cache)[i].texture;
+        }
+    }
+
+    // If not in cache, load it
+    SDL_Texture *new_texture = load_texture_with_scale_mode(renderer, path, SDL_SCALEMODE_NEAREST);
+    if (!new_texture) {
+        return nullptr; // Loading failed.
+    }
+
+    // Add the new texture to the cache
+    if (*cache_count >= *cache_capacity) {
+        int new_capacity = *cache_capacity == 0 ? 16 : *cache_capacity * 2;
+        TextureCacheEntry *new_cache_ptr = (TextureCacheEntry *) realloc(*cache, new_capacity * sizeof(TextureCacheEntry));
+        if (!new_cache_ptr) {
+            fprintf(stderr, "[CACHE] Failed to reallocate texture cache!\n");
+            SDL_DestroyTexture(new_texture);
+            return nullptr;
+        }
+        *cache = new_cache_ptr;
+        *cache_capacity = new_capacity;
+    }
+
+    // Add to cache
+    strncpy((*cache)[*cache_count].path, path, MAX_PATH_LENGTH - 1);
+    (*cache)[*cache_count].texture = new_texture;
+    (*cache_count)++;
+
+    return new_texture;
+}
+
+
+void free_animated_texture(AnimatedTexture *anim) {
+    if (!anim) return;
+    for (int i = 0; i < anim->frame_count; i++) {
+        if (anim->frames[i]) {
+            SDL_DestroyTexture(anim->frames[i]);
+        }
+    }
+    free(anim->frames);
+    free(anim->delays);
+    free(anim);
+}
+
+AnimatedTexture *get_animated_texture_from_cache(SDL_Renderer *renderer, AnimatedTextureCacheEntry **cache, int *cache_count, int *cache_capacity, const char* path) {
+    if (path == nullptr || path[0] == '\0') return nullptr;
+
+    // 1. Check if the animation is already in the cache.
+    for (int i = 0; i < *cache_count; i++) {
+        if (strcmp((*cache)[i].path, path) == 0) {
+            return (*cache)[i].anim;
+        }
+    }
+
+    // 2. If not in cache, load it.
+    AnimatedTexture *new_anim = load_animated_gif(renderer, path);
+    if (!new_anim) return nullptr;
+
+    // 3. Add the new animation to the cache.
+    if (*cache_count >= *cache_capacity) {
+        int new_capacity = *cache_capacity == 0 ? 8 : *cache_capacity * 2;
+        AnimatedTextureCacheEntry *new_cache_ptr = (AnimatedTextureCacheEntry *) realloc(*cache, new_capacity * sizeof(AnimatedTextureCacheEntry));
+        if (!new_cache_ptr) {
+            fprintf(stderr, "[CACHE] Failed to reallocate animation cache!\n");
+            free_animated_texture(new_anim);
+            return nullptr;
+        }
+        *cache = new_cache_ptr;
+        *cache_capacity = new_capacity;
+    }
+
+    // Add to cache
+    strncpy((*cache)[*cache_count].path, path, MAX_PATH_LENGTH - 1);
+    (*cache)[*cache_count].anim = new_anim;
+    (*cache_count)++;
+
+    return new_anim;
+}
 
 bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     // Allocate memory for the tracker itself
@@ -2281,10 +2349,11 @@ void tracker_render(Tracker *t, const AppSettings *settings) {
     // SDL_RenderPresent(t->renderer);
 }
 
+// END OF NON-STATIC FUNCTIONS ------------------------------------
 
 // -------------------------------------------- TRACKER RENDERING START --------------------------------------------
 
-
+// START OF STATIC FUNCTIONS ------------------------------------
 /**
  * @brief Helper to draw a separator line with a title for a new section.
  *
@@ -3271,6 +3340,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
     current_y += row_max_height;
 }
 
+
+// END OF STATIC FUNCTIONS ------------------------------------
 
 // Animate overlay, display more than just advancements
 void tracker_render_gui(Tracker *t, const AppSettings *settings) {
