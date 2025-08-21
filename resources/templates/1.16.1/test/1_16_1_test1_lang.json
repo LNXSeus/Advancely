@@ -262,5 +262,13 @@
   "multi_stage_goal.ms_goal:even_more_basics.stage.2": "Eat raw beef",
   "multi_stage_goal.ms_goal:even_more_basics.stage.3": "Mine 64 dirt",
   "multi_stage_goal.ms_goal:even_more_basics.stage.4": "Get 'A Seedy Place' Advancement",
-  "multi_stage_goal.ms_goal:even_more_basics.stage.final": "Done!"
+  "multi_stage_goal.ms_goal:even_more_basics.stage.final": "Done!",
+
+  "multi_stage_goal.ms_goal:even_more_basics2.display_name": "Even More Basics2!",
+  "multi_stage_goal.ms_goal:even_more_basics2.stage.0": "Pickup 3 Oak Logs",
+  "multi_stage_goal.ms_goal:even_more_basics2.stage.one": "Jump 17 times",
+  "multi_stage_goal.ms_goal:even_more_basics2.stage.2": "Eat raw beefyyy",
+  "multi_stage_goal.ms_goal:even_more_basics2.stage.3": "Mine 64 dirt",
+  "multi_stage_goal.ms_goal:even_more_basics2.stage.4": "Get 'A Seedy Place' Advancement",
+  "multi_stage_goal.ms_goal:even_more_basics2.stage.final": "Done!"
 }

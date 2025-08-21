@@ -989,6 +989,10 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
             continue;
         }
 
+        new_cat->alpha = 1.0f;
+        new_cat->is_visible_on_overlay = true;
+        new_cat->fade_timer = 0.0f;
+
         if (cat_json->string) {
             strncpy(new_cat->root_name, cat_json->string, sizeof(new_cat->root_name) - 1);
         } else {
@@ -1060,6 +1064,12 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                 for (cJSON *crit_item = criteria_obj->child; crit_item != nullptr; crit_item = crit_item->next) {
                     TrackableItem *new_crit = (TrackableItem *) calloc(1, sizeof(TrackableItem));
                     if (new_crit) {
+
+                        // Initialization for animation state
+                        new_crit->alpha = 1.0f;
+                        new_crit->is_visible_on_overlay = true;
+                        new_crit->fade_timer = 0.0f;
+
                         strncpy(new_crit->root_name, crit_item->string, sizeof(new_crit->root_name) - 1);
 
                         // Add pre-parsing for multi-criteria stats
@@ -1287,6 +1297,11 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
     cJSON_ArrayForEach(item_json, category_json) {
         TrackableItem *new_item = (TrackableItem *) calloc(1, sizeof(TrackableItem));
         if (new_item) {
+
+            new_item->alpha = 1.0f;
+            new_item->is_visible_on_overlay = true;
+            new_item->fade_timer = 0.0f;
+
             cJSON *root_name_json = cJSON_GetObjectItem(item_json, "root_name");
             if (cJSON_IsString(root_name_json)) {
                 strncpy(new_item->root_name, root_name_json->valuestring, sizeof(new_item->root_name) - 1);
@@ -1384,6 +1399,11 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
         // Iterate through each goal
         MultiStageGoal *new_goal = (MultiStageGoal *) calloc(1, sizeof(MultiStageGoal));
         if (!new_goal) continue;
+
+        // Initialization for animation state
+        new_goal->alpha = 1.0f;
+        new_goal->is_visible_on_overlay = true;
+        new_goal->fade_timer = 0.0f;
 
         // Parse root_name and icon
         cJSON *root_name = cJSON_GetObjectItem(goal_item_json, "root_name");
@@ -2080,7 +2100,6 @@ void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settin
 void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
     // Use deltaTime for animations
     // game logic goes here
-    (void) deltaTime;
 
     MC_Version version = settings_get_version_from_string(settings->version_str);
 
@@ -2125,6 +2144,100 @@ void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
     tracker_update_custom_progress(t, settings_json, settings);
     tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json, player_unlocks_json, version, settings);
     tracker_calculate_overall_progress(t, version, settings); //THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
+
+    // Handle fade out animation
+
+    // Advancements
+    float dt = *deltaTime;
+    for (int i = 0; i < t->template_data->advancement_count; i++) {
+        TrackableCategory *adv = t->template_data->advancements[i];
+        bool should_be_hidden = (adv->criteria_count > 0 && adv->all_template_criteria_met) || (adv->criteria_count == 0 && adv->done);
+        if (should_be_hidden && adv->is_visible_on_overlay) {
+            adv->is_visible_on_overlay = false; // Start fading out
+        }
+        if (!adv->is_visible_on_overlay && adv->alpha > 0.0f) {
+            adv->fade_timer += dt;
+            adv->alpha = 1.0f - (adv->fade_timer / OVERLAY_FADE_DURATION);
+            if (adv->alpha < 0.0f) adv->alpha = 0.0f;
+        }
+
+        for (int j = 0; j < adv->criteria_count; j++) {
+            TrackableItem *crit = adv->criteria[j];
+            if (crit->done && crit->is_visible_on_overlay) {
+                crit->is_visible_on_overlay = false;
+            }
+            if (!crit->is_visible_on_overlay && crit->alpha > 0.0f) {
+                crit->fade_timer += dt;
+                crit->alpha = 1.0f - (crit->fade_timer / OVERLAY_FADE_DURATION);
+                if (crit->alpha < 0.0f) crit->alpha = 0.0f;
+            }
+        }
+    }
+
+        // Stats
+    for (int i = 0; i < t->template_data->stat_count; i++) {
+        TrackableCategory *stat_cat = t->template_data->stats[i];
+        if (stat_cat->done && stat_cat->is_visible_on_overlay) {
+            stat_cat->is_visible_on_overlay = false;
+        }
+        if (!stat_cat->is_visible_on_overlay && stat_cat->alpha > 0.0f) {
+            stat_cat->fade_timer += dt;
+            stat_cat->alpha = 1.0f - (stat_cat->fade_timer / OVERLAY_FADE_DURATION);
+            if (stat_cat->alpha < 0.0f) stat_cat->alpha = 0.0f;
+        }
+
+        for (int j = 0; j < stat_cat->criteria_count; j++) {
+            TrackableItem *crit = stat_cat->criteria[j];
+            if (crit->done && crit->is_visible_on_overlay) {
+                crit->is_visible_on_overlay = false;
+            }
+            if (!crit->is_visible_on_overlay && crit->alpha > 0.0f) {
+                crit->fade_timer += dt;
+                crit->alpha = 1.0f - (crit->fade_timer / OVERLAY_FADE_DURATION);
+                if (crit->alpha < 0.0f) crit->alpha = 0.0f;
+            }
+        }
+    }
+
+    // Unlocks
+    for (int i = 0; i < t->template_data->unlock_count; i++) {
+        TrackableItem *unlock = t->template_data->unlocks[i];
+        if (unlock->done && unlock->is_visible_on_overlay) {
+            unlock->is_visible_on_overlay = false;
+        }
+        if (!unlock->is_visible_on_overlay && unlock->alpha > 0.0f) {
+            unlock->fade_timer += dt;
+            unlock->alpha = 1.0f - (unlock->fade_timer / OVERLAY_FADE_DURATION);
+            if (unlock->alpha < 0.0f) unlock->alpha = 0.0f;
+        }
+    }
+
+    // Custom Goals
+    for (int i = 0; i < t->template_data->custom_goal_count; i++) {
+        TrackableItem *custom_goal = t->template_data->custom_goals[i];
+        if (custom_goal->done && custom_goal->is_visible_on_overlay) {
+            custom_goal->is_visible_on_overlay = false;
+        }
+        if (!custom_goal->is_visible_on_overlay && custom_goal->alpha > 0.0f) {
+            custom_goal->fade_timer += dt;
+            custom_goal->alpha = 1.0f - (custom_goal->fade_timer / OVERLAY_FADE_DURATION);
+            if (custom_goal->alpha < 0.0f) custom_goal->alpha = 0.0f;
+        }
+    }
+
+    // Multi-Stage Goals
+    for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
+        MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+        bool is_finished = goal->current_stage >= goal->stage_count - 1;
+        if (is_finished && goal->is_visible_on_overlay) {
+            goal->is_visible_on_overlay = false;
+        }
+        if (!goal->is_visible_on_overlay && goal->alpha > 0.0f) {
+            goal->fade_timer += dt;
+            goal->alpha = 1.0f - (goal->fade_timer / OVERLAY_FADE_DURATION);
+            if (goal->alpha < 0.0f) goal->alpha = 0.0f;
+        }
+    }
 
     // Clean up the parsed JSON objects
     cJSON_Delete(player_adv_json);

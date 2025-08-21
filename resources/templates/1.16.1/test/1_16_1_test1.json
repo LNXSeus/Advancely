@@ -875,6 +875,48 @@
           "target": 0
         }
       ]
+    },
+    {
+      "root_name": "ms_goal:even_more_basics2",
+      "icon": "items/compass_20_1.9.png",
+      "stages": [
+        {
+          "stage_id": "0",
+          "type": "stat",
+          "root_name": "minecraft:picked_up/minecraft:oak_log",
+          "target": 3
+        },
+        {
+          "stage_id": "one",
+          "type": "stat",
+          "root_name": "minecraft:custom/minecraft:jump",
+          "target": 17
+        },
+        {
+          "stage_id": "2",
+          "type": "criterion",
+          "parent_advancement": "minecraft:husbandry/balanced_diet",
+          "root_name": "beef"
+        },
+        {
+          "stage_id": "3",
+          "type": "stat",
+          "root_name": "minecraft:mined/minecraft:dirt",
+          "target": 64
+        },
+        {
+          "stage_id": "4",
+          "type": "advancement",
+          "root_name": "minecraft:husbandry/plant_seed",
+          "target": 1
+        },
+        {
+          "stage_id": "final",
+          "type": "final",
+          "root_name": "",
+          "target": 0
+        }
+      ]
     }
   ]
 }
