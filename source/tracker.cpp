@@ -51,8 +51,11 @@ static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *pa
     if (!anim_texture->frames || !anim_texture->delays) {
         // Allocation failed
         free(anim_texture->frames);
+        anim_texture->frames = nullptr;
         free(anim_texture->delays);
+        anim_texture->delays = nullptr;
         free(anim_texture);
+        anim_texture = nullptr;
         IMG_FreeAnimation(anim);
         return nullptr;
     }
@@ -114,8 +117,11 @@ static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *pa
             fprintf(stderr, "[TRACKER - GIF LOAD] Failed to create texture for frame %d from %s\n", i, path);
             // Cleanup if a frame texture fails to create
             free(anim_texture->frames);
+            anim_texture->frames = nullptr;
             free(anim_texture->delays);
+            anim_texture->delays = nullptr;
             free(anim_texture);
+            anim_texture = nullptr;
             IMG_FreeAnimation(anim);
             return nullptr;
         }
@@ -191,6 +197,7 @@ static void tracker_save_snapshot_to_file(Tracker *t) {
         fputs(json_str, file);
         fclose(file);
         free(json_str);
+        json_str = nullptr;
         printf("[TRACKER] Snapshot saved to %s\n", t->snapshot_path);
     }
     cJSON_Delete(root); // Clean up
@@ -842,6 +849,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
         } else {
             fprintf(stderr, "[TRACKER] PARSE ERROR: Found a JSON item with a nullptr key. Skipping.\n");
             free(new_cat);
+            new_cat = nullptr;
             cat_json = cat_json->next;
             continue;
         }
@@ -1165,6 +1173,7 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
             } else {
                 // Skip this item if it has no root_name
                 free(new_item);
+                new_item = nullptr;
                 continue;
             }
 
@@ -1311,6 +1320,7 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
             new_goal->stages = (SubGoal **) calloc(new_goal->stage_count, sizeof(SubGoal *));
             if (!new_goal->stages) {
                 free(new_goal);
+                new_goal = nullptr;
                 continue;
             }
 
@@ -1732,9 +1742,11 @@ static void free_trackable_items(TrackableItem **items, int count) {
         // Cleanup for animated textures
         if (items[i]) {
             free(items[i]);
+            items[i] = nullptr;
         }
     }
     free(items);
+    items = nullptr;
 }
 
 /**
@@ -1754,10 +1766,43 @@ static void free_trackable_categories(TrackableCategory **categories, int count)
 
             // Then free the category itself
             free(categories[i]);
+            categories[i] = nullptr;
         }
     }
     free(categories);
+    categories = nullptr;
 }
+
+/**
+ * @brief Frees an array of MultiStageGoal pointers, including their nested stages.
+ * @param goals The array of MultiStageGoal pointers to be freed.
+ * @param count The number of elements in the array.
+ */
+static void free_multi_stage_goals(MultiStageGoal **goals, int count) {
+    if (!goals) return;
+    for (int i = 0; i < count; i++) {
+        MultiStageGoal *goal = goals[i];
+        if (goal) {
+            // Free the sub-goals first
+            if (goal->stages) {
+                for (int j = 0; j < goal->stage_count; j++) {
+                    // Check if the pointer is valid before freeing
+                    if (goal->stages[j]) {
+                        free(goal->stages[j]);
+                        goal->stages[j] = nullptr;
+                    }
+                }
+                free(goal->stages); // Then free the array of pointers
+                goal->stages = nullptr;
+            }
+            free(goal); // Finally, free the parent goal struct
+            goal = nullptr;
+        }
+    }
+    free(goals); // Free the top-level array of goal pointers
+    goals = nullptr;
+}
+
 
 /**
  * @brief Frees all dynamically allocated memory within a TemplateData struct. Multi-stage goals are freed here.
@@ -1789,20 +1834,9 @@ static void tracker_free_template_data(TemplateData *td) {
         free_trackable_items(td->custom_goals, td->custom_goal_count);
     }
 
-    // Free multi-stage goals data, don't think it works with free_trackable_categories()
+    // Free multi-stage goals data
     if (td->multi_stage_goals) {
-        for (int i = 0; i < td->multi_stage_goal_count; i++) {
-            MultiStageGoal *goal = td->multi_stage_goals[i];
-            if (goal) {
-                for (int j = 0; j < goal->stage_count; j++) {
-                    free(goal->stages[j]);
-                }
-                free(goal->stages);
-
-                free(goal);
-            }
-        }
-        free(td->multi_stage_goals);
+        free_multi_stage_goals(td->multi_stage_goals, td->multi_stage_goal_count);
     }
 
     td->advancements = nullptr;
@@ -1909,8 +1943,11 @@ void free_animated_texture(AnimatedTexture *anim) {
         }
     }
     free(anim->frames);
+    anim->frames = nullptr;
     free(anim->delays);
+    anim->delays = nullptr;
     free(anim);
+    anim = nullptr;
 }
 
 AnimatedTexture *get_animated_texture_from_cache(SDL_Renderer *renderer, AnimatedTextureCacheEntry **cache,
@@ -1996,6 +2033,7 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     // Initialize SDL components for the tracker
     if (!tracker_init_sdl(t, settings)) {
         free(t);
+        t = nullptr;
         *tracker = nullptr;
         tracker = nullptr;
         return false;
@@ -2646,6 +2684,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                              : (crit->progress >= crit->goal && crit->goal > 0);
                             settings_save(settings, t->template_data);
                             SDL_SetAtomicInt(&g_needs_update, 1);
+                            SDL_SetAtomicInt(&g_game_data_changed, 1);
                         }
                         current_element_x += 20 * t->zoom_level + 4 * t->zoom_level;
                     }
@@ -2710,6 +2749,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     }
                     settings_save(settings, t->template_data);
                     SDL_SetAtomicInt(&g_needs_update, 1);
+                    SDL_SetAtomicInt(&g_game_data_changed, 1);
                 }
             }
             current_x += uniform_item_width + horizontal_spacing;
@@ -3033,6 +3073,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 item->is_manually_completed = true;
                 settings_save(settings, t->template_data);
                 SDL_SetAtomicInt(&g_needs_update, 1);
+                SDL_SetAtomicInt(&g_game_data_changed, 1);
             }
         }
 
@@ -3672,6 +3713,7 @@ void tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
         fputs(json_str, file);
         fclose(file);
         free(json_str);
+        json_str = nullptr;
     }
     cJSON_Delete(settings_root);
 
@@ -3704,6 +3746,7 @@ void tracker_free(Tracker **tracker, const AppSettings *settings) {
                 }
             }
             free(t->texture_cache);
+            t->texture_cache = nullptr;
         }
 
         // Free all animations in the cache
@@ -3715,6 +3758,7 @@ void tracker_free(Tracker **tracker, const AppSettings *settings) {
                 }
             }
             free(t->anim_cache);
+            t->anim_cache = nullptr;
         }
 
         if (t->minecraft_font) {
@@ -3729,6 +3773,7 @@ void tracker_free(Tracker **tracker, const AppSettings *settings) {
             tracker_free_template_data(t->template_data);
             // This ONLY frees the CONTENT of the struct, not the struct itself
             free(t->template_data); // This frees the struct, STRUCT FREED HERE
+            t->template_data = nullptr;
         }
 
         if (t->renderer) {
@@ -3745,6 +3790,7 @@ void tracker_free(Tracker **tracker, const AppSettings *settings) {
 
         // tracker is heap allocated so free it
         free(t);
+        t = nullptr;
         *tracker = nullptr;
         tracker = nullptr;
         if (settings->print_debug_status) {

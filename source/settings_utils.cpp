@@ -240,7 +240,7 @@ bool settings_load(AppSettings *settings) {
     // Set safe defaults first by calling settings_set_defaults
     settings_set_defaults(settings);
 
-    // Try to load and parse the settings file
+    // Try to load and parse the settings file, read with escaping
     cJSON *json = cJSON_from_file(SETTINGS_FILE_PATH); // returns json object with corrected slashes from windows paste
     if (json == nullptr) {
         fprintf(stderr, "[SETTINGS UTILS] Failed to load settings file: %s. Using default settings.\n",
@@ -423,7 +423,7 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
     if (!settings) return;
 
     // Read the existing file, or create a new JSON object if it doesn't exist
-    cJSON *root = cJSON_from_file(SETTINGS_FILE_PATH);
+    cJSON *root = cJSON_from_file(SETTINGS_FILE_PATH); // With escaping
     if (!root) {
         root = cJSON_CreateObject();
     }
@@ -531,6 +531,7 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
         if (json_str) {
             fputs(json_str, file);
             free(json_str);
+            json_str = nullptr;
         }
         fclose(file);
     } else {

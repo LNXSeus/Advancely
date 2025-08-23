@@ -31,6 +31,7 @@ extern "C" {
 // We make g_needs_update available to global_event_handler.h with external linkage
 SDL_AtomicInt g_needs_update;
 SDL_AtomicInt g_settings_changed; // Watching when settings.json is modified to re-init paths
+SDL_AtomicInt g_game_data_changed; // When game data is modified, custom counter is changed or manually override changed
 
 // Global mutex to protect the watcher and paths (see they don't break when called in close succession)
 static SDL_Mutex *g_watcher_mutex = nullptr;
@@ -59,6 +60,7 @@ static void global_watch_callback(dmon_watch_id watch_id, dmon_action action, co
 
             // Automatically set the flag to 1. Safe to call from any thread.
             SDL_SetAtomicInt(&g_needs_update, 1);
+            SDL_SetAtomicInt(&g_game_data_changed, 1);
         }
     }
 }
@@ -162,6 +164,7 @@ int main(int argc, char *argv[]) {
         dmon_initialized = true;
         SDL_SetAtomicInt(&g_needs_update, 1);
         SDL_SetAtomicInt(&g_settings_changed, 0);
+        SDL_SetAtomicInt(&g_game_data_changed, 1);
 
         // HARDCODED SETTINGS DIRECTORY
         if (app_settings.print_debug_status) {
@@ -249,6 +252,16 @@ int main(int argc, char *argv[]) {
                 // Update the tracker with the new paths and template data
                 tracker_reinit_template(tracker, &app_settings);
 
+                // // After re-init, reset overlay animation state to prevent crashes
+                // if (overlay) {
+                //     overlay->scroll_offset_row1 = 0.0f;
+                //     overlay->scroll_offset_row2 = 0.0f;
+                //     // overlay->scroll_offset_row3 = 0.0f; // TODO: Row 3 here as well??
+                //     overlay->start_index_row1 = 0;
+                //     overlay->start_index_row2 = 0;
+                //     // overlay->start_index_row3 = 0; // TODO: Row 3 here as well??
+                // }
+
                 // Start watching the new directory
                 if (strlen(tracker->saves_path) > 0) {
                     if (app_settings.print_debug_status) {
@@ -292,8 +305,11 @@ int main(int argc, char *argv[]) {
                 // Update TITLE of the tracker window with some info, similar to the debug print
                 tracker_update_title(tracker, &app_settings);
 
-                // Reset the timer as the update has happened
-                tracker->time_since_last_update = 0.0f;
+                // Check if the update was triggered by a game file change or hotkey press of counter
+                if (SDL_SetAtomicInt(&g_game_data_changed, 0) == 1) {
+                    // Reset the timer as the update has happened
+                    tracker->time_since_last_update = 0.0f;
+                }
             }
 
 
@@ -314,8 +330,6 @@ int main(int argc, char *argv[]) {
             // settings_opened flag is triggered by Esc key -> tracker_events() and global event handler
             settings_render_gui(&settings_opened, &app_settings, tracker->roboto_font, tracker);
 
-
-            // ImGui::ShowDemoWindow(); // TODO: Remove this
 
             ImGui::Render();
 
