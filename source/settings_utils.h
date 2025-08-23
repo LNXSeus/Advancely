@@ -29,6 +29,7 @@ extern "C" {
 #define DEFAULT_REMOVE_COMPLETED_GOALS true
 #define DEFAULT_PRINT_DEBUG_STATUS false
 #define DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_LEFT
+#define DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED false
 
 // DEFINE DEFAULT SETTINGS
 #define DEFAULT_VERSION "1.16.1"
@@ -101,6 +102,7 @@ struct AppSettings {
     bool remove_completed_goals;              // If true, completed goals are hidden from the tracker view.
     OverlayProgressTextAlignment overlay_progress_text_align; // Alignment for the progress text in the overlay.
     bool overlay_animation_speedup;           // If true, the overlay animation speed is increased.
+    bool overlay_row3_remove_completed;       // If true, the third row will also hide completed goals as row 2 does.
 
     // --- Window Geometry ---
     WindowRect tracker_window;                // The saved position and size of the main tracker window.

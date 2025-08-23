@@ -153,6 +153,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
             ImGui::SetTooltip(speed_up_tooltip_buffer);
         }
+
+        ImGui::SameLine();
+
+        ImGui::Checkbox("Hide Completed Row 3 Goals", &temp_settings.overlay_row3_remove_completed);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("If checked, all Goals (Stats, Custom Goals and Multi-Stage Goals) will disappear from Row 3 of the overlay.\nThis is independent of the main 'Remove Completed Goals' setting.");
+        }
     }
 
     ImGui::Checkbox("Always On Top", &temp_settings.tracker_always_on_top);
@@ -162,7 +169,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::SameLine();
     ImGui::Checkbox("Remove Completed Goals", &temp_settings.remove_completed_goals);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Hides fully completed goals and sub-goals to tidy up the view.");
+        ImGui::SetTooltip("Hides fully completed goals and sub-goals from the tracker window to tidy up the view.");
     }
 
     if (temp_settings.enable_overlay) {
