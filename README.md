@@ -1,56 +1,91 @@
-![Advancely Logo](/resources/gui/Advancely_Logo.png)
+# [**DOWNLOAD ADVANCELY NOW! (Windows, Linux & macOS, any MC Java Version)**](https://github.com/LNXSeus/Advancely/releases)
+# A highly customizable tool to track Minecraft progress beyond just Advancements.
 
-# A highly customizable tool to track Minecraft progress beyond just Advancements. <br>
-## This tracker supports modded advancements/recipes, custom statistics, unlocks, multi-stage goals, manual goals and custom counters. <br>
-### This tracker is built to be flexible, supporting everything from vanilla, through modded advancements and even custom datapacks. It automatically detects changes in your latest world save file, providing real-time progress updates.
+## This tracker supports an arbitrary number of advancements, recipes, custom statistics, unlocks, multi-stage goals, manual goals, and custom counters for over 100 Minecraft versions.
 
-## Download (Windows, Linux, MacOS)
+### Built for flexibility, Advancely supports everything from vanilla speedruns to modded adventures and custom datapacks. It automatically detects changes in your latest singleplayer world, providing real-time progress updates.
 
-[**Advancely Releases**](https://github.com/LNXSeus/Advancely/releases)
+## Socials
+* [Support Advancely](https://streamlabs.com/lnxseus/tip)
+* [My YouTube](https://www.youtube.com/@lnxs?sub_confirmation=1)
+* [My Twitch](https://www.twitch.tv/lnxseus)
+* [My Twitch Archive](https://www.youtube.com/@lnxsarchive/playlists?view=1&sort=lad&flow=grid&sub_confirmation=1)
+* [My Discord](https://discord.gg/TyNgXDz)
+* [My GitHub](https://github.com/LNXSeus)
 
-[My YouTube](https://www.youtube.com/@lnxs?sub_confirmation=1)
+## What is Advancely?
+
+Advancely is a sophisticated, data-driven progress tracker designed for Minecraft speedrunners, completionists, and content creators. Unlike other tools that only track vanilla advancements, Advancely can be configured to monitor virtually any goal you can imagine. It operates in real-time by watching your singleplayer save files for changes, meaning your progress is always up-to-date without any manual intervention. Its true power lies in its template system, which allows you to define exactly what you want to track for any version, mod, or playstyle.
 
 ## Core Features
 
+* **Interactive Map View**: The main tracker window is not a static list but an interactive map of your progress. You can freely organize your view to focus on what matters most.
+
+  * **Pan**: Right-Click or Middle-Click + Drag
+  * **Zoom**: Mouse Wheel
+  * **Lock Layout**: Press `SPACE` to lock the grid layout, preventing it from rearranging when you resize the window or zoom.
+
 * **Comprehensive Tracking**: Advancely isn't limited to just advancements. It tracks multiple data types directly from your save file, including:
 
-    * **Advancements/Recipes**: Tracks completion status and individual criteria as well as recipes (also stored as advancements in the advancements file).
-    * **Statistics**: Monitors any game statistic, such as blocks mined or distance flown, against a target value. Also allows for nested statistics and custom icons. Any statistic can be checked off manually as well.
-    * **Unlocks**: Allows you to fully track unlocks, which is exclusive to the 25w14craftmine snapshot.
+  * **Advancements & Recipes**: Tracks completion status and individual criteria for any advancement or recipe from vanilla, mods, or datapacks.
+  * **Statistics**: Monitors any in-game statistic (e.g., blocks mined, distance flown) against a target value. Supports nested "sub-stats" under a single category and allows for manual completion overrides via an in-app checkbox.
+  * **Unlocks**: Fully tracks the unique "unlocks" progression system from the `25w14craftmine` snapshot.
+
+* **Advanced Goal Types**:
+
+  * **Multi-Stage Goals**: Create long-term objectives that combine several smaller steps. A single goal can require you to first complete a stat, then an unlock, then a specific **advancement criterion** (e.g., visiting a specific biome), and finally an entire advancement in sequence.
+  * **Custom Counters & Manual Goals**: For objectives that can't be automatically tracked (like counting structures visited), you can create manual checklist goals or counters with target values. All progress is saved automatically into `settings.json`.
+    * **Hotkeys**: Use configurable hotkeys to increment or decrement your custom counters. Up to 32 hotkeys are supported. Hotkeys currently only work when the tracker window is in focus.
 
 * **Full Mod & Datapack Support**: The tracker is designed to be data-driven. It correctly parses items, stats, and advancements from any mod or data pack (e.g., `conquest:`, `blazeandcave:`) without being limited to the vanilla `minecraft:` namespace.
 
-* **Multi-Stage Goals**: Create long-term objectives that combine several smaller steps. A single goal can require you to first achieve an advancement, then reach a certain statistic, then an unlock (from the 25w14craftmine) and lastly complete another advancement in sequence.
+* **Animated Icons**: Bring your tracker and overlay to life with animated `.gif` icons alongside static `.png` files.
 
-* **Custom Counters with Hotkeys and Manual Tracking**: For goals that can't be automatically tracked (like counting amount of structures visited or finding specific items), you can create custom counters or check them off manually. Set a target value in your template and use configurable hotkeys to increment or decrement the count. List of hotkeys can be found [here](https://pastebin.com/vPKgWAen). Currently, the hotkeys only work when tabbed into the tracker window. All progress is saved automatically back into `settings.json`.
+  * **Important**: For GIFs to work correctly, they must be unoptimized with all frame data intact. You can prepare any GIF by uploading it to [**ezgif.com/maker**](https://ezgif.com/maker), selecting the **"Don't Stack Frames"** option, and exporting the result. The site has a 2MB file size limit for this feature.
 
-## Customization
+## Extensive Version Support (1.0 – 1.21+)
 
-The true power of Advancely lies in its customization. You can define exactly what you want to track by creating your own template files from within the settings window alongside the text it should display. This allows for translations into any language.
+Advancely supports over 100 Minecraft versions, including every full release from 1.0 upwards and all April Fool's snapshots.
 
-You select the minecraft version, the category, all the advancements, statistics, goals you want to track with custom translations. The tracker will then parse your template and track progress against the goals you've defined.
+* **Playtime Tracking**: The tracker reads total playtime directly from the world's stats file, which is measured in in-game ticks (20 ticks per second). It does not read from `level.dat`.
 
-## Supporting 100+ Minecraft versions (1.0–1.21.7+)
+* **Era-Specific Logic**:
 
-Find the full list of supported versions [here](https://pastebin.com/NhkaT3qD).
+  * **1.0 – 1.6.4 (Legacy)**: Advancely supports two modes for these versions:
+    * **Default (Snapshot Mode)**: For vanilla play, it reads the global stats file. When you load a new world, it takes a "snapshot" of your progress and tracks all new stats and achievements against that baseline, effectively simulating per-world stats.
+    * **StatsPerWorld Mod Support**: If you are using Legacy Fabric with the [StatsPerWorld Mod](https://github.com/RedLime/StatsPerWorld/releases), Advancely can be configured to read local `.dat` stat files directly, just like in modern versions. Playtime is tracked via the ID: `1100`.
+  * **1.7.2 – 1.11.2 (Mid-Era)**: Reads achievements and stats from the per-world stats JSON file. Playtime is tracked via `stat.playOneMinute`.
+  * **1.12 – 1.16.5 (Modern)**: Reads from separate, per-world advancements and stats files. Playtime is tracked via `minecraft:play_one_minute`.
+  * **1.17+**: Same as above, but playtime is tracked via the renamed `minecraft:play_time` statistic.
+  * **25w14craftmine**: Fully supports the unique advancements, stats, and unlocks files from this snapshot.
 
-This tracker supports **any full release** from Minecraft 1.0 upwards including all april fool snapshots:
+## Full Customization & Configuration
 
-* **1.0–1.6.4**: It reads the global stats file and takes a snapshot when a new world is created and then starts counting from zero to simulate local per-world stats. Working with these versions requires knowing the IDs of stats and advancements. You can find the translations for those IDs [here](https://pastebin.com/qPsgc4Eb) and the individual item IDs [here](https://pastebin.com/r5tpjPFm). It's important to note that for example item ID 24 (Regular Sandstone), 24:1 (Chiseled Sandstone) and 24:2 (Smooth Sandstone) all contribute to the same statistic, so can't be separated. (Credits: [minecraftinfo.com](https://www.minecraftinfo.com/idlist.htm))
-* **1.7.2–1.11.2**: Advancely reads the stats file for stats and achievements  and playtime is tracked through the stat.playOneMinute entry.
-* **1.12–1.16.5**: Advancely reads the stats and advancements file and playtime is tracked through the minecraft:play_one_minute entry.
-* **1.17+**: Advancely reads the stats and advancements file and playtime is tracked through the minecraft:play_time entry.
-* **25w14craftmine**: Advancely reads the stats, advancements, and unlocks file. (Game version 1.21.5)
+The true power of Advancely lies in its customization. All settings can be configured in real-time from the settings window (`ESC` key).
+
+| Setting Group        | Options & Features                                                                                                                                                                                            |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Path Settings** | `Auto-Detect` saves path for your OS or specify a `Manual` path.                                                                                                                                              |
+| **Template Settings**| Select your `Version`, `Category`, and an `Optional Flag` to load a specific ruleset. You can create your own templates by following the folder structure in `resources/templates`.                             |
+| **General Settings** | Toggle the `Overlay`, set an `FPS Limit`, keep the tracker `Always On Top`, automatically `Remove Completed Goals` from view, and enable the `StatsPerWorld Mod` compatibility for legacy versions.                |
+| **Visual Settings** | Full RGBA color customization for the tracker `background`, `text`, overlay `background`, and overlay `text`. You can also adjust the `Overlay Width`.                                                         |
+| **Overlay Settings** | Fine-tune the `Overlay Scroll Speed` (negative values reverse direction), `Speed Up Animation` (also toggled with `SPACE` in the overlay window), and align the top progress text (`Left`, `Center`, or `Right`). |
+| **Hotkey Settings** | Assign keyboard hotkeys to increment/decrement any custom counters defined in your template. You can find a list of supported key names [here](https://pastebin.com/vPKgWAen).                                   |
+| **Debug Settings** | `Print Debug To Console` to see detailed, real-time status updates in your terminal.                                                                                                                            |
+
+*Coming Soon: The overlay's top progress text will also be fully customizable via a format string in the settings.*
 
 ## How To Use
 
-1.  **Download**: Grab the latest release from the [**release page**](https://github.com/LNXSeus/Advancely/releases) (supports Windows, Linux, and MacOS).
-2.  **Configure**: Open `settings.json` to select your Minecraft version, category, and save path detection mode (`auto` or `manual`). You can also configure hotkeys there.
-3.  **Run**: Launch Advancely and speedrun Minecraft. The tracker will automatically find your most recent world and display your progress in real time.
+1.  **Download**: Grab the latest release for your operating system from the [**releases page**](https://github.com/LNXSeus/Advancely/releases).
+2.  **Configure (Optional)**: For first-time use, you can simply run the application. To customize, press `ESC` in the tracker window to open the settings. Here you can select your Minecraft version, choose a tracking category, and configure visuals and hotkeys.
+3.  **Run**: Launch Advancely. It will automatically find your most recently played singleplayer world and begin displaying your progress in real-time.
 
 ### Licenses & Credits
 
 *This project uses dmon by Sepehr Taghdisian, licensed under the BSD 2-Clause License.*
-*This project also uses the SDL3 library suite and cJSON. More information can be found in the [LICENSES.txt](LICENSES.txt) file.*
+*This project's user interface is powered by the excellent [Dear ImGui](https://github.com/ocornut/imgui) library.*
+*This project also uses the SDL3 library suite and cJSON. More information can be found in the [LICENSES.txt](https://www.google.com/search?q=LICENSES.txt) file.*
+*Lots of assitance was provided by Gemini 2.5 Pro.*
 *Minecraft item .png files downloaded from [Minecraft Asset Clout](https://mcasset.cloud/1.0/) and block renders from the [Minecraft Wiki](https://www.minecraft.wiki) (downloaded by [Dogmaster](https://www.twitch.tv/thedogmaster28))*
-*Shoutout to [Oskar](https://github.com/Oskar3141) for providing me his project files (kAAmel) and Darwin Baker for creating [AATool](https://github.com/DarwinBaker/AATool), which served as inspiration!*
+*Shoutout to [Oskar](https://github.com/Oskar3141) for providing me his project files (kAAmel) and Darwin Baker for creating [AATool](https://github.com/DarwinBaker/AATool), which served as inspiration\!*
