@@ -23,6 +23,7 @@ struct AppSettings;
 // This global variable is defined in main.cpp and made accessible here
 extern SDL_AtomicInt g_needs_update; // Global flag to signal that an update is needed initially in main.c
 extern SDL_AtomicInt g_settings_changed;
+extern SDL_AtomicInt g_game_data_changed; // To reset update timer on game data change or completion change (visually)
 
 /**
  * @brief Processes the global SDL event queue.

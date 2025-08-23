@@ -36,6 +36,7 @@ void fs_ensure_directory_exists(const char *path) {
         }
     }
     free(path_copy);
+    path_copy = nullptr;
 }
 
 void fs_create_empty_template_file(const char *path) {

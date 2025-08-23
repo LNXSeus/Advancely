@@ -60,6 +60,7 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                     if (hotkey_triggered) {
                         settings_save(app_settings, t->template_data);
                         SDL_SetAtomicInt(&g_needs_update, 1); // Request a data refresh
+                        SDL_SetAtomicInt(&g_game_data_changed, 1);
                         break;
                     }
                 }
