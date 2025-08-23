@@ -442,31 +442,45 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         char info_buffer[512];
         char final_buffer[1024];
         char formatted_time[64];
-        char formatted_update_time[64];
-        char formatted_category[128];
-
-        format_category_string(settings->category, formatted_category, sizeof(formatted_category));
         format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
-        float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
-        format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time));
 
-        MC_Version version = settings_get_version_from_string(settings->version_str);
-        const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
+        // Check if the run is 100% complete
+        bool is_run_complete = t->template_data->advancements_completed_count >= t->template_data->advancement_count &&
+                               t->template_data->overall_progress_percentage >= 100.0f;
 
-        snprintf(info_buffer, sizeof(info_buffer),
-                 "%s | %s - %s%s%s | %s: %d/%d - Prog: %.2f%% | %s IGT | Upd: %s",
-                 t->world_name,
-                 settings->version_str,
-                 formatted_category,
-                 *settings->optional_flag ? " - " : "",
-                 settings->optional_flag,
-                 adv_ach_label,
-                 t->template_data->advancements_completed_count,
-                 t->template_data->advancement_count,
-                 t->template_data->overall_progress_percentage,
-                 formatted_time,
-                 formatted_update_time);
+        if (is_run_complete) {
+            // If the run is complete, display the final time message
+            snprintf(info_buffer, sizeof(info_buffer),
+                     "*** RUN COMPLETE! *** | Final Time: %s",
+                     formatted_time);
+        } else {
+            // Otherwise, display the standard progress info
+            char formatted_update_time[64];
+            char formatted_category[128];
 
+            format_category_string(settings->category, formatted_category, sizeof(formatted_category));
+            float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
+            format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time));
+
+            MC_Version version = settings_get_version_from_string(settings->version_str);
+            const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
+
+            snprintf(info_buffer, sizeof(info_buffer),
+                     "%s | %s - %s%s%s | %s: %d/%d - Prog: %.2f%% | %s IGT | Upd: %s",
+                     t->world_name,
+                     settings->version_str,
+                     formatted_category,
+                     *settings->optional_flag ? " - " : "",
+                     settings->optional_flag,
+                     adv_ach_label,
+                     t->template_data->advancements_completed_count,
+                     t->template_data->advancement_count,
+                     t->template_data->overall_progress_percentage,
+                     formatted_time,
+                     formatted_update_time);
+        }
+
+        // Always Append the rotating social media text
         snprintf(final_buffer, sizeof(final_buffer), "%s | %s", info_buffer, SOCIALS[o->current_social_index]);
 
         SDL_Color text_color = {
