@@ -281,7 +281,8 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
     }
     for (int i = 0; i < t->template_data->stat_count; i++) {
         TrackableCategory *cat = t->template_data->stats[i];
-        if (cat->is_single_stat_category && cat->criteria_count > 0 && cat->criteria[0]->goal <= 0 && cat->icon_path[0] == '\0') {
+        if (cat->is_single_stat_category && cat->criteria_count > 0 && cat->criteria[0]->goal <= 0 && cat->icon_path[0]
+            == '\0') {
             continue;
         }
         for (int j = 0; j < cat->criteria_count; j++) row1_items.push_back({cat->criteria[j], cat});
@@ -312,7 +313,7 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
 
         // Count visible items to prevent lag when the row is completed
         size_t visible_item_count = 0;
-        for (const auto& item_pair : row1_items) {
+        for (const auto &item_pair: row1_items) {
             if (!item_pair.first->done) {
                 visible_item_count++;
             }
@@ -356,7 +357,7 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
         float max_text_width = 0.0f;
 
         // Process all visible items in a single pass to get their count and max width
-        for (const auto& display_item : row2_items) {
+        for (const auto &display_item: row2_items) {
             if (is_display_item_done(display_item, settings)) {
                 continue; // Skip hidden items
             }
@@ -367,25 +368,28 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
             char progress_buf[64] = {0};
 
             if (display_item.type == OverlayDisplayItem::ADVANCEMENT) {
-                auto* adv = static_cast<TrackableCategory*>(display_item.item_ptr);
+                auto *adv = static_cast<TrackableCategory *>(display_item.item_ptr);
                 strncpy(name_buf, adv->display_name, sizeof(name_buf) - 1);
-                if (adv->criteria_count > 0) snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)", adv->completed_criteria_count, adv->criteria_count);
+                if (adv->criteria_count > 0) snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
+                                                      adv->completed_criteria_count, adv->criteria_count);
             } else if (display_item.type == OverlayDisplayItem::UNLOCK) {
-                auto* unlock = static_cast<TrackableItem*>(display_item.item_ptr);
+                auto *unlock = static_cast<TrackableItem *>(display_item.item_ptr);
                 strncpy(name_buf, unlock->display_name, sizeof(name_buf) - 1);
             }
 
-            TTF_Text* temp_text = TTF_CreateText(o->text_engine, o->font, name_buf, 0);
+            TTF_Text *temp_text = TTF_CreateText(o->text_engine, o->font, name_buf, 0);
             if (temp_text) {
-                int w; TTF_GetTextSize(temp_text, &w, nullptr);
-                max_text_width = fmaxf(max_text_width, (float)w);
+                int w;
+                TTF_GetTextSize(temp_text, &w, nullptr);
+                max_text_width = fmaxf(max_text_width, (float) w);
                 TTF_DestroyText(temp_text);
             }
             if (progress_buf[0] != '\0') {
                 temp_text = TTF_CreateText(o->text_engine, o->font, progress_buf, 0);
                 if (temp_text) {
-                    int w; TTF_GetTextSize(temp_text, &w, nullptr);
-                    max_text_width = fmaxf(max_text_width, (float)w);
+                    int w;
+                    TTF_GetTextSize(temp_text, &w, nullptr);
+                    max_text_width = fmaxf(max_text_width, (float) w);
                     TTF_DestroyText(temp_text);
                 }
             }
@@ -400,21 +404,25 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
             int items_scrolled = floor(fabs(o->scroll_offset_row2) / item_full_width);
             if (items_scrolled > 0) {
                 o->scroll_offset_row2 = fmod(o->scroll_offset_row2, item_full_width);
-                if (scroll_delta > 0) { // Moving RTL
+                if (scroll_delta > 0) {
+                    // Moving RTL
                     for (int i = 0; i < items_scrolled; ++i) {
                         size_t loop_guard = 0;
                         do {
                             o->start_index_row2 = (o->start_index_row2 + 1) % row2_items.size();
                             loop_guard++;
-                        } while (is_display_item_done(row2_items[o->start_index_row2], settings) && loop_guard < row2_items.size() * 2);
+                        } while (is_display_item_done(row2_items[o->start_index_row2], settings) && loop_guard <
+                                 row2_items.size() * 2);
                     }
-                } else { // Moving LTR
+                } else {
+                    // Moving LTR
                     for (int i = 0; i < items_scrolled; ++i) {
                         size_t loop_guard = 0;
                         do {
                             o->start_index_row2 = (o->start_index_row2 - 1 + row2_items.size()) % row2_items.size();
                             loop_guard++;
-                        } while (is_display_item_done(row2_items[o->start_index_row2], settings) && loop_guard < row2_items.size() * 2);
+                        } while (is_display_item_done(row2_items[o->start_index_row2], settings) && loop_guard <
+                                 row2_items.size() * 2);
                     }
                 }
             }
@@ -439,49 +447,124 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
     // Render Progress Text (Top Bar)
     if (t && t->template_data) {
-        char info_buffer[512];
+        char info_buffer[512] = {0};
         char final_buffer[1024];
-        char formatted_time[64];
-        format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
+        char temp_chunk[256];
+        bool first_item_added = false;
+
+        auto add_component = [&](const char* component_str) {
+            if (first_item_added) {
+                strcat(info_buffer, " | ");
+            }
+            strcat(info_buffer, component_str);
+            first_item_added = true;
+        };
 
         // Check if the run is 100% complete
         bool is_run_complete = t->template_data->advancements_completed_count >= t->template_data->advancement_count &&
                                t->template_data->overall_progress_percentage >= 100.0f;
 
         if (is_run_complete) {
-            // If the run is complete, display the final time message
-            snprintf(info_buffer, sizeof(info_buffer),
-                     "*** RUN COMPLETE! *** | Final Time: %s",
-                     formatted_time);
+            char formatted_time[64];
+            format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
+            snprintf(info_buffer, sizeof(info_buffer), "*** RUN COMPLETE! *** | Final Time: %s", formatted_time);
         } else {
-            // Otherwise, display the standard progress info
-            char formatted_update_time[64];
-            char formatted_category[128];
+            // Conditionally build the progress string section by section
+            if (settings->overlay_show_world && t->world_name[0] != '\0') {
+                add_component(t->world_name);
+            }
 
-            format_category_string(settings->category, formatted_category, sizeof(formatted_category));
-            float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
-            format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time));
+            if (settings->overlay_show_run_details) {
+                char formatted_category[128];
+                format_category_string(settings->category, formatted_category, sizeof(formatted_category));
+                snprintf(temp_chunk, sizeof(temp_chunk), "%s - %s%s%s",
+                         settings->version_str,
+                         formatted_category,
+                         *settings->optional_flag ? " - " : "",
+                         settings->optional_flag);
+                add_component(temp_chunk);
+            }
 
-            MC_Version version = settings_get_version_from_string(settings->version_str);
-            const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
+            if (settings->overlay_show_progress) {
+                MC_Version version = settings_get_version_from_string(settings->version_str);
+                const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
+                snprintf(temp_chunk, sizeof(temp_chunk), "%s: %d/%d - Prog: %.2f%%",
+                         adv_ach_label, t->template_data->advancements_completed_count,
+                         t->template_data->advancement_count, t->template_data->overall_progress_percentage);
+                add_component(temp_chunk);
+            }
 
-            snprintf(info_buffer, sizeof(info_buffer),
-                     "%s | %s - %s%s%s | %s: %d/%d - Prog: %.2f%% | %s IGT | Upd: %s",
-                     t->world_name,
-                     settings->version_str,
-                     formatted_category,
-                     *settings->optional_flag ? " - " : "",
-                     settings->optional_flag,
-                     adv_ach_label,
-                     t->template_data->advancements_completed_count,
-                     t->template_data->advancement_count,
-                     t->template_data->overall_progress_percentage,
-                     formatted_time,
-                     formatted_update_time);
+            if (settings->overlay_show_igt) {
+                char formatted_time[64];
+                format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
+                snprintf(temp_chunk, sizeof(temp_chunk), "%s IGT", formatted_time);
+                add_component(temp_chunk);
+            }
+
+            if (settings->overlay_show_update_timer) {
+                char formatted_update_time[64];
+                float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
+                format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time));
+                snprintf(temp_chunk, sizeof(temp_chunk), "Upd: %s", formatted_update_time);
+                add_component(temp_chunk);
+            }
         }
 
-        // Always Append the rotating social media text
-        snprintf(final_buffer, sizeof(final_buffer), "%s | %s", info_buffer, SOCIALS[o->current_social_index]);
+        // Always append the rotating social media text to the prepared message
+        if (info_buffer[0] != '\0') {
+            snprintf(final_buffer, sizeof(final_buffer), "%s | %s", info_buffer, SOCIALS[o->current_social_index]);
+        } else {
+            // If all sections are turned off, just show the socials
+            strncpy(final_buffer, SOCIALS[o->current_social_index], sizeof(final_buffer) -1);
+        }
+
+
+        // TODO: Remove
+        // // Render Progress Text (Top Bar)
+        // if (t && t->template_data) {
+        //     char info_buffer[512];
+        //     char final_buffer[1024];
+        //     char formatted_time[64];
+        //     format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
+        //
+        //     // Check if the run is 100% complete
+        //     bool is_run_complete = t->template_data->advancements_completed_count >= t->template_data->advancement_count &&
+        //                            t->template_data->overall_progress_percentage >= 100.0f;
+        //
+        //     if (is_run_complete) {
+        //         // If the run is complete, display the final time message
+        //         snprintf(info_buffer, sizeof(info_buffer),
+        //                  "*** RUN COMPLETE! *** | Final Time: %s",
+        //                  formatted_time);
+        //     } else {
+        //         // Otherwise, display the standard progress info
+        //         char formatted_update_time[64];
+        //         char formatted_category[128];
+        //
+        //         format_category_string(settings->category, formatted_category, sizeof(formatted_category));
+        //         float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
+        //         format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time));
+        //
+        //         MC_Version version = settings_get_version_from_string(settings->version_str);
+        //         const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
+        //
+        //         snprintf(info_buffer, sizeof(info_buffer),
+        //                  "%s | %s - %s%s%s | %s: %d/%d - Prog: %.2f%% | %s IGT | Upd: %s",
+        //                  t->world_name,
+        //                  settings->version_str,
+        //                  formatted_category,
+        //                  *settings->optional_flag ? " - " : "",
+        //                  settings->optional_flag,
+        //                  adv_ach_label,
+        //                  t->template_data->advancements_completed_count,
+        //                  t->template_data->advancement_count,
+        //                  t->template_data->overall_progress_percentage,
+        //                  formatted_time,
+        //                  formatted_update_time);
+        //     }
+        //
+        //     // Always Append the rotating social media text
+        //     snprintf(final_buffer, sizeof(final_buffer), "%s | %s", info_buffer, SOCIALS[o->current_social_index]);
 
         SDL_Color text_color = {
             settings->overlay_text_color.r, settings->overlay_text_color.g, settings->overlay_text_color.b,
@@ -655,12 +738,14 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         const float TEXT_Y_OFFSET = 4.0f;
 
         std::vector<OverlayDisplayItem> row2_items;
-        for (int i = 0; i < t->template_data->advancement_count; ++i) row2_items.push_back({
-            t->template_data->advancements[i], OverlayDisplayItem::ADVANCEMENT
-        });
-        for (int i = 0; i < t->template_data->unlock_count; ++i) row2_items.push_back({
-            t->template_data->unlocks[i], OverlayDisplayItem::UNLOCK
-        });
+        for (int i = 0; i < t->template_data->advancement_count; ++i)
+            row2_items.push_back({
+                t->template_data->advancements[i], OverlayDisplayItem::ADVANCEMENT
+            });
+        for (int i = 0; i < t->template_data->unlock_count; ++i)
+            row2_items.push_back({
+                t->template_data->unlocks[i], OverlayDisplayItem::UNLOCK
+            });
 
         size_t visible_item_count = 0;
         for (const auto &item: row2_items) {
@@ -679,8 +764,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 if (display_item.type == OverlayDisplayItem::ADVANCEMENT) {
                     auto *adv = static_cast<TrackableCategory *>(display_item.item_ptr);
                     strncpy(name_buf, adv->display_name, sizeof(name_buf) - 1);
-                    if (adv->criteria_count > 0) snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
-                                                          adv->completed_criteria_count, adv->criteria_count);
+                    if (adv->criteria_count > 0)
+                        snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
+                                 adv->completed_criteria_count, adv->criteria_count);
                 } else if (display_item.type == OverlayDisplayItem::UNLOCK) {
                     auto *unlock = static_cast<TrackableItem *>(display_item.item_ptr);
                     strncpy(name_buf, unlock->display_name, sizeof(name_buf) - 1);

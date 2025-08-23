@@ -111,6 +111,13 @@ struct AppSettings {
     ColorRGBA overlay_bg_color;               // Background color for the overlay window.
     ColorRGBA text_color;                     // Global text color for UI elements.
     ColorRGBA overlay_text_color;             // Text color for the overlay window.
+
+    // --- Overlay Text Sections ---
+    bool overlay_show_world;                // If true, the world name is shown in the overlay.
+    bool overlay_show_run_details;          // If true, the run details are shown in the overlay.
+    bool overlay_show_progress;             // If true, the progress bar is shown in the overlay.
+    bool overlay_show_igt;                  // If true, the in-game time is shown in the overlay.
+    bool overlay_show_update_timer;         // If true, the update timer is shown in the overlay.
 };
 
 

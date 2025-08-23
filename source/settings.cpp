@@ -186,6 +186,16 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SameLine();
         ImGui::RadioButton("Right", (int *) &temp_settings.overlay_progress_text_align,
                            OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT);
+
+        ImGui::Text("Overlay Text Sections:");
+        ImGui::SameLine();
+        ImGui::Checkbox("World", &temp_settings.overlay_show_world); ImGui::SameLine();
+        ImGui::Checkbox("Run Details", &temp_settings.overlay_show_run_details); ImGui::SameLine();
+        ImGui::Checkbox("Progress", &temp_settings.overlay_show_progress); ImGui::SameLine();
+        ImGui::Checkbox("IGT", &temp_settings.overlay_show_igt); ImGui::SameLine();
+        ImGui::Checkbox("Update Timer", &temp_settings.overlay_show_update_timer);
+
+        ImGui::Separator();
         ImGui::Spacing();
     }
 

@@ -63,17 +63,15 @@ Advancely supports over 100 Minecraft versions, including every full release fro
 
 The true power of Advancely lies in its customization. All settings can be configured in real-time from the settings window (`ESC` key).
 
-| Setting Group        | Options & Features                                                                                                                                                                                            |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Path Settings** | `Auto-Detect` saves path for your OS or specify a `Manual` path.                                                                                                                                              |
-| **Template Settings**| Select your `Version`, `Category`, and an `Optional Flag` to load a specific ruleset. You can create your own templates by following the folder structure in `resources/templates`.                             |
-| **General Settings** | Toggle the `Overlay`, set an `FPS Limit`, keep the tracker `Always On Top`, automatically `Remove Completed Goals` from view, and enable the `StatsPerWorld Mod` compatibility for legacy versions.                |
-| **Visual Settings** | Full RGBA color customization for the tracker `background`, `text`, overlay `background`, and overlay `text`. You can also adjust the `Overlay Width`.                                                         |
-| **Overlay Settings** | Fine-tune the `Overlay Scroll Speed` (negative values reverse direction), `Speed Up Animation` (also toggled with `SPACE` in the overlay window), and align the top progress text (`Left`, `Center`, or `Right`). |
-| **Hotkey Settings** | Assign keyboard hotkeys to increment/decrement any custom counters defined in your template. You can find a list of supported key names [here](https://pastebin.com/vPKgWAen).                                   |
-| **Debug Settings** | `Print Debug To Console` to see detailed, real-time status updates in your terminal.                                                                                                                            |
-
-*Coming Soon: The overlay's top progress text will also be fully customizable via a format string in the settings.*
+| Setting Group        | Options & Features                                                                                                                                                                                                                  |
+| -------------------- |-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Path Settings** | `Auto-Detect` saves path for your OS or specify a `Manual` path.                                                                                                                                                                    |
+| **Template Settings**| Select your `Version`, `Category`, and an `Optional Flag` to load a specific ruleset. You can create your own templates by following the folder structure in `resources/templates`.                                                 |
+| **General Settings** | Toggle the `Overlay`, set an `FPS Limit`, keep the tracker `Always On Top`, automatically `Remove Completed Goals` from view, and enable the `StatsPerWorld Mod` compatibility for legacy versions.                                 |
+| **Visual Settings** | Full RGBA color customization for the tracker `background`, `text`, overlay `background`, and overlay `text`. You can also adjust the `Overlay Width`.                                                                              |
+| **Overlay Settings** | Fine-tune the `Overlay Scroll Speed` (negative values reverse direction), `Speed Up Animation` (also toggled with `SPACE` in the overlay window), and align the fully customizable top progress text (`Left`, `Center`, or `Right`).|
+| **Hotkey Settings** | Assign keyboard hotkeys to increment/decrement any custom counters defined in your template. You can find a list of supported key names [here](https://pastebin.com/vPKgWAen).                                                      |
+| **Debug Settings** | `Print Debug To Console` to see detailed, real-time status updates in your terminal.                                                                                                                                                |
 
 ## How To Use
 
