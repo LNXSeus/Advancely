@@ -5,7 +5,6 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
-#include "main.h"
 #include "tracker.h"
 
 #ifdef __cplusplus

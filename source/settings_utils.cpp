@@ -215,7 +215,6 @@ void settings_set_defaults(AppSettings *settings) {
     settings->fps = DEFAULT_FPS;
     settings->tracker_always_on_top = DEFAULT_TRACKER_ALWAYS_ON_TOP;
     settings->overlay_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
-    settings->goal_align_left = DEFAULT_GOAL_ALIGN_LEFT;
     settings->remove_completed_goals = DEFAULT_REMOVE_COMPLETED_GOALS;
     settings->print_debug_status = DEFAULT_PRINT_DEBUG_STATUS;
     settings->overlay_progress_text_align = DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN;
@@ -327,13 +326,6 @@ bool settings_load(AppSettings *settings) {
             settings->overlay_scroll_speed = (float) scroll_speed->valuedouble;
         else {
             settings->overlay_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
-            defaults_were_used = true;
-        }
-
-        const cJSON *align = cJSON_GetObjectItem(general_settings, "goal_align_left");
-        if (align && cJSON_IsBool(align)) settings->goal_align_left = cJSON_IsTrue(align);
-        else {
-            settings->goal_align_left = DEFAULT_GOAL_ALIGN_LEFT;
             defaults_were_used = true;
         }
 
@@ -452,7 +444,6 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
     cJSON_ReplaceItemInObject(general_obj, "fps", cJSON_CreateNumber(settings->fps));
     cJSON_ReplaceItemInObject(general_obj, "always_on_top", cJSON_CreateBool(settings->tracker_always_on_top));
     cJSON_ReplaceItemInObject(general_obj, "overlay_scroll_speed", cJSON_CreateNumber(settings->overlay_scroll_speed));
-    cJSON_ReplaceItemInObject(general_obj, "goal_align_left", cJSON_CreateBool(settings->goal_align_left));
     cJSON_ReplaceItemInObject(general_obj, "remove_completed_goals", cJSON_CreateBool(settings->remove_completed_goals));
     cJSON_ReplaceItemInObject(general_obj, "print_debug_status", cJSON_CreateBool(settings->print_debug_status));
     cJSON_ReplaceItemInObject(general_obj, "overlay_progress_text_align",
