@@ -3366,6 +3366,23 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
         if (!goal) continue;
         uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, ImGui::CalcTextSize(goal->display_name).x));
+
+        // Account for the width of the current stage text (for proper spacing)
+        float required_width = ImGui::CalcTextSize(goal->display_name).x;
+
+        if (goal->current_stage < goal->stage_count) {
+            SubGoal *active_stage = goal->stages[goal->current_stage];
+            char stage_text[256];
+            if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress > 0) {
+                snprintf(stage_text, sizeof(stage_text), "%s (%d/%d)", active_stage->display_text,
+                         active_stage->current_stat_progress, active_stage->required_progress);
+            } else {
+                snprintf(stage_text, sizeof(stage_text), "%s", active_stage->display_text);
+            }
+            required_width = fmaxf(required_width, ImGui::CalcTextSize(stage_text).x);
+        }
+
+        uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, required_width));
     }
 
     float padding = 50.0f, current_x = padding, row_max_height = 0.0f;

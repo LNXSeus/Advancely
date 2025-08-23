@@ -14,31 +14,11 @@ extern "C" {
 
 struct AppSettings;
 
-// TODO: Remove
-// enum to track the animation state of an item
-// enum ItemState {
-//     ITEM_VISIBLE,
-//     ITEM_COMPLETED, // The item is complete, but we're still rendering a gap for it
-//     ITEM_REMOVED // The item is fully removed, and the gap is closed (off-screen)
-// };
-
-// // New struct to hold state for each item in the first row
-// typedef struct {
-//     TrackableItem *item;
-//     ItemState state;
-// } Row1Item;
-
-// // New struct to hold state for each item in the second row
-// typedef struct {
-//     TrackableItem *item;
-//     ItemState state;
-// } Row2Item;
-
-// // New struct to hold state for each item in the third row
-// typedef struct {
-//     TrackableItem *item;
-//     ItemState state;
-// } Row3Item;
+// Helper struct to handle rendering different item types in the overlay
+struct OverlayDisplayItem {
+    void* item_ptr;
+    enum ItemType { ADVANCEMENT, UNLOCK, STAT, CUSTOM, MULTISTAGE } type;
+};
 
 struct Overlay {
     SDL_Window *window;
