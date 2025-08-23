@@ -13,14 +13,14 @@ const ColorRGBA DEFAULT_OVERLAY_BG_COLOR = {0, 80, 255, 255};
 const ColorRGBA DEFAULT_TEXT_COLOR = {255, 255, 255, 255};
 const ColorRGBA DEFAULT_OVERLAY_TEXT_COLOR = {255, 255, 255, 255};
 
-const char* VERSION_STRINGS[] = {
-    #define X(e, s) s,
+const char *VERSION_STRINGS[] = {
+#define X(e, s) s,
     VERSION_LIST
-    #undef X
+#undef X
 };
-const int VERSION_STRINGS_COUNT = sizeof(VERSION_STRINGS) / sizeof(char*);
+const int VERSION_STRINGS_COUNT = sizeof(VERSION_STRINGS) / sizeof(char *);
 
-static const char* overlay_text_align_to_string(OverlayProgressTextAlignment align) {
+static const char *overlay_text_align_to_string(OverlayProgressTextAlignment align) {
     switch (align) {
         case OVERLAY_PROGRESS_TEXT_ALIGN_CENTER: return "center";
         case OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT: return "right";
@@ -29,7 +29,7 @@ static const char* overlay_text_align_to_string(OverlayProgressTextAlignment ali
     }
 }
 
-static OverlayProgressTextAlignment string_to_overlay_text_align(const char* str) {
+static OverlayProgressTextAlignment string_to_overlay_text_align(const char *str) {
     if (!str) return OVERLAY_PROGRESS_TEXT_ALIGN_LEFT;
     if (strcmp(str, "center") == 0) return OVERLAY_PROGRESS_TEXT_ALIGN_CENTER;
     if (strcmp(str, "right") == 0) return OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT;
@@ -180,7 +180,7 @@ MC_Version settings_get_version_from_string(const char *version_str) {
     // Loop through the map to find a matching string
     for (int i = 0; i < VERSION_STRINGS_COUNT; i++) {
         if (strcmp(version_str, VERSION_STRINGS[i]) == 0) {
-            return (MC_Version)i; // Cast index to enum type
+            return (MC_Version) i; // Cast index to enum type
         }
     }
 
@@ -231,6 +231,13 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_bg_color = DEFAULT_OVERLAY_BG_COLOR;
     settings->text_color = DEFAULT_TEXT_COLOR;
     settings->overlay_text_color = DEFAULT_OVERLAY_TEXT_COLOR;
+
+    // Default Overlay Text Toggles
+    settings->overlay_show_world = true;
+    settings->overlay_show_run_details = true;
+    settings->overlay_show_progress = true;
+    settings->overlay_show_igt = true;
+    settings->overlay_show_update_timer = true;
 }
 
 bool settings_load(AppSettings *settings) {
@@ -250,40 +257,45 @@ bool settings_load(AppSettings *settings) {
 
     // Load settings, explicitly applying defaults if a key is missing or invalid
     const cJSON *path_mode_json = cJSON_GetObjectItem(json, "path_mode");
-    if (path_mode_json && cJSON_IsString(path_mode_json)) settings->path_mode = settings_get_path_mode_from_string(
-                                            path_mode_json->valuestring);
+    if (path_mode_json && cJSON_IsString(path_mode_json))
+        settings->path_mode = settings_get_path_mode_from_string(
+            path_mode_json->valuestring);
     else {
         settings->path_mode = PATH_MODE_AUTO;
         defaults_were_used = true;
     }
 
     const cJSON *manual_path_json = cJSON_GetObjectItem(json, "manual_saves_path");
-    if (manual_path_json && cJSON_IsString(manual_path_json)) strncpy(settings->manual_saves_path, manual_path_json->valuestring,
-                                                  sizeof(settings->manual_saves_path) - 1);
+    if (manual_path_json && cJSON_IsString(manual_path_json))
+        strncpy(settings->manual_saves_path, manual_path_json->valuestring,
+                sizeof(settings->manual_saves_path) - 1);
     else {
         settings->manual_saves_path[0] = '\0';
         defaults_were_used = true;
     }
 
     const cJSON *version_json = cJSON_GetObjectItem(json, "version");
-    if (version_json && cJSON_IsString(version_json)) strncpy(settings->version_str, version_json->valuestring,
-                                              sizeof(settings->version_str) - 1);
+    if (version_json && cJSON_IsString(version_json))
+        strncpy(settings->version_str, version_json->valuestring,
+                sizeof(settings->version_str) - 1);
     else {
         strncpy(settings->version_str, "1.21.6", sizeof(settings->version_str) - 1);
         defaults_were_used = true;
     }
 
     const cJSON *category_json = cJSON_GetObjectItem(json, "category");
-    if (category_json && cJSON_IsString(category_json)) strncpy(settings->category, category_json->valuestring,
-                                               sizeof(settings->category) - 1);
+    if (category_json && cJSON_IsString(category_json))
+        strncpy(settings->category, category_json->valuestring,
+                sizeof(settings->category) - 1);
     else {
         strncpy(settings->category, "all_advancements", sizeof(settings->category) - 1);
         defaults_were_used = true;
     }
 
     const cJSON *optional_flag_json = cJSON_GetObjectItem(json, "optional_flag");
-    if (optional_flag_json && cJSON_IsString(optional_flag_json)) strncpy(settings->optional_flag, optional_flag_json->valuestring,
-                                                    sizeof(settings->optional_flag) - 1);
+    if (optional_flag_json && cJSON_IsString(optional_flag_json))
+        strncpy(settings->optional_flag, optional_flag_json->valuestring,
+                sizeof(settings->optional_flag) - 1);
     else {
         settings->optional_flag[0] = '\0';
         defaults_were_used = true;
@@ -292,7 +304,6 @@ bool settings_load(AppSettings *settings) {
     // Load general settings, explicitly applying defaults if a key is missing or invalid
     cJSON *general_settings = cJSON_GetObjectItem(json, "general");
     if (general_settings) {
-
         // Toggling the overlay window
         const cJSON *enable_overlay = cJSON_GetObjectItem(general_settings, "enable_overlay");
         if (enable_overlay && cJSON_IsBool(enable_overlay)) settings->enable_overlay = cJSON_IsTrue(enable_overlay);
@@ -302,7 +313,8 @@ bool settings_load(AppSettings *settings) {
         }
 
         const cJSON *stats_per_world_legacy = cJSON_GetObjectItem(general_settings, "using_stats_per_world_legacy");
-        if (stats_per_world_legacy && cJSON_IsBool(stats_per_world_legacy)) settings->using_stats_per_world_legacy = cJSON_IsTrue(stats_per_world_legacy);
+        if (stats_per_world_legacy && cJSON_IsBool(stats_per_world_legacy))
+            settings->using_stats_per_world_legacy = cJSON_IsTrue(stats_per_world_legacy);
         else {
             settings->using_stats_per_world_legacy = DEFAULT_USING_STATS_PER_WORLD_LEGACY;
             defaults_were_used = true;
@@ -330,7 +342,8 @@ bool settings_load(AppSettings *settings) {
         }
 
         const cJSON *remove_completed = cJSON_GetObjectItem(general_settings, "remove_completed_goals");
-        if (remove_completed && cJSON_IsBool(remove_completed)) settings->remove_completed_goals = cJSON_IsTrue(remove_completed);
+        if (remove_completed && cJSON_IsBool(remove_completed))
+            settings->remove_completed_goals = cJSON_IsTrue(remove_completed);
         else {
             settings->remove_completed_goals = DEFAULT_REMOVE_COMPLETED_GOALS;
             defaults_were_used = true;
@@ -344,14 +357,16 @@ bool settings_load(AppSettings *settings) {
         }
 
         const cJSON *align_text = cJSON_GetObjectItem(general_settings, "overlay_progress_text_align");
-        if (align_text && cJSON_IsString(align_text)) settings->overlay_progress_text_align = string_to_overlay_text_align(align_text->valuestring);
+        if (align_text && cJSON_IsString(align_text))
+            settings->overlay_progress_text_align = string_to_overlay_text_align(align_text->valuestring);
         else {
             settings->overlay_progress_text_align = DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN;
             defaults_were_used = true;
         }
 
         const cJSON *overlay_speedup = cJSON_GetObjectItem(general_settings, "overlay_animation_speedup");
-        if (overlay_speedup && cJSON_IsBool(overlay_speedup)) settings->overlay_animation_speedup = cJSON_IsTrue(overlay_speedup);
+        if (overlay_speedup && cJSON_IsBool(overlay_speedup))
+            settings->overlay_animation_speedup = cJSON_IsTrue(overlay_speedup);
         else {
             settings->overlay_animation_speedup = DEFAULT_OVERLAY_SPEED_UP;
             defaults_were_used = true;
@@ -364,6 +379,26 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
+        // --- Load Overlay Text Toggles ---
+        const cJSON *show_world = cJSON_GetObjectItem(general_settings, "overlay_show_world");
+        if(show_world && cJSON_IsBool(show_world)) settings->overlay_show_world = cJSON_IsTrue(show_world);
+        else { settings->overlay_show_world = true; defaults_were_used = true; }
+
+        const cJSON *show_run = cJSON_GetObjectItem(general_settings, "overlay_show_run_details");
+        if(show_run && cJSON_IsBool(show_run)) settings->overlay_show_run_details = cJSON_IsTrue(show_run);
+        else { settings->overlay_show_run_details = true; defaults_were_used = true; }
+
+        const cJSON *show_prog = cJSON_GetObjectItem(general_settings, "overlay_show_progress");
+        if(show_prog && cJSON_IsBool(show_prog)) settings->overlay_show_progress = cJSON_IsTrue(show_prog);
+        else { settings->overlay_show_progress = true; defaults_were_used = true; }
+
+        const cJSON *show_igt = cJSON_GetObjectItem(general_settings, "overlay_show_igt");
+        if(show_igt && cJSON_IsBool(show_igt)) settings->overlay_show_igt = cJSON_IsTrue(show_igt);
+        else { settings->overlay_show_igt = true; defaults_were_used = true; }
+
+        const cJSON *show_update = cJSON_GetObjectItem(general_settings, "overlay_show_update_timer");
+        if(show_update && cJSON_IsBool(show_update)) settings->overlay_show_update_timer = cJSON_IsTrue(show_update);
+        else { settings->overlay_show_update_timer = true; defaults_were_used = true; }
 
     } else {
         defaults_were_used = true;
@@ -382,7 +417,8 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         if (load_color(visual_settings, "text_color", &settings->text_color, &DEFAULT_TEXT_COLOR))
             defaults_were_used = true;
-        if (load_color(visual_settings, "overlay_text_color", &settings->overlay_text_color, &DEFAULT_OVERLAY_TEXT_COLOR))
+        if (load_color(visual_settings, "overlay_text_color", &settings->overlay_text_color,
+                       &DEFAULT_OVERLAY_TEXT_COLOR))
             defaults_were_used = true;
     } else {
         defaults_were_used = true;
@@ -444,13 +480,22 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
     cJSON_ReplaceItemInObject(general_obj, "fps", cJSON_CreateNumber(settings->fps));
     cJSON_ReplaceItemInObject(general_obj, "always_on_top", cJSON_CreateBool(settings->tracker_always_on_top));
     cJSON_ReplaceItemInObject(general_obj, "overlay_scroll_speed", cJSON_CreateNumber(settings->overlay_scroll_speed));
-    cJSON_ReplaceItemInObject(general_obj, "remove_completed_goals", cJSON_CreateBool(settings->remove_completed_goals));
+    cJSON_ReplaceItemInObject(general_obj, "remove_completed_goals",
+                              cJSON_CreateBool(settings->remove_completed_goals));
     cJSON_ReplaceItemInObject(general_obj, "print_debug_status", cJSON_CreateBool(settings->print_debug_status));
     cJSON_ReplaceItemInObject(general_obj, "overlay_progress_text_align",
                               cJSON_CreateString(overlay_text_align_to_string(settings->overlay_progress_text_align)));
-    cJSON_ReplaceItemInObject(general_obj, "overlay_animation_speedup", cJSON_CreateBool(settings->overlay_animation_speedup));
+    cJSON_ReplaceItemInObject(general_obj, "overlay_animation_speedup",
+                              cJSON_CreateBool(settings->overlay_animation_speedup));
     cJSON_ReplaceItemInObject(general_obj, "overlay_row3_remove_completed",
                               cJSON_CreateBool(settings->overlay_row3_remove_completed));
+
+    // --- Save Overlay Text Toggles ---
+    cJSON_ReplaceItemInObject(general_obj, "overlay_show_world", cJSON_CreateBool(settings->overlay_show_world));
+    cJSON_ReplaceItemInObject(general_obj, "overlay_show_run_details", cJSON_CreateBool(settings->overlay_show_run_details));
+    cJSON_ReplaceItemInObject(general_obj, "overlay_show_progress", cJSON_CreateBool(settings->overlay_show_progress));
+    cJSON_ReplaceItemInObject(general_obj, "overlay_show_igt", cJSON_CreateBool(settings->overlay_show_igt));
+    cJSON_ReplaceItemInObject(general_obj, "overlay_show_update_timer", cJSON_CreateBool(settings->overlay_show_update_timer));
 
 
     // Update Visual Settings
@@ -492,18 +537,21 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
 
             // Save if we are forcing it true, OR if an override key already exists (to update it to false)
             if (stat_cat->is_manually_completed || cJSON_HasObjectItem(override_obj, stat_cat->root_name)) {
-                cJSON_ReplaceItemInObject(override_obj, stat_cat->root_name, cJSON_CreateBool(stat_cat->is_manually_completed));
+                cJSON_ReplaceItemInObject(override_obj, stat_cat->root_name,
+                                          cJSON_CreateBool(stat_cat->is_manually_completed));
             }
 
 
             for (int j = 0; j < stat_cat->criteria_count; j++) {
                 TrackableItem *sub_stat = stat_cat->criteria[j];
                 char sub_stat_key[512];
-                snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name, sub_stat->root_name);
+                snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name,
+                         sub_stat->root_name);
 
                 // Save if we are forcing it true, OR if an override key already exists (to update it to false)
                 if (sub_stat->is_manually_completed || cJSON_HasObjectItem(override_obj, sub_stat_key)) {
-                    cJSON_ReplaceItemInObject(override_obj, sub_stat_key, cJSON_CreateBool(sub_stat->is_manually_completed));
+                    cJSON_ReplaceItemInObject(override_obj, sub_stat_key,
+                                              cJSON_CreateBool(sub_stat->is_manually_completed));
                 }
             }
         }
@@ -511,11 +559,12 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
 
     // Update Hotkeys
     cJSON_DeleteItemFromObject(root, "hotkeys");
-    cJSON* hotkeys_array = cJSON_CreateArray();
+    cJSON *hotkeys_array = cJSON_CreateArray();
     for (int i = 0; i < settings->hotkey_count; ++i) {
-        const HotkeyBinding* hb = &settings->hotkeys[i];
-        if (strlen(hb->target_goal) > 0) { // Only save if it's a valid binding
-            cJSON* hotkey_obj = cJSON_CreateObject();
+        const HotkeyBinding *hb = &settings->hotkeys[i];
+        if (strlen(hb->target_goal) > 0) {
+            // Only save if it's a valid binding
+            cJSON *hotkey_obj = cJSON_CreateObject();
             cJSON_AddStringToObject(hotkey_obj, "target_goal", hb->target_goal);
             cJSON_AddStringToObject(hotkey_obj, "increment_key", hb->increment_key);
             cJSON_AddStringToObject(hotkey_obj, "decrement_key", hb->decrement_key);
