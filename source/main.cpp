@@ -296,12 +296,11 @@ int main(int argc, char *argv[]) {
                 tracker->time_since_last_update = 0.0f;
             }
 
-            // Unlock mutex after all updates are done
-            SDL_UnlockMutex(g_watcher_mutex);
+
 
             // Overlay animations should run every frame, if it exists
             if (overlay) {
-                overlay_update(overlay, &deltaTime, &app_settings);
+                overlay_update(overlay, &deltaTime, tracker, &app_settings);
             }
             // IMGUI RENDERING
             ImGui_ImplSDLRenderer3_NewFrame();
@@ -332,6 +331,9 @@ int main(int argc, char *argv[]) {
             if (overlay) {
                 overlay_render(overlay, tracker, &app_settings);
             }
+
+            // Unlock mutex after all updates are done
+            SDL_UnlockMutex(g_watcher_mutex);
 
             // --- Frame limiting ---
             const float frame_time = (float) SDL_GetTicks() - (float)current_time;

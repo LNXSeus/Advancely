@@ -101,6 +101,7 @@
       "icon": "blocks/Dirt.png",
       "criteria": {
         "minecraft:mined/minecraft:dirt": {
+          "icon": "blocks/Oak_Log_(UD)_JE8_BE3.png",
           "target": -1
         }
       }

@@ -80,15 +80,16 @@ struct Tracker {
 SDL_Texture *load_texture_with_scale_mode(SDL_Renderer *renderer, const char *path, SDL_ScaleMode scale_mode);
 
 /**
-* @brief Gets an SDL_Texture from a path, utilizing a specific cache to avoid redundant loads.
-* @param renderer The renderer to create the texture with.
-* @param cache A pointer to the cache array.
-* @param cache_count A pointer to the current number of items in the cache.
-* @param cache_capacity A pointer to the cache's current capacity.
-* @param path The path to the image file.
-* @return A pointer to the cached or newly loaded SDL_Texture, or nullptr on failure.
+    * @brief Gets an SDL_Texture from a path, utilizing a specific cache to avoid redundant loads.
+    * @param renderer The renderer to create the texture with.
+    * @param cache A pointer to the cache array.
+    * @param cache_count A pointer to the current number of items in the cache.
+    * @param cache_capacity A pointer to the cache's current capacity.
+    * @param path The path to the image file.
+    * @param scale_mode The desired SDL_ScaleMode for the texture if it needs to be loaded.
+    * @return A pointer to the cached or newly loaded SDL_Texture, or nullptr on failure.
 */
-SDL_Texture *get_texture_from_cache(SDL_Renderer *renderer, TextureCacheEntry **cache, int *cache_count, int *cache_capacity, const char *path);
+SDL_Texture *get_texture_from_cache(SDL_Renderer *renderer, TextureCacheEntry **cache, int *cache_count, int *cache_capacity, const char *path, SDL_ScaleMode scale_mode);
 
 
 /**
@@ -107,9 +108,10 @@ void free_animated_texture(AnimatedTexture *anim);
  * @param cache_count A pointer to the current number of items in the cache.
  * @param cache_capacity A pointer to the cache's current capacity.
  * @param path The path to the GIF file.
+ * @param scale_mode The desired SDL_ScaleMode for the texture frames if it needs to be loaded.
  * @return A pointer to the cached or newly loaded AnimatedTexture, or nullptr on failure.
  */
-AnimatedTexture *get_animated_texture_from_cache(SDL_Renderer *renderer, AnimatedTextureCacheEntry **cache, int *cache_count, int *cache_capacity, const char* path);
+AnimatedTexture *get_animated_texture_from_cache(SDL_Renderer *renderer, AnimatedTextureCacheEntry **cache, int *cache_count, int *cache_capacity, const char* path, SDL_ScaleMode scale_mode);
 
 
 /**
