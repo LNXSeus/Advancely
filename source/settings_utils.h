@@ -25,7 +25,6 @@ extern "C" {
 #define DEFAULT_TRACKER_ALWAYS_ON_TOP true
 #define DEFAULT_OVERLAY_SCROLL_SPEED 1.0f
 #define DEFAULT_OVERLAY_SPEED_UP false // Boolean controls whether speed up is enabled
-#define DEFAULT_GOAL_ALIGN_LEFT true
 #define DEFAULT_REMOVE_COMPLETED_GOALS true
 #define DEFAULT_PRINT_DEBUG_STATUS false
 #define DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_LEFT
@@ -98,7 +97,6 @@ struct AppSettings {
     bool tracker_always_on_top;               // If true, the main tracker window stays above other windows.
     bool print_debug_status;                  // If true, tracker_print_debug_status() function gets called.
     float overlay_scroll_speed;               // The speed and direction of the scrolling animation in the overlay.
-    bool goal_align_left;                     // If true, items in the overlay are aligned to the left.
     bool remove_completed_goals;              // If true, completed goals are hidden from the tracker view.
     OverlayProgressTextAlignment overlay_progress_text_align; // Alignment for the progress text in the overlay.
     bool overlay_animation_speedup;           // If true, the overlay animation speed is increased.

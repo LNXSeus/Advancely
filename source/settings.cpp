@@ -172,15 +172,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SetTooltip("Hides fully completed goals and sub-goals from the tracker window to tidy up the view.");
     }
 
-    if (temp_settings.enable_overlay) {
-        ImGui::SameLine();
-        ImGui::Checkbox("Goal Align Left", &temp_settings.goal_align_left);
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(
-                "When enabled, multi-stage goals and custom goals will fill in from the left, otherwise from the right.");
-        }
-    }
-
     ImGui::Separator();
     ImGui::Spacing();
 
@@ -414,9 +405,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
          "  - FPS Limit: %d\n"
          "  - Overlay Scroll Speed: %.2f\n"
          "  - Speed Up Animation: %s\n"
+         "  - Hide Completed Row 3 Goals: %s\n"
          "  - Always On Top: %s\n"
          "  - Remove Completed: %s\n"
-         "  - Goal Align Left: %s\n"
          "  - Overlay Width: %s\n"
          "  - Print Debug To Console: %s",
 
@@ -428,9 +419,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
          DEFAULT_FPS,
          DEFAULT_OVERLAY_SCROLL_SPEED,
          DEFAULT_OVERLAY_SPEED_UP ? "Enabled" : "Disabled",
+         DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
          DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
          DEFAULT_REMOVE_COMPLETED_GOALS ? "Enabled" : "Disabled",
-         DEFAULT_GOAL_ALIGN_LEFT ? "Enabled" : "Disabled",
          "1440px",
          DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled"
          );

@@ -13,7 +13,6 @@
     "overlay_row3_remove_completed": false,
     "always_on_top":	true,
     "remove_completed_goals": true,
-    "goal_align_left":	true,
     "overlay_progress_text_align": "left",
     "print_debug_status": false
   },
