@@ -2062,6 +2062,17 @@ void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settin
                         // Open settings window, TOGGLE settings_opened
                         *settings_opened = !(*settings_opened);
                         break;
+                    case SDL_SCANCODE_SPACE:
+                        // Toggle the layout locked state
+                        t->layout_locked = !t->layout_locked;
+
+                        // If we just locked the layout, save the current width
+                        if (t->layout_locked) {
+                            // This logic mirrors what happens when the UI checkbox is clicked.
+                            ImGuiIO &io = ImGui::GetIO();
+                            t->locked_layout_width = io.DisplaySize.x / t->zoom_level;
+                        }
+                        break;
                     // Window move/resize events are handled in main.c
                     default:
                         break;
@@ -3389,7 +3400,7 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
     }
 
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Prevents the layout from rearranging when zooming or resizing the window.");
+        ImGui::SetTooltip("Also toggled by pressing SPACE.\nPrevents the layout from rearranging when zooming or resizing the window.");
     }
 
     ImGui::SameLine();

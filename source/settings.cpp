@@ -148,8 +148,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (ImGui::IsItemHovered()) {
             char speed_up_tooltip_buffer[1024];
             snprintf(speed_up_tooltip_buffer, sizeof(speed_up_tooltip_buffer),
-                     "Toggles speeding up the overlay animation by a factor of %.1f. Don't forget to hit apply!\nOn top of that you can also hold SPACE when tabbed into the overlay window.",
-                     OVERLAY_SPEEDUP_FACTOR);
+                     "Toggles speeding up the overlay animation by a factor of %.1f. Don't forget to hit apply!\nOn top of that you can also hold SPACE (also %.1f) when tabbed into the overlay window.",
+                     OVERLAY_SPEEDUP_FACTOR, OVERLAY_SPEEDUP_FACTOR);
 
             ImGui::SetTooltip(speed_up_tooltip_buffer);
         }

@@ -30,7 +30,7 @@ extern "C" {
 #define SDL_FLAGS SDL_INIT_VIDEO // TODO: OR'd together with SDL_INIT_AUDIO
 
 #define TRACKER_TITLE "Advancely"
-#define ADVANCELY_VERSION "v0.9.9" // vMAJOR.MINOR.PATCH // TODO: Update this always
+#define ADVANCELY_VERSION "v0.9.10" // vMAJOR.MINOR.PATCH // TODO: Update this always
 #define ADVANCELY_ICON_PATH "resources/gui/Advancely_Logo_NoText.png" // TODO: Use this in tracker_init_sdl()
 #define ADVANCELY_FADED_ALPHA 100
 #define TRACKER_SEPARATOR_LINE_WIDTH 0.80f
@@ -43,7 +43,7 @@ extern "C" {
 #define OVERLAY_TITLE "Advancely Overlay"
 #define OVERLAY_FIXED_HEIGHT 420
 #define OVERLAY_DEFAULT_WIDTH 1440
-#define OVERLAY_SPEEDUP_FACTOR 5.0f
+#define OVERLAY_SPEEDUP_FACTOR 5.0f // Both the setting and SPACEBAR use this value
 #define OVERLAY_FADE_DURATION 0.5f // Duration of the fade-out animation in seconds
 
 
