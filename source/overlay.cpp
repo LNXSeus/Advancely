@@ -92,9 +92,8 @@ static void render_texture_with_alpha(SDL_Renderer *renderer, SDL_Texture *textu
             float pad_y = (dest->h - scaled_h) / 2.0f;
 
             // Create the final, centered, and correctly scaled destination rectangle
-            SDL_FRect final_dest = { dest->x + pad_x, dest->y + pad_y, scaled_w, scaled_h };
+            SDL_FRect final_dest = {dest->x + pad_x, dest->y + pad_y, scaled_w, scaled_h};
             SDL_RenderTexture(renderer, texture_to_render, nullptr, &final_dest);
-
         } else {
             // For animated textures, render stretched as before, since they are pre-padded.
             SDL_RenderTexture(renderer, texture_to_render, nullptr, dest);
@@ -117,12 +116,37 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     // temp variable to not dereference over and over again
     Overlay *o = *overlay;
 
-    o->scroll_offset_row1 = 0.0f;
-    o->scroll_offset_row2 = 0.0f;
-    o->scroll_offset_row3 = 0.0f;
+
     o->social_media_timer = 0.0f;
     o->current_social_index = 0;
     o->text_engine = nullptr;
+
+    o->scroll_offset_row1 = 0.0f;
+    o->scroll_offset_row2 = 0.0f;
+    o->scroll_offset_row3 = 0.0f;
+    o->start_index_row1 = 0;
+    o->start_index_row2 = 0;
+    o->start_index_row3 = 0;
+
+    // TODO: Remove
+    // o->row1_total_width = 0.0f;
+    // o->row2_total_width = 0.0f;
+    // o->row3_total_width = 0.0f;
+    //
+    // // Initialize new state for Row 1
+    // o->row1_items = nullptr;
+    // o->row1_item_count = 0;
+    // o->row1_item_capacity = 0;
+    //
+    // // Initialize new state for Row 2
+    // o->row2_items = nullptr;
+    // o->row2_item_count = 0;
+    // o->row2_item_capacity = 0;
+    //
+    // // Initialize new state for Row 3
+    // o->row3_items = nullptr;
+    // o->row3_item_count = 0;
+    // o->row3_item_capacity = 0;
 
     o->texture_cache = nullptr;
     o->texture_cache_count = 0;
@@ -145,9 +169,13 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     }
 
     // Load global background textures using the overlay's renderer
-    o->adv_bg = load_texture_with_scale_mode(o->renderer, "resources/gui/advancement_background.png", SDL_SCALEMODE_NEAREST);
-    o->adv_bg_half_done = load_texture_with_scale_mode(o->renderer, "resources/gui/advancement_background_half_done.png", SDL_SCALEMODE_NEAREST);
-    o->adv_bg_done = load_texture_with_scale_mode(o->renderer, "resources/gui/advancement_background_done.png", SDL_SCALEMODE_NEAREST);
+    o->adv_bg = load_texture_with_scale_mode(o->renderer, "resources/gui/advancement_background.png",
+                                             SDL_SCALEMODE_NEAREST);
+    o->adv_bg_half_done = load_texture_with_scale_mode(o->renderer,
+                                                       "resources/gui/advancement_background_half_done.png",
+                                                       SDL_SCALEMODE_NEAREST);
+    o->adv_bg_done = load_texture_with_scale_mode(o->renderer, "resources/gui/advancement_background_done.png",
+                                                  SDL_SCALEMODE_NEAREST);
     if (!o->adv_bg || !o->adv_bg_half_done || !o->adv_bg_done) {
         fprintf(stderr, "[OVERLAY] Failed to load advancement background textures.\n");
         overlay_free(overlay, settings);
@@ -208,18 +236,112 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
     }
 }
 
-void overlay_update(Overlay *o, float *deltaTime, const AppSettings *settings) {
-    // Base speed: 1440 pixels in 24 seconds = 60 pixels/second
-    const float base_scroll_speed = 60.0f;
-    float speed_multiplier = settings->overlay_scroll_speed;
+void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSettings *settings) {
+    if (!t || !t->template_data) return;
 
+
+    // --- Gather Items for Each Row ---
+    // We rebuild these lists each update to react to game progress.
+
+    // Row 1: All individual criteria and sub-stats
+    std::vector<std::pair<TrackableItem *, TrackableCategory *> > row1_items;
+    for (int i = 0; i < t->template_data->advancement_count; i++) {
+        TrackableCategory *cat = t->template_data->advancements[i];
+        for (int j = 0; j < cat->criteria_count; j++) {
+            row1_items.push_back({cat->criteria[j], cat});
+        }
+    }
+    for (int i = 0; i < t->template_data->stat_count; i++) {
+        TrackableCategory *cat = t->template_data->stats[i];
+        for (int j = 0; j < cat->criteria_count; j++) {
+            row1_items.push_back({cat->criteria[j], cat});
+        }
+    }
+
+    // Row 2: Parent advancements, stats, and unlocks
+    std::vector<void *> row2_items; // Using void* for heterogeneous types
+    for (int i = 0; i < t->template_data->advancement_count; ++i)
+        row2_items.push_back(
+            t->template_data->advancements[i]);
+    for (int i = 0; i < t->template_data->unlock_count; ++i) row2_items.push_back(t->template_data->unlocks[i]);
+    for (int i = 0; i < t->template_data->stat_count; ++i) row2_items.push_back(t->template_data->stats[i]);
+
+    // Row 3: Custom and Multi-Stage Goals
+    std::vector<void *> row3_items;
+    for (int i = 0; i < t->template_data->custom_goal_count; ++i)
+        row3_items.push_back(
+            t->template_data->custom_goals[i]);
+    for (int i = 0; i < t->template_data->multi_stage_goal_count; ++i)
+        row3_items.push_back(
+            t->template_data->multi_stage_goals[i]);
+
+
+    // --- Update Animation State for Each Row ---
+    const float base_scroll_speed = 60.0f; // 24 seconds for 1440px
+    float speed_multiplier = settings->overlay_scroll_speed;
     if (settings->overlay_animation_speedup) {
         speed_multiplier *= OVERLAY_SPEEDUP_FACTOR;
     }
+    float scroll_delta = -(base_scroll_speed * speed_multiplier * (*deltaTime)); // minus is reversing the scroll
 
-    float scroll_delta = base_scroll_speed * speed_multiplier * (*deltaTime);
 
-    o->scroll_offset_row1 += scroll_delta;
+    // Reset start index if it becomes invalid after the item list is rebuilt (changing template (with fewer items))
+    if (!row1_items.empty() && static_cast<size_t>(o->start_index_row1) >= row1_items.size()) {
+        o->start_index_row1 = 0; // Reset index if it's out of bounds
+    }
+
+    // Row 1 Update Logic
+
+    if (!row1_items.empty()) {
+        const float item_full_width = 48.0f + 8.0f; // ROW1_ICON_SIZE + ROW1_SPACING
+        o->scroll_offset_row1 += scroll_delta;
+
+        int items_scrolled = floor(fabs(o->scroll_offset_row1) / item_full_width);
+        if (items_scrolled > 0) {
+            o->scroll_offset_row1 = fmod(o->scroll_offset_row1, item_full_width);
+
+            // --- FIX: Handle index update based on scroll direction ---
+            if (scroll_delta > 0) { // Moving Right-to-Left, find NEXT item
+                for (int i = 0; i < items_scrolled; ++i) {
+                    size_t loop_guard = 0;
+                    do {
+                        o->start_index_row1 = (o->start_index_row1 + 1) % row1_items.size();
+                        loop_guard++;
+                    } while (row1_items[o->start_index_row1].first->done && loop_guard < row1_items.size() * 2);
+                }
+            } else { // Moving Left-to-Right, find PREVIOUS item
+                for (int i = 0; i < items_scrolled; ++i) {
+                    size_t loop_guard = 0;
+                    do {
+                        // Correct way to decrement with wrapping for unsigned and negative results
+                        o->start_index_row1 = (o->start_index_row1 - 1 + row1_items.size()) % row1_items.size();
+                        loop_guard++;
+                    } while (row1_items[o->start_index_row1].first->done && loop_guard < row1_items.size() * 2);
+                }
+            }
+        }
+    }
+
+    // TODO: Remove
+    // if (!row1_items.empty()) {
+    //     const float item_full_width = 48.0f + 8.0f; // ROW1_ICON_SIZE + ROW1_SPACING
+    //     o->scroll_offset_row1 += scroll_delta;
+    //
+    //     int items_scrolled = floor(fabs(o->scroll_offset_row1) / item_full_width);
+    //     if (items_scrolled > 0) {
+    //         o->scroll_offset_row1 = fmod(o->scroll_offset_row1, item_full_width);
+    //         for (int i = 0; i < items_scrolled; ++i) {
+    //             size_t loop_guard = 0;
+    //             do {
+    //                 o->start_index_row1 = (o->start_index_row1 + 1) % row1_items.size();
+    //                 loop_guard++;
+    //             } while (row1_items[o->start_index_row1].first->done && loop_guard < row1_items.size() * 2);
+    //         }
+    //     }
+    // }
+
+    // Rows 2 & 3 would have similar update blocks, but need to calculate their item widths first.
+    // For now, we keep a simple scroll for them as their widths are variable.
     o->scroll_offset_row2 += scroll_delta;
     o->scroll_offset_row3 += scroll_delta;
 
@@ -229,9 +351,42 @@ void overlay_update(Overlay *o, float *deltaTime, const AppSettings *settings) {
         o->social_media_timer -= SOCIAL_CYCLE_SECONDS;
         o->current_social_index = (o->current_social_index + 1) % NUM_SOCIALS;
     }
-
-    // TODO: Wrap scroll_offset based on the total width of rendered overlay content.
-    // For example: if (o->scroll_offset > total_content_width) { o->scroll_offset = 0; }
+    // TODO: Remove
+    //
+    //
+    // // Check for items whose gaps have scrolled off-screen and mark them for removal
+    // int window_w;
+    // SDL_GetWindowSizeInPixels(o->window, &window_w, nullptr);
+    // const float ROW1_ICON_SIZE = 48.0f;
+    // const float ROW1_SPACING = 8.0f;
+    // float item_full_width = ROW1_ICON_SIZE + ROW1_SPACING;
+    // float current_x_pos = -o->scroll_offset_row1;
+    //
+    // for (int i = 0; i < o->row1_item_count; i++) {
+    //     Row1Item *item = &o->row1_items[i];
+    //
+    //     // We only care about items that are leaving a gap
+    //     if (item->state != ITEM_COMPLETED) {
+    //         current_x_pos += item_full_width;
+    //         continue;
+    //     }
+    //
+    //     bool is_off_screen = false;
+    //     if (scroll_delta > 0) {
+    //         // Moving Left to Right (positive speed)
+    //         // Off-screen if its right edge has passed the left side of the window
+    //         is_off_screen = (current_x_pos + item_full_width) < 0;
+    //     } else if (scroll_delta < 0) {
+    //         // Moving Right to Left (negative speed)
+    //         // Off-screen if its left edge has passed the right side of the window
+    //         is_off_screen = current_x_pos > window_w;
+    //     }
+    //
+    //     if (is_off_screen) {
+    //         item->state = ITEM_REMOVED;
+    //     }
+    //     current_x_pos += item_full_width;
+    // }
 }
 
 void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
@@ -239,7 +394,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                            settings->overlay_bg_color.b, settings->overlay_bg_color.a);
     SDL_RenderClear(o->renderer);
 
-    // Render Progress Text (Top Bar) - NO CHANGES HERE
+    // Render Progress Text (Top Bar)
     if (t && t->template_data) {
         char info_buffer[512];
         char final_buffer[1024];
@@ -280,7 +435,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         if (text_surface) {
             SDL_Texture *text_texture = SDL_CreateTextureFromSurface(o->renderer, text_surface);
             if (text_texture) {
-                SDL_SetTextureScaleMode(text_texture, SDL_SCALEMODE_NEAREST);
+                SDL_SetTextureScaleMode(text_texture, SDL_SCALEMODE_NEAREST); // Linear scaling for overlay
                 int overlay_w;
                 SDL_GetWindowSize(o->window, &overlay_w, nullptr);
                 const float padding = 10.0f;
@@ -314,108 +469,177 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
     // --- ROW 1: Criteria & Sub-stats Icons ---
     {
-        const float ROW1_Y_POS = 52.0f; // Initially was 60.0f
+        const float ROW1_Y_POS = 52.0f;
         const float ROW1_ICON_SIZE = 48.0f;
         const float ROW1_SPACING = 8.0f;
-        const float ROW1_SHARED_ICON_SIZE = 30.0f; // Size of shared icons, intially was 24.0f
+        const float ROW1_SHARED_ICON_SIZE = 30.0f;
+        const float item_full_width = ROW1_ICON_SIZE + ROW1_SPACING;
 
-        std::vector<TrackableItem *> items;
-        std::vector<TrackableCategory *> parents;
-
+        // Gather items to determine the list we are animating
+        std::vector<std::pair<TrackableItem *, TrackableCategory *> > row1_items;
         for (int i = 0; i < t->template_data->advancement_count; i++) {
             TrackableCategory *cat = t->template_data->advancements[i];
             for (int j = 0; j < cat->criteria_count; j++) {
-                if (cat->criteria[j]->alpha > 0.0f) {
-                    items.push_back(cat->criteria[j]);
-                    parents.push_back(cat);
-                }
+                row1_items.push_back({cat->criteria[j], cat});
             }
         }
         for (int i = 0; i < t->template_data->stat_count; i++) {
             TrackableCategory *cat = t->template_data->stats[i];
             for (int j = 0; j < cat->criteria_count; j++) {
-                if (cat->criteria[j]->alpha > 0.0f) {
-                    items.push_back(cat->criteria[j]);
-                    parents.push_back(cat);
-                }
+                row1_items.push_back({cat->criteria[j], cat});
             }
         }
 
-        if (!items.empty()) {
-            float item_full_width = ROW1_ICON_SIZE + ROW1_SPACING;
-            float total_row_width = items.size() * item_full_width;
-
-            if (total_row_width > 0) {
-                float start_pos = fmod(o->scroll_offset_row1, total_row_width);
-                if (start_pos < 0) {
-                    start_pos += total_row_width;
-                }
-
-                // Calculate how many blocks to draw to always fill the screen
-                int blocks_to_draw = (int)ceil((float)window_w / total_row_width) + 1;
-
-                auto render_block = [&](float block_offset) {
-                    for (size_t i = 0; i < items.size(); ++i) {
-                        float current_x = block_offset + (i * item_full_width);
-                        if (current_x + item_full_width < 0 || current_x > window_w) continue;
-
-                        TrackableItem *item = items[i];
-                        TrackableCategory *parent = parents[i];
-
-                        Uint8 final_alpha = (Uint8) (item->alpha * 255);
-                        if (final_alpha == 0) continue;
-
-                        SDL_FRect dest_rect = {current_x, ROW1_Y_POS, ROW1_ICON_SIZE, ROW1_ICON_SIZE};
-
-                        // TODO: Debug Placeholder Pink Squares for Criteria and Sub-Stats
-                        // SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, 50); // Bright semi-transparent pink
-                        // SDL_RenderFillRect(o->renderer, &dest_rect);
+        // TODO: Remove
+        // // Explicitly count visible items and only draw them
+        // size_t visible_item_count = 0;
+        // for (const auto& pair : row1_items) {
+        //     if (!pair.first->done) {
+        //         visible_item_count++;
+        //     }
+        // }
 
 
-                        // Separate .gif and .png textures
-                        SDL_Texture* tex = nullptr;
-                        AnimatedTexture* anim_tex = nullptr;
-                        if (strstr(item->icon_path, ".gif")) {
-                            anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity, item->icon_path);
-                        } else {
-                            tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count, &o->texture_cache_capacity, item->icon_path);
-                        }
-                        render_texture_with_alpha(o->renderer, tex, anim_tex, &dest_rect, final_alpha);
+        if (!row1_items.empty()) {
+            // Determine how many slots to draw based on screen width.
+            int items_to_draw = ceil((float) window_w / item_full_width) + 2; // To render items off screen
+            // Only draw as many items as are visible, but repeat them if needed to fill the screen (marquee effect).
 
-                        // TODO: Remove
-                        // render_texture_with_alpha(o->renderer, item->texture, item->anim_texture, &dest_rect,
-                        //                           final_alpha);
+            // Draw either enough slots to fill the screen OR only the visible items, whichever is smaller.
+            // This prevents drawing empty, superfluous slots.
 
-                        if (item->is_shared) {
+            // int items_to_draw = std::min(geometric_slots_needed, (int)visible_item_count);
+            // int items_to_draw = geometric_slots_needed;
+            int current_item_idx = o->start_index_row1;
 
-                            SDL_Texture* parent_tex = nullptr;
-                            AnimatedTexture* parent_anim_tex = nullptr;
-                            if (strstr(parent->icon_path, ".gif")) {
-                                parent_anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity, parent->icon_path);
-                            } else {
-                                parent_tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count, &o->texture_cache_capacity, parent->icon_path);
-                            }
-                            SDL_FRect shared_dest_rect = { current_x, ROW1_Y_POS, ROW1_SHARED_ICON_SIZE, ROW1_SHARED_ICON_SIZE };
-                            render_texture_with_alpha(o->renderer, parent_tex, parent_anim_tex, &shared_dest_rect, final_alpha);
+            // printf("\n--- NEW RENDER FRAME ---\n"); // DEBUG: Mark the start of a new render pass
 
-                            // TODO: Remove
-                            // SDL_FRect shared_dest_rect = {
-                            //     current_x, ROW1_Y_POS, ROW1_SHARED_ICON_SIZE, ROW1_SHARED_ICON_SIZE
-                            // };
-                            // render_texture_with_alpha(o->renderer, parent->texture, parent->anim_texture,
-                            //                           &shared_dest_rect, final_alpha);
-                        }
+            for (int k = 0; k < items_to_draw; k++) {
+
+
+                // -1.0f to offset rendering one icon width to the left (make it hidden)
+                float x_pos = ((k - 1.0f) * item_full_width) - o->scroll_offset_row1;
+
+                // --- DEBUG: Print current state for this slot ---
+                // printf("--- k = %d ---\n", k);
+
+                // TODO: Visual debugger (keep this under debug print) later
+                // // Draw a colored box for each slot to visualize the grid
+                // SDL_SetRenderDrawBlendMode(o->renderer, SDL_BLENDMODE_BLEND);
+                // if (k % 2 == 0) {
+                //     SDL_SetRenderDrawColor(o->renderer, 255, 0, 0, 50); // Red for even slots
+                // } else {
+                //     SDL_SetRenderDrawColor(o->renderer, 0, 0, 255, 50); // Blue for odd slots
+                // }
+                // SDL_FRect debug_rect = {x_pos, ROW1_Y_POS, ROW1_ICON_SIZE, ROW1_ICON_SIZE};
+                // SDL_RenderFillRect(o->renderer, &debug_rect);
+                // // --- END DEBUG DRAWING ---
+
+                // TODO: Remove
+                // float x_pos;
+                // if (settings->overlay_scroll_speed >= 0) { // Left to Right
+                //     x_pos = window_w - ((k + 1) * item_full_width) + o->scroll_offset_row1;
+                // } else { // Right to left
+                //     x_pos = (k * item_full_width) - o->scroll_offset_row1;
+                // }
+
+                // Find the next visible item
+                size_t loop_guard = 0;
+                while (row1_items[current_item_idx].first->done) {
+                    // printf("  - Skipping idx %d (done=true)\n", current_item_idx);
+                    current_item_idx = (current_item_idx + 1) % row1_items.size();
+                    loop_guard++;
+                    if (loop_guard > row1_items.size()) {
+                        // printf("  - SAFETY BREAK HIT: All items appear to be done.\n");
+                        goto end_row1_render; // All items are done
                     }
-                };
-
-                // Loop to draw as many blocks as needed
-                for (int i = 0; i < blocks_to_draw; ++i) {
-                    render_block(start_pos + (i * total_row_width));
-                    render_block(start_pos - ((i + 1) * total_row_width));
                 }
+
+                // --- DEBUG: Print the result of the search ---
+                // printf("  - Settled on idx %d to draw in slot %d\n", current_item_idx, k);
+
+                TrackableItem *item_to_render = row1_items[current_item_idx].first;
+                TrackableCategory *parent = row1_items[current_item_idx].second;
+
+                SDL_FRect dest_rect = {x_pos, ROW1_Y_POS, ROW1_ICON_SIZE, ROW1_ICON_SIZE};
+                SDL_Texture *tex = nullptr;
+                AnimatedTexture *anim_tex = nullptr;
+                if (strstr(item_to_render->icon_path, ".gif")) {
+                    anim_tex = get_animated_texture_from_cache(
+                        o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity,
+                        item_to_render->icon_path, SDL_SCALEMODE_NEAREST);
+                } else {
+                    tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                                 &o->texture_cache_capacity, item_to_render->icon_path,
+                                                 SDL_SCALEMODE_NEAREST);
+                }
+                render_texture_with_alpha(o->renderer, tex, anim_tex, &dest_rect, 255);
+
+                // Safeguard Check, if item has no texture
+                if (!tex && !anim_tex) {
+                    // This item has no valid texture, print a warning and draw a placeholder
+                    fprintf(stderr, "[Overlay Render WARNING] Item '%s' (index %d) has no texture. Check icon path in template.\n", item_to_render->root_name, current_item_idx);
+                    SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, 100); // Pink placeholder
+                    SDL_RenderFillRect(o->renderer, &dest_rect);
+                } else {
+                    render_texture_with_alpha(o->renderer, tex, anim_tex, &dest_rect, 255);
+                }
+
+                if (item_to_render->is_shared && parent) {
+                    SDL_Texture *parent_tex = nullptr;
+                    AnimatedTexture *parent_anim_tex = nullptr;
+                    if (strstr(parent->icon_path, ".gif")) {
+                        parent_anim_tex = get_animated_texture_from_cache(
+                            o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity,
+                            parent->icon_path, SDL_SCALEMODE_NEAREST);
+                    } else {
+                        parent_tex = get_texture_from_cache(o->renderer, &o->texture_cache,
+                                                            &o->texture_cache_count,
+                                                            &o->texture_cache_capacity, parent->icon_path,
+                                                            SDL_SCALEMODE_NEAREST);
+                    }
+
+                    SDL_FRect shared_dest_rect = {
+                        x_pos, ROW1_Y_POS, ROW1_SHARED_ICON_SIZE, ROW1_SHARED_ICON_SIZE
+                    };
+                    render_texture_with_alpha(o->renderer, parent_tex, parent_anim_tex, &shared_dest_rect, 255);
+                }
+
+                // TODO: debug --- START DEBUG DRAWING ---
+                // // --- DEBUG: Draw the index and status on the icon ---
+                // char status_buf[16];
+                // snprintf(status_buf, sizeof(status_buf), "%d%c", current_item_idx, item_to_render->done ? 'D' : 'V');
+                // TTF_Text* status_text = TTF_CreateText(o->text_engine, o->font, status_buf, 0);
+                // if (status_text) {
+                //     TTF_SetTextColor(status_text, 255, 255, 0, 255); // Yellow
+                //     TTF_DrawRendererText(status_text, x_pos + 5, ROW1_Y_POS + 5);
+                //     TTF_DestroyText(status_text);
+                // }
+                // // --- END DEBUG ---
+
+                // Advance to the next item for the next screen slot
+                current_item_idx = (current_item_idx + 1) % row1_items.size();
             }
         }
+        end_row1_render:;
+
+        // TODO: debug --- START DEBUG DRAWING ---
+        // // Display current state variables on screen
+        // char state_buf[128];
+        // snprintf(state_buf, sizeof(state_buf), "Start Index: %d | Scroll Offset: %.2f", o->start_index_row1, o->scroll_offset_row1);
+        // TTF_Text* state_text = TTF_CreateText(o->text_engine, o->font, state_buf, 0);
+        // if (state_text) {
+        //     int window_w, window_h;
+        //     SDL_GetWindowSize(o->window, &window_w, &window_h);
+        //     TTF_SetTextColor(state_text, 255, 255, 255, 255);
+        //     TTF_DrawRendererText(state_text, 10, window_h - 40.0f); // Draw at bottom-left
+        //     TTF_DestroyText(state_text);
+        // }
+        // // --- END DEBUG DRAWING ---
+
+
     }
+
 
     struct RenderItem {
         std::string display_name;
@@ -428,7 +652,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
     };
 
     // --- GENERALIZED RENDER LOGIC FOR ROW 2 & 3 ---
-    auto render_item_row = [&](float y_pos, float scroll_offset, const std::vector<RenderItem>& items) {
+    auto render_item_row = [&](float y_pos, float scroll_offset, const std::vector<RenderItem> &items) {
         if (items.empty()) return;
 
         const float ITEM_WIDTH = 96.0f;
@@ -436,8 +660,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         const float TEXT_Y_OFFSET = 4.0f;
 
         struct TextCacheEntry {
-            TTF_Text* name_text = nullptr;
-            TTF_Text* progress_text = nullptr;
+            TTF_Text *name_text = nullptr;
+            TTF_Text *progress_text = nullptr;
             float name_w = 0, name_h = 0;
             float progress_w = 0, progress_h = 0;
         };
@@ -445,19 +669,16 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         text_cache.reserve(items.size());
 
         float max_cell_width = ITEM_WIDTH;
-        for (const auto& item : items) {
+        for (const auto &item: items) {
             TextCacheEntry entry;
-            // TODO: Where is text_color handled?
-            // SDL_Color text_color = { settings->overlay_text_color.r, settings->overlay_text_color.g, settings->overlay_text_color.b, 255 };
-
 
             entry.name_text = TTF_CreateText(o->text_engine, o->font, item.display_name.c_str(), 0);
             if (entry.name_text) {
                 // Get size as int, but store as float
                 int w, h;
                 TTF_GetTextSize(entry.name_text, &w, &h);
-                entry.name_w = (float)w;
-                entry.name_h = (float)h;
+                entry.name_w = (float) w;
+                entry.name_h = (float) h;
                 max_cell_width = fmaxf(max_cell_width, entry.name_w);
             }
 
@@ -466,8 +687,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 if (entry.progress_text) {
                     int w, h;
                     TTF_GetTextSize(entry.progress_text, &w, &h);
-                    entry.progress_w = (float)w;
-                    entry.progress_h = (float)h;
+                    entry.progress_w = (float) w;
+                    entry.progress_h = (float) h;
                     max_cell_width = fmaxf(max_cell_width, entry.progress_w);
                 }
             }
@@ -486,26 +707,26 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
             auto render_block = [&](float block_offset) {
                 for (size_t i = 0; i < items.size(); ++i) {
-                    const RenderItem& item = items[i];
+                    const RenderItem &item = items[i];
                     const TextCacheEntry &cached_text = text_cache[i];
                     float current_x = block_offset + (i * item_full_width);
 
                     if (current_x + max_cell_width < 0 || current_x > window_w) continue;
 
-                    Uint8 final_alpha_byte = (Uint8)(item.alpha * 255);
+                    Uint8 final_alpha_byte = (Uint8) (item.alpha * 255);
                     if (final_alpha_byte == 0) continue;
                     float final_alpha_float = item.alpha;
 
                     float bg_x_offset = (max_cell_width - ITEM_WIDTH) / 2.0f;
 
                     if (item.bg_texture) {
-                        SDL_FRect bg_rect = { current_x + bg_x_offset, y_pos, ITEM_WIDTH, ITEM_WIDTH };
+                        SDL_FRect bg_rect = {current_x + bg_x_offset, y_pos, ITEM_WIDTH, ITEM_WIDTH};
                         SDL_SetTextureAlphaMod(item.bg_texture, final_alpha_byte);
                         SDL_RenderTexture(o->renderer, item.bg_texture, nullptr, &bg_rect);
                         SDL_SetTextureAlphaMod(item.bg_texture, 255);
                     }
 
-                    SDL_FRect icon_rect = { current_x + bg_x_offset + 16.0f, y_pos + 16.0f, 64.0f, 64.0f };
+                    SDL_FRect icon_rect = {current_x + bg_x_offset + 16.0f, y_pos + 16.0f, 64.0f, 64.0f};
 
                     // TODO: DEBUG PLACEHOLDER
                     // SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, 50);
@@ -513,39 +734,51 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
 
                     // Separate .gif and .png texture loading
-                    SDL_Texture* tex = nullptr;
-                    AnimatedTexture* anim_tex = nullptr;
+                    SDL_Texture *tex = nullptr;
+                    AnimatedTexture *anim_tex = nullptr;
                     if (strstr(item.icon_path.c_str(), ".gif")) {
-                        anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity, item.icon_path.c_str());
+                        anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
+                                                                   &o->anim_cache_capacity, item.icon_path.c_str(),
+                                                                   SDL_SCALEMODE_NEAREST);
                     } else {
-                        tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count, &o->texture_cache_capacity, item.icon_path.c_str());
+                        tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                                     &o->texture_cache_capacity, item.icon_path.c_str(),
+                                                     SDL_SCALEMODE_NEAREST);
                     }
                     render_texture_with_alpha(o->renderer, tex, anim_tex, &icon_rect, final_alpha_byte);
 
                     if (cached_text.name_text) {
-                        TTF_SetTextColorFloat(cached_text.name_text, (float)settings->overlay_text_color.r / 255.0f, (float)settings->overlay_text_color.g / 255.0f, (float)settings->overlay_text_color.b / 255.0f, final_alpha_float);
-                        TTF_DrawRendererText(cached_text.name_text, current_x + (max_cell_width - cached_text.name_w) / 2.0f, y_pos + ITEM_WIDTH + TEXT_Y_OFFSET);
+                        TTF_SetTextColorFloat(cached_text.name_text, (float) settings->overlay_text_color.r / 255.0f,
+                                              (float) settings->overlay_text_color.g / 255.0f,
+                                              (float) settings->overlay_text_color.b / 255.0f, final_alpha_float);
+                        TTF_DrawRendererText(cached_text.name_text,
+                                             current_x + (max_cell_width - cached_text.name_w) / 2.0f,
+                                             y_pos + ITEM_WIDTH + TEXT_Y_OFFSET);
 
                         if (cached_text.progress_text) {
-                            TTF_SetTextColorFloat(cached_text.progress_text, (float)settings->overlay_text_color.r / 255.0f, (float)settings->overlay_text_color.g / 255.0f, (float)settings->overlay_text_color.b / 255.0f, final_alpha_float);
-                            TTF_DrawRendererText(cached_text.progress_text, current_x + (max_cell_width - cached_text.progress_w) / 2.0f, y_pos + ITEM_WIDTH + TEXT_Y_OFFSET + cached_text.name_h);
+                            TTF_SetTextColorFloat(cached_text.progress_text,
+                                                  (float) settings->overlay_text_color.r / 255.0f,
+                                                  (float) settings->overlay_text_color.g / 255.0f,
+                                                  (float) settings->overlay_text_color.b / 255.0f, final_alpha_float);
+                            TTF_DrawRendererText(cached_text.progress_text,
+                                                 current_x + (max_cell_width - cached_text.progress_w) / 2.0f,
+                                                 y_pos + ITEM_WIDTH + TEXT_Y_OFFSET + cached_text.name_h);
                         }
                     }
                 }
             };
-            int blocks_to_draw = (int)ceil((float)window_w / total_row_width) + 1;
+            int blocks_to_draw = (int) ceil((float) window_w / total_row_width) + 1;
             for (int i = 0; i < blocks_to_draw; ++i) {
                 render_block(start_pos + (i * total_row_width));
                 render_block(start_pos - ((i + 1) * total_row_width));
             }
         }
 
-        for (auto& entry : text_cache) {
+        for (auto &entry: text_cache) {
             if (entry.name_text) TTF_DestroyText(entry.name_text);
             if (entry.progress_text) TTF_DestroyText(entry.progress_text);
         }
     };
-
 
 
     // --- ROW 2 Data Collection ---
@@ -597,7 +830,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 item.alpha = stat->alpha;
 
                 if (stat->done) item.bg_texture = o->adv_bg_done;
-                else if (stat->completed_criteria_count > 0 || (stat->criteria_count == 1 && stat->criteria[0]->progress > 0)) item.bg_texture = o->adv_bg_half_done;
+                else if (stat->completed_criteria_count > 0 || (
+                             stat->criteria_count == 1 && stat->criteria[0]->progress > 0))
+                    item.bg_texture = o->adv_bg_half_done;
                 else item.bg_texture = o->adv_bg;
 
                 // This logic correctly creates the progress text, same as the tracker
@@ -606,7 +841,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     snprintf(buf, sizeof(buf), "(%d / %d)", stat->completed_criteria_count, stat->criteria_count);
                     item.progress_text = buf;
                 } else if (stat->criteria_count == 1) {
-                    TrackableItem* crit = stat->criteria[0];
+                    TrackableItem *crit = stat->criteria[0];
                     if (crit->goal > 0) {
                         char buf[32];
                         snprintf(buf, sizeof(buf), "(%d / %d)", crit->progress, crit->goal);

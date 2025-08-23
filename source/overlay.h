@@ -14,6 +14,31 @@ extern "C" {
 
 struct AppSettings;
 
+// TODO: Remove
+// enum to track the animation state of an item
+// enum ItemState {
+//     ITEM_VISIBLE,
+//     ITEM_COMPLETED, // The item is complete, but we're still rendering a gap for it
+//     ITEM_REMOVED // The item is fully removed, and the gap is closed (off-screen)
+// };
+
+// // New struct to hold state for each item in the first row
+// typedef struct {
+//     TrackableItem *item;
+//     ItemState state;
+// } Row1Item;
+
+// // New struct to hold state for each item in the second row
+// typedef struct {
+//     TrackableItem *item;
+//     ItemState state;
+// } Row2Item;
+
+// // New struct to hold state for each item in the third row
+// typedef struct {
+//     TrackableItem *item;
+//     ItemState state;
+// } Row3Item;
 
 struct Overlay {
     SDL_Window *window;
@@ -32,11 +57,38 @@ struct Overlay {
     int anim_cache_count;
     int anim_cache_capacity;
 
+
+    float social_media_timer; // Timer for cycling promotional text
+    int current_social_index; // Index of the current promotional text
+
     float scroll_offset_row1; // For animation of the first row (criteria and sub-stats)
     float scroll_offset_row2; // For animation of the second row (advancements, stat-cats and unlocks)
     float scroll_offset_row3; // For animation of the third row (custom goals and ms-goals)
-    float social_media_timer; // Timer for cycling promotional text
-    int current_social_index; // Index of the current promotional text
+    int start_index_row1;
+    int start_index_row2;
+    int start_index_row3;
+
+    // float row1_total_width; // TODO: Remove
+    // float row2_total_width; // TODO: Remove
+    // float row3_total_width; // TODO: Remove
+
+    // TODO: Remove
+    // // State management for Row 1 animation
+    // Row1Item *row1_items;
+    // int row1_item_count;
+    // int row1_item_capacity;
+
+    // TODO: Remove
+    // // State management for Row 2 animation
+    // Row2Item *row2_items;
+    // int row2_item_count;
+    // int row2_item_capacity;
+
+    // TODO: Remove
+    // // State management for Row 3 animation
+    // Row3Item *row3_items;
+    // int row3_item_count;
+    // int row3_item_capacity;
 };
 
 /**
@@ -74,9 +126,10 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
  *
  * @param o A pointer to the Overlay struct.
  * @param deltaTime A pointer to the frame's delta time.
+ * @param t A pointer to the Tracker struct to get progress data from.
  * @param settings A pointer to the loaded application settings.
  */
-void overlay_update(Overlay *o, float *deltaTime, const AppSettings *settings);
+void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSettings *settings);
 
 /**
  * @brief Initializes a new Overlay instance.

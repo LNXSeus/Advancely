@@ -22,10 +22,6 @@
 #include "imgui_internal.h"
 
 
-
-
-
-
 // TODO: Remove
 // /**
 //  * @brief Gets an SDL_Texture from a path, utilizing a cache to avoid redundant loads.
@@ -78,9 +74,10 @@
  * If the GIF isn't square-shaped, it is scaled to be square, that it renders properly.
  * @param renderer The SDL_Renderer to create textures with.
  * @param path The path to the .gif file.
+ * @param scale_mode The SDL_ScaleMode to use when scaling the frames.
  * @return A pointer to a newly allocated AnimatedTexture, or nullptr on failure.
  */
-static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *path) {
+static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *path, SDL_ScaleMode scale_mode) {
     IMG_Animation *anim = IMG_LoadAnimation(path);
     if (!anim) {
         fprintf(stderr, "[TRACKER - GIF LOAD] Failed to load animation %s: %s\n", path, SDL_GetError());
@@ -170,7 +167,7 @@ static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *pa
         }
 
         SDL_SetTextureBlendMode(anim_texture->frames[i], SDL_BLENDMODE_BLEND);
-        SDL_SetTextureScaleMode(anim_texture->frames[i], SDL_SCALEMODE_NEAREST);
+        SDL_SetTextureScaleMode(anim_texture->frames[i], scale_mode);
         anim_texture->delays[i] = anim->delays[i];
         total_duration += anim->delays[i];
     }
@@ -983,15 +980,21 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
             strncpy(new_cat->icon_path, full_icon_path, sizeof(new_cat->icon_path) - 1);
 
             if (strstr(full_icon_path, ".gif")) {
-                new_cat->anim_texture = get_animated_texture_from_cache(t->renderer, &t->anim_cache, &t->anim_cache_count, &t->anim_cache_capacity, new_cat->icon_path);
+                new_cat->anim_texture = get_animated_texture_from_cache(t->renderer, &t->anim_cache,
+                                                                        &t->anim_cache_count, &t->anim_cache_capacity,
+                                                                        new_cat->icon_path, SDL_SCALEMODE_NEAREST);
             } else {
-                new_cat->texture = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, new_cat->icon_path);
+                new_cat->texture = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count,
+                                                          &t->texture_cache_capacity, new_cat->icon_path,
+                                                          SDL_SCALEMODE_NEAREST);
             }
         }
 
         cJSON *criteria_obj = cJSON_GetObjectItem(cat_json, "criteria");
-        if (criteria_obj && cJSON_IsObject(criteria_obj) && criteria_obj->child != nullptr) {
-            // MULTI-CRITERION CASE
+        if (criteria_obj && criteria_obj->child != nullptr) {
+            // CASE B: A "criteria" block exists (for advancements or multi-stats)
+            new_cat->is_single_stat_category = false; // Multi-stats regardless of amount of criteria
+
             for (cJSON *c = criteria_obj->child; c != nullptr; c = c->next) new_cat->criteria_count++;
             if (new_cat->criteria_count > 0) {
                 new_cat->criteria = (TrackableItem **) calloc(new_cat->criteria_count, sizeof(TrackableItem *));
@@ -1000,7 +1003,6 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                 for (cJSON *crit_item = criteria_obj->child; crit_item != nullptr; crit_item = crit_item->next) {
                     TrackableItem *new_crit = (TrackableItem *) calloc(1, sizeof(TrackableItem));
                     if (new_crit) {
-
                         // Initialization for animation state
                         new_crit->alpha = 1.0f;
                         new_crit->is_visible_on_overlay = true;
@@ -1042,9 +1044,13 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                             strncpy(new_crit->icon_path, full_crit_icon_path, sizeof(new_crit->icon_path) - 1);
 
                             if (strstr(full_crit_icon_path, ".gif")) {
-                                new_crit->anim_texture = get_animated_texture_from_cache(t->renderer, &t->anim_cache, &t->anim_cache_count, &t->anim_cache_capacity, new_crit->icon_path);
+                                new_crit->anim_texture = get_animated_texture_from_cache(
+                                    t->renderer, &t->anim_cache, &t->anim_cache_count, &t->anim_cache_capacity,
+                                    new_crit->icon_path, SDL_SCALEMODE_NEAREST);
                             } else {
-                                new_crit->texture = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, new_crit->icon_path);
+                                new_crit->texture = get_texture_from_cache(
+                                    t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity,
+                                    new_crit->icon_path, SDL_SCALEMODE_NEAREST);
                             }
                         }
 
@@ -1052,14 +1058,16 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                     }
                 }
             }
-        } else if (is_stat_category) {
-            // SINGLE-CRITERION SPECIAL CASE (ONLY FOR STATS, SO "criteria": {} DOESN'T GET COUNTED FOR PROGRESS)
+        } else if (is_stat_category && !criteria_obj) {
+            // CASE A: It's a stat defined WITHOUT a "criteria" block (a true single-stat)
+            new_cat->is_single_stat_category = true;
             new_cat->criteria_count = 1;
             *total_criteria_count += 1;
-            new_cat->criteria = (TrackableItem **) calloc(1, sizeof(TrackableItem *));
-            if (new_cat->criteria) {
+            new_cat->criteria = (TrackableItem **) calloc(new_cat->criteria_count, sizeof(TrackableItem *));
+            if (new_cat->criteria_count) {
                 TrackableItem *the_criterion = (TrackableItem *) calloc(1, sizeof(TrackableItem));
                 if (the_criterion) {
+                    // This single criterion inherits properties from its parent category
                     cJSON *crit_root_name_json = cJSON_GetObjectItem(cat_json, "root_name");
                     if (cJSON_IsString(crit_root_name_json)) {
                         strncpy(the_criterion->root_name, crit_root_name_json->valuestring,
@@ -1074,19 +1082,127 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                             strncpy(the_criterion->stat_item_key, slash + 1, sizeof(the_criterion->stat_item_key) - 1);
                         }
                     }
+
                     strncpy(the_criterion->display_name, new_cat->display_name,
                             sizeof(the_criterion->display_name) - 1);
+                    strncpy(the_criterion->icon_path, new_cat->icon_path, sizeof(the_criterion->icon_path) - 1);
+                    the_criterion->is_shared = true; // Mark for overlay indicator
 
-                    // Read the goal value
-                    if (is_stat_category) {
-                        cJSON *target = cJSON_GetObjectItem(cat_json, "target");
-                        if (cJSON_IsNumber(target)) the_criterion->goal = target->valueint;
-                    }
+                    cJSON *target = cJSON_GetObjectItem(cat_json, "target");
+                    if (cJSON_IsNumber(target)) the_criterion->goal = target->valueint;
 
                     new_cat->criteria[0] = the_criterion;
                 }
             }
         }
+
+        // TODO: Remove
+        // cJSON *criteria_obj = cJSON_GetObjectItem(cat_json, "criteria");
+        // if (criteria_obj && cJSON_IsObject(criteria_obj) && criteria_obj->child != nullptr) {
+        //     // MULTI-CRITERION CASE
+        //     for (cJSON *c = criteria_obj->child; c != nullptr; c = c->next) new_cat->criteria_count++;
+        //     if (new_cat->criteria_count > 0) {
+        //         new_cat->criteria = (TrackableItem **) calloc(new_cat->criteria_count, sizeof(TrackableItem *));
+        //         *total_criteria_count += new_cat->criteria_count;
+        //         int k = 0;
+        //         for (cJSON *crit_item = criteria_obj->child; crit_item != nullptr; crit_item = crit_item->next) {
+        //             TrackableItem *new_crit = (TrackableItem *) calloc(1, sizeof(TrackableItem));
+        //             if (new_crit) {
+        //
+        //                 // Initialization for animation state
+        //                 new_crit->alpha = 1.0f;
+        //                 new_crit->is_visible_on_overlay = true;
+        //                 new_crit->fade_timer = 0.0f;
+        //
+        //                 strncpy(new_crit->root_name, crit_item->string, sizeof(new_crit->root_name) - 1);
+        //
+        //                 // Add pre-parsing for multi-criteria stats
+        //                 if (is_stat_category) {
+        //                     const char *slash = strchr(new_crit->root_name, '/');
+        //                     if (slash) {
+        //                         ptrdiff_t len = slash - new_crit->root_name;
+        //                         strncpy(new_crit->stat_category_key, new_crit->root_name, len);
+        //                         new_crit->stat_category_key[len] = '\0';
+        //                         strncpy(new_crit->stat_item_key, slash + 1, sizeof(new_crit->stat_item_key) - 1);
+        //                     }
+        //                 }
+        //
+        //                 // Read the goal value
+        //                 if (is_stat_category) {
+        //                     cJSON *target = cJSON_GetObjectItem(crit_item, "target");
+        //                     if (cJSON_IsNumber(target)) new_crit->goal = target->valueint;
+        //                 }
+        //                 char crit_lang_key[256];
+        //                 snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", cat_lang_key,
+        //                          new_crit->root_name);
+        //                 cJSON *crit_lang_entry = cJSON_GetObjectItem(lang_json, crit_lang_key);
+        //                 if (cJSON_IsString(crit_lang_entry))
+        //                     strncpy(new_crit->display_name,
+        //                             crit_lang_entry->valuestring,
+        //                             sizeof(new_crit->display_name) - 1);
+        //                 else strncpy(new_crit->display_name, new_crit->root_name, sizeof(new_crit->display_name) - 1);
+        //
+        //                 cJSON *crit_icon = cJSON_GetObjectItem(crit_item, "icon");
+        //                 if (cJSON_IsString(crit_icon) && crit_icon->valuestring[0] != '\0') {
+        //                     char full_crit_icon_path[sizeof(new_crit->icon_path)];
+        //                     snprintf(full_crit_icon_path, sizeof(full_crit_icon_path), "resources/icons/%s",
+        //                              crit_icon->valuestring);
+        //                     strncpy(new_crit->icon_path, full_crit_icon_path, sizeof(new_crit->icon_path) - 1);
+        //
+        //                     if (strstr(full_crit_icon_path, ".gif")) {
+        //                         new_crit->anim_texture = get_animated_texture_from_cache(t->renderer, &t->anim_cache, &t->anim_cache_count, &t->anim_cache_capacity, new_crit->icon_path, SDL_SCALEMODE_NEAREST);
+        //                     } else {
+        //                         new_crit->texture = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, new_crit->icon_path, SDL_SCALEMODE_NEAREST);
+        //                     }
+        //                 }
+        //
+        //                 new_cat->criteria[k++] = new_crit;
+        //             }
+        //         }
+        //     }
+        // } else if (is_stat_category) {
+        //     // SINGLE-CRITERION SPECIAL CASE (ONLY FOR STATS, SO "criteria": {} DOESN'T GET COUNTED FOR PROGRESS)
+        //     new_cat->criteria_count = 1;
+        //     *total_criteria_count += 1;
+        //     new_cat->criteria = (TrackableItem **) calloc(1, sizeof(TrackableItem *));
+        //     if (new_cat->criteria) {
+        //         TrackableItem *the_criterion = (TrackableItem *) calloc(1, sizeof(TrackableItem));
+        //         if (the_criterion) {
+        //             cJSON *crit_root_name_json = cJSON_GetObjectItem(cat_json, "root_name");
+        //             if (cJSON_IsString(crit_root_name_json)) {
+        //                 strncpy(the_criterion->root_name, crit_root_name_json->valuestring,
+        //                         sizeof(the_criterion->root_name) - 1);
+        //
+        //                 // Pre-parse stat keys
+        //                 const char *slash = strchr(the_criterion->root_name, '/');
+        //                 if (slash) {
+        //                     ptrdiff_t len = slash - the_criterion->root_name;
+        //                     strncpy(the_criterion->stat_category_key, the_criterion->root_name, len);
+        //                     the_criterion->stat_category_key[len] = '\0';
+        //                     strncpy(the_criterion->stat_item_key, slash + 1, sizeof(the_criterion->stat_item_key) - 1);
+        //                 }
+        //             }
+        //             strncpy(the_criterion->display_name, new_cat->display_name,
+        //                     sizeof(the_criterion->display_name) - 1);
+        //
+        //             // For Overlay window, single stat categories take parent icon path for 1st row (SHARED uses same icon)
+        //             // Inherit parent icon and set as shared for visual indicator
+        //             strncpy(the_criterion->icon_path, new_cat->icon_path, sizeof(the_criterion->icon_path) - 1);
+        //             the_criterion->is_shared = true;
+        //
+        //             // Read the goal value
+        //             if (is_stat_category) {
+        //                 cJSON *target = cJSON_GetObjectItem(cat_json, "target");
+        //                 if (cJSON_IsNumber(target)) the_criterion->goal = target->valueint;
+        //             }
+        //
+        //             new_cat->criteria[0] = the_criterion;
+        //         }
+        //     }
+        // }
+
+        // Implicitly, if criteria_obj exists but is empty, we do nothing.
+        // This correctly leaves criteria_count at 0, making it a "simple" category.
         (*categories_array)[i++] = new_cat;
         cat_json = cat_json->next;
     }
@@ -1233,7 +1349,6 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
     cJSON_ArrayForEach(item_json, category_json) {
         TrackableItem *new_item = (TrackableItem *) calloc(1, sizeof(TrackableItem));
         if (new_item) {
-
             new_item->alpha = 1.0f;
             new_item->is_visible_on_overlay = true;
             new_item->fade_timer = 0.0f;
@@ -1269,9 +1384,13 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
                 strncpy(new_item->icon_path, full_icon_path, sizeof(new_item->icon_path) - 1);
 
                 if (strstr(full_icon_path, ".gif")) {
-                    new_item->anim_texture = get_animated_texture_from_cache(t->renderer, &t->anim_cache, &t->anim_cache_count, &t->anim_cache_capacity, new_item->icon_path);
+                    new_item->anim_texture = get_animated_texture_from_cache(
+                        t->renderer, &t->anim_cache, &t->anim_cache_count, &t->anim_cache_capacity, new_item->icon_path,
+                        SDL_SCALEMODE_NEAREST);
                 } else {
-                    new_item->texture = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, new_item->icon_path);
+                    new_item->texture = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count,
+                                                               &t->texture_cache_capacity, new_item->icon_path,
+                                                               SDL_SCALEMODE_NEAREST);
                 }
             }
 
@@ -1354,9 +1473,13 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
             strncpy(new_goal->icon_path, full_icon_path, sizeof(new_goal->icon_path) - 1);
 
             if (strstr(full_icon_path, ".gif")) {
-                new_goal->anim_texture = get_animated_texture_from_cache(t->renderer, &t->anim_cache, &t->anim_cache_count, &t->anim_cache_capacity, new_goal->icon_path);
+                new_goal->anim_texture = get_animated_texture_from_cache(
+                    t->renderer, &t->anim_cache, &t->anim_cache_count, &t->anim_cache_capacity, new_goal->icon_path,
+                    SDL_SCALEMODE_NEAREST);
             } else {
-                new_goal->texture = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, new_goal->icon_path);
+                new_goal->texture = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count,
+                                                           &t->texture_cache_capacity, new_goal->icon_path,
+                                                           SDL_SCALEMODE_NEAREST);
             }
         }
 
@@ -1884,8 +2007,6 @@ static void tracker_free_template_data(TemplateData *td) {
 }
 
 
-
-
 // ----------------------------------------- END OF STATIC FUNCTIONS -----------------------------------------
 
 // START OF NON-STATIC FUNCTIONS ------------------------------------
@@ -1934,7 +2055,8 @@ SDL_Texture *load_texture_with_scale_mode(SDL_Renderer *renderer, const char *pa
     return new_texture;
 }
 
-SDL_Texture *get_texture_from_cache(SDL_Renderer *renderer, TextureCacheEntry **cache, int *cache_count, int *cache_capacity, const char *path) {
+SDL_Texture *get_texture_from_cache(SDL_Renderer *renderer, TextureCacheEntry **cache, int *cache_count,
+                                    int *cache_capacity, const char *path, SDL_ScaleMode scale_mode) {
     if (path == nullptr || path[0] == '\0') return nullptr;
 
     // Check if the texture is already in the cache
@@ -1945,7 +2067,7 @@ SDL_Texture *get_texture_from_cache(SDL_Renderer *renderer, TextureCacheEntry **
     }
 
     // If not in cache, load it
-    SDL_Texture *new_texture = load_texture_with_scale_mode(renderer, path, SDL_SCALEMODE_NEAREST);
+    SDL_Texture *new_texture = load_texture_with_scale_mode(renderer, path, scale_mode);
     if (!new_texture) {
         return nullptr; // Loading failed.
     }
@@ -1953,7 +2075,8 @@ SDL_Texture *get_texture_from_cache(SDL_Renderer *renderer, TextureCacheEntry **
     // Add the new texture to the cache
     if (*cache_count >= *cache_capacity) {
         int new_capacity = *cache_capacity == 0 ? 16 : *cache_capacity * 2;
-        TextureCacheEntry *new_cache_ptr = (TextureCacheEntry *) realloc(*cache, new_capacity * sizeof(TextureCacheEntry));
+        TextureCacheEntry *new_cache_ptr = (TextureCacheEntry *) realloc(
+            *cache, new_capacity * sizeof(TextureCacheEntry));
         if (!new_cache_ptr) {
             fprintf(stderr, "[CACHE] Failed to reallocate texture cache!\n");
             SDL_DestroyTexture(new_texture);
@@ -1984,7 +2107,9 @@ void free_animated_texture(AnimatedTexture *anim) {
     free(anim);
 }
 
-AnimatedTexture *get_animated_texture_from_cache(SDL_Renderer *renderer, AnimatedTextureCacheEntry **cache, int *cache_count, int *cache_capacity, const char* path) {
+AnimatedTexture *get_animated_texture_from_cache(SDL_Renderer *renderer, AnimatedTextureCacheEntry **cache,
+                                                 int *cache_count, int *cache_capacity, const char *path,
+                                                 SDL_ScaleMode scale_mode) {
     if (path == nullptr || path[0] == '\0') return nullptr;
 
     // 1. Check if the animation is already in the cache.
@@ -1995,13 +2120,14 @@ AnimatedTexture *get_animated_texture_from_cache(SDL_Renderer *renderer, Animate
     }
 
     // 2. If not in cache, load it.
-    AnimatedTexture *new_anim = load_animated_gif(renderer, path);
+    AnimatedTexture *new_anim = load_animated_gif(renderer, path, scale_mode);
     if (!new_anim) return nullptr;
 
     // 3. Add the new animation to the cache.
     if (*cache_count >= *cache_capacity) {
         int new_capacity = *cache_capacity == 0 ? 8 : *cache_capacity * 2;
-        AnimatedTextureCacheEntry *new_cache_ptr = (AnimatedTextureCacheEntry *) realloc(*cache, new_capacity * sizeof(AnimatedTextureCacheEntry));
+        AnimatedTextureCacheEntry *new_cache_ptr = (AnimatedTextureCacheEntry *) realloc(
+            *cache, new_capacity * sizeof(AnimatedTextureCacheEntry));
         if (!new_cache_ptr) {
             fprintf(stderr, "[CACHE] Failed to reallocate animation cache!\n");
             free_animated_texture(new_anim);
@@ -2166,6 +2292,7 @@ void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settin
 
 // Periodically recheck file changes
 void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
+    (void) deltaTime;
     // Use deltaTime for animations
     // game logic goes here
 
@@ -2213,99 +2340,100 @@ void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
     tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json, player_unlocks_json, version, settings);
     tracker_calculate_overall_progress(t, version, settings); //THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
 
+    // TODO: Remove
     // Handle fade out animation
-
-    // Advancements
-    float dt = *deltaTime;
-    for (int i = 0; i < t->template_data->advancement_count; i++) {
-        TrackableCategory *adv = t->template_data->advancements[i];
-        bool should_be_hidden = (adv->criteria_count > 0 && adv->all_template_criteria_met) || (adv->criteria_count == 0 && adv->done);
-        if (should_be_hidden && adv->is_visible_on_overlay) {
-            adv->is_visible_on_overlay = false; // Start fading out
-        }
-        if (!adv->is_visible_on_overlay && adv->alpha > 0.0f) {
-            adv->fade_timer += dt;
-            adv->alpha = 1.0f - (adv->fade_timer / OVERLAY_FADE_DURATION);
-            if (adv->alpha < 0.0f) adv->alpha = 0.0f;
-        }
-
-        for (int j = 0; j < adv->criteria_count; j++) {
-            TrackableItem *crit = adv->criteria[j];
-            if (crit->done && crit->is_visible_on_overlay) {
-                crit->is_visible_on_overlay = false;
-            }
-            if (!crit->is_visible_on_overlay && crit->alpha > 0.0f) {
-                crit->fade_timer += dt;
-                crit->alpha = 1.0f - (crit->fade_timer / OVERLAY_FADE_DURATION);
-                if (crit->alpha < 0.0f) crit->alpha = 0.0f;
-            }
-        }
-    }
-
-        // Stats
-    for (int i = 0; i < t->template_data->stat_count; i++) {
-        TrackableCategory *stat_cat = t->template_data->stats[i];
-        if (stat_cat->done && stat_cat->is_visible_on_overlay) {
-            stat_cat->is_visible_on_overlay = false;
-        }
-        if (!stat_cat->is_visible_on_overlay && stat_cat->alpha > 0.0f) {
-            stat_cat->fade_timer += dt;
-            stat_cat->alpha = 1.0f - (stat_cat->fade_timer / OVERLAY_FADE_DURATION);
-            if (stat_cat->alpha < 0.0f) stat_cat->alpha = 0.0f;
-        }
-
-        for (int j = 0; j < stat_cat->criteria_count; j++) {
-            TrackableItem *crit = stat_cat->criteria[j];
-            if (crit->done && crit->is_visible_on_overlay) {
-                crit->is_visible_on_overlay = false;
-            }
-            if (!crit->is_visible_on_overlay && crit->alpha > 0.0f) {
-                crit->fade_timer += dt;
-                crit->alpha = 1.0f - (crit->fade_timer / OVERLAY_FADE_DURATION);
-                if (crit->alpha < 0.0f) crit->alpha = 0.0f;
-            }
-        }
-    }
-
-    // Unlocks
-    for (int i = 0; i < t->template_data->unlock_count; i++) {
-        TrackableItem *unlock = t->template_data->unlocks[i];
-        if (unlock->done && unlock->is_visible_on_overlay) {
-            unlock->is_visible_on_overlay = false;
-        }
-        if (!unlock->is_visible_on_overlay && unlock->alpha > 0.0f) {
-            unlock->fade_timer += dt;
-            unlock->alpha = 1.0f - (unlock->fade_timer / OVERLAY_FADE_DURATION);
-            if (unlock->alpha < 0.0f) unlock->alpha = 0.0f;
-        }
-    }
-
-    // Custom Goals
-    for (int i = 0; i < t->template_data->custom_goal_count; i++) {
-        TrackableItem *custom_goal = t->template_data->custom_goals[i];
-        if (custom_goal->done && custom_goal->is_visible_on_overlay) {
-            custom_goal->is_visible_on_overlay = false;
-        }
-        if (!custom_goal->is_visible_on_overlay && custom_goal->alpha > 0.0f) {
-            custom_goal->fade_timer += dt;
-            custom_goal->alpha = 1.0f - (custom_goal->fade_timer / OVERLAY_FADE_DURATION);
-            if (custom_goal->alpha < 0.0f) custom_goal->alpha = 0.0f;
-        }
-    }
-
-    // Multi-Stage Goals
-    for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
-        MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
-        bool is_finished = goal->current_stage >= goal->stage_count - 1;
-        if (is_finished && goal->is_visible_on_overlay) {
-            goal->is_visible_on_overlay = false;
-        }
-        if (!goal->is_visible_on_overlay && goal->alpha > 0.0f) {
-            goal->fade_timer += dt;
-            goal->alpha = 1.0f - (goal->fade_timer / OVERLAY_FADE_DURATION);
-            if (goal->alpha < 0.0f) goal->alpha = 0.0f;
-        }
-    }
+    //
+    // // Advancements
+    // float dt = *deltaTime;
+    // for (int i = 0; i < t->template_data->advancement_count; i++) {
+    //     TrackableCategory *adv = t->template_data->advancements[i];
+    //     bool should_be_hidden = (adv->criteria_count > 0 && adv->all_template_criteria_met) || (adv->criteria_count == 0 && adv->done);
+    //     if (should_be_hidden && adv->is_visible_on_overlay) {
+    //         adv->is_visible_on_overlay = false; // Start fading out
+    //     }
+    //     if (!adv->is_visible_on_overlay && adv->alpha > 0.0f) {
+    //         adv->fade_timer += dt;
+    //         adv->alpha = 1.0f - (adv->fade_timer / OVERLAY_FADE_DURATION);
+    //         if (adv->alpha < 0.0f) adv->alpha = 0.0f;
+    //     }
+    //
+    //     for (int j = 0; j < adv->criteria_count; j++) {
+    //         TrackableItem *crit = adv->criteria[j];
+    //         if (crit->done && crit->is_visible_on_overlay) {
+    //             crit->is_visible_on_overlay = false;
+    //         }
+    //         if (!crit->is_visible_on_overlay && crit->alpha > 0.0f) {
+    //             crit->fade_timer += dt;
+    //             crit->alpha = 1.0f - (crit->fade_timer / OVERLAY_FADE_DURATION);
+    //             if (crit->alpha < 0.0f) crit->alpha = 0.0f;
+    //         }
+    //     }
+    // }
+    //
+    //     // Stats
+    // for (int i = 0; i < t->template_data->stat_count; i++) {
+    //     TrackableCategory *stat_cat = t->template_data->stats[i];
+    //     if (stat_cat->done && stat_cat->is_visible_on_overlay) {
+    //         stat_cat->is_visible_on_overlay = false;
+    //     }
+    //     if (!stat_cat->is_visible_on_overlay && stat_cat->alpha > 0.0f) {
+    //         stat_cat->fade_timer += dt;
+    //         stat_cat->alpha = 1.0f - (stat_cat->fade_timer / OVERLAY_FADE_DURATION);
+    //         if (stat_cat->alpha < 0.0f) stat_cat->alpha = 0.0f;
+    //     }
+    //
+    //     for (int j = 0; j < stat_cat->criteria_count; j++) {
+    //         TrackableItem *crit = stat_cat->criteria[j];
+    //         if (crit->done && crit->is_visible_on_overlay) {
+    //             crit->is_visible_on_overlay = false;
+    //         }
+    //         if (!crit->is_visible_on_overlay && crit->alpha > 0.0f) {
+    //             crit->fade_timer += dt;
+    //             crit->alpha = 1.0f - (crit->fade_timer / OVERLAY_FADE_DURATION);
+    //             if (crit->alpha < 0.0f) crit->alpha = 0.0f;
+    //         }
+    //     }
+    // }
+    //
+    // // Unlocks
+    // for (int i = 0; i < t->template_data->unlock_count; i++) {
+    //     TrackableItem *unlock = t->template_data->unlocks[i];
+    //     if (unlock->done && unlock->is_visible_on_overlay) {
+    //         unlock->is_visible_on_overlay = false;
+    //     }
+    //     if (!unlock->is_visible_on_overlay && unlock->alpha > 0.0f) {
+    //         unlock->fade_timer += dt;
+    //         unlock->alpha = 1.0f - (unlock->fade_timer / OVERLAY_FADE_DURATION);
+    //         if (unlock->alpha < 0.0f) unlock->alpha = 0.0f;
+    //     }
+    // }
+    //
+    // // Custom Goals
+    // for (int i = 0; i < t->template_data->custom_goal_count; i++) {
+    //     TrackableItem *custom_goal = t->template_data->custom_goals[i];
+    //     if (custom_goal->done && custom_goal->is_visible_on_overlay) {
+    //         custom_goal->is_visible_on_overlay = false;
+    //     }
+    //     if (!custom_goal->is_visible_on_overlay && custom_goal->alpha > 0.0f) {
+    //         custom_goal->fade_timer += dt;
+    //         custom_goal->alpha = 1.0f - (custom_goal->fade_timer / OVERLAY_FADE_DURATION);
+    //         if (custom_goal->alpha < 0.0f) custom_goal->alpha = 0.0f;
+    //     }
+    // }
+    //
+    // // Multi-Stage Goals
+    // for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
+    //     MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+    //     bool is_finished = goal->current_stage >= goal->stage_count - 1;
+    //     if (is_finished && goal->is_visible_on_overlay) {
+    //         goal->is_visible_on_overlay = false;
+    //     }
+    //     if (!goal->is_visible_on_overlay && goal->alpha > 0.0f) {
+    //         goal->fade_timer += dt;
+    //         goal->alpha = 1.0f - (goal->fade_timer / OVERLAY_FADE_DURATION);
+    //         if (goal->alpha < 0.0f) goal->alpha = 0.0f;
+    //     }
+    // }
 
     // Clean up the parsed JSON objects
     cJSON_Delete(player_adv_json);
@@ -2517,17 +2645,29 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             }
 
 
-            // Render advancement criteria if count is > 0, render stat-category sub-stats if count is > 1
-            bool is_complex = false;
-            if (!is_stat_section) {
-                is_complex = cat && cat->criteria_count > 0;
+            bool is_complex;
+            // TODO: Remove
+            // if (!is_stat_section) {
+            //     is_complex = cat && cat->criteria_count > 0;
+            // } else {
+            //     is_complex = cat && cat->criteria_count > 1;
+            // }
+
+
+            if (is_stat_section) {
+                // A stat is "complex" (shows sub-items) if the parser identified it as a multi-stat category.
+                is_complex = !cat->is_single_stat_category;
             } else {
-                is_complex = cat && cat->criteria_count > 1;
+                // An advancement is "complex" if it has one or more criteria.
+                is_complex = cat->criteria_count > 0;
             }
+
+            // Check for the correct pass BEFORE checking if we should hide
+            if (is_complex != complex_pass) continue;
 
             // Check for the correct pass BEfORE checking if we should hide
             // If it's not the right pass for this item, skip it immediately
-            if (!cat || (is_complex != complex_pass)) continue;
+            // if (!cat || (is_complex != complex_pass)) continue; // TODO: Remove
 
             // Determine if the item should be hidden by "Remove completed goals"
             // DOES NOT HIDE when advancement has wrong criteria, that are not in the game (modern versions)
@@ -2769,8 +2909,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                     current_element_x += 32 * t->zoom_level + 4 * t->zoom_level;
 
-                    // Draw Checkbox for Sub-Stat
-                    if (is_stat_section) {
+                    // Draw Checkbox for Sub-Stat ONLY if there is more than one.
+                    if (is_stat_section && cat->criteria_count > 1) {
                         ImVec2 check_pos = ImVec2(current_element_x, crit_base_pos.y + 6 * t->zoom_level);
                         ImRect checkbox_rect(
                             check_pos, ImVec2(check_pos.x + 20 * t->zoom_level, check_pos.y + 20 * t->zoom_level));
@@ -3734,8 +3874,9 @@ void tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
         cJSON *old_cat_item = old_stat_override ? cJSON_GetObjectItem(old_stat_override, stat_cat->root_name) : nullptr;
 
         // Always add the parent entry (e.g., "stat_cat:mine_more_sand")
-        if (old_cat_item) cJSON_AddItemToObject(new_stat_override, stat_cat->root_name,
-                                                cJSON_Duplicate(old_cat_item, 1));
+        if (old_cat_item)
+            cJSON_AddItemToObject(new_stat_override, stat_cat->root_name,
+                                  cJSON_Duplicate(old_cat_item, 1));
         else cJSON_AddBoolToObject(new_stat_override, stat_cat->root_name, false);
 
         // Only add ".criteria." entries if the template defines multiple sub-stats for this category.
@@ -3749,8 +3890,9 @@ void tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
                 cJSON *old_sub_item = old_stat_override
                                           ? cJSON_GetObjectItem(old_stat_override, sub_stat_key)
                                           : nullptr;
-                if (old_sub_item) cJSON_AddItemToObject(new_stat_override, sub_stat_key,
-                                                        cJSON_Duplicate(old_sub_item, 1));
+                if (old_sub_item)
+                    cJSON_AddItemToObject(new_stat_override, sub_stat_key,
+                                          cJSON_Duplicate(old_sub_item, 1));
                 else cJSON_AddBoolToObject(new_stat_override, sub_stat_key, false);
             }
         }
