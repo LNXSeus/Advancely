@@ -10,6 +10,7 @@
     "fps":	60,
     "overlay_scroll_speed":	1,
     "overlay_animation_speedup": false,
+    "overlay_row3_remove_completed": false,
     "always_on_top":	true,
     "remove_completed_goals": true,
     "goal_align_left":	true,

@@ -47,28 +47,6 @@ struct Overlay {
     int start_index_row1;
     int start_index_row2;
     int start_index_row3;
-
-    // float row1_total_width; // TODO: Remove
-    // float row2_total_width; // TODO: Remove
-    // float row3_total_width; // TODO: Remove
-
-    // TODO: Remove
-    // // State management for Row 1 animation
-    // Row1Item *row1_items;
-    // int row1_item_count;
-    // int row1_item_capacity;
-
-    // TODO: Remove
-    // // State management for Row 2 animation
-    // Row2Item *row2_items;
-    // int row2_item_count;
-    // int row2_item_capacity;
-
-    // TODO: Remove
-    // // State management for Row 3 animation
-    // Row3Item *row3_items;
-    // int row3_item_count;
-    // int row3_item_capacity;
 };
 
 /**

@@ -220,6 +220,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->print_debug_status = DEFAULT_PRINT_DEBUG_STATUS;
     settings->overlay_progress_text_align = DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN;
     settings->overlay_animation_speedup = DEFAULT_OVERLAY_SPEED_UP;
+    settings->overlay_row3_remove_completed = DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED;
 
     // Default Geometry
     WindowRect default_window = {DEFAULT_WINDOW_POS, DEFAULT_WINDOW_POS, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE};
@@ -364,6 +365,13 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
+        const cJSON *row3_hide = cJSON_GetObjectItem(general_settings, "overlay_row3_remove_completed");
+        if (row3_hide && cJSON_IsBool(row3_hide)) settings->overlay_row3_remove_completed = cJSON_IsTrue(row3_hide);
+        else {
+            settings->overlay_row3_remove_completed = DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED;
+            defaults_were_used = true;
+        }
+
 
     } else {
         defaults_were_used = true;
@@ -450,6 +458,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
     cJSON_ReplaceItemInObject(general_obj, "overlay_progress_text_align",
                               cJSON_CreateString(overlay_text_align_to_string(settings->overlay_progress_text_align)));
     cJSON_ReplaceItemInObject(general_obj, "overlay_animation_speedup", cJSON_CreateBool(settings->overlay_animation_speedup));
+    cJSON_ReplaceItemInObject(general_obj, "overlay_row3_remove_completed",
+                              cJSON_CreateBool(settings->overlay_row3_remove_completed));
 
 
     // Update Visual Settings
