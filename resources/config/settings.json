@@ -1,6 +1,6 @@
 {
-  "path_mode":	"manual",
-  "manual_saves_path":	"C:\\Users\\Linus\\AppData\\Roaming\\PrismLauncher\\instances\\1.16.1\\minecraft\\saves",
+  "path_mode":	"auto",
+  "manual_saves_path":	"",
   "version":	"1.16.1",
   "category":	"All_Advancements",
   "optional_flag":	"",
