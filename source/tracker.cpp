@@ -6,6 +6,8 @@
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
+#include <cJSON.h>
+#include <cmath>
 
 #include "tracker.h"
 #include "init_sdl.h"
@@ -16,9 +18,7 @@
 #include "global_event_handler.h"
 #include "format_utils.h"
 #include "logger.h"
-
-#include <cJSON.h>
-#include <cmath>
+#include "main.h" // For show_error_message
 
 #include "imgui_internal.h"
 
@@ -35,8 +35,7 @@
 static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *path, SDL_ScaleMode scale_mode) {
     IMG_Animation *anim = IMG_LoadAnimation(path);
     if (!anim) {
-        fprintf(stderr, "[TRACKER - GIF LOAD] Failed to load animation %s: %s\n", path, SDL_GetError());
-        log_message("[TRACKER - GIF LOAD] Failed to load animation %s: %s\n", path, SDL_GetError());
+        log_message(LOG_ERROR, "[TRACKER - GIF LOAD] Failed to load animation %s: %s\n", path, SDL_GetError());
         return nullptr;
     }
 
@@ -78,7 +77,7 @@ static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *pa
             SDL_Texture *temp_texture = SDL_CreateTextureFromSurface(renderer, frame_surface);
             if (!temp_texture) {
                 SDL_Log("Failed to create temporary texture from GIF frame: %s", SDL_GetError());
-                log_message("Failed to create temporary texture from GIF frame: %s", SDL_GetError());
+                log_message(LOG_ERROR, "Failed to create temporary texture from GIF frame: %s", SDL_GetError());
                 anim_texture->frames[i] = nullptr; // Mark as failed
                 continue; // Skip to next frame
             }
@@ -117,8 +116,7 @@ static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *pa
         anim_texture->frames[i] = final_frame_texture;
 
         if (!anim_texture->frames[i]) {
-            fprintf(stderr, "[TRACKER - GIF LOAD] Failed to create texture for frame %d from %s\n", i, path);
-            log_message("[TRACKER - GIF LOAD] Failed to create texture for frame %d from %s\n", i, path);
+            log_message(LOG_ERROR, "[TRACKER - GIF LOAD] Failed to create texture for frame %d from %s\n", i, path);
             // Cleanup if a frame texture fails to create
             free(anim_texture->frames);
             anim_texture->frames = nullptr;
@@ -139,9 +137,8 @@ static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *pa
 
     // If the GIF has no timing info, calculate a default animation speed
     if (anim_texture->total_duration == 0 && anim_texture->frame_count > 0) {
-        printf("[TRACKER - GIF LOAD] GIF at '%s' has no timing info. Applying default %dms delay.\n", path,
-               DEFAULT_GIF_DELAY_MS);
-        log_message("[TRACKER - GIF LOAD] GIF at '%s' has no timing info. Applying default %dms delay.\n", path,
+        log_message(LOG_INFO, "[TRACKER - GIF LOAD] GIF at '%s' has no timing info. Applying default %dms delay.\n",
+                    path,
                     DEFAULT_GIF_DELAY_MS);
         total_duration = 0; // Reset to recalculate
         for (int i = 0; i < anim_texture->frame_count; i++) {
@@ -204,8 +201,7 @@ static void tracker_save_snapshot_to_file(Tracker *t) {
         fclose(file);
         free(json_str);
         json_str = nullptr;
-        printf("[TRACKER] Snapshot saved to %s\n", t->snapshot_path);
-        log_message("[TRACKER] Snapshot saved to %s\n", t->snapshot_path);
+        log_message(LOG_INFO, "[TRACKER] Snapshot saved to %s\n", t->snapshot_path);
     }
     cJSON_Delete(root); // Clean up
 }
@@ -218,12 +214,12 @@ static void tracker_save_snapshot_to_file(Tracker *t) {
  * @param t A pointer to the Tracker struct.
  */
 static void tracker_load_snapshot_from_file(Tracker *t, const AppSettings *settings) {
+    (void) settings;
+
     cJSON *snapshot_json = cJSON_from_file(t->snapshot_path);
     if (!snapshot_json) {
-        if (settings->print_debug_status) {
-            printf("[TRACKER] No existing snapshot file found for this configuration.\n");
-            log_message("[TRACKER] No existing snapshot file found for this configuration.\n");
-        }
+        log_message(LOG_INFO, "[TRACKER] No existing snapshot file found for this configuration.\n");
+
         return;
     }
 
@@ -261,10 +257,7 @@ static void tracker_load_snapshot_from_file(Tracker *t, const AppSettings *setti
         }
     }
     cJSON_Delete(snapshot_json);
-    if (settings->print_debug_status) {
-        printf("[TRACKER] Snapshot successfully loaded from %s\n", t->snapshot_path);
-        log_message("[TRACKER] Snapshot successfully loaded from %s\n", t->snapshot_path);
-    }
+    log_message(LOG_INFO, "[TRACKER] Snapshot successfully loaded from %s\n", t->snapshot_path);
 }
 
 /**
@@ -272,10 +265,10 @@ static void tracker_load_snapshot_from_file(Tracker *t, const AppSettings *setti
  * This is called when a new world is loaded to establish a baseline for progress.
  */
 static void tracker_snapshot_legacy_stats(Tracker *t, const AppSettings *settings) {
+    (void) settings;
     cJSON *player_stats_json = cJSON_from_file(t->stats_path);
     if (!player_stats_json) {
-        fprintf(stderr, "[TRACKER] Could not read stats file to create snapshot.\n");
-        log_message("[TRACKER] Could not read stats file to create snapshot.\n");
+        log_message(LOG_ERROR, "[TRACKER] Could not read stats file to create snapshot.\n");
         return;
     }
 
@@ -339,75 +332,62 @@ static void tracker_snapshot_legacy_stats(Tracker *t, const AppSettings *setting
     // SAVE TO SNAPSHOT FILE
     tracker_save_snapshot_to_file(t);
 
-    if (settings->print_debug_status) {
-        // TODO: DEBUGGING CODE TO PRINT WHAT THE SNAPSHOT LOOKS LIKE
-        // --- ADD THIS EXPANDED DEBUGGING CODE ---
-        printf("\n--- STARTING SNAPSHOT FOR WORLD: %s ---\n", t->template_data->snapshot_world_name);
+    // TODO: DEBUGGING CODE TO PRINT WHAT THE SNAPSHOT LOOKS LIKE
+    // --- ADD THIS EXPANDED DEBUGGING CODE ---
+    log_message(LOG_INFO, "\n--- STARTING SNAPSHOT FOR WORLD: %s ---\n", t->template_data->snapshot_world_name);
 
-        // Re-load the JSON file just for this debug print (this is inefficient but simple for debugging)
-        cJSON *debug_json = cJSON_from_file(t->stats_path);
-        if (debug_json) {
-            cJSON *stats_change = cJSON_GetObjectItem(debug_json, "stats-change");
-            if (cJSON_IsArray(stats_change)) {
-                printf("\n--- LEGACY ACHIEVEMENT CHECK ---\n");
-                // Loop through achievements from the template
-                for (int i = 0; i < t->template_data->advancement_count; i++) {
-                    TrackableCategory *ach = t->template_data->advancements[i];
-                    bool found = false;
-                    int value = 0;
+    // Re-load the JSON file just for this debug print (this is inefficient but simple for debugging)
+    cJSON *debug_json = cJSON_from_file(t->stats_path);
+    if (debug_json) {
+        cJSON *stats_change = cJSON_GetObjectItem(debug_json, "stats-change");
+        if (cJSON_IsArray(stats_change)) {
+            log_message(LOG_INFO, "\n--- LEGACY ACHIEVEMENT CHECK ---\n");
+            // Loop through achievements from the template
+            for (int i = 0; i < t->template_data->advancement_count; i++) {
+                TrackableCategory *ach = t->template_data->advancements[i];
+                bool found = false;
+                int value = 0;
 
-                    // Search for this achievement in the player's stats data
-                    cJSON *stat_entry;
-                    cJSON_ArrayForEach(stat_entry, stats_change) {
-                        cJSON *item = stat_entry->child;
-                        if (item && strcmp(item->string, ach->root_name) == 0) {
-                            found = true;
-                            value = item->valueint;
-                            break;
-                        }
-                    }
-
-                    if (found) {
-                        printf("  - Achievement '%s' (ID: %s): FOUND with value: %d\n", ach->display_name,
-                               ach->root_name,
-                               value);
-                        log_message("  - Achievement '%s' (ID: %s): FOUND with value: %d\n", ach->display_name,
-                                    ach->root_name,
-                                    value);
-                    } else {
-                        printf("  - Achievement '%s' (ID: %s): NOT FOUND in player data\n", ach->display_name,
-                               ach->root_name);
-                        log_message("  - Achievement '%s' (ID: %s): NOT FOUND in player data\n", ach->display_name,
-                                    ach->root_name);
+                // Search for this achievement in the player's stats data
+                cJSON *stat_entry;
+                cJSON_ArrayForEach(stat_entry, stats_change) {
+                    cJSON *item = stat_entry->child;
+                    if (item && strcmp(item->string, ach->root_name) == 0) {
+                        found = true;
+                        value = item->valueint;
+                        break;
                     }
                 }
-            }
-            cJSON_Delete(debug_json);
-        }
-    }
 
-    if (settings->print_debug_status) {
-        printf("\n--- LEGACY STAT SNAPSHOT ---\n");
-        log_message("\n--- LEGACY STAT SNAPSHOT ---\n");
-        printf("Playtime Snapshot: %lld ticks\n", t->template_data->playtime_snapshot);
-        log_message("Playtime Snapshot: %lld ticks\n", t->template_data->playtime_snapshot);
-
-        // Use a nested loop to print the stats
-        for (int i = 0; i < t->template_data->stat_count; i++) {
-            TrackableCategory *stat_cat = t->template_data->stats[i];
-            printf("  - Category '%s':\n", stat_cat->display_name);
-            log_message("  - Category '%s':\n", stat_cat->display_name);
-            for (int j = 0; j < stat_cat->criteria_count; j++) {
-                TrackableItem *sub_stat = stat_cat->criteria[j];
-                printf("    - Sub-Stat '%s' (ID: %s): Snapshot Value = %d\n",
-                       sub_stat->display_name, sub_stat->root_name, sub_stat->initial_progress);
-                log_message("    - Sub-Stat '%s' (ID: %s): Snapshot Value = %d\n",
-                            sub_stat->display_name, sub_stat->root_name, sub_stat->initial_progress);
+                if (found) {
+                    log_message(LOG_INFO, "  - Achievement '%s' (ID: %s): FOUND with value: %d\n", ach->display_name,
+                                ach->root_name,
+                                value);
+                } else {
+                    log_message(LOG_INFO, "  - Achievement '%s' (ID: %s): NOT FOUND in player data\n",
+                                ach->display_name,
+                                ach->root_name);
+                }
             }
         }
-        printf("--- END OF SNAPSHOT ---\n\n");
-        log_message("--- END OF SNAPSHOT ---\n\n");
+        cJSON_Delete(debug_json);
     }
+
+
+    log_message(LOG_INFO, "\n--- LEGACY STAT SNAPSHOT ---\n");
+    log_message(LOG_INFO, "Playtime Snapshot: %lld ticks\n", t->template_data->playtime_snapshot);
+
+    // Use a nested loop to print the stats
+    for (int i = 0; i < t->template_data->stat_count; i++) {
+        TrackableCategory *stat_cat = t->template_data->stats[i];
+        log_message(LOG_INFO, "  - Category '%s':\n", stat_cat->display_name);
+        for (int j = 0; j < stat_cat->criteria_count; j++) {
+            TrackableItem *sub_stat = stat_cat->criteria[j];
+            log_message(LOG_INFO, "    - Sub-Stat '%s' (ID: %s): Snapshot Value = %d\n",
+                        sub_stat->display_name, sub_stat->root_name, sub_stat->initial_progress);
+        }
+    }
+    log_message(LOG_INFO, "--- END OF SNAPSHOT ---\n\n");
 }
 
 /**
@@ -836,11 +816,10 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                                      TrackableCategory ***categories_array,
                                      int *count, int *total_criteria_count, const char *lang_key_prefix,
                                      bool is_stat_category, MC_Version version, const AppSettings *settings) {
+    (void) settings;
     if (!category_json) {
-        if (settings->print_debug_status) {
-            printf("[TRACKER] tracker_parse_categories: category_json is nullptr\n");
-            log_message("[TRACKER] tracker_parse_categories: category_json is nullptr\n");
-        }
+        log_message(LOG_INFO, "[TRACKER] tracker_parse_categories: category_json is nullptr\n");
+
         return;
     }
 
@@ -869,8 +848,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
         if (cat_json->string) {
             strncpy(new_cat->root_name, cat_json->string, sizeof(new_cat->root_name) - 1);
         } else {
-            fprintf(stderr, "[TRACKER] PARSE ERROR: Found a JSON item with a nullptr key. Skipping.\n");
-            log_message("[TRACKER] PARSE ERROR: Found a JSON item with a nullptr key. Skipping.\n");
+            log_message(LOG_ERROR, "[TRACKER] PARSE ERROR: Found a JSON item with a nullptr key. Skipping.\n");
             free(new_cat);
             new_cat = nullptr;
             cat_json = cat_json->next;
@@ -1122,6 +1100,7 @@ static void flag_shared_icons(IconPathCounter *counts, int unique_count, Trackab
  * @param t The Tracker struct.
  */
 static void tracker_detect_shared_icons(Tracker *t, const AppSettings *settings) {
+    (void) settings;
     int total_criteria = t->template_data->total_criteria_count + t->template_data->stat_total_criteria_count;
     if (total_criteria == 0) return;
 
@@ -1139,10 +1118,7 @@ static void tracker_detect_shared_icons(Tracker *t, const AppSettings *settings)
 
     free(counts);
     counts = nullptr;
-    if (settings->print_debug_status) {
-        printf("[TRACKER] Shared icon detection complete.\n");
-        log_message("[TRACKER] Shared icon detection complete.");
-    }
+    log_message(LOG_INFO, "[TRACKER] Shared icon detection complete.");
 }
 
 /**
@@ -1164,20 +1140,17 @@ static void tracker_detect_shared_icons(Tracker *t, const AppSettings *settings)
 static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJSON *lang_json,
                                             TrackableItem ***items_array,
                                             int *count, const char *lang_key_prefix, const AppSettings *settings) {
+    (void) settings;
     (void) t;
     if (!category_json) {
-        if (settings->print_debug_status) {
-            printf("[TRACKER] tracker_parse_simple_trackables: category_json is nullptr\n");
-            log_message("[TRACKER] tracker_parse_simple_trackables: category_json is nullptr\n");
-        }
+        log_message(LOG_INFO, "[TRACKER] tracker_parse_simple_trackables: category_json is nullptr\n");
+
         return;
     }
     *count = cJSON_GetArraySize(category_json);
     if (*count == 0) {
-        if (settings->print_debug_status) {
-            printf("[TRACKER] tracker_parse_simple_trackables: No items found\n");
-            log_message("[TRACKER] tracker_parse_simple_trackables: No items found\n");
-        }
+        log_message(LOG_INFO, "[TRACKER] tracker_parse_simple_trackables: No items found\n");
+
         return;
     }
 
@@ -1264,11 +1237,10 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
                                             int *count, const AppSettings *settings) {
     (void) t;
     (void) lang_json;
+    (void) settings;
     if (!goals_json) {
-        if (settings->print_debug_status) {
-            printf("[TRACKER] tracker_parse_multi_stage_goals: goals_json is nullptr\n");
-            log_message("[TRACKER] tracker_parse_multi_stage_goals: goals_json is nullptr\n");
-        }
+        log_message(LOG_INFO, "[TRACKER] tracker_parse_multi_stage_goals: goals_json is nullptr\n");
+
         *count = 0;
         // goals_array = nullptr;
         return;
@@ -1276,18 +1248,15 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
 
     *count = cJSON_GetArraySize(goals_json);
     if (*count == 0) {
-        if (settings->print_debug_status) {
-            printf("[TRACKER] tracker_parse_multi_stage_goals: No goals found\n");
-            log_message("[TRACKER] tracker_parse_multi_stage_goals: No goals found\n");
-        }
+        log_message(LOG_INFO, "[TRACKER] tracker_parse_multi_stage_goals: No goals found\n");
+
         // goals_array = nullptr;
         return;
     }
 
     *goals_array = (MultiStageGoal **) calloc(*count, sizeof(MultiStageGoal *));
     if (!*goals_array) {
-        fprintf(stderr, "[TRACKER] Failed to allocate memory for MultiStageGoal array.\n");
-        log_message("[TRACKER] Failed to allocate memory for MultiStageGoal array.\n");
+        log_message(LOG_ERROR, "[TRACKER] Failed to allocate memory for MultiStageGoal array.\n");
         *count = 0;
         return;
     }
@@ -1428,8 +1397,7 @@ static void tracker_update_unlock_progress(Tracker *t, const cJSON *player_unloc
 
     cJSON *obtained_obj = cJSON_GetObjectItem(player_unlocks_json, "obtained"); // Top level object in unlocks file
     if (!obtained_obj) {
-        fprintf(stderr, "[TRACKER] Failed to find 'obtained' object in player unlocks file.\n");
-        log_message("[TRACKER] Failed to find 'obtained' object in player unlocks file.\n");
+        log_message(LOG_ERROR, "[TRACKER] Failed to find 'obtained' object in player unlocks file.\n");
         return;
     }
 
@@ -1456,11 +1424,10 @@ static void tracker_update_unlock_progress(Tracker *t, const cJSON *player_unloc
  * @param settings_json A pointer to the parsed settings.json cJSON object.
  */
 static void tracker_update_custom_progress(Tracker *t, cJSON *settings_json, const AppSettings *settings) {
+    (void) settings;
     if (!settings_json) {
-        if (settings->print_debug_status) {
-            printf("[TRACKER] Failed to load or parse settings file.\n");
-            log_message("[TRACKER] Failed to load or parse settings file.\n");
-        }
+        log_message(LOG_INFO, "[TRACKER] Failed to load or parse settings file.\n");
+
         return;
     }
 
@@ -1516,15 +1483,13 @@ static void tracker_update_custom_progress(Tracker *t, cJSON *settings_json, con
 static void tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_adv_json,
                                                 const cJSON *player_stats_json, const cJSON *player_unlocks_json,
                                                 MC_Version version, const AppSettings *settings) {
+    (void) settings;
     if (t->template_data->multi_stage_goal_count == 0) return;
 
     if (!player_adv_json && !player_stats_json) {
-        if (settings->print_debug_status) {
-            printf(
-                "[TRACKER] Failed to load or parse player advancements or player stats file to update multi-stage goal progress.\n");
-            log_message(
-                "[TRACKER] Failed to load or parse player advancements or player stats file to update multi-stage goal progress.\n");
-        }
+        log_message(LOG_INFO,
+                    "[TRACKER] Failed to load or parse player advancements or player stats file to update multi-stage goal progress.\n");
+
         return;
     }
 
@@ -1706,6 +1671,7 @@ static void tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
  */
 static void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const AppSettings *settings) {
     (void) version;
+    (void) settings;
     if (!t || !t->template_data) return; // || because we can't be sure if the template_data is initialized
 
     // calculate the total number of "steps"
@@ -1746,12 +1712,8 @@ static void tracker_calculate_overall_progress(Tracker *t, MC_Version version, c
     }
 
 
-    if (settings->print_debug_status) {
-        printf("Completed steps for progress: %d\n", completed_steps);
-        log_message("Completed steps for progress: %d\n", completed_steps);
-        printf("Total step for progress: %d\n", total_steps);
-        log_message("Total step for progress: %d\n", total_steps);
-    }
+    log_message(LOG_INFO, "Completed steps for progress: %d\n", completed_steps);
+    log_message(LOG_INFO, "Total step for progress: %d\n", total_steps);
 
 
     // Set 100% if no steps are found
@@ -1888,16 +1850,14 @@ static void tracker_free_template_data(TemplateData *td) {
 
 SDL_Texture *load_texture_with_scale_mode(SDL_Renderer *renderer, const char *path, SDL_ScaleMode scale_mode) {
     if (path == nullptr || path[0] == '\0') {
-        fprintf(stderr, "[TRACKER - TEXTURE LOAD] Invalid path for texture: %s\n", path);
-        log_message("[TRACKER - TEXTURE LOAD] Invalid path for texture: %s\n", path);
+        log_message(LOG_ERROR, "[TRACKER - TEXTURE LOAD] Invalid path for texture: %s\n", path);
         return nullptr;
     }
 
     // Load original surfaces
     SDL_Surface *loaded_surface = IMG_Load(path);
     if (!loaded_surface) {
-        fprintf(stderr, "[TRACKER - TEXTURE LOAD] Failed to load image %s: %s\n", path, SDL_GetError());
-        log_message("[TRACKER - TEXTURE LOAD] Failed to load image %s: %s\n", path, SDL_GetError());
+        log_message(LOG_ERROR, "[TRACKER - TEXTURE LOAD] Failed to load image %s: %s\n", path, SDL_GetError());
         return nullptr;
     }
 
@@ -1913,9 +1873,7 @@ SDL_Texture *load_texture_with_scale_mode(SDL_Renderer *renderer, const char *pa
     SDL_DestroySurface(loaded_surface);
 
     if (!formatted_surface) {
-        fprintf(stderr, "[TRACKER - TEXTURE LOAD] Failed to create formatted surface for image %s: %s\n", path,
-                SDL_GetError());
-        log_message("[TRACKER - TEXTURE LOAD] Failed to create formatted surface for image %s: %s\n", path,
+        log_message(LOG_ERROR, "[TRACKER - TEXTURE LOAD] Failed to create formatted surface for image %s: %s\n", path,
                     SDL_GetError());
         return nullptr;
     }
@@ -1923,9 +1881,8 @@ SDL_Texture *load_texture_with_scale_mode(SDL_Renderer *renderer, const char *pa
     SDL_Texture *new_texture = SDL_CreateTextureFromSurface(renderer, formatted_surface);
     SDL_DestroySurface(formatted_surface); // Clean up the surface after creating the texture
     if (!new_texture) {
-        fprintf(stderr, "[TRACKER - TEXTURE LOAD] Failed to create texture from surface %s: %s\n", path,
-                SDL_GetError());
-        log_message("[TRACKER - TEXTURE LOAD] Failed to create texture from surface %s: %s\n", path, SDL_GetError());
+        log_message(LOG_ERROR, "[TRACKER - TEXTURE LOAD] Failed to create texture from surface %s: %s\n", path,
+                    SDL_GetError());
         return nullptr;
     }
 
@@ -1958,8 +1915,7 @@ SDL_Texture *get_texture_from_cache(SDL_Renderer *renderer, TextureCacheEntry **
         TextureCacheEntry *new_cache_ptr = (TextureCacheEntry *) realloc(
             *cache, new_capacity * sizeof(TextureCacheEntry));
         if (!new_cache_ptr) {
-            fprintf(stderr, "[CACHE] Failed to reallocate texture cache!\n");
-            log_message("[CACHE] Failed to reallocate texture cache!\n");
+            log_message(LOG_ERROR, "[CACHE] Failed to reallocate texture cache!\n");
             SDL_DestroyTexture(new_texture);
             return nullptr;
         }
@@ -2013,8 +1969,7 @@ AnimatedTexture *get_animated_texture_from_cache(SDL_Renderer *renderer, Animate
         AnimatedTextureCacheEntry *new_cache_ptr = (AnimatedTextureCacheEntry *) realloc(
             *cache, new_capacity * sizeof(AnimatedTextureCacheEntry));
         if (!new_cache_ptr) {
-            fprintf(stderr, "[CACHE] Failed to reallocate animation cache!\n");
-            log_message("[CACHE] Failed to reallocate animation cache!\n");
+            log_message(LOG_ERROR, "[CACHE] Failed to reallocate animation cache!\n");
             free_animated_texture(new_anim);
             return nullptr;
         }
@@ -2034,8 +1989,7 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     // Allocate memory for the tracker itself
     *tracker = (Tracker *) malloc(sizeof(Tracker));
     if (*tracker == nullptr) {
-        fprintf(stderr, "[TRACKER] Failed to allocate memory for tracker.\n");
-        log_message("[TRACKER] Failed to allocate memory for tracker.\n");
+        log_message(LOG_ERROR, "[TRACKER] Failed to allocate memory for tracker.\n");
         return false;
     }
 
@@ -2085,8 +2039,7 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     // Initialize SDL_ttf
     t->minecraft_font = TTF_OpenFont("resources/fonts/Minecraft.ttf", 24);
     if (!t->minecraft_font) {
-        fprintf(stderr, "[TRACKER] Failed to load Minecraft font: %s\n", SDL_GetError());
-        log_message("[TRACKER] Failed to load Minecraft font: %s\n", SDL_GetError());
+        log_message(LOG_ERROR, "[TRACKER] Failed to load Minecraft font: %s\n", SDL_GetError());
         tracker_free(tracker, settings);
         return false;
     }
@@ -2102,8 +2055,7 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     t->adv_bg_done = load_texture_with_scale_mode(t->renderer, "resources/gui/advancement_background_done.png",
                                                   SDL_SCALEMODE_NEAREST);
     if (!t->adv_bg || !t->adv_bg_half_done || !t->adv_bg_done) {
-        fprintf(stderr, "[TRACKER] Failed to load advancement background textures.\n");
-        log_message("[TRACKER] Failed to load advancement background textures.\n");
+        log_message(LOG_ERROR, "[TRACKER] Failed to load advancement background textures.\n");
         tracker_free(tracker, settings);
         return false;
     }
@@ -2111,8 +2063,7 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     // Allocate the main data container
     t->template_data = (TemplateData *) calloc(1, sizeof(TemplateData));
     if (!t->template_data) {
-        fprintf(stderr, "[TRACKER] Failed to allocate memory for template data.\n");
-        log_message("[TRACKER] Failed to allocate memory for template data.\n");
+        log_message(LOG_ERROR, "[TRACKER] Failed to allocate memory for template data.\n");
         tracker_free(tracker, settings);
         return false;
     }
@@ -2123,8 +2074,11 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     // Initialize paths (also during runtime)
     tracker_reinit_paths(t, settings);
 
-    // Parse the advancement template JSON file
-    tracker_load_and_parse_data(t, settings);
+    // Parse the advancement template JSON file and check for critical failure
+    if (!tracker_load_and_parse_data(t, settings)) {
+        tracker_free(tracker, settings);
+        return false;
+    }
 
     return true; // Success
 }
@@ -2207,10 +2161,9 @@ void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
     // it means we've loaded a new world and need to take a new snapshot of the global stats
     if (version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy && strcmp(
             t->world_name, t->template_data->snapshot_world_name) != 0) {
-        if (settings->print_debug_status) {
-            printf("[TRACKER] Legacy world change detected. Taking new stat snapshot for world: %s\n", t->world_name);
-            log_message("[TRACKER] Legacy world change detected. Taking new stat snapshot for world: %s\n", t->world_name);
-        }
+        log_message(LOG_INFO, "[TRACKER] Legacy world change detected. Taking new stat snapshot for world: %s\n",
+                    t->world_name);
+
         tracker_snapshot_legacy_stats(t, settings);
         // Take a new snapshot when StatsPerWorld is disabled in legacy version
     }
@@ -3519,10 +3472,8 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
 void tracker_reinit_template(Tracker *t, const AppSettings *settings) {
     if (!t) return;
 
-    if (settings->print_debug_status) {
-        printf("[TRACKER] Re-initializing template...\n");
-        log_message("[TRACKER] Re-initializing template...\n");
-    }
+    log_message(LOG_INFO, "[TRACKER] Re-initializing template...\n");
+
 
     // Update the paths from settings.json
     tracker_reinit_paths(t, settings);
@@ -3553,10 +3504,8 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings) {
     MC_Version version = settings_get_version_from_string(settings->version_str);
 
     if (get_saves_path(t->saves_path, MAX_PATH_LENGTH, settings->path_mode, settings->manual_saves_path)) {
-        if (settings->print_debug_status) {
-            printf("[TRACKER] Using saves path: %s\n", t->saves_path);
-            log_message("[TRACKER] Using saves path: %s\n", t->saves_path);
-        }
+        log_message(LOG_INFO, "[TRACKER] Using saves path: %s\n", t->saves_path);
+
 
         // Find the specific world files using the correct flag
 
@@ -3573,8 +3522,7 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings) {
             t->unlocks_path,
             MAX_PATH_LENGTH);
     } else {
-        fprintf(stderr, "[TRACKER] CRITICAL: Failed to get saves path.\n");
-        log_message("[TRACKER] CRITICAL: Failed to get saves path.\n");
+        log_message(LOG_ERROR, "[TRACKER] CRITICAL: Failed to get saves path.\n");
 
         // Ensure paths are empty
         t->saves_path[0] = '\0';
@@ -3585,21 +3533,17 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings) {
     }
 }
 
-void tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
-    if (settings->print_debug_status) {
-        printf("[TRACKER] Loading advancement template from: %s\n", t->advancement_template_path);
-        log_message("[TRACKER] Loading advancement template from: %s\n", t->advancement_template_path);
-    }
+bool tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
+    log_message(LOG_INFO, "[TRACKER] Loading advancement template from: %s\n", t->advancement_template_path);
+
     cJSON *template_json = cJSON_from_file(t->advancement_template_path);
 
-    settings_load((AppSettings *) settings);
+    // settings_load((AppSettings *) settings); // TODO: Remove??
 
     // Check if template file exists otherwise create it using temp_create_utils.c
     if (!template_json) {
-        fprintf(stderr, "[TRACKER] Template file not found: %s\n", t->advancement_template_path);
-        log_message("[TRACKER] Template file not found: %s\n", t->advancement_template_path);
-        fprintf(stderr, "[TRACKER] Attempting to create new template and language files...\n");
-        log_message("[TRACKER] Attempting to create new template and language files...\n");
+        log_message(LOG_ERROR, "[TRACKER] Template file not found: %s\n", t->advancement_template_path);
+        log_message(LOG_ERROR, "[TRACKER] Attempting to create new template and language files...\n");
 
         // Ensure directory structure exists
         fs_ensure_directory_exists(t->advancement_template_path);
@@ -3613,9 +3557,10 @@ void tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
         template_json = cJSON_from_file(t->advancement_template_path);
 
         if (!template_json) {
-            fprintf(stderr, "[TRACKER] CRITICAL: Failed to load the newly created template file.\n");
-            log_message("[TRACKER] CRITICAL: Failed to load the newly created template file.\n");
-            return;
+            log_message(LOG_ERROR, "[TRACKER] CRITICAL: Failed to load the newly created template file.\n");
+            show_error_message("Template Error",
+                               "The selected template file is missing or corrupted and could not be recreated.\nPlease check the file path in your settings or the file's contents.");
+            return false; // Signal critical failure
         }
     }
 
@@ -3629,9 +3574,8 @@ void tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
     // Load settings.json to check for custom progress
     cJSON *settings_json = cJSON_from_file(SETTINGS_FILE_PATH);
     if (!settings_json) {
-        fprintf(stderr, "[TRACKER] Failed to load or parse settings file.\n");
-        log_message("[TRACKER] Failed to load or parse settings file.\n");
-        return;
+        log_message(LOG_ERROR, "[TRACKER] Failed to load or parse settings file.\n");
+        return false;
     }
 
     // Parse the 3 main categories from the template
@@ -3783,15 +3727,16 @@ void tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
         cJSON_Delete(lang_json);
     }
 
-    if (settings->print_debug_status) {
-        printf("[TRACKER] Initial template parsing complete.\n");
-        log_message("[TRACKER] Initial template parsing complete.\n");
-    }
+    log_message(LOG_INFO, "[TRACKER] Initial template parsing complete.\n");
+
+    return true; // Success
     // No need to delete settings_json, because it's not parsed, handled in tracker_update()
 }
 
 
 void tracker_free(Tracker **tracker, const AppSettings *settings) {
+    (void) settings;
+
     if (tracker && *tracker) {
         Tracker *t = *tracker;
 
@@ -3850,10 +3795,7 @@ void tracker_free(Tracker **tracker, const AppSettings *settings) {
         t = nullptr;
         *tracker = nullptr;
         tracker = nullptr;
-        if (settings->print_debug_status) {
-            printf("[TRACKER] Tracker freed!\n");
-            log_message("[TRACKER] Tracker freed!\n");
-        }
+        log_message(LOG_INFO, "[TRACKER] Tracker freed!\n");
     }
 }
 
@@ -3923,50 +3865,36 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
     char formatted_time[128];
     format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
 
-    printf("\n============================================================\n");
-    log_message("\n============================================================\n");
-    printf(" World:      %s\n", t->world_name);
-    log_message(" World:      %s\n", t->world_name);
-    printf(" Version:    %s\n", settings->version_str);
-    log_message(" Version:    %s\n", settings->version_str);
+    log_message(LOG_INFO, "\n============================================================\n");
+    log_message(LOG_INFO, " World:      %s\n", t->world_name);
+    log_message(LOG_INFO, " Version:    %s\n", settings->version_str);
 
     // When category isn't empty
     if (settings->category[0] != '\0') {
-        printf(" Category:   %s\n", formatted_category);
-        log_message(" Category:   %s\n", formatted_category);
+        log_message(LOG_INFO, " Category:   %s\n", formatted_category);
     }
     // When flag isn't empty
     if (settings->optional_flag[0] != '\0') {
-        printf(" Flag:       %s\n", settings->optional_flag);
-        log_message(" Flag:       %s\n", settings->optional_flag);
+        log_message(LOG_INFO, " Flag:       %s\n", settings->optional_flag);
     }
-    printf(" Play Time:  %s\n", formatted_time);
-    log_message(" Play Time:  %s\n", formatted_time);
-    printf("============================================================\n");
-    log_message("============================================================\n");
+    log_message(LOG_INFO, " Play Time:  %s\n", formatted_time);
+    log_message(LOG_INFO, "============================================================\n");
 
 
     // Check if the run is completed, check both advancement and overall progress
     if (t->template_data->advancements_completed_count >= t->template_data->advancement_count && t->template_data->
         overall_progress_percentage >= 100.0f) {
-        printf("\n                  *** RUN COMPLETE! ***\n\n");
-        log_message("\n                  *** RUN COMPLETE! ***\n\n");
-        printf("                  Final Time: %s\n\n", formatted_time);
-        log_message("                  Final Time: %s\n\n", formatted_time);
-        printf("============================================================\n\n");
-        log_message("============================================================\n\n");
+        log_message(LOG_INFO, "\n                  *** RUN COMPLETE! ***\n\n");
+        log_message(LOG_INFO, "                  Final Time: %s\n\n", formatted_time);
+        log_message(LOG_INFO, "============================================================\n\n");
     } else {
         // Advancements or Achievements
         if (version >= MC_VERSION_1_12) {
-            printf("[Advancements] %d / %d completed\n", t->template_data->advancements_completed_count,
-                   t->template_data->advancement_count);
-            log_message("[Advancements] %d / %d completed\n", t->template_data->advancements_completed_count,
-                       t->template_data->advancement_count);
+            log_message(LOG_INFO, "[Advancements] %d / %d completed\n", t->template_data->advancements_completed_count,
+                        t->template_data->advancement_count);
         } else {
-            printf("[Achievements] %d / %d completed\n", t->template_data->advancements_completed_count,
-                   t->template_data->advancement_count);
-            log_message("[Achievements] %d / %d completed\n", t->template_data->advancements_completed_count,
-                       t->template_data->advancement_count);
+            log_message(LOG_INFO, "[Achievements] %d / %d completed\n", t->template_data->advancements_completed_count,
+                        t->template_data->advancement_count);
         }
         for (int i = 0; i < t->template_data->advancement_count; i++) {
             TrackableCategory *adv = t->template_data->advancements[i];
@@ -3985,14 +3913,11 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
 
             // Only print criteria count if there are more than 1
             if (adv->criteria_count > 1) {
-                printf("  - %s (%d/%d criteria): %s\n", adv->display_name, adv->completed_criteria_count,
-                       adv->criteria_count,
-                       status_text);
-                log_message("  - %s (%d/%d criteria): %s\n", adv->display_name, adv->completed_criteria_count,
-                       adv->criteria_count,
-                       status_text);
+                log_message(LOG_INFO, "  - %s (%d/%d criteria): %s\n", adv->display_name, adv->completed_criteria_count,
+                            adv->criteria_count,
+                            status_text);
             } else {
-                printf("  - %s: %s\n", adv->display_name, status_text);
+                log_message(LOG_INFO, "  - %s: %s\n", adv->display_name, status_text);
             }
 
 
@@ -4000,9 +3925,7 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
                 TrackableItem *crit = adv->criteria[j];
                 // takes translation from the language file otherwise root_name
                 // Print if criteria is shared
-                printf("    - %s: %s%s\n", crit->display_name, crit->is_shared ? "SHARED - " : "",
-                       crit->done ? "DONE" : "NOT DONE");
-                log_message("    - %s: %s%s\n", crit->display_name, crit->is_shared ? "SHARED - " : "",
+                log_message(LOG_INFO, "    - %s: %s%s\n", crit->display_name, crit->is_shared ? "SHARED - " : "",
                             crit->done ? "DONE" : "NOT DONE");
             }
         }
@@ -4046,12 +3969,7 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
                 // Check if the single criterion has a target greater 0 or -1
                 if (sub_stat->goal > 0) {
                     // It's a completable single-criterion stat
-                    printf("[Stat] %s: %d / %d - %s\n",
-                           stat_cat->display_name,
-                           sub_stat->progress,
-                           sub_stat->goal,
-                           sub_status_text);
-                    log_message("[Stat] %s: %d / %d - %s\n",
+                    log_message(LOG_INFO, "[Stat] %s: %d / %d - %s\n",
                                 stat_cat->display_name,
                                 sub_stat->progress,
                                 sub_stat->goal,
@@ -4059,11 +3977,7 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
                 } else if (sub_stat->goal == -1) {
                     // When target is -1 it acts as infinte counter, then goal doesn't get printed
                     // It's a completable single-criterion stat
-                    printf("[Stat] %s: %d - %s\n",
-                           stat_cat->display_name,
-                           sub_stat->progress,
-                           sub_status_text);
-                    log_message("[Stat] %s: %d - %s\n",
+                    log_message(LOG_INFO, "[Stat] %s: %d - %s\n",
                                 stat_cat->display_name,
                                 sub_stat->progress,
                                 sub_status_text);
@@ -4072,32 +3986,22 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
                     // NO STAT SHOULD EVER HAVE A GOAL OF 0
                     // HERE WE'RE HANDLING GOAL OF 0 AND NO ICON KEY
                     // THEN it's a hidden stat for multi-stage for legacy
-                    printf("[Stat Tracker] %s: %d\n",
-                           stat_cat->display_name,
-                           sub_stat->progress);
-                    log_message("[Stat Tracker] %s: %d\n",
+                    log_message(LOG_INFO, "[Stat Tracker] %s: %d\n",
                                 stat_cat->display_name,
                                 sub_stat->progress);
                 } else {
                     // When target value is 0 or NOT EXISTENT for mid-era and modern versions
                     // Then it's a MISTAKE IN THE TEMPLATE FILE
-                    printf("[Stat] %s: %d\n - HAS GOAL OF %d, which it shouldn't have. This stat can't be completed.\n",
-                           stat_cat->display_name,
-                           sub_stat->progress,
-                           sub_stat->goal);
-                    log_message("[Stat] %s: %d\n - HAS GOAL OF %d, which it shouldn't have. This stat can't be completed.\n",
-                                stat_cat->display_name,
-                                sub_stat->progress,
-                                sub_stat->goal);
+                    log_message(
+                        LOG_INFO,
+                        "[Stat] %s: %d\n - HAS GOAL OF %d, which it shouldn't have. This stat can't be completed.\n",
+                        stat_cat->display_name,
+                        sub_stat->progress,
+                        sub_stat->goal);
                 }
             } else {
                 // Full stat category uses the status of the category, others use sub_status above
-                printf("[Stat Category] %s (%d/%d): %s\n",
-                       stat_cat->display_name,
-                       stat_cat->completed_criteria_count,
-                       stat_cat->criteria_count,
-                       status_text);
-                log_message("[Stat Category] %s (%d/%d): %s\n",
+                log_message(LOG_INFO, "[Stat Category] %s (%d/%d): %s\n",
                             stat_cat->display_name,
                             stat_cat->completed_criteria_count,
                             stat_cat->criteria_count,
@@ -4119,13 +4023,7 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
                         sub_status_text = "NOT DONE";
                     }
                     // You could add a check here for sub_stat->goal != -1 if you don't want to print progress for untracked stats
-                    printf("  - %s: %s%d / %d - %s\n",
-                           sub_stat->display_name,
-                           sub_stat->is_shared ? "SHARED - " : "",
-                           sub_stat->progress,
-                           sub_stat->goal,
-                           sub_status_text);
-                    log_message("  - %s: %s%d / %d - %s\n",
+                    log_message(LOG_INFO, "  - %s: %s%d / %d - %s\n",
                                 sub_stat->display_name,
                                 sub_stat->is_shared ? "SHARED - " : "",
                                 sub_stat->progress,
@@ -4138,9 +4036,7 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
 
         // Only print unlocks if they exist
         if (t->template_data->unlock_count > 0) {
-            printf("[Unlocks] %d / %d completed\n", t->template_data->unlocks_completed_count,
-                   t->template_data->unlock_count);
-            log_message("[Unlocks] %d / %d completed\n", t->template_data->unlocks_completed_count,
+            log_message(LOG_INFO, "[Unlocks] %d / %d completed\n", t->template_data->unlocks_completed_count,
                         t->template_data->unlock_count);
         }
 
@@ -4148,8 +4044,7 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
         for (int i = 0; i < t->template_data->unlock_count; i++) {
             TrackableItem *unlock = t->template_data->unlocks[i];
             if (!unlock) continue;
-            printf("  - %s: %s\n", unlock->display_name, unlock->done ? "UNLOCKED" : "LOCKED");
-            log_message("  - %s: %s\n", unlock->display_name, unlock->done ? "UNLOCKED" : "LOCKED");
+            log_message(LOG_INFO, "  - %s: %s\n", unlock->display_name, unlock->done ? "UNLOCKED" : "LOCKED");
         }
 
 
@@ -4160,30 +4055,21 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
             if (custom_goal->goal == -1) {
                 // Case 1: Infinite counter. Show the count, or "COMPLETED" if overridden.
                 if (custom_goal->done) {
-                    printf("[Custom Counter] %s: COMPLETED (MANUAL)\n", custom_goal->display_name);
-                    log_message("[Custom Counter] %s: COMPLETED (MANUAL)\n", custom_goal->display_name);
+                    log_message(LOG_INFO, "[Custom Counter] %s: COMPLETED (MANUAL)\n", custom_goal->display_name);
                 } else {
-                    printf("[Custom Counter] %s: %d\n", custom_goal->display_name, custom_goal->progress);
-                    log_message("[Custom Counter] %s: %d\n", custom_goal->display_name, custom_goal->progress);
+                    log_message(LOG_INFO, "[Custom Counter] %s: %d\n", custom_goal->display_name,
+                                custom_goal->progress);
                 }
             } else if (custom_goal->goal > 0) {
                 // Case 2: Normal counter with a target goal.
-                printf("[Custom Counter] %s: %d / %d - %s\n",
-                       custom_goal->display_name,
-                       custom_goal->progress,
-                       custom_goal->goal,
-                       custom_goal->done ? "COMPLETED" : "INCOMPLETE");
-                log_message("[Custom Counter] %s: %d / %d - %s\n",
+                log_message(LOG_INFO, "[Custom Counter] %s: %d / %d - %s\n",
                             custom_goal->display_name,
                             custom_goal->progress,
                             custom_goal->goal,
                             custom_goal->done ? "COMPLETED" : "INCOMPLETE");
             } else {
                 // Case 3: Simple on/off toggle when goal == 0 or not set
-                printf("[Custom Goal] %s: %s\n",
-                       custom_goal->display_name,
-                       custom_goal->done ? "COMPLETED" : "INCOMPLETE");
-                log_message("[Custom Goal] %s: %s\n",
+                log_message(LOG_INFO, "[Custom Goal] %s: %s\n",
                             custom_goal->display_name,
                             custom_goal->done ? "COMPLETED" : "INCOMPLETE");
             }
@@ -4196,43 +4082,34 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
 
                 // Check if the active stage is a stat and print its progress
                 if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress > 0) {
-                    printf("[Multi-Stage Goal] %s: %s (%d/%d)\n",
-                           goal->display_name,
-                           active_stage->display_text,
-                           active_stage->current_stat_progress,
-                           active_stage->required_progress);
-                    log_message("[Multi-Stage Goal] %s: %s (%d/%d)\n",
-                           goal->display_name,
-                           active_stage->display_text,
-                           active_stage->current_stat_progress,
-                           active_stage->required_progress);
+                    log_message(LOG_INFO, "[Multi-Stage Goal] %s: %s (%d/%d)\n",
+                                goal->display_name,
+                                active_stage->display_text,
+                                active_stage->current_stat_progress,
+                                active_stage->required_progress);
                 } else {
                     // If it's not "stat" print this
-                    printf("[Multi-Stage Goal] %s: %s\n", goal->display_name, active_stage->display_text);
-                    log_message("[Multi-Stage Goal] %s: %s\n", goal->display_name, active_stage->display_text);
+                    log_message(LOG_INFO, "[Multi-Stage Goal] %s: %s\n", goal->display_name,
+                                active_stage->display_text);
                 }
             }
         }
 
         // Advancement/Achievement Progress AGAIN
         if (version >= MC_VERSION_1_12) {
-            printf("\n[Advancements] %d / %d completed\n", t->template_data->advancements_completed_count,
-                   t->template_data->advancement_count);
-            log_message("\n[Advancements] %d / %d completed\n", t->template_data->advancements_completed_count,
-                   t->template_data->advancement_count);
+            log_message(LOG_INFO, "\n[Advancements] %d / %d completed\n",
+                        t->template_data->advancements_completed_count,
+                        t->template_data->advancement_count);
         } else {
-            printf("\n[Achievements] %d / %d completed\n", t->template_data->advancements_completed_count,
-                   t->template_data->advancement_count);
-            log_message("\n[Achievements] %d / %d completed\n", t->template_data->advancements_completed_count,
-                   t->template_data->advancement_count);
+            log_message(LOG_INFO, "\n[Achievements] %d / %d completed\n",
+                        t->template_data->advancements_completed_count,
+                        t->template_data->advancement_count);
         }
 
 
         // Overall Progress
-        printf("[Overall Progress] %.2f%%\n", t->template_data->overall_progress_percentage);
-        log_message("[Overall Progress] %.2f%%\n", t->template_data->overall_progress_percentage);
-        printf("============================================================\n\n");
-        log_message("============================================================\n\n");
+        log_message(LOG_INFO, "[Overall Progress] %.2f%%\n", t->template_data->overall_progress_percentage);
+        log_message(LOG_INFO, "============================================================\n\n");
     }
     // Force the output buffer to write to the console immediately
     fflush(stdout);

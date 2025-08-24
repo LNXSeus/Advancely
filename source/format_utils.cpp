@@ -17,7 +17,7 @@ void format_category_string(const char *input, char *output, size_t max_len) {
             output[i++] = ' ';
             capitalize_next = true;
         } else {
-            output[i++] = capitalize_next ? (char) toupper((unsigned char)*input) : *input;
+            output[i++] = capitalize_next ? (char) toupper((unsigned char) *input) : *input;
             capitalize_next = false;
         }
         input++;

@@ -75,9 +75,15 @@ The true power of Advancely lies in its customization. All settings can be confi
 
 ## How To Use
 
-1.  **Download**: Grab the latest release for your operating system from the [**releases page**](https://github.com/LNXSeus/Advancely/releases).
-2.  **Configure (Optional)**: For first-time use, you can simply run the application. To customize, press `ESC` in the tracker window to open the settings. Here you can select your Minecraft version, choose a tracking category, and configure visuals and hotkeys.
-3.  **Run**: Launch Advancely. It will automatically find your most recently played singleplayer world and begin displaying your progress in real-time.
+1.  **Download**: Grab the latest release (Windows, Linux, or macOS are all in one) from the [**releases page**](https://github.com/LNXSeus/Advancely/releases).
+2.  **Extract to Folder**: Extract the downloaded zip file into a folder and the run the Advancely.exe file ALWAYS from that folder. **DO NOT CREATE A SHORTCUT TO THE EXE FILE**. 
+3.  **Configure (Optional)**: For first-time use, you can simply run the application. To customize, press `ESC` in the tracker window to open the settings. Here you can select your Minecraft version, choose a tracking category, and configure visuals and hotkeys.
+4.  **Run**: Launch Advancely FROM THE EXTRACTED FOLDER. It will automatically find your most recently played singleplayer world and begin displaying your progress in real-time.
+
+### Known Limitations
+
+* **Symbolic Links**: On Windows and macOS, the real-time file watcher may not function correctly if your `.minecraft/saves` folder is a symbolic link. For best results, please provide a direct path to your saves folder in the settings if you use a custom location.
+* **Shortcuts**: You must always run the application from where all the `.dll` files are located. Do not create a shortcut to the Advancely.exe file.
 
 ### Licenses & Credits
 

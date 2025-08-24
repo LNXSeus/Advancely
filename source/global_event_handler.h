@@ -13,7 +13,6 @@ extern "C" {
 #endif
 
 
-
 // Forward declarations
 struct Tracker;
 struct Overlay;

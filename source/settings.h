@@ -12,7 +12,6 @@ extern "C" {
 #endif
 
 
-
 // Avoid including the full header
 struct AppSettings;
 
@@ -27,7 +26,8 @@ struct AppSettings;
  * @param t A pointer to the Tracker struct.
  * @param force_open_flag A pointer to the global flag that forces the window open.
  */
-void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t, bool *force_open_flag);
+void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t,
+                         bool *force_open_flag);
 
 
 #ifdef __cplusplus

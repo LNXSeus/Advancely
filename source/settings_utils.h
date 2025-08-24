@@ -31,14 +31,13 @@ extern "C" {
 #define DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED false
 
 // DEFINE DEFAULT SETTINGS
-#define DEFAULT_VERSION "1.16.1"
-#define DEFAULT_CATEGORY "All_Advancements"
-#define DEFAULT_OPTIONAL_FLAG ""
+#define DEFAULT_VERSION "1.16.1"  // Also needs to be changed in settings_load()
+#define DEFAULT_CATEGORY "all_advancements" // Also needs to be changed in settings_load()
+#define DEFAULT_OPTIONAL_FLAG ""  // Also needs to be changed in settings_load()
 
 // Default window positions/sizes. -1 means centered or default size.
 #define DEFAULT_WINDOW_POS (-1)
 #define DEFAULT_WINDOW_SIZE (-1)
-
 
 
 struct TemplateData;
@@ -75,49 +74,53 @@ extern const ColorRGBA DEFAULT_OVERLAY_TEXT_COLOR;
 // A Struct to hold all application settings in one place
 struct AppSettings {
     // --- Template Configuration ---
-    char version_str[64];                     // The selected Minecraft version string, e.g., "1.16.1".
-    PathMode path_mode;                       // The mode for finding the saves path (auto or manual).
-    char manual_saves_path[MAX_PATH_LENGTH];  // The user-defined path to the saves folder if path_mode is manual.
-    char category[MAX_PATH_LENGTH];           // The speedrun or goal category, used to build the template file name.
-    char optional_flag[MAX_PATH_LENGTH];      // An optional string appended to the template file name for variants.
+    char version_str[64]; // The selected Minecraft version string, e.g., "1.16.1".
+    PathMode path_mode; // The mode for finding the saves path (auto or manual).
+    char manual_saves_path[MAX_PATH_LENGTH]; // The user-defined path to the saves folder if path_mode is manual.
+    char category[MAX_PATH_LENGTH]; // The speedrun or goal category, used to build the template file name.
+    char optional_flag[MAX_PATH_LENGTH]; // An optional string appended to the template file name for variants.
 
     // --- Constructed Paths (from above settings) ---
-    char template_path[MAX_PATH_LENGTH];      // The final, constructed path to the template .json file.
-    char lang_path[MAX_PATH_LENGTH];          // The final, constructed path to the language .json file.
-    char snapshot_path[MAX_PATH_LENGTH];      // The final, constructed path to the legacy snapshot .json file.
+    char template_path[MAX_PATH_LENGTH]; // The final, constructed path to the template .json file.
+    char lang_path[MAX_PATH_LENGTH]; // The final, constructed path to the language .json file.
+    char snapshot_path[MAX_PATH_LENGTH]; // The final, constructed path to the legacy snapshot .json file.
 
     // --- Hotkeys ---
-    int hotkey_count;                         // The number of active hotkey bindings.
-    HotkeyBinding hotkeys[MAX_HOTKEYS];       // Array of hotkey bindings for custom goals.
+    int hotkey_count; // The number of active hotkey bindings.
+    HotkeyBinding hotkeys[MAX_HOTKEYS]; // Array of hotkey bindings for custom goals.
 
     // --- General Settings ---
-    bool enable_overlay;                      // If true, the overlay window is created and rendered.
-    bool using_stats_per_world_legacy;        // If true, legacy versions look for per-world .dat files (for StatsPerWorld mod).
-    float fps;                                // The target frames per second for the application loop.
-    bool tracker_always_on_top;               // If true, the main tracker window stays above other windows.
-    bool print_debug_status;                  // If true, tracker_print_debug_status() function gets called.
-    float overlay_scroll_speed;               // The speed and direction of the scrolling animation in the overlay.
-    bool remove_completed_goals;              // If true, completed goals are hidden from the tracker view.
+    bool enable_overlay; // If true, the overlay window is created and rendered.
+    bool using_stats_per_world_legacy;
+    // If true, legacy versions look for per-world .dat files (for StatsPerWorld mod).
+    float fps; // The target frames per second for the application loop.
+    bool tracker_always_on_top; // If true, the main tracker window stays above other windows.
+
+    // If false only error messages are printed to console and log file
+    // Logic is used in logger.cpp in log_message() function
+    bool print_debug_status;
+    float overlay_scroll_speed; // The speed and direction of the scrolling animation in the overlay.
+    bool remove_completed_goals; // If true, completed goals are hidden from the tracker view.
     OverlayProgressTextAlignment overlay_progress_text_align; // Alignment for the progress text in the overlay.
-    bool overlay_animation_speedup;           // If true, the overlay animation speed is increased.
-    bool overlay_row3_remove_completed;       // If true, the third row will also hide completed goals as row 2 does.
+    bool overlay_animation_speedup; // If true, the overlay animation speed is increased.
+    bool overlay_row3_remove_completed; // If true, the third row will also hide completed goals as row 2 does.
 
     // --- Window Geometry ---
-    WindowRect tracker_window;                // The saved position and size of the main tracker window.
-    WindowRect overlay_window;                // The saved position and size of the overlay window.
+    WindowRect tracker_window; // The saved position and size of the main tracker window.
+    WindowRect overlay_window; // The saved position and size of the overlay window.
 
     // --- Colors ---
-    ColorRGBA tracker_bg_color;               // Background color for the main tracker window.
-    ColorRGBA overlay_bg_color;               // Background color for the overlay window.
-    ColorRGBA text_color;                     // Global text color for UI elements.
-    ColorRGBA overlay_text_color;             // Text color for the overlay window.
+    ColorRGBA tracker_bg_color; // Background color for the main tracker window.
+    ColorRGBA overlay_bg_color; // Background color for the overlay window.
+    ColorRGBA text_color; // Global text color for UI elements.
+    ColorRGBA overlay_text_color; // Text color for the overlay window.
 
     // --- Overlay Text Sections ---
-    bool overlay_show_world;                // If true, the world name is shown in the overlay.
-    bool overlay_show_run_details;          // If true, the run details are shown in the overlay.
-    bool overlay_show_progress;             // If true, the progress bar is shown in the overlay.
-    bool overlay_show_igt;                  // If true, the in-game time is shown in the overlay.
-    bool overlay_show_update_timer;         // If true, the update timer is shown in the overlay.
+    bool overlay_show_world; // If true, the world name is shown in the overlay.
+    bool overlay_show_run_details; // If true, the run details are shown in the overlay.
+    bool overlay_show_progress; // If true, the progress bar is shown in the overlay.
+    bool overlay_show_igt; // If true, the in-game time is shown in the overlay.
+    bool overlay_show_update_timer; // If true, the update timer is shown in the overlay.
 };
 
 

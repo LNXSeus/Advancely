@@ -18,55 +18,55 @@ extern "C" {
 // A simple structure for a texture cache entry
 // To prevent loading the same SDL texture multiple times
 typedef struct {
-    char path[MAX_PATH_LENGTH];     // The path to the texture file
-    SDL_Texture *texture;           // The SDL_Texture object
+    char path[MAX_PATH_LENGTH]; // The path to the texture file
+    SDL_Texture *texture; // The SDL_Texture object
 } TextureCacheEntry;
 
 typedef struct {
-    char path[MAX_PATH_LENGTH];     // The path to the texture file
-    AnimatedTexture *anim;       // The SDL_Texture object
+    char path[MAX_PATH_LENGTH]; // The path to the texture file
+    AnimatedTexture *anim; // The SDL_Texture object
 } AnimatedTextureCacheEntry;
 
 struct Tracker {
-    SDL_Window *window;             // The main overlay window
-    SDL_Renderer *renderer;         // The main overlay renderer
+    SDL_Window *window; // The main overlay window
+    SDL_Renderer *renderer; // The main overlay renderer
 
     // --- Texture Cache ---
     TextureCacheEntry *texture_cache; // Array of texture cache entries
-    int texture_cache_count;          // Number of entries in the cache
-    int texture_cache_capacity;       // Maximum capacity of the cache
+    int texture_cache_count; // Number of entries in the cache
+    int texture_cache_capacity; // Maximum capacity of the cache
     AnimatedTextureCacheEntry *anim_cache; // Array of animated texture cache entries
-    int anim_cache_count;             // Number of entries in the cache
-    int anim_cache_capacity;          // Maximum capacity of the cache
+    int anim_cache_count; // Number of entries in the cache
+    int anim_cache_capacity; // Maximum capacity of the cache
 
     // --- Global Textures ---
-    SDL_Texture *adv_bg;            // Texture for the default advancement background.
-    SDL_Texture *adv_bg_half_done;  // Texture for partially completed advancement/stat backgrounds.
-    SDL_Texture *adv_bg_done;       // Texture for completed advancement/stat backgrounds.
+    SDL_Texture *adv_bg; // Texture for the default advancement background.
+    SDL_Texture *adv_bg_half_done; // Texture for partially completed advancement/stat backgrounds.
+    SDL_Texture *adv_bg_done; // Texture for completed advancement/stat backgrounds.
 
     // --- UI & Camera ---
-    ImVec2 camera_offset;           // The current panning offset of the main view.
-    float zoom_level;               // The current zoom level of the main view.
-    float time_since_last_update;   // Timer tracking seconds since the last data file update.
-    bool layout_locked;             // Flag to lock the grid layout width, preventing reflow on window resize.
-    float locked_layout_width;      // The saved width of the layout when it was locked.
+    ImVec2 camera_offset; // The current panning offset of the main view.
+    float zoom_level; // The current zoom level of the main view.
+    float time_since_last_update; // Timer tracking seconds since the last data file update.
+    bool layout_locked; // Flag to lock the grid layout width, preventing reflow on window resize.
+    float locked_layout_width; // The saved width of the layout when it was locked.
 
     // --- Fonts ---
-    ImFont *roboto_font;            // ImGui font for the settings window UI.
-    TTF_Font *minecraft_font;       // SDL_TTF font for the overlay window.
+    ImFont *roboto_font; // ImGui font for the settings window UI.
+    TTF_Font *minecraft_font; // SDL_TTF font for the overlay window.
 
     // --- Core Data ---
-    TemplateData *template_data;    // A pointer to the struct holding all parsed template and progress data.
+    TemplateData *template_data; // A pointer to the struct holding all parsed template and progress data.
 
     // --- File Paths ---
     char advancement_template_path[MAX_PATH_LENGTH]; // Full path to the current template .json file.
-    char lang_path[MAX_PATH_LENGTH];                 // Full path to the current language .json file.
-    char saves_path[MAX_PATH_LENGTH];                // Path to the .minecraft/saves directory.
-    char world_name[MAX_PATH_LENGTH];                // Name of the most recently played world.
-    char advancements_path[MAX_PATH_LENGTH];         // Full path to the player's advancements .json file for the current world.
-    char unlocks_path[MAX_PATH_LENGTH];              // Full path to the player's unlocks .json file (if applicable).
-    char stats_path[MAX_PATH_LENGTH];                // Full path to the player's stats file (.json or .dat) for the current world.
-    char snapshot_path[MAX_PATH_LENGTH];             // Full path to the snapshot file for legacy stat tracking.
+    char lang_path[MAX_PATH_LENGTH]; // Full path to the current language .json file.
+    char saves_path[MAX_PATH_LENGTH]; // Path to the .minecraft/saves directory.
+    char world_name[MAX_PATH_LENGTH]; // Name of the most recently played world.
+    char advancements_path[MAX_PATH_LENGTH]; // Full path to the player's advancements .json file for the current world.
+    char unlocks_path[MAX_PATH_LENGTH]; // Full path to the player's unlocks .json file (if applicable).
+    char stats_path[MAX_PATH_LENGTH]; // Full path to the player's stats file (.json or .dat) for the current world.
+    char snapshot_path[MAX_PATH_LENGTH]; // Full path to the snapshot file for legacy stat tracking.
 };
 
 
@@ -89,7 +89,8 @@ SDL_Texture *load_texture_with_scale_mode(SDL_Renderer *renderer, const char *pa
     * @param scale_mode The desired SDL_ScaleMode for the texture if it needs to be loaded.
     * @return A pointer to the cached or newly loaded SDL_Texture, or nullptr on failure.
 */
-SDL_Texture *get_texture_from_cache(SDL_Renderer *renderer, TextureCacheEntry **cache, int *cache_count, int *cache_capacity, const char *path, SDL_ScaleMode scale_mode);
+SDL_Texture *get_texture_from_cache(SDL_Renderer *renderer, TextureCacheEntry **cache, int *cache_count,
+                                    int *cache_capacity, const char *path, SDL_ScaleMode scale_mode);
 
 
 /**
@@ -111,7 +112,9 @@ void free_animated_texture(AnimatedTexture *anim);
  * @param scale_mode The desired SDL_ScaleMode for the texture frames if it needs to be loaded.
  * @return A pointer to the cached or newly loaded AnimatedTexture, or nullptr on failure.
  */
-AnimatedTexture *get_animated_texture_from_cache(SDL_Renderer *renderer, AnimatedTextureCacheEntry **cache, int *cache_count, int *cache_capacity, const char* path, SDL_ScaleMode scale_mode);
+AnimatedTexture *get_animated_texture_from_cache(SDL_Renderer *renderer, AnimatedTextureCacheEntry **cache,
+                                                 int *cache_count, int *cache_capacity, const char *path,
+                                                 SDL_ScaleMode scale_mode);
 
 
 /**
@@ -217,8 +220,9 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings);
  *
  * @param t A pointer to the Tracker struct containing the necessary paths.
  * @param settings A pointer to the application settings.
- */
-void tracker_load_and_parse_data(Tracker *t, const AppSettings *settings);
+ * @return true on success, false on a critical failure.
+*/
+bool tracker_load_and_parse_data(Tracker *t, const AppSettings *settings);
 
 /**
  * @brief Frees all resources associated with the Tracker instance.

@@ -2,11 +2,13 @@
 // Created by Linus on 27.06.2025.
 //
 
+#include <cstdio>
+#include <cstring>
+
 #include "settings_utils.h"
 #include "logger.h"
 #include "file_utils.h" // has the cJSON_from_file function
-#include <cstdio>
-#include <cstring>
+#include "main.h"
 
 // Define the actual constant values for the colors here in the .cpp file.
 const ColorRGBA DEFAULT_TRACKER_BG_COLOR = {13, 17, 23, 255};
@@ -249,12 +251,13 @@ bool settings_load(AppSettings *settings) {
     settings_set_defaults(settings);
 
     // Try to load and parse the settings file, read with escaping
-    cJSON *json = cJSON_from_file(SETTINGS_FILE_PATH); // returns json object with corrected slashes from windows paste
+    cJSON *json = cJSON_from_file(SETTINGS_FILE_PATH);
     if (json == nullptr) {
-        fprintf(stderr, "[SETTINGS UTILS] Failed to load settings file: %s. Using default settings.\n",
+        log_message(LOG_ERROR,"[SETTINGS UTILS] Failed to load or parse settings file: %s. Using default settings.\n",
                 SETTINGS_FILE_PATH);
-        log_message("[SETTINGS UTILS] Failed to load settings file: %s. Using default settings.\n",
-                SETTINGS_FILE_PATH);
+
+        // Show pop-up error message
+        show_error_message("Settings Corrupted", "Could not read settings.json. The file may be corrupted or missing.\n Restart Advancely then your settings have been reset to their defaults.");
         defaults_were_used = true; // The whole file is missing, so it needs to be created.
     }
 
@@ -282,7 +285,7 @@ bool settings_load(AppSettings *settings) {
         strncpy(settings->version_str, version_json->valuestring,
                 sizeof(settings->version_str) - 1);
     else {
-        strncpy(settings->version_str, "1.21.6", sizeof(settings->version_str) - 1);
+        strncpy(settings->version_str, "1.16.1", sizeof(settings->version_str) - 1);
         defaults_were_used = true;
     }
 
@@ -452,10 +455,8 @@ bool settings_load(AppSettings *settings) {
 
     cJSON_Delete(json);
     construct_template_paths(settings);
-    if (settings->print_debug_status) {
-        printf("[SETTINGS UTILS] Settings loaded successfully!\n");
-        log_message("[SETTINGS UTILS] Settings loaded successfully!\n");
-    }
+        log_message(LOG_INFO,"[SETTINGS UTILS] Settings loaded successfully!\n");
+
     return defaults_were_used;
 }
 
@@ -463,43 +464,57 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
     if (!settings) return;
 
     // Read the existing file, or create a new JSON object if it doesn't exist
-    cJSON *root = cJSON_from_file(SETTINGS_FILE_PATH); // With escaping
+    cJSON *root = cJSON_from_file(SETTINGS_FILE_PATH);
     if (!root) {
         root = cJSON_CreateObject();
     }
 
-    // Update top-level settings
-    cJSON_ReplaceItemInObject(root, "path_mode",
-                              cJSON_CreateString(settings->path_mode == PATH_MODE_MANUAL ? "manual" : "auto"));
-    cJSON_ReplaceItemInObject(root, "manual_saves_path", cJSON_CreateString(settings->manual_saves_path));
-    cJSON_ReplaceItemInObject(root, "version", cJSON_CreateString(settings->version_str));
-    cJSON_ReplaceItemInObject(root, "category", cJSON_CreateString(settings->category));
-    cJSON_ReplaceItemInObject(root, "optional_flag", cJSON_CreateString(settings->optional_flag));
+    // Update top-level settings using a safe "delete then add" pattern
+    cJSON_DeleteItemFromObject(root, "path_mode");
+    cJSON_AddItemToObject(root, "path_mode", cJSON_CreateString(settings->path_mode == PATH_MODE_MANUAL ? "manual" : "auto"));
+    cJSON_DeleteItemFromObject(root, "manual_saves_path");
+    cJSON_AddItemToObject(root, "manual_saves_path", cJSON_CreateString(settings->manual_saves_path));
+    cJSON_DeleteItemFromObject(root, "version");
+    cJSON_AddItemToObject(root, "version", cJSON_CreateString(settings->version_str));
+    cJSON_DeleteItemFromObject(root, "category");
+    cJSON_AddItemToObject(root, "category", cJSON_CreateString(settings->category));
+    cJSON_DeleteItemFromObject(root, "optional_flag");
+    cJSON_AddItemToObject(root, "optional_flag", cJSON_CreateString(settings->optional_flag));
 
     // Update General Settings
     cJSON *general_obj = get_or_create_object(root, "general");
-    cJSON_ReplaceItemInObject(general_obj, "enable_overlay", cJSON_CreateBool(settings->enable_overlay));
-    cJSON_ReplaceItemInObject(general_obj, "using_stats_per_world_legacy",
-                              cJSON_CreateBool(settings->using_stats_per_world_legacy));
-    cJSON_ReplaceItemInObject(general_obj, "fps", cJSON_CreateNumber(settings->fps));
-    cJSON_ReplaceItemInObject(general_obj, "always_on_top", cJSON_CreateBool(settings->tracker_always_on_top));
-    cJSON_ReplaceItemInObject(general_obj, "overlay_scroll_speed", cJSON_CreateNumber(settings->overlay_scroll_speed));
-    cJSON_ReplaceItemInObject(general_obj, "remove_completed_goals",
-                              cJSON_CreateBool(settings->remove_completed_goals));
-    cJSON_ReplaceItemInObject(general_obj, "print_debug_status", cJSON_CreateBool(settings->print_debug_status));
-    cJSON_ReplaceItemInObject(general_obj, "overlay_progress_text_align",
-                              cJSON_CreateString(overlay_text_align_to_string(settings->overlay_progress_text_align)));
-    cJSON_ReplaceItemInObject(general_obj, "overlay_animation_speedup",
-                              cJSON_CreateBool(settings->overlay_animation_speedup));
-    cJSON_ReplaceItemInObject(general_obj, "overlay_row3_remove_completed",
-                              cJSON_CreateBool(settings->overlay_row3_remove_completed));
+    cJSON_DeleteItemFromObject(general_obj, "enable_overlay");
+    cJSON_AddItemToObject(general_obj, "enable_overlay", cJSON_CreateBool(settings->enable_overlay));
+    cJSON_DeleteItemFromObject(general_obj, "using_stats_per_world_legacy");
+    cJSON_AddItemToObject(general_obj, "using_stats_per_world_legacy", cJSON_CreateBool(settings->using_stats_per_world_legacy));
+    cJSON_DeleteItemFromObject(general_obj, "fps");
+    cJSON_AddItemToObject(general_obj, "fps", cJSON_CreateNumber(settings->fps));
+    cJSON_DeleteItemFromObject(general_obj, "always_on_top");
+    cJSON_AddItemToObject(general_obj, "always_on_top", cJSON_CreateBool(settings->tracker_always_on_top));
+    cJSON_DeleteItemFromObject(general_obj, "overlay_scroll_speed");
+    cJSON_AddItemToObject(general_obj, "overlay_scroll_speed", cJSON_CreateNumber(settings->overlay_scroll_speed));
+    cJSON_DeleteItemFromObject(general_obj, "remove_completed_goals");
+    cJSON_AddItemToObject(general_obj, "remove_completed_goals", cJSON_CreateBool(settings->remove_completed_goals));
+    cJSON_DeleteItemFromObject(general_obj, "print_debug_status");
+    cJSON_AddItemToObject(general_obj, "print_debug_status", cJSON_CreateBool(settings->print_debug_status));
+    cJSON_DeleteItemFromObject(general_obj, "overlay_progress_text_align");
+    cJSON_AddItemToObject(general_obj, "overlay_progress_text_align", cJSON_CreateString(overlay_text_align_to_string(settings->overlay_progress_text_align)));
+    cJSON_DeleteItemFromObject(general_obj, "overlay_animation_speedup");
+    cJSON_AddItemToObject(general_obj, "overlay_animation_speedup", cJSON_CreateBool(settings->overlay_animation_speedup));
+    cJSON_DeleteItemFromObject(general_obj, "overlay_row3_remove_completed");
+    cJSON_AddItemToObject(general_obj, "overlay_row3_remove_completed", cJSON_CreateBool(settings->overlay_row3_remove_completed));
 
     // --- Save Overlay Text Toggles ---
-    cJSON_ReplaceItemInObject(general_obj, "overlay_show_world", cJSON_CreateBool(settings->overlay_show_world));
-    cJSON_ReplaceItemInObject(general_obj, "overlay_show_run_details", cJSON_CreateBool(settings->overlay_show_run_details));
-    cJSON_ReplaceItemInObject(general_obj, "overlay_show_progress", cJSON_CreateBool(settings->overlay_show_progress));
-    cJSON_ReplaceItemInObject(general_obj, "overlay_show_igt", cJSON_CreateBool(settings->overlay_show_igt));
-    cJSON_ReplaceItemInObject(general_obj, "overlay_show_update_timer", cJSON_CreateBool(settings->overlay_show_update_timer));
+    cJSON_DeleteItemFromObject(general_obj, "overlay_show_world");
+    cJSON_AddItemToObject(general_obj, "overlay_show_world", cJSON_CreateBool(settings->overlay_show_world));
+    cJSON_DeleteItemFromObject(general_obj, "overlay_show_run_details");
+    cJSON_AddItemToObject(general_obj, "overlay_show_run_details", cJSON_CreateBool(settings->overlay_show_run_details));
+    cJSON_DeleteItemFromObject(general_obj, "overlay_show_progress");
+    cJSON_AddItemToObject(general_obj, "overlay_show_progress", cJSON_CreateBool(settings->overlay_show_progress));
+    cJSON_DeleteItemFromObject(general_obj, "overlay_show_igt");
+    cJSON_AddItemToObject(general_obj, "overlay_show_igt", cJSON_CreateBool(settings->overlay_show_igt));
+    cJSON_DeleteItemFromObject(general_obj, "overlay_show_update_timer");
+    cJSON_AddItemToObject(general_obj, "overlay_show_update_timer", cJSON_CreateBool(settings->overlay_show_update_timer));
 
 
     // Update Visual Settings
@@ -517,20 +532,23 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
         for (int i = 0; i < td->custom_goal_count; i++) {
             TrackableItem *item = td->custom_goals[i];
 
+            // Delete old entry before adding new one to prevent duplicates
+            cJSON_DeleteItemFromObject(progress_obj, item->root_name);
+
             // 3-way logic for custom progress, -1, greater than 0, or 0 and not set
             if (item->goal == -1) {
                 // Infinite Counter: Save 'true' if done, otherwise save the number.
                 if (item->done) {
-                    cJSON_ReplaceItemInObject(progress_obj, item->root_name, cJSON_CreateBool(true));
+                    cJSON_AddItemToObject(progress_obj, item->root_name, cJSON_CreateBool(true));
                 } else {
-                    cJSON_ReplaceItemInObject(progress_obj, item->root_name, cJSON_CreateNumber(item->progress));
+                    cJSON_AddItemToObject(progress_obj, item->root_name, cJSON_CreateNumber(item->progress));
                 }
             } else if (item->goal > 0) {
                 // Normal Counter: Always save the number.
-                cJSON_ReplaceItemInObject(progress_obj, item->root_name, cJSON_CreateNumber(item->progress));
+                cJSON_AddItemToObject(progress_obj, item->root_name, cJSON_CreateNumber(item->progress));
             } else {
                 // Simple Toggle: Always save the boolean 'done' status.
-                cJSON_ReplaceItemInObject(progress_obj, item->root_name, cJSON_CreateBool(item->done));
+                cJSON_AddItemToObject(progress_obj, item->root_name, cJSON_CreateBool(item->done));
             }
         }
 
@@ -539,23 +557,23 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
         for (int i = 0; i < td->stat_count; i++) {
             TrackableCategory *stat_cat = td->stats[i];
 
+            // Delete old entry before adding new one
+            cJSON_DeleteItemFromObject(override_obj, stat_cat->root_name);
             // Save if we are forcing it true, OR if an override key already exists (to update it to false)
             if (stat_cat->is_manually_completed || cJSON_HasObjectItem(override_obj, stat_cat->root_name)) {
-                cJSON_ReplaceItemInObject(override_obj, stat_cat->root_name,
-                                          cJSON_CreateBool(stat_cat->is_manually_completed));
+                cJSON_AddItemToObject(override_obj, stat_cat->root_name, cJSON_CreateBool(stat_cat->is_manually_completed));
             }
-
 
             for (int j = 0; j < stat_cat->criteria_count; j++) {
                 TrackableItem *sub_stat = stat_cat->criteria[j];
                 char sub_stat_key[512];
-                snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name,
-                         sub_stat->root_name);
+                snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name, sub_stat->root_name);
 
+                // Delete old entry before adding new one
+                cJSON_DeleteItemFromObject(override_obj, sub_stat_key);
                 // Save if we are forcing it true, OR if an override key already exists (to update it to false)
                 if (sub_stat->is_manually_completed || cJSON_HasObjectItem(override_obj, sub_stat_key)) {
-                    cJSON_ReplaceItemInObject(override_obj, sub_stat_key,
-                                              cJSON_CreateBool(sub_stat->is_manually_completed));
+                    cJSON_AddItemToObject(override_obj, sub_stat_key, cJSON_CreateBool(sub_stat->is_manually_completed));
                 }
             }
         }
@@ -588,8 +606,7 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
         }
         fclose(file);
     } else {
-        fprintf(stderr, "[SETTINGS UTILS] Failed to open settings file for writing: %s\n", SETTINGS_FILE_PATH);
-        log_message("[SETTINGS UTILS] Failed to open settings file for writing: %s\n", SETTINGS_FILE_PATH);
+        log_message(LOG_ERROR,"[SETTINGS UTILS] Failed to open settings file for writing: %s\n", SETTINGS_FILE_PATH);
     }
     cJSON_Delete(root);
 }

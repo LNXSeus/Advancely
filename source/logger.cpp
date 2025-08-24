@@ -3,11 +3,23 @@
 //
 
 #include "logger.h"
+#include "settings_utils.h" // Include the full header for the AppSettings definition
 #include <cstdio>
 #include <ctime>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 // Global file pointer for the log file, only accessible within this file
 static FILE *log_file = nullptr;
+
+// A static pointer to the application settings
+static const AppSettings *g_app_settings = nullptr;
+
+void log_set_settings(const AppSettings *settings) {
+    g_app_settings = settings;
+}
 
 void log_init(void) {
     // Open the log file in write mode to clear it on each startup
@@ -26,7 +38,12 @@ void log_init(void) {
     fflush(log_file); // Ensure the header is written immediately
 }
 
-void log_message(const char *format, ...) {
+void log_message(LogLevel level, const char *format, ...) {
+    // If the message is informational, only proceed if debug printing is enabled.
+    if (level == LOG_INFO && (g_app_settings == nullptr || !g_app_settings->print_debug_status)) {
+        return;
+    }
+
     // Buffer to hold the formatted message
     char message[4096];
     va_list args;
@@ -36,12 +53,36 @@ void log_message(const char *format, ...) {
     vsnprintf(message, sizeof(message), format, args);
     va_end(args);
 
-    // Print the message to the standard console (stdout)
-    printf("%s", message);
+    // Print to the appropriate console stream
+    if (level == LOG_ERROR) {
+#ifdef _WIN32
+        HANDLE hConsole = GetStdHandle(STD_ERROR_HANDLE);
+        CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
+        WORD saved_attributes;
 
-    // Also write the message to the log file if it's open
+        // Save current attributes
+        GetConsoleScreenBufferInfo(hConsole, &consoleInfo);
+        saved_attributes = consoleInfo.wAttributes;
+
+        // Set text color to red
+        SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
+        fprintf(stderr, "%s", message);
+        // Restore original attributes
+        SetConsoleTextAttribute(hConsole, saved_attributes);
+#else
+        // Use ANSI escape codes for other platforms (Linux, macOS)
+        fprintf(stderr, "\033[91m%s\033[0m", message);
+#endif
+    } else {
+        printf("%s", message);
+    }
+
+    // Also write the message to the log file if it's open, with a timestamp
     if (log_file != nullptr) {
-        fprintf(log_file, "%s", message);
+        char time_buf[16];
+        time_t now = time(0);
+        strftime(time_buf, sizeof(time_buf), "%H:%M:%S", localtime(&now));
+        fprintf(log_file, "[%s] %s", time_buf, message);
         fflush(log_file); // Ensure log is written immediately in case of a crash
     }
 }

@@ -11,7 +11,7 @@
 // function to read a JSON file
 // In file_utils.cpp
 
-cJSON* cJSON_from_file(const char* filename) {
+cJSON *cJSON_from_file(const char *filename) {
     FILE *f = fopen(filename, "rb");
     if (!f) {
         return nullptr;
@@ -27,17 +27,17 @@ cJSON* cJSON_from_file(const char* filename) {
     }
 
     // Sanity check to prevent allocating massive buffers due to file errors
-    if (length > 100000000) { // 100 MB limit, generous for a JSON file
-        fprintf(stderr, "[FILE_UTILS] File size is abnormally large (%ld bytes). Aborting read: %s\n", length, filename);
-        log_message("[FILE_UTILS] File size is abnormally large (%ld bytes). Aborting read: %s\n", length, filename);
+    if (length > 100000000) {
+        // 100 MB limit, generous for a JSON file
+        log_message(LOG_ERROR, "[FILE_UTILS] File size is abnormally large (%ld bytes). Aborting read: %s\n", length,
+                    filename);
         fclose(f);
         return nullptr;
     }
 
-    char *buffer = (char*)malloc(length + 1);
+    char *buffer = (char *) malloc(length + 1);
     if (!buffer) {
-        fprintf(stderr, "[FILE_UTILS] Failed to allocate buffer for file: %s\n", filename);
-        log_message("[FILE_UTILS] Failed to allocate buffer for file: %s\n", filename);
+        log_message(LOG_ERROR, "[FILE_UTILS] Failed to allocate buffer for file: %s\n", filename);
         fclose(f);
         return nullptr;
     }
@@ -45,9 +45,8 @@ cJSON* cJSON_from_file(const char* filename) {
     size_t bytes_read = fread(buffer, 1, length, f);
     fclose(f);
 
-    if (bytes_read != (size_t)length) {
-        fprintf(stderr, "[FILE_UTILS] Failed to read entire file (size changed during read): %s\n", filename);
-        log_message("[FILE_UTILS] Failed to read entire file (size changed during read): %s\n", filename);
+    if (bytes_read != (size_t) length) {
+        log_message(LOG_ERROR, "[FILE_UTILS] Failed to read entire file (size changed during read): %s\n", filename);
         free(buffer);
         return nullptr;
     }
@@ -59,12 +58,10 @@ cJSON* cJSON_from_file(const char* filename) {
     if (json == nullptr) {
         const char *error_ptr = cJSON_GetErrorPtr();
         if (error_ptr != nullptr) {
-            fprintf(stderr, "[FILE UTILS] cJSON parse error near '%s' in file: %s\n", error_ptr, filename);
-            log_message("[FILE UTILS] cJSON parse error near '%s' in file: %s\n", error_ptr, filename);
+            log_message(LOG_ERROR, "[FILE UTILS] cJSON parse error near '%s' in file: %s\n", error_ptr, filename);
         }
     }
 
     free(buffer);
     return json;
 }
-

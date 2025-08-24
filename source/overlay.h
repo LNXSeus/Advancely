@@ -16,7 +16,8 @@ struct AppSettings;
 
 // Helper struct to handle rendering different item types in the overlay
 struct OverlayDisplayItem {
-    void* item_ptr;
+    void *item_ptr;
+
     enum ItemType { ADVANCEMENT, UNLOCK, STAT, CUSTOM, MULTISTAGE } type;
 };
 

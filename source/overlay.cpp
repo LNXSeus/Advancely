@@ -110,8 +110,7 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     *overlay = (Overlay *) calloc(1, sizeof(Overlay));
     // Check here if calloc failed
     if (*overlay == nullptr) {
-        fprintf(stderr, "[OVERLAY] Error allocating memory for overlay.\n");
-        log_message("[OVERLAY] Error allocating memory for overlay.\n");
+        log_message(LOG_ERROR, "[OVERLAY] Error allocating memory for overlay.\n");
         return false;
     }
 
@@ -145,8 +144,7 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
 
     o->text_engine = TTF_CreateRendererTextEngine(o->renderer);
     if (!o->text_engine) {
-        fprintf(stderr, "[OVERLAY] Failed to create text engine: %s\n", SDL_GetError());
-        log_message("[OVERLAY] Failed to create text engine: %s\n", SDL_GetError());
+        log_message(LOG_ERROR, "[OVERLAY] Failed to create text engine: %s\n", SDL_GetError());
         overlay_free(overlay, settings);
         return false;
     }
@@ -160,8 +158,7 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     o->adv_bg_done = load_texture_with_scale_mode(o->renderer, "resources/gui/advancement_background_done.png",
                                                   SDL_SCALEMODE_NEAREST);
     if (!o->adv_bg || !o->adv_bg_half_done || !o->adv_bg_done) {
-        fprintf(stderr, "[OVERLAY] Failed to load advancement background textures.\n");
-        log_message("[OVERLAY] Failed to load advancement background textures.\n");
+        log_message(LOG_ERROR, "[OVERLAY] Failed to load advancement background textures.\n");
         overlay_free(overlay, settings);
         return false;
     }
@@ -171,8 +168,7 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     const float base_font_size = 24.0f;
     o->font = TTF_OpenFont("resources/fonts/Minecraft.ttf", base_font_size);
     if (!o->font) {
-        fprintf(stderr, "[OVERLAY] Failed to load font: %s\n", SDL_GetError());
-        log_message("[OVERLAY] Failed to load font: %s\n", SDL_GetError());
+        log_message(LOG_ERROR, "[OVERLAY] Failed to load font: %s\n", SDL_GetError());
         overlay_free(overlay, settings);
         return false;
     }
@@ -195,10 +191,8 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
             // Allowing repeats here
             switch (event->key.scancode) {
                 case SDL_SCANCODE_SPACE:
-                    if (settings->print_debug_status) {
-                        printf("[OVERLAY] Overlay Space key pressed, speeding up tracker.\n");
-                        log_message("[OVERLAY] Overlay Space key pressed, speeding up tracker.\n");
-                    }
+                    log_message(LOG_INFO, "[OVERLAY] Overlay Space key pressed, speeding up tracker.\n");
+
                     // speed up tracker
                     // The speedup is applied to deltaTime, which affect the update rate of the animation in overlay_update()
                     *deltaTime *= OVERLAY_SPEEDUP_FACTOR;
@@ -376,8 +370,9 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
             if (display_item.type == OverlayDisplayItem::ADVANCEMENT) {
                 auto *adv = static_cast<TrackableCategory *>(display_item.item_ptr);
                 strncpy(name_buf, adv->display_name, sizeof(name_buf) - 1);
-                if (adv->criteria_count > 0) snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
-                                                      adv->completed_criteria_count, adv->criteria_count);
+                if (adv->criteria_count > 0)
+                    snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
+                             adv->completed_criteria_count, adv->criteria_count);
             } else if (display_item.type == OverlayDisplayItem::UNLOCK) {
                 auto *unlock = static_cast<TrackableItem *>(display_item.item_ptr);
                 strncpy(name_buf, unlock->display_name, sizeof(name_buf) - 1);
@@ -458,7 +453,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         char temp_chunk[256];
         bool first_item_added = false;
 
-        auto add_component = [&](const char* component_str) {
+        auto add_component = [&](const char *component_str) {
             if (first_item_added) {
                 strcat(info_buffer, " | ");
             }
@@ -510,7 +505,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             if (settings->overlay_show_update_timer) {
                 char formatted_update_time[64];
                 float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
-                format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time));
+                format_time_since_update(last_update_time_5_seconds, formatted_update_time,
+                                         sizeof(formatted_update_time));
                 snprintf(temp_chunk, sizeof(temp_chunk), "Upd: %s", formatted_update_time);
                 add_component(temp_chunk);
             }
@@ -521,7 +517,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             snprintf(final_buffer, sizeof(final_buffer), "%s | %s", info_buffer, SOCIALS[o->current_social_index]);
         } else {
             // If all sections are turned off, just show the socials
-            strncpy(final_buffer, SOCIALS[o->current_social_index], sizeof(final_buffer) -1);
+            strncpy(final_buffer, SOCIALS[o->current_social_index], sizeof(final_buffer) - 1);
         }
 
 
@@ -652,11 +648,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 // Safeguard Check, if item has no texture
                 if (!tex && !anim_tex) {
                     // This item has no valid texture, print a warning and draw a placeholder
-                    fprintf(
-                        stderr,
+                    log_message(
+                        LOG_ERROR,
                         "[Overlay Render WARNING] Item '%s' (index %d) has no texture. Check icon path in template.\n",
-                        item_to_render->root_name, current_item_idx);
-                    log_message("[Overlay Render WARNING] Item '%s' (index %d) has no texture. Check icon path in template.\n",
                         item_to_render->root_name, current_item_idx);
                     SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, 100); // Pink placeholder
                     SDL_RenderFillRect(o->renderer, &dest_rect);
@@ -1084,6 +1078,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
 
 void overlay_free(Overlay **overlay, const AppSettings *settings) {
+    (void) settings;
     if (overlay && *overlay) {
         Overlay *o = *overlay;
 
@@ -1142,9 +1137,6 @@ void overlay_free(Overlay **overlay, const AppSettings *settings) {
         o = nullptr;
         *overlay = nullptr;
 
-        if (settings->print_debug_status) {
-            printf("[OVERLAY] Overlay freed!\n");
-            log_message("[OVERLAY] Overlay freed!\n");
-        }
+        log_message(LOG_INFO, "[OVERLAY] Overlay freed!\n");
     }
 }

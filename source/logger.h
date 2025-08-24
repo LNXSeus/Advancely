@@ -11,6 +11,19 @@ extern "C" {
 
 #include <stdarg.h>
 
+// Enum to specify the type of log message
+typedef enum {
+    LOG_INFO,
+    LOG_ERROR
+} LogLevel;
+
+/**
+* @brief Gives the logger a pointer to the main application settings.
+* This is used to check if debug messages should be printed.
+* @param settings A pointer to the AppSettings struct.
+*/
+void log_set_settings(const struct AppSettings *settings);
+
 /**
  * @brief Initializes the logging system.
  * Creates/overwrites advancely_log.txt and adds a timestamp.
@@ -20,10 +33,12 @@ void log_init(void);
 /**
  * @brief Logs a formatted message to the console and the log file.
  * This function is a wrapper around printf/fprintf and is variadic.
+ * This function does not proceed if the message is only informational and debug printing is disabled.
+ * @param level The logging level (LOG_INFO for stdout, LOG_ERROR for stderr).
  * @param format The format string for the message.
  * @param ... The arguments for the format string.
  */
-void log_message(const char *format, ...);
+void log_message(LogLevel level, const char *format, ...);
 
 /**
  * @brief Closes the log file.

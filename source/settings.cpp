@@ -12,9 +12,8 @@
 #include "global_event_handler.h" // For global variables
 #include "path_utils.h" // For path_exists()
 
-// #include "init_sdl.h" // TODO: Remove this when possible
-
-void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t, bool *force_open_flag) {
+void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t,
+                         bool *force_open_flag) {
     if (!*p_open) {
         return;
     }
@@ -43,7 +42,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (force_open_flag && *force_open_flag) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.8f, 0.0f, 1.0f)); // Yellow text
         ImGui::TextWrapped("IMPORTANT: Could not find Minecraft saves folder automatically.");
-        ImGui::TextWrapped("Please enter the correct path to your '.minecraft/saves' folder below and click 'Apply Settings'.");
+        ImGui::TextWrapped(
+            "Please enter the correct path to your '.minecraft/saves' folder below and click 'Apply Settings'.");
         ImGui::PopStyleColor();
         ImGui::Separator();
         ImGui::Spacing();
@@ -75,7 +75,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
         if (show_invalid_manual_path_error) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f)); // Red text
-            ImGui::TextWrapped("The specified path is invalid or does not exist. Please provide a valid path to your '.minecraft/saves' folder.");
+            ImGui::TextWrapped(
+                "The specified path is invalid or does not exist. Please provide a valid path to your '.minecraft/saves' folder.");
             ImGui::PopStyleColor();
         }
 
@@ -153,6 +154,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SetTooltip("Enables a separate window to show your progress in your stream.\n"
             "Use a color key filter in your streaming software on the 'Overlay BG' hex color.\n"
             "A negative scroll speed animates from right-to-left.\n"
+            "To adjust the horizontal spacing between items per row,\nyou can shorten the display names in the language (*_lang.json) file.\n"
             "To turn off the overlay, disable this checkbox and hit 'Apply Settings'!");
     }
 
@@ -164,7 +166,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::DragFloat("Overlay Scroll Speed", &temp_settings.overlay_scroll_speed, 0.001f, -25.00f, 25.00f, "%.3f");
 
         if (ImGui::Checkbox("Speed Up Animation", &temp_settings.overlay_animation_speedup)) {
-
         }
         if (ImGui::IsItemHovered()) {
             char speed_up_tooltip_buffer[1024];
@@ -179,7 +180,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
         ImGui::Checkbox("Hide Completed Row 3 Goals", &temp_settings.overlay_row3_remove_completed);
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("If checked, all Goals (Stats, Custom Goals and Multi-Stage Goals) will disappear from Row 3 of the overlay.\nThis is independent of the main 'Remove Completed Goals' setting.");
+            ImGui::SetTooltip(
+                "If checked, all Goals (Stats, Custom Goals and Multi-Stage Goals) will disappear from Row 3 of the overlay.\nThis is independent of the main 'Remove Completed Goals' setting.");
         }
     }
 
@@ -210,10 +212,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
         ImGui::Text("Overlay Text Sections:");
         ImGui::SameLine();
-        ImGui::Checkbox("World", &temp_settings.overlay_show_world); ImGui::SameLine();
-        ImGui::Checkbox("Run Details", &temp_settings.overlay_show_run_details); ImGui::SameLine();
-        ImGui::Checkbox("Progress", &temp_settings.overlay_show_progress); ImGui::SameLine();
-        ImGui::Checkbox("IGT", &temp_settings.overlay_show_igt); ImGui::SameLine();
+        ImGui::Checkbox("World", &temp_settings.overlay_show_world);
+        ImGui::SameLine();
+        ImGui::Checkbox("Run Details", &temp_settings.overlay_show_run_details);
+        ImGui::SameLine();
+        ImGui::Checkbox("Progress", &temp_settings.overlay_show_progress);
+        ImGui::SameLine();
+        ImGui::Checkbox("IGT", &temp_settings.overlay_show_igt);
+        ImGui::SameLine();
         ImGui::Checkbox("Update Timer", &temp_settings.overlay_show_update_timer);
 
         ImGui::Separator();
@@ -295,11 +301,11 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::Checkbox("Print Debug To Console", &temp_settings.print_debug_status);
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip(
-        "This toggles printing a detailed progress report to the console after every file update.\n\n"
-        "IMPORTANT: This can spam the console with a large amount of text if your template files contain many entries.\n\n"
-        "This setting only affects the detailed report. General status messages and errors are always printed to the console and saved to advancely_log.txt.\n"
-        "The log is flushed after every message, making it ideal for diagnosing crashes.\n"
-        "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.");
+            "This toggles printing a detailed progress report to the console after every file update.\n\n"
+            "IMPORTANT: This can spam the console with a large amount of text if your template files contain many entries.\n\n"
+            "This setting only affects the detailed report. General status messages and errors are always printed to the console and saved to advancely_log.txt.\n"
+            "The log is flushed after every message, making it ideal for diagnosing crashes.\n"
+            "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.");
     }
 
     ImGui::Separator();
@@ -392,6 +398,11 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // Apply the changes
     if (ImGui::Button("Apply Settings")) {
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "Apply any changes made in this window. It will fail to apply if any warnings are shown.");
+        }
+
         // Assume the error is cleared unless we find one
         show_invalid_manual_path_error = false;
 
@@ -417,7 +428,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 settings_save(app_settings, nullptr);
                 SDL_SetAtomicInt(&g_settings_changed, 1); // Trigger a reload
             }
-        } else { // temp_settings.path_mode == PATH_MODE_AUTO
+        } else {
+            // temp_settings.path_mode == PATH_MODE_AUTO
             char auto_path_buffer[MAX_PATH_LENGTH];
             get_saves_path(auto_path_buffer, MAX_PATH_LENGTH, PATH_MODE_AUTO, nullptr);
 
@@ -460,38 +472,38 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         char tooltip_buffer[1024];
 
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-         "Resets all settings (besides window size/position & hotkeys) in this window to their default values.\n"
-         "This does not modify your template files.\n\n"
-         "Defaults:\n"
-         "  - Path Mode: Auto-Detect\n"
-         "  - Version: %s\n"
-         "  - StatsPerWorld Mod (1.0-1.6.4): %s\n"
-         "  - Category: %s\n"
-         "  - Optional Flag: %s\n"
-         "  - Overlay: %s\n"
-         "  - FPS Limit: %d\n"
-         "  - Overlay Scroll Speed: %.2f\n"
-         "  - Speed Up Animation: %s\n"
-         "  - Hide Completed Row 3 Goals: %s\n"
-         "  - Always On Top: %s\n"
-         "  - Remove Completed: %s\n"
-         "  - Overlay Width: %s\n"
-         "  - Print Debug To Console: %s",
+                 "Resets all settings (besides window size/position & hotkeys) in this window to their default values.\n"
+                 "This does not modify your template files.\n\n"
+                 "Defaults:\n"
+                 "  - Path Mode: Auto-Detect\n"
+                 "  - Version: %s\n"
+                 "  - StatsPerWorld Mod (1.0-1.6.4): %s\n"
+                 "  - Category: %s\n"
+                 "  - Optional Flag: %s\n"
+                 "  - Overlay: %s\n"
+                 "  - FPS Limit: %d\n"
+                 "  - Overlay Scroll Speed: %.2f\n"
+                 "  - Speed Up Animation: %s\n"
+                 "  - Hide Completed Row 3 Goals: %s\n"
+                 "  - Always On Top: %s\n"
+                 "  - Remove Completed: %s\n"
+                 "  - Overlay Width: %s\n"
+                 "  - Print Debug To Console: %s",
 
-         DEFAULT_VERSION,
-         DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
-         DEFAULT_CATEGORY,
-         DEFAULT_OPTIONAL_FLAG,
-         DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
-         DEFAULT_FPS,
-         DEFAULT_OVERLAY_SCROLL_SPEED,
-         DEFAULT_OVERLAY_SPEED_UP ? "Enabled" : "Disabled",
-         DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
-         DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
-         DEFAULT_REMOVE_COMPLETED_GOALS ? "Enabled" : "Disabled",
-         "1440px",
-         DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled"
-         );
+                 DEFAULT_VERSION,
+                 DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
+                 DEFAULT_CATEGORY,
+                 DEFAULT_OPTIONAL_FLAG,
+                 DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
+                 DEFAULT_FPS,
+                 DEFAULT_OVERLAY_SCROLL_SPEED,
+                 DEFAULT_OVERLAY_SPEED_UP ? "Enabled" : "Disabled",
+                 DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
+                 DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
+                 DEFAULT_REMOVE_COMPLETED_GOALS ? "Enabled" : "Disabled",
+                 "1440px",
+                 DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled"
+        );
         ImGui::SetTooltip(tooltip_buffer);
     }
 

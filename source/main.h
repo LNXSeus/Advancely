@@ -2,6 +2,10 @@
 // Created by Linus on 24.06.2025.
 //
 
+// -----------------------------------------------------------------------------------------------------------------
+// MAIN.H IS CALLED FROM MAIN.CPP, SETTINGS_UTILS.CPP AND TRACKER.CPP because of show_error_message function
+// -----------------------------------------------------------------------------------------------------------------
+
 #ifndef MAIN_H
 #define MAIN_H
 
@@ -12,6 +16,7 @@
 // These are C++ compatible as they have their own extern "C" guards
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h> // Load with IMG_Load and get *SDL_Surface, SDL_SetWindowIcon (maybe for overlay idk) -> https://youtu.be/EP6EwVwfCiU?t=1200
+
 #include <SDL3_ttf/SDL_ttf.h> // TODO: Remove this later
 
 
@@ -24,13 +29,16 @@
 extern "C" {
 #endif
 
+// Global error message function, accessible for other files
+void show_error_message(const char *title, const char *message);
+
 // Not including any utility headers here
 
 // Set my own SDL_FLAGS
 #define SDL_FLAGS SDL_INIT_VIDEO // TODO: OR'd together with SDL_INIT_AUDIO
 
 #define TRACKER_TITLE "Advancely"
-#define ADVANCELY_VERSION "v0.9.17" // vMAJOR.MINOR.PATCH // TODO: Update this always
+#define ADVANCELY_VERSION "v0.9.18" // vMAJOR.MINOR.PATCH // TODO: Update this always
 #define ADVANCELY_ICON_PATH "resources/gui/Advancely_Logo_NoText.png" // TODO: Use this in tracker_init_sdl()
 #define ADVANCELY_FADED_ALPHA 100
 #define TRACKER_SEPARATOR_LINE_WIDTH 0.80f
