@@ -775,85 +775,73 @@
     }
   },
   "stats": {
-    "stat_cat:gold_blocks_picked_up": {
-      "icon": "blocks/Trapped_Chest.png",
+    "stat:gold_blocks_picked_up": {
+      "icon": "blocks/Block_of_Gold_JE6_BE3.png",
       "root_name": "minecraft:picked_up/minecraft:gold_block",
       "target": 164
     },
-    "stat_cat:whatever2": {
-      "icon": "blocks/Trapped_Chest.png",
-      "criteria": {
-        "minecraft:custom/minecraft:open_chest": {
-          "target": 3,
-          "icon": "blocks/Chest_(S)_JE2.png"
-        },
-        "minecraft:custom/minecraft:sneak_time": {
-          "target": 400,
-          "icon": "items/clock_09_1.9.png"
-        }
-      }
-    },
-    "stat_cat:mine_more_sand": {
-      "icon": "blocks/Sand_JE5_BE3.png",
-      "root_name": "minecraft:mined/minecraft:sand",
+    "stat:wither_skeletons_killed": {
+      "icon": "blocks/Wither_Skeleton_Skull_(S)_JE2.png",
+      "root_name": "minecraft:killed/minecraft:wither_skeleton",
       "target": -1
     },
-    "stat_cat:break_wooden_shovel": {
-      "icon": "items/wooden_shovel_3d_shareware_v1.34.png",
-      "root_name": "minecraft:broken/minecraft:wooden_shovel",
-      "target": 1
+    "stat:tnt_picked_up": {
+      "icon": "blocks/TNT_JE3_BE2.png",
+      "root_name": "minecraft:picked_up/minecraft:tnt",
+      "target": -1
+    },
+    "stat:debris_picked_up": {
+      "icon": "blocks/Ancient_Debris_JE1_BE1.png",
+      "root_name": "minecraft:picked_up/minecraft:ancient_debris",
+      "target": -1
+    },
+    "stat:bee_nests_picked_up": {
+      "icon": "blocks/Bee_Nest_(S)_JE1.png",
+      "root_name": "minecraft:picked_up/minecraft:bee_nest",
+      "target": -1
     }
   },
   "unlocks": [],
-  "custom": [
-    {
-      "root_name": "custom:good_view",
-      "icon": "items/ender_eye_3d_shareware_v1.34.png"
-    },
-    {
-      "root_name": "custom:fun_counter",
-      "icon": "items/cake_3d_shareware_v1.34.png",
-      "target": -1
-    },
-    {
-      "root_name": "custom:count_100",
-      "icon": "items/compass_20_1.9.png",
-      "target": 100
-    }
-  ],
+  "custom": [],
   "multi_stage_goals": [
     {
-      "root_name": "ms_goal:even_more_basics",
-      "icon": "items/compass_20_1.9.png",
+      "root_name": "ms_goal:beacon",
+      "icon": "blocks/Beacon_JE6_BE2.png",
       "stages": [
         {
-          "stage_id": "0",
+          "stage_id": "1",
           "type": "stat",
-          "root_name": "minecraft:picked_up/minecraft:oak_log",
+          "root_name": "minecraft:picked_up/minecraft:wither_skeleton_skull",
           "target": 3
         },
         {
-          "stage_id": "one",
-          "type": "stat",
-          "root_name": "minecraft:custom/minecraft:jump",
-          "target": 17
-        },
-        {
           "stage_id": "2",
-          "type": "criterion",
-          "parent_advancement": "minecraft:husbandry/balanced_diet",
-          "root_name": "beef"
+          "type": "advancement",
+          "root_name": "minecraft:nether/summon_wither",
+          "target": 1
         },
         {
           "stage_id": "3",
-          "type": "stat",
-          "root_name": "minecraft:mined/minecraft:dirt",
-          "target": 64
+          "type": "criterion",
+          "parent_advancement": "minecraft:adventure/kill_all_mobs",
+          "root_name": "minecraft:wither"
         },
         {
           "stage_id": "4",
+          "type": "stat",
+          "root_name": "minecraft:crafted/minecraft:beacon",
+          "target": 1
+        },
+        {
+          "stage_id": "5",
+          "type": "stat",
+          "root_name": "minecraft:used/minecraft:beacon",
+          "target": 1
+        },
+        {
+          "stage_id": "6",
           "type": "advancement",
-          "root_name": "minecraft:husbandry/plant_seed",
+          "root_name": "minecraft:nether/create_full_beacon",
           "target": 1
         },
         {
@@ -865,37 +853,151 @@
       ]
     },
     {
-      "root_name": "ms_goal:even_more_basics2",
-      "icon": "items/compass_20_1.9.png",
+      "root_name": "ms_goal:hdwgh",
+      "icon": "items/bucket_3d_shareware_v1.34.png",
       "stages": [
         {
-          "stage_id": "0",
+          "stage_id": "1",
           "type": "stat",
-          "root_name": "minecraft:picked_up/minecraft:oak_log",
-          "target": 3
-        },
-        {
-          "stage_id": "one",
-          "type": "stat",
-          "root_name": "minecraft:custom/minecraft:jump",
-          "target": 17
+          "root_name": "minecraft:picked_up/minecraft:nautilus_shell",
+          "target": 8
         },
         {
           "stage_id": "2",
-          "type": "criterion",
-          "parent_advancement": "minecraft:husbandry/balanced_diet",
-          "root_name": "beef"
+          "type": "stat",
+          "root_name": "minecraft:crafted/minecraft:conduit",
+          "target": 1
         },
         {
           "stage_id": "3",
           "type": "stat",
-          "root_name": "minecraft:mined/minecraft:dirt",
-          "target": 64
+          "root_name": "minecraft:used/minecraft:conduit",
+          "target": 1
         },
         {
           "stage_id": "4",
           "type": "advancement",
-          "root_name": "minecraft:husbandry/plant_seed",
+          "root_name": "minecraft:adventure/hero_of_the_village",
+          "target": 1
+        },
+        {
+          "stage_id": "5",
+          "type": "advancement",
+          "root_name": "minecraft:nether/all_effects",
+          "target": 1
+        },
+        {
+          "stage_id": "final",
+          "type": "final",
+          "root_name": "",
+          "target": 0
+        }
+      ]
+    },
+    {
+      "root_name": "ms_goal:netherite",
+      "icon": "items/netherite_hoe_20w14infinite.png",
+      "stages": [
+        {
+          "stage_id": "1",
+          "type": "advancement",
+          "root_name": "minecraft:adventure/use_lodestone",
+          "target": 1
+        },
+        {
+          "stage_id": "2",
+          "type": "advancement",
+          "root_name": "minecraft:husbandry/obtain_netherite_hoe",
+          "target": 1
+        },
+        {
+          "stage_id": "3",
+          "type": "advancement",
+          "root_name": "minecraft:nether/netherite_armor",
+          "target": 1
+        },
+        {
+          "stage_id": "final",
+          "type": "final",
+          "root_name": "",
+          "target": 0
+        }
+      ]
+    },
+    {
+      "root_name": "ms_goal:thunder",
+      "icon": "items/trident_1.13.png",
+      "stages": [
+        {
+          "stage_id": "1",
+          "type": "stat",
+          "root_name": "minecraft:picked_up/minecraft:trident",
+          "target": 1
+        },
+        {
+          "stage_id": "2",
+          "type": "advancement",
+          "root_name": "minecraft:adventure/very_very_frightening",
+          "target": 1
+        },
+        {
+          "stage_id": "final",
+          "type": "final",
+          "root_name": "",
+          "target": 0
+        }
+      ]
+    },
+    {
+      "root_name": "ms_goal:egap",
+      "icon": "items/Enchanted_Golden_Apple_unoptimized.gif",
+      "stages": [
+        {
+          "stage_id": "1",
+          "type": "advancement",
+          "root_name": "minecraft:recipes/misc/mojang_banner_pattern",
+          "target": 1
+        },
+        {
+          "stage_id": "2",
+          "type": "stat",
+          "root_name": "minecraft:used/minecraft:enchanted_golden_apple",
+          "target": 1
+        },
+        {
+          "stage_id": "final",
+          "type": "final",
+          "root_name": "",
+          "target": 0
+        }
+      ]
+    },
+    {
+      "root_name": "ms_goal:bees",
+      "icon": "animals/bee_animated.gif",
+      "stages": [
+        {
+          "stage_id": "1",
+          "type": "advancement",
+          "root_name": "minecraft:husbandry/silk_touch_nest",
+          "target": 1
+        },
+        {
+          "stage_id": "2",
+          "type": "stat",
+          "root_name": "minecraft:used/minecraft:bee_nest",
+          "target": 1
+        },
+        {
+          "stage_id": "3",
+          "type": "advancement",
+          "root_name": "minecraft:husbandry/safely_harvest_honey",
+          "target": 1
+        },
+        {
+          "stage_id": "4",
+          "type": "advancement",
+          "root_name": "minecraft:adventure/honey_block_slide",
           "target": 1
         },
         {
