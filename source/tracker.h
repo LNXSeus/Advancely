@@ -249,7 +249,8 @@ void tracker_update_title(Tracker *t, const AppSettings *settings);
  *
  * This function is for debugging and prints progress on advancements, stats, unlocks,
  * custom goals and multi-stage goals. This function is only called when debug print
- * is turned on in the settings.
+ * is turned on in the settings. It also logs everything to the log file if
+ * print debug status is turned on in the settings.
  *
  * @param t A pointer to the Tracker struct.
  * @param settings A pointer to the application settings.

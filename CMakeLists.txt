@@ -44,6 +44,8 @@ set(SOURCE_FILES
         "source/imgui/imgui_demo.cpp" # Recommended for development
         "source/imgui/imgui_impl_sdl3.cpp"
         "source/imgui/imgui_impl_sdlrenderer3.cpp"
+        source/logger.cpp
+        source/logger.h
 )
 
 # --- 2. CREATE THE EXECUTABLE ---
@@ -160,7 +162,9 @@ if(WIN32)
             "${MINGW_BIN_DIR}/libbrotlicommon.dll"
             $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
 
-
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/zlib1.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
 
             COMMENT "[CMAKE] Copying DLLs to build directory"
     )

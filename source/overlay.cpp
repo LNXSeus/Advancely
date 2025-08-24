@@ -6,6 +6,7 @@
 #include "init_sdl.h"
 #include "settings_utils.h"
 #include "format_utils.h"
+#include "logger.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -110,6 +111,7 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     // Check here if calloc failed
     if (*overlay == nullptr) {
         fprintf(stderr, "[OVERLAY] Error allocating memory for overlay.\n");
+        log_message("[OVERLAY] Error allocating memory for overlay.\n");
         return false;
     }
 
@@ -144,6 +146,7 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     o->text_engine = TTF_CreateRendererTextEngine(o->renderer);
     if (!o->text_engine) {
         fprintf(stderr, "[OVERLAY] Failed to create text engine: %s\n", SDL_GetError());
+        log_message("[OVERLAY] Failed to create text engine: %s\n", SDL_GetError());
         overlay_free(overlay, settings);
         return false;
     }
@@ -158,6 +161,7 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
                                                   SDL_SCALEMODE_NEAREST);
     if (!o->adv_bg || !o->adv_bg_half_done || !o->adv_bg_done) {
         fprintf(stderr, "[OVERLAY] Failed to load advancement background textures.\n");
+        log_message("[OVERLAY] Failed to load advancement background textures.\n");
         overlay_free(overlay, settings);
         return false;
     }
@@ -168,6 +172,7 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     o->font = TTF_OpenFont("resources/fonts/Minecraft.ttf", base_font_size);
     if (!o->font) {
         fprintf(stderr, "[OVERLAY] Failed to load font: %s\n", SDL_GetError());
+        log_message("[OVERLAY] Failed to load font: %s\n", SDL_GetError());
         overlay_free(overlay, settings);
         return false;
     }
@@ -192,6 +197,7 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
                 case SDL_SCANCODE_SPACE:
                     if (settings->print_debug_status) {
                         printf("[OVERLAY] Overlay Space key pressed, speeding up tracker.\n");
+                        log_message("[OVERLAY] Overlay Space key pressed, speeding up tracker.\n");
                     }
                     // speed up tracker
                     // The speedup is applied to deltaTime, which affect the update rate of the animation in overlay_update()
@@ -519,53 +525,6 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         }
 
 
-        // TODO: Remove
-        // // Render Progress Text (Top Bar)
-        // if (t && t->template_data) {
-        //     char info_buffer[512];
-        //     char final_buffer[1024];
-        //     char formatted_time[64];
-        //     format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
-        //
-        //     // Check if the run is 100% complete
-        //     bool is_run_complete = t->template_data->advancements_completed_count >= t->template_data->advancement_count &&
-        //                            t->template_data->overall_progress_percentage >= 100.0f;
-        //
-        //     if (is_run_complete) {
-        //         // If the run is complete, display the final time message
-        //         snprintf(info_buffer, sizeof(info_buffer),
-        //                  "*** RUN COMPLETE! *** | Final Time: %s",
-        //                  formatted_time);
-        //     } else {
-        //         // Otherwise, display the standard progress info
-        //         char formatted_update_time[64];
-        //         char formatted_category[128];
-        //
-        //         format_category_string(settings->category, formatted_category, sizeof(formatted_category));
-        //         float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
-        //         format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time));
-        //
-        //         MC_Version version = settings_get_version_from_string(settings->version_str);
-        //         const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
-        //
-        //         snprintf(info_buffer, sizeof(info_buffer),
-        //                  "%s | %s - %s%s%s | %s: %d/%d - Prog: %.2f%% | %s IGT | Upd: %s",
-        //                  t->world_name,
-        //                  settings->version_str,
-        //                  formatted_category,
-        //                  *settings->optional_flag ? " - " : "",
-        //                  settings->optional_flag,
-        //                  adv_ach_label,
-        //                  t->template_data->advancements_completed_count,
-        //                  t->template_data->advancement_count,
-        //                  t->template_data->overall_progress_percentage,
-        //                  formatted_time,
-        //                  formatted_update_time);
-        //     }
-        //
-        //     // Always Append the rotating social media text
-        //     snprintf(final_buffer, sizeof(final_buffer), "%s | %s", info_buffer, SOCIALS[o->current_social_index]);
-
         SDL_Color text_color = {
             settings->overlay_text_color.r, settings->overlay_text_color.g, settings->overlay_text_color.b,
             settings->overlay_text_color.a
@@ -696,6 +655,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     fprintf(
                         stderr,
                         "[Overlay Render WARNING] Item '%s' (index %d) has no texture. Check icon path in template.\n",
+                        item_to_render->root_name, current_item_idx);
+                    log_message("[Overlay Render WARNING] Item '%s' (index %d) has no texture. Check icon path in template.\n",
                         item_to_render->root_name, current_item_idx);
                     SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, 100); // Pink placeholder
                     SDL_RenderFillRect(o->renderer, &dest_rect);
@@ -1183,6 +1144,7 @@ void overlay_free(Overlay **overlay, const AppSettings *settings) {
 
         if (settings->print_debug_status) {
             printf("[OVERLAY] Overlay freed!\n");
+            log_message("[OVERLAY] Overlay freed!\n");
         }
     }
 }

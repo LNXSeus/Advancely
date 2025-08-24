@@ -3,6 +3,7 @@
 //
 
 #include "temp_create_utils.h"
+#include "logger.h"
 #include <cstdio>
 #include <cstdlib> // For free()
 #include <cstring>
@@ -43,6 +44,7 @@ void fs_create_empty_template_file(const char *path) {
     FILE *file = fopen(path, "w");
     if (!file) {
         fprintf(stderr, "[TEMP CREATE UTILS] Failed to create template file: %s\n", path);
+        log_message("[TEMP CREATE UTILS] Failed to create template file: %s\n", path);
         return;
     }
 
@@ -56,15 +58,18 @@ void fs_create_empty_template_file(const char *path) {
     fputs(skeleton, file);
     fclose(file);
     printf("[TEMP CREATE UTILS] Created template file: %s\n", path);
+    log_message("[TEMP CREATE UTILS] Created template file: %s\n", path);
 }
 
 void fs_create_empty_lang_file(const char *path) {
     FILE *file = fopen(path, "w");
     if (!file) {
         fprintf(stderr, "[TEMP CREATE UTILS] Failed to create language file: %s\n", path);
+        log_message("[TEMP CREATE UTILS] Failed to create language file: %s\n", path);
         return;
     }
     fputs("{\n}\n", file);
     fclose(file);
     printf("[TEMP CREATE UTILS] Created language file: %s\n", path);
+    log_message("[TEMP CREATE UTILS] Created language file: %s\n", path);
 }

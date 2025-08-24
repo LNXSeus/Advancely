@@ -4,6 +4,7 @@
 
 
 #include "settings.h"
+#include "logger.h"
 
 #include <vector>
 
@@ -13,7 +14,7 @@
 
 // #include "init_sdl.h" // TODO: Remove this when possible
 
-void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t) {
+void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t, bool *force_open_flag) {
     if (!*p_open) {
         return;
     }
@@ -21,7 +22,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // This static variable tracks the open state from the previous frame
     static bool was_open_last_frame = false;
 
-    // HOlds temporary copy of the settings for editing
+    // Flag to track invalid manual path (especially important when auto path is invalid as well, to prevent dmon crashes)
+    static bool show_invalid_manual_path_error = false;
+
+    // Holds temporary copy of the settings for editing
     static AppSettings temp_settings;
 
     // If the window was just opened (i.e., it was closed last frame but is open now),
@@ -34,6 +38,16 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // Begin an ImGui window. The 'p_open' parameter provides the 'X' button to close it.
     ImGui::Begin("Advancely Settings", p_open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
+
+    // If settings were forced open, display a prominent warning message
+    if (force_open_flag && *force_open_flag) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.8f, 0.0f, 1.0f)); // Yellow text
+        ImGui::TextWrapped("IMPORTANT: Could not find Minecraft saves folder automatically.");
+        ImGui::TextWrapped("Please enter the correct path to your '.minecraft/saves' folder below and click 'Apply Settings'.");
+        ImGui::PopStyleColor();
+        ImGui::Separator();
+        ImGui::Spacing();
+    }
 
     if (roboto_font) {
         ImGui::PushFont(roboto_font);
@@ -58,6 +72,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (temp_settings.path_mode == PATH_MODE_MANUAL) {
         ImGui::Indent();
         ImGui::InputText("Manual Saves Path", temp_settings.manual_saves_path, MAX_PATH_LENGTH);
+
+        if (show_invalid_manual_path_error) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f)); // Red text
+            ImGui::TextWrapped("The specified path is invalid or does not exist. Please provide a valid path to your '.minecraft/saves' folder.");
+            ImGui::PopStyleColor();
+        }
+
         ImGui::Unindent();
     }
 
@@ -274,7 +295,11 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::Checkbox("Print Debug To Console", &temp_settings.print_debug_status);
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip(
-            "This toggles printing debug information to the console (only printf, fprintf are excluded). \nAny other prints including errors are unaffected by this setting.\nRequires running the application from a console (like MSYS2 MINGW64)\nto see the output. Just navigate to the path and execute with \"./Advancely\".");
+        "This toggles printing a detailed progress report to the console after every file update.\n\n"
+        "IMPORTANT: This can spam the console with a large amount of text if your template files contain many entries.\n\n"
+        "This setting only affects the detailed report. General status messages and errors are always printed to the console and saved to advancely_log.txt.\n"
+        "The log is flushed after every message, making it ideal for diagnosing crashes.\n"
+        "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.");
     }
 
     ImGui::Separator();
@@ -367,20 +392,52 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // Apply the changes
     if (ImGui::Button("Apply Settings")) {
-        // Validate the manual path before applying settings
+        // Assume the error is cleared unless we find one
+        show_invalid_manual_path_error = false;
+
+        // Step 1: Validate the manual Path if it's being used
         if (temp_settings.path_mode == PATH_MODE_MANUAL) {
             // Check if the path is empty or does not exist
             if (strlen(temp_settings.manual_saves_path) == 0 || !path_exists(temp_settings.manual_saves_path)) {
-                // If invalid, revert to auto mode to prevent dmon errors
-                temp_settings.path_mode = PATH_MODE_AUTO;
+                // CASE 1: Manual mode is selected, but the path is invalid.
+                show_invalid_manual_path_error = true;
+                // Do not apply settings; force user to correct the path
+            } else {
+                // CASE 2: Manual mode is selected, and the path is valid. Apply settings.
+                show_invalid_manual_path_error = false; // Hide error message
+
+                // If the path is now valid, we can clear the force_open_flag
+                if (force_open_flag) {
+                    *force_open_flag = false;
+                }
+
+                // Copy temp settings to the real settings, save, and trigger a reload
+                memcpy(app_settings, &temp_settings, sizeof(AppSettings));
+                SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
+                settings_save(app_settings, nullptr);
+                SDL_SetAtomicInt(&g_settings_changed, 1); // Trigger a reload
+            }
+        } else { // temp_settings.path_mode == PATH_MODE_AUTO
+            char auto_path_buffer[MAX_PATH_LENGTH];
+            get_saves_path(auto_path_buffer, MAX_PATH_LENGTH, PATH_MODE_AUTO, nullptr);
+
+            if (!path_exists(auto_path_buffer)) {
+                // CASE 3: Auto mode is selected, but the auto-detected path is invalid.
+                temp_settings.path_mode = PATH_MODE_MANUAL; // Revert the choice in the UI
+                if (force_open_flag) {
+                    *force_open_flag = true; // Re-trigger the warning message
+                }
+            } else {
+                // CASE 4: Auto mode is selected, and the path is valid. Apply settings.
+                if (force_open_flag) {
+                    *force_open_flag = false;
+                }
+                memcpy(app_settings, &temp_settings, sizeof(AppSettings));
+                SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
+                settings_save(app_settings, nullptr);
+                SDL_SetAtomicInt(&g_settings_changed, 1);
             }
         }
-
-        // When the button is clicked, copy temp settings to the real settings, save, and trigger a reload
-        memcpy(app_settings, &temp_settings, sizeof(AppSettings));
-        SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
-        settings_save(app_settings, nullptr);
-        SDL_SetAtomicInt(&g_settings_changed, 1); // Trigger a reload
     }
 
     // Place the next button on the same line

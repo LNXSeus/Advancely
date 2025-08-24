@@ -3,6 +3,7 @@
 //
 
 #include "settings_utils.h"
+#include "logger.h"
 #include "file_utils.h" // has the cJSON_from_file function
 #include <cstdio>
 #include <cstring>
@@ -252,6 +253,8 @@ bool settings_load(AppSettings *settings) {
     if (json == nullptr) {
         fprintf(stderr, "[SETTINGS UTILS] Failed to load settings file: %s. Using default settings.\n",
                 SETTINGS_FILE_PATH);
+        log_message("[SETTINGS UTILS] Failed to load settings file: %s. Using default settings.\n",
+                SETTINGS_FILE_PATH);
         defaults_were_used = true; // The whole file is missing, so it needs to be created.
     }
 
@@ -451,6 +454,7 @@ bool settings_load(AppSettings *settings) {
     construct_template_paths(settings);
     if (settings->print_debug_status) {
         printf("[SETTINGS UTILS] Settings loaded successfully!\n");
+        log_message("[SETTINGS UTILS] Settings loaded successfully!\n");
     }
     return defaults_were_used;
 }
@@ -585,6 +589,7 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
         fclose(file);
     } else {
         fprintf(stderr, "[SETTINGS UTILS] Failed to open settings file for writing: %s\n", SETTINGS_FILE_PATH);
+        log_message("[SETTINGS UTILS] Failed to open settings file for writing: %s\n", SETTINGS_FILE_PATH);
     }
     cJSON_Delete(root);
 }
