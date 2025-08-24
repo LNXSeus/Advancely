@@ -8,13 +8,16 @@ extern "C" {
 #include <cJSON.h>
 }
 
+// SDL imports
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
 #include <SDL3_ttf/SDL_ttf.h>
-
+#include <SDL3/SDL_messagebox.h> // For SDL_ShowMessageBox
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_atomic.h>
 #include <SDL3/SDL_mutex.h>
+
+// Local includes
 #include "tracker.h" // includes main.h
 #include "overlay.h"
 #include "settings.h"
@@ -35,6 +38,12 @@ SDL_AtomicInt g_settings_changed; // Watching when settings.json is modified to 
 SDL_AtomicInt g_game_data_changed; // When game data is modified, custom counter is changed or manually override changed
 bool g_force_open_settings = false;
 static Uint64 g_last_file_mod_time = 0; // Standard 64-bit integer for the timestamp
+
+
+// A global helper to show a user-facing error pop-up
+void show_error_message(const char* title, const char* message) {
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, title, message, nullptr);
+}
 
 // Global mutex to protect the watcher and paths (see they don't break when called in close succession)
 static SDL_Mutex *g_watcher_mutex = nullptr;
@@ -83,14 +92,14 @@ static void settings_watch_callback(dmon_watch_id watch_id, dmon_action action, 
     (void) watch_id;
     (void) rootdir;
     (void) oldfilepath;
+    (void) user;
 
-    AppSettings *settings = (AppSettings *) user;
+    // AppSettings *settings = (AppSettings *) user;
 
     if (action == DMON_ACTION_MODIFY) {
         if (strcmp(filepath, "settings.json") == 0) {
-            if (settings && settings->print_debug_status) {
-                printf("[DMON - MAIN] settings.json modified. Triggering update.\n");
-            }
+                log_message(LOG_INFO, "[DMON - MAIN] settings.json modified. Triggering update.\n");
+
             SDL_SetAtomicInt(&g_settings_changed, 1);
         }
     }
@@ -108,6 +117,17 @@ int main(int argc, char *argv[]) {
     // Initialize the logger at the very beginning
     log_init();
 
+    // Check for write permissions in the current directory before doing anything else
+    FILE *write_test = fopen(".advancely-write-test", "w");
+    if (write_test == nullptr) {
+        show_error_message("Permission Error", "Advancely does not have permission to write files in this folder.\nPlease move it to another location (e.g., your Desktop or Documents folder) and run it again.");
+        log_message(LOG_ERROR,"CRITICAL: Failed to get write permissions in the application directory. Exiting.\n");
+        log_close();
+        return EXIT_FAILURE;
+    }
+    fclose(write_test);
+    remove(".advancely-write-test");
+
     // Expect the worst
     bool exit_status = EXIT_FAILURE;
     bool dmon_initialized = false; // Make sure dmon is initialized
@@ -115,13 +135,15 @@ int main(int argc, char *argv[]) {
     // Load settings ONCE at the start and check if file was incomplete to use default values
     // settings_load() returns true if the file was incomplete and used default values
     AppSettings app_settings;
+
     if (settings_load(&app_settings)) {
-        if (app_settings.print_debug_status) {
-            printf("[MAIN] Settings file was incomplete or missing, saving with default values.\n");
-        }
+        // ----- This is the only if statement with print_debug_status outside of logger -----------
+            log_message(LOG_INFO, "[MAIN] Settings file was incomplete or missing, saving with default values.\n");
+
         settings_save(&app_settings, nullptr); // Save complete settings back to the file
     }
 
+    log_set_settings(&app_settings); // Give the logger access to the settings
 
     Tracker *tracker = nullptr; // pass address to function
     Overlay *overlay = nullptr;
@@ -131,16 +153,14 @@ int main(int argc, char *argv[]) {
 
     g_watcher_mutex = SDL_CreateMutex();
     if (!g_watcher_mutex) {
-        fprintf(stderr, "[MAIN] Failed to create mutex: %s\n", SDL_GetError());
-        log_message("[MAIN] Failed to create mutex: %s\n", SDL_GetError());
+        log_message(LOG_ERROR,"[MAIN] Failed to create mutex: %s\n", SDL_GetError());
         log_close();
         return EXIT_FAILURE;
     }
 
     // Initialize SDL ttf
     if (!TTF_Init()) {
-        fprintf(stderr, "[MAIN] Failed to initialize SDL_ttf: %s\n", SDL_GetError());
-        log_message("[MAIN] Failed to initialize SDL_ttf: %s\n", SDL_GetError());
+        log_message(LOG_ERROR,"[MAIN] Failed to initialize SDL_ttf: %s\n", SDL_GetError());
         log_close();
         return EXIT_FAILURE;
     }
@@ -149,8 +169,7 @@ int main(int argc, char *argv[]) {
         // Conditionally create the overlay at startup, based on settings
         if (app_settings.enable_overlay) {
             if (!overlay_new(&overlay, &app_settings)) {
-                fprintf(stderr, "[MAIN] Failed to create overlay, continuing without it.\n");
-                log_message("[MAIN] Failed to create overlay, continuing without it.\n");
+                log_message(LOG_ERROR,"[MAIN] Failed to create overlay, continuing without it.\n");
             }
         }
         // Initialize ImGUI
@@ -173,17 +192,14 @@ int main(int argc, char *argv[]) {
         // Roboto Font is for the settings inside the tracker
         tracker->roboto_font = io.Fonts->AddFontFromFileTTF("resources/fonts/Roboto-Regular.ttf", 16.0f);
         if (tracker->roboto_font == nullptr) {
-            fprintf(
-                stderr,
-                "[MAIN - IMGUI] Failed to load font: resources/fonts/Roboto-Regular.ttf. Settings window will use default font.\n");
-            log_message(
+            log_message(LOG_ERROR,
                 "[MAIN - IMGUI] Failed to load font: resources/fonts/Roboto-Regular.ttf. Settings window will use default font.\n");
         }
 
         // Check if the currently configured saves path is valid, regardless of mode.
         // This ensures that on every launch, if the path is bad, we force the user to fix it.
         if (!path_exists(tracker->saves_path)) {
-            log_message("[MAIN] Current saves path is invalid. Forcing manual configuration.\n");
+            log_message(LOG_ERROR,"[MAIN] Current saves path is invalid. Forcing manual configuration.\n");
 
             // If the current path is invalid, we must be in manual mode for the user to fix it.
             app_settings.path_mode = PATH_MODE_MANUAL;
@@ -200,30 +216,24 @@ int main(int argc, char *argv[]) {
         SDL_SetAtomicInt(&g_game_data_changed, 1);
 
         // HARDCODED SETTINGS DIRECTORY
-        if (app_settings.print_debug_status) {
-            printf("[DMON - MAIN] Watching config directory: resources/config/\n");
-            log_message("[DMON - MAIN] Watching config directory: resources/config/\n");
-        }
+            log_message(LOG_INFO,"[DMON - MAIN] Watching config directory: resources/config/\n");
+
         dmon_watch("resources/config/", settings_watch_callback, 0, nullptr);
 
 
         // Watch saves directory and store the watcher ID, ONLY if the path is valid
         if (path_exists(tracker->saves_path)) {
             if (strlen(tracker->saves_path) > 0) {
-                if (app_settings.print_debug_status) {
-                    printf("[DMON - MAIN] Watching saves directory: %s\n", tracker->saves_path);
-                    log_message("[DMON - MAIN] Watching saves directory: %s\n", tracker->saves_path);
-                }
+                    log_message(LOG_INFO,"[DMON - MAIN] Watching saves directory: %s\n", tracker->saves_path);
+
                 // Watch saves directory and monitor child directories, passing the mutex as user data
                 saves_watcher_id = dmon_watch(tracker->saves_path, global_watch_callback, DMON_WATCHFLAGS_RECURSIVE,
                                               g_watcher_mutex);
             } else {
-                fprintf(stderr, "[DMON - MAIN] Failed to watch saves directory as it's empty: %s\n", tracker->saves_path);
-                log_message("[DMON - MAIN] Failed to watch saves directory as it's empty: %s\n", tracker->saves_path);
+                log_message(LOG_ERROR,"[DMON - MAIN] Failed to watch saves directory as it's empty: %s\n", tracker->saves_path);
             }
         } else {
-            printf("[DMON - MAIN] Saves path is invalid. File watcher not started.\n");
-            log_message("[DMON - MAIN] Saves path is invalid. File watcher not started.\n");
+            log_message(LOG_INFO,"[DMON - MAIN] Saves path is invalid. File watcher not started.\n");
         }
 
         bool is_running = true;
@@ -261,10 +271,8 @@ int main(int argc, char *argv[]) {
             // Check if settings.json has been modified (by UI or external editor)
             // Single point of truth for tracker data, triggered by "Apply" button
             if (SDL_SetAtomicInt(&g_settings_changed, 0) == 1) {
-                if (app_settings.print_debug_status) {
-                    printf("[MAIN] Settings changed. Re-initializing template and file watcher.\n");
-                    log_message("[MAIN] Settings changed. Re-initializing template and file watcher.\n");
-                }
+                    log_message(LOG_INFO,"[MAIN] Settings changed. Re-initializing template and file watcher.\n");
+
 
                 // Stop watching the old directory, oNLY if it was being watched
                 if (saves_watcher_id.id > 0) {
@@ -273,6 +281,7 @@ int main(int argc, char *argv[]) {
 
                 // Reload settings from file to get the latest changes
                 settings_load(&app_settings);
+                log_set_settings(&app_settings); // Update the logger with the new settings
 
                 // Logic to enable/disable overlay at runtime
                 bool overlay_should_be_enabled = app_settings.enable_overlay;
@@ -280,20 +289,15 @@ int main(int argc, char *argv[]) {
 
                 if (overlay_should_be_enabled && !overlay_is_currently_enabled) {
                     // It was disabled, now enable it
-                    if (app_settings.print_debug_status) {
-                        printf("[MAIN] Enabling overlay.\n");
-                        log_message("[MAIN] Enabling overlay.\n");
-                    }
+                        log_message(LOG_INFO,"[MAIN] Enabling overlay.\n");
+
                     if (!overlay_new(&overlay, &app_settings)) {
-                        fprintf(stderr, "[MAIN] Failed to create overlay at runtime.\n");
-                        log_message("[MAIN] Failed to create overlay at runtime.\n");
+                        log_message(LOG_ERROR,"[MAIN] Failed to create overlay at runtime.\n");
                     }
                 } else if (!overlay_should_be_enabled && overlay_is_currently_enabled) {
                     // It was enabled, now disable it
-                    if (app_settings.print_debug_status) {
-                        printf("[MAIN] Disabling overlay.\n");
-                        log_message("[MAIN] Disabling overlay.\n");
-                    }
+                        log_message(LOG_INFO,"[MAIN] Disabling overlay.\n");
+
                     overlay_free(&overlay, &app_settings);
                 }
 
@@ -307,10 +311,8 @@ int main(int argc, char *argv[]) {
 
                 // Start watching the new directory
                 if (strlen(tracker->saves_path) > 0) {
-                    if (app_settings.print_debug_status) {
-                        printf("[MAIN] Now watching new saves directory: %s\n", tracker->saves_path);
-                        log_message("[MAIN] Now watching new saves directory: %s\n", tracker->saves_path);
-                    }
+                        log_message(LOG_INFO,"[MAIN] Now watching new saves directory: %s\n", tracker->saves_path);
+
                     saves_watcher_id = dmon_watch(tracker->saves_path, global_watch_callback,
                                                   DMON_WATCHFLAGS_RECURSIVE,
                                                   nullptr);
@@ -353,8 +355,9 @@ int main(int argc, char *argv[]) {
                     // Now update progress with the correct paths
                     tracker_update(tracker, &deltaTime, &app_settings);
 
-                    // Print debug status based on settings
-                    if (app_settings.print_debug_status) tracker_print_debug_status(tracker, &app_settings);
+                    // Print debug status (individual prints use log_message function)
+                    // log_message function prints based on print_debug_status setting
+                    tracker_print_debug_status(tracker, &app_settings);
 
                     // Update TITLE of the tracker window with some info, similar to the debug print
                     tracker_update_title(tracker, &app_settings);

@@ -14,8 +14,7 @@
 
 bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
     if (!SDL_Init(SDL_FLAGS)) {
-        fprintf(stderr, "[INIT SDL] Failed to initialize SDL3: %s\n", SDL_GetError());
-        log_message("[INIT SDL] Failed to initialize SDL3: %s\n", SDL_GetError());
+        log_message(LOG_ERROR, "[INIT SDL] Failed to initialize SDL3: %s\n", SDL_GetError());
         return false;
     }
 
@@ -34,8 +33,7 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
 
     t->window = SDL_CreateWindow(TRACKER_TITLE, w, h, window_flags);
     if (!t->window) {
-        fprintf(stderr, "[INIT SDL] Failed to create tracker window: %s\n", SDL_GetError());
-        log_message("[INIT SDL] Failed to create tracker window: %s\n", SDL_GetError());
+        log_message(LOG_ERROR, "[INIT SDL] Failed to create tracker window: %s\n", SDL_GetError());
         return false;
     }
 
@@ -44,25 +42,19 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
     if (icon_surface) {
         SDL_SetWindowIcon(t->window, icon_surface);
         SDL_DestroySurface(icon_surface);
-        if (settings->print_debug_status) {
-            printf("[INIT SDL] Tracker window icon set to %s\n", ADVANCELY_ICON_PATH);
-            printf("[INIT SDL] Tracker window icon size: %dx%d\n", icon_surface->w, icon_surface->h);
-        }
+        log_message(LOG_INFO, "[INIT SDL] Tracker window icon set to %s\n", ADVANCELY_ICON_PATH);
+        log_message(LOG_INFO, "[INIT SDL] Tracker window icon size: %dx%d\n", icon_surface->w, icon_surface->h);
     } else {
-        fprintf(stderr, "[INIT SDL] Failed to load tracker window icon: %s\n", SDL_GetError());
-        log_message("[INIT SDL] Failed to load tracker window icon: %s\n", SDL_GetError());
+        log_message(LOG_ERROR, "[INIT SDL] Failed to load tracker window icon: %s\n", SDL_GetError());
     }
 
     // Set position after creation to handle multi-monitor setups better
     SDL_SetWindowPosition(t->window, x, y);
 
     // DEBUG: Print the value being set at initialization
-    if (settings->print_debug_status) {
-        printf("[INIT SDL] Settings initial AlwaysOnTop state to: %s\n",
-               settings->tracker_always_on_top ? "true" : "false");
-        log_message("[INIT SDL] Settings initial AlwaysOnTop state to: %s\n",
-                    settings->tracker_always_on_top ? "true" : "false");
-    }
+    log_message(LOG_INFO, "[INIT SDL] Settings initial AlwaysOnTop state to: %s\n",
+                settings->tracker_always_on_top ? "true" : "false");
+
 
     // More reliable than SDL_WINDOW_ALWAYS_ON_TOP flag
     SDL_SetWindowAlwaysOnTop(t->window, settings->tracker_always_on_top);
@@ -70,16 +62,12 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
     t->renderer = SDL_CreateRenderer(t->window, nullptr);
 
     if (!t->renderer) {
-        fprintf(stderr, "[INIT SDL] Failed to create tracker renderer: %s\n", SDL_GetError());
-        log_message("[INIT SDL] Failed to create tracker renderer: %s\n", SDL_GetError());
+        log_message(LOG_ERROR, "[INIT SDL] Failed to create tracker renderer: %s\n", SDL_GetError());
         return false;
     } // Then destroy the renderer in tracker_free
 
+    log_message(LOG_INFO, "[INIT SDL] Tracker initialized!\n");
 
-    if (settings->print_debug_status) {
-        printf("[INIT SDL] Tracker initialized!\n"); // Shows through MINGW64, not terminal ./Advancely to run
-        log_message("[INIT SDL] Tracker initialized!\n");
-    }
     return true;
 }
 
@@ -98,8 +86,7 @@ bool overlay_init_sdl(Overlay *o, const AppSettings *settings) {
 
     o->window = SDL_CreateWindow(OVERLAY_TITLE, w, h, window_flags);
     if (!o->window) {
-        fprintf(stderr, "[INIT SDL] Failed to create overlay window: %s\n", SDL_GetError());
-        log_message("[INIT SDL] Failed to create overlay window: %s\n", SDL_GetError());
+        log_message(LOG_ERROR, "[INIT SDL] Failed to create overlay window: %s\n", SDL_GetError());
         return false;
     }
 
@@ -108,13 +95,9 @@ bool overlay_init_sdl(Overlay *o, const AppSettings *settings) {
     if (icon_surface) {
         SDL_SetWindowIcon(o->window, icon_surface);
         SDL_DestroySurface(icon_surface);
-        if (settings->print_debug_status) {
-            printf("[INIT SDL] Overlay window icon set to %s\n", ADVANCELY_ICON_PATH);
-            log_message("[INIT SDL] Overlay window icon set to %s\n", ADVANCELY_ICON_PATH);
-        }
+        log_message(LOG_INFO, "[INIT SDL] Overlay window icon set to %s\n", ADVANCELY_ICON_PATH);
     } else {
-        fprintf(stderr, "[INIT SDL] Failed to load overlay window icon: %s\n", SDL_GetError());
-        log_message("[INIT SDL] Failed to load overlay window icon: %s\n", SDL_GetError());
+        log_message(LOG_ERROR, "[INIT SDL] Failed to load overlay window icon: %s\n", SDL_GetError());
     }
 
     SDL_SetWindowPosition(o->window, x, y);
@@ -122,15 +105,11 @@ bool overlay_init_sdl(Overlay *o, const AppSettings *settings) {
     o->renderer = SDL_CreateRenderer(o->window, nullptr);
 
     if (!o->renderer) {
-        fprintf(stderr, "[INIT SDL] Failed to create overlay renderer: %s\n", SDL_GetError());
-        log_message("[INIT SDL] Failed to create overlay renderer: %s\n", SDL_GetError());
+        log_message(LOG_ERROR, "[INIT SDL] Failed to create overlay renderer: %s\n", SDL_GetError());
         return false;
     } // Then destroy the renderer in overlay_free
 
-    if (settings->print_debug_status) {
-        printf("[INIT SDL] Overlay initialized!\n"); // Shows through MINGW64, not terminal ./Advancely to run
-        log_message("[INIT SDL] Overlay initialized!\n");
-    }
+    log_message(LOG_INFO, "[INIT SDL] Overlay initialized!\n");
+
     return true;
 }
-

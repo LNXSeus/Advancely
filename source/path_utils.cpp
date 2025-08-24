@@ -14,7 +14,7 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <shlobj.h>
-#include <wchar.h>
+#include <cwchar>
 #else
 #include <dirent.h>
 #include <sys/stat.h>
@@ -89,9 +89,7 @@ bool get_saves_path(char *out_path, size_t max_len, PathMode mode, const char *m
             out_path[max_len - 1] = '\0'; // Ensure nullptr-termination
             success = true;
         } else {
-            fprintf(stderr, "[PATH UTILS] Manual path is empty or invalid.\n");
-            log_message("[PATH UTILS] Manual path is empty or invalid.\n");
-
+            log_message(LOG_ERROR, "[PATH UTILS] Manual path is empty or invalid.\n");
         }
     }
 
@@ -130,8 +128,7 @@ void find_player_data_files(
     WIN32_FIND_DATAA find_world_data;
     HANDLE h_find_world = FindFirstFileA(search_path, &find_world_data);
     if (h_find_world == INVALID_HANDLE_VALUE) {
-        fprintf(stderr, "[PATH UTILS] Cannot find files in saves directory: %s\n", saves_path);
-        log_message("[PATH UTILS] Cannot find files in saves directory: %s\n", saves_path);
+        log_message(LOG_ERROR, "[PATH UTILS] Cannot find files in saves directory: %s\n", saves_path);
         return;
     }
     FILETIME latest_time = {0, 0};
@@ -148,9 +145,8 @@ void find_player_data_files(
 
     if (strlen(latest_world_name) > 0) {
         strncpy(out_world_name, latest_world_name, max_len - 1);
-        if (settings && settings->print_debug_status) {
-            printf("[PATH UTILS] Found latest world: %s\n", out_world_name);
-            log_message("[PATH UTILS] Found latest world: %s\n", out_world_name);
+        if (settings) {
+            log_message(LOG_INFO, "[PATH UTILS] Found latest world: %s\n", out_world_name);
         }
     } else {
         strncpy(out_world_name, "No Worlds Found", max_len - 1);
@@ -162,15 +158,16 @@ void find_player_data_files(
             // LEGACY WITH MOD: Look for .dat file inside the latest world's stats folder
             if (strlen(latest_world_name) > 0) {
                 char stats_search_path[MAX_PATH_LENGTH];
-                snprintf(stats_search_path, sizeof(stats_search_path), "%s/%s/stats/*.dat", saves_path, latest_world_name);
+                snprintf(stats_search_path, sizeof(stats_search_path), "%s/%s/stats/*.dat", saves_path,
+                         latest_world_name);
 
                 WIN32_FIND_DATAA find_file_data;
                 HANDLE h_find_file = FindFirstFileA(stats_search_path, &find_file_data);
                 if (h_find_file != INVALID_HANDLE_VALUE) {
-                    snprintf(out_stats_path, max_len, "%s/%s/stats/%s", saves_path, latest_world_name, find_file_data.cFileName);
-                    if (settings && settings->print_debug_status) {
-                        printf("[PATH UTILS] Found legacy per-world stats file: %s\n", out_stats_path);
-                        log_message("[PATH UTILS] Found legacy per-world stats file: %s\n", out_stats_path);
+                    snprintf(out_stats_path, max_len, "%s/%s/stats/%s", saves_path, latest_world_name,
+                             find_file_data.cFileName);
+                    if (settings) {
+                        log_message(LOG_INFO, "[PATH UTILS] Found legacy per-world stats file: %s\n", out_stats_path);
                     }
                     FindClose(h_find_file);
                 }
@@ -189,9 +186,8 @@ void find_player_data_files(
             HANDLE h_find_file = FindFirstFileA(stats_search_path, &find_file_data);
             if (h_find_file != INVALID_HANDLE_VALUE) {
                 snprintf(out_stats_path, max_len, "%s/stats/%s", mc_root_path, find_file_data.cFileName);
-                if (settings && settings->print_debug_status) {
-                    printf("[PATH UTILS] Found legacy global stats file: %s\n", out_stats_path);
-                    log_message("[PATH UTILS] Found legacy global stats file: %s\n", out_stats_path);
+                if (settings) {
+                    log_message(LOG_INFO, "[PATH UTILS] Found legacy global stats file: %s\n", out_stats_path);
                 }
                 FindClose(h_find_file);
             }
@@ -211,9 +207,8 @@ void find_player_data_files(
         h_find_file = FindFirstFileA(sub_search_path, &find_file_data);
         if (h_find_file != INVALID_HANDLE_VALUE) {
             snprintf(out_stats_path, max_len, "%s/%s", temp_path, find_file_data.cFileName);
-            if (settings && settings->print_debug_status) {
-                printf("[PATH UTILS] Found mid/modern era stats file: %s\n", out_stats_path);
-                log_message("[PATH UTILS] Found mid/modern era stats file: %s\n", out_stats_path);
+            if (settings) {
+                log_message(LOG_INFO, "[PATH UTILS] Found mid/modern era stats file: %s\n", out_stats_path);
             }
             FindClose(h_find_file);
         }
@@ -266,8 +261,7 @@ void find_player_data_files(
     char latest_world_name[MAX_PATH_LENGTH] = {0};
     DIR *saves_dir = opendir(saves_path);
     if (!saves_dir) {
-        fprintf(stderr, "[PATH UTILS] Cannot open saves directory: %s\n", saves_path);
-        log_message("[PATH UTILS] Cannot open saves directory: %s\n", saves_path);
+        log_message(LOG_ERROR,"[PATH UTILS] Cannot open saves directory: %s\n", saves_path);
         return;
     }
     struct dirent *entry;
@@ -289,9 +283,8 @@ void find_player_data_files(
 
     if (strlen(latest_world_name) > 0) {
         strncpy(out_world_name, latest_world_name, max_len - 1);
-        if (settings && settings->print_debug_status) {
-            printf("[PATH UTILS] Found latest world: %s\n", out_world_name);
-            log_message("[PATH UTILS] Found latest world: %s\n", out_world_name);
+        if (settings) {
+            log_message(LOG_INFO,"[PATH UTILS] Found latest world: %s\n", out_world_name);
         }
     } else {
         strncpy(out_world_name, "No Worlds Found", max_len - 1);
@@ -309,9 +302,8 @@ void find_player_data_files(
                     while ((entry = readdir(stats_dir)) != nullptr) {
                         if (strstr(entry->d_name, ".dat")) {
                             snprintf(out_stats_path, max_len, "%s/%s", stats_path_dir, entry->d_name);
-                            if (settings && settings->print_debug_status) {
-                                printf("[PATH UTILS] Found legacy per-world stats file: %s\n", out_stats_path);
-                                log_message("[PATH UTILS] Found legacy per-world stats file: %s\n", out_stats_path);
+                            if (settings) {
+                                log_message(LOG_INFO,"[PATH UTILS] Found legacy per-world stats file: %s\n", out_stats_path);
                             }
                             break;
                         }
@@ -333,9 +325,8 @@ void find_player_data_files(
                 while ((entry = readdir(stats_dir)) != nullptr) {
                     if (strstr(entry->d_name, ".dat")) {
                         snprintf(out_stats_path, max_len, "%s/%s", stats_path_dir, entry->d_name);
-                        if (settings && settings->print_debug_status) {
-                            printf("[PATH UTILS] Found legacy global stats file: %s\n", out_stats_path);
-                            log_message("[PATH UTILS] Found legacy global stats file: %s\n", out_stats_path);
+                        if (settings) {
+                            log_message(LOG_INFO,"[PATH UTILS] Found legacy global stats file: %s\n", out_stats_path);
                         }
                         break;
                     }
@@ -357,9 +348,8 @@ void find_player_data_files(
             while ((entry = readdir(dir)) != nullptr) {
                 if (strstr(entry->d_name, ".json")) {
                     snprintf(out_stats_path, max_len, "%s/%s", folder_path, entry->d_name);
-                    if (settings && settings->print_debug_status) {
-                        printf("[PATH UTILS] Found mid/modern era stats file: %s\n", out_stats_path);
-                        log_message("[PATH UTILS] Found mid/modern era stats file: %s\n", out_stats_path);
+                    if (settings) {
+                        log_message(LOG_INFO,"[PATH UTILS] Found mid/modern era stats file: %s\n", out_stats_path);
                     }
                     break;
                 }
@@ -398,7 +388,7 @@ void find_player_data_files(
 }
 #endif
 
-bool path_exists(const char* path) {
+bool path_exists(const char *path) {
 #ifdef _WIN32
     DWORD file_attributes = GetFileAttributesA(path);
     return (file_attributes != INVALID_FILE_ATTRIBUTES);

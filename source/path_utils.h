@@ -34,7 +34,7 @@ void normalize_path(char *path);
  * @param manual_path The path to use if mode is PATH_MODE_MANUAL. Can be NULL if mode is auto.
  * @return True if a valid path was found and stored, false otherwise.
  */
-bool get_saves_path(char *out_path, size_t max_len, PathMode mode, const char* manual_path);
+bool get_saves_path(char *out_path, size_t max_len, PathMode mode, const char *manual_path);
 
 /**
  * @brief Finds the player's data files based on the Minecraft version.
@@ -67,12 +67,12 @@ void find_player_data_files(
     size_t max_len
 );
 
-    /**
- * @brief Checks if a given file or directory path exists.
- * @param path The path to check.
- * @return true if the path exists, false otherwise.
- */
-bool path_exists(const char* path);
+/**
+* @brief Checks if a given file or directory path exists.
+* @param path The path to check.
+* @return true if the path exists, false otherwise.
+*/
+bool path_exists(const char *path);
 
 #ifdef __cplusplus
 }
