@@ -2,8 +2,8 @@
   "path_mode":	"manual",
   "manual_saves_path":	"C:\\Users\\Linus\\AppData\\Roaming\\PrismLauncher\\instances\\1.16.1\\minecraft\\saves",
   "version":	"1.16.1",
-  "category":	"test",
-  "optional_flag":	"1",
+  "category":	"All_Advancements",
+  "optional_flag":	"",
   "general":	{
     "using_stats_per_world_legacy": true,
     "enable_overlay": false,

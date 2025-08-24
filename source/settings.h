@@ -29,8 +29,6 @@ struct AppSettings;
 void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t);
 
 
-
-
 #ifdef __cplusplus
 }
 #endif

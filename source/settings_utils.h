@@ -32,8 +32,8 @@ extern "C" {
 
 // DEFINE DEFAULT SETTINGS
 #define DEFAULT_VERSION "1.16.1"
-#define DEFAULT_CATEGORY "test"
-#define DEFAULT_OPTIONAL_FLAG "1"
+#define DEFAULT_CATEGORY "All_Advancements"
+#define DEFAULT_OPTIONAL_FLAG ""
 
 // Default window positions/sizes. -1 means centered or default size.
 #define DEFAULT_WINDOW_POS (-1)
