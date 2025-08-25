@@ -8,6 +8,7 @@
 #include "settings_utils.h"
 #include "logger.h"
 #include "file_utils.h" // has the cJSON_from_file function
+#include "global_event_handler.h"
 #include "main.h"
 
 // Define the actual constant values for the colors here in the .cpp file.
@@ -223,6 +224,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_progress_text_align = DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN;
     settings->overlay_animation_speedup = DEFAULT_OVERLAY_SPEED_UP;
     settings->overlay_row3_remove_completed = DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED;
+    settings->overlay_stat_cycle_speed = DEFAULT_OVERLAY_STAT_CYCLE_SPEED;
 
     // Default Geometry
     WindowRect default_window = {DEFAULT_WINDOW_POS, DEFAULT_WINDOW_POS, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE};
@@ -385,6 +387,13 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
+        const cJSON *cycle_speed = cJSON_GetObjectItem(general_settings, "overlay_stat_cycle_speed");
+        if (cycle_speed && cJSON_IsNumber(cycle_speed)) settings->overlay_stat_cycle_speed = (float) cycle_speed->valuedouble;
+        else {
+            settings->overlay_stat_cycle_speed = DEFAULT_OVERLAY_STAT_CYCLE_SPEED;
+            defaults_were_used = true;
+        }
+
         // --- Load Overlay Text Toggles ---
         const cJSON *show_world = cJSON_GetObjectItem(general_settings, "overlay_show_world");
         if(show_world && cJSON_IsBool(show_world)) settings->overlay_show_world = cJSON_IsTrue(show_world);
@@ -483,26 +492,30 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
 
     // Update General Settings
     cJSON *general_obj = get_or_create_object(root, "general");
-    cJSON_DeleteItemFromObject(general_obj, "enable_overlay");
-    cJSON_AddItemToObject(general_obj, "enable_overlay", cJSON_CreateBool(settings->enable_overlay));
     cJSON_DeleteItemFromObject(general_obj, "using_stats_per_world_legacy");
     cJSON_AddItemToObject(general_obj, "using_stats_per_world_legacy", cJSON_CreateBool(settings->using_stats_per_world_legacy));
     cJSON_DeleteItemFromObject(general_obj, "fps");
     cJSON_AddItemToObject(general_obj, "fps", cJSON_CreateNumber(settings->fps));
     cJSON_DeleteItemFromObject(general_obj, "always_on_top");
     cJSON_AddItemToObject(general_obj, "always_on_top", cJSON_CreateBool(settings->tracker_always_on_top));
-    cJSON_DeleteItemFromObject(general_obj, "overlay_scroll_speed");
-    cJSON_AddItemToObject(general_obj, "overlay_scroll_speed", cJSON_CreateNumber(settings->overlay_scroll_speed));
     cJSON_DeleteItemFromObject(general_obj, "remove_completed_goals");
     cJSON_AddItemToObject(general_obj, "remove_completed_goals", cJSON_CreateBool(settings->remove_completed_goals));
     cJSON_DeleteItemFromObject(general_obj, "print_debug_status");
     cJSON_AddItemToObject(general_obj, "print_debug_status", cJSON_CreateBool(settings->print_debug_status));
+
+    // Update Overlay Settings
+    cJSON_DeleteItemFromObject(general_obj, "enable_overlay");
+    cJSON_AddItemToObject(general_obj, "enable_overlay", cJSON_CreateBool(settings->enable_overlay));
+    cJSON_DeleteItemFromObject(general_obj, "overlay_scroll_speed");
+    cJSON_AddItemToObject(general_obj, "overlay_scroll_speed", cJSON_CreateNumber(settings->overlay_scroll_speed));
     cJSON_DeleteItemFromObject(general_obj, "overlay_progress_text_align");
     cJSON_AddItemToObject(general_obj, "overlay_progress_text_align", cJSON_CreateString(overlay_text_align_to_string(settings->overlay_progress_text_align)));
     cJSON_DeleteItemFromObject(general_obj, "overlay_animation_speedup");
     cJSON_AddItemToObject(general_obj, "overlay_animation_speedup", cJSON_CreateBool(settings->overlay_animation_speedup));
     cJSON_DeleteItemFromObject(general_obj, "overlay_row3_remove_completed");
     cJSON_AddItemToObject(general_obj, "overlay_row3_remove_completed", cJSON_CreateBool(settings->overlay_row3_remove_completed));
+    cJSON_DeleteItemFromObject(general_obj, "overlay_stat_cycle_speed");
+    cJSON_AddItemToObject(general_obj, "overlay_stat_cycle_speed", cJSON_CreateNumber(settings->overlay_stat_cycle_speed));
 
     // --- Save Overlay Text Toggles ---
     cJSON_DeleteItemFromObject(general_obj, "overlay_show_world");

@@ -37,11 +37,8 @@ extern "C" {
 SDL_AtomicInt g_needs_update;
 SDL_AtomicInt g_settings_changed; // Watching when settings.json is modified to re-init paths
 SDL_AtomicInt g_game_data_changed; // When game data is modified, custom counter is changed or manually override changed
+// SDL_AtomicInt g_app_is_saving; // Flag to prevent self-triggering file watch events // TODO: Remove
 bool g_force_open_settings = false;
-
-// Global mutex to protect the watcher and paths (see they don't break when called in close succession)
-// static SDL_Mutex *g_watcher_mutex = nullptr; TODO: Remove
-// SDL_AtomicInt g_last_file_mod_time; // Use 32-bit atomic for the timestamp for lock-free callback
 
 
 // A global helper to show a user-facing error pop-up
@@ -57,11 +54,6 @@ void show_error_message(const char *title, const char *message) {
  */
 static void global_watch_callback(dmon_watch_id watch_id, dmon_action action, const char *rootdir, const char *filepath,
                                   const char *oldfilepath, void *user) {
-    // This callback is now lock-free and only uses atomic operations
-
-    // Lock the mutex to prevent the main thread from calling dmon_unwatch while this callback is running.
-    // This prevents a race condition that can corrupt the heap and cause crashes later on.
-    // SDL_LockMutex(g_watcher_mutex); // TODO: Remove
 
     // Satisfying Werror - not used
     (void) watch_id;
@@ -78,8 +70,6 @@ static void global_watch_callback(dmon_watch_id watch_id, dmon_action action, co
             SDL_SetAtomicInt(&g_game_data_changed, 1);
         }
     }
-
-    // SDL_UnlockMutex(g_watcher_mutex); // TODO: Remove
 }
 
 /**
@@ -87,9 +77,6 @@ static void global_watch_callback(dmon_watch_id watch_id, dmon_action action, co
  */
 static void settings_watch_callback(dmon_watch_id watch_id, dmon_action action, const char *rootdir,
                                     const char *filepath, const char *oldfilepath, void *user) {
-
-    // Lock the mutex to ensure thread-safe access. This is consistent with the other callback.
-    // SDL_LockMutex(g_watcher_mutex);  // TODO: Remove
 
     (void) watch_id;
     (void) rootdir;
@@ -105,8 +92,6 @@ static void settings_watch_callback(dmon_watch_id watch_id, dmon_action action, 
             SDL_SetAtomicInt(&g_settings_changed, 1);
         }
     }
-
-    // SDL_UnlockMutex(g_watcher_mutex); // TODO: Remove
 }
 
 
@@ -280,22 +265,12 @@ int main(int argc, char *argv[]) {
             if (SDL_SetAtomicInt(&g_settings_changed, 0) == 1) {
                 log_message(LOG_INFO, "[MAIN] Settings changed. Re-initializing template and file watcher.\n");
 
-                // Lock the mutex ONLY when modifying the dmon watchers
-                // SDL_LockMutex(g_watcher_mutex); TODO: Remove??
-
                 // To prevent deadlocks, we must fully de-initialize and re-initialize the dmon watcher
-                dmon_deinit(); // TODO: New
-                dmon_init(); // TODO: New
-
-
-                // Stop watching the old directory, oNLY if it was being watched
-                // TODO: Remove
-                // if (saves_watcher_id.id > 0) {
-                //     dmon_unwatch(saves_watcher_id);
-                // }
+                dmon_deinit();
+                dmon_init();
 
                 // Re-watch the config directory first
-                dmon_watch("resources/config/", settings_watch_callback, 0, nullptr); // TODO: New
+                dmon_watch("resources/config/", settings_watch_callback, 0, nullptr);
 
 
                 // Reload settings from file to get the latest changes
@@ -352,12 +327,6 @@ int main(int argc, char *argv[]) {
             // Check if dmon (or manual update through custom goal) has requested an update
             // Atomically check if the flag is 1
             if (SDL_GetAtomicInt(&g_needs_update) == 1) {
-                // Read the atomic timestamp safely
-                // TODO: Remove?
-                // Uint32 last_mod_time = (Uint32)SDL_GetAtomicInt(&g_last_file_mod_time);
-                // Uint32 current_ticks = SDL_GetTicks();
-
-                // SDL_SetAtomicInt(&g_needs_update, 0); // TODO: Remove?
 
                 MC_Version version = settings_get_version_from_string(app_settings.version_str);
                 find_player_data_files(
@@ -424,8 +393,6 @@ int main(int argc, char *argv[]) {
                 overlay_render(overlay, tracker, &app_settings);
             }
 
-            // Unlock mutex after all updates are done
-            //  SDL_UnlockMutex(g_watcher_mutex); TODO: Remove
 
             // --- Frame limiting ---
             const float frame_time = (float) SDL_GetTicks() - (float) current_time;
@@ -445,7 +412,6 @@ int main(int argc, char *argv[]) {
 
     tracker_free(&tracker, &app_settings);
     overlay_free(&overlay, &app_settings);
-    // SDL_DestroyMutex(g_watcher_mutex); // Destroy the mutex TODO: Remove
     SDL_Quit(); // This is ONCE for all windows
 
     // Close logger at the end

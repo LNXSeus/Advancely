@@ -7,13 +7,13 @@
 
 #include "path_utils.h" // For MAX_PATH_LENGTH
 #include "data_structures.h" // For MC_Version and PathMode enums
+#include <SDL3/SDL_stdinc.h> // Add this for Uint32
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #include <cJSON.h>
-
 
 #define SETTINGS_FILE_PATH "resources/config/settings.json"
 #define MAX_HOTKEYS 32 // Limit for amount of hotkeys
@@ -29,6 +29,7 @@ extern "C" {
 #define DEFAULT_PRINT_DEBUG_STATUS false
 #define DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_LEFT
 #define DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED false
+#define DEFAULT_OVERLAY_STAT_CYCLE_SPEED 3.0f // Default: cycle every 3 seconds
 
 // DEFINE DEFAULT SETTINGS
 #define DEFAULT_VERSION "1.16.1"  // Also needs to be changed in settings_load()
@@ -104,6 +105,7 @@ struct AppSettings {
     OverlayProgressTextAlignment overlay_progress_text_align; // Alignment for the progress text in the overlay.
     bool overlay_animation_speedup; // If true, the overlay animation speed is increased.
     bool overlay_row3_remove_completed; // If true, the third row will also hide completed goals as row 2 does.
+    float overlay_stat_cycle_speed; // Time in seconds between cycling sub-stats on the overlay.
 
     // --- Window Geometry ---
     WindowRect tracker_window; // The saved position and size of the main tracker window.

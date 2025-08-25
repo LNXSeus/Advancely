@@ -74,6 +74,24 @@ void find_player_data_files(
 */
 bool path_exists(const char *path);
 
+/**
+* @brief Gets a parent directory path by navigating up a specified number of levels.
+* This is used to get to the instance path from the saves path.
+* @param original_path The starting path.
+* @param out_path A buffer to store the resulting parent path.
+* @param max_len The size of the out_path buffer.
+* @param levels The number of directory levels to go up.
+* @return true if the operation was successful, false otherwise.
+*/
+bool get_parent_directory(const char *original_path, char *out_path, size_t max_len, int levels);
+
+/**
+* @brief Converts a path with forward slashes to a native Windows path with backslashes, in-place.
+* Used for "Open instance folder" button.
+* @param path The path string to modify.
+*/
+void path_to_windows_native(char *path);
+
 #ifdef __cplusplus
 }
 #endif

@@ -54,7 +54,8 @@ struct Overlay {
  * @brief Initializes a new Overlay instance.
  *
  * Allocates memory for the Overlay struct and initializes its SDL components,
- * creating the window and renderer for the overlay.
+ * including the window, renderer, and text engine. It also pre-loads global
+ * textures (like item backgrounds) and sets up caches for efficient texture loading.
  *
  * @param overlay A pointer to an Overlay struct pointer that will be allocated.
  * @param settings A pointer to the loaded application settings.
@@ -65,23 +66,24 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings);
 /**
  * @brief Handles SDL events specifically for the overlay window.
  *
- * Processes events like closing the window or keyboard inputs. For example,
- * holding down the SPACE key increases the overlay animation speed.
+ * Processes user input for the overlay, such as closing the window or pressing
+ * the SPACE key to temporarily speed up the scrolling animations.
  *
  * @param o A pointer to the Overlay struct.
  * @param event A pointer to the SDL_Event to process.
  * @param is_running A pointer to the main application loop's running flag.
- * @param deltaTime A pointer to the frame's delta time, which can be modified by events.
+ * @param deltaTime A pointer to the frame's delta time, modified by the speedup hotkey.
  * @param settings A pointer to the loaded application settings.
  */
 void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *deltaTime, const AppSettings *settings);
 
 /**
- * @brief Updates the state of the overlay.
+ * @brief Updates the state of the overlay's animations for the current frame.
  *
- * This function is currently a placeholder for future logic, such as animations
- * or other dynamic updates within the overlay window. Pressing the SPACE key
- * in the overlay window will increase the animation speed.
+ * This function handles all time-based updates for the overlay. Its primary roles are:
+ * 1.  Updating the horizontal scrolling offsets for all three rows of items.
+ * 2.  Managing the timed, independent cycling of sub-stats for any multi-stat categories
+ * displayed in the third row.
  *
  * @param o A pointer to the Overlay struct.
  * @param deltaTime A pointer to the frame's delta time.
@@ -91,21 +93,25 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
 void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSettings *settings);
 
 /**
- * @brief Initializes a new Overlay instance.
- * Clears the screen with the background color. This is where all visual elements
- * for the overlay will be drawn.
+ * @brief Renders all visual elements of the overlay window for the current frame.
+ *
+ * This function is responsible for all drawing. It renders the top info bar (with world name,
+ * progress, IGT, etc.) and the three distinct, horizontally-scrolling rows of items.
+ * It handles drawing backgrounds, icons (both static .png and animated .gif), and all
+ * dynamic text, including the cycling sub-stat display for multi-stat goals.
  *
  * @param o A pointer to the Overlay struct.
  * @param t A pointer to the Tracker struct to get progress data from.
- * @param settings A pointer to the application settings containing color information.
+ * @param settings A pointer to the application settings containing color and layout information.
  */
 void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings);
 
 /**
  * @brief Frees all resources associated with the Overlay instance.
  *
- * This includes destroying the SDL renderer and window and deallocating
- * the memory for the Overlay struct itself.
+ * This function safely destroys all SDL-related objects and deallocates all memory.
+ * This includes the SDL renderer and window, all cached textures and animations, the
+ * loaded font, the text engine, and the Overlay struct itself.
  *
  * @param overlay A pointer to the Overlay struct pointer to be freed.
  * @param settings A pointer to the loaded application settings.
