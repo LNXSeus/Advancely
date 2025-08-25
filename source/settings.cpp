@@ -152,6 +152,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::Checkbox("Enable Overlay", &temp_settings.enable_overlay);
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Enables a separate window to show your progress in your stream.\n"
+            "More settings related to the overlay window become available once enabled.\n"
             "Use a color key filter in your streaming software on the 'Overlay BG' hex color.\n"
             "A negative scroll speed animates from right-to-left.\n"
             "To adjust the horizontal spacing between items per row,\nyou can shorten the display names in the language (*_lang.json) file.\n"
@@ -303,7 +304,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SetTooltip(
             "This toggles printing a detailed progress report to the console after every file update.\n\n"
             "IMPORTANT: This can spam the console with a large amount of text if your template files contain many entries.\n\n"
-            "This setting only affects the detailed report. General status messages and errors are always printed to the console and saved to advancely_log.txt.\n"
+            "This setting only affects the detailed report. General status messages and errors\nare always printed to the console and saved to advancely_log.txt.\n"
             "The log is flushed after every message, making it ideal for diagnosing crashes.\n"
             "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.");
     }

@@ -166,6 +166,21 @@ if(WIN32)
             "${MINGW_BIN_DIR}/zlib1.dll"
             $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
 
+
+            # For 1.11.2 Biomes not displaying
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libwebpdemux-2.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libwebp-7.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libsharpyuv-0.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+            # END of 1.11.2
+
             COMMENT "[CMAKE] Copying DLLs to build directory"
     )
 endif()

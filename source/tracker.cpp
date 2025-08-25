@@ -843,7 +843,6 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
 
         new_cat->alpha = 1.0f;
         new_cat->is_visible_on_overlay = true;
-        new_cat->fade_timer = 0.0f;
 
         if (cat_json->string) {
             strncpy(new_cat->root_name, cat_json->string, sizeof(new_cat->root_name) - 1);
@@ -926,7 +925,6 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                         // Initialization for animation state
                         new_crit->alpha = 1.0f;
                         new_crit->is_visible_on_overlay = true;
-                        new_crit->fade_timer = 0.0f;
 
                         strncpy(new_crit->root_name, crit_item->string, sizeof(new_crit->root_name) - 1);
 
@@ -1164,7 +1162,6 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
         if (new_item) {
             new_item->alpha = 1.0f;
             new_item->is_visible_on_overlay = true;
-            new_item->fade_timer = 0.0f;
 
             cJSON *root_name_json = cJSON_GetObjectItem(item_json, "root_name");
             if (cJSON_IsString(root_name_json)) {
@@ -1271,7 +1268,6 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
         // Initialization for animation state
         new_goal->alpha = 1.0f;
         new_goal->is_visible_on_overlay = true;
-        new_goal->fade_timer = 0.0f;
 
         // Parse root_name and icon
         cJSON *root_name = cJSON_GetObjectItem(goal_item_json, "root_name");
@@ -1688,7 +1684,7 @@ static void tracker_calculate_overall_progress(Tracker *t, MC_Version version, c
     // - For hidden helper stats for legacy versions ms-goals, they DON'T count towards the progress at all
     for (int i = 0; i < t->template_data->stat_count; i++) {
         TrackableCategory *stat_cat = t->template_data->stats[i];
-        if (version <= MC_VERSION_1_6_4 && stat_cat->criteria_count == 1 && stat_cat->criteria[0]->goal <= 0) {
+        if (version <= MC_VERSION_1_6_4 && stat_cat->criteria_count == 1 && stat_cat->criteria[0]->goal == 0) {
             continue; // Skip hidden legacy stats
         }
         total_steps += stat_cat->criteria_count;
@@ -1793,7 +1789,7 @@ static void free_multi_stage_goals(MultiStageGoal **goals, int count) {
                 goal->stages = nullptr;
             }
             free(goal); // Finally, free the parent goal struct
-            goal = nullptr;
+            goals[i] = nullptr; // Nullify the pointer IN THE ARRAY
         }
     }
     free(goals); // Free the top-level array of goal pointers
@@ -3484,6 +3480,10 @@ void tracker_reinit_template(Tracker *t, const AppSettings *settings) {
 
         // After clearing, ensure the snapshot name is also cleared to force a new snapshot
         t->template_data->snapshot_world_name[0] = '\0';
+
+        // After freeing the contents, zero out the entire struct to reset all counters,
+        // flags, and snapshot data to a clean state. This fixes the legacy playtime bug.
+        memset(t->template_data, 0, sizeof(TemplateData)); // TODO: New
     }
     // Load and parse data from the new template files
     tracker_load_and_parse_data(t, settings);
