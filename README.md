@@ -1,7 +1,8 @@
 # [**DOWNLOAD ADVANCELY NOW! (Windows, Linux & macOS, any MC Java Version)**](https://github.com/LNXSeus/Advancely/releases)
-# A highly customizable tool to track Minecraft progress beyond just Advancements.
+# A highly customizable and interactive tool to track Minecraft progress beyond just Advancements.
 
 ## This tracker supports an arbitrary number of advancements, recipes, custom statistics, unlocks, multi-stage goals, manual goals, and custom counters for over 100 Minecraft versions.
+
 
 ### Built for flexibility, Advancely supports everything from vanilla speedruns to modded adventures and custom datapacks. It automatically detects changes in your latest singleplayer world, providing real-time progress updates.
 
@@ -21,6 +22,8 @@ Advancely is a sophisticated, data-driven progress tracker designed for Minecraf
 
 * **Interactive Map View**: The main tracker window is not a static list but an interactive map of your progress. You can freely organize your view to focus on what matters most.
 
+![1.16.1 All Advancements Tracker Preview](Tracker_1_16_1_AA_Preview.png)
+
   * **Pan**: Right-Click or Middle-Click + Drag
   * **Zoom**: Mouse Wheel
   * **Lock Layout**: Press `SPACE` to lock the grid layout, preventing it from rearranging when you resize the window or zoom.
@@ -39,7 +42,9 @@ Advancely is a sophisticated, data-driven progress tracker designed for Minecraf
 
 * **Full Mod & Datapack Support**: The tracker is designed to be data-driven. It correctly parses items, stats, and advancements from any mod or data pack (e.g., `conquest:`, `blazeandcave:`) without being limited to the vanilla `minecraft:` namespace.
 
-* **Animated Icons**: Bring your tracker and overlay to life with animated `.gif` icons alongside static `.png` files.
+* **Stream Overlay**: Bring your tracker and overlay to life with animated `.gif` icons alongside static `.png` files.
+
+![Advancely 1.16.1 All Advancements Overlay Preview](Overlay_1_16_1_AA_Preview.png)
 
   * **Important**: For GIFs to work correctly, they must be unoptimized with all frame data intact. You can prepare any GIF by uploading it to [**ezgif.com/maker**](https://ezgif.com/maker), selecting the **"Don't Stack Frames"** option, and exporting the result. The site has a 2MB file size limit for this feature.
 
@@ -61,29 +66,40 @@ Advancely supports over 100 Minecraft versions, including every full release fro
 
 ## Full Customization & Configuration
 
+![Advancely Settings Window](v0.9.21_Settings_Window_Preview.png)
+
 The true power of Advancely lies in its customization. All settings can be configured in real-time from the settings window (`ESC` key).
 
-| Setting Group        | Options & Features                                                                                                                                                                                                                  |
-| -------------------- |-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Path Settings** | `Auto-Detect` saves path for your OS or specify a `Manual` path.                                                                                                                                                                    |
-| **Template Settings**| Select your `Version`, `Category`, and an `Optional Flag` to load a specific ruleset. You can create your own templates by following the folder structure in `resources/templates`.                                                 |
-| **General Settings** | Toggle the `Overlay`, set an `FPS Limit`, keep the tracker `Always On Top`, automatically `Remove Completed Goals` from view, and enable the `StatsPerWorld Mod` compatibility for legacy versions.                                 |
-| **Visual Settings** | Full RGBA color customization for the tracker `background`, `text`, overlay `background`, and overlay `text`. You can also adjust the `Overlay Width`.                                                                              |
-| **Overlay Settings** | Fine-tune the `Overlay Scroll Speed` (negative values reverse direction), `Speed Up Animation` (also toggled with `SPACE` in the overlay window), and align the fully customizable top progress text (`Left`, `Center`, or `Right`).|
-| **Hotkey Settings** | Assign keyboard hotkeys to increment/decrement any custom counters defined in your template. You can find a list of supported key names [here](https://pastebin.com/vPKgWAen).                                                      |
-| **Debug Settings** | `Print Debug To Console` to see detailed, real-time status updates in your terminal.                                                                                                                                                |
+| Setting Group | Options & Features |
+| :--- | :--- |
+| **Path Settings** | `Auto-Detect` saves path for your OS or specify a `Manual` path. An `Open Instances Folder` button is also available, which navigates up three directories from your saves path—ideal for custom launchers. |
+| **Template Settings**| Select your `Version`, `Category`, and an `Optional Flag` to load a specific ruleset. You can create your own templates by following the folder structure in `resources/templates` and use the `Open Template Folder` button for quick access. |
+| **General Settings** | Toggle the `Overlay`, set an `FPS Limit`, keep the tracker `Always On Top`, automatically `Remove Completed Goals` from the main view, and enable the `StatsPerWorld Mod` compatibility for legacy versions. |
+| **Visual Settings** | Full RGBA color customization for the tracker `background`, `text`, overlay `background`, and overlay `text`. You can also adjust the `Overlay Width`. |
+| **Overlay Settings** | Fine-tune the `Overlay Scroll Speed` (negative values reverse direction), `Sub-Stat Cycle Speed` for multi-stat animations, and `Speed Up Animation` (also toggled with `SPACE` in the overlay window). You can also align the top progress text (`Left`, `Center`, or `Right`), toggle `Hide Completed Row 3 Goals`, and toggle visibility for each section of the info bar (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`). |
+| **Hotkey Settings** | Assign keyboard hotkeys to increment/decrement any custom counters defined in your template (hotkeys only work when the tracker window is focused). You can find a list of supported key names [here](https://pastebin.com/vPKgWAen). |
+| **Debug Settings** | `Print Debug To Console` to see detailed, real-time status updates in your terminal. |
 
 ## How To Use
 
 1.  **Download**: Grab the latest release (Windows, Linux, or macOS are all in one) from the [**releases page**](https://github.com/LNXSeus/Advancely/releases).
 2.  **Extract to Folder**: Extract the downloaded zip file into a folder and the run the Advancely.exe file ALWAYS from that folder. **DO NOT CREATE A SHORTCUT TO THE EXE FILE**. 
 3.  **Configure (Optional)**: For first-time use, you can simply run the application. To customize, press `ESC` in the tracker window to open the settings. Here you can select your Minecraft version, choose a tracking category, and configure visuals and hotkeys.
-4.  **Run**: Launch Advancely FROM THE EXTRACTED FOLDER. It will automatically find your most recently played singleplayer world and begin displaying your progress in real-time.
+4.  **Run**: Launch Advancely from the extracted folder or create a shortcut. It will automatically find your most recently played singleplayer world and begin displaying your progress in real-time.
 
 ### Known Limitations
 
 * **Symbolic Links**: On Windows and macOS, the real-time file watcher may not function correctly if your `.minecraft/saves` folder is a symbolic link. For best results, please provide a direct path to your saves folder in the settings if you use a custom location.
 * **Shortcuts**: You must always run the application from where all the `.dll` files are located. Do not create a shortcut to the Advancely.exe file.
+
+### Beta Testers
+
+Massive thanks to all the beta testers:
+
+* ethansplace98
+* yumeko
+* zurtletif
+
 
 ### Licenses & Credits
 

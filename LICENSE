@@ -51,6 +51,8 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ----------------------------------------------------------------------------
 
+This project uses the ImGui library.
+
 The MIT License (MIT)
 
 Copyright (c) 2014-2025 Omar Cornut

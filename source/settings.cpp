@@ -73,6 +73,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::Indent();
         ImGui::InputText("Manual Saves Path", temp_settings.manual_saves_path, MAX_PATH_LENGTH);
 
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Enter the path to your '.minecraft/saves' folder.\n"
+                              "You can just paste it in.\n"
+                              "Doesn't matter if the path uses forward- or backward slashes.");
+        }
+
         if (show_invalid_manual_path_error) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f)); // Red text
             ImGui::TextWrapped(
@@ -81,6 +87,34 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         }
 
         ImGui::Unindent();
+    }
+
+    // Open Instances Folder Button
+    // Only show the button if the current saves path is valid and not empty.
+    if (t->saves_path[0] != '\0' && path_exists(t->saves_path)) {
+        if (ImGui::Button("Open Instances Folder")) {
+            char instances_path[MAX_PATH_LENGTH];
+            if (get_parent_directory(t->saves_path, instances_path, sizeof(instances_path), 3)) {
+                char command[MAX_PATH_LENGTH + 32];
+#ifdef _WIN32
+                // Convert slashes to backslashes for the windows expolorer command
+                path_to_windows_native(instances_path);
+                snprintf(command, sizeof(command), "explorer \"%s\"", instances_path);
+#elif __APPLE__
+                snprintf(command, sizeof(command), "open \"%s\"", instances_path);
+#else
+                snprintf(command, sizeof(command), "xdg-open \"%s\"", instances_path);
+#endif
+                // DEBUG: Log the exact command being passed to the system.
+                log_message(LOG_INFO, "[DEBUG settings] Executing system command: %s\n", command);
+                system(command);
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("IMPORTANT: If you just changed your saves path you'll need to hit 'Apply Settings' first.\n"
+                "Attempts to open the parent 'instances' folder (goes up 3 directories from your saves path).\n"
+                              "Useful for quickly switching between instances in custom launchers.");
+        }
     }
 
     ImGui::Separator();
@@ -142,36 +176,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Opens the 'resources/templates' folder in your file explorer.");
-    }
-
-
-    ImGui::SameLine();
-    // Open Instances Folder Button
-    // Only show the button if the current saves path is valid and not empty.
-    if (t->saves_path[0] != '\0' && path_exists(t->saves_path)) {
-        if (ImGui::Button("Open Instances Folder")) {
-            char instances_path[MAX_PATH_LENGTH];
-            if (get_parent_directory(t->saves_path, instances_path, sizeof(instances_path), 3)) {
-                char command[MAX_PATH_LENGTH + 32];
-#ifdef _WIN32
-                // Convert slashes to backslashes for the windows expolorer command
-                path_to_windows_native(instances_path);
-                snprintf(command, sizeof(command), "explorer \"%s\"", instances_path);
-#elif __APPLE__
-                snprintf(command, sizeof(command), "open \"%s\"", instances_path);
-#else
-                snprintf(command, sizeof(command), "xdg-open \"%s\"", instances_path);
-#endif
-                // DEBUG: Log the exact command being passed to the system.
-                log_message(LOG_INFO, "[DEBUG settings] Executing system command: %s\n", command);
-                system(command);
-            }
-        }
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("IMPORTANT: If you just changed your saves path you'll need to hit 'Apply Settings' first.\n"
-                "Attempts to open the parent 'instances' folder (goes up 3 directories from your saves path).\n"
-                              "Useful for quickly switching between instances in custom launchers.");
-        }
     }
 
     ImGui::Separator();

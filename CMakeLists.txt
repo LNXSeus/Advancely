@@ -193,6 +193,36 @@ add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
         COMMENT "[CMAKE] Copying resources to build directory"
 )
 
+# Move the _PLEASE_READ_ME.txt file to the output directory
+add_custom_command(TARGET Advancely POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        "${CMAKE_SOURCE_DIR}/_PLEASE_READ_ME.txt"
+        "$<TARGET_FILE_DIR:Advancely>"
+        COMMENT "Copying _PLEASE_READ_ME.txt to output directory..."
+)
+
+add_custom_command(TARGET Advancely POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        "${CMAKE_SOURCE_DIR}/LICENSE"
+        "$<TARGET_FILE_DIR:Advancely>"
+        COMMENT "Copying LICENSE to output directory..."
+)
+
+add_custom_command(TARGET Advancely POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        "${CMAKE_SOURCE_DIR}/LICENSES.txt"
+        "$<TARGET_FILE_DIR:Advancely>"
+        COMMENT "Copying LICENSES.txt to output directory..."
+)
+
+add_custom_command(TARGET Advancely POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        "${CMAKE_SOURCE_DIR}/README.md"
+        "$<TARGET_FILE_DIR:Advancely>"
+        COMMENT "Copying README.md to output directory..."
+)
+
+
 
 
 # --- 6. COMPILER FLAGS & SANITIZERS ---
