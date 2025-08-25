@@ -18,6 +18,9 @@
 
 // TODO: Add more socials here
 const char *SOCIALS[] = {
+    "Advance to the",
+    "next level with",
+    "Advancely!",
     "Download Advancely at",
     "github.com/LNXSeus/Advancely",
     "Support LNXS on",

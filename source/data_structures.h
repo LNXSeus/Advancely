@@ -171,7 +171,6 @@ struct TrackableItem {
     // Animation State
     float alpha;                 // Current transparency (1.0f = opaque, 0.0f = transparent)
     bool is_visible_on_overlay;  // Tracks if the item should be rendered
-    float fade_timer;            // Timer for the fade-out animation
 };
 
 
@@ -211,7 +210,6 @@ struct TrackableCategory {
     // Animation State
     float alpha; // Current transparency (1.0f = opaque, 0.0f = transparent)
     bool is_visible_on_overlay; // Tracks if the category should be rendered
-    float fade_timer; // Timer for the fade-out animation
 };
 
 
@@ -253,7 +251,6 @@ struct MultiStageGoal {
     // Animation State
     float alpha; // Current transparency (1.0f = opaque, 0.0f = transparent)
     bool is_visible_on_overlay; // Tracks if the item should be rendered
-    float fade_timer; // Timer for the fade-out animation
 };
 
 // The main container for all data loaded from the template files.
@@ -291,9 +288,6 @@ struct TemplateData {
     // Taking snapshot for legacy versions when world is changed to track changes per world
     long long playtime_snapshot; // Stores playtime at world load for legacy versions
     char snapshot_world_name[MAX_PATH_LENGTH]; // The world the current snapshot belongs to
-
-    // TODO: Remove this later
-    // cJSON *lang_json; // The loaded language file for display names
 };
 
 // PATHMODE AND VERSION STUFF
