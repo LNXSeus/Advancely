@@ -3383,6 +3383,30 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
 
     // This text will now be drawn using the user's selected color.
     ImGui::TextUnformatted(info_buffer);
+
+    // Add a tooltip to the info window to explain the progress metrics.
+    if (ImGui::IsWindowHovered()) {
+        ImGui::BeginTooltip();
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 40.0f);
+
+        ImGui::TextUnformatted("Progress Breakdown");
+        ImGui::Separator();
+
+        ImGui::BulletText("The Adv/Ach counter tracks only the main goals defined in the \"advancements\" section of your template file.");
+
+        ImGui::BulletText("The Progress %% shows your total completion across all individual sub-tasks from all categories. Each of the following tasks has an equal weight in the calculation:");
+        ImGui::Indent();
+        ImGui::BulletText("Advancement Criteria");
+        ImGui::BulletText("Unlocks (exclusive to 25w14craftmine)");
+        ImGui::BulletText("Individual Sub-Stats");
+        ImGui::BulletText("Custom Goals");
+        ImGui::BulletText("Multi-Stage Goal Stages");
+        ImGui::Unindent();
+
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
+
     ImGui::End();
 
     // Pop the two style colors still on the stack (WindowBg and the content's Text color).
@@ -3482,8 +3506,7 @@ void tracker_reinit_template(Tracker *t, const AppSettings *settings) {
         t->template_data->snapshot_world_name[0] = '\0';
 
         // After freeing the contents, zero out the entire struct to reset all counters,
-        // flags, and snapshot data to a clean state. This fixes the legacy playtime bug.
-        memset(t->template_data, 0, sizeof(TemplateData)); // TODO: New
+        // memset(t->template_data, 0, sizeof(TemplateData)); // TODO: Remove
     }
     // Load and parse data from the new template files
     tracker_load_and_parse_data(t, settings);

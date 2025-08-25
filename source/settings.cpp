@@ -144,6 +144,36 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SetTooltip("Opens the 'resources/templates' folder in your file explorer.");
     }
 
+
+    ImGui::SameLine();
+    // Open Instances Folder Button
+    // Only show the button if the current saves path is valid and not empty.
+    if (t->saves_path[0] != '\0' && path_exists(t->saves_path)) {
+        if (ImGui::Button("Open Instances Folder")) {
+            char instances_path[MAX_PATH_LENGTH];
+            if (get_parent_directory(t->saves_path, instances_path, sizeof(instances_path), 3)) {
+                char command[MAX_PATH_LENGTH + 32];
+#ifdef _WIN32
+                // Convert slashes to backslashes for the windows expolorer command
+                path_to_windows_native(instances_path);
+                snprintf(command, sizeof(command), "explorer \"%s\"", instances_path);
+#elif __APPLE__
+                snprintf(command, sizeof(command), "open \"%s\"", instances_path);
+#else
+                snprintf(command, sizeof(command), "xdg-open \"%s\"", instances_path);
+#endif
+                // DEBUG: Log the exact command being passed to the system.
+                log_message(LOG_INFO, "[DEBUG settings] Executing system command: %s\n", command);
+                system(command);
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("IMPORTANT: If you just changed your saves path you'll need to hit 'Apply Settings' first.\n"
+                "Attempts to open the parent 'instances' folder (goes up 3 directories from your saves path).\n"
+                              "Useful for quickly switching between instances in custom launchers.");
+        }
+    }
+
     ImGui::Separator();
     ImGui::Spacing();
 
@@ -161,10 +191,23 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // This toggles the framerate of everything
     ImGui::DragFloat("FPS Limit", &temp_settings.fps, 1.0f, 10.0f, 540.0f, "%.0f");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Limits the frames per second of the tracker and overlay window. Default is 60 FPS.\n"
+            "Higher values may result in higher GPU usage.");
+    }
 
     // Conditionally display overlay related settings
     if (temp_settings.enable_overlay) {
         ImGui::DragFloat("Overlay Scroll Speed", &temp_settings.overlay_scroll_speed, 0.001f, -25.00f, 25.00f, "%.3f");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("A negative scroll speed animates from right-to-left.\n"
+                "A scroll speed of 0.0 is static.\n");
+        }
+
+        ImGui::DragFloat("Sub-Stat Cycle Interval (s)", &temp_settings.overlay_stat_cycle_speed, 0.1f, 0.1f, 120.0f, "%.3f s");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("The time in seconds before cycling to the next sub-stat on a multi-stat goal on the overlay.\n");
+        }
 
         if (ImGui::Checkbox("Speed Up Animation", &temp_settings.overlay_animation_speedup)) {
         }
@@ -484,6 +527,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Overlay: %s\n"
                  "  - FPS Limit: %d\n"
                  "  - Overlay Scroll Speed: %.2f\n"
+                 "  - Sub-Stat Cycle Speed: %.1f s\n"
                  "  - Speed Up Animation: %s\n"
                  "  - Hide Completed Row 3 Goals: %s\n"
                  "  - Always On Top: %s\n"
@@ -498,6 +542,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
                  DEFAULT_FPS,
                  DEFAULT_OVERLAY_SCROLL_SPEED,
+                 DEFAULT_OVERLAY_STAT_CYCLE_SPEED,
                  DEFAULT_OVERLAY_SPEED_UP ? "Enabled" : "Disabled",
                  DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
                  DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",

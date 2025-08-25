@@ -14,6 +14,7 @@
     "print_debug_status":	false,
     "overlay_progress_text_align":	"left",
     "overlay_animation_speedup":	false,
+    "overlay_stat_cycle_speed": 3.0,
     "overlay_row3_remove_completed":	false,
     "overlay_show_world":	true,
     "overlay_show_run_details":	true,

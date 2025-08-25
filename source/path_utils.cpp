@@ -397,3 +397,61 @@ bool path_exists(const char *path) {
     return (stat(path, &buffer) == 0);
 #endif
 }
+
+
+bool get_parent_directory(const char *original_path, char *out_path, size_t max_len, int levels) {
+    if (!original_path || !out_path || max_len == 0 || levels <= 0) {
+        return false;
+    }
+
+    // DEBUG: Log the initial state
+    log_message(LOG_INFO, "[PATH UTILS DEBUG get_parent_directory] Start: path='%s', levels=%d\n", original_path, levels);
+
+    // Copy the original path to the output buffer to work with it.
+    strncpy(out_path, original_path, max_len - 1);
+    out_path[max_len - 1] = '\0';
+
+    for (int i = 0; i < levels; ++i) {
+        size_t len = strlen(out_path);
+
+        // If the path ends with a slash, remove it first to ensure we find the correct parent.
+        if (len > 0 && (out_path[len - 1] == '/' || out_path[len - 1] == '\\')) {
+            out_path[len - 1] = '\0';
+        }
+
+        // Find the last directory separator.
+        char *last_slash = strrchr(out_path, '/');
+        char *last_backslash = strrchr(out_path, '\\');
+        char *separator = (last_slash > last_backslash) ? last_slash : last_backslash;
+
+        if (separator) {
+            // Truncate the string at the separator to get the parent directory.
+            *separator = '\0';
+
+            // DEBUG: Log the result of this step
+            log_message(LOG_INFO, "[PATH UTILS DEBUG get_parent_directory] After level %d: path='%s'\n", i + 1, out_path);
+
+            // If the truncation resulted in an empty string (e.g., from "/saves"), it's an error.
+            if (out_path[0] == '\0') {
+                log_message(LOG_ERROR, "[PATH UTILS DEBUG get_parent_directory] Path became empty. Failing.\n");
+                return false;
+            }
+        } else {
+            // No more separators found, cannot go up further.
+            log_message(LOG_ERROR, "[PATH UTILS DEBUG get_parent_directory] No separator found at level %d. Failing.\n", i + 1);
+            return false;
+        }
+    }
+
+    log_message(LOG_INFO, "[PATH UTILS DEBUG get_parent_directory] Success. Final path: '%s'\n", out_path);
+    return true;
+}
+
+void path_to_windows_native(char *path) {
+    if (!path) return;
+    for (char *p = path; *p; p++) {
+        if (*p == '/') {
+            *p = '\\';
+        }
+    }
+}
