@@ -36,6 +36,60 @@ const char *SOCIALS[] = {
 };
 const int NUM_SOCIALS = sizeof(SOCIALS) / sizeof(char *);
 
+/**
+ * @brief Helper function for text caching to improve performance.
+ * @param o The Overlay instance
+ * @param text The text to cache
+ * @param color The color of the text
+ * @return The SDL_Texture of the cached text
+ */
+static SDL_Texture *get_text_texture_from_cache(Overlay *o, const char *text, SDL_Color color) {
+    if (!text || text[0] == '\0') {
+        return nullptr;
+    }
+
+    // 1. Check if the texture is already in the cache
+    for (int i = 0; i < o->text_cache_count; i++) {
+        TextCacheEntry *entry = &o->text_cache[i];
+        if (strcmp(entry->text, text) == 0 &&
+            entry->color.r == color.r && entry->color.g == color.g &&
+            entry->color.b == color.b && entry->color.a == color.a) {
+            return entry->texture;
+            }
+    }
+
+    // 2. If not in cache, create it and add it
+    SDL_Surface *text_surface = TTF_RenderText_Blended(o->font, text, 0, color);
+    if (!text_surface) {
+        return nullptr;
+    }
+    SDL_Texture *text_texture = SDL_CreateTextureFromSurface(o->renderer, text_surface);
+    SDL_DestroySurface(text_surface);
+    if (!text_texture) {
+        return nullptr;
+    }
+    SDL_SetTextureScaleMode(text_texture, SDL_SCALEMODE_NEAREST);
+
+    // 3. Add to cache, resizing if necessary
+    if (o->text_cache_count >= o->text_cache_capacity) {
+        int new_capacity = o->text_cache_capacity == 0 ? 32 : o->text_cache_capacity * 2;
+        auto *new_cache = (TextCacheEntry *) realloc(o->text_cache, new_capacity * sizeof(TextCacheEntry));
+        if (!new_cache) {
+            SDL_DestroyTexture(text_texture);
+            return nullptr;
+        }
+        o->text_cache = new_cache;
+        o->text_cache_capacity = new_capacity;
+    }
+
+    TextCacheEntry *new_entry = &o->text_cache[o->text_cache_count++];
+    strncpy(new_entry->text, text, sizeof(new_entry->text) - 1);
+    new_entry->color = color;
+    new_entry->texture = text_texture;
+
+    return new_entry->texture;
+}
+
 /** @brief Helper function to render a texture (static or animated) with alpha modulation
  * It also corrects the aspect ratio of the .png textures.
  *
@@ -120,24 +174,27 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     // temp variable to not dereference over and over again
     Overlay *o = *overlay;
 
+    // Caches are zero initialized by calloc
 
-    o->social_media_timer = 0.0f;
-    o->current_social_index = 0;
-    o->text_engine = nullptr;
 
-    o->scroll_offset_row1 = 0.0f;
-    o->scroll_offset_row2 = 0.0f;
-    o->scroll_offset_row3 = 0.0f;
-    o->start_index_row1 = 0;
-    o->start_index_row2 = 0;
-    o->start_index_row3 = 0;
-
-    o->texture_cache = nullptr;
-    o->texture_cache_count = 0;
-    o->texture_cache_capacity = 0;
-    o->anim_cache = nullptr;
-    o->anim_cache_count = 0;
-    o->anim_cache_capacity = 0;
+    // TODO: Remove
+    // o->social_media_timer = 0.0f;
+    // o->current_social_index = 0;
+    // o->text_engine = nullptr;
+    //
+    // o->scroll_offset_row1 = 0.0f;
+    // o->scroll_offset_row2 = 0.0f;
+    // o->scroll_offset_row3 = 0.0f;
+    // o->start_index_row1 = 0;
+    // o->start_index_row2 = 0;
+    // o->start_index_row3 = 0;
+    //
+    // o->texture_cache = nullptr;
+    // o->texture_cache_count = 0;
+    // o->texture_cache_capacity = 0;
+    // o->anim_cache = nullptr;
+    // o->anim_cache_count = 0;
+    // o->anim_cache_capacity = 0;
 
     // Create the SDL window and renderer
     if (!overlay_init_sdl(o, settings)) {
@@ -179,43 +236,16 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
 }
 
 
-void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *deltaTime,
-                    const AppSettings *settings) {
-    (void) o;
-    (void) settings;
-    (void) deltaTime;
-
+void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *deltaTime, const AppSettings *settings) {
+    (void) o; (void) settings; (void) deltaTime;
     switch (event->type) {
-        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-            *is_running = false;
-            break;
-
+        case SDL_EVENT_WINDOW_CLOSE_REQUESTED: *is_running = false; break;
         case SDL_EVENT_KEY_DOWN:
-            // Allowing repeats here
-            switch (event->key.scancode) {
-                case SDL_SCANCODE_SPACE:
-                    log_message(LOG_INFO, "[OVERLAY] Overlay Space key pressed, speeding up tracker.\n");
-
-                    // speed up tracker
-                    // The speedup is applied to deltaTime, which affect the update rate of the animation in overlay_update()
-                    *deltaTime *= OVERLAY_SPEEDUP_FACTOR;
-                    break;
-                default:
-                    break;
+            if (event->key.scancode == SDL_SCANCODE_SPACE) {
+                *deltaTime *= OVERLAY_SPEEDUP_FACTOR;
             }
             break;
-        // TODO: Work with mouse events (HANDLED by ImGui)
-        case SDL_EVENT_MOUSE_BUTTON_DOWN:
-            // printf("[OVERLAY] Mouse button pressed in overlay.\n");
-            break;
-        case SDL_EVENT_MOUSE_MOTION:
-            // printf("[OVERLAY] Mouse moved in overlay.\n");
-            break;
-        case SDL_EVENT_MOUSE_BUTTON_UP:
-            // printf("[OVERLAY] Mouse button released in overlay.\n");
-            break;
-        default:
-            break;
+        default: break;
     }
 }
 
@@ -384,22 +414,34 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
                 strncpy(name_buf, unlock->display_name, sizeof(name_buf) - 1);
             }
 
-            TTF_Text *temp_text = TTF_CreateText(o->text_engine, o->font, name_buf, 0);
-            if (temp_text) {
-                int w;
-                TTF_GetTextSize(temp_text, &w, nullptr);
-                max_text_width = fmaxf(max_text_width, (float) w);
-                TTF_DestroyText(temp_text);
+            // --- OPTIMIZATION: Use TTF_MeasureString for Row 3 as well ---
+            int w;
+            if (name_buf[0] != '\0') {
+                TTF_MeasureString(o->font, name_buf, 0, 0, &w, nullptr);
+                max_text_width = fmaxf(max_text_width, (float)w);
             }
             if (progress_buf[0] != '\0') {
-                temp_text = TTF_CreateText(o->text_engine, o->font, progress_buf, 0);
-                if (temp_text) {
-                    int w;
-                    TTF_GetTextSize(temp_text, &w, nullptr);
-                    max_text_width = fmaxf(max_text_width, (float) w);
-                    TTF_DestroyText(temp_text);
-                }
+                TTF_MeasureString(o->font, progress_buf, 0, 0, &w, nullptr);
+                max_text_width = fmaxf(max_text_width, (float)w);
             }
+
+            // TODO: Remove
+            // TTF_Text *temp_text = TTF_CreateText(o->text_engine, o->font, name_buf, 0);
+            // if (temp_text) {
+            //     int w;
+            //     TTF_GetTextSize(temp_text, &w, nullptr);
+            //     max_text_width = fmaxf(max_text_width, (float) w);
+            //     TTF_DestroyText(temp_text);
+            // }
+            // if (progress_buf[0] != '\0') {
+            //     temp_text = TTF_CreateText(o->text_engine, o->font, progress_buf, 0);
+            //     if (temp_text) {
+            //         int w;
+            //         TTF_GetTextSize(temp_text, &w, nullptr);
+            //         max_text_width = fmaxf(max_text_width, (float) w);
+            //         TTF_DestroyText(temp_text);
+            //     }
+            // }
         }
 
         // Only run the animation logic if there is something to show
@@ -436,7 +478,7 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
         }
     }
 
-    // Row 3 doesn't disappear
+    // Row 3 doesn't disappear by default (only with setting)
     o->scroll_offset_row3 -= scroll_delta;
 
     // The timing logic for complex stat categories lives in overlay_render().
@@ -534,32 +576,18 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             settings->overlay_text_color.r, settings->overlay_text_color.g, settings->overlay_text_color.b,
             settings->overlay_text_color.a
         };
-        // Blended is higher quality than Solid
-        SDL_Surface *text_surface = TTF_RenderText_Blended(o->font, final_buffer, 0, text_color);
-        if (text_surface) {
-            SDL_Texture *text_texture = SDL_CreateTextureFromSurface(o->renderer, text_surface);
-            if (text_texture) {
-                SDL_SetTextureScaleMode(text_texture, SDL_SCALEMODE_NEAREST); // Linear scaling for overlay
-                int overlay_w;
-                SDL_GetWindowSize(o->window, &overlay_w, nullptr);
-                const float padding = 10.0f;
-                SDL_FRect dest_rect = {padding, padding, (float) text_surface->w, (float) text_surface->h};
-                switch (settings->overlay_progress_text_align) {
-                    case OVERLAY_PROGRESS_TEXT_ALIGN_CENTER:
-                        dest_rect.x = ((float) overlay_w - (float) text_surface->w) / 2.0f;
-                        break;
-                    case OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT:
-                        dest_rect.x = (float) overlay_w - (float) text_surface->w - padding;
-                        break;
-                    case OVERLAY_PROGRESS_TEXT_ALIGN_LEFT:
-                    default:
-                        dest_rect.x = padding;
-                        break;
-                }
-                SDL_RenderTexture(o->renderer, text_texture, nullptr, &dest_rect);
-                SDL_DestroyTexture(text_texture);
-            }
-            SDL_DestroySurface(text_surface);
+
+        // Use text cache for top info bar
+        SDL_Texture *text_texture = get_text_texture_from_cache(o, final_buffer, text_color);
+        if (text_texture) {
+            float w, h;
+            SDL_GetTextureSize(text_texture, &w, &h);
+            int overlay_w; SDL_GetWindowSize(o->window, &overlay_w, nullptr);
+            const float padding = 10.0f;
+            SDL_FRect dest_rect = {padding, padding, w, h};
+            if (settings->overlay_progress_text_align == OVERLAY_PROGRESS_TEXT_ALIGN_CENTER) dest_rect.x = ((float)overlay_w - w) / 2.0f;
+            else if (settings->overlay_progress_text_align == OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT) dest_rect.x = (float)overlay_w - w - padding;
+            SDL_RenderTexture(o->renderer, text_texture, nullptr, &dest_rect);
         }
     }
 
@@ -570,6 +598,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
     int window_w;
     SDL_GetWindowSizeInPixels(o->window, &window_w, nullptr);
+    SDL_Color text_color = {settings->overlay_text_color.r, settings->overlay_text_color.g, settings->overlay_text_color.b, 255};
 
     // --- ROW 1: Criteria & Sub-stats Icons ---
     {
@@ -736,22 +765,34 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     strncpy(name_buf, unlock->display_name, sizeof(name_buf) - 1);
                 }
 
-                TTF_Text *temp_text = TTF_CreateText(o->text_engine, o->font, name_buf, 0);
-                if (temp_text) {
-                    int w;
-                    TTF_GetTextSize(temp_text, &w, nullptr);
-                    max_text_width = fmaxf(max_text_width, (float) w);
-                    TTF_DestroyText(temp_text);
+                // Use TTF_MeasureString for Row 3 as well
+                int w;
+                if (name_buf[0] != '\0') {
+                    TTF_MeasureString(o->font, name_buf, 0, 0, &w, nullptr);
+                    max_text_width = fmaxf(max_text_width, (float)w);
                 }
                 if (progress_buf[0] != '\0') {
-                    temp_text = TTF_CreateText(o->text_engine, o->font, progress_buf, 0);
-                    if (temp_text) {
-                        int w;
-                        TTF_GetTextSize(temp_text, &w, nullptr);
-                        max_text_width = fmaxf(max_text_width, (float) w);
-                        TTF_DestroyText(temp_text);
-                    }
+                    TTF_MeasureString(o->font, progress_buf, 0, 0, &w, nullptr);
+                    max_text_width = fmaxf(max_text_width, (float)w);
                 }
+
+                // TODO: Remove
+                // TTF_Text *temp_text = TTF_CreateText(o->text_engine, o->font, name_buf, 0);
+                // if (temp_text) {
+                //     int w;
+                //     TTF_GetTextSize(temp_text, &w, nullptr);
+                //     max_text_width = fmaxf(max_text_width, (float) w);
+                //     TTF_DestroyText(temp_text);
+                // }
+                // if (progress_buf[0] != '\0') {
+                //     temp_text = TTF_CreateText(o->text_engine, o->font, progress_buf, 0);
+                //     if (temp_text) {
+                //         int w;
+                //         TTF_GetTextSize(temp_text, &w, nullptr);
+                //         max_text_width = fmaxf(max_text_width, (float) w);
+                //         TTF_DestroyText(temp_text);
+                //     }
+                // }
             }
 
             const float cell_width = fmaxf(ITEM_WIDTH, max_text_width);
@@ -816,31 +857,29 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 }
                 render_texture_with_alpha(o->renderer, tex, anim_tex, &icon_rect, 255);
 
-                TTF_Text *name_text = TTF_CreateText(o->text_engine, o->font, name_buf, 0);
-                if (name_text) {
-                    int w, h;
-                    TTF_GetTextSize(name_text, &w, &h);
-                    float text_x = x_pos + (cell_width - (float) w) / 2.0f;
-                    TTF_SetTextColor(name_text, settings->overlay_text_color.r, settings->overlay_text_color.g,
-                                     settings->overlay_text_color.b, 255);
-                    TTF_DrawRendererText(name_text, text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET);
+
+                // Text rendering now uses the cache
+                SDL_Texture *name_texture = get_text_texture_from_cache(o, name_buf, text_color);
+                if (name_texture) {
+                    float w, h;
+                    SDL_GetTextureSize(name_texture, &w, &h);
+                    float text_x = x_pos + (cell_width - w) / 2.0f;
+                    SDL_FRect dest_rect = {text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET, w, h};
+                    SDL_RenderTexture(o->renderer, name_texture, nullptr, &dest_rect);
 
                     if (progress_buf[0] != '\0') {
-                        TTF_Text *progress_text = TTF_CreateText(o->text_engine, o->font, progress_buf, 0);
-                        if (progress_text) {
-                            TTF_GetTextSize(progress_text, &w, nullptr);
-                            text_x = x_pos + (cell_width - (float) w) / 2.0f;
-                            TTF_SetTextColor(progress_text, settings->overlay_text_color.r,
-                                             settings->overlay_text_color.g, settings->overlay_text_color.b, 255);
-                            TTF_DrawRendererText(progress_text, text_x,
-                                                 ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + (float) h);
-                            TTF_DestroyText(progress_text);
+                        SDL_Texture *progress_texture = get_text_texture_from_cache(o, progress_buf, text_color);
+                        if (progress_texture) {
+                            float pw, ph;
+                            SDL_GetTextureSize(progress_texture, &pw, &ph);
+                            float p_text_x = x_pos + (cell_width - pw) / 2.0f;
+                            SDL_FRect p_dest_rect = {p_text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + h, pw, ph};
+                            SDL_RenderTexture(o->renderer, progress_texture, nullptr, &p_dest_rect);
                         }
                     }
-                    TTF_DestroyText(name_text);
                 }
 
-                // FIX: This is the correct place to advance to the next item for the next screen slot.
+                // This is the correct place to advance to the next item for the next screen slot.
                 current_item_idx = (current_item_idx + 1) % row2_items.size();
             }
         }
@@ -884,7 +923,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         if (visible_item_count > 0) {
             float max_text_width = 0.0f;
             // First pass: calculate the max width required by any visible item in the row
-            for (const auto &display_item: row3_items) {
+            for (const auto &display_item: row3_items) { // This is the layout calculation loop
                 if (is_display_item_done(display_item, settings)) continue;
 
                 char name_buf[256] = {0};
@@ -959,21 +998,15 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     default: break;
                 }
 
-                TTF_Text *temp_text = TTF_CreateText(o->text_engine, o->font, name_buf, 0);
-                if (temp_text) {
-                    int w;
-                    TTF_GetTextSize(temp_text, &w, nullptr);
-                    max_text_width = fmaxf(max_text_width, (float) w);
-                    TTF_DestroyText(temp_text);
+                // Use TTF_MeasureString for Row 3 as well
+                int w;
+                if (name_buf[0] != '\0') {
+                    TTF_MeasureString(o->font, name_buf, 0, 0, &w, nullptr);
+                    max_text_width = fmaxf(max_text_width, (float)w);
                 }
                 if (progress_buf[0] != '\0') {
-                    temp_text = TTF_CreateText(o->text_engine, o->font, progress_buf, 0);
-                    if (temp_text) {
-                        int w;
-                        TTF_GetTextSize(temp_text, &w, nullptr);
-                        max_text_width = fmaxf(max_text_width, (float) w);
-                        TTF_DestroyText(temp_text);
-                    }
+                    TTF_MeasureString(o->font, progress_buf, 0, 0, &w, nullptr);
+                    max_text_width = fmaxf(max_text_width, (float)w);
                 }
             }
 
@@ -1120,31 +1153,32 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     }
                     render_texture_with_alpha(o->renderer, tex, anim_tex, &icon_rect, 255);
 
-                    TTF_Text *name_text = TTF_CreateText(o->text_engine, o->font, name_buf, 0);
-                    if (name_text) {
-                        int w, h;
-                        TTF_GetTextSize(name_text, &w, &h);
-                        float text_x = current_x + (cell_width - (float) w) / 2.0f;
-                        TTF_SetTextColor(name_text, settings->overlay_text_color.r, settings->overlay_text_color.g,
-                                         settings->overlay_text_color.b, 255);
-                        TTF_DrawRendererText(name_text, text_x, ROW3_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET);
+
+                    // Optimized text rendering using cache
+
+                    // --- OPTIMIZATION: Text rendering now uses the cache ---
+                    SDL_Texture *name_texture = get_text_texture_from_cache(o, name_buf, text_color);
+                    if (name_texture) {
+                        float w, h;
+                        SDL_GetTextureSize(name_texture, &w, &h);
+                        float text_x = current_x + (cell_width - w) / 2.0f;
+                        SDL_FRect dest_rect = {text_x, ROW3_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET, w, h};
+                        SDL_RenderTexture(o->renderer, name_texture, nullptr, &dest_rect);
 
                         if (progress_buf[0] != '\0') {
-                            TTF_Text *progress_text = TTF_CreateText(o->text_engine, o->font, progress_buf, 0);
-                            if (progress_text) {
-                                TTF_GetTextSize(progress_text, &w, nullptr);
-                                text_x = current_x + (cell_width - (float) w) / 2.0f;
-                                TTF_SetTextColor(progress_text, settings->overlay_text_color.r,
-                                                 settings->overlay_text_color.g, settings->overlay_text_color.b, 255);
-                                TTF_DrawRendererText(progress_text, text_x,
-                                                     ROW3_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + (float) h);
-                                TTF_DestroyText(progress_text);
+                            SDL_Texture *progress_texture = get_text_texture_from_cache(o, progress_buf, text_color);
+                            if (progress_texture) {
+                                float pw, ph;
+                                SDL_GetTextureSize(progress_texture, &pw, &ph);
+                                float p_text_x = current_x + (cell_width - pw) / 2.0f;
+                                SDL_FRect p_dest_rect = {p_text_x, ROW3_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + h, pw, ph};
+                                SDL_RenderTexture(o->renderer, progress_texture, nullptr, &p_dest_rect);
                             }
                         }
-                        TTF_DestroyText(name_text);
                     }
 
                     visible_item_index++;
+
                 }
             }
         }
@@ -1220,6 +1254,17 @@ void overlay_free(Overlay **overlay, const AppSettings *settings) {
             }
             free(o->anim_cache);
             o->anim_cache = nullptr;
+        }
+
+        // Free the new text cache
+        if (o->text_cache) {
+            for (int i = 0; i < o->text_cache_count; i++) {
+                if (o->text_cache[i].texture) {
+                    SDL_DestroyTexture(o->text_cache[i].texture);
+                }
+            }
+            free(o->text_cache);
+            o->text_cache = nullptr;
         }
 
         if (o->text_engine) {

@@ -22,7 +22,7 @@ Advancely is a sophisticated, data-driven progress tracker designed for Minecraf
 
 * **Interactive Map View**: The main tracker window is not a static list but an interactive map of your progress. You can freely organize your view to focus on what matters most.
 
-![1.16.1 All Advancements Tracker Preview](Tracker_1_16_1_AA_Preview.png)
+![1.16.1 All Advancements Tracker Preview](readme_assets/Tracker_1_16_1_AA_Preview.png)
 
   * **Pan**: Right-Click or Middle-Click + Drag
   * **Zoom**: Mouse Wheel
@@ -46,7 +46,7 @@ Advancely is a sophisticated, data-driven progress tracker designed for Minecraf
 
 **Template-Specific Notes**: A toggleable notes window is available in the bottom-right corner of the tracker. Any text you type is saved instantly to a `_notes.txt` file, which is stored right next to the template file you are currently using. This makes your notes specific to each category and version you track. Furthermore, if you edit the `.txt` file directly while the tracker is running, the notes window will update live with your changes.
 
-![Advancely 1.16.1 All Advancements Overlay Preview](Overlay_1_16_1_AA_Preview.png)
+![Advancely 1.16.1 All Advancements Overlay Preview](readme_assets/Overlay_1_16_1_AA_Preview.png)
 
   * **Important**: For GIFs to work correctly, they must be unoptimized with all frame data intact. You can prepare any GIF by uploading it to [**ezgif.com/maker**](https://ezgif.com/maker), selecting the **"Don't Stack Frames"** option, and exporting the result. The site has a 2MB file size limit for this feature.
 
@@ -68,7 +68,7 @@ Advancely supports over 100 Minecraft versions, including every full release fro
 
 ## Full Customization & Configuration
 
-![Advancely Settings Window](v0.9.21_Settings_Window_Preview.png)
+![Advancely Settings Window](readme_assets/v0.9.21_Settings_Window_Preview.png)
 
 The true power of Advancely lies in its customization. All settings can be configured in real-time from the settings window (`ESC` key).
 
@@ -86,7 +86,7 @@ The true power of Advancely lies in its customization. All settings can be confi
 
 1.  **Download**: Grab the latest release (Windows, Linux, or macOS are all in one) from the [**releases page**](https://github.com/LNXSeus/Advancely/releases).
 2.  **Extract to Folder**: Extract the downloaded zip file into a folder and the run the Advancely.exe file ALWAYS from that folder. **DO NOT CREATE A SHORTCUT TO THE EXE FILE**. 
-3.  **Configure (Optional)**: For first-time use, you can simply run the application. To customize, press `ESC` in the tracker window to open the settings. Here you can select your Minecraft version, choose a tracking category, and configure visuals and hotkeys.
+3.  **Configure (Optional)**: For first-time use, you can simply run the application. To customize, press `ESC` in the tracker window to open the settings. Here you can select your Minecraft version, choose a tracking category, and configure visuals and hotkeys. To keep your settings after updating to a newer version just paste your old `settings.json` file into the updated config folder.
 4.  **Run**: Launch Advancely from the extracted folder or create a shortcut. It will automatically find your most recently played singleplayer world and begin displaying your progress in real-time.
 
 ### Known Limitations

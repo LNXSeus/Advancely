@@ -21,6 +21,13 @@ struct OverlayDisplayItem {
     enum ItemType { ADVANCEMENT, UNLOCK, STAT, CUSTOM, MULTISTAGE } type;
 };
 
+// A cache entry for rendered text to avoid re-creating textures every frame
+typedef struct {
+    char text[256]; // The text string that was rendered
+    SDL_Color color; // The color it was rendered with
+    SDL_Texture *texture;
+} TextCacheEntry;
+
 struct Overlay {
     SDL_Window *window;
     SDL_Renderer *renderer;
@@ -31,12 +38,16 @@ struct Overlay {
     SDL_Texture *adv_bg_half_done;
     SDL_Texture *adv_bg_done;
 
+    // Cahces for textures to improve performance
     TextureCacheEntry *texture_cache;
     int texture_cache_count;
     int texture_cache_capacity;
     AnimatedTextureCacheEntry *anim_cache;
     int anim_cache_count;
     int anim_cache_capacity;
+    TextCacheEntry *text_cache;
+    int text_cache_count;
+    int text_cache_capacity;
 
 
     float social_media_timer; // Timer for cycling promotional text

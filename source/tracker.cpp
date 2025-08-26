@@ -3260,6 +3260,11 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 void tracker_render_gui(Tracker *t, AppSettings *settings) {
     if (!t || !t->template_data) return;
 
+    if (settings->print_debug_status) {
+        // Add this line to show the ImGui Metrics Window
+        ImGui::ShowMetricsWindow();
+    }
+
     ImGuiIO &io = ImGui::GetIO();
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(ImVec2(io.DisplaySize));
