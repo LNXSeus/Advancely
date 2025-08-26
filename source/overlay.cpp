@@ -887,7 +887,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             for (const auto &display_item: row3_items) {
                 if (is_display_item_done(display_item, settings)) continue;
 
-                char name_buf[256] = {0}; char progress_buf[256] = {0};
+                char name_buf[256] = {0};
+                char progress_buf[256] = {0};
 
                 switch (display_item.type) {
                     case OverlayDisplayItem::STAT: {
@@ -914,8 +915,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                     strcpy(longest_sub_stat_line, temp_sub_stat_buf);
                                 }
                             }
-                            strncpy(name_buf, title_line, sizeof(name_buf) -1);
-                            strncpy(progress_buf, longest_sub_stat_line, sizeof(progress_buf) -1);
+                            strncpy(name_buf, title_line, sizeof(name_buf) - 1);
+                            strncpy(progress_buf, longest_sub_stat_line, sizeof(progress_buf) - 1);
                         } else {
                             // Otherwise, use the original static format for single-criterion stats.
                             strncpy(name_buf, stat->display_name, sizeof(name_buf) - 1);
@@ -1006,9 +1007,19 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     switch (display_item.type) {
                         case OverlayDisplayItem::STAT: {
                             auto *stat = static_cast<TrackableCategory *>(display_item.item_ptr);
-                            if (stat->done) bg_texture = o->adv_bg_done;
-                            else if (stat->completed_criteria_count > 0)
+                            // Check for completion first, then for the "half-done" state
+                            if (stat->done) {
+                                bg_texture = o->adv_bg_done;
+                            }
+                            // A stat is "half-done" if:
+                            // 1. It's a complex category with at least one criterion met.
+                            // OR
+                            // 2. It's a simple category and its progress is greater than zero.
+                            else if ((!stat->is_single_stat_category && stat->completed_criteria_count > 0) ||
+                                     (stat->is_single_stat_category && stat->criteria_count > 0 && stat->criteria[0]->
+                                      progress > 0)) {
                                 bg_texture = o->adv_bg_half_done;
+                            }
                             icon_path = stat->icon_path;
 
                             if (stat->criteria_count > 1) {
@@ -1023,7 +1034,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 }
 
                                 if (!incomplete_indices.empty()) {
-                                    int cycle_duration_ms = (int)(settings->overlay_stat_cycle_speed * 1000.0f);
+                                    int cycle_duration_ms = (int) (settings->overlay_stat_cycle_speed * 1000.0f);
                                     if (cycle_duration_ms <= 0) cycle_duration_ms = 1000;
 
                                     Uint32 current_ticks = SDL_GetTicks();
@@ -1034,11 +1045,11 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
                                     if (crit->goal > 0) {
                                         snprintf(progress_buf, sizeof(progress_buf), "%d. %s (%d / %d)",
-                                             original_crit_index + 1, crit->display_name, crit->progress,
-                                             crit->goal);
+                                                 original_crit_index + 1, crit->display_name, crit->progress,
+                                                 crit->goal);
                                     } else if (crit->goal == -1) {
-                                         snprintf(progress_buf, sizeof(progress_buf), "%d. %s (%d)",
-                                             original_crit_index + 1, crit->display_name, crit->progress);
+                                        snprintf(progress_buf, sizeof(progress_buf), "%d. %s (%d)",
+                                                 original_crit_index + 1, crit->display_name, crit->progress);
                                     }
                                 } else {
                                     progress_buf[0] = '\0';
@@ -1141,7 +1152,6 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
     // --- DEBUG: Performance Display ---
     if (settings->print_debug_status) {
-
         // Static variables to track frame rate
         static Uint32 frame_count = 0;
         static Uint32 last_fps_update_time = 0;
@@ -1152,7 +1162,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
         // Calculate FPS once every second
         if ((current_ticks - last_fps_update_time) >= 1000) {
-            current_fps = (float)frame_count;
+            current_fps = (float) frame_count;
             frame_count = 0;
             last_fps_update_time = current_ticks;
         }
@@ -1169,7 +1179,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             SDL_Texture *text_texture = SDL_CreateTextureFromSurface(o->renderer, text_surface);
             if (text_texture) {
                 SDL_SetTextureScaleMode(text_texture, SDL_SCALEMODE_NEAREST);
-                SDL_FRect dest_rect = {5.0f, 5.0f, (float)text_surface->w, (float)text_surface->h};
+                SDL_FRect dest_rect = {5.0f, 5.0f, (float) text_surface->w, (float) text_surface->h};
                 SDL_RenderTexture(o->renderer, text_texture, nullptr, &dest_rect);
                 SDL_DestroyTexture(text_texture);
             }
