@@ -901,7 +901,7 @@
         {
           "stage_id": "1",
           "type": "advancement",
-          "root_name": "minecraft:adventure/use_lodestone",
+          "root_name": "minecraft:nether/use_lodestone",
           "target": 1
         },
         {
