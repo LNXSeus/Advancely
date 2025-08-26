@@ -276,6 +276,9 @@ static bool is_display_item_done(const OverlayDisplayItem &display_item, const A
 void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSettings *settings) {
     if (!t || !t->template_data) return;
 
+    // Store the current delta time so we can display it in the render function.
+    o->last_delta_time = *deltaTime;
+
     // --- Gather Items for Each Row ---
     std::vector<std::pair<TrackableItem *, TrackableCategory *> > row1_items;
     for (int i = 0; i < t->template_data->advancement_count; i++) {
@@ -438,66 +441,6 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
 
     // The timing logic for complex stat categories lives in overlay_render().
 
-    // TODO: Remove
-    // // --- Update Sub-Stat Cycling for Multi-Stats ---
-    // for (int i = 0; i < t->template_data->stat_count; ++i) {
-    //     TrackableCategory *stat_cat = t->template_data->stats[i];
-    //     if (stat_cat->criteria_count > 1) { // Only cycle if there is more than one sub-stat.
-    //         bool needs_new_index = false;
-    //
-    //         // Reason 1: The current index is invalid or the item it points to is now complete.
-    //         if (stat_cat->current_cycle_index < 0 || stat_cat->criteria[stat_cat->current_cycle_index]->done) {
-    //             needs_new_index = true;
-    //         }
-    //
-    //         // Reason 2: The cycle timer has elapsed.
-    //         stat_cat->cycle_timer += *deltaTime;
-    //         if (stat_cat->cycle_timer >= settings->overlay_stat_cycle_speed) {
-    //             stat_cat->cycle_timer = fmod(stat_cat->cycle_timer, settings->overlay_stat_cycle_speed);
-    //             needs_new_index = true;
-    //         }
-    //
-    //         // If we need a new index for any reason, find the next available incomplete one.
-    //         if (needs_new_index) {
-    //             int start_search = (stat_cat->current_cycle_index < 0) ? 0 : (stat_cat->current_cycle_index + 1);
-    //             int next_index = -1; // Default to -1 (none found)
-    //
-    //             for (int k = 0; k < stat_cat->criteria_count; ++k) {
-    //                 int search_idx = (start_search + k) % stat_cat->criteria_count;
-    //                 if (!stat_cat->criteria[search_idx]->done) {
-    //                     next_index = search_idx;
-    //                     break;
-    //                 }
-    //             }
-    //             stat_cat->current_cycle_index = next_index;
-    //         }
-    //     }
-    // }
-
-    // TODO: Remove
-    // // --- Update Sub-Stat Cycling for Multi-Stats ---
-    // for (int i = 0; i < t->template_data->stat_count; ++i) {
-    //     TrackableCategory *stat_cat = t->template_data->stats[i];
-    //     if (stat_cat->criteria_count > 1) { // Apply cycling only to multi-stat stat_categories
-    //         stat_cat->cycle_timer += *deltaTime;
-    //         if (stat_cat->cycle_timer >= settings->overlay_stat_cycle_speed) {
-    //             stat_cat->cycle_timer = fmod(stat_cat->cycle_timer, settings->overlay_stat_cycle_speed);
-    //
-    //             // Find the next INCOMPLETE sub-stat to display
-    //             int next_index = -1;
-    //             int current_search_index = (stat_cat->current_cycle_index + 1) % stat_cat->criteria_count;
-    //
-    //             for (int k = 0; k < stat_cat->criteria_count; ++k) {
-    //                 if (!stat_cat->criteria[current_search_index]->done) {
-    //                     next_index = current_search_index;
-    //                     break;
-    //                 }
-    //                 current_search_index = (current_search_index + 1) % stat_cat->criteria_count;
-    //             }
-    //             stat_cat->current_cycle_index = next_index; // Will be -1 if all are complete
-    //         }
-    //     }
-    // }
 
     // --- Cycle through social media text ---
     o->social_media_timer += *deltaTime;
@@ -1195,6 +1138,46 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             }
         }
     }
+
+    // --- DEBUG: Performance Display ---
+    if (settings->print_debug_status) {
+
+        // Static variables to track frame rate
+        static Uint32 frame_count = 0;
+        static Uint32 last_fps_update_time = 0;
+        static float current_fps = 0.0f;
+
+        frame_count++;
+        Uint32 current_ticks = SDL_GetTicks();
+
+        // Calculate FPS once every second
+        if ((current_ticks - last_fps_update_time) >= 1000) {
+            current_fps = (float)frame_count;
+            frame_count = 0;
+            last_fps_update_time = current_ticks;
+        }
+
+        // Format the debug string
+        char debug_buffer[128];
+        snprintf(debug_buffer, sizeof(debug_buffer), "FPS: %.1f | dT: %.1f ms",
+                 current_fps, o->last_delta_time * 1000.0f);
+
+        // Render the text to a texture
+        SDL_Color text_color = {255, 255, 0, 255}; // Bright yellow for visibility
+        SDL_Surface *text_surface = TTF_RenderText_Blended(o->font, debug_buffer, 0, text_color);
+        if (text_surface) {
+            SDL_Texture *text_texture = SDL_CreateTextureFromSurface(o->renderer, text_surface);
+            if (text_texture) {
+                SDL_SetTextureScaleMode(text_texture, SDL_SCALEMODE_NEAREST);
+                SDL_FRect dest_rect = {5.0f, 5.0f, (float)text_surface->w, (float)text_surface->h};
+                SDL_RenderTexture(o->renderer, text_texture, nullptr, &dest_rect);
+                SDL_DestroyTexture(text_texture);
+            }
+            SDL_DestroySurface(text_surface);
+        }
+    }
+
+    // END OF DEBUG -------------------------------------------------
 
     SDL_RenderPresent(o->renderer);
 }
