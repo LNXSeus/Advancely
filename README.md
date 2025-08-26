@@ -16,7 +16,7 @@
 
 ## What is Advancely?
 
-Advancely is a sophisticated, data-driven progress tracker designed for Minecraft speedrunners, completionists, and content creators. Unlike other tools that only track vanilla advancements, Advancely can be configured to monitor virtually any goal you can imagine. It operates in real-time by watching your singleplayer save files for changes, meaning your progress is always up-to-date without any manual intervention. Its true power lies in its template system, which allows you to define exactly what you want to track for any version, mod, or playstyle.
+Advancely is a sophisticated, data-driven progress tracker designed for Minecraft speedrunners, completionists, and content creators. Unlike other tools that only track vanilla advancements, Advancely can be configured to monitor virtually any goal you can imagine. It operates in real-time by watching your singleplayer save files for changes, meaning your progress is always up-to-date without any manual intervention. Its true power lies in its `.json` template system, which allows you to define exactly what you want to track for any version, mod, or playstyle.
 
 ## Core Features
 
@@ -44,7 +44,7 @@ Advancely is a sophisticated, data-driven progress tracker designed for Minecraf
 
 * **Stream Overlay**: Bring your tracker and overlay to life with animated `.gif` icons alongside static `.png` files.
 
-**📝 Template-Specific Notes**: A toggleable notes window is available in the bottom-right corner of the tracker. Any text you type is saved instantly to a `_notes.txt` file, which is stored right next to the template file you are currently using. This makes your notes specific to each category and version you track. Furthermore, if you edit the `.txt` file directly while the tracker is running, the notes window will update live with your changes.
+**Template-Specific Notes**: A toggleable notes window is available in the bottom-right corner of the tracker. Any text you type is saved instantly to a `_notes.txt` file, which is stored right next to the template file you are currently using. This makes your notes specific to each category and version you track. Furthermore, if you edit the `.txt` file directly while the tracker is running, the notes window will update live with your changes.
 
 ![Advancely 1.16.1 All Advancements Overlay Preview](Overlay_1_16_1_AA_Preview.png)
 
@@ -93,6 +93,11 @@ The true power of Advancely lies in its customization. All settings can be confi
 
 * **Symbolic Links**: On Windows and macOS, the real-time file watcher may not function correctly if your `.minecraft/saves` folder is a symbolic link. For best results, please provide a direct path to your saves folder in the settings if you use a custom location.
 * **Shortcuts**: You must always run the application from where all the `.dll` files are located. Do not create a shortcut to the Advancely.exe file.
+
+### Running into Issues?
+
+* **Check log file**: First look into the `advancely_log.txt` file to see if there are any errors that were caused by wrong usage of the application. With the `Print Debug To Console` setting enabled the log file will also print regular information to the console (including progress on goals on game updates) not just errors.
+* **Report an Issue**: If you have any issues, that aren't caused by wrong usage, please contact me on [Discord @lnxseus](https://discord.gg/TyNgXDz) or [create a new issue](https://github.com/LNXSeus/Advancely/issues/new) on GitHub!
 
 ### Beta Testers
 

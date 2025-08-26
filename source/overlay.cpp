@@ -922,9 +922,6 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             }
             row3_items.push_back({stat_cat, OverlayDisplayItem::STAT});
         }
-        // for (int i = 0; i < t->template_data->stat_count; ++i) row3_items.push_back({
-        //     t->template_data->stats[i], OverlayDisplayItem::STAT
-        // });
         for (int i = 0; i < t->template_data->custom_goal_count; ++i)
             row3_items.push_back({
                 t->template_data->custom_goals[i], OverlayDisplayItem::CUSTOM
@@ -953,24 +950,23 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     case OverlayDisplayItem::STAT: {
                         auto *stat = static_cast<TrackableCategory *>(display_item.item_ptr);
 
-                        // If there is more than one criterion, use the new multi-line cycling format.
                         if (stat->criteria_count > 1) {
                             // For multi-stats, find the max width between the title and the longest sub-stat.
                             char title_line[256];
-                            // Row 1: Main name and overall progress
                             snprintf(title_line, sizeof(title_line), "%s (%d / %d)", stat->display_name,
                                      stat->completed_criteria_count, stat->criteria_count);
 
-                            // Find the longest possible sub-stat string for width calculation
                             char longest_sub_stat_line[256] = {0};
-
-                            // Row 2 (Cycling): Find the longest possible sub-stat string for width calculation
                             for (int j = 0; j < stat->criteria_count; ++j) {
                                 TrackableItem *crit = stat->criteria[j];
-                                char temp_sub_stat_buf[256];
-                                snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s (%d / %d)",
-                                         j + 1, crit->display_name, crit->progress, crit->goal);
-                                // If the 2nd text line of complex stat is longer
+                                char temp_sub_stat_buf[256] = {0};
+                                if (crit->goal > 0) {
+                                    snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s (%d / %d)",
+                                             j + 1, crit->display_name, crit->progress, crit->goal);
+                                } else if (crit->goal == -1) {
+                                    snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s (%d)",
+                                             j + 1, crit->display_name, crit->progress);
+                                }
                                 if (strlen(temp_sub_stat_buf) > strlen(longest_sub_stat_line)) {
                                     strcpy(longest_sub_stat_line, temp_sub_stat_buf);
                                 }
@@ -978,30 +974,19 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             strncpy(name_buf, title_line, sizeof(name_buf) -1);
                             strncpy(progress_buf, longest_sub_stat_line, sizeof(progress_buf) -1);
                         } else {
-                            // Otherwise, use the original static format.
+                            // Otherwise, use the original static format for single-criterion stats.
                             strncpy(name_buf, stat->display_name, sizeof(name_buf) - 1);
                             if (stat->criteria_count == 1) {
                                 TrackableItem *crit = stat->criteria[0];
-                                if (crit->goal > 0)
+                                if (crit->goal > 0) {
                                     snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
                                              crit->progress, crit->goal);
+                                } else if (crit->goal == -1) {
+                                    snprintf(progress_buf, sizeof(progress_buf), "(%d)", crit->progress);
+                                }
                             }
                         }
                         break;
-
-                        // TODO: Remove
-                        // // Text Row 1: Main name and overall progress
-                        // strncpy(name_buf, stat->display_name, sizeof(name_buf) - 1);
-                        // if (stat->criteria_count > 1) {
-                        //     snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)", stat->completed_criteria_count,
-                        //              stat->criteria_count);
-                        // } else if (stat->criteria_count == 1) { // Stats with 1 criterion
-                        //     TrackableItem *crit = stat->criteria[0];
-                        //     if (crit->goal > 0)
-                        //         snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
-                        //                  crit->progress, crit->goal);
-                        // }
-                        // break;
                     }
                     case OverlayDisplayItem::CUSTOM: {
                         auto *goal = static_cast<TrackableItem *>(display_item.item_ptr);
@@ -1083,13 +1068,10 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 bg_texture = o->adv_bg_half_done;
                             icon_path = stat->icon_path;
 
-                            // If there is more than one criterion, use the new time-based cycling display.
                             if (stat->criteria_count > 1) {
-                                // Line 1: Main name and overall progress
                                 snprintf(name_buf, sizeof(name_buf), "%s (%d / %d)", stat->display_name,
                                          stat->completed_criteria_count, stat->criteria_count);
 
-                                // Line 2: Find which incomplete sub-stat to display based on system time
                                 std::vector<int> incomplete_indices;
                                 for (int j = 0; j < stat->criteria_count; ++j) {
                                     if (!stat->criteria[j]->done) {
@@ -1098,79 +1080,40 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 }
 
                                 if (!incomplete_indices.empty()) {
-                                    // Calculate which item to show using an independent timer
                                     int cycle_duration_ms = (int)(settings->overlay_stat_cycle_speed * 1000.0f);
-                                    if (cycle_duration_ms <= 0) cycle_duration_ms = 1000; // Prevent division by zero
+                                    if (cycle_duration_ms <= 0) cycle_duration_ms = 1000;
 
                                     Uint32 current_ticks = SDL_GetTicks();
                                     int num_incomplete = incomplete_indices.size();
                                     int list_index_to_show = (current_ticks / cycle_duration_ms) % num_incomplete;
-
                                     int original_crit_index = incomplete_indices[list_index_to_show];
-
                                     TrackableItem *crit = stat->criteria[original_crit_index];
-                                    snprintf(progress_buf, sizeof(progress_buf), "%d. %s (%d / %d)",
+
+                                    if (crit->goal > 0) {
+                                        snprintf(progress_buf, sizeof(progress_buf), "%d. %s (%d / %d)",
                                              original_crit_index + 1, crit->display_name, crit->progress,
                                              crit->goal);
+                                    } else if (crit->goal == -1) {
+                                         snprintf(progress_buf, sizeof(progress_buf), "%d. %s (%d)",
+                                             original_crit_index + 1, crit->display_name, crit->progress);
+                                    }
                                 } else {
-                                    progress_buf[0] = '\0'; // Don't show a second line if all are complete
+                                    progress_buf[0] = '\0';
                                 }
                             } else {
-                                // Original static rendering for stats with 0 or 1 criterion.
                                 strncpy(name_buf, stat->display_name, sizeof(name_buf) - 1);
                                 if (stat->criteria_count == 1) {
                                     TrackableItem *crit = stat->criteria[0];
-                                    if (crit->goal > 0)
+                                    if (crit->goal > 0) {
                                         snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
                                                  crit->progress, crit->goal);
+                                    } else if (crit->goal == -1) {
+                                        snprintf(progress_buf, sizeof(progress_buf), "(%d)", crit->progress);
+                                    }
                                 }
                             }
                             break;
                         }
-                        // TODO: Remove
-                        // case OverlayDisplayItem::STAT: {
-                        //     auto *stat = static_cast<TrackableCategory *>(display_item.item_ptr);
-                        //
-                        //     // Depending on full sub-stats completed go to half done or full done.
-                        //     if (stat->done) bg_texture = o->adv_bg_done;
-                        //     else if (stat->completed_criteria_count > 0)
-                        //         bg_texture = o->adv_bg_half_done;
-                        //
-                        //     icon_path = stat->icon_path;
-                        //
-                        //     // TODO: Remove
-                        //     // if (stat->done) bg_texture = o->adv_bg_done;
-                        //     // else if (stat->completed_criteria_count > 0 || (
-                        //     //              stat->criteria_count == 1 && stat->criteria[0]->progress > 0))
-                        //     //     bg_texture = o->adv_bg_half_done;
-                        //
-                        //     // If there is more than one criterion, use the new multi-line cycling format.
-                        //     if (stat->criteria_count > 1) {
-                        //         // Multi-stat rendering: Name + overall progress on line 1...
-                        //         snprintf(name_buf, sizeof(name_buf), "%s (%d / %d)", stat->display_name,
-                        //                  stat->completed_criteria_count, stat->criteria_count);
-                        //
-                        //         // ...and the cycling sub-stat on line 2.
-                        //         if (stat->current_cycle_index != -1) {
-                        //             TrackableItem *crit = stat->criteria[stat->current_cycle_index];
-                        //             snprintf(progress_buf, sizeof(progress_buf), "%d. %s (%d / %d)",
-                        //                      stat->current_cycle_index + 1, crit->display_name, crit->progress,
-                        //                      crit->goal);
-                        //         } else {
-                        //             progress_buf[0] = '\0'; // Nothing to display if all are complete
-                        //         }
-                        //     } else {
-                        //         // Original static rendering for stats with 0 or 1 criterion.
-                        //         strncpy(name_buf, stat->display_name, sizeof(name_buf) - 1);
-                        //         if (stat->criteria_count == 1) {
-                        //             TrackableItem *crit = stat->criteria[0];
-                        //             if (crit->goal > 0)
-                        //                 snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
-                        //                          crit->progress, crit->goal);
-                        //         }
-                        //     }
-                        //     break;
-                        // }
                         case OverlayDisplayItem::CUSTOM: {
                             auto *goal = static_cast<TrackableItem *>(display_item.item_ptr);
                             if (goal->done) bg_texture = o->adv_bg_done;

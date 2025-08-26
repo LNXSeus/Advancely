@@ -205,10 +205,11 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::DragFloat("Overlay Scroll Speed", &temp_settings.overlay_scroll_speed, 0.001f, -25.00f, 25.00f, "%.3f");
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("A negative scroll speed animates from right-to-left.\n"
-                "A scroll speed of 0.0 is static.\n");
+                "A scroll speed of 0.0 is static.\n"
+                "Default of 1.0 scrolls 1440 pixels (default width) in 24 seconds.");
         }
 
-        ImGui::DragFloat("Sub-Stat Cycle Interval (s)", &temp_settings.overlay_stat_cycle_speed, 0.1f, 0.1f, 120.0f, "%.3f s");
+        ImGui::DragFloat("Sub-Stat Cycle Interval (s)", &temp_settings.overlay_stat_cycle_speed, 0.1f, 0.1f, 60.0f, "%.3f s");
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("The time in seconds before cycling to the next sub-stat on a multi-stat goal on the overlay.\n");
         }
@@ -351,7 +352,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SetTooltip(
             "This toggles printing a detailed progress report to the console after every file update.\n\n"
             "IMPORTANT: This can spam the console with a large amount of text if your template files contain many entries.\n\n"
-            "This setting only affects the detailed report. General status messages and errors\nare always printed to the console and saved to advancely_log.txt.\n"
+            "This setting only affects the detailed report. General status messages and errors\n"
+            "Progress on advancements is only printed if the game sends an update.\n"
+            "are always printed to the console and saved to advancely_log.txt.\n"
             "The log is flushed after every message, making it ideal for diagnosing crashes.\n"
             "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.");
     }
@@ -439,17 +442,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 strncpy(binding->decrement_key, key_names[current_dec_key_idx], sizeof(binding->decrement_key) - 1);
             }
         }
-    }
 
-    ImGui::Separator();
-    ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+    }
 
     // Apply the changes
     if (ImGui::Button("Apply Settings")) {
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(
-                "Apply any changes made in this window. It will fail to apply if any warnings are shown.");
-        }
 
         // Assume the error is cleared unless we find one
         show_invalid_manual_path_error = false;
@@ -498,6 +497,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 SDL_SetAtomicInt(&g_settings_changed, 1);
             }
         }
+    }
+
+    // Hover text for the apply button
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip(
+            "Apply any changes made in this window. It will fail to apply if any warnings are shown.");
     }
 
     // Place the next button on the same line
