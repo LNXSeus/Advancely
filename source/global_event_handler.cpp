@@ -26,42 +26,48 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
 
         // Event-based HOTKEY HANDLING
         if (event.type == SDL_EVENT_KEY_DOWN && event.key.repeat == 0) {
-            // Only trigger on initial key press
-            bool hotkey_triggered = false;
+            // If any ImGui widget is active (e.g., typing in a text box), do not process hotkeys.
+            if (ImGui::IsAnyItemActive()) {
+                // We don't break here; we want other event processing to continue,
+                // but we skip the hotkey logic for this specific event.
+            } else {
+                // Only trigger on initial key press
+                bool hotkey_triggered = false;
 
-            // Defensive check to prevent crash if data is not ready
-            if (t && t->template_data && t->template_data->custom_goals) {
-                for (int i = 0; i < app_settings->hotkey_count; i++) {
-                    HotkeyBinding *hb = &app_settings->hotkeys[i];
-                    TrackableItem *target_goal = nullptr;
+                // Defensive check to prevent crash if data is not ready
+                if (t && t->template_data && t->template_data->custom_goals) {
+                    for (int i = 0; i < app_settings->hotkey_count; i++) {
+                        HotkeyBinding *hb = &app_settings->hotkeys[i];
+                        TrackableItem *target_goal = nullptr;
 
-                    // Find the goal this hotkey is bound to
-                    for (int j = 0; j < t->template_data->custom_goal_count; j++) {
-                        if (strcmp(t->template_data->custom_goals[j]->root_name, hb->target_goal) == 0) {
-                            target_goal = t->template_data->custom_goals[j];
+                        // Find the goal this hotkey is bound to
+                        for (int j = 0; j < t->template_data->custom_goal_count; j++) {
+                            if (strcmp(t->template_data->custom_goals[j]->root_name, hb->target_goal) == 0) {
+                                target_goal = t->template_data->custom_goals[j];
+                                break;
+                            }
+                        }
+                        if (!target_goal) continue;
+
+                        // Convert key names from settings to scancodes for comparison
+                        SDL_Scancode inc_scancode = SDL_GetScancodeFromName(hb->increment_key);
+                        SDL_Scancode dec_scancode = SDL_GetScancodeFromName(hb->decrement_key);
+
+                        // Check if the pressed key matches a hotkey
+                        if (event.key.scancode == inc_scancode) {
+                            target_goal->progress++;
+                            hotkey_triggered = true;
+                        } else if (event.key.scancode == dec_scancode) {
+                            target_goal->progress--;
+                            hotkey_triggered = true;
+                        }
+
+                        if (hotkey_triggered) {
+                            settings_save(app_settings, t->template_data);
+                            SDL_SetAtomicInt(&g_needs_update, 1); // Request a data refresh
+                            SDL_SetAtomicInt(&g_game_data_changed, 1);
                             break;
                         }
-                    }
-                    if (!target_goal) continue;
-
-                    // Convert key names from settings to scancodes for comparison
-                    SDL_Scancode inc_scancode = SDL_GetScancodeFromName(hb->increment_key);
-                    SDL_Scancode dec_scancode = SDL_GetScancodeFromName(hb->decrement_key);
-
-                    // Check if the pressed key matches a hotkey
-                    if (event.key.scancode == inc_scancode) {
-                        target_goal->progress++;
-                        hotkey_triggered = true;
-                    } else if (event.key.scancode == dec_scancode) {
-                        target_goal->progress--;
-                        hotkey_triggered = true;
-                    }
-
-                    if (hotkey_triggered) {
-                        settings_save(app_settings, t->template_data);
-                        SDL_SetAtomicInt(&g_needs_update, 1); // Request a data refresh
-                        SDL_SetAtomicInt(&g_game_data_changed, 1);
-                        break;
                     }
                 }
             }

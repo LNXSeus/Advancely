@@ -1991,6 +1991,10 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
 
     Tracker *t = *tracker;
 
+    // Initialize notes state
+    t->notes_window_open = false;
+    t->notes_buffer[0] = '\0';
+
     // Explicitly initialize all members
     t->window = nullptr;
     t->renderer = nullptr;
@@ -2090,6 +2094,10 @@ void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settin
 
         case SDL_EVENT_KEY_DOWN:
             if (event->key.repeat == 0) {
+                // Do not process tracker-specific hotkeys if an ImGui item is active.
+                if (ImGui::IsAnyItemActive()) {
+                    break;
+                }
                 switch (event->key.scancode) {
                     case SDL_SCANCODE_ESCAPE:
                         // printf("[TRACKER] Escape key pressed in tracker: Opening settings window now.\n");
@@ -3249,7 +3257,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 // END OF STATIC FUNCTIONS ------------------------------------
 
 // Animate overlay, display more than just advancements
-void tracker_render_gui(Tracker *t, const AppSettings *settings) {
+void tracker_render_gui(Tracker *t, AppSettings *settings) {
     if (!t || !t->template_data) return;
 
     ImGuiIO &io = ImGui::GetIO();
@@ -3392,9 +3400,11 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
         ImGui::TextUnformatted("Progress Breakdown");
         ImGui::Separator();
 
-        ImGui::BulletText("The Adv/Ach counter tracks only the main goals defined in the \"advancements\" section of your template file.");
+        ImGui::BulletText(
+            "The Adv/Ach counter tracks only the main goals defined in the \"advancements\" section of your template file.");
 
-        ImGui::BulletText("The Progress %% shows your total completion across all individual sub-tasks from all categories. Each of the following tasks has an equal weight in the calculation:");
+        ImGui::BulletText(
+            "The Progress %% shows your total completion across all individual sub-tasks from all categories. Each of the following tasks has an equal weight in the calculation:");
         ImGui::Indent();
         ImGui::BulletText("Advancement Criteria");
         ImGui::BulletText("Unlocks (exclusive to 25w14craftmine)");
@@ -3416,13 +3426,15 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
     const float button_padding = 10.0f;
     ImVec2 lock_button_text_size = ImGui::CalcTextSize("Lock Layout");
     ImVec2 reset_button_text_size = ImGui::CalcTextSize("Reset Layout");
+    ImVec2 notes_button_text_size = ImGui::CalcTextSize("Notes");
 
     // Add padding and space for the checkbox square
     ImVec2 lock_button_size = ImVec2(lock_button_text_size.x + 25.0f, lock_button_text_size.y + 8.0f);
     ImVec2 reset_button_size = ImVec2(reset_button_text_size.x + 25.0f, reset_button_text_size.y + 8.0f);
+    ImVec2 notes_button_size = ImVec2(notes_button_text_size.x + 0.0f, notes_button_text_size.y + 8.0f);
 
     // TODO: Adjust this for more buttons, with 3 buttons it's padding * 2.0f, 4 buttons is 3.0f and so on (in addition to button)
-    float buttons_total_width = lock_button_size.x + reset_button_size.x + button_padding;
+    float buttons_total_width = lock_button_size.x + reset_button_size.x + notes_button_size.x + (button_padding * 2.0f);
 
 
     // Position a new transparent window in the bottom right to hold the buttons
@@ -3480,8 +3492,80 @@ void tracker_render_gui(Tracker *t, const AppSettings *settings) {
         ImGui::SetTooltip("Resets camera position and zoom level to their defaults.");
     }
 
+    ImGui::SameLine();
+
+    // Add the "Notes" checkbox
+    ImGui::Checkbox("Notes", &t->notes_window_open);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Toggle the template-specific notes window.\n"
+                          "Once you type inside the window all hotkeys are disabled.\n"
+                          "Anything you type is immediately saved to the notes file in the template folder.\n"
+                          "This window can arbitrarily be resized.\n"
+                          "There's a 64KB limit on the size of the notes file.");
+    }
+
     ImGui::PopStyleColor(5); // Pop the style colors, there's 5 of them
     ImGui::End(); // End Layout Controls Window
+
+
+    // --- Render Notes Window ---
+    if (t->notes_window_open) {
+        // Dynamically create the window title to show which template the notes belong to.
+        char notes_title[256];
+        char formatted_category[128];
+        format_category_string(settings->category, formatted_category, sizeof(formatted_category));
+        snprintf(notes_title, sizeof(notes_title), "Notes: %s - %s%s%s",
+                 settings->version_str,
+                 formatted_category,
+                 *settings->optional_flag ? " - " : "",
+                 settings->optional_flag);
+
+        ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
+
+        if (ImGui::Begin(notes_title, &t->notes_window_open)) {
+            // Capture the font setting at the beginning of the frame.
+            // This ensures PushFont and PopFont are always balanced, even if the setting changes mid-frame.
+            const bool use_roboto = settings->notes_use_roboto_font;
+
+            if (use_roboto && t->roboto_font) {
+                ImGui::PushFont(t->roboto_font);
+            }
+
+            // Calculate the editor size to leave just enough space for the checkbox at the bottom.
+            float bottom_widget_height = ImGui::GetFrameHeightWithSpacing();
+            ImVec2 editor_size = ImVec2(-FLT_MIN, -bottom_widget_height);
+
+            // Draw the text editor.
+            if (ImGui::InputTextMultiline("##NotesEditor", t->notes_buffer, sizeof(t->notes_buffer),
+                                         editor_size, ImGuiInputTextFlags_AllowTabInput)) {
+                // Text was edited, save it to the file immediately.
+                tracker_save_notes(t, settings);
+            }
+
+            // Draw the checkbox in the bottom right corner.
+            const char* checkbox_label = "Use Settings Font";
+            float checkbox_width = ImGui::CalcTextSize(checkbox_label).x + ImGui::GetFrameHeightWithSpacing();
+            ImGui::SetCursorPosX(ImGui::GetWindowWidth() - checkbox_width - ImGui::GetStyle().WindowPadding.x);
+            // The checkbox still modifies the original setting directly.
+            if (ImGui::Checkbox(checkbox_label, &settings->notes_use_roboto_font)) {
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("Toggle whether to use the settings window font for the notes editor (better readability).");
+                }
+                // Save the setting immediately when it's changed.
+                settings_save(settings, nullptr);
+            }
+
+            // Use the captured state to decide whether to pop the font.
+            if (use_roboto && t->roboto_font) {
+                ImGui::PopFont();
+            }
+        }
+        // End() must always be called to match a Begin(), regardless of its return value.
+        ImGui::End();
+    }
+
+
+
     ImGui::End(); // End TrackerMap window
 }
 
@@ -3750,6 +3834,9 @@ bool tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
         cJSON_Delete(lang_json);
     }
 
+    // After parsing everything, do an initial load of the notes file.
+    tracker_load_notes(t, settings);
+
     log_message(LOG_INFO, "[TRACKER] Initial template parsing complete.\n");
 
     return true; // Success
@@ -3870,6 +3957,39 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
 
     // Putting buffer into Window title
     SDL_SetWindowTitle(t->window, title_buffer);
+}
+
+void tracker_load_notes(Tracker *t, const AppSettings *settings) {
+    if (!t || !settings || settings->notes_path[0] == '\0') {
+        if (t) t->notes_buffer[0] = '\0';
+        return;
+    }
+
+    FILE *file = fopen(settings->notes_path, "r");
+    if (!file) {
+        // File doesn't exist, which is fine. Ensure buffer is empty.
+        t->notes_buffer[0] = '\0';
+        return;
+    }
+
+    // Read the entire file into the buffer
+    size_t bytes_read = fread(t->notes_buffer, 1, sizeof(t->notes_buffer) - 1, file);
+    t->notes_buffer[bytes_read] = '\0'; // Ensure null-termination
+    fclose(file);
+}
+
+void tracker_save_notes(const Tracker *t, const AppSettings *settings) {
+    if (!t || !settings || settings->notes_path[0] == '\0') {
+        return;
+    }
+
+    FILE *file = fopen(settings->notes_path, "w");
+    if (file) {
+        fputs(t->notes_buffer, file);
+        fclose(file);
+    } else {
+        log_message(LOG_ERROR, "[TRACKER] Failed to open notes file for writing: %s\n", settings->notes_path);
+    }
 }
 
 void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
