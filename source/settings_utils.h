@@ -30,6 +30,7 @@ extern "C" {
 #define DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_LEFT
 #define DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED false
 #define DEFAULT_OVERLAY_STAT_CYCLE_SPEED 3.0f // Default: cycle every 3 seconds
+#define DEFAULT_NOTES_USE_ROBOTO false // Default: use the standard Minecraft font for notes otherwise roboto
 
 // DEFINE DEFAULT SETTINGS
 #define DEFAULT_VERSION "1.16.1"  // Also needs to be changed in settings_load()
@@ -85,6 +86,7 @@ struct AppSettings {
     char template_path[MAX_PATH_LENGTH]; // The final, constructed path to the template .json file.
     char lang_path[MAX_PATH_LENGTH]; // The final, constructed path to the language .json file.
     char snapshot_path[MAX_PATH_LENGTH]; // The final, constructed path to the legacy snapshot .json file.
+    char notes_path[MAX_PATH_LENGTH]; // The final, constructed path to the notes .txt file.
 
     // --- Hotkeys ---
     int hotkey_count; // The number of active hotkey bindings.
@@ -106,6 +108,7 @@ struct AppSettings {
     bool overlay_animation_speedup; // If true, the overlay animation speed is increased.
     bool overlay_row3_remove_completed; // If true, the third row will also hide completed goals as row 2 does.
     float overlay_stat_cycle_speed; // Time in seconds between cycling sub-stats on the overlay.
+    bool notes_use_roboto_font; // If true, the notes window uses the Roboto font instead of the default.
 
     // --- Window Geometry ---
     WindowRect tracker_window; // The saved position and size of the main tracker window.
@@ -171,7 +174,7 @@ bool settings_load(AppSettings *settings);
 void settings_save(const AppSettings *settings, const TemplateData *td);
 
 /**
- * @brief Constructs the full paths to the template and language JSON files. Does NOT CREATE the files or load them.
+ * @brief Constructs the full paths to the template, language, snapshot JSON and notes TXT files. Does NOT CREATE the files or load them.
  *
  * Based on the version, category, and optional flag settings, this function
  * builds the final, relative paths to the required data files and stores them

@@ -225,6 +225,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_animation_speedup = DEFAULT_OVERLAY_SPEED_UP;
     settings->overlay_row3_remove_completed = DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED;
     settings->overlay_stat_cycle_speed = DEFAULT_OVERLAY_STAT_CYCLE_SPEED;
+    settings->notes_use_roboto_font = DEFAULT_NOTES_USE_ROBOTO;
 
     // Default Geometry
     WindowRect default_window = {DEFAULT_WINDOW_POS, DEFAULT_WINDOW_POS, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE};
@@ -394,6 +395,13 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
+        const cJSON *notes_font = cJSON_GetObjectItem(general_settings, "notes_use_roboto_font");
+        if (notes_font && cJSON_IsBool(notes_font)) settings->notes_use_roboto_font = cJSON_IsTrue(notes_font);
+        else {
+            settings->notes_use_roboto_font = DEFAULT_NOTES_USE_ROBOTO;
+            defaults_were_used = true;
+        }
+
         // --- Load Overlay Text Toggles ---
         const cJSON *show_world = cJSON_GetObjectItem(general_settings, "overlay_show_world");
         if(show_world && cJSON_IsBool(show_world)) settings->overlay_show_world = cJSON_IsTrue(show_world);
@@ -503,7 +511,7 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
     cJSON_DeleteItemFromObject(general_obj, "print_debug_status");
     cJSON_AddItemToObject(general_obj, "print_debug_status", cJSON_CreateBool(settings->print_debug_status));
 
-    // Update Overlay Settings
+    // Update Overlay/Notes Settings
     cJSON_DeleteItemFromObject(general_obj, "enable_overlay");
     cJSON_AddItemToObject(general_obj, "enable_overlay", cJSON_CreateBool(settings->enable_overlay));
     cJSON_DeleteItemFromObject(general_obj, "overlay_scroll_speed");
@@ -516,6 +524,10 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
     cJSON_AddItemToObject(general_obj, "overlay_row3_remove_completed", cJSON_CreateBool(settings->overlay_row3_remove_completed));
     cJSON_DeleteItemFromObject(general_obj, "overlay_stat_cycle_speed");
     cJSON_AddItemToObject(general_obj, "overlay_stat_cycle_speed", cJSON_CreateNumber(settings->overlay_stat_cycle_speed));
+    cJSON_DeleteItemFromObject(general_obj, "notes_use_roboto_font");
+    cJSON_AddItemToObject(general_obj, "notes_use_roboto_font", cJSON_CreateBool(settings->notes_use_roboto_font));
+
+
 
     // --- Save Overlay Text Toggles ---
     cJSON_DeleteItemFromObject(general_obj, "overlay_show_world");
@@ -651,4 +663,5 @@ void construct_template_paths(AppSettings *settings) {
     snprintf(settings->template_path, MAX_PATH_LENGTH, "%s.json", base_path);
     snprintf(settings->lang_path, MAX_PATH_LENGTH, "%s_lang.json", base_path);
     snprintf(settings->snapshot_path, MAX_PATH_LENGTH, "%s_snapshot.json", base_path);
+    snprintf(settings->notes_path, MAX_PATH_LENGTH, "%s_notes.txt", base_path);
 }

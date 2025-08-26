@@ -44,6 +44,8 @@ Advancely is a sophisticated, data-driven progress tracker designed for Minecraf
 
 * **Stream Overlay**: Bring your tracker and overlay to life with animated `.gif` icons alongside static `.png` files.
 
+**📝 Template-Specific Notes**: A toggleable notes window is available in the bottom-right corner of the tracker. Any text you type is saved instantly to a `_notes.txt` file, which is stored right next to the template file you are currently using. This makes your notes specific to each category and version you track. Furthermore, if you edit the `.txt` file directly while the tracker is running, the notes window will update live with your changes.
+
 ![Advancely 1.16.1 All Advancements Overlay Preview](Overlay_1_16_1_AA_Preview.png)
 
   * **Important**: For GIFs to work correctly, they must be unoptimized with all frame data intact. You can prepare any GIF by uploading it to [**ezgif.com/maker**](https://ezgif.com/maker), selecting the **"Don't Stack Frames"** option, and exporting the result. The site has a 2MB file size limit for this feature.

@@ -537,6 +537,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Always On Top: %s\n"
                  "  - Remove Completed: %s\n"
                  "  - Overlay Width: %s\n"
+                 "  - Use Settings Font: %s\n"
                  "  - Print Debug To Console: %s",
 
                  DEFAULT_VERSION,
@@ -552,6 +553,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
                  DEFAULT_REMOVE_COMPLETED_GOALS ? "Enabled" : "Disabled",
                  "1440px",
+                 DEFAULT_NOTES_USE_ROBOTO ? "Enabled" : "Disabled",
                  DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled"
         );
         ImGui::SetTooltip(tooltip_buffer);

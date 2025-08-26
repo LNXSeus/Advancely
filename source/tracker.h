@@ -50,6 +50,8 @@ struct Tracker {
     float time_since_last_update; // Timer tracking seconds since the last data file update.
     bool layout_locked; // Flag to lock the grid layout width, preventing reflow on window resize.
     float locked_layout_width; // The saved width of the layout when it was locked.
+    bool notes_window_open; // Flag to control the visibility of the notes window.
+    char notes_buffer[65536]; // 64KB buffer to hold the text for the notes.
 
     // --- Fonts ---
     ImFont *roboto_font; // ImGui font for the settings window UI.
@@ -182,7 +184,7 @@ void tracker_render(Tracker *t, const AppSettings *settings);
  * @param t Tracker struct
  * @param settings A pointer to the application settings containing color information
  */
-void tracker_render_gui(Tracker *t, const AppSettings *settings);
+void tracker_render_gui(Tracker *t, AppSettings *settings);
 
 /**
  * @brief Reloads settings, frees all old template data, and loads a new template.
@@ -217,6 +219,7 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings);
  * StatsPerWorld Mod isn't used, otherwise it reads from the stats folder per-world.
  * This function now writes the stat_progress_override and custom_progress into the settings file.
  * Hotkeys are handled in settings_utils.cpp in the settings_save() function.
+ * It also initializes the notes window through tracker_load_notes().
  *
  * @param t A pointer to the Tracker struct containing the necessary paths.
  * @param settings A pointer to the application settings.
@@ -247,6 +250,21 @@ void tracker_free(Tracker **tracker, const AppSettings *settings);
  * @param settings A pointer to the application settings.
  */
 void tracker_update_title(Tracker *t, const AppSettings *settings);
+
+/**
+ * @brief Loads the content of the template-specific notes file into the tracker's notes buffer.
+ * If the file does not exist, the buffer is cleared.
+ * @param t A pointer to the Tracker struct.
+ * @param settings A pointer to the application settings containing the notes_path.
+ */
+void tracker_load_notes(Tracker *t, const AppSettings *settings);
+
+/**
+ * @brief Saves the current content of the tracker's notes buffer to the notes file.
+ * @param t A pointer to the Tracker struct.
+ * @param settings A pointer to the application settings containing the notes_path.
+ */
+void tracker_save_notes(const Tracker *t, const AppSettings *settings);
 
 /**
  * @brief Prints the current advancement status to the console.
