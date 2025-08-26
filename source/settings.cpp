@@ -350,7 +350,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::Checkbox("Print Debug To Console", &temp_settings.print_debug_status);
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip(
-            "This toggles printing a detailed progress report to the console after every file update.\n\n"
+            "This toggles printing a detailed progress report to the console after every file update.\n"
+            "Currently it also toggles an FPS counter for the overlay window.\n\n"
             "IMPORTANT: This can spam the console with a large amount of text if your template files contain many entries.\n\n"
             "This setting only affects the detailed report. General status messages and errors\n"
             "Progress on advancements is only printed if the game sends an update.\n"

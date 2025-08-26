@@ -262,10 +262,18 @@ int main(int argc, char *argv[]) {
             float deltaTime = (float) (current_time - last_frame_time) / 1000.0f;
             last_frame_time = current_time;
 
+            // Cap deltaTime to prevent massive jumps after a long frame (e.g., during file loading).
+            // A cap of 0.1f means the game will never simulate more than 1/10th of a second,
+            // regardless of how long the freeze was. This turns a stutter into a smooth slowdown.
+            const float MAX_DELTATIME = 0.1f;  // frame_target_time * 4.0f; -> 15 fps on 60 fps
+            if (deltaTime > MAX_DELTATIME) {
+                deltaTime = MAX_DELTATIME;
+            }
             // Increment the time since the last update every frame
             tracker->time_since_last_update += deltaTime;
 
             // --- Per-Frame Logic ---
+
 
             // Lock mutex before touching watchers or paths
             // SDL_LockMutex(g_watcher_mutex); TODO: Remove
