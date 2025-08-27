@@ -86,7 +86,7 @@ The true power of Advancely lies in its customization. All settings can be confi
 
 1.  **Download**: Grab the latest release (Windows, Linux, or macOS are all in one) from the [**releases page**](https://github.com/LNXSeus/Advancely/releases).
 2.  **Extract to Folder**: Extract the downloaded zip file into a folder and the run the Advancely.exe file ALWAYS from that folder. **DO NOT CREATE A SHORTCUT TO THE EXE FILE**. 
-3.  **Configure (Optional)**: For first-time use, you can simply run the application. To customize, press `ESC` in the tracker window to open the settings. Here you can select your Minecraft version, choose a tracking category, and configure visuals and hotkeys. To keep your settings after updating to a newer version just paste your old `settings.json` file into the updated config folder.
+3.  **Configure (Optional)**: For first-time use, you can simply run the application. To customize, press `ESC` in the tracker window to open the settings. Here you can select your Minecraft version, choose a tracking category, and configure visuals and hotkeys. To keep your settings after updating to a newer version just paste your old `settings.json` file into the updated config folder, same thing with the notes.txt files in the template folder.
 4.  **Run**: Launch Advancely from the extracted folder or create a shortcut. It will automatically find your most recently played singleplayer world and begin displaying your progress in real-time.
 
 ### Known Limitations

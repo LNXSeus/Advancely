@@ -1116,7 +1116,7 @@ static void tracker_detect_shared_icons(Tracker *t, const AppSettings *settings)
 
     free(counts);
     counts = nullptr;
-    log_message(LOG_INFO, "[TRACKER] Shared icon detection complete.");
+    log_message(LOG_INFO, "[TRACKER] Shared icon detection complete.\n");
 }
 
 /**
