@@ -296,7 +296,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     overlay_text_col[2] = (float) temp_settings.overlay_text_color.b / 255.0f;
     overlay_text_col[3] = (float) temp_settings.overlay_text_color.a / 255.0f;
 
-    if (ImGui::ColorEdit4("Tracker BG", tracker_bg)) {
+    if (ImGui::ColorEdit3("Tracker BG", tracker_bg)) {
         temp_settings.tracker_bg_color = {
             (Uint8) (tracker_bg[0] * 255), (Uint8) (tracker_bg[1] * 255), (Uint8) (tracker_bg[2] * 255),
             (Uint8) (tracker_bg[3] * 255)
@@ -305,7 +305,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // Conditionally display overlay background color picker
     if (temp_settings.enable_overlay) {
-        if (ImGui::ColorEdit4("Overlay BG", overlay_bg)) {
+        if (ImGui::ColorEdit3("Overlay BG", overlay_bg)) {
             temp_settings.overlay_bg_color = {
                 (Uint8) (overlay_bg[0] * 255), (Uint8) (overlay_bg[1] * 255), (Uint8) (overlay_bg[2] * 255),
                 (Uint8) (overlay_bg[3] * 255)
@@ -313,7 +313,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         }
     }
 
-    if (ImGui::ColorEdit4("Text Color", text_col)) {
+    if (ImGui::ColorEdit3("Text Color", text_col)) {
         temp_settings.text_color = {
             (Uint8) (text_col[0] * 255), (Uint8) (text_col[1] * 255), (Uint8) (text_col[2] * 255),
             (Uint8) (text_col[3] * 255)
@@ -321,7 +321,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     if (temp_settings.enable_overlay) {
-        if (ImGui::ColorEdit4("Overlay Text Color", overlay_text_col)) {
+        if (ImGui::ColorEdit3("Overlay Text Color", overlay_text_col)) {
             temp_settings.overlay_text_color = {
                 (Uint8) (overlay_text_col[0] * 255), (Uint8) (overlay_text_col[1] * 255),
                 (Uint8) (overlay_text_col[2] * 255), (Uint8) (overlay_text_col[3] * 255)
@@ -356,7 +356,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             "This setting only affects the detailed report. General status messages and errors\n"
             "Progress on advancements is only printed if the game sends an update.\n"
             "are always printed to the console and saved to advancely_log.txt.\n"
-            "The log is flushed after every message, making it ideal for diagnosing crashes.\n"
+            "The log is flushed after every message and reset on startup, making it ideal for diagnosing crashes.\n"
             "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.");
     }
 
