@@ -49,11 +49,11 @@
       "criteria": {}
     },
     "minecraft:adventure/voluntary_exile": {
-      "icon": "blocks/Ominous_Banner_JE2.png",
+      "icon": "blocks/Ominous_Banner.gif",
       "criteria": {}
     },
     "minecraft:adventure/hero_of_the_village": {
-      "icon": "blocks/Ominous_Banner_JE2.png",
+      "icon": "blocks/Ominous_Banner.gif",
       "criteria": {}
     },
     "minecraft:adventure/throw_trident": {
@@ -779,6 +779,11 @@
       "icon": "blocks/Block_of_Gold_JE6_BE3.png",
       "root_name": "minecraft:picked_up/minecraft:gold_block",
       "target": 164
+    },
+    "stat:drowneds_killed": {
+      "icon": "monsters/Drowned_mob.png",
+      "root_name": "minecraft:killed/minecraft:drowned",
+      "target": -1
     },
     "stat:wither_skeletons_killed": {
       "icon": "blocks/Wither_Skeleton_Skull_(S)_JE2.png",
