@@ -240,6 +240,7 @@
   "advancement.minecraft.nether.ride_strider": "This Boat Has Legs",
 
   "stat.stat:gold_blocks_picked_up": "Gold Blocks Picked Up",
+  "stat.stat:drowneds_killed": "Drowneds Killed",
   "stat.stat:wither_skeletons_killed": "Wither Skeletons Killed",
   "stat.stat:tnt_picked_up": "TNT Picked Up",
   "stat.stat:debris_picked_up": "Ancient Debris Picked Up",
