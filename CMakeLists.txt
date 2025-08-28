@@ -33,8 +33,6 @@ set(SOURCE_FILES
         # External libraries included as source and stay in C
         "source/external/cJSON.c"
         # dmon.h is header-only and included in main.cpp, so it doesn't need to be listed here.
-        # Windows-specific resource file
-        "icon.rc"
 
         # --- Add all the ImGui source files ---
         "source/imgui/imgui.cpp"
@@ -44,9 +42,16 @@ set(SOURCE_FILES
         "source/imgui/imgui_demo.cpp" # Recommended for development
         "source/imgui/imgui_impl_sdl3.cpp"
         "source/imgui/imgui_impl_sdlrenderer3.cpp"
-        source/logger.cpp
-        source/logger.h
+        "source/logger.cpp"
 )
+
+# append windows specific source files
+if(WIN32)
+    list(APPEND SOURCE_FILES
+            # Windows-specific resource file
+            "icon.rc"
+    )
+endif()
 
 # --- 2. CREATE THE EXECUTABLE ---
 

@@ -2500,260 +2500,274 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
             ImVec2 screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
                                        (current_y * t->zoom_level) + t->camera_offset.y);
-            ImVec2 bg_size = ImVec2(96.0f, 96.0f);
 
-            SDL_Texture *bg_texture_to_use = t->adv_bg; // Default to normal background
-            if (cat->done) {
-                bg_texture_to_use = t->adv_bg_done;
-            } else {
-                bool has_progress = false;
-                if (is_complex) {
-                    has_progress = cat->completed_criteria_count > 0;
-                } else if (cat->criteria_count == 1) {
-                    has_progress = cat->criteria[0]->progress > 0;
-                }
-                if (has_progress) {
-                    bg_texture_to_use = t->adv_bg_half_done;
-                }
-            }
+            // Culling logic
+            ImVec2 item_size_on_screen = ImVec2(uniform_item_width * t->zoom_level, item_height * t->zoom_level);
+            bool is_visible = !(screen_pos.x > io.DisplaySize.x || (screen_pos.x + item_size_on_screen.x) < 0 ||
+                                screen_pos.y > io.DisplaySize.y || (screen_pos.y + item_size_on_screen.y) < 0);
 
-            // For the large 96x96 icon
-            if (bg_texture_to_use)
-                draw_list->AddImage((void *) bg_texture_to_use, screen_pos,
-                                    ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
-                                           screen_pos.y + bg_size.y * t->zoom_level));
-            SDL_Texture *texture_to_draw = nullptr;
-            if (cat->anim_texture && cat->anim_texture->frame_count > 0) {
-                // also making a nullptr check for the 'delays' pointer
-                if (cat->anim_texture->delays && cat->anim_texture->total_duration > 0) {
-                    Uint32 current_time = SDL_GetTicks();
-                    Uint32 elapsed_time = current_time % cat->anim_texture->total_duration;
+            if (is_visible) {
+                ImVec2 bg_size = ImVec2(96.0f, 96.0f);
 
-                    int current_frame = 0;
-                    Uint32 time_sum = 0;
-                    for (int frame_idx = 0; frame_idx < cat->anim_texture->frame_count; ++frame_idx) {
-                        time_sum += cat->anim_texture->delays[frame_idx];
-                        if (elapsed_time < time_sum) {
-                            current_frame = frame_idx;
-                            break;
-                        }
-                    }
-                    texture_to_draw = cat->anim_texture->frames[current_frame];
+                SDL_Texture *bg_texture_to_use = t->adv_bg; // Default to normal background
+                if (cat->done) {
+                    bg_texture_to_use = t->adv_bg_done;
                 } else {
-                    texture_to_draw = cat->anim_texture->frames[0];
+                    bool has_progress = false;
+                    if (is_complex) {
+                        has_progress = cat->completed_criteria_count > 0;
+                    } else if (cat->criteria_count == 1) {
+                        has_progress = cat->criteria[0]->progress > 0;
+                    }
+                    if (has_progress) {
+                        bg_texture_to_use = t->adv_bg_half_done;
+                    }
                 }
-            } else if (cat->texture) {
-                texture_to_draw = cat->texture;
-            }
 
-            if (texture_to_draw) {
-                // Get texture dimensions to calculate aspect ratio
-                float tex_w = 0.0f, tex_h = 0.0f;
-                SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
+                // For the large 96x96 icon
+                if (bg_texture_to_use)
+                    draw_list->AddImage((void *) bg_texture_to_use, screen_pos,
+                                        ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
+                                               screen_pos.y + bg_size.y * t->zoom_level));
+                SDL_Texture *texture_to_draw = nullptr;
+                if (cat->anim_texture && cat->anim_texture->frame_count > 0) {
+                    // also making a nullptr check for the 'delays' pointer
+                    if (cat->anim_texture->delays && cat->anim_texture->total_duration > 0) {
+                        Uint32 current_time = SDL_GetTicks();
+                        Uint32 elapsed_time = current_time % cat->anim_texture->total_duration;
 
-                // Define the target box size (64x64 for parent icons)
-                ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
-
-                // Calculate scaled dimensions to fit inside the box while maintaining aspect ratio
-                float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
-                ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
-
-                // Center the image within the 16,16 to 80,80 space
-                // Define the top-left of the icon box area (inside the 96x96 background)
-                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
-                // Calculate padding needed to center the scaled image within the box
-                ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
-                                        (target_box_size.y - scaled_size.y) * 0.5f);
-
-                // The final top-left and bottom-right corners for drawing
-                ImVec2 p_min = ImVec2(box_p_min.x + padding.x, box_p_min.y + padding.y);
-                ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
-
-                draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
-            }
-
-            // TODO: Here you can adjust the padding between goal background texture and text, change the float value
-            // You need to apply it to all four rendering functions render_*_section
-            float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
-            draw_list->AddText(nullptr, 16.0f * t->zoom_level,
-                               ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
-                                      text_y_pos), text_color, cat->display_name);
-
-            // Render snapshot text on a new line
-            if (snapshot_text[0] != '\0') {
-                text_y_pos += text_size.y * t->zoom_level + 4.0f;
-                draw_list->AddText(nullptr, 14.0f * t->zoom_level,
-                                   ImVec2(
-                                       screen_pos.x + (bg_size.x * t->zoom_level - snapshot_text_size.x * t->zoom_level)
-                                       * 0.5f, text_y_pos), text_color, snapshot_text);
-            }
-
-            if (progress_text[0] != '\0') {
-                text_y_pos += text_size.y * t->zoom_level + 4.0f;
-                draw_list->AddText(nullptr, 14.0f * t->zoom_level,
-                                   ImVec2(
-                                       screen_pos.x + (bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level)
-                                       * 0.5f, text_y_pos), text_color, progress_text);
-            }
-
-            if (is_complex) {
-                float sub_item_y_offset = current_y + bg_size.y + text_size.y + 4.0f;
-                if (progress_text[0] != '\0') sub_item_y_offset += progress_text_size.y + 4.0f;
-                sub_item_y_offset += 12.0f;
-
-                for (int j = 0; j < cat->criteria_count; j++) {
-                    TrackableItem *crit = cat->criteria[j];
-                    if (!crit || (crit->done && settings->remove_completed_goals)) continue;
-
-                    ImVec2 crit_base_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
-                                                  (sub_item_y_offset * t->zoom_level) + t->camera_offset.y);
-                    float current_element_x = crit_base_pos.x;
-
-
-                    // For the small 32x32 icons
-
-                    SDL_Texture *crit_texture_to_draw = nullptr;
-                    if (crit->anim_texture && crit->anim_texture->frame_count > 0) {
-                        if (crit->anim_texture->delays && crit->anim_texture->total_duration > 0) {
-                            Uint32 current_time = SDL_GetTicks();
-                            Uint32 elapsed_time = current_time % crit->anim_texture->total_duration;
-                            int current_frame = 0;
-                            Uint32 time_sum = 0;
-                            for (int frame_idx = 0; frame_idx < crit->anim_texture->frame_count; ++frame_idx) {
-                                time_sum += crit->anim_texture->delays[frame_idx];
-                                if (elapsed_time < time_sum) {
-                                    current_frame = frame_idx;
-                                    break;
-                                }
+                        int current_frame = 0;
+                        Uint32 time_sum = 0;
+                        for (int frame_idx = 0; frame_idx < cat->anim_texture->frame_count; ++frame_idx) {
+                            time_sum += cat->anim_texture->delays[frame_idx];
+                            if (elapsed_time < time_sum) {
+                                current_frame = frame_idx;
+                                break;
                             }
-                            crit_texture_to_draw = crit->anim_texture->frames[current_frame];
-                        } else {
-                            crit_texture_to_draw = crit->anim_texture->frames[0];
                         }
-                    } else if (crit->texture) {
-                        crit_texture_to_draw = crit->texture;
+                        texture_to_draw = cat->anim_texture->frames[current_frame];
+                    } else {
+                        texture_to_draw = cat->anim_texture->frames[0];
                     }
+                } else if (cat->texture) {
+                    texture_to_draw = cat->texture;
+                }
 
-                    if (crit_texture_to_draw) {
-                        // Get texture dimensions as floats
-                        float tex_w = 0.0f, tex_h = 0.0f;
-                        SDL_GetTextureSize(crit_texture_to_draw, &tex_w, &tex_h);
+                if (texture_to_draw) {
+                    // Get texture dimensions to calculate aspect ratio
+                    float tex_w = 0.0f, tex_h = 0.0f;
+                    SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
 
-                        // Define the target box size (32x32 for criteria)
-                        ImVec2 target_box_size = ImVec2(32.0f * t->zoom_level, 32.0f * t->zoom_level);
+                    // Define the target box size (64x64 for parent icons)
+                    ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
 
-                        // Calculate scaled dimensions to fit inside the box while maintaining aspect ratio
-                        float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
-                        ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
+                    // Calculate scaled dimensions to fit inside the box while maintaining aspect ratio
+                    float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
+                    ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
 
-                        // Center the scaled image within the 32x32 area
-                        ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
-                                                (target_box_size.y - scaled_size.y) * 0.5f);
-                        ImVec2 p_min = ImVec2(crit_base_pos.x + padding.x, crit_base_pos.y + padding.y);
-                        ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
+                    // Center the image within the 16,16 to 80,80 space
+                    // Define the top-left of the icon box area (inside the 96x96 background)
+                    ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level,
+                                              screen_pos.y + 16.0f * t->zoom_level);
+                    // Calculate padding needed to center the scaled image within the box
+                    ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
+                                            (target_box_size.y - scaled_size.y) * 0.5f);
 
-                        // Choose the tint color for fading completed icons
-                        ImU32 icon_tint = crit->done ? icon_tint_faded : IM_COL32_WHITE;
+                    // The final top-left and bottom-right corners for drawing
+                    ImVec2 p_min = ImVec2(box_p_min.x + padding.x, box_p_min.y + padding.y);
+                    ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
 
-                        // Draw the final image with correct scaling, centering, and tint
-                        draw_list->AddImage((void *) crit_texture_to_draw, p_min, p_max, ImVec2(0, 0), ImVec2(1, 1),
-                                            icon_tint);
-                    }
+                    draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
+                }
 
-                    current_element_x += 32 * t->zoom_level + 4 * t->zoom_level;
+                // TODO: Here you can adjust the padding between goal background texture and text, change the float value
+                // You need to apply it to all four rendering functions render_*_section
+                float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
+                draw_list->AddText(nullptr, 16.0f * t->zoom_level,
+                                   ImVec2(
+                                       screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
+                                       text_y_pos), text_color, cat->display_name);
 
-                    // Draw Checkbox for Sub-Stat ONLY if there is more than one.
-                    if (is_stat_section && cat->criteria_count > 1) {
-                        ImVec2 check_pos = ImVec2(current_element_x, crit_base_pos.y + 6 * t->zoom_level);
-                        ImRect checkbox_rect(
-                            check_pos, ImVec2(check_pos.x + 20 * t->zoom_level, check_pos.y + 20 * t->zoom_level));
-                        bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
-                        ImU32 check_fill_color = is_hovered ? checkbox_hover_color : checkbox_fill_color;
-                        draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill_color,
-                                                 3.0f * t->zoom_level);
-                        draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, text_color, 3.0f * t->zoom_level);
-
-                        if (crit->is_manually_completed) {
-                            ImVec2 p1 = ImVec2(check_pos.x + 5 * t->zoom_level, check_pos.y + 10 * t->zoom_level);
-                            ImVec2 p2 = ImVec2(check_pos.x + 9 * t->zoom_level, check_pos.y + 15 * t->zoom_level);
-                            ImVec2 p3 = ImVec2(check_pos.x + 15 * t->zoom_level, check_pos.y + 6 * t->zoom_level);
-                            draw_list->AddLine(p1, p2, checkmark_color, 2.0f * t->zoom_level);
-                            draw_list->AddLine(p2, p3, checkmark_color, 2.0f * t->zoom_level);
-                        }
-
-                        if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                            crit->is_manually_completed = !crit->is_manually_completed;
-                            crit->done = crit->is_manually_completed
-                                             ? true
-                                             : (crit->progress >= crit->goal && crit->goal > 0);
-                            settings_save(settings, t->template_data);
-                            SDL_SetAtomicInt(&g_needs_update, 1);
-                            SDL_SetAtomicInt(&g_game_data_changed, 1);
-                        }
-                        current_element_x += 20 * t->zoom_level + 4 * t->zoom_level;
-                    }
-
-                    // Draw Text and Progress
-                    ImU32 current_text_color = crit->done ? text_color_faded : text_color;
+                // Render snapshot text on a new line
+                if (snapshot_text[0] != '\0') {
+                    text_y_pos += text_size.y * t->zoom_level + 4.0f;
                     draw_list->AddText(nullptr, 14.0f * t->zoom_level,
-                                       ImVec2(current_element_x, crit_base_pos.y + 8 * t->zoom_level),
-                                       current_text_color, crit->display_name);
-                    current_element_x += ImGui::CalcTextSize(crit->display_name).x * t->zoom_level + 4 * t->zoom_level;
-
-                    char crit_progress_text[32] = "";
-                    if (is_stat_section) {
-                        if (crit->goal > 0) {
-                            snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d / %d)", crit->progress,
-                                     crit->goal);
-                        } else if (crit->goal == -1) {
-                            snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d)", crit->progress);
-                        }
-                        if (crit_progress_text[0] != '\0') {
-                            draw_list->AddText(nullptr, 14.0f * t->zoom_level,
-                                               ImVec2(current_element_x, crit_base_pos.y + 8 * t->zoom_level),
-                                               current_text_color, crit_progress_text);
-                        }
-                    }
-
-                    sub_item_y_offset += 36.0f;
-                }
-            }
-
-            if (is_stat_section) {
-                // Change first 5 to 70 to display checkbox in top right
-                ImVec2 check_pos = ImVec2(screen_pos.x + 5 * t->zoom_level, screen_pos.y + 5 * t->zoom_level);
-                ImRect checkbox_rect(check_pos, ImVec2(check_pos.x + 20 * t->zoom_level,
-                                                       check_pos.y + 20 * t->zoom_level));
-                bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
-                ImU32 check_fill_color = is_hovered ? checkbox_hover_color : checkbox_fill_color;
-                draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill_color, 3.0f * t->zoom_level);
-                draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, text_color, 3.0f * t->zoom_level);
-
-                // Only draw checkmark if manually completed
-                if (cat->is_manually_completed) {
-                    ImVec2 p1 = ImVec2(check_pos.x + 5 * t->zoom_level, check_pos.y + 10 * t->zoom_level);
-                    ImVec2 p2 = ImVec2(check_pos.x + 9 * t->zoom_level, check_pos.y + 15 * t->zoom_level);
-                    ImVec2 p3 = ImVec2(check_pos.x + 15 * t->zoom_level, check_pos.y + 6 * t->zoom_level);
-                    draw_list->AddLine(p1, p2, checkmark_color, 2.0f * t->zoom_level);
-                    draw_list->AddLine(p2, p3, checkmark_color, 2.0f * t->zoom_level);
+                                       ImVec2(
+                                           screen_pos.x + (
+                                               bg_size.x * t->zoom_level - snapshot_text_size.x * t->zoom_level)
+                                           * 0.5f, text_y_pos), text_color, snapshot_text);
                 }
 
-                if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                    cat->is_manually_completed = !cat->is_manually_completed;
-                    bool is_naturally_done = (cat->completed_criteria_count >= cat->criteria_count && cat->
-                                              criteria_count > 0);
-                    cat->done = cat->is_manually_completed || is_naturally_done;
+                if (progress_text[0] != '\0') {
+                    text_y_pos += text_size.y * t->zoom_level + 4.0f;
+                    draw_list->AddText(nullptr, 14.0f * t->zoom_level,
+                                       ImVec2(
+                                           screen_pos.x + (
+                                               bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level)
+                                           * 0.5f, text_y_pos), text_color, progress_text);
+                }
 
-                    for (int j = 0; j < cat->criteria_count; ++j) {
+                if (is_complex) {
+                    float sub_item_y_offset = current_y + bg_size.y + text_size.y + 4.0f;
+                    if (progress_text[0] != '\0') sub_item_y_offset += progress_text_size.y + 4.0f;
+                    sub_item_y_offset += 12.0f;
+
+                    for (int j = 0; j < cat->criteria_count; j++) {
                         TrackableItem *crit = cat->criteria[j];
-                        bool crit_is_naturally_done = (crit->goal > 0 && crit->progress >= crit->goal);
-                        // Child is done if parent forces it, it forces itself, or it's naturally done
-                        crit->done = cat->is_manually_completed || crit->is_manually_completed ||
-                                     crit_is_naturally_done;
+                        if (!crit || (crit->done && settings->remove_completed_goals)) continue;
+
+                        ImVec2 crit_base_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
+                                                      (sub_item_y_offset * t->zoom_level) + t->camera_offset.y);
+                        float current_element_x = crit_base_pos.x;
+
+
+                        // For the small 32x32 icons
+
+                        SDL_Texture *crit_texture_to_draw = nullptr;
+                        if (crit->anim_texture && crit->anim_texture->frame_count > 0) {
+                            if (crit->anim_texture->delays && crit->anim_texture->total_duration > 0) {
+                                Uint32 current_time = SDL_GetTicks();
+                                Uint32 elapsed_time = current_time % crit->anim_texture->total_duration;
+                                int current_frame = 0;
+                                Uint32 time_sum = 0;
+                                for (int frame_idx = 0; frame_idx < crit->anim_texture->frame_count; ++frame_idx) {
+                                    time_sum += crit->anim_texture->delays[frame_idx];
+                                    if (elapsed_time < time_sum) {
+                                        current_frame = frame_idx;
+                                        break;
+                                    }
+                                }
+                                crit_texture_to_draw = crit->anim_texture->frames[current_frame];
+                            } else {
+                                crit_texture_to_draw = crit->anim_texture->frames[0];
+                            }
+                        } else if (crit->texture) {
+                            crit_texture_to_draw = crit->texture;
+                        }
+
+                        if (crit_texture_to_draw) {
+                            // Get texture dimensions as floats
+                            float tex_w = 0.0f, tex_h = 0.0f;
+                            SDL_GetTextureSize(crit_texture_to_draw, &tex_w, &tex_h);
+
+                            // Define the target box size (32x32 for criteria)
+                            ImVec2 target_box_size = ImVec2(32.0f * t->zoom_level, 32.0f * t->zoom_level);
+
+                            // Calculate scaled dimensions to fit inside the box while maintaining aspect ratio
+                            float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
+                            ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
+
+                            // Center the scaled image within the 32x32 area
+                            ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
+                                                    (target_box_size.y - scaled_size.y) * 0.5f);
+                            ImVec2 p_min = ImVec2(crit_base_pos.x + padding.x, crit_base_pos.y + padding.y);
+                            ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
+
+                            // Choose the tint color for fading completed icons
+                            ImU32 icon_tint = crit->done ? icon_tint_faded : IM_COL32_WHITE;
+
+                            // Draw the final image with correct scaling, centering, and tint
+                            draw_list->AddImage((void *) crit_texture_to_draw, p_min, p_max, ImVec2(0, 0), ImVec2(1, 1),
+                                                icon_tint);
+                        }
+
+                        current_element_x += 32 * t->zoom_level + 4 * t->zoom_level;
+
+                        // Draw Checkbox for Sub-Stat ONLY if there is more than one.
+                        if (is_stat_section && cat->criteria_count > 1) {
+                            ImVec2 check_pos = ImVec2(current_element_x, crit_base_pos.y + 6 * t->zoom_level);
+                            ImRect checkbox_rect(
+                                check_pos, ImVec2(check_pos.x + 20 * t->zoom_level, check_pos.y + 20 * t->zoom_level));
+                            bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
+                            ImU32 check_fill_color = is_hovered ? checkbox_hover_color : checkbox_fill_color;
+                            draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill_color,
+                                                     3.0f * t->zoom_level);
+                            draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, text_color, 3.0f * t->zoom_level);
+
+                            if (crit->is_manually_completed) {
+                                ImVec2 p1 = ImVec2(check_pos.x + 5 * t->zoom_level, check_pos.y + 10 * t->zoom_level);
+                                ImVec2 p2 = ImVec2(check_pos.x + 9 * t->zoom_level, check_pos.y + 15 * t->zoom_level);
+                                ImVec2 p3 = ImVec2(check_pos.x + 15 * t->zoom_level, check_pos.y + 6 * t->zoom_level);
+                                draw_list->AddLine(p1, p2, checkmark_color, 2.0f * t->zoom_level);
+                                draw_list->AddLine(p2, p3, checkmark_color, 2.0f * t->zoom_level);
+                            }
+
+                            if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                                crit->is_manually_completed = !crit->is_manually_completed;
+                                crit->done = crit->is_manually_completed
+                                                 ? true
+                                                 : (crit->progress >= crit->goal && crit->goal > 0);
+                                settings_save(settings, t->template_data);
+                                SDL_SetAtomicInt(&g_needs_update, 1);
+                                SDL_SetAtomicInt(&g_game_data_changed, 1);
+                            }
+                            current_element_x += 20 * t->zoom_level + 4 * t->zoom_level;
+                        }
+
+                        // Draw Text and Progress
+                        ImU32 current_text_color = crit->done ? text_color_faded : text_color;
+                        draw_list->AddText(nullptr, 14.0f * t->zoom_level,
+                                           ImVec2(current_element_x, crit_base_pos.y + 8 * t->zoom_level),
+                                           current_text_color, crit->display_name);
+                        current_element_x += ImGui::CalcTextSize(crit->display_name).x * t->zoom_level + 4 * t->
+                                zoom_level;
+
+                        char crit_progress_text[32] = "";
+                        if (is_stat_section) {
+                            if (crit->goal > 0) {
+                                snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d / %d)", crit->progress,
+                                         crit->goal);
+                            } else if (crit->goal == -1) {
+                                snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d)", crit->progress);
+                            }
+                            if (crit_progress_text[0] != '\0') {
+                                draw_list->AddText(nullptr, 14.0f * t->zoom_level,
+                                                   ImVec2(current_element_x, crit_base_pos.y + 8 * t->zoom_level),
+                                                   current_text_color, crit_progress_text);
+                            }
+                        }
+
+                        sub_item_y_offset += 36.0f;
                     }
-                    settings_save(settings, t->template_data);
-                    SDL_SetAtomicInt(&g_needs_update, 1);
-                    SDL_SetAtomicInt(&g_game_data_changed, 1);
+                }
+
+                if (is_stat_section) {
+                    // Change first 5 to 70 to display checkbox in top right
+                    ImVec2 check_pos = ImVec2(screen_pos.x + 5 * t->zoom_level, screen_pos.y + 5 * t->zoom_level);
+                    ImRect checkbox_rect(check_pos, ImVec2(check_pos.x + 20 * t->zoom_level,
+                                                           check_pos.y + 20 * t->zoom_level));
+                    bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
+                    ImU32 check_fill_color = is_hovered ? checkbox_hover_color : checkbox_fill_color;
+                    draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill_color,
+                                             3.0f * t->zoom_level);
+                    draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, text_color, 3.0f * t->zoom_level);
+
+                    // Only draw checkmark if manually completed
+                    if (cat->is_manually_completed) {
+                        ImVec2 p1 = ImVec2(check_pos.x + 5 * t->zoom_level, check_pos.y + 10 * t->zoom_level);
+                        ImVec2 p2 = ImVec2(check_pos.x + 9 * t->zoom_level, check_pos.y + 15 * t->zoom_level);
+                        ImVec2 p3 = ImVec2(check_pos.x + 15 * t->zoom_level, check_pos.y + 6 * t->zoom_level);
+                        draw_list->AddLine(p1, p2, checkmark_color, 2.0f * t->zoom_level);
+                        draw_list->AddLine(p2, p3, checkmark_color, 2.0f * t->zoom_level);
+                    }
+
+                    if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                        cat->is_manually_completed = !cat->is_manually_completed;
+                        bool is_naturally_done = (cat->completed_criteria_count >= cat->criteria_count && cat->
+                                                  criteria_count > 0);
+                        cat->done = cat->is_manually_completed || is_naturally_done;
+
+                        for (int j = 0; j < cat->criteria_count; ++j) {
+                            TrackableItem *crit = cat->criteria[j];
+                            bool crit_is_naturally_done = (crit->goal > 0 && crit->progress >= crit->goal);
+                            // Child is done if parent forces it, it forces itself, or it's naturally done
+                            crit->done = cat->is_manually_completed || crit->is_manually_completed ||
+                                         crit_is_naturally_done;
+                        }
+                        settings_save(settings, t->template_data);
+                        SDL_SetAtomicInt(&g_needs_update, 1);
+                        SDL_SetAtomicInt(&g_game_data_changed, 1);
+                    }
                 }
             }
             current_x += uniform_item_width + horizontal_spacing;
@@ -2820,73 +2834,79 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
         ImVec2 screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
                                    (current_y * t->zoom_level) + t->camera_offset.y);
-        ImVec2 bg_size = ImVec2(96.0f, 96.0f);
-        SDL_Texture *bg_texture = item->done ? t->adv_bg_done : t->adv_bg;
 
-        if (bg_texture)
-            draw_list->AddImage((void *) bg_texture, screen_pos,
-                                ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
-                                       screen_pos.y + bg_size.y * t->zoom_level));
+        // Culling Logic
+        ImVec2 item_size_on_screen = ImVec2(uniform_item_width * t->zoom_level, item_height * t->zoom_level);
+        bool is_visible = !(screen_pos.x > io.DisplaySize.x || (screen_pos.x + item_size_on_screen.x) < 0 ||
+                            screen_pos.y > io.DisplaySize.y || (screen_pos.y + item_size_on_screen.y) < 0);
+        if (is_visible) {
+            ImVec2 bg_size = ImVec2(96.0f, 96.0f);
+            SDL_Texture *bg_texture = item->done ? t->adv_bg_done : t->adv_bg;
 
-        // Asure proper rendering for .gif files
-        SDL_Texture *texture_to_draw = nullptr;
-        if (item->anim_texture && item->anim_texture->frame_count > 0) {
-            // also making a nullptr check for the 'delays' pointer
-            if (item->anim_texture->delays && item->anim_texture->total_duration > 0) {
-                Uint32 current_time = SDL_GetTicks();
-                Uint32 elapsed_time = current_time % item->anim_texture->total_duration;
+            if (bg_texture)
+                draw_list->AddImage((void *) bg_texture, screen_pos,
+                                    ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
+                                           screen_pos.y + bg_size.y * t->zoom_level));
 
-                int current_frame = 0;
-                Uint32 time_sum = 0;
-                for (int frame_idx = 0; frame_idx < item->anim_texture->frame_count; ++frame_idx) {
-                    time_sum += item->anim_texture->delays[frame_idx];
-                    if (elapsed_time < time_sum) {
-                        current_frame = frame_idx;
-                        break;
+            // Asure proper rendering for .gif files
+            SDL_Texture *texture_to_draw = nullptr;
+            if (item->anim_texture && item->anim_texture->frame_count > 0) {
+                // also making a nullptr check for the 'delays' pointer
+                if (item->anim_texture->delays && item->anim_texture->total_duration > 0) {
+                    Uint32 current_time = SDL_GetTicks();
+                    Uint32 elapsed_time = current_time % item->anim_texture->total_duration;
+
+                    int current_frame = 0;
+                    Uint32 time_sum = 0;
+                    for (int frame_idx = 0; frame_idx < item->anim_texture->frame_count; ++frame_idx) {
+                        time_sum += item->anim_texture->delays[frame_idx];
+                        if (elapsed_time < time_sum) {
+                            current_frame = frame_idx;
+                            break;
+                        }
                     }
+                    texture_to_draw = item->anim_texture->frames[current_frame];
+                } else {
+                    texture_to_draw = item->anim_texture->frames[0];
                 }
-                texture_to_draw = item->anim_texture->frames[current_frame];
-            } else {
-                texture_to_draw = item->anim_texture->frames[0];
+            } else if (item->texture) {
+                texture_to_draw = item->texture;
             }
-        } else if (item->texture) {
-            texture_to_draw = item->texture;
+
+            if (texture_to_draw) {
+                // Declare as float to match the function's requirements
+                float tex_w = 0.0f, tex_h = 0.0f;
+                // Call the function directly without casting ---
+                SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
+
+                // Define the target box size (64x64 for parent icons)
+                ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
+
+                // Calculate scaled dimensions to fit inside the box while maintaining aspect ratio
+                float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
+                ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
+
+                // Define the top-left of the icon box area (inside the 96x96 background)
+                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
+                // Calculate padding needed to center the scaled image within the box
+                ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
+                                        (target_box_size.y - scaled_size.y) * 0.5f);
+
+                // The final top-left and bottom-right corners for drawing
+                ImVec2 p_min = ImVec2(box_p_min.x + padding.x, box_p_min.y + padding.y);
+                ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
+
+                draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
+            }
+
+            ImVec2 text_size = ImGui::CalcTextSize(item->display_name);
+
+            // The 4.0f is for padding between the text and the background
+            draw_list->AddText(nullptr, 16.0f * t->zoom_level,
+                               ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
+                                      screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level)), text_color,
+                               item->display_name);
         }
-
-        if (texture_to_draw) {
-            // Declare as float to match the function's requirements
-            float tex_w = 0.0f, tex_h = 0.0f;
-            // Call the function directly without casting ---
-            SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
-
-            // Define the target box size (64x64 for parent icons)
-            ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
-
-            // Calculate scaled dimensions to fit inside the box while maintaining aspect ratio
-            float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
-            ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
-
-            // Define the top-left of the icon box area (inside the 96x96 background)
-            ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
-            // Calculate padding needed to center the scaled image within the box
-            ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
-                                    (target_box_size.y - scaled_size.y) * 0.5f);
-
-            // The final top-left and bottom-right corners for drawing
-            ImVec2 p_min = ImVec2(box_p_min.x + padding.x, box_p_min.y + padding.y);
-            ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
-
-            draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
-        }
-
-        ImVec2 text_size = ImGui::CalcTextSize(item->display_name);
-
-        // The 4.0f is for padding between the text and the background
-        draw_list->AddText(nullptr, 16.0f * t->zoom_level,
-                           ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
-                                  screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level)), text_color,
-                           item->display_name);
-
         current_x += uniform_item_width + horizontal_spacing;
         row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
     }
@@ -2965,119 +2985,128 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
         ImVec2 screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
                                    (current_y * t->zoom_level) + t->camera_offset.y);
-        ImVec2 bg_size = ImVec2(96.0f, 96.0f);
-        SDL_Texture *bg_texture = item->done ? t->adv_bg_done : t->adv_bg;
 
-        // Select background based on progress for counters, half-done when in between
-        if (item->done) {
-            bg_texture = t->adv_bg_done;
-        } else if ((item->goal > 0 || item->goal == -1) && item->progress > 0) {
-            // Specifically checking for -1 as well
-            bg_texture = t->adv_bg_half_done;
-        } else {
-            bg_texture = t->adv_bg;
-        }
+        // Culling Logic
+        ImVec2 item_size_on_screen = ImVec2(uniform_item_width * t->zoom_level, item_height * t->zoom_level);
+        bool is_visible = !(screen_pos.x > io.DisplaySize.x || (screen_pos.x + item_size_on_screen.x) < 0 ||
+                            screen_pos.y > io.DisplaySize.y || (screen_pos.y + item_size_on_screen.y) < 0);
 
-        if (bg_texture)
-            draw_list->AddImage((void *) bg_texture, screen_pos,
-                                ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
-                                       screen_pos.y + bg_size.y * t->zoom_level));
+        if (is_visible) {
+            ImVec2 bg_size = ImVec2(96.0f, 96.0f);
+            SDL_Texture *bg_texture = item->done ? t->adv_bg_done : t->adv_bg;
 
-        // Asure proper rendering of .gif files
-        SDL_Texture *texture_to_draw = nullptr;
-        if (item->anim_texture && item->anim_texture->frame_count > 0) {
-            // also making a nullptr check for the 'delays' pointer
-            if (item->anim_texture->delays && item->anim_texture->total_duration > 0) {
-                Uint32 current_time = SDL_GetTicks();
-                Uint32 elapsed_time = current_time % item->anim_texture->total_duration;
-
-                int current_frame = 0;
-                Uint32 time_sum = 0;
-                for (int frame_idx = 0; frame_idx < item->anim_texture->frame_count; ++frame_idx) {
-                    time_sum += item->anim_texture->delays[frame_idx];
-                    if (elapsed_time < time_sum) {
-                        current_frame = frame_idx;
-                        break;
-                    }
-                }
-                texture_to_draw = item->anim_texture->frames[current_frame];
-            } else {
-                texture_to_draw = item->anim_texture->frames[0];
-            }
-        } else if (item->texture) {
-            texture_to_draw = item->texture;
-        }
-
-        if (texture_to_draw) {
-            // Declare as float to match the function's requirements
-            float tex_w = 0.0f, tex_h = 0.0f;
-            // Call the function directly without casting ---
-            SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
-
-            // Define the target box size (64x64 for parent icons)
-            ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
-
-            // Calculate scaled dimensions to fit inside the box while maintaining aspect ratio
-            float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
-            ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
-
-            // Define the top-left of the icon box area (inside the 96x96 background)
-            ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
-            // Calculate padding needed to center the scaled image within the box
-            ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
-                                    (target_box_size.y - scaled_size.y) * 0.5f);
-
-            // The final top-left and bottom-right corners for drawing
-            ImVec2 p_min = ImVec2(box_p_min.x + padding.x, box_p_min.y + padding.y);
-            ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
-
-            draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
-        }
-
-
-        // The 4.0f is for padding, can be adjusted
-        draw_list->AddText(nullptr, 16.0f * t->zoom_level,
-                           ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
-                                  screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level)), text_color,
-                           item->display_name);
-        if (progress_text[0] != '\0') {
-            draw_list->AddText(nullptr, 14.0f * t->zoom_level,
-                               ImVec2(
-                                   screen_pos.x + (bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level) *
-                                   0.5f, screen_pos.y + (bg_size.y + text_size.y + 4.0f) * t->zoom_level + (
-                                             4.0f * t->zoom_level)), text_color,
-                               progress_text);
-        }
-
-        // Checkbox logic for manual override
-        bool can_be_overridden = (item->goal <= 0 || item->goal == -1);
-        if (can_be_overridden) {
-            // Change first 5 to 70 to move the checkbox to the right
-            ImVec2 check_pos = ImVec2(screen_pos.x + 5 * t->zoom_level, screen_pos.y + 5 * t->zoom_level);
-            ImVec2 check_size = ImVec2(20 * t->zoom_level, 20 * t->zoom_level);
-            ImRect checkbox_rect(check_pos, ImVec2(check_pos.x + check_size.x, check_pos.y + check_size.y));
-
-            bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
-            ImU32 check_fill_color = is_hovered ? checkbox_hover_color : checkbox_fill_color;
-            draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill_color, 3.0f * t->zoom_level);
-            draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, text_color,
-                               3.0f * t->zoom_level);
-
+            // Select background based on progress for counters, half-done when in between
             if (item->done) {
-                draw_list->AddLine(ImVec2(check_pos.x + 5 * t->zoom_level, check_pos.y + 10 * t->zoom_level),
-                                   ImVec2(check_pos.x + 9 * t->zoom_level, check_pos.y + 15 * t->zoom_level),
-                                   checkmark_color, 2.0f * t->zoom_level);
-                draw_list->AddLine(ImVec2(check_pos.x + 9 * t->zoom_level, check_pos.y + 15 * t->zoom_level),
-                                   ImVec2(check_pos.x + 15 * t->zoom_level, check_pos.y + 6 * t->zoom_level),
-                                   checkmark_color, 2.0f * t->zoom_level);
+                bg_texture = t->adv_bg_done;
+            } else if ((item->goal > 0 || item->goal == -1) && item->progress > 0) {
+                // Specifically checking for -1 as well
+                bg_texture = t->adv_bg_half_done;
+            } else {
+                bg_texture = t->adv_bg;
             }
 
-            if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                item->done = !item->done;
-                item->is_manually_completed = true;
-                settings_save(settings, t->template_data);
-                SDL_SetAtomicInt(&g_needs_update, 1);
-                SDL_SetAtomicInt(&g_game_data_changed, 1);
+            if (bg_texture)
+                draw_list->AddImage((void *) bg_texture, screen_pos,
+                                    ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
+                                           screen_pos.y + bg_size.y * t->zoom_level));
+
+            // Asure proper rendering of .gif files
+            SDL_Texture *texture_to_draw = nullptr;
+            if (item->anim_texture && item->anim_texture->frame_count > 0) {
+                // also making a nullptr check for the 'delays' pointer
+                if (item->anim_texture->delays && item->anim_texture->total_duration > 0) {
+                    Uint32 current_time = SDL_GetTicks();
+                    Uint32 elapsed_time = current_time % item->anim_texture->total_duration;
+
+                    int current_frame = 0;
+                    Uint32 time_sum = 0;
+                    for (int frame_idx = 0; frame_idx < item->anim_texture->frame_count; ++frame_idx) {
+                        time_sum += item->anim_texture->delays[frame_idx];
+                        if (elapsed_time < time_sum) {
+                            current_frame = frame_idx;
+                            break;
+                        }
+                    }
+                    texture_to_draw = item->anim_texture->frames[current_frame];
+                } else {
+                    texture_to_draw = item->anim_texture->frames[0];
+                }
+            } else if (item->texture) {
+                texture_to_draw = item->texture;
+            }
+
+            if (texture_to_draw) {
+                // Declare as float to match the function's requirements
+                float tex_w = 0.0f, tex_h = 0.0f;
+                // Call the function directly without casting ---
+                SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
+
+                // Define the target box size (64x64 for parent icons)
+                ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
+
+                // Calculate scaled dimensions to fit inside the box while maintaining aspect ratio
+                float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
+                ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
+
+                // Define the top-left of the icon box area (inside the 96x96 background)
+                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
+                // Calculate padding needed to center the scaled image within the box
+                ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
+                                        (target_box_size.y - scaled_size.y) * 0.5f);
+
+                // The final top-left and bottom-right corners for drawing
+                ImVec2 p_min = ImVec2(box_p_min.x + padding.x, box_p_min.y + padding.y);
+                ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
+
+                draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
+            }
+
+
+            // The 4.0f is for padding, can be adjusted
+            draw_list->AddText(nullptr, 16.0f * t->zoom_level,
+                               ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
+                                      screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level)), text_color,
+                               item->display_name);
+            if (progress_text[0] != '\0') {
+                draw_list->AddText(nullptr, 14.0f * t->zoom_level,
+                                   ImVec2(
+                                       screen_pos.x + (bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level)
+                                       *
+                                       0.5f, screen_pos.y + (bg_size.y + text_size.y + 4.0f) * t->zoom_level + (
+                                                 4.0f * t->zoom_level)), text_color,
+                                   progress_text);
+            }
+
+            // Checkbox logic for manual override
+            bool can_be_overridden = (item->goal <= 0 || item->goal == -1);
+            if (can_be_overridden) {
+                // Change first 5 to 70 to move the checkbox to the right
+                ImVec2 check_pos = ImVec2(screen_pos.x + 5 * t->zoom_level, screen_pos.y + 5 * t->zoom_level);
+                ImVec2 check_size = ImVec2(20 * t->zoom_level, 20 * t->zoom_level);
+                ImRect checkbox_rect(check_pos, ImVec2(check_pos.x + check_size.x, check_pos.y + check_size.y));
+
+                bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
+                ImU32 check_fill_color = is_hovered ? checkbox_hover_color : checkbox_fill_color;
+                draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill_color, 3.0f * t->zoom_level);
+                draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, text_color,
+                                   3.0f * t->zoom_level);
+
+                if (item->done) {
+                    draw_list->AddLine(ImVec2(check_pos.x + 5 * t->zoom_level, check_pos.y + 10 * t->zoom_level),
+                                       ImVec2(check_pos.x + 9 * t->zoom_level, check_pos.y + 15 * t->zoom_level),
+                                       checkmark_color, 2.0f * t->zoom_level);
+                    draw_list->AddLine(ImVec2(check_pos.x + 9 * t->zoom_level, check_pos.y + 15 * t->zoom_level),
+                                       ImVec2(check_pos.x + 15 * t->zoom_level, check_pos.y + 6 * t->zoom_level),
+                                       checkmark_color, 2.0f * t->zoom_level);
+                }
+
+                if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                    item->done = !item->done;
+                    item->is_manually_completed = true;
+                    settings_save(settings, t->template_data);
+                    SDL_SetAtomicInt(&g_needs_update, 1);
+                    SDL_SetAtomicInt(&g_game_data_changed, 1);
+                }
             }
         }
 
@@ -3174,79 +3203,88 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
         ImVec2 screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
                                    (current_y * t->zoom_level) + t->camera_offset.y);
-        ImVec2 bg_size = ImVec2(96.0f, 96.0f);
 
-        SDL_Texture *bg_texture;
-        if (goal->current_stage >= goal->stage_count - 1) bg_texture = t->adv_bg_done;
-        else if (goal->current_stage > 0) bg_texture = t->adv_bg_half_done;
-        else bg_texture = t->adv_bg;
+        // Culling Logic
+        ImVec2 item_size_on_screen = ImVec2(uniform_item_width * t->zoom_level, item_height * t->zoom_level);
+        bool is_visible = !(screen_pos.x > io.DisplaySize.x || (screen_pos.x + item_size_on_screen.x) < 0 ||
+                            screen_pos.y > io.DisplaySize.y || (screen_pos.y + item_size_on_screen.y) < 0);
 
-        if (bg_texture)
-            draw_list->AddImage((void *) bg_texture, screen_pos,
-                                ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
-                                       screen_pos.y + bg_size.y * t->zoom_level));
+        if (is_visible) {
+            ImVec2 bg_size = ImVec2(96.0f, 96.0f);
 
-        SDL_Texture *texture_to_draw = nullptr;
-        if (goal->anim_texture && goal->anim_texture->frame_count > 0) {
-            // also making a nullptr check for the 'delays' pointer
-            if (goal->anim_texture->delays && goal->anim_texture->total_duration > 0) {
-                Uint32 current_time = SDL_GetTicks();
-                Uint32 elapsed_time = current_time % goal->anim_texture->total_duration;
+            SDL_Texture *bg_texture;
+            if (goal->current_stage >= goal->stage_count - 1) bg_texture = t->adv_bg_done;
+            else if (goal->current_stage > 0) bg_texture = t->adv_bg_half_done;
+            else bg_texture = t->adv_bg;
 
-                int current_frame = 0;
-                Uint32 time_sum = 0;
-                for (int frame_idx = 0; frame_idx < goal->anim_texture->frame_count; ++frame_idx) {
-                    time_sum += goal->anim_texture->delays[frame_idx];
-                    if (elapsed_time < time_sum) {
-                        current_frame = frame_idx;
-                        break;
+            if (bg_texture)
+                draw_list->AddImage((void *) bg_texture, screen_pos,
+                                    ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
+                                           screen_pos.y + bg_size.y * t->zoom_level));
+
+            SDL_Texture *texture_to_draw = nullptr;
+            if (goal->anim_texture && goal->anim_texture->frame_count > 0) {
+                // also making a nullptr check for the 'delays' pointer
+                if (goal->anim_texture->delays && goal->anim_texture->total_duration > 0) {
+                    Uint32 current_time = SDL_GetTicks();
+                    Uint32 elapsed_time = current_time % goal->anim_texture->total_duration;
+
+                    int current_frame = 0;
+                    Uint32 time_sum = 0;
+                    for (int frame_idx = 0; frame_idx < goal->anim_texture->frame_count; ++frame_idx) {
+                        time_sum += goal->anim_texture->delays[frame_idx];
+                        if (elapsed_time < time_sum) {
+                            current_frame = frame_idx;
+                            break;
+                        }
                     }
+                    texture_to_draw = goal->anim_texture->frames[current_frame];
+                } else {
+                    texture_to_draw = goal->anim_texture->frames[0];
                 }
-                texture_to_draw = goal->anim_texture->frames[current_frame];
-            } else {
-                texture_to_draw = goal->anim_texture->frames[0];
+            } else if (goal->texture) {
+                texture_to_draw = goal->texture;
             }
-        } else if (goal->texture) {
-            texture_to_draw = goal->texture;
+
+            if (texture_to_draw) {
+                // Declare as float to match the function's requirements
+                float tex_w = 0.0f, tex_h = 0.0f;
+                // Call the function directly without casting ---
+                SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
+
+                // Define the target box size (64x64 for parent icons)
+                ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
+
+                // Calculate scaled dimensions to fit inside the box while maintaining aspect ratio
+                float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
+                ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
+
+                // Define the top-left of the icon box area (inside the 96x96 background)
+                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
+                // Calculate padding needed to center the scaled image within the box
+                ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
+                                        (target_box_size.y - scaled_size.y) * 0.5f);
+
+                // The final top-left and bottom-right corners for drawing
+                ImVec2 p_min = ImVec2(box_p_min.x + padding.x, box_p_min.y + padding.y);
+                ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
+
+                draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
+            }
+
+            // The 4.0f is for padding, can be adjusted
+            draw_list->AddText(nullptr, 16.0f * t->zoom_level,
+                               ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
+                                      screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level)), text_color,
+                               goal->display_name);
+            draw_list->AddText(nullptr, 14.0f * t->zoom_level,
+                               ImVec2(
+                                   screen_pos.x + (bg_size.x * t->zoom_level - stage_text_size.x * t->zoom_level) *
+                                   0.5f,
+                                   screen_pos.y + (bg_size.y + text_size.y + 4.0f) * t->zoom_level + (
+                                       4.0f * t->zoom_level)), text_color,
+                               stage_text);
         }
-
-        if (texture_to_draw) {
-            // Declare as float to match the function's requirements
-            float tex_w = 0.0f, tex_h = 0.0f;
-            // Call the function directly without casting ---
-            SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
-
-            // Define the target box size (64x64 for parent icons)
-            ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
-
-            // Calculate scaled dimensions to fit inside the box while maintaining aspect ratio
-            float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
-            ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
-
-            // Define the top-left of the icon box area (inside the 96x96 background)
-            ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
-            // Calculate padding needed to center the scaled image within the box
-            ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
-                                    (target_box_size.y - scaled_size.y) * 0.5f);
-
-            // The final top-left and bottom-right corners for drawing
-            ImVec2 p_min = ImVec2(box_p_min.x + padding.x, box_p_min.y + padding.y);
-            ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
-
-            draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
-        }
-
-        // The 4.0f is for padding, can be adjusted
-        draw_list->AddText(nullptr, 16.0f * t->zoom_level,
-                           ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
-                                  screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level)), text_color,
-                           goal->display_name);
-        draw_list->AddText(nullptr, 14.0f * t->zoom_level,
-                           ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - stage_text_size.x * t->zoom_level) * 0.5f,
-                                  screen_pos.y + (bg_size.y + text_size.y + 4.0f) * t->zoom_level + (
-                                      4.0f * t->zoom_level)), text_color,
-                           stage_text);
-
         current_x += uniform_item_width + horizontal_spacing;
         row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
     }
@@ -3439,7 +3477,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     ImVec2 notes_button_size = ImVec2(notes_button_text_size.x + 0.0f, notes_button_text_size.y + 8.0f);
 
     // TODO: Adjust this for more buttons, with 3 buttons it's padding * 2.0f, 4 buttons is 3.0f and so on (in addition to button)
-    float buttons_total_width = lock_button_size.x + reset_button_size.x + notes_button_size.x + (button_padding * 2.0f);
+    float buttons_total_width = lock_button_size.x + reset_button_size.x + notes_button_size.x + (
+                                    button_padding * 2.0f);
 
 
     // Position a new transparent window in the bottom right to hold the buttons
@@ -3503,10 +3542,10 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     ImGui::Checkbox("Notes", &t->notes_window_open);
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Toggle the template-specific notes window.\n"
-                          "Once you type inside the window all hotkeys are disabled.\n"
-                          "Anything you type is immediately saved to the notes file in the template folder.\n"
-                          "This window can arbitrarily be resized.\n"
-                          "There's a 64KB limit on the size of the notes file.");
+            "Once you type inside the window all hotkeys are disabled.\n"
+            "Anything you type is immediately saved to the notes file in the template folder.\n"
+            "This window can arbitrarily be resized.\n"
+            "There's a 64KB limit on the size of the notes file.");
     }
 
     ImGui::PopStyleColor(5); // Pop the style colors, there's 5 of them
@@ -3542,19 +3581,20 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
             // Draw the text editor.
             if (ImGui::InputTextMultiline("##NotesEditor", t->notes_buffer, sizeof(t->notes_buffer),
-                                         editor_size, ImGuiInputTextFlags_AllowTabInput)) {
+                                          editor_size, ImGuiInputTextFlags_AllowTabInput)) {
                 // Text was edited, save it to the file immediately.
                 tracker_save_notes(t, settings);
             }
 
             // Draw the checkbox in the bottom right corner.
-            const char* checkbox_label = "Use Settings Font";
+            const char *checkbox_label = "Use Settings Font";
             float checkbox_width = ImGui::CalcTextSize(checkbox_label).x + ImGui::GetFrameHeightWithSpacing();
             ImGui::SetCursorPosX(ImGui::GetWindowWidth() - checkbox_width - ImGui::GetStyle().WindowPadding.x);
             // The checkbox still modifies the original setting directly.
             if (ImGui::Checkbox(checkbox_label, &settings->notes_use_roboto_font)) {
                 if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("Toggle whether to use the settings window font for the notes editor (better readability).");
+                    ImGui::SetTooltip(
+                        "Toggle whether to use the settings window font for the notes editor (better readability).");
                 }
                 // Save the setting immediately when it's changed.
                 settings_save(settings, nullptr);
@@ -3568,7 +3608,6 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         // End() must always be called to match a Begin(), regardless of its return value.
         ImGui::End();
     }
-
 
 
     ImGui::End(); // End TrackerMap window
