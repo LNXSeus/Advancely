@@ -391,6 +391,46 @@ static void tracker_snapshot_legacy_stats(Tracker *t, const AppSettings *setting
 }
 
 /**
+ * @brief Resets all manual progress when a world change is detected.
+ * This includes custom goal progress and manual stat overrides. It then
+ * saves these reset values back to settings.json.
+ * @param t A pointer to the Tracker struct.
+ * @param settings A pointer to the AppSettings struct.
+ */
+static void tracker_reset_progress_on_world_change(Tracker *t, const AppSettings *settings) {
+    if (!t || !t->template_data) return;
+
+    log_message(LOG_INFO, "[TRACKER] World change detected. Resetting custom progress and manual overrides.\n");
+
+    // Reset custom goals
+    for (int i = 0; i < t->template_data->custom_goal_count; i++) {
+        TrackableItem *item = t->template_data->custom_goals[i];
+        if (item) {
+            item->progress = 0;
+            item->done = false;
+        }
+    }
+
+    // Reset stat overrides
+    for (int i = 0; i < t->template_data->stat_count; i++) {
+        TrackableCategory *stat_cat = t->template_data->stats[i];
+        if (stat_cat) {
+            stat_cat->is_manually_completed = false;
+            for (int j = 0; j < stat_cat->criteria_count; j++) {
+                TrackableItem *sub_stat = stat_cat->criteria[j];
+                if (sub_stat) {
+                    sub_stat->is_manually_completed = false;
+                }
+            }
+        }
+    }
+
+    // Save the reset progress back to the settings file
+    settings_save(settings, t->template_data);
+}
+
+
+/**
  * @brief (Era 1: 1.0-1.6.4) Parses legacy .dat stats files.
  */
 static void tracker_update_stats_legacy(Tracker *t, const cJSON *player_stats_json) {
@@ -2070,6 +2110,7 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
 
     // Ensure snapshot world name is initially empty
     t->template_data->snapshot_world_name[0] = '\0';
+    t->template_data->snapshot_world_name[0] = '\0';
 
     // Initialize paths (also during runtime)
     tracker_reinit_paths(t, settings);
@@ -2154,6 +2195,17 @@ void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
     (void) deltaTime;
     // Use deltaTime for animations
     // game logic goes here
+
+    // Detect if the world has changed since the last update.
+    if (t->template_data->last_known_world_name[0] != '\0' &&
+        // If world name is different
+        strcmp(t->world_name, t->template_data->last_known_world_name) != 0) {
+        // Reset custom progress and manual stat overrides
+        tracker_reset_progress_on_world_change(t, settings);
+        }
+    // After the check, update the last known world name to the current one for the next cycle.
+    strncpy(t->template_data->last_known_world_name, t->world_name, sizeof(t->template_data->last_known_world_name) - 1);
+
 
     MC_Version version = settings_get_version_from_string(settings->version_str);
 
@@ -3880,6 +3932,9 @@ bool tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
 
     // After parsing everything, do an initial load of the notes file.
     tracker_load_notes(t, settings);
+
+    // Prime the 'last_known_world_name' with the initial world on first load.
+    strncpy(t->template_data->last_known_world_name, t->world_name, sizeof(t->template_data->last_known_world_name) - 1);
 
     log_message(LOG_INFO, "[TRACKER] Initial template parsing complete.\n");
 
