@@ -288,6 +288,7 @@ struct TemplateData {
     // Taking snapshot for legacy versions when world is changed to track changes per world
     long long playtime_snapshot; // Stores playtime at world load for legacy versions
     char snapshot_world_name[MAX_PATH_LENGTH]; // The world the current snapshot belongs to
+    char last_known_world_name[MAX_PATH_LENGTH]; // The last world the tracker was active in, to detect changes.
 };
 
 // PATHMODE AND VERSION STUFF
