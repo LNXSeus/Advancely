@@ -14,9 +14,7 @@
 
 void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t,
                          bool *force_open_flag) {
-    if (!*p_open) {
-        return;
-    }
+
 
     // This static variable tracks the open state from the previous frame
     static bool was_open_last_frame = false;
@@ -24,15 +22,27 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Flag to track invalid manual path (especially important when auto path is invalid as well, to prevent dmon crashes)
     static bool show_invalid_manual_path_error = false;
 
+    // Flag to show a confirmation message when settings are applied
+    static bool show_applied_message = false;
+
     // Holds temporary copy of the settings for editing
     static AppSettings temp_settings;
 
+    // --- State management for window open/close ---
+    // Detect the transition from closed to opened state.
+    const bool just_opened = *p_open && !was_open_last_frame;
+
+    was_open_last_frame = *p_open;
+
+    if (!*p_open) return;
+
     // If the window was just opened (i.e., it was closed last frame but is open now),
     // we copy the current live settings into our temporary editing struct.
-    if (*p_open && !was_open_last_frame) {
+    if (just_opened) {
         memcpy(&temp_settings, app_settings, sizeof(AppSettings));
+        show_applied_message = false; // Reset message visibility
     }
-    was_open_last_frame = *p_open;
+
 
 
     // Begin an ImGui window. The 'p_open' parameter provides the 'X' button to close it.
@@ -448,8 +458,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::Spacing();
     }
 
-    // Apply the changes
-    if (ImGui::Button("Apply Settings")) {
+    // Apply the changes or pressing Enter key
+    if (ImGui::Button("Apply Settings") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && !ImGui::IsAnyItemActive())) {
+
+        // Reset message visibility on each new attempt
+        show_applied_message = false;
+
 
         // Assume the error is cleared unless we find one
         show_invalid_manual_path_error = false;
@@ -475,6 +489,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
                 settings_save(app_settings, nullptr);
                 SDL_SetAtomicInt(&g_settings_changed, 1); // Trigger a reload
+                show_applied_message = true;
             }
         } else {
             // temp_settings.path_mode == PATH_MODE_AUTO
@@ -496,6 +511,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
                 settings_save(app_settings, nullptr);
                 SDL_SetAtomicInt(&g_settings_changed, 1);
+                show_applied_message = true;
             }
         }
     }
@@ -503,7 +519,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Hover text for the apply button
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip(
-            "Apply any changes made in this window. It will fail to apply if any warnings are shown.");
+            "Apply any changes made in this window. You can also press 'Enter' to apply.\n"
+            "It will fail to apply if any warnings are shown.");
+    }
+
+    // Show the confirmation message if settings were applied
+    if (show_applied_message) {
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Settings Applied!");
     }
 
     // Place the next button on the same line
