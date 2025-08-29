@@ -2,151 +2,187 @@
   "advancements": {
     "5242880": {
       "icon": "items/book_normal_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242881": {
       "icon": "blocks/Oak_Log_(UD)_JE8_BE3.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242882": {
       "icon": "blocks/Crafting_Table_JE4_BE3.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242883": {
       "icon": "items/wood_pickaxe_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242884": {
       "icon": "blocks/Furnace_(S)_JE4.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242885": {
       "icon": "items/iron_ingot_1.0.png",
+      "hidden": true,
       "criteria": {}
     },
     "5242886": {
       "icon": "items/wood_hoe_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242887": {
       "icon": "items/bread_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242888": {
       "icon": "items/cake_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242889": {
       "icon": "items/stone_pickaxe_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242890": {
       "icon": "items/fish_cooked_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242891": {
       "icon": "blocks/Rail_(NS)_JE3_BE2.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242892": {
       "icon": "items/wood_sword_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242893": {
       "icon": "items/bone_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242894": {
       "icon": "items/leather_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242895": {
       "icon": "items/saddle_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242896": {
       "icon": "items/bow_standby_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242897": {
       "icon": "items/diamond_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242898": {
       "icon": "blocks/Obsidian_JE3_BE2.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242899": {
       "icon": "items/ghast_tear_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242900": {
       "icon": "items/blaze_rod_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242901": {
       "icon": "items/Water_Bottle_JE1_BE1.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242902": {
       "icon": "items/ender_eye_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242903": {
       "icon": "blocks/Dragon_Egg_JE5.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242904": {
       "icon": "blocks/Enchanting_Table_JE4_BE2.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242905": {
       "icon": "items/diamond_sword_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "5242906": {
       "icon": "blocks/Bookshelf_JE4_BE2.png",
+      "hidden": false,
       "criteria": {}
     }
   },
   "stats": {
     "stat_category:ben_10": {
       "icon": "items/iron_ingot_1.0.png",
+      "hidden": false,
       "criteria": {
         "1100": {
           "target": 12000,
-          "icon": "items/clock_00_1.9.png"
+          "icon": "items/clock_00_1.9.png",
+          "hidden": false
         },
         "2010": {
           "target": 10,
-          "icon": "blocks/Slime_Block_JE2_BE3.png"
+          "icon": "blocks/Slime_Block_JE2_BE3.png",
+          "hidden": false
         },
         "5242880": {
           "target": 10,
-          "icon": "items/book_normal_1.0.png"
+          "icon": "items/book_normal_1.0.png",
+          "hidden": false
         }
       }
     },
     "stat_category:50_shades_of_grey": {
       "icon": "items/iron_ingot_1.0.png",
+      "hidden": false,
       "criteria": {
         "2010": {
           "target": 50,
-          "icon": "blocks/Slime_Block_JE2_BE3.png"
+          "icon": "blocks/Slime_Block_JE2_BE3.png",
+          "hidden": false
         },
         "5242880": {
           "target": 50,
-          "icon": "items/book_normal_1.0.png"
+          "icon": "items/book_normal_1.0.png",
+          "hidden": false
         }
       }
     },
     "stat_category:mine_more_sand": {
       "icon": "blocks/Sand_JE5_BE3.png",
+      "hidden": false,
       "root_name": "16777228",
       "target": -1
     },
     "stat_category:break_wooden_shovel": {
       "icon": "items/wood_shovel_1.0.png",
+      "hidden": false,
       "root_name": "16974093",
       "target": 1
     },
@@ -167,16 +203,19 @@
   "custom": [
     {
       "root_name": "custom:good_view",
-      "icon": "items/ender_eye_1.0.png"
+      "icon": "items/ender_eye_1.0.png",
+      "hidden": false
     },
     {
       "root_name": "custom:fun_counter",
       "icon": "items/cake_1.0.png",
+      "hidden": false,
       "target": -1
     },
     {
       "root_name": "custom:count_100",
       "icon": "items/compass_00_1.9.png",
+      "hidden": false,
       "target": 100
     }
   ],
@@ -184,6 +223,7 @@
     {
       "root_name": "ms_goal:get_playin_MC",
       "icon": "blocks/Dirt.png",
+      "hidden": false,
       "stages": [
         {
           "stage_id": "0",

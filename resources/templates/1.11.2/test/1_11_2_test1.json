@@ -2,288 +2,367 @@
   "advancements": {
     "achievement.buildHoe": {
       "icon": "items/wood_hoe_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.killWither": {
       "icon": "items/nether_star_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.snipeSkeleton": {
       "icon": "items/bow_standby_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.buildWorkBench": {
       "icon": "blocks/Crafting_Table_JE4_BE3.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.flyPig": {
       "icon": "items/saddle_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.killCow": {
       "icon": "items/leather_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.makeBread": {
       "icon": "items/bread_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.exploreAllBiomes": {
       "icon": "items/diamond_boots_1.0.png",
+      "hidden": false,
       "criteria": {
         "Beach": {
-          "icon": "ovBiomes/1.7.2-1.11.2/beach.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/beach.png",
+          "hidden": false
         },
         "Birch Forest": {
-          "icon": "ovBiomes/1.7.2-1.11.2/birch_forest.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/birch_forest.png",
+          "hidden": false
         },
         "Birch Forest Hills": {
-          "icon": "ovBiomes/1.7.2-1.11.2/birch_forest_hills.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/birch_forest_hills.png",
+          "hidden": false
         },
         "Cold Beach": {
-          "icon": "ovBiomes/1.7.2-1.11.2/cold_beach.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/cold_beach.png",
+          "hidden": false
         },
         "Cold Taiga": {
-          "icon": "ovBiomes/1.7.2-1.11.2/cold_taiga.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/cold_taiga.png",
+          "hidden": false
         },
         "Cold Taiga Hills": {
-          "icon": "ovBiomes/1.7.2-1.11.2/cold_taiga_hills.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/cold_taiga_hills.png",
+          "hidden": false
         },
         "Deep Ocean": {
-          "icon": "ovBiomes/1.7.2-1.11.2/deep_ocean.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/deep_ocean.png",
+          "hidden": false
         },
         "Desert": {
-          "icon": "ovBiomes/1.7.2-1.11.2/desert.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/desert.png",
+          "hidden": false
         },
         "DesertHills": {
-          "icon": "ovBiomes/1.7.2-1.11.2/deserthills.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/deserthills.png",
+          "hidden": false
         },
         "Extreme Hills": {
-          "icon": "ovBiomes/1.7.2-1.11.2/extreme_hills.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/extreme_hills.png",
+          "hidden": false
         },
         "Extreme Hills+": {
-          "icon": "ovBiomes/1.7.2-1.11.2/extreme_hills+.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/extreme_hills+.png",
+          "hidden": false
         },
         "Forest": {
-          "icon": "ovBiomes/1.7.2-1.11.2/forest.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/forest.png",
+          "hidden": false
         },
         "ForestHills": {
-          "icon": "ovBiomes/1.7.2-1.11.2/foresthills.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/foresthills.png",
+          "hidden": false
         },
         "FrozenRiver": {
-          "icon": "ovBiomes/1.7.2-1.11.2/frozenriver.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/frozenriver.png",
+          "hidden": false
         },
         "Ice Mountains": {
-          "icon": "ovBiomes/1.7.2-1.11.2/ice_mountains.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/ice_mountains.png",
+          "hidden": false
         },
         "Ice Plains": {
-          "icon": "ovBiomes/1.7.2-1.11.2/ice_plains.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/ice_plains.png",
+          "hidden": false
         },
         "Jungle": {
-          "icon": "ovBiomes/1.7.2-1.11.2/jungle.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/jungle.png",
+          "hidden": false
         },
         "JungleEdge": {
-          "icon": "ovBiomes/1.7.2-1.11.2/jungleedge.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/jungleedge.png",
+          "hidden": false
         },
         "JungleHills": {
-          "icon": "ovBiomes/1.7.2-1.11.2/junglehills.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/junglehills.png",
+          "hidden": false
         },
         "Mega Taiga": {
-          "icon": "ovBiomes/1.7.2-1.11.2/mega_taiga.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/mega_taiga.png",
+          "hidden": false
         },
         "Mega Taiga Hills": {
-          "icon": "ovBiomes/1.7.2-1.11.2/mega_taiga_hills.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/mega_taiga_hills.png",
+          "hidden": false
         },
         "Mesa": {
-          "icon": "ovBiomes/1.7.2-1.11.2/mesa.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/mesa.png",
+          "hidden": false
         },
         "Mesa Plateau": {
-          "icon": "ovBiomes/1.7.2-1.11.2/mesa_plateau.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/mesa_plateau.png",
+          "hidden": false
         },
         "Mesa Plateau F": {
-          "icon": "ovBiomes/1.7.2-1.11.2/mesa_plateau_f.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/mesa_plateau_f.png",
+          "hidden": false
         },
         "MushroomIsland": {
-          "icon": "ovBiomes/1.7.2-1.11.2/mushroomisland.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/mushroomisland.png",
+          "hidden": false
         },
         "MushroomIslandShore": {
-          "icon": "ovBiomes/1.7.2-1.11.2/mushroomislandshore.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/mushroomislandshore.png",
+          "hidden": false
         },
         "Ocean": {
-          "icon": "ovBiomes/1.7.2-1.11.2/ocean.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/ocean.png",
+          "hidden": false
         },
         "Plains": {
-          "icon": "ovBiomes/1.7.2-1.11.2/plains.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/plains.png",
+          "hidden": false
         },
         "River": {
-          "icon": "ovBiomes/1.7.2-1.11.2/river.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/river.png",
+          "hidden": false
         },
         "Roofed Forest": {
-          "icon": "ovBiomes/1.7.2-1.11.2/roofed_forest.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/roofed_forest.png",
+          "hidden": false
         },
         "Savanna": {
-          "icon": "ovBiomes/1.7.2-1.11.2/savanna.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/savanna.png",
+          "hidden": false
         },
         "Savanna Plateau": {
-          "icon": "ovBiomes/1.7.2-1.11.2/savanna_plateau.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/savanna_plateau.png",
+          "hidden": false
         },
         "Stone Beach": {
-          "icon": "ovBiomes/1.7.2-1.11.2/stone_beach.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/stone_beach.png",
+          "hidden": false
         },
         "Swampland": {
-          "icon": "ovBiomes/1.7.2-1.11.2/swampland.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/swampland.png",
+          "hidden": false
         },
         "Taiga": {
-          "icon": "ovBiomes/1.7.2-1.11.2/taiga.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/taiga.png",
+          "hidden": false
         },
         "TaigaHills": {
-          "icon": "ovBiomes/1.7.2-1.11.2/taigahills.png"
+          "icon": "ovBiomes/1.7.2-1.11.2/taigahills.png",
+          "hidden": false
         }
       }
     },
     "achievement.overpowered": {
       "icon": "items/Enchanted_Golden_Apple_unoptimized.gif",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.onARail": {
       "icon": "blocks/Rail_(NS)_JE3_BE2.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.diamondsToYou": {
       "icon": "items/diamond_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.blazeRod": {
       "icon": "items/blaze_rod_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.diamonds": {
       "icon": "blocks/Diamond_Ore_JE5_BE5.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.bakeCake": {
       "icon": "items/cake_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.fullBeacon": {
       "icon": "blocks/Beacon_JE6_BE2.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.buildPickaxe": {
       "icon": "items/wood_pickaxe_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.buildBetterPickaxe": {
       "icon": "items/stone_pickaxe_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.theEnd": {
       "icon": "items/ender_eye_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.breedCow": {
       "icon": "items/wheat_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.spawnWither": {
       "icon": "items/skull_wither_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.enchantments": {
       "icon": "blocks/Enchanting_Table_JE4_BE2.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.theEnd2": {
       "icon": "blocks/Dragon_Egg_JE5.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.overkill": {
       "icon": "items/diamond_sword_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.buildSword": {
       "icon": "items/wood_sword_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.mineWood": {
       "icon": "blocks/Oak_Log_(UD)_JE8_BE3.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.portal": {
       "icon": "blocks/Obsidian_JE3_BE2.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.openInventory": {
       "icon": "items/book_normal_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.killEnemy": {
       "icon": "items/bone_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.buildFurnace": {
       "icon": "blocks/Furnace_(S)_JE4.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.ghast": {
       "icon": "items/ghast_tear_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.acquireIron": {
       "icon": "items/iron_ingot_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.bookcase": {
       "icon": "blocks/Bookshelf_JE4_BE2.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.cookFish": {
       "icon": "items/fish_cooked_1.0.png",
+      "hidden": false,
       "criteria": {}
     },
     "achievement.potion": {
       "icon": "items/Potion_of_Regeneration_JE1_BE1.png",
+      "hidden": false,
       "criteria": {}
     }
   },
   "stats": {
     "stat_cat:ben_10": {
       "icon": "items/iron_ingot_1.0.png",
+      "hidden": false,
       "criteria": {
         "stat.playOneMinute": {
           "target": 12000,
-          "icon": "items/clock_00_1.9.png"
+          "icon": "items/clock_00_1.9.png",
+          "hidden": false
         },
         "stat.jump": {
           "target": 10,
-          "icon": "blocks/Slime_Block_JE2_BE3.png"
+          "icon": "blocks/Slime_Block_JE2_BE3.png",
+          "hidden": false
         },
         "achievement.openInventory": {
           "target": 10,
-          "icon": "items/book_normal_1.0.png"
+          "icon": "items/book_normal_1.0.png",
+          "hidden": false
         }
       }
     },
     "stat_category:50_shades_of_grey": {
       "icon": "items/iron_ingot_1.0.png",
+      "hidden": false,
       "criteria": {
         "stat.jump": {
           "target": 50,
-          "icon": "blocks/Slime_Block_JE2_BE3.png"
+          "icon": "blocks/Slime_Block_JE2_BE3.png",
+          "hidden": false
         },
         "achievement.openInventory": {
           "target": 50,
-          "icon": "items/book_normal_1.0.png"
+          "icon": "items/book_normal_1.0.png",
+          "hidden": false
         }
       }
     },
     "stat_cat:mine_more_sand": {
       "icon": "blocks/Sand_JE5_BE3.png",
+      "hidden": false,
       "root_name": "stat.mineBlock.minecraft.sand",
       "target": -1
     },
     "stat_cat:break_wooden_shovel": {
       "icon": "items/wood_shovel_1.0.png",
+      "hidden": false,
       "root_name": "stat.breakItem.minecraft.wooden_shovel",
       "target": 1
     }
@@ -292,16 +371,19 @@
   "custom": [
     {
       "root_name": "custom:good_view",
-      "icon": "items/ender_eye_1.0.png"
+      "icon": "items/ender_eye_1.0.png",
+      "hidden": false
     },
     {
       "root_name": "custom:fun_counter",
       "icon": "items/cake_1.0.png",
+      "hidden": false,
       "target": -1
     },
     {
       "root_name": "custom:count_100",
       "icon": "items/compass_00_1.9.png",
+      "hidden": false,
       "target": 100
     }
   ],
@@ -309,6 +391,7 @@
     {
       "root_name": "ms_goal:MC_Tutorial",
       "icon": "blocks/Grass_Block_JE7_BE6.png",
+      "hidden": false,
       "stages": [
         {
           "stage_id": "first",

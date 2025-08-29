@@ -14,6 +14,8 @@ extern "C" {
 /**
  * @brief Formats a string like "acquire_hardware" into "Acquire Hardware".
  * It replaces underscores with spaces and capitalizes the first letter of each word.
+ * SPECIAL CASE: If the underscore is the first character it will just be removed and
+ * not replaced with a space.The letter is still capitalized after.
  * @param input The source string.
  * @param output The buffer to write the formatted string to.
  * @param max_len The size of the output buffer.
