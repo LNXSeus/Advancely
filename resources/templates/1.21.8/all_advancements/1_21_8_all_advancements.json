@@ -208,12 +208,12 @@
       "icon": "items/shulker_shell_3d_shareware_v1.34.png",
       "criteria": {}
     },
-    "minecraft:husbandry/place_dried_ghast_in_water": {
-      "icon": "blocks/Dried_Ghast_JE1_BE1.png",
-      "criteria": {}
-    },
     "minecraft:husbandry/root": {
       "icon": "blocks/Hay_Bale_(UD)_JE2_BE2.png",
+      "criteria": {}
+    },
+    "minecraft:husbandry/place_dried_ghast_in_water": {
+      "icon": "blocks/Dried_Ghast_JE1_BE1.png",
       "criteria": {}
     },
     "minecraft:husbandry/plant_seed": {
