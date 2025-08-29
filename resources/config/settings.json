@@ -5,6 +5,7 @@
   "category":	"all_advancements",
   "optional_flag":	"",
   "general":	{
+    "section_order":	[0, 1, 2, 3, 4],
     "enable_overlay":	false,
     "using_stats_per_world_legacy":	true,
     "fps":	60,
