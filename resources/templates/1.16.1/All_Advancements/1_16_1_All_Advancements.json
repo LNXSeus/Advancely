@@ -1,5 +1,471 @@
 {
   "advancements": {
+    "minecraft:story/mine_stone": {
+      "icon": "items/wooden_pickaxe_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:story/upgrade_tools": {
+      "icon": "items/stone_pickaxe_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:story/iron_tools": {
+      "icon": "items/iron_pickaxe_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:story/smelt_iron": {
+      "icon": "items/iron_ingot_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:story/mine_diamond": {
+      "icon": "items/diamond_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:story/lava_bucket": {
+      "icon": "items/lava_bucket_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:story/form_obsidian": {
+      "icon": "blocks/Obsidian_JE3_BE2.png",
+      "criteria": {}
+    },
+    "minecraft:story/enter_the_nether": {
+      "icon": "items/flint_and_steel_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:story/obtain_armor": {
+      "icon": "items/iron_chestplate_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:story/shiny_gear": {
+      "icon": "items/diamond_chestplate_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:story/cure_zombie_villager": {
+      "icon": "items/golden_apple_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:story/root": {
+      "icon": "blocks/Grass_Block_JE7_BE6.png",
+      "criteria": {}
+    },
+    "minecraft:story/deflect_arrow": {
+      "icon": "items/Shield_JE2_BE1.png",
+      "criteria": {}
+    },
+    "minecraft:story/follow_ender_eye": {
+      "icon": "items/ender_eye_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:story/enter_the_end": {
+      "icon": "blocks/End_Stone_JE3_BE2.png",
+      "criteria": {}
+    },
+    "minecraft:story/enchant_item": {
+      "icon": "items/enchanted_book_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:nether/return_to_sender": {
+      "icon": "items/fireball_1.9.png",
+      "criteria": {}
+    },
+    "minecraft:nether/use_lodestone": {
+      "icon": "blocks/Lodestone_JE1_BE1.png",
+      "criteria": {}
+    },
+    "minecraft:nether/charge_respawn_anchor": {
+      "icon": "blocks/Respawn_Anchor_(0)_JE1.png",
+      "criteria": {}
+    },
+    "minecraft:nether/obtain_crying_obsidian": {
+      "icon": "blocks/Crying_Obsidian_JE1_BE1.png",
+      "criteria": {}
+    },
+    "minecraft:nether/loot_bastion": {
+      "icon": "blocks/Chest_(S)_JE2.png",
+      "criteria": {}
+    },
+    "minecraft:nether/find_bastion": {
+      "icon": "blocks/Polished_Blackstone_Bricks_JE2_BE2.png",
+      "criteria": {}
+    },
+    "minecraft:nether/find_fortress": {
+      "icon": "blocks/Nether_Bricks_JE4_BE5.png",
+      "criteria": {}
+    },
+    "minecraft:nether/root": {
+      "icon": "blocks/Nether_Bricks_JE4_BE5.png",
+      "criteria": {}
+    },
+    "minecraft:nether/uneasy_alliance": {
+      "icon": "items/ghast_tear_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:nether/fast_travel": {
+      "icon": "items/map_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:nether/brew_potion": {
+      "icon": "items/Water_Bottle_JE2_BE2.png",
+      "criteria": {}
+    },
+    "minecraft:nether/obtain_blaze_rod": {
+      "icon": "items/blaze_rod_1.0.png",
+      "criteria": {}
+    },
+    "minecraft:nether/distract_piglin": {
+      "icon": "items/gold_ingot_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:nether/obtain_ancient_debris": {
+      "icon": "blocks/Ancient_Debris_JE1_BE1.png",
+      "criteria": {}
+    },
+    "minecraft:nether/explore_nether": {
+      "icon": "items/netherite_boots_20w14infinite.png",
+      "criteria": {
+        "minecraft:nether_wastes": {
+          "icon": "neBiomes/nether_wastes.png"
+        },
+        "minecraft:crimson_forest": {
+          "icon": "neBiomes/crimson_forest.png"
+        },
+        "minecraft:warped_forest": {
+          "icon": "neBiomes/warped_forest.png"
+        },
+        "minecraft:basalt_deltas": {
+          "icon": "neBiomes/basalt_deltas.png"
+        },
+        "minecraft:soul_sand_valley": {
+          "icon": "neBiomes/soul_sand_valley.png"
+        }
+      }
+    },
+    "minecraft:nether/netherite_armor": {
+      "icon": "items/netherite_chestplate_20w14infinite.png",
+      "criteria": {}
+    },
+    "minecraft:nether/all_effects": {
+      "icon": "items/bucket_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:nether/all_potions": {
+      "icon": "items/milk_bucket_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:nether/create_full_beacon": {
+      "icon": "blocks/Beacon_JE6_BE2.png",
+      "criteria": {}
+    },
+    "minecraft:nether/create_beacon": {
+      "icon": "blocks/Beacon_JE6_BE2.png",
+      "criteria": {}
+    },
+    "minecraft:nether/summon_wither": {
+      "icon": "items/nether_star_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:nether/get_wither_skull": {
+      "icon": "blocks/Wither_Skeleton_Skull_(S)_JE2.png",
+      "criteria": {}
+    },
+    "minecraft:nether/ride_strider": {
+      "icon": "items/warped_fungus_on_a_stick_20w14infinite.png",
+      "criteria": {}
+    },
+    "minecraft:end/root": {
+      "icon": "blocks/End_Stone_JE3_BE2.png",
+      "criteria": {}
+    },
+    "minecraft:end/kill_dragon": {
+      "icon": "blocks/Dragon_Head_(S)_JE1.png",
+      "criteria": {}
+    },
+    "minecraft:end/dragon_egg": {
+      "icon": "blocks/Dragon_Egg_JE5.png",
+      "criteria": {}
+    },
+    "minecraft:end/enter_end_gateway": {
+      "icon": "items/ender_pearl_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:end/find_end_city": {
+      "icon": "blocks/Purpur_Block_JE2_BE2.png",
+      "criteria": {}
+    },
+    "minecraft:end/dragon_breath": {
+      "icon": "items/dragon_breath_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:end/respawn_dragon": {
+      "icon": "items/end_crystal_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:end/elytra": {
+      "icon": "items/elytra_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:end/levitate": {
+      "icon": "items/shulker_shell_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:husbandry/root": {
+      "icon": "blocks/Hay_Bale_(UD)_JE2_BE2.png",
+      "criteria": {}
+    },
+    "minecraft:husbandry/plant_seed": {
+      "icon": "items/wheat_seeds_1.13.png",
+      "criteria": {}
+    },
+    "minecraft:husbandry/breed_an_animal": {
+      "icon": "items/wheat_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:husbandry/tame_an_animal": {
+      "icon": "items/lead_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:husbandry/fishy_business": {
+      "icon": "items/fishing_rod_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:husbandry/tactical_fishing": {
+      "icon": "items/pufferfish_bucket_3d_shareware_v1.34.png",
+      "criteria": {}
+    },
+    "minecraft:husbandry/silk_touch_nest": {
+      "icon": "blocks/Bee_Nest_(S)_JE1.png",
+      "criteria": {}
+    },
+    "minecraft:husbandry/safely_harvest_honey": {
+      "icon": "items/honey_bottle_1.15.png",
+      "criteria": {}
+    },
+    "minecraft:husbandry/obtain_netherite_hoe": {
+      "icon": "items/netherite_hoe_20w14infinite.png",
+      "criteria": {}
+    },
+    "minecraft:husbandry/bred_all_animals": {
+      "icon": "items/golden_carrot_25w14craftmine.png",
+      "criteria": {
+        "minecraft:pig": {
+          "icon": "animals/pig.png"
+        },
+        "minecraft:sheep": {
+          "icon": "animals/sheep.png"
+        },
+        "minecraft:chicken": {
+          "icon": "animals/chicken.png"
+        },
+        "minecraft:cow": {
+          "icon": "animals/cow.png"
+        },
+        "minecraft:mooshroom": {
+          "icon": "animals/mooshroom.png"
+        },
+        "minecraft:cat": {
+          "icon": "animals/cat.png"
+        },
+        "minecraft:ocelot": {
+          "icon": "animals/ocelot.png"
+        },
+        "minecraft:wolf": {
+          "icon": "animals/wolf.png"
+        },
+        "minecraft:fox": {
+          "icon": "animals/fox.png"
+        },
+        "minecraft:rabbit": {
+          "icon": "animals/rabbit.png"
+        },
+        "minecraft:bee": {
+          "icon": "animals/bee.png"
+        },
+        "minecraft:horse": {
+          "icon": "animals/horse.png"
+        },
+        "minecraft:donkey": {
+          "icon": "animals/donkey.png"
+        },
+        "minecraft:mule": {
+          "icon": "animals/mule.png"
+        },
+        "minecraft:llama": {
+          "icon": "animals/llama.png"
+        },
+        "minecraft:panda": {
+          "icon": "animals/panda.png"
+        },
+        "minecraft:turtle": {
+          "icon": "animals/turtle.png"
+        },
+        "minecraft:strider": {
+          "icon": "animals/strider.png"
+        },
+        "minecraft:hoglin": {
+          "icon": "monsters/hoglin.png"
+        }
+      }
+    },
+    "minecraft:husbandry/balanced_diet": {
+      "icon": "items/apple_3d_shareware_v1.34.png",
+      "criteria": {
+        "bread": {
+          "icon": "items/bread_3d_shareware_v1.34.png"
+        },
+        "cooked_porkchop": {
+          "icon": "items/cooked_porkchop_3d_shareware_v1.34.png"
+        },
+        "porkchop": {
+          "icon": "items/porkchop_3d_shareware_v1.34.png"
+        },
+        "cooked_beef": {
+          "icon": "items/cooked_beef_3d_shareware_v1.34.png"
+        },
+        "beef": {
+          "icon": "items/beef_3d_shareware_v1.34.png"
+        },
+        "cooked_chicken": {
+          "icon": "items/cooked_chicken_3d_shareware_v1.34.png"
+        },
+        "chicken": {
+          "icon": "items/chicken_3d_shareware_v1.34.png"
+        },
+        "cooked_mutton": {
+          "icon": "items/cooked_mutton_3d_shareware_v1.34.png"
+        },
+        "mutton": {
+          "icon": "items/mutton_3d_shareware_v1.34.png"
+        },
+        "cooked_rabbit": {
+          "icon": "items/cooked_rabbit_3d_shareware_v1.34.png"
+        },
+        "rabbit": {
+          "icon": "items/rabbit_3d_shareware_v1.34.png"
+        },
+        "cooked_cod": {
+          "icon": "items/cooked_cod_1.13.png"
+        },
+        "cod": {
+          "icon": "items/cod_1.13.png"
+        },
+        "tropical_fish": {
+          "icon": "items/tropical_fish_1.13.png"
+        },
+        "cooked_salmon": {
+          "icon": "items/cooked_salmon_1.13.png"
+        },
+        "salmon": {
+          "icon": "items/salmon_1.13.png"
+        },
+        "pufferfish": {
+          "icon": "items/pufferfish_1.13.png"
+        },
+        "cookie": {
+          "icon": "items/cookie_3d_shareware_v1.34.png"
+        },
+        "pumpkin_pie": {
+          "icon": "items/pumpkin_pie_3d_shareware_v1.34.png"
+        },
+        "apple": {
+          "icon": "items/apple_3d_shareware_v1.34.png"
+        },
+        "golden_apple": {
+          "icon": "items/golden_apple_3d_shareware_v1.34.png"
+        },
+        "enchanted_golden_apple": {
+          "icon": "items/Enchanted_Golden_Apple_unoptimized.gif"
+        },
+        "golden_carrot": {
+          "icon": "items/golden_carrot_3d_shareware_v1.34.png"
+        },
+        "carrot": {
+          "icon": "items/carrot_3d_shareware_v1.34.png"
+        },
+        "melon_slice": {
+          "icon": "items/melon_slice_3d_shareware_v1.34.png"
+        },
+        "baked_potato": {
+          "icon": "items/baked_potato_3d_shareware_v1.34.png"
+        },
+        "potato": {
+          "icon": "items/potato_3d_shareware_v1.34.png"
+        },
+        "poisonous_potato": {
+          "icon": "items/poisonous_potato_3d_shareware_v1.34.png"
+        },
+        "beetroot": {
+          "icon": "items/beetroot_3d_shareware_v1.34.png"
+        },
+        "sweet_berries": {
+          "icon": "items/sweet_berries_3d_shareware_v1.34.png"
+        },
+        "chorus_fruit": {
+          "icon": "items/chorus_fruit_3d_shareware_v1.34.png"
+        },
+        "mushroom_stew": {
+          "icon": "items/mushroom_stew_3d_shareware_v1.34.png"
+        },
+        "suspicious_stew": {
+          "icon": "items/suspicious_stew_3d_shareware_v1.34.png"
+        },
+        "rabbit_stew": {
+          "icon": "items/rabbit_stew_3d_shareware_v1.34.png"
+        },
+        "beetroot_soup": {
+          "icon": "items/beetroot_soup_3d_shareware_v1.34.png"
+        },
+        "dried_kelp": {
+          "icon": "items/dried_kelp_1.13.png"
+        },
+        "honey_bottle": {
+          "icon": "items/honey_bottle_1.15.png"
+        },
+        "rotten_flesh": {
+          "icon": "items/rotten_flesh_3d_shareware_v1.34.png"
+        },
+        "spider_eye": {
+          "icon": "items/spider_eye_3d_shareware_v1.34.png"
+        }
+      }
+    },
+    "minecraft:husbandry/complete_catalogue": {
+      "icon": "items/cod_1.13.png",
+      "criteria": {
+        "textures/entity/cat/jellie.png": {
+          "icon": "cats/jellie.png"
+        },
+        "textures/entity/cat/calico.png": {
+          "icon": "cats/calico.png"
+        },
+        "textures/entity/cat/red.png": {
+          "icon": "cats/red.png"
+        },
+        "textures/entity/cat/black.png": {
+          "icon": "cats/tuxedo.png"
+        },
+        "textures/entity/cat/white.png": {
+          "icon": "cats/white.png"
+        },
+        "textures/entity/cat/ragdoll.png": {
+          "icon": "cats/ragdoll.png"
+        },
+        "textures/entity/cat/british_shorthair.png": {
+          "icon": "cats/british_shorthair.png"
+        },
+        "textures/entity/cat/tabby.png": {
+          "icon": "cats/tabby.png"
+        },
+        "textures/entity/cat/all_black.png": {
+          "icon": "cats/black.png"
+        },
+        "textures/entity/cat/persian.png": {
+          "icon": "cats/persian.png"
+        },
+        "textures/entity/cat/siamese.png": {
+          "icon": "cats/siamese.png"
+        }
+      }
+    },
     "minecraft:adventure/root": {
       "icon": "items/map_empty_1.11.png",
       "criteria": {}
@@ -306,472 +772,6 @@
           "icon": "monsters/ravager.png"
         }
       }
-    },
-    "minecraft:end/root": {
-      "icon": "blocks/End_Stone_JE3_BE2.png",
-      "criteria": {}
-    },
-    "minecraft:end/kill_dragon": {
-      "icon": "blocks/Dragon_Head_(S)_JE1.png",
-      "criteria": {}
-    },
-    "minecraft:end/dragon_egg": {
-      "icon": "blocks/Dragon_Egg_JE5.png",
-      "criteria": {}
-    },
-    "minecraft:end/enter_end_gateway": {
-      "icon": "items/ender_pearl_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:end/find_end_city": {
-      "icon": "blocks/Purpur_Block_JE2_BE2.png",
-      "criteria": {}
-    },
-    "minecraft:end/dragon_breath": {
-      "icon": "items/dragon_breath_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:end/respawn_dragon": {
-      "icon": "items/end_crystal_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:end/elytra": {
-      "icon": "items/elytra_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:end/levitate": {
-      "icon": "items/shulker_shell_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:husbandry/root": {
-      "icon": "blocks/Hay_Bale_(UD)_JE2_BE2.png",
-      "criteria": {}
-    },
-    "minecraft:husbandry/plant_seed": {
-      "icon": "items/wheat_seeds_1.13.png",
-      "criteria": {}
-    },
-    "minecraft:husbandry/breed_an_animal": {
-      "icon": "items/wheat_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:husbandry/tame_an_animal": {
-      "icon": "items/lead_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:husbandry/fishy_business": {
-      "icon": "items/fishing_rod_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:husbandry/tactical_fishing": {
-      "icon": "items/pufferfish_bucket_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:husbandry/silk_touch_nest": {
-      "icon": "blocks/Bee_Nest_(S)_JE1.png",
-      "criteria": {}
-    },
-    "minecraft:husbandry/safely_harvest_honey": {
-      "icon": "items/honey_bottle_1.15.png",
-      "criteria": {}
-    },
-    "minecraft:husbandry/obtain_netherite_hoe": {
-      "icon": "items/netherite_hoe_20w14infinite.png",
-      "criteria": {}
-    },
-    "minecraft:husbandry/bred_all_animals": {
-      "icon": "items/golden_carrot_25w14craftmine.png",
-      "criteria": {
-        "minecraft:pig": {
-          "icon": "animals/pig.png"
-        },
-        "minecraft:sheep": {
-          "icon": "animals/sheep.png"
-        },
-        "minecraft:chicken": {
-          "icon": "animals/chicken.png"
-        },
-        "minecraft:cow": {
-          "icon": "animals/cow.png"
-        },
-        "minecraft:mooshroom": {
-          "icon": "animals/mooshroom.png"
-        },
-        "minecraft:cat": {
-          "icon": "animals/cat.png"
-        },
-        "minecraft:ocelot": {
-          "icon": "animals/ocelot.png"
-        },
-        "minecraft:wolf": {
-          "icon": "animals/wolf.png"
-        },
-        "minecraft:fox": {
-          "icon": "animals/fox.png"
-        },
-        "minecraft:rabbit": {
-          "icon": "animals/rabbit.png"
-        },
-        "minecraft:bee": {
-          "icon": "animals/bee.png"
-        },
-        "minecraft:horse": {
-          "icon": "animals/horse.png"
-        },
-        "minecraft:donkey": {
-          "icon": "animals/donkey.png"
-        },
-        "minecraft:mule": {
-          "icon": "animals/mule.png"
-        },
-        "minecraft:llama": {
-          "icon": "animals/llama.png"
-        },
-        "minecraft:panda": {
-          "icon": "animals/panda.png"
-        },
-        "minecraft:turtle": {
-          "icon": "animals/turtle.png"
-        },
-        "minecraft:strider": {
-          "icon": "animals/strider.png"
-        },
-        "minecraft:hoglin": {
-          "icon": "monsters/hoglin.png"
-        }
-      }
-    },
-    "minecraft:husbandry/balanced_diet": {
-      "icon": "items/apple_3d_shareware_v1.34.png",
-      "criteria": {
-        "bread": {
-          "icon": "items/bread_3d_shareware_v1.34.png"
-        },
-        "cooked_porkchop": {
-          "icon": "items/cooked_porkchop_3d_shareware_v1.34.png"
-        },
-        "porkchop": {
-          "icon": "items/porkchop_3d_shareware_v1.34.png"
-        },
-        "cooked_beef": {
-          "icon": "items/cooked_beef_3d_shareware_v1.34.png"
-        },
-        "beef": {
-          "icon": "items/beef_3d_shareware_v1.34.png"
-        },
-        "cooked_chicken": {
-          "icon": "items/cooked_chicken_3d_shareware_v1.34.png"
-        },
-        "chicken": {
-          "icon": "items/chicken_3d_shareware_v1.34.png"
-        },
-        "cooked_mutton": {
-          "icon": "items/cooked_mutton_3d_shareware_v1.34.png"
-        },
-        "mutton": {
-          "icon": "items/mutton_3d_shareware_v1.34.png"
-        },
-        "cooked_rabbit": {
-          "icon": "items/cooked_rabbit_3d_shareware_v1.34.png"
-        },
-        "rabbit": {
-          "icon": "items/rabbit_3d_shareware_v1.34.png"
-        },
-        "cooked_cod": {
-          "icon": "items/cooked_cod_1.13.png"
-        },
-        "cod": {
-          "icon": "items/cod_1.13.png"
-        },
-        "tropical_fish": {
-          "icon": "items/tropical_fish_1.13.png"
-        },
-        "cooked_salmon": {
-          "icon": "items/cooked_salmon_1.13.png"
-        },
-        "salmon": {
-          "icon": "items/salmon_1.13.png"
-        },
-        "pufferfish": {
-          "icon": "items/pufferfish_1.13.png"
-        },
-        "cookie": {
-          "icon": "items/cookie_3d_shareware_v1.34.png"
-        },
-        "pumpkin_pie": {
-          "icon": "items/pumpkin_pie_3d_shareware_v1.34.png"
-        },
-        "apple": {
-          "icon": "items/apple_3d_shareware_v1.34.png"
-        },
-        "golden_apple": {
-          "icon": "items/golden_apple_3d_shareware_v1.34.png"
-        },
-        "enchanted_golden_apple": {
-          "icon": "items/Enchanted_Golden_Apple_unoptimized.gif"
-        },
-        "golden_carrot": {
-          "icon": "items/golden_carrot_3d_shareware_v1.34.png"
-        },
-        "carrot": {
-          "icon": "items/carrot_3d_shareware_v1.34.png"
-        },
-        "melon_slice": {
-          "icon": "items/melon_slice_3d_shareware_v1.34.png"
-        },
-        "baked_potato": {
-          "icon": "items/baked_potato_3d_shareware_v1.34.png"
-        },
-        "potato": {
-          "icon": "items/potato_3d_shareware_v1.34.png"
-        },
-        "poisonous_potato": {
-          "icon": "items/poisonous_potato_3d_shareware_v1.34.png"
-        },
-        "beetroot": {
-          "icon": "items/beetroot_3d_shareware_v1.34.png"
-        },
-        "sweet_berries": {
-          "icon": "items/sweet_berries_3d_shareware_v1.34.png"
-        },
-        "chorus_fruit": {
-          "icon": "items/chorus_fruit_3d_shareware_v1.34.png"
-        },
-        "mushroom_stew": {
-          "icon": "items/mushroom_stew_3d_shareware_v1.34.png"
-        },
-        "suspicious_stew": {
-          "icon": "items/suspicious_stew_3d_shareware_v1.34.png"
-        },
-        "rabbit_stew": {
-          "icon": "items/rabbit_stew_3d_shareware_v1.34.png"
-        },
-        "beetroot_soup": {
-          "icon": "items/beetroot_soup_3d_shareware_v1.34.png"
-        },
-        "dried_kelp": {
-          "icon": "items/dried_kelp_1.13.png"
-        },
-        "honey_bottle": {
-          "icon": "items/honey_bottle_1.15.png"
-        },
-        "rotten_flesh": {
-          "icon": "items/rotten_flesh_3d_shareware_v1.34.png"
-        },
-        "spider_eye": {
-          "icon": "items/spider_eye_3d_shareware_v1.34.png"
-        }
-      }
-    },
-    "minecraft:husbandry/complete_catalogue": {
-      "icon": "items/cod_1.13.png",
-      "criteria": {
-        "textures/entity/cat/jellie.png": {
-          "icon": "cats/jellie.png"
-        },
-        "textures/entity/cat/calico.png": {
-          "icon": "cats/calico.png"
-        },
-        "textures/entity/cat/red.png": {
-          "icon": "cats/red.png"
-        },
-        "textures/entity/cat/black.png": {
-          "icon": "cats/tuxedo.png"
-        },
-        "textures/entity/cat/white.png": {
-          "icon": "cats/white.png"
-        },
-        "textures/entity/cat/ragdoll.png": {
-          "icon": "cats/ragdoll.png"
-        },
-        "textures/entity/cat/british_shorthair.png": {
-          "icon": "cats/british_shorthair.png"
-        },
-        "textures/entity/cat/tabby.png": {
-          "icon": "cats/tabby.png"
-        },
-        "textures/entity/cat/all_black.png": {
-          "icon": "cats/black.png"
-        },
-        "textures/entity/cat/persian.png": {
-          "icon": "cats/persian.png"
-        },
-        "textures/entity/cat/siamese.png": {
-          "icon": "cats/siamese.png"
-        }
-      }
-    },
-    "minecraft:story/mine_stone": {
-      "icon": "items/wooden_pickaxe_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:story/upgrade_tools": {
-      "icon": "items/stone_pickaxe_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:story/iron_tools": {
-      "icon": "items/iron_pickaxe_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:story/smelt_iron": {
-      "icon": "items/iron_ingot_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:story/mine_diamond": {
-      "icon": "items/diamond_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:story/lava_bucket": {
-      "icon": "items/lava_bucket_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:story/form_obsidian": {
-      "icon": "blocks/Obsidian_JE3_BE2.png",
-      "criteria": {}
-    },
-    "minecraft:story/enter_the_nether": {
-      "icon": "items/flint_and_steel_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:story/obtain_armor": {
-      "icon": "items/iron_chestplate_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:story/shiny_gear": {
-      "icon": "items/diamond_chestplate_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:story/cure_zombie_villager": {
-      "icon": "items/golden_apple_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:story/root": {
-      "icon": "blocks/Grass_Block_JE7_BE6.png",
-      "criteria": {}
-    },
-    "minecraft:story/deflect_arrow": {
-      "icon": "items/Shield_JE2_BE1.png",
-      "criteria": {}
-    },
-    "minecraft:story/follow_ender_eye": {
-      "icon": "items/ender_eye_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:story/enter_the_end": {
-      "icon": "blocks/End_Stone_JE3_BE2.png",
-      "criteria": {}
-    },
-    "minecraft:story/enchant_item": {
-      "icon": "items/enchanted_book_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:nether/return_to_sender": {
-      "icon": "items/fireball_1.9.png",
-      "criteria": {}
-    },
-    "minecraft:nether/use_lodestone": {
-      "icon": "blocks/Lodestone_JE1_BE1.png",
-      "criteria": {}
-    },
-    "minecraft:nether/charge_respawn_anchor": {
-      "icon": "blocks/Respawn_Anchor_(0)_JE1.png",
-      "criteria": {}
-    },
-    "minecraft:nether/obtain_crying_obsidian": {
-      "icon": "blocks/Crying_Obsidian_JE1_BE1.png",
-      "criteria": {}
-    },
-    "minecraft:nether/loot_bastion": {
-      "icon": "blocks/Chest_(S)_JE2.png",
-      "criteria": {}
-    },
-    "minecraft:nether/find_bastion": {
-      "icon": "blocks/Polished_Blackstone_Bricks_JE2_BE2.png",
-      "criteria": {}
-    },
-    "minecraft:nether/find_fortress": {
-      "icon": "blocks/Nether_Bricks_JE4_BE5.png",
-      "criteria": {}
-    },
-    "minecraft:nether/root": {
-      "icon": "blocks/Nether_Bricks_JE4_BE5.png",
-      "criteria": {}
-    },
-    "minecraft:nether/uneasy_alliance": {
-      "icon": "items/ghast_tear_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:nether/fast_travel": {
-      "icon": "items/map_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:nether/brew_potion": {
-      "icon": "items/Water_Bottle_JE2_BE2.png",
-      "criteria": {}
-    },
-    "minecraft:nether/obtain_blaze_rod": {
-      "icon": "items/blaze_rod_1.0.png",
-      "criteria": {}
-    },
-    "minecraft:nether/distract_piglin": {
-      "icon": "items/gold_ingot_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:nether/obtain_ancient_debris": {
-      "icon": "blocks/Ancient_Debris_JE1_BE1.png",
-      "criteria": {}
-    },
-    "minecraft:nether/explore_nether": {
-      "icon": "items/netherite_boots_20w14infinite.png",
-      "criteria": {
-        "minecraft:nether_wastes": {
-          "icon": "neBiomes/nether_wastes.png"
-        },
-        "minecraft:crimson_forest": {
-          "icon": "neBiomes/crimson_forest.png"
-        },
-        "minecraft:warped_forest": {
-          "icon": "neBiomes/warped_forest.png"
-        },
-        "minecraft:basalt_deltas": {
-          "icon": "neBiomes/basalt_deltas.png"
-        },
-        "minecraft:soul_sand_valley": {
-          "icon": "neBiomes/soul_sand_valley.png"
-        }
-      }
-    },
-    "minecraft:nether/netherite_armor": {
-      "icon": "items/netherite_chestplate_20w14infinite.png",
-      "criteria": {}
-    },
-    "minecraft:nether/all_effects": {
-      "icon": "items/bucket_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:nether/all_potions": {
-      "icon": "items/milk_bucket_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:nether/create_full_beacon": {
-      "icon": "blocks/Beacon_JE6_BE2.png",
-      "criteria": {}
-    },
-    "minecraft:nether/create_beacon": {
-      "icon": "blocks/Beacon_JE6_BE2.png",
-      "criteria": {}
-    },
-    "minecraft:nether/summon_wither": {
-      "icon": "items/nether_star_3d_shareware_v1.34.png",
-      "criteria": {}
-    },
-    "minecraft:nether/get_wither_skull": {
-      "icon": "blocks/Wither_Skeleton_Skull_(S)_JE2.png",
-      "criteria": {}
-    },
-    "minecraft:nether/ride_strider": {
-      "icon": "items/warped_fungus_on_a_stick_20w14infinite.png",
-      "criteria": {}
     }
   },
   "stats": {
