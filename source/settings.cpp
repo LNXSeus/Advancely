@@ -197,6 +197,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // General Settings
     ImGui::Text("General Settings");
+
+
     ImGui::Checkbox("Enable Overlay", &temp_settings.enable_overlay);
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Enables a separate window to show your progress in your stream.\n"
@@ -356,6 +358,45 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         }
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Adjusts the width of the overlay window.\nDefault: %dpx", OVERLAY_DEFAULT_WIDTH);
+        }
+    }
+
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    // --- Section Order ---
+    ImGui::Text("Section Order");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Drag and drop to reorder the sections in the main tracker window.");
+    }
+
+    for (int n = 0; n < SECTION_COUNT; n++) {
+        int item_type_id = temp_settings.section_order[n];
+        const char *item_name = TRACKER_SECTION_NAMES[item_type_id];
+
+        // Make each item a selectable that can be dragged
+        ImGui::Selectable(item_name);
+
+        // Drag Source
+        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
+            // Set payload to carry the index of the item being dragged
+            ImGui::SetDragDropPayload("DND_SECTION_ORDER", &n, sizeof(int));
+            ImGui::Text("Reorder %s", item_name);
+            ImGui::EndDragDropSource();
+        }
+
+        // Drop Target
+        if (ImGui::BeginDragDropTarget()) {
+            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("DND_SECTION_ORDER")) {
+                IM_ASSERT(payload->DataSize == sizeof(int));
+                int source_n = *(const int *) payload->Data;
+
+                // Swap the items in the temporary settings
+                int temp = temp_settings.section_order[n];
+                temp_settings.section_order[n] = temp_settings.section_order[source_n];
+                temp_settings.section_order[source_n] = temp;
+            }
+            ImGui::EndDragDropTarget();
         }
     }
 
@@ -567,41 +608,42 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         char tooltip_buffer[1024];
 
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                 "Resets all settings (besides window size/position & hotkeys) in this window to their default values.\n"
-                 "This does not modify your template files.\n\n"
-                 "Defaults:\n"
-                 "  - Path Mode: Auto-Detect\n"
-                 "  - Version: %s\n"
-                 "  - StatsPerWorld Mod (1.0-1.6.4): %s\n"
-                 "  - Category: %s\n"
-                 "  - Optional Flag: %s\n"
-                 "  - Overlay: %s\n"
-                 "  - FPS Limit: %d\n"
-                 "  - Overlay Scroll Speed: %.2f\n"
-                 "  - Sub-Stat Cycle Speed: %.1f s\n"
-                 "  - Speed Up Animation: %s\n"
-                 "  - Hide Completed Row 3 Goals: %s\n"
-                 "  - Always On Top: %s\n"
-                 "  - Remove Completed: %s\n"
-                 "  - Overlay Width: %s\n"
-                 "  - Use Settings Font: %s\n"
-                 "  - Print Debug To Console: %s",
+                         "Resets all settings (besides window size/position & hotkeys) in this window to their default values.\n"
+                         "This does not modify your template files.\n\n"
+                         "Defaults:\n"
+                         "  - Path Mode: Auto-Detect\n"
+                         "  - Version: %s\n"
+                         "  - StatsPerWorld Mod (1.0-1.6.4): %s\n"
+                         "  - Category: %s\n"
+                         "  - Optional Flag: %s\n"
+                         "  - Section Order: Advancements -> Unlocks -> Statistics -> Custom Goals -> Multi-Stage Goals\n"
+                         "  - Overlay: %s\n"
+                         "  - FPS Limit: %d\n"
+                         "  - Overlay Scroll Speed: %.2f\n"
+                         "  - Sub-Stat Cycle Speed: %.1f s\n"
+                         "  - Speed Up Animation: %s\n"
+                         "  - Hide Completed Row 3 Goals: %s\n"
+                         "  - Always On Top: %s\n"
+                         "  - Remove Completed: %s\n"
+                         "  - Overlay Width: %s\n"
+                         "  - Use Settings Font: %s\n"
+                         "  - Print Debug To Console: %s",
 
-                 DEFAULT_VERSION,
-                 DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
-                 DEFAULT_CATEGORY,
-                 DEFAULT_OPTIONAL_FLAG,
-                 DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
-                 DEFAULT_FPS,
-                 DEFAULT_OVERLAY_SCROLL_SPEED,
-                 DEFAULT_OVERLAY_STAT_CYCLE_SPEED,
-                 DEFAULT_OVERLAY_SPEED_UP ? "Enabled" : "Disabled",
-                 DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
-                 DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
-                 DEFAULT_REMOVE_COMPLETED_GOALS ? "Enabled" : "Disabled",
-                 "1440px",
-                 DEFAULT_NOTES_USE_ROBOTO ? "Enabled" : "Disabled",
-                 DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled"
+                         DEFAULT_VERSION,
+                         DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
+                         DEFAULT_CATEGORY,
+                         DEFAULT_OPTIONAL_FLAG,
+                         DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
+                         DEFAULT_FPS,
+                         DEFAULT_OVERLAY_SCROLL_SPEED,
+                         DEFAULT_OVERLAY_STAT_CYCLE_SPEED,
+                         DEFAULT_OVERLAY_SPEED_UP ? "Enabled" : "Disabled",
+                         DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
+                         DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
+                         DEFAULT_REMOVE_COMPLETED_GOALS ? "Enabled" : "Disabled",
+                         "1440px",
+                         DEFAULT_NOTES_USE_ROBOTO ? "Enabled" : "Disabled",
+                         DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled"
         );
         ImGui::SetTooltip(tooltip_buffer);
     }

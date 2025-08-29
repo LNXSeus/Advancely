@@ -9,9 +9,24 @@
 #include "data_structures.h" // For MC_Version and PathMode enums
 #include <SDL3/SDL_stdinc.h> // Add this for Uint32
 
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+// Enum to identify the tracker sections
+enum TrackerSection {
+    SECTION_ADVANCEMENTS,
+    SECTION_UNLOCKS, // Exclusive to 25w14craftmine
+    SECTION_STATS,
+    SECTION_CUSTOM,
+    SECTION_MULTISTAGE,
+    SECTION_COUNT // Currently 5
+};
+
+// Helper array of names for the settings UI
+extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 
 #include <cJSON.h>
 
@@ -81,6 +96,9 @@ struct AppSettings {
     char manual_saves_path[MAX_PATH_LENGTH]; // The user-defined path to the saves folder if path_mode is manual.
     char category[MAX_PATH_LENGTH]; // The speedrun or goal category, used to build the template file name.
     char optional_flag[MAX_PATH_LENGTH]; // An optional string appended to the template file name for variants.
+
+    // --- Section Order ---
+    int section_order[SECTION_COUNT]; // Stores the display order of the tracker sections.
 
     // --- Constructed Paths (from above settings) ---
     char template_path[MAX_PATH_LENGTH]; // The final, constructed path to the template .json file.

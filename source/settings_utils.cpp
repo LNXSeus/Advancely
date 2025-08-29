@@ -17,6 +17,15 @@ const ColorRGBA DEFAULT_OVERLAY_BG_COLOR = {0, 80, 255, 255};
 const ColorRGBA DEFAULT_TEXT_COLOR = {255, 255, 255, 255};
 const ColorRGBA DEFAULT_OVERLAY_TEXT_COLOR = {255, 255, 255, 255};
 
+// Define the array of section names
+const char *TRACKER_SECTION_NAMES[SECTION_COUNT] = {
+    "Advancements",
+    "Unlocks",
+    "Statistics",
+    "Custom Goals",
+    "Multi-Stage Goals"
+};
+
 const char *VERSION_STRINGS[] = {
 #define X(e, s) s,
     VERSION_LIST
@@ -211,6 +220,10 @@ void settings_set_defaults(AppSettings *settings) {
     strncpy(settings->category, DEFAULT_CATEGORY, sizeof(settings->category) - 1);
     strncpy(settings->optional_flag, DEFAULT_OPTIONAL_FLAG, sizeof(settings->optional_flag) - 1);
 
+    // Set the default section order
+    for (int i = 0; i < SECTION_COUNT; i++) {
+        settings->section_order[i] = i;
+    }
     settings->hotkey_count = 0;
 
     // New visual/general defaults
@@ -313,6 +326,36 @@ bool settings_load(AppSettings *settings) {
     // Load general settings, explicitly applying defaults if a key is missing or invalid
     cJSON *general_settings = cJSON_GetObjectItem(json, "general");
     if (general_settings) {
+        // Load Section Order
+        const cJSON *order_json = cJSON_GetObjectItem(general_settings, "section_order");
+        if (cJSON_IsArray(order_json) && cJSON_GetArraySize(order_json) == SECTION_COUNT) {
+            bool found[SECTION_COUNT] = {false};
+            bool valid = true;
+            for (int i = 0; i < SECTION_COUNT; ++i) {
+                cJSON *item = cJSON_GetArrayItem(order_json, i);
+                if (cJSON_IsNumber(item) && item->valueint >= 0 && item->valueint < SECTION_COUNT) {
+                    int val = item->valueint;
+                    if (!found[val]) {
+                        settings->section_order[i] = val;
+                        found[val] = true;
+                    } else {
+                        valid = false;
+                        break;
+                    }
+                } else {
+                    valid = false;
+                    break;
+                }
+            }
+            if (!valid) { // If array is malformed, revert to default
+                for (int i = 0; i < SECTION_COUNT; ++i) settings->section_order[i] = i;
+                defaults_were_used = true;
+            }
+        } else {
+            // If key is missing or wrong size, use default
+            for (int i = 0; i < SECTION_COUNT; ++i) settings->section_order[i] = i;
+            defaults_were_used = true;
+        }
         // Toggling the overlay window
         const cJSON *enable_overlay = cJSON_GetObjectItem(general_settings, "enable_overlay");
         if (enable_overlay && cJSON_IsBool(enable_overlay)) settings->enable_overlay = cJSON_IsTrue(enable_overlay);
@@ -500,6 +543,12 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
 
     // Update General Settings
     cJSON *general_obj = get_or_create_object(root, "general");
+
+    // Add section order to general settings
+    cJSON_DeleteItemFromObject(general_obj, "section_order");
+    cJSON *order_array = cJSON_CreateIntArray(settings->section_order, SECTION_COUNT);
+    cJSON_AddItemToObject(general_obj, "section_order", order_array);
+
     cJSON_DeleteItemFromObject(general_obj, "using_stats_per_world_legacy");
     cJSON_AddItemToObject(general_obj, "using_stats_per_world_legacy", cJSON_CreateBool(settings->using_stats_per_world_legacy));
     cJSON_DeleteItemFromObject(general_obj, "fps");

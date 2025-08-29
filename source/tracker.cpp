@@ -2323,7 +2323,7 @@ static void render_section_separator(Tracker *t, const AppSettings *settings, fl
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     float zoom = t->zoom_level;
 
-    current_y += 40.0f; // Padding before the separator
+    current_y += 12.0f; // Padding before the separator
 
     // Measure the text
     ImVec2 text_size = ImGui::CalcTextSize(title);
@@ -3480,15 +3480,46 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // Get the current game version
     MC_Version version = settings_get_version_from_string(settings->version_str);
 
-    //  Render All Sections in Order
-    render_trackable_category_section(t, settings, current_y, t->template_data->advancements,
-                                      t->template_data->advancement_count, "Advancements", false, version);
-    render_simple_item_section(t, settings, current_y, t->template_data->unlocks, t->template_data->unlock_count,
-                               "Unlocks");
-    render_trackable_category_section(t, settings, current_y, t->template_data->stats, t->template_data->stat_count,
-                                      "Statistics", true, version);
-    render_custom_goals_section(t, settings, current_y, "Custom Goals");
-    render_multistage_goals_section(t, settings, current_y, "Multi-Stage Goals");
+    //  Render All Sections in User-Defined Order
+    for (int i = 0; i < SECTION_COUNT; ++i) {
+        auto section_id = (TrackerSection) settings->section_order[i];
+        switch (section_id) {
+            case SECTION_ADVANCEMENTS:
+                render_trackable_category_section(t, settings, current_y, t->template_data->advancements,
+                                                  t->template_data->advancement_count, "Advancements", false, version);
+                break;
+            case SECTION_UNLOCKS:
+                render_simple_item_section(t, settings, current_y, t->template_data->unlocks,
+                                           t->template_data->unlock_count,
+                                           "Unlocks");
+                break;
+            case SECTION_STATS:
+                render_trackable_category_section(t, settings, current_y, t->template_data->stats,
+                                                  t->template_data->stat_count,
+                                                  "Statistics", true, version);
+                break;
+            case SECTION_CUSTOM:
+                render_custom_goals_section(t, settings, current_y, "Custom Goals");
+                break;
+            case SECTION_MULTISTAGE:
+                render_multistage_goals_section(t, settings, current_y, "Multi-Stage Goals");
+                break;
+            case SECTION_COUNT:
+                // Should not happen
+                break;
+        }
+    }
+
+    // TODO: Remove
+    // //  Render All Sections in Order
+    // render_trackable_category_section(t, settings, current_y, t->template_data->advancements,
+    //                                   t->template_data->advancement_count, "Advancements", false, version);
+    // render_simple_item_section(t, settings, current_y, t->template_data->unlocks, t->template_data->unlock_count,
+    //                            "Unlocks");
+    // render_trackable_category_section(t, settings, current_y, t->template_data->stats, t->template_data->stat_count,
+    //                                   "Statistics", true, version);
+    // render_custom_goals_section(t, settings, current_y, "Custom Goals");
+    // render_multistage_goals_section(t, settings, current_y, "Multi-Stage Goals");
 
     // --- Info Bar ---
 
