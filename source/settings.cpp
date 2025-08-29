@@ -25,6 +25,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Flag to show a confirmation message when settings are applied
     static bool show_applied_message = false;
 
+    // Flag to show a confirmation message when settings are reset
+    static bool show_defaults_applied_message = false;
+
     // Holds temporary copy of the settings for editing
     static AppSettings temp_settings;
 
@@ -41,6 +44,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (just_opened) {
         memcpy(&temp_settings, app_settings, sizeof(AppSettings));
         show_applied_message = false; // Reset message visibility
+        show_defaults_applied_message = false; // Reset "Defaults Applied" message visibility
     }
 
 
@@ -214,7 +218,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (temp_settings.enable_overlay) {
         ImGui::DragFloat("Overlay Scroll Speed", &temp_settings.overlay_scroll_speed, 0.001f, -25.00f, 25.00f, "%.3f");
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("A negative scroll speed animates from right-to-left.\n"
+            ImGui::SetTooltip("A negative scroll speed animates from right-to-left\n"
+                              "(items always appear in the same order as they are on the tracker).\n"
                 "A scroll speed of 0.0 is static.\n"
                 "Default of 1.0 scrolls 1440 pixels (default width) in 24 seconds.");
         }
@@ -251,7 +256,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::SameLine();
     ImGui::Checkbox("Remove Completed Goals", &temp_settings.remove_completed_goals);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Hides fully completed goals and sub-goals from the tracker window to tidy up the view.");
+        ImGui::SetTooltip("Hides fully completed goals and sub-goals from the tracker window to tidy up the view.\n"
+                          "Unchecking this setting will make all goals visible,\n"
+                          "even ones set to - \"hidden\": true - in the template.");
     }
 
     ImGui::Separator();
@@ -463,7 +470,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
         // Reset message visibility on each new attempt
         show_applied_message = false;
-
+        show_defaults_applied_message = false; // Reset the other message
 
         // Assume the error is cleared unless we find one
         show_invalid_manual_path_error = false;
@@ -529,10 +536,21 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Settings Applied!");
     }
 
+    // Show the confirmation message if settings were reset
+    if (show_defaults_applied_message) {
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Defaults Applied!");
+    }
+
     // Place the next button on the same line
     ImGui::SameLine();
 
     if (ImGui::Button("Reset To Defaults")) {
+
+        // Clear any previous "Applied!" message and show the "Defaults!" message
+        show_applied_message = false;
+        show_defaults_applied_message = true;
+
         // Preserve current window geometry before resetting other settings
         WindowRect current_tracker_window = temp_settings.tracker_window;
         WindowRect current_overlay_window = temp_settings.overlay_window;

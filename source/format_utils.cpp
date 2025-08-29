@@ -7,10 +7,18 @@
 #include <cstdio>
 
 void format_category_string(const char *input, char *output, size_t max_len) {
-    if (!input || !output || max_len == 0) return;
+    if (!input || !output || max_len == 0) {
+        if (output && max_len > 0) output[0] = '\0';
+        return;
+    }
 
     size_t i = 0;
     bool capitalize_next = true;
+
+    // If the string starts with an underscore, skip it but still capitalize the next letter.
+    if (*input == '_') {
+        input++;
+    }
 
     while (*input && i < max_len - 1) {
         if (*input == '_') {

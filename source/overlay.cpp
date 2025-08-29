@@ -13,6 +13,7 @@
 #include <cmath> // Required for roundf()
 #include <string>
 #include <vector> // Required for collecting items to render
+#include <algorithm> // Required for std::reverse
 
 #define SOCIAL_CYCLE_SECONDS 20.0f
 
@@ -253,8 +254,53 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
 // Helper to check the 'done' status of any displayable item type
 static bool is_display_item_done(const OverlayDisplayItem &display_item, const AppSettings *settings) {
     bool should_hide_when_done;
+    bool is_actually_done = false;
+    bool is_hidden = false;
 
-    // Determine which setting controls the hiding behavior based on the item type
+    // Step 1: Extract completion and hidden status from the generic item pointer
+    switch (display_item.type) {
+        case OverlayDisplayItem::ADVANCEMENT: {
+            auto *adv = static_cast<TrackableCategory *>(display_item.item_ptr);
+            is_actually_done = adv->done;
+            is_hidden = adv->is_hidden;
+            break;
+        }
+        case OverlayDisplayItem::UNLOCK: {
+            auto *unlock = static_cast<TrackableItem *>(display_item.item_ptr);
+            is_actually_done = unlock->done;
+            is_hidden = unlock->is_hidden;
+            break;
+        }
+        case OverlayDisplayItem::STAT: {
+            auto *stat = static_cast<TrackableCategory *>(display_item.item_ptr);
+            // Hide legacy helper stats
+            MC_Version version = settings_get_version_from_string(settings->version_str);
+            bool is_hidden_legacy = (version <= MC_VERSION_1_6_4 && stat->is_single_stat_category && stat->criteria[0]->
+                                     goal <= 0);
+            is_actually_done = stat->done || is_hidden_legacy;
+            is_hidden = stat->is_hidden;
+            break;
+        }
+        case OverlayDisplayItem::CUSTOM: {
+            auto *goal = static_cast<TrackableItem *>(display_item.item_ptr);
+            is_actually_done = goal->done;
+            is_hidden = goal->is_hidden;
+            break;
+        }
+        case OverlayDisplayItem::MULTISTAGE: {
+            auto *goal = static_cast<MultiStageGoal *>(display_item.item_ptr);
+            is_actually_done = goal->current_stage >= goal->stage_count - 1;
+            is_hidden = goal->is_hidden;
+            break;
+        }
+    }
+
+    // Step 2: If the item is marked as hidden in the template, always hide it from the overlay.
+    if (is_hidden) {
+        return true;
+    }
+
+    // Step 3: Determine if the row this item belongs to should hide completed items.
     switch (display_item.type) {
         case OverlayDisplayItem::STAT:
         case OverlayDisplayItem::CUSTOM:
@@ -266,42 +312,71 @@ static bool is_display_item_done(const OverlayDisplayItem &display_item, const A
         case OverlayDisplayItem::ADVANCEMENT:
         case OverlayDisplayItem::UNLOCK:
         default:
-            // Toggle hiding through "Remove Completed Goals"
-            // should_hide_when_done = settings->remove_completed_goals;
-
             // These types belong to Row 2, ALWAYS HIDE THEM
             should_hide_when_done = true;
             break;
     }
 
-    // If hiding is disabled for this item's row, it's never considered "done" for removal purposes.
-    if (!should_hide_when_done) return false;
-
-    // If hiding is enabled, check the actual completion status of the item
-    switch (display_item.type) {
-        case OverlayDisplayItem::ADVANCEMENT: {
-            auto *adv = static_cast<TrackableCategory *>(display_item.item_ptr);
-            return adv->done; // Complete advancement if game says it's done, hiding from overlay 2nd row
-        }
-        case OverlayDisplayItem::UNLOCK:
-            return static_cast<TrackableItem *>(display_item.item_ptr)->done;
-        case OverlayDisplayItem::STAT: {
-            auto *stat = static_cast<TrackableCategory *>(display_item.item_ptr);
-            // Hide legacy helper stats
-            MC_Version version = settings_get_version_from_string(settings->version_str);
-            bool is_hidden_legacy = (version <= MC_VERSION_1_6_4 && stat->is_single_stat_category && stat->criteria[0]->
-                                     goal <= 0);
-            return stat->done || is_hidden_legacy;
-        }
-        case OverlayDisplayItem::CUSTOM:
-            return static_cast<TrackableItem *>(display_item.item_ptr)->done;
-        case OverlayDisplayItem::MULTISTAGE: {
-            auto *goal = static_cast<MultiStageGoal *>(display_item.item_ptr);
-            return goal->current_stage >= goal->stage_count - 1;
-        }
+    // Step 4: Hide the item if its row is configured to hide completed items AND the item is actually done.
+    if (should_hide_when_done && is_actually_done) {
+        return true;
     }
-    return true;
+
+    // If none of the above conditions are met, show the item.
+    return false;
 }
+
+// static bool is_display_item_done(const OverlayDisplayItem &display_item, const AppSettings *settings) {
+//     bool should_hide_when_done;
+//
+//     // Determine which setting controls the hiding behavior based on the item type
+//     switch (display_item.type) {
+//         case OverlayDisplayItem::STAT:
+//         case OverlayDisplayItem::CUSTOM:
+//         case OverlayDisplayItem::MULTISTAGE:
+//             // These types belong to Row 3
+//             should_hide_when_done = settings->overlay_row3_remove_completed;
+//             break;
+//
+//         case OverlayDisplayItem::ADVANCEMENT:
+//         case OverlayDisplayItem::UNLOCK:
+//         default:
+//             // Toggle hiding through "Remove Completed Goals"
+//             // should_hide_when_done = settings->remove_completed_goals;
+//
+//             // These types belong to Row 2, ALWAYS HIDE THEM
+//             should_hide_when_done = true;
+//             break;
+//     }
+//
+//     // If hiding is disabled for this item's row, it's never considered "done" for removal purposes.
+//     if (!should_hide_when_done) return false;
+//
+//     // If hiding is enabled, check the actual completion status of the item
+//     switch (display_item.type) {
+//         case OverlayDisplayItem::ADVANCEMENT: {
+//             auto *adv = static_cast<TrackableCategory *>(display_item.item_ptr);
+//             return adv->done; // Complete advancement if game says it's done, hiding from overlay 2nd row
+//         }
+//         case OverlayDisplayItem::UNLOCK:
+//             return static_cast<TrackableItem *>(display_item.item_ptr)->done;
+//         case OverlayDisplayItem::STAT: {
+//             auto *stat = static_cast<TrackableCategory *>(display_item.item_ptr);
+//             // Hide legacy helper stats
+//             MC_Version version = settings_get_version_from_string(settings->version_str);
+//             bool is_hidden_legacy = (version <= MC_VERSION_1_6_4 && stat->is_single_stat_category && stat->criteria[0]->
+//                                      goal <= 0);
+//             return stat->done || is_hidden_legacy;
+//         }
+//         case OverlayDisplayItem::CUSTOM:
+//             return static_cast<TrackableItem *>(display_item.item_ptr)->done;
+//         case OverlayDisplayItem::MULTISTAGE: {
+//             auto *goal = static_cast<MultiStageGoal *>(display_item.item_ptr);
+//             return goal->current_stage >= goal->stage_count - 1;
+//         }
+//     }
+//     return true;
+// }
 
 void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSettings *settings) {
     if (!t || !t->template_data) return;
@@ -529,11 +604,13 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             if (settings->overlay_show_run_details) {
                 char formatted_category[128];
                 format_category_string(settings->category, formatted_category, sizeof(formatted_category));
+                char formatted_flag[128];
+                format_category_string(settings->optional_flag, formatted_flag, sizeof(formatted_flag));
                 snprintf(temp_chunk, sizeof(temp_chunk), "%s - %s%s%s",
                          settings->version_str,
                          formatted_category,
                          *settings->optional_flag ? " - " : "",
-                         settings->optional_flag);
+                         formatted_flag);
                 add_component(temp_chunk);
             }
 
@@ -626,6 +703,11 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             for (int j = 0; j < cat->criteria_count; j++) {
                 row1_items.push_back({cat->criteria[j], cat});
             }
+        }
+
+        // Reverse the item order for a left-to-right scrolling effect if scroll speed is positive
+        if (settings->overlay_scroll_speed > 0) {
+            std::reverse(row1_items.begin(), row1_items.end());
         }
 
 
@@ -739,6 +821,11 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             row2_items.push_back({
                 t->template_data->unlocks[i], OverlayDisplayItem::UNLOCK
             });
+
+        // Reverse the item order for left-to-right scrolling if scroll speed is positive
+        if (settings->overlay_scroll_speed > 0) {
+            std::reverse(row2_items.begin(), row2_items.end());
+        }
 
         size_t visible_item_count = 0;
         for (const auto &item: row2_items) {
@@ -912,6 +999,11 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             row3_items.push_back({
                 t->template_data->multi_stage_goals[i], OverlayDisplayItem::MULTISTAGE
             });
+
+        // Reverse the item order for left-to-right scrolling if scroll speed is positive
+        if (settings->overlay_scroll_speed > 0) {
+            std::reverse(row3_items.begin(), row3_items.end());
+        }
 
         size_t visible_item_count = 0;
         for (const auto &item: row3_items) {

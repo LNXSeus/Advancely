@@ -2,106 +2,133 @@
   "advancements": {
     "minecraft:story/deflect_arrow": {
       "icon": "items/Shield_JE2_BE1.png",
+      "hidden": false,
       "criteria": {}
     },
     "minecraft:story/smelt_iron": {
       "icon": "items/iron_ingot_25w14craftmine.png",
+      "hidden": false,
       "criteria": {}
     },
     "minecraft:mines/all_special_mines_completed": {
       "icon": "blocks/Beacon_JE6_BE2.png",
+      "hidden": false,
       "criteria": {
         "minecraft:wither_boss": {
-          "icon": "items/wither_spawn_egg_25w14craftmine.png"
+          "icon": "items/wither_spawn_egg_25w14craftmine.png",
+          "hidden": false
         },
         "minecraft:kuiper_belt": {
-          "icon": "items/polar_bear_spawn_egg_25w14craftmine.png"
+          "icon": "items/polar_bear_spawn_egg_25w14craftmine.png",
+          "hidden": false
         },
         "minecraft:raid": {
-          "icon": "items/pillager_spawn_egg_1.21.5.png"
+          "icon": "items/pillager_spawn_egg_1.21.5.png",
+          "hidden": false
         },
         "minecraft:spooky_scary_skeletons_boss": {
-          "icon": "items/skeleton_spawn_egg_25w14craftmine.png"
+          "icon": "items/skeleton_spawn_egg_25w14craftmine.png",
+          "hidden": false
         },
         "minecraft:ender_dragon_boss": {
-          "icon": "items/ender_dragon_spawn_egg_25w14craftmine.png"
+          "icon": "items/ender_dragon_spawn_egg_25w14craftmine.png",
+          "hidden": false
         },
         "minecraft:small_but_deadly_boss": {
-          "icon": "items/silverfish_spawn_egg_1.21.5.png"
+          "icon": "items/silverfish_spawn_egg_1.21.5.png",
+          "hidden": false
         },
         "minecraft:angry_ghast_boss": {
-          "icon": "items/ghast_spawn_egg_25w14craftmine.png"
+          "icon": "items/ghast_spawn_egg_25w14craftmine.png",
+          "hidden": false
         },
         "minecraft:warden_boss": {
-          "icon": "items/warden_spawn_egg_1.21.5.png"
+          "icon": "items/warden_spawn_egg_1.21.5.png",
+          "hidden": false
         },
         "minecraft:enderman_boss": {
-          "icon": "items/enderman_spawn_egg_25w14craftmine.png"
+          "icon": "items/enderman_spawn_egg_25w14craftmine.png",
+          "hidden": false
         }
       }
     },
     "minecraft:feats/wither": {
       "icon": "items/wither_spawn_egg_25w14craftmine.png",
+      "hidden": false,
       "criteria": {
         "completed_event": {
-          "icon": "blocks/Wither_Skeleton_Skull_(S)_JE2.png"
+          "icon": "blocks/Wither_Skeleton_Skull_(S)_JE2.png",
+          "hidden": false
         }
       }
     },
     "minecraft:feats/kuiper_world": {
       "icon": "blocks/Snow_Block_JE2_BE2.png",
+      "hidden": false,
       "criteria": {
         "completed_event": {
-          "icon": "items/snowball_25w14craftmine.png"
+          "icon": "items/snowball_25w14craftmine.png",
+          "hidden": false
         }
       }
     },
     "minecraft:recipes/misc/charcoal": {
       "icon": "items/charcoal_25w14craftmine.png",
+      "hidden": false,
       "criteria": {}
     }
   },
   "stats": {
     "stat_category:3_armor_trims": {
       "icon": "items/netherite_chestplate_25w14craftmine.png",
+      "hidden": false,
       "criteria": {
         "minecraft:used/minecraft:sentry_armor_trim_smithing_template": {
           "target": 1,
-          "icon": "items/sentry_armor_trim_smithing_template_25w14craftmine.png"
+          "icon": "items/sentry_armor_trim_smithing_template_25w14craftmine.png",
+          "hidden": false
         },
         "minecraft:used/minecraft:vex_armor_trim_smithing_template": {
           "target": 1,
-          "icon": "items/vex_armor_trim_smithing_template_25w14craftmine.png"
+          "icon": "items/vex_armor_trim_smithing_template_25w14craftmine.png",
+          "hidden": false
         },
         "minecraft:used/minecraft:wild_armor_trim_smithing_template": {
           "target": 1,
-          "icon": "items/wild_armor_trim_smithing_template_25w14craftmine.png"
+          "icon": "items/wild_armor_trim_smithing_template_25w14craftmine.png",
+          "hidden": false
         }
       }
     },
     "stat_category:2_armor_trims": {
       "icon": "items/iron_chestplate_25w14craftmine.png",
+      "hidden": false,
       "criteria": {
         "minecraft:used/minecraft:sentry_armor_trim_smithing_template": {
           "target": 1,
-          "icon": "items/sentry_armor_trim_smithing_template_25w14craftmine.png"
+          "icon": "items/sentry_armor_trim_smithing_template_25w14craftmine.png",
+          "hidden": false
         },
         "minecraft:used/minecraft:vex_armor_trim_smithing_template": {
           "target": 1,
-          "icon": "items/vex_armor_trim_smithing_template_25w14craftmine.png"
+          "icon": "items/vex_armor_trim_smithing_template_25w14craftmine.png",
+          "hidden": false
         }
       }
     },
     "stat_category:log_collection": {
       "icon": "blocks/Oak_Log_(UD)_JE8_BE3.png",
+      "hidden": false,
       "root_name": "minecraft:mined/minecraft:oak_log",
       "target": 4
     },
     "stat_category:inf_dirt_collection": {
       "icon": "blocks/Dirt.png",
+      "hidden": false,
       "criteria": {
         "minecraft:mined/minecraft:dirt": {
           "icon": "blocks/Oak_Log_(UD)_JE8_BE3.png",
+          "hidden": false,
           "target": -1
         }
       }
@@ -110,26 +137,31 @@
   "unlocks": [
     {
       "root_name": "minecraft:exploration",
-      "icon": "items/Leather_Boots_(item)_JE4_BE3.png"
+      "icon": "items/Leather_Boots_(item)_JE4_BE3.png",
+      "hidden": false
     },
     {
       "root_name": "minecraft:ender_pearl_starter",
-      "icon": "items/ender_pearl_1.20.2.png"
+      "icon": "items/ender_pearl_1.20.2.png",
+      "hidden": false
     }
   ],
   "custom": [
     {
       "root_name": "custom:unbreaking_3_book",
-      "icon": "items/enchanted_book_1.20.2.png"
+      "icon": "items/enchanted_book_1.20.2.png",
+      "hidden": false
     },
     {
       "root_name": "custom:deepslate_emerald_count",
       "icon": "blocks/Deepslate_Emerald_Ore_JE1_BE1.png",
+      "hidden": false,
       "target": 5
     },
     {
       "root_name": "custom:diamond_ore_count_inf",
       "icon": "blocks/Diamond_Ore_JE5_BE5.png",
+      "hidden": false,
       "target": -1
     }
   ],
@@ -137,6 +169,7 @@
     {
       "root_name": "ms_goal:getting_started",
       "icon": "blocks/Dirt.png",
+      "hidden": false,
       "stages": [
         {
           "stage_id": "0",

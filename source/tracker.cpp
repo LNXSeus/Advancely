@@ -883,6 +883,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
 
         new_cat->alpha = 1.0f;
         new_cat->is_visible_on_overlay = true;
+        new_cat->is_hidden = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "hidden")); // Hide if hidden in template
 
         if (cat_json->string) {
             strncpy(new_cat->root_name, cat_json->string, sizeof(new_cat->root_name) - 1);
@@ -965,6 +966,9 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                         // Initialization for animation state
                         new_crit->alpha = 1.0f;
                         new_crit->is_visible_on_overlay = true;
+
+                        // When hidden is true in template
+                        new_crit->is_hidden = cJSON_IsTrue(cJSON_GetObjectItem(crit_item, "hidden"));
 
                         strncpy(new_crit->root_name, crit_item->string, sizeof(new_crit->root_name) - 1);
 
@@ -1203,6 +1207,9 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
             new_item->alpha = 1.0f;
             new_item->is_visible_on_overlay = true;
 
+            // When hidden is true in template
+            new_item->is_hidden = cJSON_IsTrue(cJSON_GetObjectItem(item_json, "hidden"));
+
             cJSON *root_name_json = cJSON_GetObjectItem(item_json, "root_name");
             if (cJSON_IsString(root_name_json)) {
                 strncpy(new_item->root_name, root_name_json->valuestring, sizeof(new_item->root_name) - 1);
@@ -1308,6 +1315,9 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
         // Initialization for animation state
         new_goal->alpha = 1.0f;
         new_goal->is_visible_on_overlay = true;
+
+        // Hide when hidden is true in template
+        new_goal->is_hidden = cJSON_IsTrue(cJSON_GetObjectItem(goal_item_json, "hidden"));
 
         // Parse root_name and icon
         cJSON *root_name = cJSON_GetObjectItem(goal_item_json, "root_name");
@@ -2202,9 +2212,10 @@ void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
         strcmp(t->world_name, t->template_data->last_known_world_name) != 0) {
         // Reset custom progress and manual stat overrides
         tracker_reset_progress_on_world_change(t, settings);
-        }
+    }
     // After the check, update the last known world name to the current one for the next cycle.
-    strncpy(t->template_data->last_known_world_name, t->world_name, sizeof(t->template_data->last_known_world_name) - 1);
+    strncpy(t->template_data->last_known_world_name, t->world_name,
+            sizeof(t->template_data->last_known_world_name) - 1);
 
 
     MC_Version version = settings_get_version_from_string(settings->version_str);
@@ -2366,26 +2377,50 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         TrackableCategory *cat = categories[i];
         if (!cat) continue;
 
-        // Use the correct and complete hiding logic for the pre-filter
-        // Don't ever hide an advancement/achievement if it has incomplete criteria (wrongly added, but adv/ach would be done)
-        bool is_hidden = false;
-        if (settings->remove_completed_goals) {
-            if (is_stat_section) {
-                if (cat->done) is_hidden = true;
-            } else {
-                // It's an advancement
-                if ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (
-                        cat->criteria_count == 0 && cat->done)) {
-                    is_hidden = true;
-                }
-            }
+        bool is_considered_complete = false;
+        if (is_stat_section) {
+            is_considered_complete = cat->done;
+        } else {
+            // It's an advancement
+            is_considered_complete = (cat->criteria_count > 0 && cat->all_template_criteria_met) || (
+                cat->criteria_count == 0 && cat->done);
         }
 
-        if (!is_hidden) {
+        // An item is visible if "Remove Completed Goals" is OFF,
+        // or if it's ON, the item must be neither completed NOR hidden.
+        if (!settings->remove_completed_goals || (!is_considered_complete && !cat->is_hidden)) {
             visible_count++;
         }
     }
     if (visible_count == 0) return;
+
+
+    // TODO: Remove
+    // int visible_count = 0;
+    // for (int i = 0; i < count; ++i) {
+    //     TrackableCategory *cat = categories[i];
+    //     if (!cat) continue;
+    //
+    //     // Use the correct and complete hiding logic for the pre-filter
+    //     // Don't ever hide an advancement/achievement if it has incomplete criteria (wrongly added, but adv/ach would be done)
+    //     bool is_hidden = false;
+    //     if (settings->remove_completed_goals) {
+    //         if (is_stat_section) {
+    //             if (cat->done) is_hidden = true;
+    //         } else {
+    //             // It's an advancement
+    //             if ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (
+    //                     cat->criteria_count == 0 && cat->done)) {
+    //                 is_hidden = true;
+    //             }
+    //         }
+    //     }
+    //
+    //     if (!is_hidden) {
+    //         visible_count++;
+    //     }
+    // }
+    // if (visible_count == 0) return;
 
     ImGuiIO &io = ImGui::GetIO();
 
@@ -2474,22 +2509,26 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             // Check for the correct pass BEFORE checking if we should hide
             if (is_complex != complex_pass) continue;
 
+            // HIDE WHEN "hidden" in template -> "Remove Completed Goals" off WILL SHOW IT
             // Determine if the item should be hidden by "Remove completed goals"
             // DOES NOT HIDE when advancement has wrong criteria, that are not in the game (modern versions)
             // DOES NOT HIDE when achievement value is 1 or higher and some template criteria are not met (mid-era versions)
             // this can act as a way to debug wrong criteria in template file that can be removed
+            // For the main category:
             bool should_hide = false;
             if (cat && settings->remove_completed_goals) {
-                if (is_stat_section) {
-                    // Stats are simple: hide them if they are marked as done
-                    if (cat->done) should_hide = true;
+                // First, check if the item itself is marked as hidden
+                if (cat->is_hidden) {
+                    should_hide = true;
                 } else {
-                    // It's an advancement
-                    // Use unambiguous flag for hiding -> all_template_criteria_met
-                    // Hide only if it has criteria AND they are all met, OR if it has NO criteria AND it's done
-                    if ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (
-                            cat->criteria_count == 0 && cat->done)) {
-                        should_hide = true;
+                    // If not, apply the existing logic for hiding completed items
+                    if (is_stat_section) {
+                        if (cat->done) should_hide = true;
+                    } else {
+                        if ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (
+                                cat->criteria_count == 0 && cat->done)) {
+                            should_hide = true;
+                        }
                     }
                 }
             }
@@ -2666,7 +2705,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                     for (int j = 0; j < cat->criteria_count; j++) {
                         TrackableItem *crit = cat->criteria[j];
-                        if (!crit || (crit->done && settings->remove_completed_goals)) continue;
+
+                        if (!crit) continue; // Skip if the criteria is null
+
+                        // Hide if "Remove Completed Goals" is on and the criterion is either done or marked as hidden
+                        if (settings->remove_completed_goals && (crit->done || crit->is_hidden)) continue;
 
                         ImVec2 crit_base_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
                                                       (sub_item_y_offset * t->zoom_level) + t->camera_offset.y);
@@ -2839,14 +2882,30 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
  */
 static void render_simple_item_section(Tracker *t, const AppSettings *settings, float &current_y, TrackableItem **items,
                                        int count, const char *section_title) {
+
     int visible_count = 0;
     for (int i = 0; i < count; ++i) {
-        if (items[i] && (!items[i]->done || !settings->remove_completed_goals)) {
-            visible_count++;
-            break;
+        TrackableItem *item = items[i];
+        if (item) {
+            // An item is visible if "Remove Completed Goals" is OFF,
+            // or if it's ON, the item must be neither done NOR hidden.
+            if (!settings->remove_completed_goals || (!item->done && !item->is_hidden)) {
+                visible_count++;
+                break; // Found at least one visible item, so we can stop counting.
+            }
         }
     }
     if (visible_count == 0) return;
+
+    // TODO: Remove
+    // int visible_count = 0;
+    // for (int i = 0; i < count; ++i) {
+    //     if (items[i] && (!items[i]->done || !settings->remove_completed_goals)) {
+    //         visible_count++;
+    //         break;
+    //     }
+    // }
+    // if (visible_count == 0) return;
 
     ImGuiIO &io = ImGui::GetIO();
 
@@ -2863,7 +2922,8 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
     float uniform_item_width = 0.0f;
     for (int i = 0; i < count; i++) {
         TrackableItem *item = items[i];
-        if (!item || (item->done && settings->remove_completed_goals)) continue;
+        // Hide if setting is on and item is either completed or marked as hidden
+        if (!item || (settings->remove_completed_goals && (item->done || item->is_hidden))) continue;
         uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, ImGui::CalcTextSize(item->display_name).x));
     }
 
@@ -2875,7 +2935,8 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
     for (int i = 0; i < count; i++) {
         TrackableItem *item = items[i];
-        if (!item || (item->done && settings->remove_completed_goals)) continue;
+        // Hide if setting is on and item is either completed or marked as hidden
+        if (!item || (settings->remove_completed_goals && (item->done || item->is_hidden))) continue;
 
         float item_height = 96.0f + ImGui::CalcTextSize(item->display_name).y + 4.0f;
         if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
@@ -2974,13 +3035,28 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
     // Pre-check for visible items
     int visible_count = 0;
     for (int i = 0; i < count; ++i) {
-        if (t->template_data->custom_goals[i] && (
-                !t->template_data->custom_goals[i]->done || !settings->remove_completed_goals)) {
-            visible_count++;
-            break;
+        TrackableItem *item = t->template_data->custom_goals[i];
+        if (item) {
+            // An item is visible if "Remove Completed Goals" is OFF,
+            // or if it's ON, the item must be neither done NOR hidden.
+            if (!settings->remove_completed_goals || (!item->done && !item->is_hidden)) {
+                visible_count++;
+                break; // Found at least one visible item, so we can stop counting.
+            }
         }
     }
     if (visible_count == 0) return;
+
+    // TODO: Remove
+    // int visible_count = 0;
+    // for (int i = 0; i < count; ++i) {
+    //     if (t->template_data->custom_goals[i] && (
+    //             !t->template_data->custom_goals[i]->done || !settings->remove_completed_goals)) {
+    //         visible_count++;
+    //         break;
+    //     }
+    // }
+    // if (visible_count == 0) return;
 
     ImGuiIO &io = ImGui::GetIO();
 
@@ -3178,13 +3254,29 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
     int visible_count = 0;
     for (int i = 0; i < count; ++i) {
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
-        bool is_done = goal && (goal->current_stage >= goal->stage_count - 1);
-        if (goal && (!is_done || !settings->remove_completed_goals)) {
-            visible_count++;
-            break;
+        if (goal) {
+            bool is_done = (goal->current_stage >= goal->stage_count - 1);
+            // A goal is visible if "Remove Completed Goals" is OFF,
+            // or if it's ON, the goal must be neither done NOR hidden.
+            if (!settings->remove_completed_goals || (!is_done && !goal->is_hidden)) {
+                visible_count++;
+                break; // Found at least one visible item, so we can stop counting.
+            }
         }
     }
     if (visible_count == 0) return;
+
+    // TODO: Remove
+    // int visible_count = 0;
+    // for (int i = 0; i < count; ++i) {
+    //     MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+    //     bool is_done = goal && (goal->current_stage >= goal->stage_count - 1);
+    //     if (goal && (!is_done || !settings->remove_completed_goals)) {
+    //         visible_count++;
+    //         break;
+    //     }
+    // }
+    // if (visible_count == 0) return;
 
     ImGuiIO &io = ImGui::GetIO();
 
@@ -3231,8 +3323,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
         bool is_done = goal && (goal->current_stage >= goal->stage_count - 1);
 
-        // Filter out completed goals if the setting is enabled
-        if (!goal || (is_done && settings->remove_completed_goals)) continue;
+        // Hide if setting is on and goal is either completed or marked as hidden
+        if (!goal || (settings->remove_completed_goals && (is_done || goal->is_hidden))) continue;
 
         SubGoal *active_stage = goal->stages[goal->current_stage];
         char stage_text[256];
@@ -3453,6 +3545,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         char formatted_category[128];
         char formatted_update_time[64];
         format_category_string(settings->category, formatted_category, sizeof(formatted_category));
+        char formatted_flag[128];
+        format_category_string(settings->optional_flag, formatted_flag, sizeof(formatted_flag));
         MC_Version version = settings_get_version_from_string(settings->version_str);
         const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
         float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
@@ -3475,7 +3569,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                  settings->version_str,
                  formatted_category,
                  *settings->optional_flag ? " - " : "",
-                 settings->optional_flag,
+                 formatted_flag,
                  adv_ach_label,
                  t->template_data->advancements_completed_count,
                  total_ach_to_display,
@@ -3934,7 +4028,8 @@ bool tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
     tracker_load_notes(t, settings);
 
     // Prime the 'last_known_world_name' with the initial world on first load.
-    strncpy(t->template_data->last_known_world_name, t->world_name, sizeof(t->template_data->last_known_world_name) - 1);
+    strncpy(t->template_data->last_known_world_name, t->world_name,
+            sizeof(t->template_data->last_known_world_name) - 1);
 
     log_message(LOG_INFO, "[TRACKER] Initial template parsing complete.\n");
 
@@ -4017,7 +4112,11 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
 
     // Format the category and optional flag strings
     format_category_string(settings->category, formatted_category, sizeof(formatted_category));
-    // Optional flag doesn't get formatted
+
+    // Optional flag gets formatted as well
+    char formatted_flag[128];
+    format_category_string(settings->optional_flag, formatted_flag, sizeof(formatted_flag));
+
     format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
 
     // Displaying Ach or Adv depending on the version
@@ -4045,8 +4144,8 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
              t->world_name,
              settings->version_str,
              formatted_category,
-             *settings->optional_flag ? " - " : "",
-             settings->optional_flag,
+             *settings->optional_flag ? "    -    " : "",
+             formatted_flag,
              adv_ach_label,
              t->template_data->advancements_completed_count,
              total_ach_to_display,
@@ -4102,10 +4201,13 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
 
     char formatted_category[128];
     format_category_string(settings->category, formatted_category, sizeof(formatted_category));
+    char formatted_flag[128];
+    format_category_string(settings->optional_flag, formatted_flag, sizeof(formatted_flag));
 
     // Format the time to DD:HH:MM:SS.MS
     char formatted_time[128];
     format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
+
 
     log_message(LOG_INFO, "\n============================================================\n");
     log_message(LOG_INFO, " World:      %s\n", t->world_name);
@@ -4117,7 +4219,7 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
     }
     // When flag isn't empty
     if (settings->optional_flag[0] != '\0') {
-        log_message(LOG_INFO, " Flag:       %s\n", settings->optional_flag);
+        log_message(LOG_INFO, " Flag:       %s\n", formatted_flag);
     }
     log_message(LOG_INFO, " Play Time:  %s\n", formatted_time);
     log_message(LOG_INFO, "============================================================\n");
