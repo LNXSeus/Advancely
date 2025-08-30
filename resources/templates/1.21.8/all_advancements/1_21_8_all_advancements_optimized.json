@@ -1593,23 +1593,17 @@
         {
           "stage_id": "1",
           "type": "advancement",
-          "root_name": "minecraft:nether/use_lodestone",
+          "root_name": "minecraft:recipes/misc/netherite_upgrade_smithing_template",
           "target": 1
         },
         {
           "stage_id": "2",
           "type": "advancement",
-          "root_name": "minecraft:recipes/misc/netherite_upgrade_smithing_template",
-          "target": 1
-        },
-        {
-          "stage_id": "3",
-          "type": "advancement",
           "root_name": "minecraft:husbandry/obtain_netherite_hoe",
           "target": 1
         },
         {
-          "stage_id": "4",
+          "stage_id": "3",
           "type": "advancement",
           "root_name": "minecraft:nether/netherite_armor",
           "target": 1
