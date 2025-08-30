@@ -162,8 +162,12 @@
   "advancement.minecraft.adventure.totem_of_undying": "Totem",
 
   "advancement.minecraft.adventure.adventuring_time": "AT",
+  "advancement.minecraft.adventure.adventuring_time.criteria.minecraft:plains": "Plains",
+  "advancement.minecraft.adventure.adventuring_time.criteria.minecraft:forest": "Forest",
+  "advancement.minecraft.adventure.adventuring_time.criteria.minecraft:wooded_hills": "Wooded H.",
+  "advancement.minecraft.adventure.adventuring_time.criteria.minecraft:birch_forest": "Birch For.",
   "advancement.minecraft.adventure.adventuring_time.criteria.minecraft:birch_forest_hills": "Birch H.",
-  "advancement.minecraft.adventure.adventuring_time.criteria.minecraft:dark_forest": "D. Forest",
+  "advancement.minecraft.adventure.adventuring_time.criteria.minecraft:dark_forest": "Dark For.",
   "advancement.minecraft.adventure.adventuring_time.criteria.minecraft:swamp": "Swamp",
   "advancement.minecraft.adventure.adventuring_time.criteria.minecraft:taiga": "Taiga",
   "advancement.minecraft.adventure.adventuring_time.criteria.minecraft:taiga_hills": "Taiga H.",
