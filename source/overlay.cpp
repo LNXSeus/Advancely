@@ -320,13 +320,20 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
         TrackableCategory *cat = t->template_data->advancements[i];
         for (int j = 0; j < cat->criteria_count; j++) row1_items.push_back({cat->criteria[j], cat});
     }
+
     for (int i = 0; i < t->template_data->stat_count; i++) {
         TrackableCategory *cat = t->template_data->stats[i];
-        if (cat->is_single_stat_category && cat->criteria_count > 0 && cat->criteria[0]->goal <= 0 && cat->icon_path[0]
-            == '\0') {
+
+        // If the stat category is a simple stat (defined without a "criteria" block in the template),
+        // do not add its auto-generated criterion to Row 1.
+        if (cat->is_single_stat_category) {
             continue;
         }
-        for (int j = 0; j < cat->criteria_count; j++) row1_items.push_back({cat->criteria[j], cat});
+
+        // For complex stats, add all of their defined criteria to Row 1.
+        for (int j = 0; j < cat->criteria_count; j++) {
+            row1_items.push_back({cat->criteria[j], cat});
+        }
     }
 
     std::vector<OverlayDisplayItem> row2_items; // Advancements & Unlocks
@@ -355,7 +362,8 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
         // Count visible items to prevent lag when the row is completed
         size_t visible_item_count = 0;
         for (const auto &item_pair: row1_items) {
-            if (!item_pair.first->done) {
+            // A criterion is only visible if it is not done AND its parent category is not hidden.
+            if (!item_pair.first->done && !item_pair.second->is_hidden) {
                 visible_item_count++;
             }
         }
@@ -369,10 +377,10 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
                 if (scroll_delta > 0) {
                     for (int i = 0; i < items_scrolled; ++i) {
                         size_t loop_guard = 0;
-                        do {
+                        do { // Only rendering item if it is not done AND its parent category is not hidden.
                             o->start_index_row1 = (o->start_index_row1 + 1) % row1_items.size();
                             loop_guard++;
-                        } while (row1_items[o->start_index_row1].first->done && loop_guard < row1_items.size() * 2);
+                        } while ((row1_items[o->start_index_row1].first->done || row1_items[o->start_index_row1].second->is_hidden) && loop_guard < row1_items.size() * 2);
                     }
                 } else {
                     for (int i = 0; i < items_scrolled; ++i) {
@@ -380,7 +388,7 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
                         do {
                             o->start_index_row1 = (o->start_index_row1 - 1 + row1_items.size()) % row1_items.size();
                             loop_guard++;
-                        } while (row1_items[o->start_index_row1].first->done && loop_guard < row1_items.size() * 2);
+                        } while ((row1_items[o->start_index_row1].first->done || row1_items[o->start_index_row1].second->is_hidden) && loop_guard < row1_items.size() * 2);
                     }
                 }
             }
@@ -606,13 +614,17 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 row1_items.push_back({cat->criteria[j], cat});
             }
         }
+
         for (int i = 0; i < t->template_data->stat_count; i++) {
             TrackableCategory *cat = t->template_data->stats[i];
-            // Skip hidden helper stats that are not meant to be displayed (no target nor icon path)
-            if (cat->is_single_stat_category && cat->criteria_count > 0 && cat->criteria[0]->goal == 0 && cat->icon_path
-                [0] == '\0') {
+
+            // If the stat category is a simple stat (defined without a "criteria" block in the template),
+            // do not add its auto-generated criterion to Row 1.
+            if (cat->is_single_stat_category) {
                 continue;
             }
+
+            // For complex stats, add all of their defined criteria to Row 1.
             for (int j = 0; j < cat->criteria_count; j++) {
                 row1_items.push_back({cat->criteria[j], cat});
             }
@@ -631,30 +643,20 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             // int items_to_draw = geometric_slots_needed;
             int current_item_idx = o->start_index_row1;
 
-            // printf("\n--- NEW RENDER FRAME ---\n"); // DEBUG: Mark the start of a new render pass
 
             for (int k = 0; k < items_to_draw; k++) {
                 // -1.0f to offset rendering one icon width to the left (make it hidden)
                 float x_pos = ((k - 1.0f) * item_full_width) - o->scroll_offset_row1;
 
-                // --- DEBUG: Print current state for this slot ---
-                // printf("--- k = %d ---\n", k);
-
-
-                // Find the next visible item
+                // Find the next visible item, skipping it if it's done OR its parent is hidden.
                 size_t loop_guard = 0;
-                while (row1_items[current_item_idx].first->done) {
-                    // printf("  - Skipping idx %d (done=true)\n", current_item_idx);
+                while (row1_items[current_item_idx].first->done || row1_items[current_item_idx].second->is_hidden) {
                     current_item_idx = (current_item_idx + 1) % row1_items.size();
                     loop_guard++;
                     if (loop_guard > row1_items.size()) {
-                        // printf("  - SAFETY BREAK HIT: All items appear to be done.\n");
-                        goto end_row1_render; // All items are done
+                        goto end_row1_render; // All visible items are done/hidden
                     }
                 }
-
-                // --- DEBUG: Print the result of the search ---
-                // printf("  - Settled on idx %d to draw in slot %d\n", current_item_idx, k);
 
                 TrackableItem *item_to_render = row1_items[current_item_idx].first;
                 TrackableCategory *parent = row1_items[current_item_idx].second;
