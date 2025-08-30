@@ -354,10 +354,9 @@
   "multi_stage_goal.ms_goal:hdwgh.final": "HDWGH Done!",
 
   "multi_stage_goal.ms_goal:netherite.display_name": "Netherite",
-  "multi_stage_goal.ms_goal:netherite.stage.1": "Use Lodestone",
-  "multi_stage_goal.ms_goal:netherite.stage.2": "Get Upgrade",
-  "multi_stage_goal.ms_goal:netherite.stage.3": "Craft Neth. Hoe",
-  "multi_stage_goal.ms_goal:netherite.stage.4": "Get Neth. Armor",
+  "multi_stage_goal.ms_goal:netherite.stage.1": "Get Upgrade",
+  "multi_stage_goal.ms_goal:netherite.stage.2": "Craft Neth. Hoe",
+  "multi_stage_goal.ms_goal:netherite.stage.3": "Get Neth. Armor",
   "multi_stage_goal.ms_goal:netherite.stage.final": "Neth. Done!",
 
   "multi_stage_goal.ms_goal:thunder.display_name": "Thunder",
