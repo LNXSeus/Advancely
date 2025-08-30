@@ -177,26 +177,6 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
 
     // Caches are zero initialized by calloc
 
-
-    // TODO: Remove
-    // o->social_media_timer = 0.0f;
-    // o->current_social_index = 0;
-    // o->text_engine = nullptr;
-    //
-    // o->scroll_offset_row1 = 0.0f;
-    // o->scroll_offset_row2 = 0.0f;
-    // o->scroll_offset_row3 = 0.0f;
-    // o->start_index_row1 = 0;
-    // o->start_index_row2 = 0;
-    // o->start_index_row3 = 0;
-    //
-    // o->texture_cache = nullptr;
-    // o->texture_cache_count = 0;
-    // o->texture_cache_capacity = 0;
-    // o->anim_cache = nullptr;
-    // o->anim_cache_count = 0;
-    // o->anim_cache_capacity = 0;
-
     // Create the SDL window and renderer
     if (!overlay_init_sdl(o, settings)) {
         overlay_free(overlay, settings);
@@ -499,24 +479,6 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
                 TTF_MeasureString(o->font, progress_buf, 0, 0, &w, nullptr);
                 max_text_width = fmaxf(max_text_width, (float)w);
             }
-
-            // TODO: Remove
-            // TTF_Text *temp_text = TTF_CreateText(o->text_engine, o->font, name_buf, 0);
-            // if (temp_text) {
-            //     int w;
-            //     TTF_GetTextSize(temp_text, &w, nullptr);
-            //     max_text_width = fmaxf(max_text_width, (float) w);
-            //     TTF_DestroyText(temp_text);
-            // }
-            // if (progress_buf[0] != '\0') {
-            //     temp_text = TTF_CreateText(o->text_engine, o->font, progress_buf, 0);
-            //     if (temp_text) {
-            //         int w;
-            //         TTF_GetTextSize(temp_text, &w, nullptr);
-            //         max_text_width = fmaxf(max_text_width, (float) w);
-            //         TTF_DestroyText(temp_text);
-            //     }
-            // }
         }
 
         // Only run the animation logic if there is something to show
@@ -706,7 +668,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         }
 
         // Reverse the item order for a left-to-right scrolling effect if scroll speed is positive
-        if (settings->overlay_scroll_speed > 0) {
+        if (settings->overlay_scroll_speed >= 0) {
             std::reverse(row1_items.begin(), row1_items.end());
         }
 
@@ -823,7 +785,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             });
 
         // Reverse the item order for left-to-right scrolling if scroll speed is positive
-        if (settings->overlay_scroll_speed > 0) {
+        if (settings->overlay_scroll_speed >= 0) {
             std::reverse(row2_items.begin(), row2_items.end());
         }
 
@@ -862,24 +824,6 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     TTF_MeasureString(o->font, progress_buf, 0, 0, &w, nullptr);
                     max_text_width = fmaxf(max_text_width, (float)w);
                 }
-
-                // TODO: Remove
-                // TTF_Text *temp_text = TTF_CreateText(o->text_engine, o->font, name_buf, 0);
-                // if (temp_text) {
-                //     int w;
-                //     TTF_GetTextSize(temp_text, &w, nullptr);
-                //     max_text_width = fmaxf(max_text_width, (float) w);
-                //     TTF_DestroyText(temp_text);
-                // }
-                // if (progress_buf[0] != '\0') {
-                //     temp_text = TTF_CreateText(o->text_engine, o->font, progress_buf, 0);
-                //     if (temp_text) {
-                //         int w;
-                //         TTF_GetTextSize(temp_text, &w, nullptr);
-                //         max_text_width = fmaxf(max_text_width, (float) w);
-                //         TTF_DestroyText(temp_text);
-                //     }
-                // }
             }
 
             const float cell_width = fmaxf(ITEM_WIDTH, max_text_width);
@@ -1001,7 +945,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             });
 
         // Reverse the item order for left-to-right scrolling if scroll speed is positive
-        if (settings->overlay_scroll_speed > 0) {
+        if (settings->overlay_scroll_speed >= 0) {
             std::reverse(row3_items.begin(), row3_items.end());
         }
 

@@ -158,14 +158,6 @@ int main(int argc, char *argv[]) {
     // Variable to hold the ID of our saves watcher
     dmon_watch_id saves_watcher_id = {0}; // Initialize to a known invalid state (id=0)
 
-    // TODO: Remove
-    // g_watcher_mutex = SDL_CreateMutex();
-    // if (!g_watcher_mutex) {
-    //     log_message(LOG_ERROR, "[MAIN] Failed to create mutex: %s\n", SDL_GetError());
-    //     log_close();
-    //     return EXIT_FAILURE;
-    // }
-
     // Initialize SDL ttf
     if (!TTF_Init()) {
         log_message(LOG_ERROR, "[MAIN] Failed to initialize SDL_ttf: %s\n", SDL_GetError());
@@ -275,9 +267,6 @@ int main(int argc, char *argv[]) {
             // --- Per-Frame Logic ---
 
 
-            // Lock mutex before touching watchers or paths
-            // SDL_LockMutex(g_watcher_mutex); TODO: Remove
-
             handle_global_events(tracker, overlay, &app_settings, &is_running, &settings_opened, &deltaTime);
 
 
@@ -355,9 +344,6 @@ int main(int argc, char *argv[]) {
                         log_message(LOG_INFO, "[MAIN] Now watching notes directory: %s\n", notes_dir);
                     }
                 }
-
-                // Unlock the mutex now that we are done modifying watchers
-                // SDL_UnlockMutex(g_watcher_mutex); // TODO: Remove??
 
                 // Force a data update and apply non-critical changes
                 SDL_SetAtomicInt(&g_needs_update, 1);

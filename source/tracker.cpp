@@ -2272,36 +2272,6 @@ void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
 void tracker_render(Tracker *t, const AppSettings *settings) {
     (void) t;
     (void) settings;
-    // Set draw color and clear screen
-    // SDL_SetRenderDrawColor(t->renderer, settings->tracker_bg_color.r, settings->tracker_bg_color.g,
-    //                        settings->tracker_bg_color.b, settings->tracker_bg_color.a);
-    // SDL_RenderClear(t->renderer); // TODO: Remove this, in main function directly
-
-
-    // TODO: Draw the advancement icons
-    // ... inside your loop for drawing advancements ...
-    // for (int i = 0; i < t->template_data->advancement_count; ++i) {
-    //     TrackableCategory* adv = t->template_data->advancements[i];
-    //
-    //     // ... loop through criteria to draw them ...
-    //     for (int j = 0; j < adv->criteria_count; ++j) {
-    //         TrackableItem* crit = adv->criteria[j];
-    //
-    //         // 1. Draw the criterion's own icon (e.g., from crit->texture)
-    //
-    //         // 2. Check the flag
-    //         if (crit->is_shared) {
-    //             // If it's a shared criterion, also draw the parent
-    //             // advancement's icon (e.g., from adv->texture)
-    //             // as an overlay or next to the criterion's icon.
-    //         }
-    //     }
-    // }
-    // Drawing happens here
-
-
-    // present backbuffer
-    // SDL_RenderPresent(t->renderer);
 }
 
 // END OF NON-STATIC FUNCTIONS ------------------------------------
@@ -2393,34 +2363,6 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         }
     }
     if (visible_count == 0) return;
-
-
-    // TODO: Remove
-    // int visible_count = 0;
-    // for (int i = 0; i < count; ++i) {
-    //     TrackableCategory *cat = categories[i];
-    //     if (!cat) continue;
-    //
-    //     // Use the correct and complete hiding logic for the pre-filter
-    //     // Don't ever hide an advancement/achievement if it has incomplete criteria (wrongly added, but adv/ach would be done)
-    //     bool is_hidden = false;
-    //     if (settings->remove_completed_goals) {
-    //         if (is_stat_section) {
-    //             if (cat->done) is_hidden = true;
-    //         } else {
-    //             // It's an advancement
-    //             if ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (
-    //                     cat->criteria_count == 0 && cat->done)) {
-    //                 is_hidden = true;
-    //             }
-    //         }
-    //     }
-    //
-    //     if (!is_hidden) {
-    //         visible_count++;
-    //     }
-    // }
-    // if (visible_count == 0) return;
 
     ImGuiIO &io = ImGui::GetIO();
 
@@ -2897,16 +2839,6 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
     }
     if (visible_count == 0) return;
 
-    // TODO: Remove
-    // int visible_count = 0;
-    // for (int i = 0; i < count; ++i) {
-    //     if (items[i] && (!items[i]->done || !settings->remove_completed_goals)) {
-    //         visible_count++;
-    //         break;
-    //     }
-    // }
-    // if (visible_count == 0) return;
-
     ImGuiIO &io = ImGui::GetIO();
 
     // Use locked width if layout is locked
@@ -3046,17 +2978,6 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         }
     }
     if (visible_count == 0) return;
-
-    // TODO: Remove
-    // int visible_count = 0;
-    // for (int i = 0; i < count; ++i) {
-    //     if (t->template_data->custom_goals[i] && (
-    //             !t->template_data->custom_goals[i]->done || !settings->remove_completed_goals)) {
-    //         visible_count++;
-    //         break;
-    //     }
-    // }
-    // if (visible_count == 0) return;
 
     ImGuiIO &io = ImGui::GetIO();
 
@@ -3265,18 +3186,6 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         }
     }
     if (visible_count == 0) return;
-
-    // TODO: Remove
-    // int visible_count = 0;
-    // for (int i = 0; i < count; ++i) {
-    //     MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
-    //     bool is_done = goal && (goal->current_stage >= goal->stage_count - 1);
-    //     if (goal && (!is_done || !settings->remove_completed_goals)) {
-    //         visible_count++;
-    //         break;
-    //     }
-    // }
-    // if (visible_count == 0) return;
 
     ImGuiIO &io = ImGui::GetIO();
 
@@ -3509,17 +3418,6 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                 break;
         }
     }
-
-    // TODO: Remove
-    // //  Render All Sections in Order
-    // render_trackable_category_section(t, settings, current_y, t->template_data->advancements,
-    //                                   t->template_data->advancement_count, "Advancements", false, version);
-    // render_simple_item_section(t, settings, current_y, t->template_data->unlocks, t->template_data->unlock_count,
-    //                            "Unlocks");
-    // render_trackable_category_section(t, settings, current_y, t->template_data->stats, t->template_data->stat_count,
-    //                                   "Statistics", true, version);
-    // render_custom_goals_section(t, settings, current_y, "Custom Goals");
-    // render_multistage_goals_section(t, settings, current_y, "Multi-Stage Goals");
 
     // --- Info Bar ---
 
@@ -3809,9 +3707,6 @@ void tracker_reinit_template(Tracker *t, const AppSettings *settings) {
 
         // After clearing, ensure the snapshot name is also cleared to force a new snapshot
         t->template_data->snapshot_world_name[0] = '\0';
-
-        // After freeing the contents, zero out the entire struct to reset all counters,
-        // memset(t->template_data, 0, sizeof(TemplateData)); // TODO: Remove
     }
     // Load and parse data from the new template files
     tracker_load_and_parse_data(t, settings);
@@ -3865,8 +3760,6 @@ bool tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
     log_message(LOG_INFO, "[TRACKER] Loading advancement template from: %s\n", t->advancement_template_path);
 
     cJSON *template_json = cJSON_from_file(t->advancement_template_path);
-
-    // settings_load((AppSettings *) settings); // TODO: Remove??
 
     // Check if template file exists otherwise create it using temp_create_utils.c
     if (!template_json) {
