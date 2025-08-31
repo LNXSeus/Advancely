@@ -1758,10 +1758,6 @@ static void tracker_calculate_overall_progress(Tracker *t, MC_Version version, c
     }
 
 
-    log_message(LOG_INFO, "Completed steps for progress: %d\n", completed_steps);
-    log_message(LOG_INFO, "Total step for progress: %d\n", total_steps);
-
-
     // Set 100% if no steps are found
     if (total_steps > 0) {
         t->template_data->overall_progress_percentage = ((float) completed_steps / (float) total_steps) * 100.0f;
@@ -2033,7 +2029,10 @@ AnimatedTexture *get_animated_texture_from_cache(SDL_Renderer *renderer, Animate
 
 bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     // Allocate memory for the tracker itself
-    *tracker = (Tracker *) malloc(sizeof(Tracker));
+    // Calloc assures null initialization
+    *tracker = (Tracker *) calloc(1, sizeof(Tracker));
+    // TODO: Remove
+    // *tracker = (Tracker *) malloc(sizeof(Tracker));
     if (*tracker == nullptr) {
         log_message(LOG_ERROR, "[TRACKER] Failed to allocate memory for tracker.\n");
         return false;

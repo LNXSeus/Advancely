@@ -107,7 +107,7 @@ Massive thanks to all the beta testers:
 * ethansplace98
 * yumeko
 * zurtletif
-
+* 3emis
 
 ### Licenses & Credits
 

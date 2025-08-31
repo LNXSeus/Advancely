@@ -11,6 +11,12 @@
 
 #include "imgui.h"
 
+#ifdef _WIN32
+#include <windows.h> // For PROCESS_INFORMATION
+#endif
+
+#include "ipc_data.h" // For SharedData
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -30,6 +36,23 @@ typedef struct {
 struct Tracker {
     SDL_Window *window; // The main overlay window
     SDL_Renderer *renderer; // The main overlay renderer
+
+    // --- Overlay Process Management ---
+#ifdef _WIN32
+    PROCESS_INFORMATION overlay_process_info;
+#else
+    pid_t overlay_pid;
+#endif
+
+    // --- IPC Handles ---
+#ifdef _WIN32
+    HANDLE h_map_file;
+    HANDLE h_mutex;
+#else
+    int shm_fd;
+    sem_t *mutex;
+#endif
+    SharedData *p_shared_data; // Pointer to the mapped shared memory
 
     // --- Texture Cache ---
     TextureCacheEntry *texture_cache; // Array of texture cache entries

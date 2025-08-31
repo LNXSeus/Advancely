@@ -15,7 +15,7 @@
 #include <vector> // Required for collecting items to render
 #include <algorithm> // Required for std::reverse
 
-#define SOCIAL_CYCLE_SECONDS 20.0f
+#define SOCIAL_CYCLE_SECONDS 15.0f
 
 // TODO: Add more socials here
 const char *SOCIALS[] = {
