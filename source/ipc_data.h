@@ -17,13 +17,23 @@
 #define SHARED_MEM_NAME "AdvancelySharedMemory"
 #define MUTEX_NAME "AdvancelyMutex"
 
+// Define a large, fixed-size buffer for our serialized data.
+// 64MB should be more than enough for any template.
+#define SHARED_BUFFER_SIZE (64 * 1024 * 1024)
+
+// The new struct holds the size of the data and the data itself as a raw byte buffer.
+typedef struct {
+    size_t data_size;
+    char buffer[SHARED_BUFFER_SIZE];
+} SharedData;
+
+// TODO: Remove
 // This struct defines the exact data that will be sent from
 // tracker process to the overlay process
-
-typedef struct {
-    TemplateData template_data;
-    char world_name[MAX_PATH_LENGTH];
-    float time_since_last_update;
-} SharedData;
+// typedef struct {
+//     TemplateData template_data;
+//     char world_name[MAX_PATH_LENGTH];
+//     float time_since_last_update;
+// } SharedData;
 
 #endif //IPC_DATA_H

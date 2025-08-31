@@ -56,6 +56,7 @@ SDL_AtomicInt g_needs_update;
 SDL_AtomicInt g_settings_changed; // Watching when settings.json is modified to re-init paths
 SDL_AtomicInt g_game_data_changed; // When game data is modified, custom counter is changed or manually override changed
 SDL_AtomicInt g_notes_changed;
+SDL_AtomicInt g_apply_button_clicked;
 bool g_force_open_settings = false;
 
 // TODO: Remove function below when fixed
@@ -75,6 +76,358 @@ bool g_force_open_settings = false;
 // }
 
 
+/**
+ * @brief Serializes the TemplateData into a flat byte buffer.
+ * This "flattens" the complex data structure so it can be sent to another process.
+ */
+static size_t serialize_template_data(TemplateData *td, char *buffer) {
+    if (!td || !buffer) return 0;
+
+    char *head = buffer;
+
+    // 1. Copy the main TemplateData struct.
+    memcpy(head, td, sizeof(TemplateData));
+    head += sizeof(TemplateData);
+
+    // 2. Copy advancements and their criteria.
+    for (int i = 0; i < td->advancement_count; i++) {
+        memcpy(head, td->advancements[i], sizeof(TrackableCategory));
+        head += sizeof(TrackableCategory);
+        for (int j = 0; j < td->advancements[i]->criteria_count; j++) {
+            memcpy(head, td->advancements[i]->criteria[j], sizeof(TrackableItem));
+            head += sizeof(TrackableItem);
+        }
+    }
+
+    // 3. Copy stats and their criteria.
+    for (int i = 0; i < td->stat_count; i++) {
+        memcpy(head, td->stats[i], sizeof(TrackableCategory));
+        head += sizeof(TrackableCategory);
+        for (int j = 0; j < td->stats[i]->criteria_count; j++) {
+            memcpy(head, td->stats[i]->criteria[j], sizeof(TrackableItem));
+            head += sizeof(TrackableItem);
+        }
+    }
+
+    // 4. Copy multi-stage goals and their stages.
+    for (int i = 0; i < td->multi_stage_goal_count; i++) {
+        memcpy(head, td->multi_stage_goals[i], sizeof(MultiStageGoal));
+        head += sizeof(MultiStageGoal);
+        for (int j = 0; j < td->multi_stage_goals[i]->stage_count; j++) {
+            memcpy(head, td->multi_stage_goals[i]->stages[j], sizeof(SubGoal));
+            head += sizeof(SubGoal);
+        }
+    }
+
+    // 5. Copy unlocks.
+    for (int i = 0; i < td->unlock_count; i++) {
+        memcpy(head, td->unlocks[i], sizeof(TrackableItem));
+        head += sizeof(TrackableItem);
+    }
+
+    // 6. Copy custom goals.
+    for (int i = 0; i < td->custom_goal_count; i++) {
+        memcpy(head, td->custom_goals[i], sizeof(TrackableItem));
+        head += sizeof(TrackableItem);
+    }
+
+    return head - buffer; // Return the total size of the serialized data.
+}
+
+// TODO: Remove
+// static size_t serialize_template_data(TemplateData* td, char* buffer) {
+//     if (!td || !buffer) return 0;
+//
+//     char* head = buffer;
+//
+//     // 1. Copy the main TemplateData struct.
+//     memcpy(head, td, sizeof(TemplateData));
+//     head += sizeof(TemplateData);
+//
+//     // 2. Copy advancements and their criteria.
+//     for (int i = 0; i < td->advancement_count; i++) {
+//         memcpy(head, td->advancements[i], sizeof(TrackableCategory));
+//         head += sizeof(TrackableCategory);
+//         for (int j = 0; j < td->advancements[i]->criteria_count; j++) {
+//             memcpy(head, td->advancements[i]->criteria[j], sizeof(TrackableItem));
+//             head += sizeof(TrackableItem);
+//         }
+//     }
+//
+//     // 3. Copy stats and their criteria.
+//     for (int i = 0; i < td->stat_count; i++) {
+//         memcpy(head, td->stats[i], sizeof(TrackableCategory));
+//         head += sizeof(TrackableCategory);
+//         for (int j = 0; j < td->stats[i]->criteria_count; j++) {
+//             memcpy(head, td->stats[i]->criteria[j], sizeof(TrackableItem));
+//             head += sizeof(TrackableItem);
+//         }
+//     }
+//
+//     // --- ADD THIS NEW BLOCK FOR MULTI-STAGE GOALS ---
+//     // 4. Copy multi-stage goals and their stages.
+//     for (int i = 0; i < td->multi_stage_goal_count; i++) {
+//         memcpy(head, td->multi_stage_goals[i], sizeof(MultiStageGoal));
+//         head += sizeof(MultiStageGoal);
+//         for (int j = 0; j < td->multi_stage_goals[i]->stage_count; j++) {
+//             memcpy(head, td->multi_stage_goals[i]->stages[j], sizeof(SubGoal));
+//             head += sizeof(SubGoal);
+//         }
+//     }
+//
+//     // TODO: Add more
+//     // Note: Unlocks and custom goals are still omitted for simplicity as they are not causing the current crash.
+//
+//     return head - buffer; // Return the total size of the serialized data.
+// }
+
+
+/**
+ * @brief Deserializes a flat byte buffer back into a valid TemplateData structure.
+ * This "rebuilds" the data in the overlay's memory space with new, valid pointers.
+ */
+static void deserialize_template_data(char *buffer, TemplateData *target_td) {
+    if (!buffer || !target_td) return;
+
+    char *head = buffer;
+
+    // 1. Read the main TemplateData struct to get the counts.
+    memcpy(target_td, head, sizeof(TemplateData));
+    head += sizeof(TemplateData);
+
+    // 2. Allocate memory for all the pointer arrays in the overlay's address space.
+    target_td->advancements = (TrackableCategory **) calloc(target_td->advancement_count, sizeof(TrackableCategory *));
+    target_td->stats = (TrackableCategory **) calloc(target_td->stat_count, sizeof(TrackableCategory *));
+    target_td->multi_stage_goals = (MultiStageGoal **) calloc(target_td->multi_stage_goal_count,
+                                                              sizeof(MultiStageGoal *));
+    target_td->unlocks = (TrackableItem **) calloc(target_td->unlock_count, sizeof(TrackableItem *));
+    target_td->custom_goals = (TrackableItem **) calloc(target_td->custom_goal_count, sizeof(TrackableItem *));
+
+    // 3. Read advancements and their criteria.
+    for (int i = 0; i < target_td->advancement_count; i++) {
+        target_td->advancements[i] = (TrackableCategory *) calloc(1, sizeof(TrackableCategory));
+        memcpy(target_td->advancements[i], head, sizeof(TrackableCategory));
+        head += sizeof(TrackableCategory);
+        target_td->advancements[i]->criteria = (TrackableItem **) calloc(
+            target_td->advancements[i]->criteria_count, sizeof(TrackableItem *));
+        for (int j = 0; j < target_td->advancements[i]->criteria_count; j++) {
+            target_td->advancements[i]->criteria[j] = (TrackableItem *) calloc(1, sizeof(TrackableItem));
+            memcpy(target_td->advancements[i]->criteria[j], head, sizeof(TrackableItem));
+            head += sizeof(TrackableItem);
+        }
+    }
+
+    // 4. Read stats and their criteria.
+    for (int i = 0; i < target_td->stat_count; i++) {
+        target_td->stats[i] = (TrackableCategory *) calloc(1, sizeof(TrackableCategory));
+        memcpy(target_td->stats[i], head, sizeof(TrackableCategory));
+        head += sizeof(TrackableCategory);
+        target_td->stats[i]->criteria = (TrackableItem **) calloc(target_td->stats[i]->criteria_count,
+                                                                  sizeof(TrackableItem *));
+        for (int j = 0; j < target_td->stats[i]->criteria_count; j++) {
+            target_td->stats[i]->criteria[j] = (TrackableItem *) calloc(1, sizeof(TrackableItem));
+            memcpy(target_td->stats[i]->criteria[j], head, sizeof(TrackableItem));
+            head += sizeof(TrackableItem);
+        }
+    }
+
+    // 5. Read multi-stage goals and their stages.
+    for (int i = 0; i < target_td->multi_stage_goal_count; i++) {
+        target_td->multi_stage_goals[i] = (MultiStageGoal *) calloc(1, sizeof(MultiStageGoal));
+        memcpy(target_td->multi_stage_goals[i], head, sizeof(MultiStageGoal));
+        head += sizeof(MultiStageGoal);
+        target_td->multi_stage_goals[i]->stages = (SubGoal **) calloc(target_td->multi_stage_goals[i]->stage_count,
+                                                                      sizeof(SubGoal *));
+        for (int j = 0; j < target_td->multi_stage_goals[i]->stage_count; j++) {
+            target_td->multi_stage_goals[i]->stages[j] = (SubGoal *) calloc(1, sizeof(SubGoal));
+            memcpy(target_td->multi_stage_goals[i]->stages[j], head, sizeof(SubGoal));
+            head += sizeof(SubGoal);
+        }
+    }
+
+    // 6. Read unlocks.
+    for (int i = 0; i < target_td->unlock_count; i++) {
+        target_td->unlocks[i] = (TrackableItem *) calloc(1, sizeof(TrackableItem));
+        memcpy(target_td->unlocks[i], head, sizeof(TrackableItem));
+        head += sizeof(TrackableItem);
+    }
+
+    // 7. Read custom goals.
+    for (int i = 0; i < target_td->custom_goal_count; i++) {
+        target_td->custom_goals[i] = (TrackableItem *) calloc(1, sizeof(TrackableItem));
+        memcpy(target_td->custom_goals[i], head, sizeof(TrackableItem));
+        head += sizeof(TrackableItem);
+    }
+}
+
+
+// static void deserialize_template_data(char* buffer, TemplateData* target_td) {
+//     if (!buffer || !target_td) return;
+//
+//     char* head = buffer;
+//
+//     // 1. Read the main TemplateData struct to get the counts.
+//     memcpy(target_td, head, sizeof(TemplateData));
+//     head += sizeof(TemplateData);
+//
+//     // TODO: Remove
+//     // Free any old data before allocating new data.
+//     // if (target_td->advancements) free(target_td->advancements);
+//     // if (target_td->stats) free(target_td->stats);
+//
+//     // 2. Allocate memory for the pointers in the overlay's address space.
+//     target_td->advancements = (TrackableCategory**)calloc(target_td->advancement_count, sizeof(TrackableCategory*));
+//     target_td->stats = (TrackableCategory**)calloc(target_td->stat_count, sizeof(TrackableCategory*));
+//
+//     // 3. Read the advancements and their criteria.
+//     for (int i = 0; i < target_td->advancement_count; i++) {
+//         target_td->advancements[i] = (TrackableCategory*)calloc(1, sizeof(TrackableCategory));
+//         memcpy(target_td->advancements[i], head, sizeof(TrackableCategory));
+//         head += sizeof(TrackableCategory);
+//
+//         target_td->advancements[i]->criteria = (TrackableItem**)calloc(target_td->advancements[i]->criteria_count, sizeof(TrackableItem*));
+//         for (int j = 0; j < target_td->advancements[i]->criteria_count; j++) {
+//             target_td->advancements[i]->criteria[j] = (TrackableItem*)calloc(1, sizeof(TrackableItem));
+//             memcpy(target_td->advancements[i]->criteria[j], head, sizeof(TrackableItem));
+//             head += sizeof(TrackableItem);
+//         }
+//     }
+//
+//     // 4. Read the stats and their criteria.
+//     for (int i = 0; i < target_td->stat_count; i++) {
+//         target_td->stats[i] = (TrackableCategory*)calloc(1, sizeof(TrackableCategory));
+//         memcpy(target_td->stats[i], head, sizeof(TrackableCategory));
+//         head += sizeof(TrackableCategory);
+//
+//         target_td->stats[i]->criteria = (TrackableItem**)calloc(target_td->stats[i]->criteria_count, sizeof(TrackableItem*));
+//         for (int j = 0; j < target_td->stats[i]->criteria_count; j++) {
+//             target_td->stats[i]->criteria[j] = (TrackableItem*)calloc(1, sizeof(TrackableItem));
+//             memcpy(target_td->stats[i]->criteria[j], head, sizeof(TrackableItem));
+//             head += sizeof(TrackableItem);
+//         }
+//     }
+//
+//     // 5. Read multi-stage goals and their stages.
+//     for (int i = 0; i < target_td->multi_stage_goal_count; i++) {
+//         target_td->multi_stage_goals[i] = (MultiStageGoal*)calloc(1, sizeof(MultiStageGoal));
+//         memcpy(target_td->multi_stage_goals[i], head, sizeof(MultiStageGoal));
+//         head += sizeof(MultiStageGoal);
+//         target_td->multi_stage_goals[i]->stages = (SubGoal**)calloc(target_td->multi_stage_goals[i]->stage_count, sizeof(SubGoal*));
+//         for (int j = 0; j < target_td->multi_stage_goals[i]->stage_count; j++) {
+//             target_td->multi_stage_goals[i]->stages[j] = (SubGoal*)calloc(1, sizeof(SubGoal));
+//             memcpy(target_td->multi_stage_goals[i]->stages[j], head, sizeof(SubGoal));
+//             head += sizeof(SubGoal);
+//         }
+//     }
+// }
+
+
+static void free_deserialized_data(TemplateData *td) {
+    if (!td) return;
+
+    if (td->advancements) {
+        for (int i = 0; i < td->advancement_count; i++) {
+            if (td->advancements[i]) {
+                if (td->advancements[i]->criteria) {
+                    for (int j = 0; j < td->advancements[i]->criteria_count; j++) {
+                        free(td->advancements[i]->criteria[j]);
+                    }
+                    free(td->advancements[i]->criteria);
+                }
+                free(td->advancements[i]);
+            }
+        }
+        free(td->advancements);
+    }
+
+    if (td->stats) {
+        for (int i = 0; i < td->stat_count; i++) {
+            if (td->stats[i]) {
+                if (td->stats[i]->criteria) {
+                    for (int j = 0; j < td->stats[i]->criteria_count; j++) {
+                        free(td->stats[i]->criteria[j]);
+                    }
+                    free(td->stats[i]->criteria);
+                }
+                free(td->stats[i]);
+            }
+        }
+        free(td->stats);
+    }
+
+    if (td->multi_stage_goals) {
+        for (int i = 0; i < td->multi_stage_goal_count; i++) {
+            if (td->multi_stage_goals[i]) {
+                if (td->multi_stage_goals[i]->stages) {
+                    for (int j = 0; j < td->multi_stage_goals[i]->stage_count; j++) {
+                        free(td->multi_stage_goals[i]->stages[j]);
+                    }
+                    free(td->multi_stage_goals[i]->stages);
+                }
+                free(td->multi_stage_goals[i]);
+            }
+        }
+        free(td->multi_stage_goals);
+    }
+
+    if (td->unlocks) {
+        for (int i = 0; i < td->unlock_count; i++) {
+            free(td->unlocks[i]);
+        }
+        free(td->unlocks);
+    }
+
+    if (td->custom_goals) {
+        for (int i = 0; i < td->custom_goal_count; i++) {
+            free(td->custom_goals[i]);
+        }
+        free(td->custom_goals);
+    }
+
+    // Set pointers to NULL after freeing to prevent double-freeing
+    memset(td, 0, sizeof(TemplateData));
+}
+
+// TODO: Remove
+// // Add this new helper function near the top of the file, with the other serialize/deserialize functions.
+// static void free_deserialized_data(TemplateData* td) {
+//     if (!td) return;
+//
+//     if (td->advancements) {
+//         for (int i = 0; i < td->advancement_count; i++) {
+//             if (td->advancements[i]) {
+//                 if (td->advancements[i]->criteria) {
+//                     for (int j = 0; j < td->advancements[i]->criteria_count; j++) {
+//                         free(td->advancements[i]->criteria[j]);
+//                     }
+//                     free(td->advancements[i]->criteria);
+//                 }
+//                 free(td->advancements[i]);
+//             }
+//         }
+//         free(td->advancements);
+//     }
+//
+//     if (td->stats) {
+//         for (int i = 0; i < td->stat_count; i++) {
+//             if (td->stats[i]) {
+//                 if (td->stats[i]->criteria) {
+//                     for (int j = 0; j < td->stats[i]->criteria_count; j++) {
+//                         free(td->stats[i]->criteria[j]);
+//                     }
+//                     free(td->stats[i]->criteria);
+//                 }
+//                 free(td->stats[i]);
+//             }
+//         }
+//         free(td->stats);
+//     }
+//
+//     // Set pointers to NULL after freeing to prevent double-freeing
+//     memset(td, 0, sizeof(TemplateData));
+// }
+
+
 // A global helper to show a user-facing error pop-up
 void show_error_message(const char *title, const char *message) {
     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, title, message, nullptr);
@@ -88,7 +441,6 @@ void show_error_message(const char *title, const char *message) {
  */
 static void global_watch_callback(dmon_watch_id watch_id, dmon_action action, const char *rootdir, const char *filepath,
                                   const char *oldfilepath, void *user) {
-
     // Satisfying Werror - not used
     (void) watch_id;
     (void) rootdir;
@@ -111,7 +463,6 @@ static void global_watch_callback(dmon_watch_id watch_id, dmon_action action, co
  */
 static void settings_watch_callback(dmon_watch_id watch_id, dmon_action action, const char *rootdir,
                                     const char *filepath, const char *oldfilepath, void *user) {
-
     (void) watch_id;
     (void) rootdir;
     (void) oldfilepath;
@@ -132,13 +483,16 @@ dmon_watch_id notes_watcher_id = {0};
 
 static void notes_watch_callback(dmon_watch_id watch_id, dmon_action action, const char *rootdir,
                                  const char *filepath, const char *oldfilepath, void *user) {
-    (void)watch_id; (void)rootdir; (void)oldfilepath; (void)user;
+    (void) watch_id;
+    (void) rootdir;
+    (void) oldfilepath;
+    (void) user;
 
     // We only care about file modifications
     if (action == DMON_ACTION_MODIFY) {
         // The filepath from dmon is just the filename. We need to check if it's our notes file.
         // We can't access AppSettings here, so we just signal a generic notes change.
-        const char* ext = strrchr(filepath, '.');
+        const char *ext = strrchr(filepath, '.');
         if (ext && strcmp(ext, ".txt") == 0 && strstr(filepath, "_notes")) {
             SDL_SetAtomicInt(&g_notes_changed, 1);
         }
@@ -146,9 +500,9 @@ static void notes_watch_callback(dmon_watch_id watch_id, dmon_action action, con
 }
 
 // This cross-platform function gets the full path of the currently running executable.
-static bool get_executable_path(char* out_path, size_t max_len) {
+static bool get_executable_path(char *out_path, size_t max_len) {
 #ifdef _WIN32
-    DWORD result = GetModuleFileNameA(nullptr, out_path, (DWORD)max_len);
+    DWORD result = GetModuleFileNameA(nullptr, out_path, (DWORD) max_len);
     if (result == 0 || result >= max_len) {
         return false;
     }
@@ -174,12 +528,12 @@ static bool get_executable_path(char* out_path, size_t max_len) {
 
 
 int main(int argc, char *argv[]) {
-
     // As we're not only using SDL_main() as our entry point
     SDL_SetMainReady();
 
-        bool is_overlay_mode = false;
-    if (argc > 1 && strcmp(argv[1], "--overlay") == 0) { // Additional command line "--overlay"
+    bool is_overlay_mode = false;
+    if (argc > 1 && strcmp(argv[1], "--overlay") == 0) {
+        // Additional command line "--overlay"
         is_overlay_mode = true;
     }
 
@@ -191,7 +545,7 @@ int main(int argc, char *argv[]) {
 
         // TODO: DEBUGGING ------------------------------
         // This gives you 5 seconds to attach the debugger before the program continues.
-        SDL_Delay(30000);
+        // SDL_Delay(30000);
         // Open a dedicated file for SDL's internal logs.
         // FILE* sdl_log_file = fopen("sdl_overlay_log.txt", "w");
         // if (!sdl_log_file) {
@@ -223,7 +577,7 @@ int main(int argc, char *argv[]) {
             return 1;
         }
 
-        Overlay* overlay = nullptr;
+        Overlay *overlay = nullptr;
         if (!overlay_new(&overlay, &settings)) {
             log_message(LOG_ERROR, "[OVERLAY PROCESS] overlay_new() failed.\n");
             TTF_Quit();
@@ -237,14 +591,16 @@ int main(int argc, char *argv[]) {
         overlay->h_mutex = OpenMutexA(MUTEX_ALL_ACCESS, FALSE, MUTEX_NAME);
 
         if (overlay->h_mutex == nullptr) {
-            log_message(LOG_ERROR, "[OVERLAY IPC] Failed to open mutex. Is the tracker running? Error: %lu\n", GetLastError());
+            log_message(LOG_ERROR, "[OVERLAY IPC] Failed to open mutex. Is the tracker running? Error: %lu\n",
+                        GetLastError());
             overlay_free(&overlay, &settings);
             return 1;
         }
 
         // TODO: Could also do FILE_MAP_READ
         overlay->h_map_file = OpenFileMappingA(FILE_MAP_ALL_ACCESS, FALSE, SHARED_MEM_NAME);
-        overlay->p_shared_data = (SharedData*)MapViewOfFile(overlay->h_map_file, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(SharedData));
+        overlay->p_shared_data = (SharedData *) MapViewOfFile(overlay->h_map_file, FILE_MAP_ALL_ACCESS, 0, 0,
+                                                              sizeof(SharedData));
 
         if (overlay->p_shared_data == nullptr) {
             log_message(LOG_ERROR, "[OVERLAY IPC] Failed to map shared memory. Is the tracker running?\n");
@@ -271,13 +627,21 @@ int main(int argc, char *argv[]) {
         }
 #endif
 
-        // This local struct will hold the data copied from shared memory each frame.
-        SharedData local_data_copy{};
+        // This local struct will hold the REBUILT data.
+        TemplateData live_template_data{};
 
-        // We create a "proxy" tracker struct to pass to the render functions,
-        // which avoids having to change their signatures.
+        // We create a "proxy" tracker struct to pass to the render functions.
         Tracker proxy_tracker{};
-        proxy_tracker.template_data = &local_data_copy.template_data;
+        proxy_tracker.template_data = &live_template_data; // Point it to our local rebuilt data
+
+        // TODO: Remove
+        // // This local struct will hold the data copied from shared memory each frame.
+        // SharedData local_data_copy{};
+        //
+        // // We create a "proxy" tracker struct to pass to the render functions,
+        // // which avoids having to change their signatures.
+        // Tracker proxy_tracker{};
+        // proxy_tracker.template_data = &local_data_copy.template_data;
 
         // TODO: Remove
         // // Initialize all members, including the non-trivial ImVec2
@@ -291,26 +655,38 @@ int main(int argc, char *argv[]) {
 
         bool is_running = true;
         Uint32 last_frame_time = SDL_GetTicks();
-        while(is_running) { // Separate loop for the overlay process -> with it's own framerate
-             SDL_Event event;
-             while (SDL_PollEvent(&event)) {
-                 if (event.type == SDL_EVENT_QUIT || event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
-                     is_running = false;
-                 }
-                 // Minimal event handling for the overlay window
-                 overlay_events(overlay, &event, &is_running, nullptr, &settings);
-             }
+        while (is_running) {
+            // Separate loop for the overlay process -> with it's own framerate
 
-            // Read the latest data from shared memory
+            Uint32 current_time = SDL_GetTicks();
+            float deltaTime = (float) (current_time - last_frame_time) / 1000.0f;
+            last_frame_time = current_time;
+
+
+            SDL_Event event;
+            while (SDL_PollEvent(&event)) {
+                if (event.type == SDL_EVENT_QUIT || event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
+                    is_running = false;
+                }
+                // Minimal event handling for the overlay window
+                overlay_events(overlay, &event, &is_running, &deltaTime, &settings);
+            }
+
             if (overlay->p_shared_data) {
 #ifdef _WIN32
-                DWORD wait_result = WaitForSingleObject(overlay->h_mutex, 50); // Wait up to 50ms
+                DWORD wait_result = WaitForSingleObject(overlay->h_mutex, 50);
                 if (wait_result == WAIT_OBJECT_0) {
 #else
                 if (sem_wait(overlay->mutex) == 0) {
 #endif
                     // --- Critical Section: We have the lock ---
-                    memcpy(&local_data_copy, overlay->p_shared_data, sizeof(SharedData));
+                    if (overlay->p_shared_data->data_size > 0) {
+                        // Free the data from the PREVIOUS frame.
+                        free_deserialized_data(&live_template_data);
+
+                        // Deserialize the buffer, rebuilding the data structures with valid pointers.
+                        deserialize_template_data(overlay->p_shared_data->buffer, &live_template_data);
+                    }
                     // --- End of Critical Section ---
 #ifdef _WIN32
                     ReleaseMutex(overlay->h_mutex);
@@ -320,32 +696,51 @@ int main(int argc, char *argv[]) {
                 }
             }
 
-            // Update the proxy tracker with the latest data for the render functions.
-            strncpy(proxy_tracker.world_name, local_data_copy.world_name, MAX_PATH_LENGTH - 1);
-            proxy_tracker.time_since_last_update = local_data_copy.time_since_last_update;
 
-            Uint32 current_time = SDL_GetTicks();
-            float deltaTime = (float)(current_time - last_frame_time) / 1000.0f;
-            last_frame_time = current_time;
+            // TODO: Remove
+            //             // Read the latest data from shared memory
+            //             if (overlay->p_shared_data) {
+            // #ifdef _WIN32
+            //                 DWORD wait_result = WaitForSingleObject(overlay->h_mutex, 50); // Wait up to 50ms
+            //                 if (wait_result == WAIT_OBJECT_0) {
+            // #else
+            //                 if (sem_wait(overlay->mutex) == 0) {
+            // #endif
+            //                     // --- Critical Section: We have the lock ---
+            //                     memcpy(&local_data_copy, overlay->p_shared_data, sizeof(SharedData));
+            //                     // --- End of Critical Section ---
+            // #ifdef _WIN32
+            //                     ReleaseMutex(overlay->h_mutex);
+            // #else
+            //                     sem_post(overlay->mutex);
+            // #endif
+            //                 }
+            //             }
+
+            // TODO: Remvoe
+            // // Update the proxy tracker with the latest data for the render functions.
+            // strncpy(proxy_tracker.world_name, local_data_copy.world_name, MAX_PATH_LENGTH - 1);
+            // proxy_tracker.time_since_last_update = local_data_copy.time_since_last_update;
+
 
             // The update and render functions now receive live data!
             overlay_update(overlay, &deltaTime, &proxy_tracker, &settings);
             overlay_render(overlay, &proxy_tracker, &settings);
 
-             // TODO: Remove
-             // Uint32 current_time = SDL_GetTicks();
-             // float deltaTime = (float)(current_time - last_frame_time) / 1000.0f;
-             // last_frame_time = current_time;
-             //
-             // // Update and render with placeholder data
-             // overlay_update(overlay, &deltaTime, &placeholder_tracker, &settings);
-             // overlay_render(overlay, &placeholder_tracker, &settings);
+            // TODO: Remove
+            // Uint32 current_time = SDL_GetTicks();
+            // float deltaTime = (float)(current_time - last_frame_time) / 1000.0f;
+            // last_frame_time = current_time;
+            //
+            // // Update and render with placeholder data
+            // overlay_update(overlay, &deltaTime, &placeholder_tracker, &settings);
+            // overlay_render(overlay, &placeholder_tracker, &settings);
 
-             float frame_target_time = 1000.0f / settings.fps;
-             const float frame_time = (float)SDL_GetTicks() - (float)current_time;
-             if (frame_time < frame_target_time) {
-                 SDL_Delay((Uint32)(frame_target_time - frame_time));
-             }
+            float frame_target_time = 1000.0f / settings.fps;
+            const float frame_time = (float) SDL_GetTicks() - (float) current_time;
+            if (frame_time < frame_target_time) {
+                SDL_Delay((Uint32) (frame_target_time - frame_time));
+            }
         }
 
         // Clean up IPC handles
@@ -358,6 +753,9 @@ int main(int argc, char *argv[]) {
         close(overlay->shm_fd);
         sem_close(overlay->mutex);
 #endif
+
+        // Final cleanup call before exiting
+        free_deserialized_data(&live_template_data);
 
         overlay_free(&overlay, &settings);
         TTF_Quit();
@@ -425,7 +823,6 @@ int main(int argc, char *argv[]) {
     }
 
     if (tracker_new(&tracker, &app_settings)) {
-
         // IPC CREATION
 
         log_message(LOG_INFO, "[IPC] Creating shared memory and mutex...\n");
@@ -444,7 +841,8 @@ int main(int argc, char *argv[]) {
         }
 
         // Create the shared memory file mapping
-        tracker->h_map_file = CreateFileMappingA(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(SharedData), SHARED_MEM_NAME);
+        tracker->h_map_file = CreateFileMappingA(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(SharedData),
+                                                 SHARED_MEM_NAME);
         if (tracker->h_map_file == nullptr) {
             log_message(LOG_ERROR, "[IPC] Failed to create file mapping object.\n");
 
@@ -457,7 +855,8 @@ int main(int argc, char *argv[]) {
         }
 
         // Map the shared memory into this process's address space
-        tracker->p_shared_data = (SharedData*)MapViewOfFile(tracker->h_map_file, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(SharedData));
+        tracker->p_shared_data = (SharedData *) MapViewOfFile(tracker->h_map_file, FILE_MAP_ALL_ACCESS, 0, 0,
+                                                              sizeof(SharedData));
         if (tracker->p_shared_data == nullptr) {
             log_message(LOG_ERROR, "[IPC] Could not map view of file.\n");
 
@@ -540,6 +939,7 @@ int main(int argc, char *argv[]) {
         SDL_SetAtomicInt(&g_settings_changed, 0);
         SDL_SetAtomicInt(&g_game_data_changed, 1);
         SDL_SetAtomicInt(&g_notes_changed, 0);
+        SDL_SetAtomicInt(&g_apply_button_clicked, 0);
 
         // HARDCODED SETTINGS DIRECTORY
         log_message(LOG_INFO, "[DMON - MAIN] Watching config directory: resources/config/\n");
@@ -582,7 +982,7 @@ int main(int argc, char *argv[]) {
             // Cap deltaTime to prevent massive jumps after a long frame (e.g., during file loading).
             // A cap of 0.1f means the game will never simulate more than 1/10th of a second,
             // regardless of how long the freeze was. This turns a stutter into a smooth slowdown.
-            const float MAX_DELTATIME = 0.1f;  // frame_target_time * 4.0f; -> 15 fps on 60 fps
+            const float MAX_DELTATIME = 0.1f; // frame_target_time * 4.0f; -> 15 fps on 60 fps
             if (deltaTime > MAX_DELTATIME) {
                 deltaTime = MAX_DELTATIME;
             }
@@ -599,6 +999,73 @@ int main(int argc, char *argv[]) {
 
             // Close immediately if app not running
             if (!is_running) break;
+
+            // Overlay Restart Logic (triggered ONLY by Apply button)
+            if (SDL_SetAtomicInt(&g_apply_button_clicked, 0) == 1) {
+                log_message(LOG_INFO, "[MAIN] 'Apply Settings' clicked. Re-initializing overlay process.\n");
+                // First, check if an overlay process is currently running.
+                bool overlay_is_running = false;
+#ifdef _WIN32
+                overlay_is_running = tracker->overlay_process_info.hProcess != nullptr;
+#else
+                overlay_is_running = tracker->overlay_pid > 0;
+#endif
+
+                // If an overlay is running, always terminate it to ensure settings are reapplied on restart.
+                if (overlay_is_running) {
+                    log_message(LOG_INFO, "[MAIN] Terminating existing overlay process to apply new settings.\n");
+#ifdef _WIN32
+                    TerminateProcess(tracker->overlay_process_info.hProcess, 0);
+                    CloseHandle(tracker->overlay_process_info.hProcess);
+                    CloseHandle(tracker->overlay_process_info.hThread);
+                    memset(&tracker->overlay_process_info, 0, sizeof(tracker->overlay_process_info));
+#else
+                    kill(tracker->overlay_pid, SIGKILL);
+                    tracker->overlay_pid = 0;
+#endif
+                }
+
+
+                // Now, check if the NEW settings require the overlay to be enabled.
+                if (app_settings.enable_overlay) {
+                    log_message(LOG_INFO, "[MAIN] Starting overlay process with new settings.\n");
+                    char exe_path[MAX_PATH_LENGTH];
+                    if (get_executable_path(exe_path, sizeof(exe_path))) {
+#ifdef _WIN32
+                        STARTUPINFOA si;
+                        memset(&si, 0, sizeof(si));
+                        si.cb = sizeof(si);
+                        char args[MAX_PATH_LENGTH + 16];
+                        snprintf(args, sizeof(args), "\"%s\" --overlay", exe_path);
+
+                        if (CreateProcessA(nullptr, args, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si,
+                                           &tracker->overlay_process_info)) {
+                            log_message(LOG_INFO, "[MAIN] Overlay process started with PID: %lu\n",
+                                        tracker->overlay_process_info.dwProcessId);
+                        } else {
+                            log_message(LOG_ERROR, "[MAIN] Failed to create overlay process. Error code: %lu\n",
+                                        GetLastError());
+                        }
+#else
+                        pid_t pid = fork();
+                        if (pid == 0) { // Child process
+                            char* args[] = {exe_path, (char*)"--overlay", nullptr};
+                            execv(exe_path, args);
+                            // If execv returns, it's an error
+                            log_message(LOG_ERROR, "[MAIN] Child process execv failed.\n");
+                            _exit(1);
+                        } else if (pid > 0) { // Parent process
+                            tracker->overlay_pid = pid;
+                            log_message(LOG_INFO, "[MAIN] Overlay process started with PID: %d\n", pid);
+                        } else {
+                            log_message(LOG_ERROR, "[MAIN] Failed to fork overlay process.\n");
+                        }
+#endif
+                    } else {
+                        log_message(LOG_INFO, "[MAIN] Overlay remains disabled as per new settings.\n");
+                    }
+                }
+            }
 
 
             // Check if settings.json has been modified (by UI or external editor)
@@ -617,67 +1084,9 @@ int main(int argc, char *argv[]) {
                 // Re-watch the config directory first
                 dmon_watch("resources/config/", settings_watch_callback, 0, nullptr);
 
-
-                // Reload settings from file to get the latest changes
+                // Reload settings from file to get the latest changes.
                 settings_load(&app_settings);
-                log_set_settings(&app_settings); // Update the logger with the new settings
-
-                bool overlay_should_be_enabled = app_settings.enable_overlay;
-                bool overlay_is_running = false;
-#ifdef _WIN32
-                overlay_is_running = tracker->overlay_process_info.hProcess != nullptr;
-#else
-                overlay_is_running = tracker->overlay_pid > 0;
-#endif
-
-                if (overlay_should_be_enabled && !overlay_is_running) {
-                    log_message(LOG_INFO, "[MAIN] Enabling overlay process.\n");
-                    char exe_path[MAX_PATH_LENGTH];
-                    if (get_executable_path(exe_path, sizeof(exe_path))) {
-#ifdef _WIN32
-                        // Use memset for STARTUPINFOA initialization
-                        STARTUPINFOA si;
-                        memset(&si, 0, sizeof(si));
-
-                        si.cb = sizeof(si);
-                        char args[MAX_PATH_LENGTH + 16];
-                        snprintf(args, sizeof(args), "\"%s\" --overlay", exe_path);
-
-                        if (CreateProcessA(nullptr, args, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &tracker->overlay_process_info)) {
-                            log_message(LOG_ERROR, "[MAIN] Overlay process started with PID: %lu\n", tracker->overlay_process_info.dwProcessId);
-                        } else {
-                            log_message(LOG_ERROR, "[MAIN] Failed to create overlay process. Error code: %lu\n", GetLastError());
-                        }
-#else
-                        pid_t pid = fork();
-                        if (pid == 0) { // Child process
-                            char* args[] = {exe_path, (char*)"--overlay", nullptr};
-                            execv(exe_path, args);
-                            // If execv returns, it's an error
-                            log_message(LOG_ERROR, "[MAIN] Child process execv failed.\n");
-                            _exit(1);
-                        } else if (pid > 0) { // Parent process
-                            tracker->overlay_pid = pid;
-                            log_message(LOG_INFO, "[MAIN] Overlay process started with PID: %d\n", pid);
-                        } else {
-                            log_message(LOG_ERROR, "[MAIN] Failed to fork overlay process.\n");
-                        }
-#endif
-                    } else {
-                        log_message(LOG_ERROR, "[MAIN] Could not get executable path to start overlay.\n");
-                    }
-                } else if (!overlay_should_be_enabled && overlay_is_running) {
-                    log_message(LOG_INFO, "[MAIN] Disabling overlay process.\n");
-#ifdef _WIN32
-                    TerminateProcess(tracker->overlay_process_info.hProcess, 0);
-                    CloseHandle(tracker->overlay_process_info.hProcess);
-                    CloseHandle(tracker->overlay_process_info.hThread);
-                    memset(&tracker->overlay_process_info, 0, sizeof(tracker->overlay_process_info));
-#else
-                    kill(tracker->overlay_pid, SIGKILL);
-                    tracker->overlay_pid = 0;
-#endif
-                }
+                log_set_settings(&app_settings); // Update the logger with the new settings.
 
                 // Update the tracker with the new paths and template data
                 tracker_reinit_template(tracker, &app_settings);
@@ -722,7 +1131,6 @@ int main(int argc, char *argv[]) {
             // Check if dmon (or manual update through custom goal) has requested an update
             // Atomically check if the flag is 1
             if (SDL_GetAtomicInt(&g_needs_update) == 1) {
-
                 MC_Version version = settings_get_version_from_string(app_settings.version_str);
                 find_player_data_files(
                     tracker->saves_path,
@@ -752,9 +1160,15 @@ int main(int argc, char *argv[]) {
                     if (sem_wait(tracker->mutex) == 0) {
 #endif
                         // --- Critical Section: We have the lock ---
-                        memcpy(&tracker->p_shared_data->template_data, tracker->template_data, sizeof(TemplateData));
-                        strncpy(tracker->p_shared_data->world_name, tracker->world_name, MAX_PATH_LENGTH - 1);
-                        tracker->p_shared_data->time_since_last_update = tracker->time_since_last_update;
+
+                        // Serialize the tracker data into the shared buffer.
+                        size_t size = serialize_template_data(tracker->template_data, tracker->p_shared_data->buffer);
+                        tracker->p_shared_data->data_size = size;
+
+                        // TODO: Remove
+                        // memcpy(&tracker->p_shared_data->template_data, tracker->template_data, sizeof(TemplateData));
+                        // strncpy(tracker->p_shared_data->world_name, tracker->world_name, MAX_PATH_LENGTH - 1);
+                        // tracker->p_shared_data->time_since_last_update = tracker->time_since_last_update;
                         // --- End of Critical Section ---
 #ifdef _WIN32
                         ReleaseMutex(tracker->h_mutex);
