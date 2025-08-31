@@ -6,6 +6,7 @@
 #define OVERLAY_H
 
 #include "tracker.h" // Has main.h
+#include "ipc_data.h" // For SharedData
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,6 +32,17 @@ typedef struct {
 struct Overlay {
     SDL_Window *window;
     SDL_Renderer *renderer;
+
+    // IPC Handles
+#ifdef _WIN32
+    HANDLE h_map_file;
+    HANDLE h_mutex;
+#else
+    int shm_fd;
+    sem_t *mutex;
+#endif
+    SharedData *p_shared_data; // Pointer to the mapped shared memory
+
     TTF_TextEngine *text_engine;
     TTF_Font *font; // For text on overlay window (sdl ttf)
 
