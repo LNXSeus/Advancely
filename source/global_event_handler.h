@@ -24,6 +24,7 @@ extern SDL_AtomicInt g_needs_update; // Global flag to signal that an update is 
 extern SDL_AtomicInt g_settings_changed;
 extern SDL_AtomicInt g_game_data_changed; // To reset update timer on game data change or completion change (visually)
 extern SDL_AtomicInt g_notes_changed; // To signal that the notes.txt file needs to be reloaded.
+extern SDL_AtomicInt g_apply_button_clicked; // To signal when overlay window should restart (on apply button click)
 extern bool g_force_open_settings; // Flag to force settings open on invalid path
 
 /**

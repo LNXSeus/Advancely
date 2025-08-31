@@ -457,9 +457,10 @@ static void tracker_update_stats_legacy(Tracker *t, const cJSON *player_stats_js
         }
         ach->done = is_currently_done;
 
-        if (ach->done && !ach->done_in_snapshot) {
-            t->template_data->advancements_completed_count++;
-        }
+        // If the achievement is marked as done in the player's file,
+        // it should always count towards the total, regardless of the snapshot.
+        // Previously it was with !ach->done_in_snapshot
+        if (ach->done) t->template_data->advancements_completed_count++;
     }
 
     cJSON *settings_json = cJSON_from_file(SETTINGS_FILE_PATH);

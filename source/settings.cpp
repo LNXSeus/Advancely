@@ -537,6 +537,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
                 settings_save(app_settings, nullptr);
                 SDL_SetAtomicInt(&g_settings_changed, 1); // Trigger a reload
+                SDL_SetAtomicInt(&g_apply_button_clicked, 1);
                 show_applied_message = true;
             }
         } else {
@@ -559,6 +560,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
                 settings_save(app_settings, nullptr);
                 SDL_SetAtomicInt(&g_settings_changed, 1);
+                SDL_SetAtomicInt(&g_apply_button_clicked, 1);
                 show_applied_message = true;
             }
         }
@@ -568,6 +570,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip(
             "Apply any changes made in this window. You can also press 'Enter' to apply.\n"
+            "Changes made to the overlay window will cause the overlay to restart.\n"
             "It will fail to apply if any warnings are shown.");
     }
 
