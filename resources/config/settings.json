@@ -9,6 +9,7 @@
     "enable_overlay":	false,
     "using_stats_per_world_legacy":	true,
     "fps":	60,
+    "overlay_fps": 60,
     "always_on_top":	true,
     "overlay_scroll_speed":	1,
     "remove_completed_goals":	true,

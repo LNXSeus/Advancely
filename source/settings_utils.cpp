@@ -230,6 +230,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->enable_overlay = DEFAULT_ENABLE_OVERLAY;
     settings->using_stats_per_world_legacy = DEFAULT_USING_STATS_PER_WORLD_LEGACY;
     settings->fps = DEFAULT_FPS;
+    settings->overlay_fps = DEFAULT_OVERLAY_FPS;
     settings->tracker_always_on_top = DEFAULT_TRACKER_ALWAYS_ON_TOP;
     settings->overlay_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
     settings->remove_completed_goals = DEFAULT_REMOVE_COMPLETED_GOALS;
@@ -376,6 +377,12 @@ bool settings_load(AppSettings *settings) {
         if (fps && cJSON_IsNumber(fps) && fps->valueint != -1) settings->fps = fps->valueint;
         else {
             settings->fps = DEFAULT_FPS;
+            defaults_were_used = true;
+        }
+        const cJSON *overlay_fps = cJSON_GetObjectItem(general_settings, "overlay_fps");
+        if (overlay_fps && cJSON_IsNumber(overlay_fps) && overlay_fps->valueint != -1) settings->overlay_fps = (float)overlay_fps->valuedouble;
+        else {
+            settings->overlay_fps = DEFAULT_OVERLAY_FPS;
             defaults_were_used = true;
         }
         const cJSON *on_top = cJSON_GetObjectItem(general_settings, "always_on_top");
@@ -553,6 +560,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
     cJSON_AddItemToObject(general_obj, "using_stats_per_world_legacy", cJSON_CreateBool(settings->using_stats_per_world_legacy));
     cJSON_DeleteItemFromObject(general_obj, "fps");
     cJSON_AddItemToObject(general_obj, "fps", cJSON_CreateNumber(settings->fps));
+    cJSON_DeleteItemFromObject(general_obj, "overlay_fps");
+    cJSON_AddItemToObject(general_obj, "overlay_fps", cJSON_CreateNumber(settings->overlay_fps));
     cJSON_DeleteItemFromObject(general_obj, "always_on_top");
     cJSON_AddItemToObject(general_obj, "always_on_top", cJSON_CreateBool(settings->tracker_always_on_top));
     cJSON_DeleteItemFromObject(general_obj, "remove_completed_goals");
