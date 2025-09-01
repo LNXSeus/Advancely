@@ -26,12 +26,14 @@ _This animation here is compressed. When you use the tracker the framerate will 
 
 ## Officially Added Templates
 
-| Category          | Version(s)                                  | Optional Flag |
-|-------------------|---------------------------------------------|---------------|
-| `all_advancements` | 1.16.1, 1.21.8                              |               |
-| `all_advancements` | 1.21.8                                      | _optimized    |
-| `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4 |               |
-| `miku%`           | 1.21.8                                      |               |
+| Category           | Version(s)                                         | Optional Flag |
+|--------------------|----------------------------------------------------|---------------|
+| `all_advancements` | 1.16.1, 1.21.8                                     |               |
+| `all_advancements` | 1.21.8                                             | `_optimized`  |
+| `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4        |               |
+| `miku%`            | 1.21.8                                             |               |
+| `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 1.21.8, 25w14craftmine | `1`           |
+_The `test1` templates are for you to learn and understand how templates work. These test templates include all the core functionalities of all goal types._
 
 ## Core Features
 
