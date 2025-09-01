@@ -19,6 +19,8 @@
 
 Advancely is a sophisticated, data-driven progress tracker designed for Minecraft speedrunners, completionists, and content creators. Unlike other tools that only track vanilla advancements, Advancely can be configured to monitor virtually any goal you can imagine. It operates in real-time by watching your singleplayer save files for changes, meaning your progress is always up-to-date without any manual intervention. Its true power lies in its `.json` template system, which allows you to define exactly what you want to track for any version, mod, or playstyle.
 
+![Tracker_Preview.gif](readme_assets/Tracker_Preview.gif)
+
 ## Core Features
 
 * **Interactive Map View**: The main tracker window is not a static list but an interactive map of your progress. You can freely organize your view to focus on what matters most.
@@ -43,7 +45,8 @@ Advancely is a sophisticated, data-driven progress tracker designed for Minecraf
 
 * **Full Mod & Datapack Support**: The tracker is designed to be data-driven. It correctly parses items, stats, and advancements from any mod or data pack (e.g., `conquest:`, `blazeandcave:`) without being limited to the vanilla `minecraft:` namespace.
 
-* **Stream Overlay**: Bring your tracker and overlay to life with animated `.gif` icons alongside static `.png` files.
+* **Stream Overlay**: As a streamer you'll have a nice animated overlay for your viewers to see your progress. Just use create an OBS game capture, select the Advancely Overlay window (you might have to restart the tracker) and use the color key filter on the single-colored background (just copy the hex value of the Overlay BG Color) to make it transparent.
+![Advancely_Overlay.gif](readme_assets/Advancely_Overlay.gif)
 
 **Template-Specific Notes**: A toggleable notes window is available in the bottom-right corner of the tracker. Any text you type is saved instantly to a `_notes.txt` file, which is stored right next to the template file you are currently using. This makes your notes specific to each category and version you track. Furthermore, if you edit the `.txt` file directly while the tracker is running, the notes window will update live with your changes.
 
@@ -68,6 +71,8 @@ Advancely supports over 100 Minecraft versions, including every full release fro
 ## Full Customization & Configuration
 
 The true power of Advancely lies in its customization. All settings can be configured in real-time from the settings window (`ESC` key).
+
+![v0.9.40_Settings_Window_Preview.png](readme_assets/v0.9.40_Settings_Window_Preview.png)
 
 | Setting Group         | Options & Features                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 |:----------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
