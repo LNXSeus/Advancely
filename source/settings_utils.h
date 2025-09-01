@@ -37,6 +37,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_ENABLE_OVERLAY false // Stream overlay will be off by default
 #define DEFAULT_USING_STATS_PER_WORLD_LEGACY true
 #define DEFAULT_FPS 60
+#define DEFAULT_OVERLAY_FPS 60
 #define DEFAULT_TRACKER_ALWAYS_ON_TOP true
 #define DEFAULT_OVERLAY_SCROLL_SPEED 1.0f
 #define DEFAULT_OVERLAY_SPEED_UP false // Boolean controls whether speed up is enabled
@@ -115,6 +116,7 @@ struct AppSettings {
     bool using_stats_per_world_legacy;
     // If true, legacy versions look for per-world .dat files (for StatsPerWorld mod).
     float fps; // The target frames per second for the application loop.
+    float overlay_fps; // The target frames per second for the overlay loop.
     bool tracker_always_on_top; // If true, the main tracker window stays above other windows.
 
     // If false only error messages are printed to console and log file

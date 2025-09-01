@@ -27,13 +27,5 @@ typedef struct {
     char buffer[SHARED_BUFFER_SIZE];
 } SharedData;
 
-// TODO: Remove
-// This struct defines the exact data that will be sent from
-// tracker process to the overlay process
-// typedef struct {
-//     TemplateData template_data;
-//     char world_name[MAX_PATH_LENGTH];
-//     float time_since_last_update;
-// } SharedData;
 
 #endif //IPC_DATA_H

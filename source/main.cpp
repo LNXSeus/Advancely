@@ -51,8 +51,6 @@ extern "C" {
 #include <mach-o/dyld.h>
 #endif
 
-// global flag TODO: Should be set to true when custom goal is checked off (manual update) -> SDL_SetAtomicInt(&g_needs_update, 1);
-// We make g_needs_update available to global_event_handler.h with external linkage
 SDL_AtomicInt g_needs_update;
 SDL_AtomicInt g_settings_changed; // Watching when settings.json is modified to re-init paths
 SDL_AtomicInt g_game_data_changed; // When game data is modified, custom counter is changed or manually override changed
@@ -60,21 +58,6 @@ SDL_AtomicInt g_notes_changed;
 SDL_AtomicInt g_apply_button_clicked;
 bool g_force_open_settings = false;
 
-// TODO: Remove function below when fixed
-// // This is our custom callback function that SDL will call with its internal log messages.
-// static void SDLLogOutputFunction(void *userdata, int category, SDL_LogPriority priority, const char *message) {
-//     // The 'userdata' parameter is the FILE* we will pass to SDL_SetLogOutputFunction.
-//     FILE* log_file = (FILE*)userdata;
-//     if (log_file) {
-//         // We will add a timestamp to make the log clearer.
-//         char time_buf[16];
-//         time_t now = time(0);
-//         strftime(time_buf, sizeof(time_buf), "%H:%M:%S", localtime(&now));
-//
-//         fprintf(log_file, "[%s] [SDL] Category: %d, Priority: %d, Message: %s\n", time_buf, category, priority, message);
-//         fflush(log_file); // Ensure the message is written immediately in case of a crash.
-//     }
-// }
 
 
 /**
@@ -134,53 +117,6 @@ static size_t serialize_template_data(TemplateData *td, char *buffer) {
 
     return head - buffer; // Return the total size of the serialized data.
 }
-
-// TODO: Remove
-// static size_t serialize_template_data(TemplateData* td, char* buffer) {
-//     if (!td || !buffer) return 0;
-//
-//     char* head = buffer;
-//
-//     // 1. Copy the main TemplateData struct.
-//     memcpy(head, td, sizeof(TemplateData));
-//     head += sizeof(TemplateData);
-//
-//     // 2. Copy advancements and their criteria.
-//     for (int i = 0; i < td->advancement_count; i++) {
-//         memcpy(head, td->advancements[i], sizeof(TrackableCategory));
-//         head += sizeof(TrackableCategory);
-//         for (int j = 0; j < td->advancements[i]->criteria_count; j++) {
-//             memcpy(head, td->advancements[i]->criteria[j], sizeof(TrackableItem));
-//             head += sizeof(TrackableItem);
-//         }
-//     }
-//
-//     // 3. Copy stats and their criteria.
-//     for (int i = 0; i < td->stat_count; i++) {
-//         memcpy(head, td->stats[i], sizeof(TrackableCategory));
-//         head += sizeof(TrackableCategory);
-//         for (int j = 0; j < td->stats[i]->criteria_count; j++) {
-//             memcpy(head, td->stats[i]->criteria[j], sizeof(TrackableItem));
-//             head += sizeof(TrackableItem);
-//         }
-//     }
-//
-//     // --- ADD THIS NEW BLOCK FOR MULTI-STAGE GOALS ---
-//     // 4. Copy multi-stage goals and their stages.
-//     for (int i = 0; i < td->multi_stage_goal_count; i++) {
-//         memcpy(head, td->multi_stage_goals[i], sizeof(MultiStageGoal));
-//         head += sizeof(MultiStageGoal);
-//         for (int j = 0; j < td->multi_stage_goals[i]->stage_count; j++) {
-//             memcpy(head, td->multi_stage_goals[i]->stages[j], sizeof(SubGoal));
-//             head += sizeof(SubGoal);
-//         }
-//     }
-//
-//     // TODO: Add more
-//     // Note: Unlocks and custom goals are still omitted for simplicity as they are not causing the current crash.
-//
-//     return head - buffer; // Return the total size of the serialized data.
-// }
 
 
 /**
@@ -262,65 +198,6 @@ static void deserialize_template_data(char *buffer, TemplateData *target_td) {
 }
 
 
-// static void deserialize_template_data(char* buffer, TemplateData* target_td) {
-//     if (!buffer || !target_td) return;
-//
-//     char* head = buffer;
-//
-//     // 1. Read the main TemplateData struct to get the counts.
-//     memcpy(target_td, head, sizeof(TemplateData));
-//     head += sizeof(TemplateData);
-//
-//     // TODO: Remove
-//     // Free any old data before allocating new data.
-//     // if (target_td->advancements) free(target_td->advancements);
-//     // if (target_td->stats) free(target_td->stats);
-//
-//     // 2. Allocate memory for the pointers in the overlay's address space.
-//     target_td->advancements = (TrackableCategory**)calloc(target_td->advancement_count, sizeof(TrackableCategory*));
-//     target_td->stats = (TrackableCategory**)calloc(target_td->stat_count, sizeof(TrackableCategory*));
-//
-//     // 3. Read the advancements and their criteria.
-//     for (int i = 0; i < target_td->advancement_count; i++) {
-//         target_td->advancements[i] = (TrackableCategory*)calloc(1, sizeof(TrackableCategory));
-//         memcpy(target_td->advancements[i], head, sizeof(TrackableCategory));
-//         head += sizeof(TrackableCategory);
-//
-//         target_td->advancements[i]->criteria = (TrackableItem**)calloc(target_td->advancements[i]->criteria_count, sizeof(TrackableItem*));
-//         for (int j = 0; j < target_td->advancements[i]->criteria_count; j++) {
-//             target_td->advancements[i]->criteria[j] = (TrackableItem*)calloc(1, sizeof(TrackableItem));
-//             memcpy(target_td->advancements[i]->criteria[j], head, sizeof(TrackableItem));
-//             head += sizeof(TrackableItem);
-//         }
-//     }
-//
-//     // 4. Read the stats and their criteria.
-//     for (int i = 0; i < target_td->stat_count; i++) {
-//         target_td->stats[i] = (TrackableCategory*)calloc(1, sizeof(TrackableCategory));
-//         memcpy(target_td->stats[i], head, sizeof(TrackableCategory));
-//         head += sizeof(TrackableCategory);
-//
-//         target_td->stats[i]->criteria = (TrackableItem**)calloc(target_td->stats[i]->criteria_count, sizeof(TrackableItem*));
-//         for (int j = 0; j < target_td->stats[i]->criteria_count; j++) {
-//             target_td->stats[i]->criteria[j] = (TrackableItem*)calloc(1, sizeof(TrackableItem));
-//             memcpy(target_td->stats[i]->criteria[j], head, sizeof(TrackableItem));
-//             head += sizeof(TrackableItem);
-//         }
-//     }
-//
-//     // 5. Read multi-stage goals and their stages.
-//     for (int i = 0; i < target_td->multi_stage_goal_count; i++) {
-//         target_td->multi_stage_goals[i] = (MultiStageGoal*)calloc(1, sizeof(MultiStageGoal));
-//         memcpy(target_td->multi_stage_goals[i], head, sizeof(MultiStageGoal));
-//         head += sizeof(MultiStageGoal);
-//         target_td->multi_stage_goals[i]->stages = (SubGoal**)calloc(target_td->multi_stage_goals[i]->stage_count, sizeof(SubGoal*));
-//         for (int j = 0; j < target_td->multi_stage_goals[i]->stage_count; j++) {
-//             target_td->multi_stage_goals[i]->stages[j] = (SubGoal*)calloc(1, sizeof(SubGoal));
-//             memcpy(target_td->multi_stage_goals[i]->stages[j], head, sizeof(SubGoal));
-//             head += sizeof(SubGoal);
-//         }
-//     }
-// }
 
 
 static void free_deserialized_data(TemplateData *td) {
@@ -388,45 +265,6 @@ static void free_deserialized_data(TemplateData *td) {
     // Set pointers to NULL after freeing to prevent double-freeing
     memset(td, 0, sizeof(TemplateData));
 }
-
-// TODO: Remove
-// // Add this new helper function near the top of the file, with the other serialize/deserialize functions.
-// static void free_deserialized_data(TemplateData* td) {
-//     if (!td) return;
-//
-//     if (td->advancements) {
-//         for (int i = 0; i < td->advancement_count; i++) {
-//             if (td->advancements[i]) {
-//                 if (td->advancements[i]->criteria) {
-//                     for (int j = 0; j < td->advancements[i]->criteria_count; j++) {
-//                         free(td->advancements[i]->criteria[j]);
-//                     }
-//                     free(td->advancements[i]->criteria);
-//                 }
-//                 free(td->advancements[i]);
-//             }
-//         }
-//         free(td->advancements);
-//     }
-//
-//     if (td->stats) {
-//         for (int i = 0; i < td->stat_count; i++) {
-//             if (td->stats[i]) {
-//                 if (td->stats[i]->criteria) {
-//                     for (int j = 0; j < td->stats[i]->criteria_count; j++) {
-//                         free(td->stats[i]->criteria[j]);
-//                     }
-//                     free(td->stats[i]->criteria);
-//                 }
-//                 free(td->stats[i]);
-//             }
-//         }
-//         free(td->stats);
-//     }
-//
-//     // Set pointers to NULL after freeing to prevent double-freeing
-//     memset(td, 0, sizeof(TemplateData));
-// }
 
 
 // A global helper to show a user-facing error pop-up
@@ -543,21 +381,6 @@ int main(int argc, char *argv[]) {
         log_init(); // Each process needs its own log
         log_message(LOG_INFO, "[OVERLAY PROCESS] Starting in overlay-only mode.\n");
 
-
-        // TODO: DEBUGGING ------------------------------
-        // This gives you 5 seconds to attach the debugger before the program continues.
-        // SDL_Delay(30000);
-        // Open a dedicated file for SDL's internal logs.
-        // FILE* sdl_log_file = fopen("sdl_overlay_log.txt", "w");
-        // if (!sdl_log_file) {
-        //     log_message(LOG_ERROR, "CRITICAL: Could not open sdl_overlay_log.txt for writing.\n");
-        // }
-        //
-        // // Set our custom function as the log handler BEFORE any other SDL calls.
-        // SDL_SetLogOutputFunction(SDLLogOutputFunction, sdl_log_file);
-        //
-        // // END OF DEBUGGING ------------------------------
-
         AppSettings settings;
         settings_load(&settings);
         log_set_settings(&settings);
@@ -635,24 +458,6 @@ int main(int argc, char *argv[]) {
         Tracker proxy_tracker{};
         proxy_tracker.template_data = &live_template_data; // Point it to our local rebuilt data
 
-        // TODO: Remove
-        // // This local struct will hold the data copied from shared memory each frame.
-        // SharedData local_data_copy{};
-        //
-        // // We create a "proxy" tracker struct to pass to the render functions,
-        // // which avoids having to change their signatures.
-        // Tracker proxy_tracker{};
-        // proxy_tracker.template_data = &local_data_copy.template_data;
-
-        // TODO: Remove
-        // // Initialize all members, including the non-trivial ImVec2
-        // Tracker placeholder_tracker{};
-        // TemplateData placeholder_template_data{};
-        //
-        //
-        // placeholder_tracker.template_data = &placeholder_template_data;
-        // strncpy(placeholder_tracker.world_name, "Waiting for data...", MAX_PATH_LENGTH - 1);
-
 
         bool is_running = true;
         Uint32 last_frame_time = SDL_GetTicks();
@@ -684,11 +489,30 @@ int main(int argc, char *argv[]) {
 #endif
                     // --- Critical Section: We have the lock ---
                     if (overlay->p_shared_data->data_size > 0) {
-                        // Free the data from the PREVIOUS frame.
+
+                        // Define the same header struct to read the data.
+                        typedef struct {
+                            char world_name[MAX_PATH_LENGTH];
+                            float time_since_last_update;
+                        } OverlayIPCHeader;
+
+                        OverlayIPCHeader header;
+                        char* buffer_head = overlay->p_shared_data->buffer;
+
+                        // 1. Read the header from the start of the buffer.
+                        memcpy(&header, buffer_head, sizeof(OverlayIPCHeader));
+                        buffer_head += sizeof(OverlayIPCHeader); // Move pointer past the header.
+
+                        // 2. Update the proxy tracker with the live data from the header.
+                        strncpy(proxy_tracker.world_name, header.world_name, MAX_PATH_LENGTH - 1);
+                        proxy_tracker.world_name[MAX_PATH_LENGTH - 1] = '\0';
+                        proxy_tracker.time_since_last_update = header.time_since_last_update;
+
+                        // 3. Free the template data from the PREVIOUS frame.
                         free_deserialized_data(&live_template_data);
 
-                        // Deserialize the buffer, rebuilding the data structures with valid pointers.
-                        deserialize_template_data(overlay->p_shared_data->buffer, &live_template_data);
+                        // 4. Deserialize the main template data, which starts AFTER the header.
+                        deserialize_template_data(buffer_head, &live_template_data);
                     }
                     // --- End of Critical Section ---
 #ifdef _WIN32
@@ -700,46 +524,11 @@ int main(int argc, char *argv[]) {
             }
 
 
-            // TODO: Remove
-            //             // Read the latest data from shared memory
-            //             if (overlay->p_shared_data) {
-            // #ifdef _WIN32
-            //                 DWORD wait_result = WaitForSingleObject(overlay->h_mutex, 50); // Wait up to 50ms
-            //                 if (wait_result == WAIT_OBJECT_0) {
-            // #else
-            //                 if (sem_wait(overlay->mutex) == 0) {
-            // #endif
-            //                     // --- Critical Section: We have the lock ---
-            //                     memcpy(&local_data_copy, overlay->p_shared_data, sizeof(SharedData));
-            //                     // --- End of Critical Section ---
-            // #ifdef _WIN32
-            //                     ReleaseMutex(overlay->h_mutex);
-            // #else
-            //                     sem_post(overlay->mutex);
-            // #endif
-            //                 }
-            //             }
-
-            // TODO: Remvoe
-            // // Update the proxy tracker with the latest data for the render functions.
-            // strncpy(proxy_tracker.world_name, local_data_copy.world_name, MAX_PATH_LENGTH - 1);
-            // proxy_tracker.time_since_last_update = local_data_copy.time_since_last_update;
-
-
             // The update and render functions now receive live data!
             overlay_update(overlay, &deltaTime, &proxy_tracker, &settings);
             overlay_render(overlay, &proxy_tracker, &settings);
 
-            // TODO: Remove
-            // Uint32 current_time = SDL_GetTicks();
-            // float deltaTime = (float)(current_time - last_frame_time) / 1000.0f;
-            // last_frame_time = current_time;
-            //
-            // // Update and render with placeholder data
-            // overlay_update(overlay, &deltaTime, &placeholder_tracker, &settings);
-            // overlay_render(overlay, &placeholder_tracker, &settings);
-
-            float frame_target_time = 1000.0f / settings.fps;
+            float frame_target_time = 1000.0f / settings.overlay_fps; // Overlay has it's own FPS limit
             const float frame_time = (float) SDL_GetTicks() - (float) current_time;
             if (frame_time < frame_target_time) {
                 SDL_Delay((Uint32) (frame_target_time - frame_time));
@@ -764,12 +553,6 @@ int main(int argc, char *argv[]) {
         TTF_Quit();
         SDL_Quit();
         log_close();
-
-        // Close the dedicated SDL log file on successful exit.
-        // TODO: Remove
-        // if (sdl_log_file) {
-        //     fclose(sdl_log_file);
-        // }
 
         return 0; // End the overlay process here
     }
@@ -813,7 +596,6 @@ int main(int argc, char *argv[]) {
     log_set_settings(&app_settings); // Give the logger access to the settings
 
     Tracker *tracker = nullptr; // pass address to function
-    // Overlay *overlay = nullptr; // TODO: Remove
 
     // Variable to hold the ID of our saves watcher
     dmon_watch_id saves_watcher_id = {0}; // Initialize to a known invalid state (id=0)
@@ -893,13 +675,6 @@ int main(int argc, char *argv[]) {
 #endif
 
 
-        // TODO: Remove
-        // // Conditionally create the overlay at startup, based on settings
-        // if (app_settings.enable_overlay) {
-        //     if (!overlay_new(&overlay, &app_settings)) {
-        //         log_message(LOG_ERROR, "[MAIN] Failed to create overlay, continuing without it.\n");
-        //     }
-        // }
         // Initialize ImGUI
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -1221,7 +996,7 @@ int main(int argc, char *argv[]) {
                 tracker_update_title(tracker, &app_settings);
 
                 // --- DATA WRITING TO COMMUNICATE WITH OVERLAY ---
-                if (tracker->p_shared_data) {
+                                if (tracker->p_shared_data) {
 #ifdef _WIN32
                     DWORD wait_result = WaitForSingleObject(tracker->h_mutex, 50); // Wait up to 50ms
                     if (wait_result == WAIT_OBJECT_0) {
@@ -1230,14 +1005,30 @@ int main(int argc, char *argv[]) {
 #endif
                         // --- Critical Section: We have the lock ---
 
-                        // Serialize the tracker data into the shared buffer.
-                        size_t size = serialize_template_data(tracker->template_data, tracker->p_shared_data->buffer);
-                        tracker->p_shared_data->data_size = size;
+                        // Define a header struct to hold extra IPC data.
+                        typedef struct {
+                            char world_name[MAX_PATH_LENGTH];
+                            float time_since_last_update;
+                        } OverlayIPCHeader;
 
-                        // TODO: Remove
-                        // memcpy(&tracker->p_shared_data->template_data, tracker->template_data, sizeof(TemplateData));
-                        // strncpy(tracker->p_shared_data->world_name, tracker->world_name, MAX_PATH_LENGTH - 1);
-                        // tracker->p_shared_data->time_since_last_update = tracker->time_since_last_update;
+                        OverlayIPCHeader header;
+                        strncpy(header.world_name, tracker->world_name, MAX_PATH_LENGTH - 1);
+                        header.world_name[MAX_PATH_LENGTH - 1] = '\0'; // Ensure null-termination
+                        header.time_since_last_update = tracker->time_since_last_update;
+
+                        // Get a pointer to the beginning of the shared buffer.
+                        char* buffer_head = tracker->p_shared_data->buffer;
+
+                        // 1. Copy the header to the start of the buffer.
+                        memcpy(buffer_head, &header, sizeof(OverlayIPCHeader));
+                        buffer_head += sizeof(OverlayIPCHeader); // Move the pointer past the header.
+
+                        // 2. Serialize the main template data immediately after the header.
+                        size_t template_data_size = serialize_template_data(tracker->template_data, buffer_head);
+
+                        // 3. The total data size is the header + the serialized template data.
+                        tracker->p_shared_data->data_size = sizeof(OverlayIPCHeader) + template_data_size;
+
                         // --- End of Critical Section ---
 #ifdef _WIN32
                         ReleaseMutex(tracker->h_mutex);
@@ -1258,12 +1049,6 @@ int main(int argc, char *argv[]) {
                     tracker_print_debug_status(tracker, &app_settings);
                 }
             }
-
-            // TODO: Remove
-            // // Overlay animations should run every frame, if it exists
-            // if (overlay) {
-            //     overlay_update(overlay, &deltaTime, tracker, &app_settings);
-            // }
 
             // IMGUI RENDERING
             ImGui_ImplSDLRenderer3_NewFrame();
@@ -1286,13 +1071,6 @@ int main(int argc, char *argv[]) {
             SDL_RenderClear(tracker->renderer);
             ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), tracker->renderer);
             SDL_RenderPresent(tracker->renderer);
-
-
-            // TODO: Remove
-            // // Overlay window gets rendered using SDL, if it exists
-            // if (overlay) {
-            //     overlay_render(overlay, tracker, &app_settings);
-            // }
 
 
             // --- Frame limiting ---
@@ -1347,7 +1125,6 @@ int main(int argc, char *argv[]) {
     ImGui::DestroyContext();
 
     tracker_free(&tracker, &app_settings);
-    // overlay_free(&overlay, &app_settings); // TODO: Remove
     SDL_Quit(); // This is ONCE for all windows
 
     // Close logger at the end

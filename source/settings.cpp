@@ -210,14 +210,20 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     // This toggles the framerate of everything
-    ImGui::DragFloat("FPS Limit", &temp_settings.fps, 1.0f, 10.0f, 540.0f, "%.0f");
+    ImGui::DragFloat("Tracker FPS Limit", &temp_settings.fps, 1.0f, 10.0f, 540.0f, "%.0f");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Limits the frames per second of the tracker and overlay window. Default is 60 FPS.\n"
+        ImGui::SetTooltip("Limits the frames per second of the tracker window. Default is 60 FPS.\n"
             "Higher values may result in higher GPU usage.");
     }
 
     // Conditionally display overlay related settings
     if (temp_settings.enable_overlay) {
+        ImGui::DragFloat("Overlay FPS Limit", &temp_settings.overlay_fps, 1.0f, 10.0f, 540.0f, "%.0f");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Limits the frames per second of the overlay window. Default is 60 FPS.\n"
+                              "Higher values may result in higher GPU usage.");
+        }
+
         ImGui::DragFloat("Overlay Scroll Speed", &temp_settings.overlay_scroll_speed, 0.001f, -25.00f, 25.00f, "%.3f");
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("A negative scroll speed animates from right-to-left\n"

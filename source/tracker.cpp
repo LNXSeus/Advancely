@@ -2172,29 +2172,6 @@ void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settin
                 }
             }
             break;
-        // TODO: Work with mouse events
-        case SDL_EVENT_MOUSE_BUTTON_DOWN:
-            //printf("[TRACKER] Mouse button pressed in tracker.\n");
-            // TODO: Make mouse events work to check off custom goals
-            // 1. Get mouse coordinates: event->button.x, event->button.y
-
-            // 2. Loop through all custom goals and check if the mouse is inside the bounding box of a goal's checkbox.
-            //    (This requires you to store the positions of rendered elements)
-
-            // 3. If a match is found, toggle the goal's status:
-            //    t->template_data->custom_items[i]->done = !t->template_data->custom_items[i]->done;
-
-            // 4. Immediately save the changes back to settings.json
-            //    settings_save(t->template_data); // A new function you'll create
-
-
-            break;
-        case SDL_EVENT_MOUSE_MOTION:
-            // printf("[TRACKER] Mouse moved in tracker.\n");
-            break;
-        case SDL_EVENT_MOUSE_BUTTON_UP:
-            // printf("[TRACKER] Mouse button released in tracker.\n");
-            break;
         default:
             break;
     }
