@@ -1,12 +1,13 @@
-# [**DOWNLOAD ADVANCELY NOW! (Windows, Linux & macOS, any MC Java Version)**](https://github.com/LNXSeus/Advancely/releases)
+# [**DOWNLOAD ADVANCELY NOW\! (Windows, Linux & macOS, any MC Java Version)**](https://github.com/LNXSeus/Advancely/releases)
+
 # A highly customizable and interactive tool to track Minecraft progress beyond just Advancements.
 
 ## This tracker supports an arbitrary number of advancements, recipes, custom statistics, unlocks, multi-stage goals, manual goals, and custom counters for over 100 Minecraft versions.
 
-
 ### Built for flexibility, Advancely supports everything from vanilla speedruns to modded adventures and custom datapacks. It automatically detects changes in your latest singleplayer world, providing real-time progress updates.
 
 ## Socials
+
 * [Support Advancely](https://streamlabs.com/lnxseus/tip)
 * [My YouTube](https://www.youtube.com/@lnxs?sub_confirmation=1)
 * [My Twitch](https://www.twitch.tv/lnxseus)
@@ -22,11 +23,11 @@ Advancely is a sophisticated, data-driven progress tracker designed for Minecraf
 
 * **Interactive Map View**: The main tracker window is not a static list but an interactive map of your progress. You can freely organize your view to focus on what matters most.
 
-![1.16.1 All Advancements Tracker Preview](readme_assets/Tracker_1_16_1_AA_Preview.png)
+* **Pan**: Right-Click or Middle-Click + Drag
 
-  * **Pan**: Right-Click or Middle-Click + Drag
-  * **Zoom**: Mouse Wheel
-  * **Lock Layout**: Press `SPACE` to lock the grid layout, preventing it from rearranging when you resize the window or zoom.
+* **Zoom**: Mouse Wheel
+
+* **Lock Layout**: Press `SPACE` to lock the grid layout, preventing it from rearranging when you resize the window or zoom.
 
 * **Comprehensive Tracking**: Advancely isn't limited to just advancements. It tracks multiple data types directly from your save file, including:
 
@@ -46,15 +47,13 @@ Advancely is a sophisticated, data-driven progress tracker designed for Minecraf
 
 **Template-Specific Notes**: A toggleable notes window is available in the bottom-right corner of the tracker. Any text you type is saved instantly to a `_notes.txt` file, which is stored right next to the template file you are currently using. This makes your notes specific to each category and version you track. Furthermore, if you edit the `.txt` file directly while the tracker is running, the notes window will update live with your changes.
 
-![Advancely 1.16.1 All Advancements Overlay Preview](readme_assets/Overlay_1_16_1_AA_Preview.png)
-
-  * **Important**: For GIFs to work correctly, they must be unoptimized with all frame data intact. You can prepare any GIF by uploading it to [**ezgif.com/maker**](https://ezgif.com/maker), selecting the **"Don't Stack Frames"** option, and exporting the result. The site has a 2MB file size limit for this feature.
+* **Important**: For GIFs to work correctly, they must be unoptimized with all frame data intact. You can prepare any GIF by uploading it to [**ezgif.com/maker**](https://ezgif.com/maker), selecting the **"Don't Stack Frames"** option, and exporting the result.
 
 ## Extensive Version Support (1.0 – 1.21+)
 
 Advancely supports over 100 Minecraft versions, including every full release from 1.0 upwards and all April Fool's snapshots.
 
-* **Playtime Tracking**: The tracker reads total playtime directly from the world's stats file, which is measured in in-game ticks (20 ticks per second). It does not read from `level.dat`.
+* **Playtime Tracking**: The tracker reads total playtime directly from the world's stats file, which is measured in in-game ticks (20 ticks per second).
 
 * **Era-Specific Logic**:
 
@@ -68,37 +67,35 @@ Advancely supports over 100 Minecraft versions, including every full release fro
 
 ## Full Customization & Configuration
 
-![Advancely Settings Window](readme_assets/v0.9.21_Settings_Window_Preview.png)
-
 The true power of Advancely lies in its customization. All settings can be configured in real-time from the settings window (`ESC` key).
 
-| Setting Group         | Options & Features                                                                                                                                                                                                                                                                                                                                                                                                                        |
-|:----------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Path Settings**     | `Auto-Detect` saves path for your OS or specify a `Manual` path. An `Open Instances Folder` button is also available, which navigates up three directories from your saves path—ideal for custom launchers.                                                                                                                                                                                                                               |
-| **Template Settings** | Select your `Version`, `Category`, and an `Optional Flag` to load a specific ruleset. You can create your own templates by following the folder structure in `resources/templates` and use the `Open Template Folder` button for quick access.                                                                                                                                                                                            |
-| **General Settings**  | Toggle the `Overlay`, set an `FPS Limit`, keep the tracker `Always On Top`, automatically `Remove Completed Goals` from the main view, and enable the `StatsPerWorld Mod` compatibility for legacy versions.                                                                                                                                                                                                                              |
-| **Visual Settings**   | Full RGBA color customization for the tracker `background`, `text`, overlay `background`, and overlay `text`. You can also adjust the `Overlay Width`.                                                                                                                                                                                                                                                                                    |
-| **Overlay Settings**  | Fine-tune the `Overlay Scroll Speed` (negative values reverse direction), `Sub-Stat Cycle Speed` for multi-stat animations, and `Speed Up Animation` (also toggled with `SPACE` in the overlay window). You can also align the top progress text (`Left`, `Center`, or `Right`), toggle `Hide Completed Row 3 Goals`, and toggle visibility for each section of the info bar (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`). |
-| **Hotkey Settings**   | Assign keyboard hotkeys to increment/decrement any custom counters defined in your template (hotkeys only work when the tracker window is focused). You can find a list of supported key names [here](https://pastebin.com/vPKgWAen).                                                                                                                                                                                                     |
-| **Section Order**     | Allows you to reorder the sections in the main tracker window. Default: Advancements -> Unlocks -> Stats -> Custom Goals -> Multi-Stage Goals                                                                                                                                                                                                                                                                                             |
-| **Debug Settings**    | `Print Debug To Console` to see detailed, real-time status updates in your terminal. It also displays FPS of the overlay, and opens a debug window on the tracker.                                                                                                                                                                                                                                                                        |
+| Setting Group         | Options & Features                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+|:----------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Path Settings** | `Auto-Detect` saves path for your OS or specify a `Manual` path. An `Open Instances Folder` button is also available, which navigates up three directories from your saves path—ideal for custom launchers.                                                                                                                                                                                                                                    |
+| **Template Settings** | Select your `Version`, `Category`, and an `Optional Flag` to load a specific ruleset. You can create your own templates by following the folder structure in `resources/templates` and use the `Open Template Folder` button for quick access.                                                                                                                                                                                                |
+| **General Settings** | Toggle the `Overlay`, set a `Tracker FPS Limit`, keep the tracker `Always On Top`, automatically `Remove Completed Goals` from the main view, and enable the `StatsPerWorld Mod` compatibility for legacy versions.                                                                                                                                                                                                                |
+| **Visual Settings** | Full RGBA color customization for the tracker `background`, `text`, overlay `background`, and overlay `text`. You can also adjust the `Overlay Width`.                                                                                                                                                                                                                                                                        |
+| **Overlay Settings** | Set the `Overlay FPS Limit` independently from the tracker. Fine-tune the `Overlay Scroll Speed` (negative values reverse direction), `Sub-Stat Cycle Speed` for multi-stat animations, and `Speed Up Animation` (also toggled with `SPACE` in the overlay window). You can also align the top progress text (`Left`, `Center`, or `Right`), toggle `Hide Completed Row 3 Goals`, and toggle visibility for each section of the info bar (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`). |
+| **Hotkey Settings** | Assign keyboard hotkeys to increment/decrement any custom counters defined in your template (hotkeys only work when the tracker window is focused). You can find a list of supported key names [here](https://pastebin.com/vPKgWAen).                                                                                                                                                                                                            |
+| **Section Order** | Drag and drop to reorder the sections in the main tracker window. Default: Advancements -\> Unlocks -\> Stats -\> Custom Goals -\> Multi-Stage Goals.                                                                                                                                                                                                                                                                                |
+| **Debug Settings** | `Print Debug To Console` to see detailed, real-time status updates in your terminal. It also displays the FPS of the overlay window and opens an ImGui debug window on the tracker.                                                                                                                                                                                                                                                  |
 
 ## How To Use
 
 1.  **Download**: Grab the latest release (Windows, Linux, or macOS are all in one) from the [**releases page**](https://github.com/LNXSeus/Advancely/releases).
-2.  **Extract to Folder**: Extract the downloaded zip file into a folder and the run the Advancely.exe file ALWAYS from that folder. **DO NOT CREATE A SHORTCUT TO THE EXE FILE**. 
-3.  **Configure (Optional)**: For first-time use, you can simply run the application. To customize, press `ESC` in the tracker window to open the settings. Here you can select your Minecraft version, choose a tracking category, and configure visuals and hotkeys. To keep your settings after updating to a newer version just paste your old `settings.json` file into the updated config folder, same thing with the notes.txt files in the template folder.
-4.  **Run**: Launch Advancely from the extracted folder or create a shortcut. It will automatically find your most recently played singleplayer world and begin displaying your progress in real-time.
+2.  **Extract to Folder**: Extract the downloaded zip file into a folder and run the executable. You can **create a shortcut**, but **DO NOT MOVE THE ORIGINAL .EXE FILE OUT OF THAT FOLDER**.
+3.  **Configure (Optional)**: For first-time use, you can simply run the application. To customize, press `ESC` in the tracker window to open the settings. Here you can select your Minecraft version, choose a tracking category, and configure visuals and hotkeys. To keep your settings after updating to a newer version, just paste your old `settings.json` file into the updated `resources/config` folder, and do the same for your `_notes.txt` files in the `resources/templates` folder.
+4.  **Run**: Launch Advancely from the extracted folder. It will automatically find your most recently played singleplayer world and begin displaying your progress in real-time.
 
 ### Known Limitations
 
 * **Symbolic Links**: On Windows and macOS, the real-time file watcher may not function correctly if your `.minecraft/saves` folder is a symbolic link. For best results, please provide a direct path to your saves folder in the settings if you use a custom location.
-* **Shortcuts**: You must always run the application from where all the `.dll` files are located. Do not create a shortcut to the Advancely.exe file.
+* **Shortcuts**: You must always run the application from its installation directory where all the necessary `.dll` files are located. Do not create a shortcut directly to the executable file.
 
 ### Running into Issues?
 
-* **Check log file**: First look into the `advancely_log.txt` file to see if there are any errors that were caused by wrong usage of the application. With the `Print Debug To Console` setting enabled the log file will also print regular information to the console (including progress on goals on game updates) not just errors.
-* **Report an Issue**: If you have any issues, that aren't caused by wrong usage, please contact me on [Discord @lnxseus](https://discord.gg/TyNgXDz) or [create a new issue](https://github.com/LNXSeus/Advancely/issues/new) on GitHub!
+* **Check log file**: First, look into the `advancely_log.txt` file to see if there are any errors that were caused by wrong usage of the application. With the `Print Debug To Console` setting enabled, the log file will also contain detailed progress updates, not just errors.
+* **Report an Issue**: If you have any issues that aren't caused by incorrect usage, please contact me on [Discord @lnxseus](https://discord.gg/TyNgXDz) or [create a new issue](https://github.com/LNXSeus/Advancely/issues/new) on GitHub\!
 
 ### Beta Testers
 
@@ -113,7 +110,7 @@ Massive thanks to all the beta testers:
 
 *This project uses dmon by Sepehr Taghdisian, licensed under the BSD 2-Clause License.*
 *This project's user interface is powered by the excellent [Dear ImGui](https://github.com/ocornut/imgui) library.*
-*This project also uses the SDL3 library suite and cJSON. More information can be found in the [LICENSES.txt](https://www.google.com/search?q=LICENSES.txt) file.*
-*Lots of assitance was provided by Gemini 2.5 Pro.*
-*Minecraft item .png files downloaded from [Minecraft Asset Clout](https://mcasset.cloud/1.0/) and block renders from the [Minecraft Wiki](https://www.minecraft.wiki) (downloaded by [Dogmaster](https://www.twitch.tv/thedogmaster28))*
+*This project also uses the SDL3 library suite and cJSON. More information can be found in the LICENSES.txt file.*
+*Lots of assistance was provided by Gemini 2.5 Pro.*
+*Minecraft item .png files downloaded from [Minecraft Asset Cloud](https://mcasset.cloud/1.0/) and block renders from the [Minecraft Wiki](https://www.minecraft.wiki) (downloaded by [Dogmaster](https://www.twitch.tv/thedogmaster28))*
 *Shoutout to [Oskar](https://github.com/Oskar3141) for providing me his project files (kAAmel) and Darwin Baker for creating [AATool](https://github.com/DarwinBaker/AATool), which served as inspiration\!*
