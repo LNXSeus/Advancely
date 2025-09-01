@@ -40,6 +40,7 @@ extern "C" {
 #else
 #include <unistd.h> // For fork, execv, kill
 #include <sys/types.h> // For pid_t
+#include <sys/wait.h> // For waitpid
 #include <signal.h> // For SIGKILL
 #include <fcntl.h>     // For O_* constants
 #include <sys/mman.h>  // For shared memory
@@ -655,6 +656,8 @@ int main(int argc, char *argv[]) {
 
         bool is_running = true;
         Uint32 last_frame_time = SDL_GetTicks();
+
+        // Unified OVERLAY LOOP -------------------------------------------------
         while (is_running) {
             // Separate loop for the overlay process -> with it's own framerate
 
@@ -741,7 +744,7 @@ int main(int argc, char *argv[]) {
             if (frame_time < frame_target_time) {
                 SDL_Delay((Uint32) (frame_target_time - frame_time));
             }
-        }
+        } // END OF OVERLAY LOOP
 
         // Clean up IPC handles
 #ifdef _WIN32
@@ -968,7 +971,40 @@ int main(int argc, char *argv[]) {
         Uint32 last_frame_time = SDL_GetTicks();
         float frame_target_time = 1000.0f / app_settings.fps;
 
-        // Unified Main Loop at 60 FPS
+        // Launch overlay if enabled
+        if (app_settings.enable_overlay) {
+            log_message(LOG_INFO, "[MAIN] Overlay enabled in settings. Launching on startup.\n");
+            char exe_path[MAX_PATH_LENGTH];
+            if (get_executable_path(exe_path, sizeof(exe_path))) {
+#ifdef _WIN32
+                STARTUPINFOA si;
+                memset(&si, 0, sizeof(si));
+                si.cb = sizeof(si);
+                char args[MAX_PATH_LENGTH + 16];
+                snprintf(args, sizeof(args), "\"%s\" --overlay", exe_path);
+
+                if (CreateProcessA(nullptr, args, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &tracker->overlay_process_info)) {
+                    log_message(LOG_INFO, "[MAIN] Overlay process started with PID: %lu\n", tracker->overlay_process_info.dwProcessId);
+                } else {
+                    log_message(LOG_ERROR, "[MAIN] Failed to create overlay process on startup. Error code: %lu\n", GetLastError());
+                }
+#else
+                pid_t pid = fork();
+                if (pid == 0) { // Child process
+                    char* args[] = {exe_path, (char*)"--overlay", nullptr};
+                    execv(exe_path, args);
+                    _exit(1); // Should not be reached
+                } else if (pid > 0) { // Parent process
+                    tracker->overlay_pid = pid;
+                    log_message(LOG_INFO, "[MAIN] Overlay process started with PID: %d\n", pid);
+                } else {
+                    log_message(LOG_ERROR, "[MAIN] Failed to fork overlay process on startup.\n");
+                }
+#endif
+            }
+        }
+
+        // Unified MAIN TRACKER LOOP -------------------------------------------------
         while (is_running) {
             // Force settings window open if the path was invalid on startup
             if (g_force_open_settings) {
@@ -988,6 +1024,39 @@ int main(int argc, char *argv[]) {
             }
 
             // --- Per-Frame Logic ---
+
+            // Check if overlay process has terminated
+            if (app_settings.enable_overlay) { // Only check if the overlay should be active
+                bool overlay_has_terminated = false;
+#ifdef _WIN32
+                if (tracker->overlay_process_info.hProcess != nullptr) {
+                    // GetExitCodeProcess returns STILL_ACTIVE if the process is running.
+                    // If it returns anything else, the process has terminated.
+                    DWORD exitCode;
+                    if (GetExitCodeProcess(tracker->overlay_process_info.hProcess, &exitCode) && exitCode != STILL_ACTIVE) {
+                        overlay_has_terminated = true;
+                        CloseHandle(tracker->overlay_process_info.hProcess); // Clean up handles
+                        CloseHandle(tracker->overlay_process_info.hThread);
+                        memset(&tracker->overlay_process_info, 0, sizeof(tracker->overlay_process_info));
+                    }
+                }
+#else // For Linux/macOS
+                if (tracker->overlay_pid > 0) {
+                    int status;
+                    // waitpid with WNOHANG is a non-blocking check.
+                    // It returns the PID of the exited child, 0 if it's still running, or -1 on error.
+                    if (waitpid(tracker->overlay_pid, &status, WNOHANG) == tracker->overlay_pid) {
+                        overlay_has_terminated = true;
+                        tracker->overlay_pid = 0; // Clear the PID
+                    }
+                }
+#endif
+
+                if (overlay_has_terminated) {
+                    log_message(LOG_INFO, "[MAIN] Overlay process terminated. Shutting down tracker.\n");
+                    is_running = false; // Signal the tracker's main loop to shut down
+                }
+            }
 
             // Increment the time since the last update every frame
             tracker->time_since_last_update += deltaTime;
