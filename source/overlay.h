@@ -99,7 +99,7 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings);
  * @param deltaTime A pointer to the frame's delta time, modified by the speedup hotkey.
  * @param settings A pointer to the loaded application settings.
  */
-void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *deltaTime, const AppSettings *settings);
+void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *deltaTime, AppSettings *settings);
 
 /**
  * @brief Updates the state of the overlay's animations for the current frame.
