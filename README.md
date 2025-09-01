@@ -21,6 +21,15 @@ Advancely is a sophisticated, data-driven progress tracker designed for Minecraf
 
 ![Tracker_Preview.gif](readme_assets/Tracker_Preview.gif)
 
+## Officially Added Templates
+
+| Category          | Version(s)                                  | Optional Flag |
+|-------------------|---------------------------------------------|---------------|
+| `all_advancements` | 1.16.1, 1.21.8                              |               |
+| `all_advancements` | 1.21.8                                      | _optimized    |
+| `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4 |               |
+| `miku%`           | 1.21.8                                      |               |
+
 ## Core Features
 
 * **Interactive Map View**: The main tracker window is not a static list but an interactive map of your progress. You can freely organize your view to focus on what matters most.
