@@ -621,7 +621,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
     // --- ROW 1: Criteria & Sub-stats Icons ---
     {
-        const float ROW1_Y_POS = 52.0f;
+        const float ROW1_Y_POS = 48.0f; // Initially 52
         const float ROW1_ICON_SIZE = 48.0f;
         const float ROW1_SPACING = 8.0f;
         const float ROW1_SHARED_ICON_SIZE = 30.0f;
