@@ -3499,7 +3499,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             "The Adv/Ach counter tracks only the main goals defined in the \"advancements\" section of your template file.");
 
         ImGui::BulletText(
-            "The Progress %% shows your total completion across all individual sub-tasks from all categories. Each of the following tasks has an equal weight in the calculation:");
+            "The Progress %% shows your total completion across all individual sub-tasks from all categories.\nEach of the following tasks has an equal weight in the calculation:");
         ImGui::Indent();
         ImGui::BulletText("Advancement Criteria");
         ImGui::BulletText("Unlocks (exclusive to 25w14craftmine)");
