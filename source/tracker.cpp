@@ -3738,29 +3738,38 @@ bool tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
 
     cJSON *template_json = cJSON_from_file(t->advancement_template_path);
 
-    // Check if template file exists otherwise create it using temp_create_utils.c
+    // When template doesn't exist we stop here
+    // TODO: When template doesn't exist it shouldn't do anything
     if (!template_json) {
-        log_message(LOG_ERROR, "[TRACKER] Template file not found: %s\n", t->advancement_template_path);
-        log_message(LOG_ERROR, "[TRACKER] Attempting to create new template and language files...\n");
-
-        // Ensure directory structure exists
-        fs_ensure_directory_exists(t->advancement_template_path);
-
-        // Create the empty template and language files
-        // TODO: Allow user to populate the language and template files through the settings
-        fs_create_empty_template_file(t->advancement_template_path);
-        fs_create_empty_lang_file(t->lang_path);
-
-        // Try to load the newly create template file again
-        template_json = cJSON_from_file(t->advancement_template_path);
-
-        if (!template_json) {
-            log_message(LOG_ERROR, "[TRACKER] CRITICAL: Failed to load the newly created template file.\n");
-            show_error_message("Template Error",
-                               "The selected template file is missing or corrupted and could not be recreated.\nPlease check the file path in your settings or the file's contents.");
-            return false; // Signal critical failure
-        }
+        log_message(LOG_ERROR, "[TRACKER] CRITICAL: Template file not found: %s\n", t->advancement_template_path);
+        show_error_message("Template Not Found", "The selected template file could not be found. Please check your settings or create the required template file.");
+        return false; // Signal critical failure
     }
+
+    // TODO: Template Creator will be added separately
+    // // Check if template file exists otherwise create it using temp_create_utils.c
+    // if (!template_json) {
+    //     log_message(LOG_ERROR, "[TRACKER] Template file not found: %s\n", t->advancement_template_path);
+    //     log_message(LOG_ERROR, "[TRACKER] Attempting to create new template and language files...\n");
+    //
+    //     // Ensure directory structure exists
+    //     fs_ensure_directory_exists(t->advancement_template_path);
+    //
+    //     // Create the empty template and language files
+    //     // TODO: Allow user to populate the language and template files through the settings
+    //     fs_create_empty_template_file(t->advancement_template_path);
+    //     fs_create_empty_lang_file(t->lang_path);
+    //
+    //     // Try to load the newly create template file again
+    //     template_json = cJSON_from_file(t->advancement_template_path);
+    //
+    //     if (!template_json) {
+    //         log_message(LOG_ERROR, "[TRACKER] CRITICAL: Failed to load the newly created template file.\n");
+    //         show_error_message("Template Error",
+    //                            "The selected template file is missing or corrupted and could not be recreated.\nPlease check the file path in your settings or the file's contents.");
+    //         return false; // Signal critical failure
+    //     }
+    // }
 
     // Declare lang_json as a local variable, this prevents memory leaks
     cJSON *lang_json = cJSON_from_file(t->lang_path);

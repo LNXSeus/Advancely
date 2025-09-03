@@ -4,6 +4,10 @@
 
 
 #include "settings.h"
+
+#include <algorithm>
+#include <string>
+
 #include "logger.h"
 
 #include <vector>
@@ -11,11 +15,10 @@
 #include "settings_utils.h" // ImGui imported through this
 #include "global_event_handler.h" // For global variables
 #include "path_utils.h" // For path_exists()
+#include "template_scanner.h"
 
 void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t,
                          bool *force_open_flag) {
-
-
     // This static variable tracks the open state from the previous frame
     static bool was_open_last_frame = false;
 
@@ -30,6 +33,15 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // Holds temporary copy of the settings for editing
     static AppSettings temp_settings;
+
+    static DiscoveredTemplate *discovered_templates = nullptr;
+    static int discovered_template_count = 0;
+    static char last_scanned_version[64] = "";
+
+    static std::vector<std::string> unique_category_values;
+    static std::vector<const char*> category_display_names;
+    static std::vector<std::string> flag_values;
+    static std::vector<const char*> flag_display_names;
 
     // --- State management for window open/close ---
     // Detect the transition from closed to opened state.
@@ -46,7 +58,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         show_applied_message = false; // Reset message visibility
         show_defaults_applied_message = false; // Reset "Defaults Applied" message visibility
     }
-
 
 
     // Begin an ImGui window. The 'p_open' parameter provides the 'X' button to close it.
@@ -89,8 +100,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Enter the path to your '.minecraft/saves' folder.\n"
-                              "You can just paste it in.\n"
-                              "Doesn't matter if the path uses forward- or backward slashes.");
+                "You can just paste it in.\n"
+                "Doesn't matter if the path uses forward- or backward slashes.");
         }
 
         if (show_invalid_manual_path_error) {
@@ -125,9 +136,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             }
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("IMPORTANT: If you just changed your saves path you'll need to hit 'Apply Settings' first.\n"
+            ImGui::SetTooltip(
+                "IMPORTANT: If you just changed your saves path you'll need to hit 'Apply Settings' first.\n"
                 "Attempts to open the parent 'instances' folder (goes up 3 directories from your saves path).\n"
-                              "Useful for quickly switching between instances in custom launchers.");
+                "Useful for quickly switching between instances in custom launchers.");
         }
     }
 
@@ -147,6 +159,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         );
     }
 
+// Version dropdown
     int current_version_idx = -1;
     for (int i = 0; i < VERSION_STRINGS_COUNT; i++) {
         if (strcmp(VERSION_STRINGS[i], temp_settings.version_str) == 0) {
@@ -154,30 +167,115 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             break;
         }
     }
-
     if (ImGui::Combo("Version", &current_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT)) {
         if (current_version_idx >= 0) {
-            strncpy(temp_settings.version_str, VERSION_STRINGS[current_version_idx],
-                    sizeof(temp_settings.version_str) - 1);
+            strncpy(temp_settings.version_str, VERSION_STRINGS[current_version_idx], sizeof(temp_settings.version_str) - 1);
+            temp_settings.version_str[sizeof(temp_settings.version_str) - 1] = '\0';
         }
     }
 
-    // Only show the StatsPerWorld checkbox for legacy versions
-    MC_Version selected_version = settings_get_version_from_string(temp_settings.version_str);
-    if (selected_version <= MC_VERSION_1_6_4) {
-        ImGui::Checkbox("Using StatsPerWorld Mod", &temp_settings.using_stats_per_world_legacy);
+    // --- SCANNING & UI LOGIC ---
+    if (strcmp(last_scanned_version, temp_settings.version_str) != 0) {
+        free_discovered_templates(&discovered_templates, &discovered_template_count);
+        scan_for_templates(temp_settings.version_str, &discovered_templates, &discovered_template_count);
+        strncpy(last_scanned_version, temp_settings.version_str, sizeof(last_scanned_version) - 1);
+        last_scanned_version[sizeof(last_scanned_version) - 1] = '\0';
 
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(
-                "The StatsPerWorld Mod in combination with Legacy Fabric allows legacy versions of Minecraft\n"
-                "to track stats locally per world and not globally. Check this if you're using this mod.\n"
-                "If unchecked, the tracker will use a snapshotting system to simulate per-world achievements/stats.\n"
-                "Then, achievements will even indicate if they have been completed on a previous world or on your current one.");
+        // Re-populate static category list
+        unique_category_values.clear();
+        if (discovered_template_count > 0) {
+            for (int i = 0; i < discovered_template_count; ++i) {
+                unique_category_values.push_back(discovered_templates[i].category);
+            }
+            std::sort(unique_category_values.begin(), unique_category_values.end());
+            unique_category_values.erase(std::unique(unique_category_values.begin(), unique_category_values.end()), unique_category_values.end());
+        }
+
+        // After scan, validate and reset current selection if it's no longer valid for the new version
+        bool category_is_valid = false;
+        for (const auto& cat : unique_category_values) {
+            if (cat == temp_settings.category) {
+                category_is_valid = true;
+                break;
+            }
+        }
+        if (!category_is_valid) {
+            if (!unique_category_values.empty()) {
+                strncpy(temp_settings.category, unique_category_values[0].c_str(), sizeof(temp_settings.category) - 1);
+                temp_settings.category[sizeof(temp_settings.category) - 1] = '\0';
+            } else {
+                temp_settings.category[0] = '\0';
+            }
+            // Since category is invalid, the flag must also be reset
+            temp_settings.optional_flag[0] = '\0';
         }
     }
 
-    ImGui::InputText("Category", temp_settings.category, MAX_PATH_LENGTH);
-    ImGui::InputText("Optional Flag", temp_settings.optional_flag, MAX_PATH_LENGTH);
+    // --- CATEGORY DROPDOWN ---
+    category_display_names.clear();
+    for(const auto& cat : unique_category_values) {
+        category_display_names.push_back(cat.c_str());
+    }
+
+    int category_idx = -1;
+    for (size_t i = 0; i < category_display_names.size(); ++i) {
+        if (strcmp(category_display_names[i], temp_settings.category) == 0) {
+            category_idx = i;
+            break;
+        }
+    }
+
+    if (ImGui::Combo("Category", &category_idx, category_display_names.data(), category_display_names.size())) {
+        if (category_idx >= 0 && (size_t)category_idx < category_display_names.size()) {
+            strncpy(temp_settings.category, category_display_names[category_idx], sizeof(temp_settings.category) - 1);
+            temp_settings.category[sizeof(temp_settings.category) - 1] = '\0';
+
+            // When category changes, immediately set the flag to the first available option
+            bool flag_set = false;
+            for (int i = 0; i < discovered_template_count; ++i) {
+                if (strcmp(discovered_templates[i].category, temp_settings.category) == 0) {
+                    strncpy(temp_settings.optional_flag, discovered_templates[i].optional_flag, sizeof(temp_settings.optional_flag) - 1);
+                    temp_settings.optional_flag[sizeof(temp_settings.optional_flag) - 1] = '\0';
+                    flag_set = true;
+                    break;
+                }
+            }
+            if (!flag_set) temp_settings.optional_flag[0] = '\0';
+        }
+    }
+
+    // --- OPTIONAL FLAG DROPDOWN ---
+    flag_values.clear();
+    flag_display_names.clear();
+
+    if (temp_settings.category[0] != '\0') {
+        for (int i = 0; i < discovered_template_count; ++i) {
+            if (strcmp(discovered_templates[i].category, temp_settings.category) == 0) {
+                const char* flag = discovered_templates[i].optional_flag;
+                flag_values.push_back(flag);
+                if (flag[0] == '\0') {
+                    flag_display_names.push_back("None");
+                } else {
+                    flag_display_names.push_back(flag_values.back().c_str());
+                }
+            }
+        }
+    }
+
+    int flag_idx = -1;
+    for (size_t i = 0; i < flag_values.size(); ++i) {
+        if (strcmp(flag_values[i].c_str(), temp_settings.optional_flag) == 0) {
+            flag_idx = i;
+            break;
+        }
+    }
+
+    if (ImGui::Combo("Optional Flag", &flag_idx, flag_display_names.data(), flag_display_names.size())) {
+        if (flag_idx >= 0 && (size_t)flag_idx < flag_values.size()) {
+            strncpy(temp_settings.optional_flag, flag_values[flag_idx].c_str(), sizeof(temp_settings.optional_flag) - 1);
+        }
+    }
+
 
     if (ImGui::Button("Open Template Folder")) {
 #ifdef _WIN32
@@ -221,20 +319,22 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::DragFloat("Overlay FPS Limit", &temp_settings.overlay_fps, 1.0f, 10.0f, 540.0f, "%.0f");
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Limits the frames per second of the overlay window. Default is 60 FPS.\n"
-                              "Higher values may result in higher GPU usage.");
+                "Higher values may result in higher GPU usage.");
         }
 
         ImGui::DragFloat("Overlay Scroll Speed", &temp_settings.overlay_scroll_speed, 0.001f, -25.00f, 25.00f, "%.3f");
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("A negative scroll speed animates from right-to-left\n"
-                              "(items always appear in the same order as they are on the tracker).\n"
+                "(items always appear in the same order as they are on the tracker).\n"
                 "A scroll speed of 0.0 is static.\n"
                 "Default of 1.0 scrolls 1440 pixels (default width) in 24 seconds.");
         }
 
-        ImGui::DragFloat("Sub-Stat Cycle Interval (s)", &temp_settings.overlay_stat_cycle_speed, 0.1f, 0.1f, 60.0f, "%.3f s");
+        ImGui::DragFloat("Sub-Stat Cycle Interval (s)", &temp_settings.overlay_stat_cycle_speed, 0.1f, 0.1f, 60.0f,
+                         "%.3f s");
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("The time in seconds before cycling to the next sub-stat on a multi-stat goal on the overlay.\n");
+            ImGui::SetTooltip(
+                "The time in seconds before cycling to the next sub-stat on a multi-stat goal on the overlay.\n");
         }
 
         if (ImGui::Checkbox("Speed Up Animation", &temp_settings.overlay_animation_speedup)) {
@@ -265,8 +365,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::Checkbox("Remove Completed Goals", &temp_settings.remove_completed_goals);
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Hides fully completed goals and sub-goals from the tracker window to tidy up the view.\n"
-                          "Unchecking this setting will make all goals visible,\n"
-                          "even ones set to - \"hidden\": true - in the template.");
+            "Unchecking this setting will make all goals visible,\n"
+            "even ones set to - \"hidden\": true - in the template.");
     }
 
     ImGui::Separator();
@@ -514,7 +614,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // Apply the changes or pressing Enter key
     if (ImGui::Button("Apply Settings") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && !ImGui::IsAnyItemActive())) {
-
         // Reset message visibility on each new attempt
         show_applied_message = false;
         show_defaults_applied_message = false; // Reset the other message
@@ -596,7 +695,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::SameLine();
 
     if (ImGui::Button("Reset To Defaults")) {
-
         // Clear any previous "Applied!" message and show the "Defaults!" message
         show_applied_message = false;
         show_defaults_applied_message = true;
@@ -617,42 +715,42 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         char tooltip_buffer[1024];
 
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "Resets all settings (besides window size/position & hotkeys) in this window to their default values.\n"
-                         "This does not modify your template files.\n\n"
-                         "Defaults:\n"
-                         "  - Path Mode: Auto-Detect\n"
-                         "  - Version: %s\n"
-                         "  - StatsPerWorld Mod (1.0-1.6.4): %s\n"
-                         "  - Category: %s\n"
-                         "  - Optional Flag: %s\n"
-                         "  - Section Order: Advancements -> Unlocks -> Statistics -> Custom Goals -> Multi-Stage Goals\n"
-                         "  - Overlay: %s\n"
-                         "  - FPS Limit: %d\n"
-                         "  - Overlay Scroll Speed: %.2f\n"
-                         "  - Sub-Stat Cycle Speed: %.1f s\n"
-                         "  - Speed Up Animation: %s\n"
-                         "  - Hide Completed Row 3 Goals: %s\n"
-                         "  - Always On Top: %s\n"
-                         "  - Remove Completed: %s\n"
-                         "  - Overlay Width: %s\n"
-                         "  - Use Settings Font: %s\n"
-                         "  - Print Debug To Console: %s",
+                 "Resets all settings (besides window size/position & hotkeys) in this window to their default values.\n"
+                 "This does not modify your template files.\n\n"
+                 "Defaults:\n"
+                 "  - Path Mode: Auto-Detect\n"
+                 "  - Version: %s\n"
+                 "  - StatsPerWorld Mod (1.0-1.6.4): %s\n"
+                 "  - Category: %s\n"
+                 "  - Optional Flag: %s\n"
+                 "  - Section Order: Advancements -> Unlocks -> Statistics -> Custom Goals -> Multi-Stage Goals\n"
+                 "  - Overlay: %s\n"
+                 "  - FPS Limit: %d\n"
+                 "  - Overlay Scroll Speed: %.2f\n"
+                 "  - Sub-Stat Cycle Speed: %.1f s\n"
+                 "  - Speed Up Animation: %s\n"
+                 "  - Hide Completed Row 3 Goals: %s\n"
+                 "  - Always On Top: %s\n"
+                 "  - Remove Completed: %s\n"
+                 "  - Overlay Width: %s\n"
+                 "  - Use Settings Font: %s\n"
+                 "  - Print Debug To Console: %s",
 
-                         DEFAULT_VERSION,
-                         DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
-                         DEFAULT_CATEGORY,
-                         DEFAULT_OPTIONAL_FLAG,
-                         DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
-                         DEFAULT_FPS,
-                         DEFAULT_OVERLAY_SCROLL_SPEED,
-                         DEFAULT_OVERLAY_STAT_CYCLE_SPEED,
-                         DEFAULT_OVERLAY_SPEED_UP ? "Enabled" : "Disabled",
-                         DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
-                         DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
-                         DEFAULT_REMOVE_COMPLETED_GOALS ? "Enabled" : "Disabled",
-                         "1440px",
-                         DEFAULT_NOTES_USE_ROBOTO ? "Enabled" : "Disabled",
-                         DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled"
+                 DEFAULT_VERSION,
+                 DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
+                 DEFAULT_CATEGORY,
+                 DEFAULT_OPTIONAL_FLAG,
+                 DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
+                 DEFAULT_FPS,
+                 DEFAULT_OVERLAY_SCROLL_SPEED,
+                 DEFAULT_OVERLAY_STAT_CYCLE_SPEED,
+                 DEFAULT_OVERLAY_SPEED_UP ? "Enabled" : "Disabled",
+                 DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
+                 DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
+                 DEFAULT_REMOVE_COMPLETED_GOALS ? "Enabled" : "Disabled",
+                 "1440px",
+                 DEFAULT_NOTES_USE_ROBOTO ? "Enabled" : "Disabled",
+                 DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled"
         );
         ImGui::SetTooltip(tooltip_buffer);
     }

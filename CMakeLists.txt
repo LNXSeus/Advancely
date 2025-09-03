@@ -29,6 +29,7 @@ set(SOURCE_FILES
         "source/file_utils.cpp"
         "source/format_utils.cpp" # for formatting strings
         "source/temp_create_utils.cpp"
+        "source/template_scanner.cpp"
 
         # External libraries included as source and stay in C
         "source/external/cJSON.c"
