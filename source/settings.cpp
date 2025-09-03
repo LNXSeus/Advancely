@@ -732,7 +732,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip(
             "Apply any changes made in this window. You can also press 'Enter' to apply.\n"
-            "Changes made to the overlay window will cause the overlay to restart.\n"
+            "Changes made to the overlay window will cause the overlay to restart,\n"
+            "which might lead to OBS not capturing the overlay anymore.\n"
             "It will fail to apply if any warnings are shown.");
     }
 

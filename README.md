@@ -132,6 +132,7 @@ Massive thanks to all the beta testers:
 * zurtletif
 * 3emis
 * MoreTrident
+* ShadowFlower64
 
 ### Licenses & Credits
 
