@@ -25,6 +25,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Flag to track invalid manual path (especially important when auto path is invalid as well, to prevent dmon crashes)
     static bool show_invalid_manual_path_error = false;
 
+    // Flag to show an error if the selected template doesn't exist
+    static bool show_template_not_found_error = false;
+
     // Flag to show a confirmation message when settings are applied
     static bool show_applied_message = false;
 
@@ -39,9 +42,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     static char last_scanned_version[64] = "";
 
     static std::vector<std::string> unique_category_values;
-    static std::vector<const char*> category_display_names;
+    static std::vector<const char *> category_display_names;
     static std::vector<std::string> flag_values;
-    static std::vector<const char*> flag_display_names;
+    static std::vector<const char *> flag_display_names;
 
     // --- State management for window open/close ---
     // Detect the transition from closed to opened state.
@@ -57,6 +60,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         memcpy(&temp_settings, app_settings, sizeof(AppSettings));
         show_applied_message = false; // Reset message visibility
         show_defaults_applied_message = false; // Reset "Defaults Applied" message visibility
+        show_template_not_found_error = false;
     }
 
 
@@ -159,7 +163,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         );
     }
 
-// Version dropdown
+    // Version dropdown
     int current_version_idx = -1;
     for (int i = 0; i < VERSION_STRINGS_COUNT; i++) {
         if (strcmp(VERSION_STRINGS[i], temp_settings.version_str) == 0) {
@@ -169,7 +173,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
     if (ImGui::Combo("Version", &current_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT)) {
         if (current_version_idx >= 0) {
-            strncpy(temp_settings.version_str, VERSION_STRINGS[current_version_idx], sizeof(temp_settings.version_str) - 1);
+            strncpy(temp_settings.version_str, VERSION_STRINGS[current_version_idx],
+                    sizeof(temp_settings.version_str) - 1);
             temp_settings.version_str[sizeof(temp_settings.version_str) - 1] = '\0';
         }
     }
@@ -188,12 +193,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 unique_category_values.push_back(discovered_templates[i].category);
             }
             std::sort(unique_category_values.begin(), unique_category_values.end());
-            unique_category_values.erase(std::unique(unique_category_values.begin(), unique_category_values.end()), unique_category_values.end());
+            unique_category_values.erase(std::unique(unique_category_values.begin(), unique_category_values.end()),
+                                         unique_category_values.end());
         }
 
         // After scan, validate and reset current selection if it's no longer valid for the new version
         bool category_is_valid = false;
-        for (const auto& cat : unique_category_values) {
+        for (const auto &cat: unique_category_values) {
             if (cat == temp_settings.category) {
                 category_is_valid = true;
                 break;
@@ -213,7 +219,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // --- CATEGORY DROPDOWN ---
     category_display_names.clear();
-    for(const auto& cat : unique_category_values) {
+    for (const auto &cat: unique_category_values) {
         category_display_names.push_back(cat.c_str());
     }
 
@@ -226,7 +232,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     if (ImGui::Combo("Category", &category_idx, category_display_names.data(), category_display_names.size())) {
-        if (category_idx >= 0 && (size_t)category_idx < category_display_names.size()) {
+        if (category_idx >= 0 && (size_t) category_idx < category_display_names.size()) {
             strncpy(temp_settings.category, category_display_names[category_idx], sizeof(temp_settings.category) - 1);
             temp_settings.category[sizeof(temp_settings.category) - 1] = '\0';
 
@@ -234,7 +240,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             bool flag_set = false;
             for (int i = 0; i < discovered_template_count; ++i) {
                 if (strcmp(discovered_templates[i].category, temp_settings.category) == 0) {
-                    strncpy(temp_settings.optional_flag, discovered_templates[i].optional_flag, sizeof(temp_settings.optional_flag) - 1);
+                    strncpy(temp_settings.optional_flag, discovered_templates[i].optional_flag,
+                            sizeof(temp_settings.optional_flag) - 1);
                     temp_settings.optional_flag[sizeof(temp_settings.optional_flag) - 1] = '\0';
                     flag_set = true;
                     break;
@@ -251,7 +258,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (temp_settings.category[0] != '\0') {
         for (int i = 0; i < discovered_template_count; ++i) {
             if (strcmp(discovered_templates[i].category, temp_settings.category) == 0) {
-                const char* flag = discovered_templates[i].optional_flag;
+                const char *flag = discovered_templates[i].optional_flag;
                 flag_values.push_back(flag);
                 if (flag[0] == '\0') {
                     flag_display_names.push_back("None");
@@ -271,9 +278,23 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     if (ImGui::Combo("Optional Flag", &flag_idx, flag_display_names.data(), flag_display_names.size())) {
-        if (flag_idx >= 0 && (size_t)flag_idx < flag_values.size()) {
-            strncpy(temp_settings.optional_flag, flag_values[flag_idx].c_str(), sizeof(temp_settings.optional_flag) - 1);
+        if (flag_idx >= 0 && (size_t) flag_idx < flag_values.size()) {
+            strncpy(temp_settings.optional_flag, flag_values[flag_idx].c_str(),
+                    sizeof(temp_settings.optional_flag) - 1);
         }
+    }
+
+    if (show_template_not_found_error) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f)); // Red text
+        if (temp_settings.category[0] == '\0') {
+            ImGui::TextWrapped(
+                "This template does not exist. Choose different version/category/flag or create a template.");
+        } else {
+            ImGui::TextWrapped("Error: The selected template file does not exist. Settings were not applied.");
+            // To help with debugging, we can show the path that was checked.
+            // ImGui::Text("Path checked: %s", temp_settings.template_path);
+        }
+        ImGui::PopStyleColor();
     }
 
 
@@ -621,52 +642,66 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         // Assume the error is cleared unless we find one
         show_invalid_manual_path_error = false;
 
-        // Step 1: Validate the manual Path if it's being used
-        if (temp_settings.path_mode == PATH_MODE_MANUAL) {
-            // Check if the path is empty or does not exist
-            if (strlen(temp_settings.manual_saves_path) == 0 || !path_exists(temp_settings.manual_saves_path)) {
-                // CASE 1: Manual mode is selected, but the path is invalid.
-                show_invalid_manual_path_error = true;
-                // Do not apply settings; force user to correct the path
-            } else {
-                // CASE 2: Manual mode is selected, and the path is valid. Apply settings.
-                show_invalid_manual_path_error = false; // Hide error message
+        show_template_not_found_error = false;
 
-                // If the path is now valid, we can clear the force_open_flag
-                if (force_open_flag) {
-                    *force_open_flag = false;
-                }
+        // 1. Construct the potential template path from the temporary settings.
+        construct_template_paths(&temp_settings);
 
-                // Copy temp settings to the real settings, save, and trigger a reload
-                memcpy(app_settings, &temp_settings, sizeof(AppSettings));
-                SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
-                settings_save(app_settings, nullptr);
-                SDL_SetAtomicInt(&g_settings_changed, 1); // Trigger a reload
-                SDL_SetAtomicInt(&g_apply_button_clicked, 1);
-                show_applied_message = true;
-            }
+        // 2. Check if a category is selected and if the corresponding template file exists.
+        if (temp_settings.category[0] == '\0') {
+            // It's an error to apply with "None" selected for category.
+            show_template_not_found_error = true;
+        } else if (!path_exists(temp_settings.template_path)) {
+            // The constructed path does not point to a real file.
+            show_template_not_found_error = true;
         } else {
-            // temp_settings.path_mode == PATH_MODE_AUTO
-            char auto_path_buffer[MAX_PATH_LENGTH];
-            get_saves_path(auto_path_buffer, MAX_PATH_LENGTH, PATH_MODE_AUTO, nullptr);
+            // Step 1: Validate the manual Path if it's being used
+            if (temp_settings.path_mode == PATH_MODE_MANUAL) {
+                // Check if the path is empty or does not exist
+                if (strlen(temp_settings.manual_saves_path) == 0 || !path_exists(temp_settings.manual_saves_path)) {
+                    // CASE 1: Manual mode is selected, but the path is invalid.
+                    show_invalid_manual_path_error = true;
+                    // Do not apply settings; force user to correct the path
+                } else {
+                    // CASE 2: Manual mode is selected, and the path is valid. Apply settings.
+                    show_invalid_manual_path_error = false; // Hide error message
 
-            if (!path_exists(auto_path_buffer)) {
-                // CASE 3: Auto mode is selected, but the auto-detected path is invalid.
-                temp_settings.path_mode = PATH_MODE_MANUAL; // Revert the choice in the UI
-                if (force_open_flag) {
-                    *force_open_flag = true; // Re-trigger the warning message
+                    // If the path is now valid, we can clear the force_open_flag
+                    if (force_open_flag) {
+                        *force_open_flag = false;
+                    }
+
+                    // Copy temp settings to the real settings, save, and trigger a reload
+                    memcpy(app_settings, &temp_settings, sizeof(AppSettings));
+                    SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
+                    settings_save(app_settings, nullptr);
+                    SDL_SetAtomicInt(&g_settings_changed, 1); // Trigger a reload
+                    SDL_SetAtomicInt(&g_apply_button_clicked, 1);
+                    show_applied_message = true;
                 }
             } else {
-                // CASE 4: Auto mode is selected, and the path is valid. Apply settings.
-                if (force_open_flag) {
-                    *force_open_flag = false;
+                // temp_settings.path_mode == PATH_MODE_AUTO
+                char auto_path_buffer[MAX_PATH_LENGTH];
+                get_saves_path(auto_path_buffer, MAX_PATH_LENGTH, PATH_MODE_AUTO, nullptr);
+
+                if (!path_exists(auto_path_buffer)) {
+                    // CASE 3: Auto mode is selected, but the auto-detected path is invalid.
+                    temp_settings.path_mode = PATH_MODE_MANUAL; // Revert the choice in the UI
+                    if (force_open_flag) {
+                        *force_open_flag = true; // Re-trigger the warning message
+                    }
+                } else {
+                    // CASE 4: Auto mode is selected, and the path is valid. Apply settings.
+                    if (force_open_flag) {
+                        *force_open_flag = false;
+                    }
+                    memcpy(app_settings, &temp_settings, sizeof(AppSettings));
+                    SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
+                    settings_save(app_settings, nullptr);
+                    SDL_SetAtomicInt(&g_settings_changed, 1);
+                    SDL_SetAtomicInt(&g_apply_button_clicked, 1);
+                    show_applied_message = true;
                 }
-                memcpy(app_settings, &temp_settings, sizeof(AppSettings));
-                SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
-                settings_save(app_settings, nullptr);
-                SDL_SetAtomicInt(&g_settings_changed, 1);
-                SDL_SetAtomicInt(&g_apply_button_clicked, 1);
-                show_applied_message = true;
             }
         }
     }

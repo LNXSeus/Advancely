@@ -61,12 +61,15 @@ _The `test1` templates are for you to learn and understand how templates work. T
 
 * **Full Mod & Datapack Support**: The tracker is designed to be data-driven. It correctly parses items, stats, and advancements from any mod or data pack (e.g., `conquest:`, `blazeandcave:`) without being limited to the vanilla `minecraft:` namespace.
 
-* **Stream Overlay**: As a streamer you'll have a nice animated overlay for your viewers to see your progress. Just create an OBS game capture, select the Advancely Overlay window (you might have to restart the tracker) and use the color key filter on the single-colored background (just copy the hex value of the Overlay BG Color) to make it transparent. It works relatively well to keep the `Similarity` at `1` and use a `Smoothness` of around `210`. 
-* 
+* **Stream Overlay**: As a streamer you'll have a nice animated overlay for your viewers to see your progress. Just create an OBS game capture, select the Advancely Overlay window (you might have to restart the tracker) and use the color key filter on the single-colored background (just copy the hex value of the Overlay BG Color) to make it transparent. It works relatively well to keep the `Similarity` at `1` and use a `Smoothness` of around `210`.
+
 ![Advancely_Overlay_short.gif](readme_assets/Advancely_Overlay_short.gif)
 _This animation here is compressed. When you use the overlay the framerate will be higher and the resolution perfectly sharp._
 
-**Template-Specific Notes**: A toggleable notes window is available in the bottom-right corner of the tracker. Any text you type is saved instantly to a `_notes.txt` file, which is stored right next to the template file you are currently using. This makes your notes specific to each category and version you track. Furthermore, if you edit the `.txt` file directly while the tracker is running, the notes window will update live with your changes.
+**Template-Specific Notes**: A toggleable notes window is available in the bottom-right corner of the tracker. Any text you type is saved instantly to a `_notes.txt` file, which is stored right next to the template file you are currently using. This makes your notes specific to each category and version you track. Furthermore, if you edit the `.txt` file directly while the tracker is running, the notes window will update live with your changes. You can also change the font to be the settings font for better readability.
+
+![readme_assets\1.16.1_Notes_window.png](readme_assets\1.16.1_Notes_window.png)
+
 
 * **Important**: For GIFs to work correctly, they must be unoptimized with all frame data intact. You can prepare any GIF by uploading it to [**ezgif.com/maker**](https://ezgif.com/maker), selecting the **"Don't Stack Frames"** option, and exporting the result.
 
