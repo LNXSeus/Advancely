@@ -63,7 +63,7 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                         }
 
                         if (hotkey_triggered) {
-                            settings_save(app_settings, t->template_data);
+                            settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
                             SDL_SetAtomicInt(&g_needs_update, 1); // Request a data refresh
                             SDL_SetAtomicInt(&g_game_data_changed, 1);
                             break;
@@ -122,7 +122,7 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                 // Only save window geometry changes if the settings are not being forcibly configured
                 if (!g_force_open_settings) {
                     // Save settings, passing nullptr for TemplateData as we only changed window geometry
-                    settings_save(app_settings, nullptr);
+                    settings_save(app_settings, nullptr, SAVE_CONTEXT_TRACKER_GEOM);
                 }
             }
         }

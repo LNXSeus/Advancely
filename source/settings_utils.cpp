@@ -527,7 +527,7 @@ bool settings_load(AppSettings *settings) {
     return defaults_were_used;
 }
 
-void settings_save(const AppSettings *settings, const TemplateData *td) {
+void settings_save(const AppSettings *settings, const TemplateData *td, SettingsSaveContext context) {
     if (!settings) return;
 
     // Read the existing file, or create a new JSON object if it doesn't exist
@@ -536,78 +536,89 @@ void settings_save(const AppSettings *settings, const TemplateData *td) {
         root = cJSON_CreateObject();
     }
 
-    // Update top-level settings using a safe "delete then add" pattern
-    cJSON_DeleteItemFromObject(root, "path_mode");
-    cJSON_AddItemToObject(root, "path_mode", cJSON_CreateString(settings->path_mode == PATH_MODE_MANUAL ? "manual" : "auto"));
-    cJSON_DeleteItemFromObject(root, "manual_saves_path");
-    cJSON_AddItemToObject(root, "manual_saves_path", cJSON_CreateString(settings->manual_saves_path));
-    cJSON_DeleteItemFromObject(root, "version");
-    cJSON_AddItemToObject(root, "version", cJSON_CreateString(settings->version_str));
-    cJSON_DeleteItemFromObject(root, "category");
-    cJSON_AddItemToObject(root, "category", cJSON_CreateString(settings->category));
-    cJSON_DeleteItemFromObject(root, "optional_flag");
-    cJSON_AddItemToObject(root, "optional_flag", cJSON_CreateString(settings->optional_flag));
+    // General settings, paths, and progress are only saved with "ALL" context
+    if (context == SAVE_CONTEXT_ALL) {
+        // Update top-level settings using a safe "delete then add" pattern
+        cJSON_DeleteItemFromObject(root, "path_mode");
+        cJSON_AddItemToObject(root, "path_mode", cJSON_CreateString(settings->path_mode == PATH_MODE_MANUAL ? "manual" : "auto"));
+        cJSON_DeleteItemFromObject(root, "manual_saves_path");
+        cJSON_AddItemToObject(root, "manual_saves_path", cJSON_CreateString(settings->manual_saves_path));
+        cJSON_DeleteItemFromObject(root, "version");
+        cJSON_AddItemToObject(root, "version", cJSON_CreateString(settings->version_str));
+        cJSON_DeleteItemFromObject(root, "category");
+        cJSON_AddItemToObject(root, "category", cJSON_CreateString(settings->category));
+        cJSON_DeleteItemFromObject(root, "optional_flag");
+        cJSON_AddItemToObject(root, "optional_flag", cJSON_CreateString(settings->optional_flag));
 
-    // Update General Settings
-    cJSON *general_obj = get_or_create_object(root, "general");
+        // Update General Settings
+        cJSON *general_obj = get_or_create_object(root, "general");
 
-    // Add section order to general settings
-    cJSON_DeleteItemFromObject(general_obj, "section_order");
-    cJSON *order_array = cJSON_CreateIntArray(settings->section_order, SECTION_COUNT);
-    cJSON_AddItemToObject(general_obj, "section_order", order_array);
+        // Add section order to general settings
+        cJSON_DeleteItemFromObject(general_obj, "section_order");
+        cJSON *order_array = cJSON_CreateIntArray(settings->section_order, SECTION_COUNT);
+        cJSON_AddItemToObject(general_obj, "section_order", order_array);
 
-    cJSON_DeleteItemFromObject(general_obj, "using_stats_per_world_legacy");
-    cJSON_AddItemToObject(general_obj, "using_stats_per_world_legacy", cJSON_CreateBool(settings->using_stats_per_world_legacy));
-    cJSON_DeleteItemFromObject(general_obj, "fps");
-    cJSON_AddItemToObject(general_obj, "fps", cJSON_CreateNumber(settings->fps));
-    cJSON_DeleteItemFromObject(general_obj, "overlay_fps");
-    cJSON_AddItemToObject(general_obj, "overlay_fps", cJSON_CreateNumber(settings->overlay_fps));
-    cJSON_DeleteItemFromObject(general_obj, "always_on_top");
-    cJSON_AddItemToObject(general_obj, "always_on_top", cJSON_CreateBool(settings->tracker_always_on_top));
-    cJSON_DeleteItemFromObject(general_obj, "remove_completed_goals");
-    cJSON_AddItemToObject(general_obj, "remove_completed_goals", cJSON_CreateBool(settings->remove_completed_goals));
-    cJSON_DeleteItemFromObject(general_obj, "print_debug_status");
-    cJSON_AddItemToObject(general_obj, "print_debug_status", cJSON_CreateBool(settings->print_debug_status));
+        cJSON_DeleteItemFromObject(general_obj, "using_stats_per_world_legacy");
+        cJSON_AddItemToObject(general_obj, "using_stats_per_world_legacy", cJSON_CreateBool(settings->using_stats_per_world_legacy));
+        cJSON_DeleteItemFromObject(general_obj, "fps");
+        cJSON_AddItemToObject(general_obj, "fps", cJSON_CreateNumber(settings->fps));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_fps");
+        cJSON_AddItemToObject(general_obj, "overlay_fps", cJSON_CreateNumber(settings->overlay_fps));
+        cJSON_DeleteItemFromObject(general_obj, "always_on_top");
+        cJSON_AddItemToObject(general_obj, "always_on_top", cJSON_CreateBool(settings->tracker_always_on_top));
+        cJSON_DeleteItemFromObject(general_obj, "remove_completed_goals");
+        cJSON_AddItemToObject(general_obj, "remove_completed_goals", cJSON_CreateBool(settings->remove_completed_goals));
+        cJSON_DeleteItemFromObject(general_obj, "print_debug_status");
+        cJSON_AddItemToObject(general_obj, "print_debug_status", cJSON_CreateBool(settings->print_debug_status));
 
-    // Update Overlay/Notes Settings
-    cJSON_DeleteItemFromObject(general_obj, "enable_overlay");
-    cJSON_AddItemToObject(general_obj, "enable_overlay", cJSON_CreateBool(settings->enable_overlay));
-    cJSON_DeleteItemFromObject(general_obj, "overlay_scroll_speed");
-    cJSON_AddItemToObject(general_obj, "overlay_scroll_speed", cJSON_CreateNumber(settings->overlay_scroll_speed));
-    cJSON_DeleteItemFromObject(general_obj, "overlay_progress_text_align");
-    cJSON_AddItemToObject(general_obj, "overlay_progress_text_align", cJSON_CreateString(overlay_text_align_to_string(settings->overlay_progress_text_align)));
-    cJSON_DeleteItemFromObject(general_obj, "overlay_animation_speedup");
-    cJSON_AddItemToObject(general_obj, "overlay_animation_speedup", cJSON_CreateBool(settings->overlay_animation_speedup));
-    cJSON_DeleteItemFromObject(general_obj, "overlay_row3_remove_completed");
-    cJSON_AddItemToObject(general_obj, "overlay_row3_remove_completed", cJSON_CreateBool(settings->overlay_row3_remove_completed));
-    cJSON_DeleteItemFromObject(general_obj, "overlay_stat_cycle_speed");
-    cJSON_AddItemToObject(general_obj, "overlay_stat_cycle_speed", cJSON_CreateNumber(settings->overlay_stat_cycle_speed));
-    cJSON_DeleteItemFromObject(general_obj, "notes_use_roboto_font");
-    cJSON_AddItemToObject(general_obj, "notes_use_roboto_font", cJSON_CreateBool(settings->notes_use_roboto_font));
+        // Update Overlay/Notes Settings
+        cJSON_DeleteItemFromObject(general_obj, "enable_overlay");
+        cJSON_AddItemToObject(general_obj, "enable_overlay", cJSON_CreateBool(settings->enable_overlay));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_scroll_speed");
+        cJSON_AddItemToObject(general_obj, "overlay_scroll_speed", cJSON_CreateNumber(settings->overlay_scroll_speed));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_progress_text_align");
+        cJSON_AddItemToObject(general_obj, "overlay_progress_text_align", cJSON_CreateString(overlay_text_align_to_string(settings->overlay_progress_text_align)));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_animation_speedup");
+        cJSON_AddItemToObject(general_obj, "overlay_animation_speedup", cJSON_CreateBool(settings->overlay_animation_speedup));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_row3_remove_completed");
+        cJSON_AddItemToObject(general_obj, "overlay_row3_remove_completed", cJSON_CreateBool(settings->overlay_row3_remove_completed));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_stat_cycle_speed");
+        cJSON_AddItemToObject(general_obj, "overlay_stat_cycle_speed", cJSON_CreateNumber(settings->overlay_stat_cycle_speed));
+        cJSON_DeleteItemFromObject(general_obj, "notes_use_roboto_font");
+        cJSON_AddItemToObject(general_obj, "notes_use_roboto_font", cJSON_CreateBool(settings->notes_use_roboto_font));
 
 
 
-    // --- Save Overlay Text Toggles ---
-    cJSON_DeleteItemFromObject(general_obj, "overlay_show_world");
-    cJSON_AddItemToObject(general_obj, "overlay_show_world", cJSON_CreateBool(settings->overlay_show_world));
-    cJSON_DeleteItemFromObject(general_obj, "overlay_show_run_details");
-    cJSON_AddItemToObject(general_obj, "overlay_show_run_details", cJSON_CreateBool(settings->overlay_show_run_details));
-    cJSON_DeleteItemFromObject(general_obj, "overlay_show_progress");
-    cJSON_AddItemToObject(general_obj, "overlay_show_progress", cJSON_CreateBool(settings->overlay_show_progress));
-    cJSON_DeleteItemFromObject(general_obj, "overlay_show_igt");
-    cJSON_AddItemToObject(general_obj, "overlay_show_igt", cJSON_CreateBool(settings->overlay_show_igt));
-    cJSON_DeleteItemFromObject(general_obj, "overlay_show_update_timer");
-    cJSON_AddItemToObject(general_obj, "overlay_show_update_timer", cJSON_CreateBool(settings->overlay_show_update_timer));
+        // --- Save Overlay Text Toggles ---
+        cJSON_DeleteItemFromObject(general_obj, "overlay_show_world");
+        cJSON_AddItemToObject(general_obj, "overlay_show_world", cJSON_CreateBool(settings->overlay_show_world));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_show_run_details");
+        cJSON_AddItemToObject(general_obj, "overlay_show_run_details", cJSON_CreateBool(settings->overlay_show_run_details));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_show_progress");
+        cJSON_AddItemToObject(general_obj, "overlay_show_progress", cJSON_CreateBool(settings->overlay_show_progress));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_show_igt");
+        cJSON_AddItemToObject(general_obj, "overlay_show_igt", cJSON_CreateBool(settings->overlay_show_igt));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_show_update_timer");
+        cJSON_AddItemToObject(general_obj, "overlay_show_update_timer", cJSON_CreateBool(settings->overlay_show_update_timer));
+    }
+
 
 
     // Update Visual Settings
     cJSON *visuals_obj = get_or_create_object(root, "visuals");
-    save_window_rect(visuals_obj, "tracker_window", &settings->tracker_window);
-    save_window_rect(visuals_obj, "overlay_window", &settings->overlay_window);
-    save_color(visuals_obj, "tracker_bg_color", &settings->tracker_bg_color);
-    save_color(visuals_obj, "overlay_bg_color", &settings->overlay_bg_color);
-    save_color(visuals_obj, "text_color", &settings->text_color);
-    save_color(visuals_obj, "overlay_text_color", &settings->overlay_text_color);
+    if ( context == SAVE_CONTEXT_ALL || context == SAVE_CONTEXT_TRACKER_GEOM) {
+        save_window_rect(visuals_obj, "tracker_window", &settings->tracker_window);
+    }
+    if ( context == SAVE_CONTEXT_ALL || context == SAVE_CONTEXT_OVERLAY_GEOM) {
+        save_window_rect(visuals_obj, "overlay_window", &settings->overlay_window);
+    }
+
+    if (context == SAVE_CONTEXT_ALL) {
+        save_color(visuals_obj, "tracker_bg_color", &settings->tracker_bg_color);
+        save_color(visuals_obj, "overlay_bg_color", &settings->overlay_bg_color);
+        save_color(visuals_obj, "text_color", &settings->text_color);
+        save_color(visuals_obj, "overlay_text_color", &settings->overlay_text_color);
+    }
 
     // Update Custom Progress if provided
     if (td) {

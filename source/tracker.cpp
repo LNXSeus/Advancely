@@ -426,7 +426,7 @@ static void tracker_reset_progress_on_world_change(Tracker *t, const AppSettings
     }
 
     // Save the reset progress back to the settings file
-    settings_save(settings, t->template_data);
+    settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
 }
 
 
@@ -2711,7 +2711,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                 crit->done = crit->is_manually_completed
                                                  ? true
                                                  : (crit->progress >= crit->goal && crit->goal > 0);
-                                settings_save(settings, t->template_data);
+                                settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
                                 SDL_SetAtomicInt(&g_needs_update, 1);
                                 SDL_SetAtomicInt(&g_game_data_changed, 1);
                             }
@@ -2778,7 +2778,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             crit->done = cat->is_manually_completed || crit->is_manually_completed ||
                                          crit_is_naturally_done;
                         }
-                        settings_save(settings, t->template_data);
+                        settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
                         SDL_SetAtomicInt(&g_needs_update, 1);
                         SDL_SetAtomicInt(&g_game_data_changed, 1);
                     }
@@ -3129,7 +3129,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
                     item->done = !item->done;
                     item->is_manually_completed = true;
-                    settings_save(settings, t->template_data);
+                    settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
                     SDL_SetAtomicInt(&g_needs_update, 1);
                     SDL_SetAtomicInt(&g_game_data_changed, 1);
                 }
@@ -3649,7 +3649,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                         "Toggle whether to use the settings window font for the notes editor (better readability).");
                 }
                 // Save the setting immediately when it's changed.
-                settings_save(settings, nullptr);
+                settings_save(settings, nullptr, SAVE_CONTEXT_ALL);
             }
 
             // Use the captured state to decide whether to pop the font.

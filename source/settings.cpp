@@ -163,6 +163,28 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         );
     }
 
+    ImGui::SameLine();
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.6f, 1.0f, 1.0f)); // Use a link-like color
+    ImGui::Text("(Learn more)");
+    ImGui::PopStyleColor();
+
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Opens a table of officially added templates in your browser.");
+    }
+
+    if (ImGui::IsItemClicked()) {
+        const char* url = "https://github.com/LNXSeus/Advancely#Officially-Added-Templates";
+        char command[1024];
+#ifdef _WIN32
+        snprintf(command, sizeof(command), "start %s", url);
+#elif __APPLE__
+        snprintf(command, sizeof(command), "open %s", url);
+#else
+        snprintf(command, sizeof(command), "xdg-open %s", url);
+#endif
+        system(command);
+    }
+
     // Version dropdown
     int current_version_idx = -1;
     for (int i = 0; i < VERSION_STRINGS_COUNT; i++) {
@@ -674,7 +696,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     // Copy temp settings to the real settings, save, and trigger a reload
                     memcpy(app_settings, &temp_settings, sizeof(AppSettings));
                     SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
-                    settings_save(app_settings, nullptr);
+                    settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
                     SDL_SetAtomicInt(&g_settings_changed, 1); // Trigger a reload
                     SDL_SetAtomicInt(&g_apply_button_clicked, 1);
                     show_applied_message = true;
@@ -697,7 +719,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     }
                     memcpy(app_settings, &temp_settings, sizeof(AppSettings));
                     SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
-                    settings_save(app_settings, nullptr);
+                    settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
                     SDL_SetAtomicInt(&g_settings_changed, 1);
                     SDL_SetAtomicInt(&g_apply_button_clicked, 1);
                     show_applied_message = true;

@@ -238,7 +238,7 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
             // Always save the current width and the required fixed height
             settings->overlay_window.w = w;
             settings->overlay_window.h = OVERLAY_FIXED_HEIGHT;
-            settings_save(settings, nullptr); // Save the updated settings
+            settings_save(settings, nullptr, SAVE_CONTEXT_OVERLAY_GEOM); // Save the updated settings
 
             // If the resize event resulted in a different height, force it back.
             // This creates a "sticky" height that can't be changed by the user.

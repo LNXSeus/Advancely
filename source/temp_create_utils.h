@@ -9,7 +9,6 @@
 extern "C" {
 #endif
 
-
 /**
  * @brief Ensures that the directory for a given file path exists, creating it if necessary.
  * This function is cross-platform.

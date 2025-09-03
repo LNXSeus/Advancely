@@ -15,6 +15,12 @@
 extern "C" {
 #endif
 
+typedef enum {
+    SAVE_CONTEXT_ALL, // Saving everything from "Settings Apply" butotn
+    SAVE_CONTEXT_TRACKER_GEOM, // Save only tracker window's position/size
+    SAVE_CONTEXT_OVERLAY_GEOM // Save only overlay window's positin/size
+} SettingsSaveContext;
+
 // Enum to identify the tracker sections
 enum TrackerSection {
     SECTION_ADVANCEMENTS,
@@ -185,13 +191,13 @@ void settings_set_defaults(AppSettings *settings);
 bool settings_load(AppSettings *settings);
 
 /**
- * @brief Saves the entire AppSettings configuration to settings.json.
- * It reads the existing file, updates values, and writes it back, preserving unknown fields.
- * This is the new centralized save function.
+ * @brief Saves settings to settings.json based on a specific context.
+ * It reads the existing file, updates values according to the context, and writes it back.
  * @param settings A pointer to the AppSettings struct containing the data to save.
  * @param td A pointer to the TemplateData struct to save custom progress. Can be NULL.
+ * @param context The context determining which parts of the settings to save.
  */
-void settings_save(const AppSettings *settings, const TemplateData *td);
+void settings_save(const AppSettings *settings, const TemplateData *td, SettingsSaveContext context);
 
 /**
  * @brief Constructs the full paths to the template, language, snapshot JSON and notes TXT files. Does NOT CREATE the files or load them.

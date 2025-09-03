@@ -590,7 +590,7 @@ int main(int argc, char *argv[]) {
         if (app_settings.print_debug_status) {
             log_message(LOG_INFO, "[MAIN] Settings file was incomplete or missing, saving with default values.\n");
         }
-        settings_save(&app_settings, nullptr); // Save complete settings back to the file
+        settings_save(&app_settings, nullptr, SAVE_CONTEXT_ALL); // Save complete settings back to the file
     }
 
     log_set_settings(&app_settings); // Give the logger access to the settings
@@ -708,7 +708,7 @@ int main(int argc, char *argv[]) {
             g_force_open_settings = true;
 
             // Save this state so if the app is closed and reopened, it remembers to force the settings open again.
-            settings_save(&app_settings, nullptr);
+            settings_save(&app_settings, nullptr, SAVE_CONTEXT_ALL);
         }
 
         dmon_init();
