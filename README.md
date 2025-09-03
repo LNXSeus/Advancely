@@ -133,6 +133,8 @@ Massive thanks to all the beta testers:
 * 3emis
 * MoreTrident
 * ShadowFlower64
+* PhoenixAUS_
+* metal_silver1234
 
 ### Licenses & Credits
 

@@ -1758,6 +1758,8 @@ static void tracker_calculate_overall_progress(Tracker *t, MC_Version version, c
         completed_steps += t->template_data->multi_stage_goals[i]->current_stage;
     }
 
+    log_message(LOG_INFO, "Total steps: %d,\ncompleted steps: %d\n", total_steps, completed_steps);
+
 
     // Set 100% if no steps are found
     if (total_steps > 0) {
@@ -3348,8 +3350,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                                                   (mouse_pos_in_window.y - t->camera_offset.y) / t->zoom_level);
             float old_zoom = t->zoom_level;
             t->zoom_level += io.MouseWheel * 0.1f * t->zoom_level;
-            if (t->zoom_level < 0.1f) t->zoom_level = 0.1f;
-            if (t->zoom_level > 10.0f) t->zoom_level = 10.0f;
+            if (t->zoom_level < 0.1f) t->zoom_level = 0.1f; // Adjust max zoom out, originally 0.1f
+            if (t->zoom_level > 10.0f) t->zoom_level = 10.0f; // Adjust max zoom in
             t->camera_offset.x += (mouse_pos_before_zoom.x * (old_zoom - t->zoom_level));
             t->camera_offset.y += (mouse_pos_before_zoom.y * (old_zoom - t->zoom_level));
         }
@@ -3570,7 +3572,10 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip(
-            "Also toggled by pressing SPACE.\nPrevents the layout from rearranging when zooming or resizing the window.");
+            "Also toggled by pressing SPACE.\n"
+            "Prevents the layout from rearranging when zooming or resizing the window.\n"
+            "Adjusting the window width gives more control over\n"
+            "the exact amount of goals displayed per row.");
     }
 
     ImGui::SameLine();
