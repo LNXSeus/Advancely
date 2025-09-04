@@ -73,7 +73,7 @@ _This animation here is compressed. When you use the overlay the framerate will 
 
 **Template-Specific Notes**: A toggleable notes window is available in the bottom-right corner of the tracker. Any text you type is saved instantly to a `_notes.txt` file, which is stored right next to the template file you are currently using. This makes your notes specific to each category and version you track. Furthermore, if you edit the `.txt` file directly while the tracker is running, the notes window will update live with your changes. You can also change the font to be the settings font for better readability.
 
-![readme_assets\1.16.1_Notes_window.png](readme_assets\1.16.1_Notes_window.png)
+![readme_assets/1.16.1_Notes_window.png](readme_assets\1.16.1_Notes_window.png)
 
 
 * **Important**: For GIFs to work correctly, they must be unoptimized with all frame data intact. You can prepare any GIF by uploading it to [**ezgif.com/maker**](https://ezgif.com/maker), selecting the **"Don't Stack Frames"** option, and exporting the result.
