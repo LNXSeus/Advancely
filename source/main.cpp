@@ -1006,13 +1006,13 @@ int main(int argc, char *argv[]) {
         ImGui_ImplSDLRenderer3_Init(tracker->renderer);
 
         // Load the logo texture once at statup
-        if (path_exists("resources/gui/Advancely_Logo.png")) {
-            g_logo_texture = IMG_LoadTexture(tracker->renderer, "resources/gui/Advancely_Logo.png");
+        if (path_exists(ADVANCELY_LOGO_PATH)) {
+            g_logo_texture = IMG_LoadTexture(tracker->renderer, ADVANCELY_LOGO_PATH);
             if (g_logo_texture == nullptr) {
                 log_message(LOG_ERROR, "[MAIN] Failed to load logo texture: %s\n", SDL_GetError());
             }
         } else {
-            log_message(LOG_ERROR, "[MAIN] Could not find logo texture at resources/gui/Advancely_Logo.png\n");
+            log_message(LOG_ERROR, "[MAIN] Could not find logo texture at %s\n", ADVANCELY_LOGO_PATH);
         }
 
         // Load Fonts
