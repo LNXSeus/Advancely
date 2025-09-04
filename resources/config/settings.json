@@ -24,7 +24,8 @@
     "overlay_show_igt":	true,
     "overlay_show_update_timer":	true,
     "notes_use_roboto_font":	false,
-    "check_for_updates": true
+    "check_for_updates": true,
+    "show_welcome_on_startup": true
   },
   "stat_progress_override":	{
     "stat:gold_blocks_picked_up":	false,

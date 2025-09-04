@@ -241,6 +241,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_stat_cycle_speed = DEFAULT_OVERLAY_STAT_CYCLE_SPEED;
     settings->notes_use_roboto_font = DEFAULT_NOTES_USE_ROBOTO;
     settings->check_for_updates = DEFAULT_CHECK_FOR_UPDATES;
+    settings->show_welcome_on_startup = DEFAULT_SHOW_WELCOME_ON_STARTUP;
 
     // Default Geometry
     WindowRect default_window = {DEFAULT_WINDOW_POS, DEFAULT_WINDOW_POS, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE};
@@ -460,6 +461,13 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
+        const cJSON *show_welcome = cJSON_GetObjectItem(general_settings, "show_welcome_on_startup");
+        if (show_welcome && cJSON_IsBool(show_welcome)) settings->show_welcome_on_startup = cJSON_IsTrue(show_welcome);
+        else {
+            settings->show_welcome_on_startup = DEFAULT_SHOW_WELCOME_ON_STARTUP;
+            defaults_were_used = true;
+        }
+
         // --- Load Overlay Text Toggles ---
         const cJSON *show_world = cJSON_GetObjectItem(general_settings, "overlay_show_world");
         if(show_world && cJSON_IsBool(show_world)) settings->overlay_show_world = cJSON_IsTrue(show_world);
@@ -596,7 +604,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(general_obj, "notes_use_roboto_font", cJSON_CreateBool(settings->notes_use_roboto_font));
         cJSON_DeleteItemFromObject(general_obj, "check_for_updates");
         cJSON_AddItemToObject(general_obj, "check_for_updates", cJSON_CreateBool(settings->check_for_updates));
-
+        cJSON_DeleteItemFromObject(general_obj, "show_welcome_on_startup");
+        cJSON_AddItemToObject(general_obj, "show_welcome_on_startup", cJSON_CreateBool(settings->show_welcome_on_startup));
 
 
         // --- Save Overlay Text Toggles ---

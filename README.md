@@ -123,6 +123,10 @@ The true power of Advancely lies in its customization. All settings can be confi
 * **Symbolic Links**: On Windows and macOS, the real-time file watcher may not function correctly if your `.minecraft/saves` folder is a symbolic link. For best results, please provide a direct path to your saves folder in the settings if you use a custom location.
 * **Shortcuts**: You must always run the application from its installation directory where all the necessary `.dll` files are located. Do not create a shortcut directly to the executable file.
 
+### You have a feature idea?
+
+Contact me on [Discord @lnxseus](https://discord.gg/TyNgXDz) or [create a new issue](https://github.com/LNXSeus/Advancely/issues/new) on GitHub\!
+
 ### Running into Issues?
 
 * **Check log file**: First, look into the `advancely_log.txt` file to see if there are any errors that were caused by wrong usage of the application. With the `Print Debug To Console` setting enabled, the log file will also contain detailed progress updates, not just errors.

@@ -29,9 +29,11 @@ void delete_directory_recursively(const char* path);
  * @param max_len The size of the out_latest_version buffer.
  * @param out_download_url A buffer to store the asset download URL.
  * @param url_max_len The size of the out_download_url buffer.
+ * @param out_html_url A buffer to store the URL to the release page.
+ * @param html_url_max_len The size of the out_html_url buffer.
  * @return true if a new version is available, false otherwise or on error.
- */
-bool check_for_updates(const char* current_version, char* out_latest_version, size_t max_len, char* out_download_url, size_t url_max_len);
+*/
+bool check_for_updates(const char* current_version, char* out_latest_version, size_t max_len, char* out_download_url, size_t url_max_len, char* out_html_url, size_t html_url_max_len);
 
 /**
 * @brief Downloads the update zip file from a given URL.
@@ -52,9 +54,9 @@ bool download_update_zip(const char* url);
 * 2. Copy new and modified files to the application's root directory.
 * 3. Skip user-specific files like settings.json and *_notes.txt.
 * 4. Exit replace the .exe and other files and relaunch the application.
-*
+* This function replaces all .txt, .md, .dll, .exe files in the root directory.
 * This function replaces and updates the following folders inside resources:
-*  - Templates, fonts, gui, icons.
+*  - Templates (sparing *_notes.txt), fonts, gui, icons.
 *
 * @param main_executable_path The path to the currently running executable.
 * @return true if the application should restart, false on error.

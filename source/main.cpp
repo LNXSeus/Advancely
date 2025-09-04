@@ -64,6 +64,14 @@ SDL_AtomicInt g_apply_button_clicked;
 bool g_force_open_settings = false;
 
 
+static bool g_show_release_notes_on_startup = false;
+// After auto-installing update it shows link to github release notes
+static bool show_release_notes_window = false; // For rendering the release notes window
+static bool show_welcome_window = false; // For rendering the welcome window on startup
+static char release_url_buffer[256] = {0};
+static SDL_Texture *g_logo_texture = nullptr; // Loading the advancely logo
+
+
 /**
  * @brief Serializes the TemplateData into a flat byte buffer.
  * This "flattens" the complex data structure so it can be sent to another process.
@@ -365,6 +373,72 @@ static bool get_executable_path(char *out_path, size_t max_len) {
 #endif
 }
 
+
+// Renders a welcome message window with the advancely logo and a small tutorial on startup depending on setting
+static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker *tracker, SDL_Texture *logo_texture) {
+    if (!*p_open) {
+        return;
+    }
+
+    // This flag tracks the state of the checkbox
+    static bool dont_show_again = !app_settings->show_welcome_on_startup;
+
+    ImGui::Begin("Welcome to Advancely!", p_open, ImGuiWindowFlags_AlwaysAutoResize);
+
+    if (logo_texture) {
+        float w, h;
+        SDL_GetTextureSize(logo_texture, &w, &h);
+        const float target_width = ADVANCELY_LOGO_SIZE;
+        float aspect_ratio = h / w;
+        ImVec2 new_size = ImVec2(target_width, target_width * aspect_ratio);
+        ImGui::Image((ImTextureID) logo_texture, new_size);
+        ImGui::Spacing();
+    }
+
+    ImGui::TextWrapped("Thank you for using Advancely!");
+    ImGui::TextWrapped("A highly customizable and interactive tool to track your Minecraft progress.");
+    ImGui::TextWrapped("If you have any issues/suggestions you can find more info on the GitHub page.");
+    ImGui::Separator();
+    ImGui::Text("Getting Started:");
+    ImGui::BulletText("Pan the View: Hold Right-Click or Middle-Click and drag.");
+    ImGui::BulletText("Zoom: Use the Mouse Wheel.");
+    ImGui::BulletText("Lock Layout: Press SPACE to prevent items from rearranging.");
+    ImGui::BulletText("Open Settings: Press ESC to configure everything.");
+    ImGui::BulletText("A lot more info can be found when hovering over certain elements.");
+    ImGui::Separator();
+
+    ImGui::Text("For more information, visit the main");
+    ImGui::SameLine();
+    // Style the text to look like a link
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.6f, 1.0f, 1.0f));
+    ImGui::Text("GitHub Page");
+    ImGui::PopStyleColor();
+    // Make the text clickable
+    if (ImGui::IsItemClicked()) {
+        SDL_OpenURL("https://github.com/LNXSeus/Advancely"); //
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Opens the project's main page in your browser.");
+    }
+    ImGui::SameLine();
+    ImGui::Text(".");
+    ImGui::Spacing();
+
+    ImGui::Checkbox("Don't show this again", &dont_show_again);
+
+    if (ImGui::Button("Close")) {
+        *p_open = false;
+    }
+
+    // If the window was just closed (by button or 'X'), save the setting if it changed.
+    if (!*p_open && (dont_show_again != !app_settings->show_welcome_on_startup)) {
+        app_settings->show_welcome_on_startup = !dont_show_again;
+        settings_save(app_settings, tracker->template_data, SAVE_CONTEXT_ALL);
+    }
+
+    ImGui::End();
+}
+
 // ------------------------------------ END OF STATIC FUNCTIONS ------------------------------------
 
 
@@ -372,7 +446,53 @@ int main(int argc, char *argv[]) {
     // As we're not only using SDL_main() as our entry point
     SDL_SetMainReady();
 
+    // Check for --updated flag on startup
+    if (argc > 1 && strcmp(argv[1], "--updated") == 0) {
+        // The --update flag gets passed from the apply_update() function
+        // through the update.bat script on restart
+        g_show_release_notes_on_startup = true;
+        // DEBUG PRINT 1: Confirm the flag was detected.
+        log_message(LOG_ERROR, "[DEBUG] --updated flag DETECTED. g_show_release_notes_on_startup is true.\n");
+    }
+
     bool should_exit_after_update_check = false; // To signal exit after updating
+
+    // Post-update logic
+    if (g_show_release_notes_on_startup) {
+        // DEBUG PRINT 2: Confirm we are entering the logic block to read the file.
+        log_message(LOG_ERROR, "[DEBUG] Attempting to open 'update_url.txt'...\n");
+        // Create file with something like: // Will have something like: https://github.com/LNXSeus/Advancely/releases/tag/v0.9.51
+        FILE *f = fopen("update_url.txt", "r");
+        if (f) {
+            // DEBUG PRINT 3: Confirm the file was opened successfully.
+            log_message(LOG_ERROR, "[DEBUG] 'update_url.txt' opened successfully.\n");
+            // Read the URL from the file
+            fgets(release_url_buffer, sizeof(release_url_buffer), f);
+            fclose(f);
+
+            // Trim trailing newline characters
+            release_url_buffer[strcspn(release_url_buffer, "\r\n")] = 0;
+
+            // DEBUG PRINT 4: Show the content read from the file.
+            log_message(LOG_ERROR, "[DEBUG] URL read from file: \"%s\"", release_url_buffer);
+
+            if (release_url_buffer[0] != '\0') {
+                show_release_notes_window = true; // Set the flag for the UI loop
+                // DEBUG PRINT 5: Confirm the flag to show the window is being set.
+                log_message(LOG_ERROR, "[DEBUG] URL is valid. show_release_notes_window set to true.\n");
+            } else {
+                log_message(LOG_ERROR, "[DEBUG] URL is empty. Window will not be shown.\n");
+            }
+        } else {
+            // DEBUG PRINT 3 (Failure Case): This is the most likely error when testing manually.
+            log_message(
+                LOG_ERROR,
+                "[DEBUG] FAILED to open 'update_url.txt'. The file does not exist in the current directory.\n");
+        }
+        // Whether it succeeded or not, delete the flag file and unset the global flag
+        remove("update_url.txt");
+        g_show_release_notes_on_startup = false;
+    }
 
     bool is_overlay_mode = false;
     if (argc > 1 && strcmp(argv[1], "--overlay") == 0) {
@@ -597,6 +717,9 @@ int main(int argc, char *argv[]) {
         settings_save(&app_settings, nullptr, SAVE_CONTEXT_ALL); // Save complete settings back to the file
     }
 
+    // Control welcome window visibility based on settings
+    show_welcome_window = app_settings.show_welcome_on_startup;
+
     log_set_settings(&app_settings); // Give the logger access to the settings
 
     Tracker *tracker = nullptr; // pass address to function
@@ -620,8 +743,9 @@ int main(int argc, char *argv[]) {
             }
             char latest_version_str[64];
             char download_url[256];
+            char release_page_url[256];
             if (check_for_updates(ADVANCELY_VERSION, latest_version_str, sizeof(latest_version_str), download_url,
-                                  sizeof(download_url))) {
+                                  sizeof(download_url), release_page_url, sizeof(release_page_url))) {
                 char message_buffer[1024];
                 snprintf(message_buffer, sizeof(message_buffer),
                          "A new version of Advancely is available!\n\n"
@@ -629,22 +753,24 @@ int main(int argc, char *argv[]) {
                          "  Latest Version: %s\n\n"
                          "VERY IMPORTANT: THIS WILL OVERWRITE EXISTING FILES!\n"
                          "If you HAVE MODIFIED any OFFICIAL templates, PLEASE RENAME them BEFORE UPDATING to avoid losing your changes.\n"
-                         "It will KEEP all your SETTINGS (settings.json) and template specific NOTES (_notes.txt).\n"
-                         "It will REPLACE the following folders inside resources: Fonts, gui, icons, templates.\n\n"
+                         "It's easiest to just adjust the optional flag by putting \"_custom\" right after the category for both files.\n"
+                         "It will KEEP all your SETTINGS (settings.json & imgui.ini) and template specific NOTES (_notes.txt).\n"
+                         "It will REPLACE the following file types in the root directory: .exe, .dll, .txt, .md\n"
+                         "It will REPLACE the following folders inside resources: fonts, gui, icons, templates.\n\n"
                          "Options:\n"
                          " - Later: Skip updating until next restart (Disable in settings).\n"
                          " - Official: View official templates online.\n"
                          " - Templates: Open your local templates folder.\n"
                          " - Update: Install the new version now.\n\n"
                          "Would you like to install it now?\n"
-                         "Expect 3 more windows after clicking \"Update\"that you need to confirm with \"OK\".",
+                         "Expect 3 more windows after clicking \"Update\" that you need to confirm with \"OK\".",
                          ADVANCELY_VERSION, latest_version_str);
 
 
                 const SDL_MessageBoxButtonData buttons[] = {
                     {SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Update"},
-                    {0,                                       2, "Templates"},
-                    {0,                                       3, "Official"},
+                    {0, 2, "Templates"},
+                    {0, 3, "Official"},
                     {SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "Later"},
 
                 };
@@ -699,6 +825,14 @@ int main(int argc, char *argv[]) {
                 }
 
                 if (buttonid == 1) {
+                    // -Save release page URL to a file before updating
+                    FILE *url_file = fopen("update_url.txt", "w");
+                    if (url_file) {
+                        fputs(release_page_url, url_file);
+                        fclose(url_file);
+                        log_message(LOG_INFO, "[UPDATE] Release URL saved to update_url.txt.\n");
+                    }
+
                     // User clicked "Install Update"
                     show_error_message("Downloading Update",
                                        "Downloading the latest version,\nplease wait after clicking \"OK\"...");
@@ -870,6 +1004,16 @@ int main(int argc, char *argv[]) {
         // Setup Platform/Renderer backends
         ImGui_ImplSDL3_InitForSDLRenderer(tracker->window, tracker->renderer);
         ImGui_ImplSDLRenderer3_Init(tracker->renderer);
+
+        // Load the logo texture once at statup
+        if (path_exists("resources/gui/Advancely_Logo.png")) {
+            g_logo_texture = IMG_LoadTexture(tracker->renderer, "resources/gui/Advancely_Logo.png");
+            if (g_logo_texture == nullptr) {
+                log_message(LOG_ERROR, "[MAIN] Failed to load logo texture: %s\n", SDL_GetError());
+            }
+        } else {
+            log_message(LOG_ERROR, "[MAIN] Could not find logo texture at resources/gui/Advancely_Logo.png\n");
+        }
 
         // Load Fonts
         io.Fonts->AddFontFromFileTTF("resources/fonts/Minecraft.ttf", 16.0f);
@@ -1243,6 +1387,76 @@ int main(int argc, char *argv[]) {
             ImGui_ImplSDL3_NewFrame();
             ImGui::NewFrame();
 
+            // Load the welcome window
+            welcome_render_gui(&show_welcome_window, &app_settings, tracker, g_logo_texture);
+
+            // Release notes window
+            if (show_release_notes_window) {
+                ImGui::Begin("Update Successful!", &show_release_notes_window, ImGuiWindowFlags_AlwaysAutoResize);
+
+                // Render the logo texture on "Updated Successful!" window if it exists
+                if (g_logo_texture) {
+                    float w, h;
+                    SDL_GetTextureSize(g_logo_texture, &w, &h);
+
+                    // Calculate a new size while maintaining the aspect ratio
+                    const float target_width = ADVANCELY_LOGO_SIZE; // This adjusts the image size
+                    float aspect_ratio = h / w;
+                    ImVec2 new_size = ImVec2(target_width, target_width * aspect_ratio);
+
+                    // Use the new size in the Image function
+                    ImGui::Image((ImTextureID) g_logo_texture, new_size);
+                    ImGui::Spacing();
+                }
+
+                ImGui::Text("Advancely has been updated to the latest version!");
+                ImGui::Separator();
+                ImGui::Text("Click the button below to see what's new on GitHub.");
+                ImGui::Spacing();
+                if (ImGui::Button("View Release Notes")) {
+                    SDL_OpenURL(release_url_buffer);
+                    show_release_notes_window = false; // Close window after clicking
+                }
+                ImGui::End();
+            }
+            // Post-update logic
+            if (g_show_release_notes_on_startup) {
+                // DEBUG PRINT 2: Confirm we are entering the logic block to read the file.
+                log_message(LOG_ERROR, "[DEBUG] Attempting to open 'update_url.txt'...\n");
+                // Create file with something like: // Will have something like: https://github.com/LNXSeus/Advancely/releases/tag/v0.9.51
+                FILE *f = fopen("update_url.txt", "r");
+                if (f) {
+                    // DEBUG PRINT 3: Confirm the file was opened successfully.
+                    log_message(LOG_ERROR, "[DEBUG] 'update_url.txt' opened successfully.\n");
+                    // Read the URL from the file
+                    fgets(release_url_buffer, sizeof(release_url_buffer), f);
+                    fclose(f);
+
+                    // Trim trailing newline characters
+                    release_url_buffer[strcspn(release_url_buffer, "\r\n")] = 0;
+
+                    // DEBUG PRINT 4: Show the content read from the file.
+                    log_message(LOG_ERROR, "[DEBUG] URL read from file: \"%s\"", release_url_buffer);
+
+                    if (release_url_buffer[0] != '\0') {
+                        show_release_notes_window = true; // Set the flag for the UI loop
+                        // DEBUG PRINT 5: Confirm the flag to show the window is being set.
+                        log_message(LOG_ERROR, "[DEBUG] URL is valid. show_release_notes_window set to true.\n");
+                    } else {
+                        log_message(LOG_ERROR, "[DEBUG] URL is empty. Window will not be shown.\n");
+                    }
+                } else {
+                    // DEBUG PRINT 3 (Failure Case): This is the most likely error when testing manually.
+                    log_message(
+                        LOG_ERROR,
+                        "[DEBUG] FAILED to open 'update_url.txt'. The file does not exist in the current directory.\n");
+                }
+                // Whether it succeeded or not, delete the flag file and unset the global flag
+                remove("update_url.txt");
+                g_show_release_notes_on_startup = false;
+            }
+
+
             // Render the tracker GUI USING ImGui
             tracker_render_gui(tracker, &app_settings);
 
@@ -1311,6 +1525,11 @@ int main(int argc, char *argv[]) {
     ImGui_ImplSDLRenderer3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
+
+    // Cleanup global logo texture
+    if (g_logo_texture) {
+        SDL_DestroyTexture(g_logo_texture);
+    }
 
     tracker_free(&tracker, &app_settings);
     SDL_Quit(); // This is ONCE for all windows

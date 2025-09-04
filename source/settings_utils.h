@@ -54,6 +54,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_OVERLAY_STAT_CYCLE_SPEED 3.0f // Default: cycle every 3 seconds
 #define DEFAULT_NOTES_USE_ROBOTO false // Default: use the standard Minecraft font for notes otherwise roboto
 #define DEFAULT_CHECK_FOR_UPDATES true
+#define DEFAULT_SHOW_WELCOME_ON_STARTUP true
 
 // DEFINE DEFAULT SETTINGS
 #define DEFAULT_VERSION "1.16.1"  // Also needs to be changed in settings_load()
@@ -154,6 +155,7 @@ struct AppSettings {
     bool overlay_show_igt; // If true, the in-game time is shown in the overlay.
     bool overlay_show_update_timer; // If true, the update timer is shown in the overlay.
     bool check_for_updates; // If true, checks for new versions on startup
+    bool show_welcome_on_startup; // If true, shows the welcome message on startup
 };
 
 

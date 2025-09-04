@@ -77,7 +77,7 @@ static size_t write_file_callback(void *ptr, size_t size, size_t nmemb, FILE *st
 }
 
 
-bool check_for_updates(const char* current_version, char* out_latest_version, size_t max_len, char* out_download_url, size_t url_max_len) {
+bool check_for_updates(const char* current_version, char* out_latest_version, size_t max_len, char* out_download_url, size_t url_max_len, char* out_html_url, size_t html_url_max_len) {
     CURL *curl;
     CURLcode res;
     std::string read_buffer;
@@ -86,6 +86,7 @@ bool check_for_updates(const char* current_version, char* out_latest_version, si
     // Clear output buffers initially
     if (out_latest_version && max_len > 0) out_latest_version[0] = '\0';
     if (out_download_url && url_max_len > 0) out_download_url[0] = '\0';
+    if (out_html_url && html_url_max_len > 0) out_html_url[0] = '\0';
 
 
     curl = curl_easy_init();
@@ -120,6 +121,12 @@ bool check_for_updates(const char* current_version, char* out_latest_version, si
                                 strncpy(out_download_url, download_url_json->valuestring, url_max_len - 1);
                                 out_download_url[url_max_len - 1] = '\0';
                             }
+                        }
+
+                        const cJSON *html_url_json = cJSON_GetObjectItem(json, "html_url");
+                        if (cJSON_IsString(html_url_json) && (html_url_json->valuestring != nullptr)) {
+                            strncpy(out_html_url, html_url_json->valuestring, html_url_max_len - 1);
+                            out_html_url[html_url_max_len - 1] = '\0';
                         }
                     }
                 }
@@ -215,14 +222,15 @@ bool apply_update(const char* main_executable_path) {
     fprintf(updater_script, "if not exist \".\\resources\\icons\" mkdir \".\\resources\\icons\"\n");
 
     // Copy contents of each subfolder, applying exclusions only where needed.
-    // /L -> List only, /NFL -> No file list, /NDL -> No dir list -> makes robocopy silent on success
-    fprintf(updater_script, "robocopy \"%s\\resources\\templates\" \".\\resources\\templates\" /E /IS /XF *_notes.txt /L /NFL /NDL\n", temp_dir);
-    fprintf(updater_script, "robocopy \"%s\\resources\\fonts\" \".\\resources\\fonts\" /E /IS /L /NFL /NDL\n", temp_dir);
-    fprintf(updater_script, "robocopy \"%s\\resources\\gui\" \".\\resources\\gui\" /E /IS /L /NFL /NDL\n", temp_dir);
-    fprintf(updater_script, "robocopy \"%s\\resources\\icons\" \".\\resources\\icons\" /E /IS /L /NFL /NDL\n", temp_dir);
+    // /L -> List only (removed), /NFL -> No file list, /NDL -> No dir list -> makes robocopy silent on success
+    fprintf(updater_script, "robocopy \"%s\\resources\\templates\" \".\\resources\\templates\" /E /IS /XF *_notes.txt /NFL /NDL\n", temp_dir);
+    fprintf(updater_script, "robocopy \"%s\\resources\\fonts\" \".\\resources\\fonts\" /E /IS /NFL /NDL\n", temp_dir);
+    fprintf(updater_script, "robocopy \"%s\\resources\\gui\" \".\\resources\\gui\" /E /IS /NFL /NDL\n", temp_dir);
+    fprintf(updater_script, "robocopy \"%s\\resources\\icons\" \".\\resources\\icons\" /E /IS /NFL /NDL\n", temp_dir);
 
 
-    // Copy other root files like README, LICENSE etc.
+    // Copy other root files like README, LICENSE and .dll files etc.
+    fprintf(updater_script, "copy /Y \"%s\\*.dll\" .\\\n", temp_dir);
     fprintf(updater_script, "copy /Y \"%s\\*.txt\" .\\\n", temp_dir);
     fprintf(updater_script, "copy /Y \"%s\\*.md\" .\\\n", temp_dir);
 
@@ -230,7 +238,8 @@ bool apply_update(const char* main_executable_path) {
     fprintf(updater_script, "rmdir /S /Q \"%s\"\n", temp_dir);
 
     fprintf(updater_script, "echo Relaunching Advancely...\n");
-    fprintf(updater_script, "start \"\" \"%s\"\n", main_executable_path);
+    // Add the --updated flag to the relaunch command
+    fprintf(updater_script, "start \"\" \"%s\" --updated\n", main_executable_path);
 
     // Self-delete the script
     fprintf(updater_script, "del \"%%~f0\"\n");
@@ -254,17 +263,35 @@ bool apply_update(const char* main_executable_path) {
     fprintf(updater_script, "echo \"Waiting for Advancely to close...\"\n");
     // Wait for the main process to exit
     fprintf(updater_script, "while ps -p %d > /dev/null; do sleep 1; done\n", pid);
-    // Copy new files, preserving user data
+
+    // Specific directory copies
     fprintf(updater_script, "echo \"Applying update...\"\n");
-    // Use rsync to smartly overwrite, excluding user data
-    fprintf(updater_script, "rsync -av --exclude 'resources/config/settings.json' --exclude 'resources/templates/*_notes.txt' ./%s/ .\n", temp_dir);
+    // Copy the executable and other root-level files
+    fprintf(updater_script, "echo \"Copying main application files...\"\n");
+    fprintf(updater_script, "cp ./%s/%s ./\n", temp_dir, exe_filename); // Copy the executable
+    fprintf(updater_script, "cp ./%s/*.so ./\n", temp_dir); // For Linux shared objects
+    fprintf(updater_script, "cp ./%s/*.dylib ./\n", temp_dir); // For macOS dynamic libraries
+    fprintf(updater_script, "cp ./%s/*.txt ./\n", temp_dir);
+    fprintf(updater_script, "cp ./%s/*.md ./\n", temp_dir);
+
+
+    // Ensure the main resources directory and subdirectories exist before copying
+    fprintf(updater_script, "mkdir -p ./resources\n");
+
+    // Copy only the specified subdirectories, mirroring the robocopy logic
+    // The trailing slashes on the source paths are important for rsync to copy contents.
+    fprintf(updater_script, "rsync -av --exclude '*_notes.txt' ./%s/resources/templates/ ./resources/templates/\n", temp_dir);
+    fprintf(updater_script, "rsync -av ./%s/resources/fonts/ ./resources/fonts/\n", temp_dir);
+    fprintf(updater_script, "rsync -av ./%s/resources/gui/ ./resources/gui/\n", temp_dir);
+    fprintf(updater_script, "rsync -av ./%s/resources/icons/ ./resources/icons/\n", temp_dir);
+
     // Cleanup
     fprintf(updater_script, "echo \"Cleaning up temporary files...\"\n");
     fprintf(updater_script, "rm -rf ./%s\n", temp_dir);
     fprintf(updater_script, "rm update.zip\n");
     // Relaunch
     fprintf(updater_script, "echo \"Relaunching Advancely...\"\n");
-    fprintf(updater_script, "./%s &\n", main_executable_path);
+    fprintf(updater_script, "./%s --updated &\n", main_executable_path);
     // Remove script
     fprintf(updater_script, "rm -- \"$0\"\n");
 
