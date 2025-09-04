@@ -735,11 +735,6 @@ int main(int argc, char *argv[]) {
                                 char out_path[MAX_PATH_LENGTH];
                                 const char *filename_in_zip = file_stat.m_filename;
 
-                                // const char *first_slash = strchr(filename_in_zip, '/');
-                                // if (first_slash) {
-                                //     filename_in_zip = first_slash + 1;
-                                // }
-
                                 snprintf(out_path, sizeof(out_path), "%s/%s", temp_dir, filename_in_zip);
 
                                 if (file_stat.m_is_directory) {
