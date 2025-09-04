@@ -3,11 +3,15 @@
 //
 
 #include <ctime>
+#include <direct.h>
 
 extern "C" {
 #define DMON_IMPL // Required for dmon
 #include "dmon.h"
 #include <cJSON.h>
+
+// #define MINIZ_IMPLEMENTATION // TODO: Remove
+#include "external/miniz.h"
 }
 
 // SDL imports
@@ -28,6 +32,7 @@ extern "C" {
 #include "path_utils.h" // Include for find_player_data_files
 #include "settings_utils.h" // Include for AppSettings and version checking
 #include "logger.h"
+#include "update_checker.h" // For update checker
 
 // ImGUI imports
 #include "imgui/imgui.h"
@@ -57,7 +62,6 @@ SDL_AtomicInt g_game_data_changed; // When game data is modified, custom counter
 SDL_AtomicInt g_notes_changed;
 SDL_AtomicInt g_apply_button_clicked;
 bool g_force_open_settings = false;
-
 
 
 /**
@@ -198,8 +202,6 @@ static void deserialize_template_data(char *buffer, TemplateData *target_td) {
 }
 
 
-
-
 static void free_deserialized_data(TemplateData *td) {
     if (!td) return;
 
@@ -262,7 +264,7 @@ static void free_deserialized_data(TemplateData *td) {
         free(td->custom_goals);
     }
 
-    // Set pointers to NULL after freeing to prevent double-freeing
+    // Set pointers to nullptr after freeing to prevent double-freeing
     memset(td, 0, sizeof(TemplateData));
 }
 
@@ -369,6 +371,8 @@ static bool get_executable_path(char *out_path, size_t max_len) {
 int main(int argc, char *argv[]) {
     // As we're not only using SDL_main() as our entry point
     SDL_SetMainReady();
+
+    bool should_exit_after_update_check = false; // To signal exit after updating
 
     bool is_overlay_mode = false;
     if (argc > 1 && strcmp(argv[1], "--overlay") == 0) {
@@ -489,7 +493,6 @@ int main(int argc, char *argv[]) {
 #endif
                     // --- Critical Section: We have the lock ---
                     if (overlay->p_shared_data->data_size > 0) {
-
                         // Define the same header struct to read the data.
                         typedef struct {
                             char world_name[MAX_PATH_LENGTH];
@@ -497,7 +500,7 @@ int main(int argc, char *argv[]) {
                         } OverlayIPCHeader;
 
                         OverlayIPCHeader header;
-                        char* buffer_head = overlay->p_shared_data->buffer;
+                        char *buffer_head = overlay->p_shared_data->buffer;
 
                         // 1. Read the header from the start of the buffer.
                         memcpy(&header, buffer_head, sizeof(OverlayIPCHeader));
@@ -565,6 +568,7 @@ int main(int argc, char *argv[]) {
     // Initialize the logger at the very beginning
     log_init();
 
+
     // Check for write permissions in the current directory before doing anything else
     FILE *write_test = fopen(".advancely-write-test", "w");
     if (write_test == nullptr) {
@@ -608,6 +612,188 @@ int main(int argc, char *argv[]) {
     }
 
     if (tracker_new(&tracker, &app_settings)) {
+        // Check for updates on startup
+        if (app_settings.check_for_updates) {
+            bool was_always_on_top = app_settings.tracker_always_on_top;
+            if (was_always_on_top) {
+                SDL_SetWindowAlwaysOnTop(tracker->window, false);
+            }
+            char latest_version_str[64];
+            char download_url[256];
+            if (check_for_updates(ADVANCELY_VERSION, latest_version_str, sizeof(latest_version_str), download_url,
+                                  sizeof(download_url))) {
+                char message_buffer[1024];
+                snprintf(message_buffer, sizeof(message_buffer),
+                         "A new version of Advancely is available!\n\n"
+                         "  Your Version: %s\n"
+                         "  Latest Version: %s\n\n"
+                         "VERY IMPORTANT: THIS WILL OVERWRITE EXISTING FILES!\n"
+                         "If you have modified any official templates, please rename them before updating to avoid losing your changes.\n\n"
+                         "Options:\n"
+                         " - Later: Skip updating until next restart (Disable in settings).\n"
+                         " - Official: View official templates online.\n"
+                         " - Templates: Open your local templates folder.\n"
+                         " - Update: Install the new version now.\n\n"
+                         "Would you like to install it now?",
+                         ADVANCELY_VERSION, latest_version_str);
+
+
+                const SDL_MessageBoxButtonData buttons[] = {
+                    {SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Update"},
+                    {0,                                       2, "Templates"},
+                    {0,                                       3, "Official"},
+                    {SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "Later"},
+
+                };
+                const SDL_MessageBoxData messageboxdata = {
+                    SDL_MESSAGEBOX_INFORMATION,
+                    tracker->window,
+                    "Update Available",
+                    message_buffer,
+                    SDL_arraysize(buttons),
+                    buttons,
+                    nullptr
+                };
+
+                int buttonid = -1;
+                bool decision_made = false;
+
+                while (!decision_made) {
+                    SDL_ShowMessageBox(&messageboxdata, &buttonid);
+
+                    switch (buttonid) {
+                        case 1: // Install Update
+                        case 0: // Later
+                        case -1: // User closed with 'X'
+                            decision_made = true;
+                            break;
+
+                        case 2: // Open Template Folder
+#ifdef _WIN32
+                            system("explorer resources\\templates");
+#elif __APPLE__
+                                system("open resources/templates");
+#else
+                                system("xdg-open resources/templates");
+#endif
+                            break; // Re-shows the message box
+
+                        case 3: // View Templates Online
+                        {
+                            const char *url = "https://github.com/LNXSeus/Advancely#Officially-Added-Templates";
+                            char command[1024];
+#ifdef _WIN32
+                            snprintf(command, sizeof(command), "start %s", url);
+#elif __APPLE__
+                                    snprintf(command, sizeof(command), "open %s", url);
+#else
+                                    snprintf(command, sizeof(command), "xdg-open %s", url);
+#endif
+                            system(command);
+                        }
+                        break; // Re-shows the message box
+                    }
+                }
+
+                if (buttonid == 1) {
+                    // User clicked "Install Update"
+                    show_error_message("Downloading Update",
+                                       "Downloading the latest version, please wait after clicking \"Ok\"...");
+
+                    if (download_update_zip(download_url)) {
+                        show_error_message("Download Complete",
+                                           "Update downloaded. Extracting files after clicking \"Ok\"...");
+
+                        mz_zip_archive zip_archive;
+                        memset(&zip_archive, 0, sizeof(zip_archive));
+
+                        if (mz_zip_reader_init_file(&zip_archive, "update.zip", 0)) {
+                            log_message(
+                                LOG_INFO,
+                                "[UPDATE] Successfully opened update.zip for extraction. Click \"Ok\" to continue.\n");
+                            const char *temp_dir = "update_temp";
+
+                            // Clean up old temp dir if it exists
+                            if (path_exists(temp_dir)) {
+                                delete_directory_recursively(temp_dir);
+                            }
+
+#ifdef _WIN32
+                            _mkdir(temp_dir);
+#else
+                mkdir(temp_dir, 0755);
+#endif
+
+                            mz_uint i;
+                            for (i = 0; i < mz_zip_reader_get_num_files(&zip_archive); i++) {
+                                mz_zip_archive_file_stat file_stat;
+                                if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) continue;
+
+                                char out_path[MAX_PATH_LENGTH];
+                                // This is tricky: the zip might contain a single root folder. We want to extract its *contents*.
+                                // Simple approach: find first slash and skip it.
+                                const char *filename_in_zip = file_stat.m_filename;
+                                const char *first_slash = strchr(filename_in_zip, '/');
+                                if (first_slash) {
+                                    filename_in_zip = first_slash + 1;
+                                }
+
+                                snprintf(out_path, sizeof(out_path), "%s/%s", temp_dir, filename_in_zip);
+
+                                if (file_stat.m_is_directory) {
+#ifdef _WIN32
+                                    _mkdir(out_path);
+#else
+                        mkdir(out_path, 0755);
+#endif
+                                } else {
+                                    mz_zip_reader_extract_to_file(&zip_archive, i, out_path, 0);
+                                }
+                            }
+                            mz_zip_reader_end(&zip_archive);
+
+                            // Clean up the downloaded zip file
+                            remove("update.zip");
+
+                            // Now that files are extracted, apply the update
+                            char exe_path[MAX_PATH_LENGTH];
+                            if (get_executable_path(exe_path, sizeof(exe_path))) {
+                                show_error_message("Update Ready",
+                                                   "Advancely will now close to apply the update and then restart automatically. Click \"Ok\" to continue.");
+                                if (apply_update(exe_path)) {
+                                    // The updater script has been launched.
+                                    // Signal that the application should exit.
+                                    should_exit_after_update_check = true;
+                                }
+                            } else {
+                                show_error_message("Update Error", "Could not find application path to restart.");
+                            }
+                        } else {
+                            log_message(LOG_ERROR, "[UPDATE] Failed to open update.zip for extraction.\n");
+                            show_error_message("Update Error", "Failed to open the downloaded update file.");
+                            remove("update.zip");
+                        }
+                    } else {
+                        show_error_message("Update Error",
+                                           "Failed to download the update. Please check advancely_log.txt for details.");
+                    }
+                }
+            }
+
+            if (was_always_on_top) {
+                SDL_SetWindowAlwaysOnTop(tracker->window, true);
+            }
+        }
+
+        if (should_exit_after_update_check) {
+            // Free resources and exit before the main loop starts
+            tracker_free(&tracker, &app_settings);
+            TTF_Quit();
+            SDL_Quit();
+            log_close();
+            return EXIT_SUCCESS;
+        }
+
         // IPC CREATION
 
         log_message(LOG_INFO, "[IPC] Creating shared memory and mutex...\n");
@@ -758,10 +944,13 @@ int main(int argc, char *argv[]) {
                 char args[MAX_PATH_LENGTH + 16];
                 snprintf(args, sizeof(args), "\"%s\" --overlay", exe_path);
 
-                if (CreateProcessA(nullptr, args, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &tracker->overlay_process_info)) {
-                    log_message(LOG_INFO, "[MAIN] Overlay process started with PID: %lu\n", tracker->overlay_process_info.dwProcessId);
+                if (CreateProcessA(nullptr, args, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si,
+                                   &tracker->overlay_process_info)) {
+                    log_message(LOG_INFO, "[MAIN] Overlay process started with PID: %lu\n",
+                                tracker->overlay_process_info.dwProcessId);
                 } else {
-                    log_message(LOG_ERROR, "[MAIN] Failed to create overlay process on startup. Error code: %lu\n", GetLastError());
+                    log_message(LOG_ERROR, "[MAIN] Failed to create overlay process on startup. Error code: %lu\n",
+                                GetLastError());
                 }
 #else
                 pid_t pid = fork();
@@ -801,14 +990,16 @@ int main(int argc, char *argv[]) {
             // --- Per-Frame Logic ---
 
             // Check if overlay process has terminated
-            if (app_settings.enable_overlay) { // Only check if the overlay should be active
+            if (app_settings.enable_overlay) {
+                // Only check if the overlay should be active
                 bool overlay_has_terminated = false;
 #ifdef _WIN32
                 if (tracker->overlay_process_info.hProcess != nullptr) {
                     // GetExitCodeProcess returns STILL_ACTIVE if the process is running.
                     // If it returns anything else, the process has terminated.
                     DWORD exitCode;
-                    if (GetExitCodeProcess(tracker->overlay_process_info.hProcess, &exitCode) && exitCode != STILL_ACTIVE) {
+                    if (GetExitCodeProcess(tracker->overlay_process_info.hProcess, &exitCode) && exitCode !=
+                        STILL_ACTIVE) {
                         overlay_has_terminated = true;
                         CloseHandle(tracker->overlay_process_info.hProcess); // Clean up handles
                         CloseHandle(tracker->overlay_process_info.hThread);
@@ -996,7 +1187,7 @@ int main(int argc, char *argv[]) {
                 tracker_update_title(tracker, &app_settings);
 
                 // --- DATA WRITING TO COMMUNICATE WITH OVERLAY ---
-                                if (tracker->p_shared_data) {
+                if (tracker->p_shared_data) {
 #ifdef _WIN32
                     DWORD wait_result = WaitForSingleObject(tracker->h_mutex, 50); // Wait up to 50ms
                     if (wait_result == WAIT_OBJECT_0) {
@@ -1017,7 +1208,7 @@ int main(int argc, char *argv[]) {
                         header.time_since_last_update = tracker->time_since_last_update;
 
                         // Get a pointer to the beginning of the shared buffer.
-                        char* buffer_head = tracker->p_shared_data->buffer;
+                        char *buffer_head = tracker->p_shared_data->buffer;
 
                         // 1. Copy the header to the start of the buffer.
                         memcpy(buffer_head, &header, sizeof(OverlayIPCHeader));

@@ -15,6 +15,7 @@ set(CMAKE_C_STANDARD_REQUIRED True)
 set(CMAKE_CXX_STANDARD 26) # Use the latest C++ standard
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+
 # --- 1. DEFINE PATHS & SOURCE FILES ---
 set(EXECUTABLE_NAME "Advancely")
 set(SOURCE_FILES
@@ -30,9 +31,11 @@ set(SOURCE_FILES
         "source/format_utils.cpp" # for formatting strings
         "source/temp_create_utils.cpp"
         "source/template_scanner.cpp"
+        "source/update_checker.cpp"
 
         # External libraries included as source and stay in C
         "source/external/cJSON.c"
+        "source/external/miniz.c"
         # dmon.h is header-only and included in main.cpp, so it doesn't need to be listed here.
 
         # --- Add all the ImGui source files ---
@@ -63,6 +66,15 @@ else()
     add_executable(${EXECUTABLE_NAME} ${SOURCE_FILES})
 endif()
 
+# This command targets a specific source file and sets its properties.
+set_source_files_properties(
+        source/external/miniz.c
+        PROPERTIES
+        # This adds a compiler flag ONLY when compiling this specific file.
+        # -Wno-type-limits will disable the "comparison is always false" warning.
+        COMPILE_FLAGS "-Wno-type-limits"
+)
+
 # Tell the compiler where to find your project's header files.
 target_include_directories(Advancely PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/source"
@@ -79,6 +91,7 @@ target_include_directories(Advancely PRIVATE
 find_package(SDL3 REQUIRED)
 find_package(SDL3_image REQUIRED)
 find_package(SDL3_ttf REQUIRED)
+find_package(CURL REQUIRED)
 
 # The official SDL3_mixer is not yet released. If you are using an unofficial build
 # or the older SDL2_mixer, you would find it here. For now, it's commented out.
@@ -91,6 +104,7 @@ target_link_libraries(${EXECUTABLE_NAME} PRIVATE
         SDL3::SDL3
         SDL3_image::SDL3_image
         SDL3_ttf::SDL3_ttf
+        CURL::libcurl
 )
 
 # Add platform-specific system libraries
@@ -170,6 +184,56 @@ if(WIN32)
 
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${MINGW_BIN_DIR}/zlib1.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+
+            # Libcurl
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libcurl-4.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libnghttp2-14.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libngtcp2-16.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libidn2-0.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libnghttp3-9.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libngtcp2_crypto_ossl.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libpsl-5.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libssh2-1.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libzstd.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libcrypto-3-x64.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libunistring-5.dll"
+            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${MINGW_BIN_DIR}/libssl-3-x64.dll"
             $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
 
 

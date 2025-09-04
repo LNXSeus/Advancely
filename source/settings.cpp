@@ -567,6 +567,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.");
     }
 
+    ImGui::SameLine();
+    ImGui::Checkbox("Auto-Check for Updates", &temp_settings.check_for_updates);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("If enabled, Advancely will check for a new version on startup and notify you if one is available.");
+    }
+
     ImGui::Separator();
     ImGui::Spacing();
 
@@ -792,7 +798,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Remove Completed: %s\n"
                  "  - Overlay Width: %s\n"
                  "  - Use Settings Font: %s\n"
-                 "  - Print Debug To Console: %s",
+                 "  - Print Debug To Console: %s\n"
+                 "  - Check For Updates: %s",
 
                  DEFAULT_VERSION,
                  DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
@@ -808,7 +815,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_REMOVE_COMPLETED_GOALS ? "Enabled" : "Disabled",
                  "1440px",
                  DEFAULT_NOTES_USE_ROBOTO ? "Enabled" : "Disabled",
-                 DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled"
+                 DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled",
+                 DEFAULT_CHECK_FOR_UPDATES ? "Enabled" : "Disabled"
         );
         ImGui::SetTooltip(tooltip_buffer);
     }

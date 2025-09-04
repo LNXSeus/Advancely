@@ -125,7 +125,7 @@ The true power of Advancely lies in its customization. All settings can be confi
 
 ### Beta Testers
 
-Massive thanks to all the beta testers:
+Massive thanks to all the beta testers. _Message me on discord @lnxseus with proof of using Advancely before its full release and you'll be added here:_
 
 * ethansplace98
 * yumeko
@@ -141,6 +141,8 @@ Massive thanks to all the beta testers:
 *This project uses dmon by Sepehr Taghdisian, licensed under the BSD 2-Clause License.*
 *This project's user interface is powered by the excellent [Dear ImGui](https://github.com/ocornut/imgui) library.*
 *This project also uses the SDL3 library suite and cJSON. More information can be found in the LICENSES.txt file.*
+*This project uses [curl/libcurl](https://curl.se/libcurl)*
+*This project uses the [miniz](https://github.com/mongoose-os-libs/miniz) compression library.*
 *Lots of assistance was provided by Gemini 2.5 Pro.*
 *Minecraft item .png files downloaded from [Minecraft Asset Cloud](https://mcasset.cloud/1.0/) and block renders from the [Minecraft Wiki](https://www.minecraft.wiki) (downloaded by [Dogmaster](https://www.twitch.tv/thedogmaster28))*
 *Shoutout to [Oskar](https://github.com/Oskar3141) for providing me his project files (kAAmel) and Darwin Baker for creating [AATool](https://github.com/DarwinBaker/AATool), which served as inspiration\!*
