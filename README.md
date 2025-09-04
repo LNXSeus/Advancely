@@ -68,7 +68,7 @@ It's easiest to just add an optional flag (here it would be `_1`) turning someth
 
 * **Stream Overlay**: As a streamer you'll have a nice animated overlay for your viewers to see your progress. Just create an OBS game capture, select the Advancely Overlay window (you might have to restart the tracker) and use the color key filter on the single-colored background (just copy the hex value of the Overlay BG Color) to make it transparent. It works relatively well to keep the `Similarity` at `1` and use a `Smoothness` of around `210`.
 
-![Advancely_Overlay_short.gif](readme_assets/Advancely_Overlay_short.gif)
+![Advancely_Overlay_short.gif](readme_assets/Advancely_Overlay_short.gif) 
 _This animation here is compressed. When you use the overlay the framerate will be higher and the resolution perfectly sharp._
 
 **Template-Specific Notes**: A toggleable notes window is available in the bottom-right corner of the tracker. Any text you type is saved instantly to a `_notes.txt` file, which is stored right next to the template file you are currently using. This makes your notes specific to each category and version you track. Furthermore, if you edit the `.txt` file directly while the tracker is running, the notes window will update live with your changes. You can also change the font to be the settings font for better readability.
