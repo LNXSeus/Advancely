@@ -273,13 +273,6 @@ add_custom_command(TARGET Advancely POST_BUILD
 
 add_custom_command(TARGET Advancely POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_SOURCE_DIR}/LICENSE"
-        "$<TARGET_FILE_DIR:Advancely>"
-        COMMENT "[CMAKE] Copying LICENSE to output directory..."
-)
-
-add_custom_command(TARGET Advancely POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
         "${CMAKE_SOURCE_DIR}/LICENSES.txt"
         "$<TARGET_FILE_DIR:Advancely>"
         COMMENT "[CMAKE] Copying LICENSES.txt to output directory..."

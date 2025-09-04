@@ -41,7 +41,7 @@ void show_error_message(const char *title, const char *message);
 #define ADVANCELY_LOGO_SIZE 512.0f // Logo size on startup message window or update successful window
 
 // This is the version that gets compared with the latest release tag on GitHub
-#define ADVANCELY_VERSION "v0.9.57" // vMAJOR.MINOR.PATCH // TODO: Update this always, SAME FORMAT ON RELEASE TAG!
+#define ADVANCELY_VERSION "v0.9.58" // vMAJOR.MINOR.PATCH // TODO: Update this always, SAME FORMAT ON RELEASE TAG!
 #define ADVANCELY_ICON_PATH "resources/gui/Advancely_Logo_NoText.png" // TODO: Use this in tracker_init_sdl()
 #define ADVANCELY_FADED_ALPHA 100
 #define TRACKER_SEPARATOR_LINE_WIDTH 0.80f
