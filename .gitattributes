@@ -1,3 +1,4 @@
 *.png binary
 *.gif binary
 readme_assets/ export-ignore
+LICENSE export-ignore

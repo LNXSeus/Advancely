@@ -628,13 +628,16 @@ int main(int argc, char *argv[]) {
                          "  Your Version: %s\n"
                          "  Latest Version: %s\n\n"
                          "VERY IMPORTANT: THIS WILL OVERWRITE EXISTING FILES!\n"
-                         "If you have modified any official templates, please rename them before updating to avoid losing your changes.\n\n"
+                         "If you HAVE MODIFIED any OFFICIAL templates, PLEASE RENAME them BEFORE UPDATING to avoid losing your changes.\n"
+                         "It will KEEP all your SETTINGS (settings.json) and template specific NOTES (_notes.txt).\n"
+                         "It will REPLACE the following folders inside resources: Fonts, gui, icons, templates.\n\n"
                          "Options:\n"
                          " - Later: Skip updating until next restart (Disable in settings).\n"
                          " - Official: View official templates online.\n"
                          " - Templates: Open your local templates folder.\n"
                          " - Update: Install the new version now.\n\n"
-                         "Would you like to install it now?",
+                         "Would you like to install it now?\n"
+                         "Expect 3 more windows after clicking \"Update\"that you need to confirm with \"OK\".",
                          ADVANCELY_VERSION, latest_version_str);
 
 
@@ -698,11 +701,11 @@ int main(int argc, char *argv[]) {
                 if (buttonid == 1) {
                     // User clicked "Install Update"
                     show_error_message("Downloading Update",
-                                       "Downloading the latest version, please wait after clicking \"Ok\"...");
+                                       "Downloading the latest version,\nplease wait after clicking \"OK\"...");
 
                     if (download_update_zip(download_url)) {
                         show_error_message("Download Complete",
-                                           "Update downloaded. Extracting files after clicking \"Ok\"...");
+                                           "Update downloaded.\nExtracting files after clicking \"OK\"...");
 
                         mz_zip_archive zip_archive;
                         memset(&zip_archive, 0, sizeof(zip_archive));
@@ -710,7 +713,7 @@ int main(int argc, char *argv[]) {
                         if (mz_zip_reader_init_file(&zip_archive, "update.zip", 0)) {
                             log_message(
                                 LOG_INFO,
-                                "[UPDATE] Successfully opened update.zip for extraction. Click \"Ok\" to continue.\n");
+                                "[UPDATE] Successfully opened update.zip for extraction.\nClick \"OK\" to continue.\n");
                             const char *temp_dir = "update_temp";
 
                             // Clean up old temp dir if it exists
@@ -730,13 +733,12 @@ int main(int argc, char *argv[]) {
                                 if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) continue;
 
                                 char out_path[MAX_PATH_LENGTH];
-                                // This is tricky: the zip might contain a single root folder. We want to extract its *contents*.
-                                // Simple approach: find first slash and skip it.
                                 const char *filename_in_zip = file_stat.m_filename;
-                                const char *first_slash = strchr(filename_in_zip, '/');
-                                if (first_slash) {
-                                    filename_in_zip = first_slash + 1;
-                                }
+
+                                // const char *first_slash = strchr(filename_in_zip, '/');
+                                // if (first_slash) {
+                                //     filename_in_zip = first_slash + 1;
+                                // }
 
                                 snprintf(out_path, sizeof(out_path), "%s/%s", temp_dir, filename_in_zip);
 
@@ -759,7 +761,7 @@ int main(int argc, char *argv[]) {
                             char exe_path[MAX_PATH_LENGTH];
                             if (get_executable_path(exe_path, sizeof(exe_path))) {
                                 show_error_message("Update Ready",
-                                                   "Advancely will now close to apply the update and then restart automatically. Click \"Ok\" to continue.");
+                                                   "Advancely will now close to apply the update and then restart automatically.\nClick \"OK\" to continue.");
                                 if (apply_update(exe_path)) {
                                     // The updater script has been launched.
                                     // Signal that the application should exit.
@@ -775,7 +777,7 @@ int main(int argc, char *argv[]) {
                         }
                     } else {
                         show_error_message("Update Error",
-                                           "Failed to download the update. Please check advancely_log.txt for details.");
+                                           "Failed to download the update.\nPlease check advancely_log.txt for details.");
                     }
                 }
             }

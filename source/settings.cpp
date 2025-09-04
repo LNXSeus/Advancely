@@ -346,8 +346,11 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             "More settings related to the overlay window become available once enabled.\n"
             "Use a color key filter in your streaming software on the 'Overlay BG' hex color.\n"
             "A negative scroll speed animates from right-to-left.\n"
-            "To adjust the horizontal spacing between items per row,\nyou can shorten the display names in the language (*_lang.json) file.\n"
-            "To turn off the overlay, disable this checkbox and hit 'Apply Settings'!");
+            "To adjust the horizontal spacing between items per row,\n"
+            "you can shorten the display names in the language (*_lang.json) file.\n"
+            "To turn off the overlay, disable this checkbox and hit 'Apply Settings'!\n\n"
+            "IMPORTANT FOR STREAMERS: Applying and settings restarts the overlay window,\n"
+            "which might lead to OBS capturing the main tracker window instead.");
     }
 
     // This toggles the framerate of everything

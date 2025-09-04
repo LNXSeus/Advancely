@@ -53,6 +53,9 @@ bool download_update_zip(const char* url);
 * 3. Skip user-specific files like settings.json and *_notes.txt.
 * 4. Exit replace the .exe and other files and relaunch the application.
 *
+* This function replaces and updates the following folders inside resources:
+*  - Templates, fonts, gui, icons.
+*
 * @param main_executable_path The path to the currently running executable.
 * @return true if the application should restart, false on error.
 */
