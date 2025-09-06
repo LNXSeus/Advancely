@@ -3084,7 +3084,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
     }
     if (visible_count == 0) return;
 
-            ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO &io = ImGui::GetIO();
 
     // Use locked width if layout is locked
     float wrapping_width = t->layout_locked ? t->locked_layout_width : (io.DisplaySize.x / t->zoom_level);
@@ -3257,7 +3257,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
     }
     if (visible_count == 0) return;
 
-            ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO &io = ImGui::GetIO();
 
 
     // Use locked width if layout is locked
@@ -3870,15 +3870,10 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // Pop the two style colors still on the stack (WindowBg and the content's Text color).
     ImGui::PopStyleColor(2);
 
-
-    // TODO: Remove
-    // ImVec2 lock_button_text_size = ImGui::CalcTextSize("Lock Layout");
-    // ImVec2 reset_button_text_size = ImGui::CalcTextSize("Reset Layout");
-    // ImVec2 notes_button_text_size = ImGui::CalcTextSize("Notes");
-
     // Layout Control Buttons
     const float button_padding = 10.0f;
     const float search_box_width = 250.0f;
+    const float clear_button_width = ImGui::GetFrameHeight(); // A nice square size for the "X" button
     ImVec2 lock_button_text_size = ImGui::CalcTextSize("Lock Layout");
     ImVec2 reset_button_text_size = ImGui::CalcTextSize("Reset Layout");
     ImVec2 notes_button_text_size = ImGui::CalcTextSize("Notes");
@@ -3887,10 +3882,11 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     ImVec2 lock_button_size = ImVec2(lock_button_text_size.x + 25.0f, lock_button_text_size.y + 8.0f);
     ImVec2 reset_button_size = ImVec2(reset_button_text_size.x + 25.0f, reset_button_text_size.y + 8.0f);
     ImVec2 notes_button_size = ImVec2(notes_button_text_size.x - 13.0f, notes_button_text_size.y + 8.0f);
+    // -13 to shift it to the left
 
-    // TODO: Adjust this for more buttons, with 3 buttons it's padding * 2.0f, 4 buttons is 3.0f and so on (in addition to button)
-    float controls_total_width = search_box_width + lock_button_size.x + reset_button_size.x + notes_button_size.x + (
-                                     button_padding * 4.0f);
+
+    float controls_total_width = clear_button_width + search_box_width + lock_button_size.x + reset_button_size.x +
+                                 notes_button_size.x + (button_padding * 5.0f);
 
 
     // Position a new transparent window in the bottom right to hold the buttons
@@ -3932,12 +3928,46 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                                                         (float) settings->text_color.b / 255.f,
                                                         (float) ADVANCELY_FADED_ALPHA / 255.0f)); //
 
+    // Render the "X" button OR an invisible dummy widget to hold the space
+    if (t->search_buffer[0] != '\0') {
+        if (ImGui::Button("X##ClearSearch", ImVec2(clear_button_width, 0))) {
+            t->search_buffer[0] = '\0'; // Clear the buffer
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Clear Search");
+        }
+    } else {
+        // Render an invisible widget of the same size to hold the space
+        ImGui::Dummy(ImVec2(clear_button_width, 0));
+    }
+
+    ImGui::SameLine();
+
+    // Render the search bix
+    // Apply styles for placeholder and border
+    bool search_is_active = (t->search_buffer[0] != '\0');
+    if (search_is_active) {
+        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4((float) settings->text_color.r / 255.f,
+                                                      (float) settings->text_color.g / 255.f,
+                                                      (float) settings->text_color.b / 255.f, 0.8f));
+    }
+    ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4((float) settings->text_color.r / 255.f,
+                                                        (float) settings->text_color.g / 255.f,
+                                                        (float) settings->text_color.b / 255.f,
+                                                        (float) ADVANCELY_FADED_ALPHA / 255.0f));
+
+    if (t->focus_search_box_requested) {
+        ImGui::SetKeyboardFocusHere();
+        t->focus_search_box_requested = false;
+    }
+
     // Search box
     ImGui::SetNextItemWidth(search_box_width);
     ImGui::InputTextWithHint("##SearchBox", "Search...", t->search_buffer, sizeof(t->search_buffer));
 
     // Pop color
-    ImGui::PopStyleColor();
+    ImGui::PopStyleColor(2);
+    if (search_is_active) ImGui::PopStyleColor(); // Pop border color
 
     if (ImGui::IsItemHovered()) {
         ImGui::BeginTooltip();
