@@ -2354,48 +2354,6 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
     // Pre-computation and Filtering
     int visible_count = 0;
 
-    // TODO: Remove
-    // for (int i = 0; i < count; ++i) {
-    //
-    //     TrackableCategory *cat = categories[i];
-    //     if (!cat) continue;
-    //
-    //     // First, check if the category itself is visible based on the "Remove Completed" setting
-    //     bool is_considered_complete = false;
-    //     if (is_stat_section) {
-    //         is_considered_complete = cat->done;
-    //     } else {
-    //         is_considered_complete = (cat->criteria_count > 0 && cat->all_template_criteria_met) || (
-    //                                      cat->criteria_count == 0 && cat->done);
-    //     }
-    //
-    //     if (settings->remove_completed_goals && (is_considered_complete || cat->is_hidden)) {
-    //         continue; // Skip this category if it's hidden by the main filter
-    //     }
-    //
-    //     // Now, check if this visible category or any of its visible children match the search
-    //     if (str_contains_insensitive(cat->display_name, t->search_buffer)) {
-    //         visible_count++;
-    //         break; // Parent matches, so the section is visible.
-    //     }
-    //
-    //     // If parent doesn't match, check children
-    //     bool child_found = false;
-    //     for (int j = 0; j < cat->criteria_count; j++) {
-    //         TrackableItem *crit = cat->criteria[j];
-    //         if (crit && (!settings->remove_completed_goals || (!crit->done && !crit->is_hidden))) {
-    //             if (str_contains_insensitive(crit->display_name, t->search_buffer)) {
-    //                 child_found = true;
-    //                 break;
-    //             }
-    //         }
-    //     }
-    //     if (child_found) {
-    //         visible_count++;
-    //         break; // A child matches, so the section is visible.
-    //     }
-    // }
-
     // Section separator remains visible with the same spacing even during search
     for (int i = 0; i < count; ++i) {
         TrackableCategory *cat = categories[i];
@@ -2558,9 +2516,17 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             if (!parent_matches) {
                 for (int j = 0; j < cat->criteria_count; j++) {
                     TrackableItem *crit = cat->criteria[j];
-                    if (crit && str_contains_insensitive(crit->display_name, t->search_buffer)) {
+                    // A child must pass the standard hide filter AND the search filter to be included
+                    if (crit &&
+                        (!settings->remove_completed_goals || (!crit->done && !crit->is_hidden)) &&
+                        str_contains_insensitive(crit->display_name, t->search_buffer))
+                    {
                         matching_children.push_back(crit);
                     }
+                    // TODO: Remove
+                    // if (crit && str_contains_insensitive(crit->display_name, t->search_buffer)) {
+                    //     matching_children.push_back(crit);
+                    // }
                 }
             }
 
@@ -2608,11 +2574,18 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             ImVec2 snapshot_text_size = ImGui::CalcTextSize(snapshot_text);
             int visible_criteria = 0;
             if (is_complex) {
-                for (int j = 0; j < cat->criteria_count; j++)
-                    if (
-                        cat->criteria[j] && (!cat->criteria[j]->done || !settings->remove_completed_goals))
-                        visible_criteria
-                                ++;
+                if (parent_matches) {
+                    // If parent matches, count all children that pass the standard hide filter.
+                    for (int j = 0; j < cat->criteria_count; j++) {
+                        TrackableItem* crit = cat->criteria[j];
+                        if (crit && (!settings->remove_completed_goals || (!crit->done && !crit->is_hidden))) {
+                            visible_criteria++;
+                        }
+                    }
+                } else {
+                    // If only children match, the number of visible criteria is the size of our pre-filtered list.
+                    visible_criteria = matching_children.size();
+                }
             }
             float item_height = 96.0f + text_size.y + 4.0f + ((float) visible_criteria * 36.0f);
             if (progress_text[0] != '\0') item_height += progress_text_size.y + 4.0f;
@@ -3976,7 +3949,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         ImGui::TextUnformatted(
             "Search for goals by name (case-insensitive). You can also use Ctrl + F (or Cmd + F on macOS).");
         ImGui::Separator();
-        ImGui::TextUnformatted("How filtering works:");
+        ImGui::TextUnformatted("It applies the filter to anything currently visible in the following way:");
 
         ImGui::BulletText(
             "Advancements & Statistics: Shows a category if its title or any of its sub-criteria match.\nIf only a sub-criterion matches, only that specific one will be shown under its parent.");

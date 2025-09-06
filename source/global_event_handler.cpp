@@ -10,6 +10,7 @@
 #include "settings_utils.h" // For AppSettings
 
 #include "imgui_impl_sdl3.h"
+#include "logger.h"
 
 void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                           bool *is_running, bool *settings_opened, float *deltaTime) {
@@ -26,11 +27,24 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
 
         // Event-based HOTKEY HANDLING
         if (event.type == SDL_EVENT_KEY_DOWN && event.key.repeat == 0) {
-            // If any ImGui widget is active (e.g., typing in a text box), do not process hotkeys.
-            if (ImGui::IsAnyItemActive()) {
+
+            // Hotkey for UI control (e.g., focusing the search box)
+            SDL_Keymod mod_state = SDL_GetModState();
+
+            // Ctrl + F or Cmd + F for search box focus
+            // Global hotkey for focusing the search box (Ctrl+F or Cmd+F)
+            bool is_ctrl_or_cmd = (mod_state & SDL_KMOD_CTRL) || (mod_state & SDL_KMOD_GUI);
+
+            if (is_ctrl_or_cmd && event.key.scancode == SDL_SCANCODE_F) {
+
+                // if the user is currently typing in another text box (like the settings or notes).
+                if (t) t->focus_search_box_requested = true;
+            }
+            // If any ImGui widget is inactive active (e.g., not typing in a text box), then process hotkeys.
+            if (!ImGui::IsAnyItemActive()) {
+
                 // We don't break here; we want other event processing to continue,
                 // but we skip the hotkey logic for this specific event.
-            } else {
                 // Only trigger on initial key press
                 bool hotkey_triggered = false;
 
@@ -71,19 +85,6 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                         }
                     }
                 }
-
-                // Ctrl + F or Cmd + F for search box focus
-                // Global hotkey for focusing the search box (Ctrl+F or Cmd+F)
-                SDL_Keymod mod_state = SDL_GetModState();
-                bool is_ctrl_or_cmd = (mod_state & SDL_KMOD_CTRL) || (mod_state & SDL_KMOD_GUI);
-
-                if (is_ctrl_or_cmd && event.key.scancode == SDL_SCANCODE_F) {
-                    if (t) { // Ensure the tracker object exists
-                        t->focus_search_box_requested = true;
-                        hotkey_triggered = true; // Prevents other actions if needed
-                    }
-                }
-
             }
             // TODO: Spacebar probably only used in overlay_events in overlay.cpp
             // Global hotkey for animation speedup
