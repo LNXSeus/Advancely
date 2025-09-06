@@ -35,6 +35,7 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                 bool hotkey_triggered = false;
 
                 // Defensive check to prevent crash if data is not ready
+                // CUSTOM GOAL HOTKEYS
                 if (t && t->template_data && t->template_data->custom_goals) {
                     for (int i = 0; i < app_settings->hotkey_count; i++) {
                         HotkeyBinding *hb = &app_settings->hotkeys[i];
@@ -70,6 +71,19 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                         }
                     }
                 }
+
+                // Ctrl + F or Cmd + F for search box focus
+                // Global hotkey for focusing the search box (Ctrl+F or Cmd+F)
+                SDL_Keymod mod_state = SDL_GetModState();
+                bool is_ctrl_or_cmd = (mod_state & SDL_KMOD_CTRL) || (mod_state & SDL_KMOD_GUI);
+
+                if (is_ctrl_or_cmd && event.key.scancode == SDL_SCANCODE_F) {
+                    if (t) { // Ensure the tracker object exists
+                        t->focus_search_box_requested = true;
+                        hotkey_triggered = true; // Prevents other actions if needed
+                    }
+                }
+
             }
             // TODO: Spacebar probably only used in overlay_events in overlay.cpp
             // Global hotkey for animation speedup

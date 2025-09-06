@@ -3,6 +3,8 @@
 //
 
 #include <cstdio>
+#include <string>
+#include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
@@ -10,6 +12,9 @@
 #include <cmath>
 
 #include "tracker.h"
+
+#include <vector>
+
 #include "init_sdl.h"
 #include "path_utils.h"
 #include "settings_utils.h"
@@ -21,6 +26,29 @@
 #include "main.h" // For show_error_message
 
 #include "imgui_internal.h"
+
+
+/**
+ * @brief Performs a case-insensitive check to see if a string contains another string.
+ * Empty search querry matches everything
+ * @param haystack The string to search within.
+ * @param needle The string to search for.
+ * @return True if the needle is found in the haystack, false otherwise.
+ */
+static bool str_contains_insensitive(const char *haystack, const char *needle) {
+    if (!needle || *needle == '\0') return true; // An empty search query matches everything
+    if (!haystack) return false;
+
+    std::string haystack_lower = haystack;
+    std::transform(haystack_lower.begin(), haystack_lower.end(), haystack_lower.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+
+    std::string needle_lower = needle;
+    std::transform(needle_lower.begin(), needle_lower.end(), needle_lower.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+
+    return haystack_lower.find(needle_lower) != std::string::npos;
+}
 
 
 /**
@@ -2046,6 +2074,9 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     // Initialize notes state
     t->notes_window_open = false;
     t->notes_buffer[0] = '\0';
+    t->search_buffer[0] = '\0';
+    t->focus_search_box_requested = false;
+
 
     // Explicitly initialize all members
     t->window = nullptr;
@@ -2323,25 +2354,67 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
     // Pre-computation and Filtering
     int visible_count = 0;
     for (int i = 0; i < count; ++i) {
+        // TODO: Remove
+        //     TrackableCategory *cat = categories[i];
+        //     if (!cat) continue;
+        //
+        //     bool is_considered_complete = false;
+        //     if (is_stat_section) {
+        //         is_considered_complete = cat->done;
+        //     } else {
+        //         // It's an advancement
+        //         is_considered_complete = (cat->criteria_count > 0 && cat->all_template_criteria_met) || (
+        //             cat->criteria_count == 0 && cat->done);
+        //     }
+        //
+        //     // An item is visible if "Remove Completed Goals" is OFF,
+        //     // or if it's ON, the item must be neither completed NOR hidden.
+        //     if (!settings->remove_completed_goals || (!is_considered_complete && !cat->is_hidden)) {
+        //         visible_count++;
+        //     }
+        // }
+        // if (visible_count == 0) return;
+
         TrackableCategory *cat = categories[i];
         if (!cat) continue;
 
+        // First, check if the category itself is visible based on the "Remove Completed" setting
         bool is_considered_complete = false;
         if (is_stat_section) {
             is_considered_complete = cat->done;
         } else {
-            // It's an advancement
             is_considered_complete = (cat->criteria_count > 0 && cat->all_template_criteria_met) || (
-                cat->criteria_count == 0 && cat->done);
+                                         cat->criteria_count == 0 && cat->done);
         }
 
-        // An item is visible if "Remove Completed Goals" is OFF,
-        // or if it's ON, the item must be neither completed NOR hidden.
-        if (!settings->remove_completed_goals || (!is_considered_complete && !cat->is_hidden)) {
+        if (settings->remove_completed_goals && (is_considered_complete || cat->is_hidden)) {
+            continue; // Skip this category if it's hidden by the main filter
+        }
+
+        // Now, check if this visible category or any of its visible children match the search
+        if (str_contains_insensitive(cat->display_name, t->search_buffer)) {
             visible_count++;
+            break; // Parent matches, so the section is visible.
+        }
+
+        // If parent doesn't match, check children
+        bool child_found = false;
+        for (int j = 0; j < cat->criteria_count; j++) {
+            TrackableItem *crit = cat->criteria[j];
+            if (crit && (!settings->remove_completed_goals || (!crit->done && !crit->is_hidden))) {
+                if (str_contains_insensitive(crit->display_name, t->search_buffer)) {
+                    child_found = true;
+                    break;
+                }
+            }
+        }
+        if (child_found) {
+            visible_count++;
+            break; // A child matches, so the section is visible.
         }
     }
-    if (visible_count == 0) return;
+
+    if (visible_count == 0) return; // No items in this entire section are visible with the current filters.
 
     ImGuiIO &io = ImGui::GetIO();
 
@@ -2368,7 +2441,26 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
     float uniform_item_width = 0.0f;
     for (int i = 0; i < count; i++) {
         TrackableCategory *cat = categories[i];
-        if (!cat || (cat->done && settings->remove_completed_goals)) continue;
+        // TODO: Remove
+        // if (!cat || (cat->done && settings->remove_completed_goals)) continue;
+
+        if (!cat || (settings->remove_completed_goals && (cat->is_hidden || cat->done))) {
+            continue;
+        }
+        // Also filter by search term here
+        bool parent_matches = str_contains_insensitive(cat->display_name, t->search_buffer);
+        bool child_matches = false;
+        if (!parent_matches) {
+            for (int j = 0; j < cat->criteria_count; j++) {
+                if (cat->criteria[j] && str_contains_insensitive(cat->criteria[j]->display_name, t->search_buffer)) {
+                    child_matches = true;
+                    break;
+                }
+            }
+        }
+        if (!parent_matches && !child_matches) {
+            continue;
+        }
 
         float required_width = ImGui::CalcTextSize(cat->display_name).x;
         if (cat->criteria_count > 1) {
@@ -2456,6 +2548,26 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
             // If we should hide it, skip the rendering
             if (should_hide) continue;
+
+            bool parent_matches = str_contains_insensitive(cat->display_name, t->search_buffer);
+
+            // We only need to find matching children if the parent itself doesn't match the search.
+            std::vector<TrackableItem *> matching_children;
+            if (!parent_matches) {
+                for (int j = 0; j < cat->criteria_count; j++) {
+                    TrackableItem *crit = cat->criteria[j];
+                    if (crit && str_contains_insensitive(crit->display_name, t->search_buffer)) {
+                        matching_children.push_back(crit);
+                    }
+                }
+            }
+
+            bool child_matches = !matching_children.empty();
+
+            // If nothing in this category tree matches the search term, skip rendering it entirely.
+            if (!parent_matches && !child_matches) {
+                continue;
+            }
 
             // Prepare snapshot status text for legacy achievements (without mod)
             char snapshot_text[8] = "";
@@ -2624,126 +2736,263 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     if (progress_text[0] != '\0') sub_item_y_offset += progress_text_size.y + 4.0f;
                     sub_item_y_offset += 12.0f;
 
-                    for (int j = 0; j < cat->criteria_count; j++) {
-                        TrackableItem *crit = cat->criteria[j];
+                    if (parent_matches) {
+                        for (int j = 0; j < cat->criteria_count; j++) {
+                            TrackableItem *crit = cat->criteria[j];
 
-                        if (!crit) continue; // Skip if the criteria is null
+                            if (!crit) continue; // Skip if the criteria is null
 
-                        // Hide if "Remove Completed Goals" is on and the criterion is either done or marked as hidden
-                        if (settings->remove_completed_goals && (crit->done || crit->is_hidden)) continue;
+                            // Hide if "Remove Completed Goals" is on and the criterion is either done or marked as hidden
+                            if (settings->remove_completed_goals && (crit->done || crit->is_hidden)) continue;
 
-                        ImVec2 crit_base_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
-                                                      (sub_item_y_offset * t->zoom_level) + t->camera_offset.y);
-                        float current_element_x = crit_base_pos.x;
+                            ImVec2 crit_base_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
+                                                          (sub_item_y_offset * t->zoom_level) + t->camera_offset.y);
+                            float current_element_x = crit_base_pos.x;
 
 
-                        // For the small 32x32 icons
+                            // For the small 32x32 icons
 
-                        SDL_Texture *crit_texture_to_draw = nullptr;
-                        if (crit->anim_texture && crit->anim_texture->frame_count > 0) {
-                            if (crit->anim_texture->delays && crit->anim_texture->total_duration > 0) {
-                                Uint32 current_time = SDL_GetTicks();
-                                Uint32 elapsed_time = current_time % crit->anim_texture->total_duration;
-                                int current_frame = 0;
-                                Uint32 time_sum = 0;
-                                for (int frame_idx = 0; frame_idx < crit->anim_texture->frame_count; ++frame_idx) {
-                                    time_sum += crit->anim_texture->delays[frame_idx];
-                                    if (elapsed_time < time_sum) {
-                                        current_frame = frame_idx;
-                                        break;
+                            SDL_Texture *crit_texture_to_draw = nullptr;
+                            if (crit->anim_texture && crit->anim_texture->frame_count > 0) {
+                                if (crit->anim_texture->delays && crit->anim_texture->total_duration > 0) {
+                                    Uint32 current_time = SDL_GetTicks();
+                                    Uint32 elapsed_time = current_time % crit->anim_texture->total_duration;
+                                    int current_frame = 0;
+                                    Uint32 time_sum = 0;
+                                    for (int frame_idx = 0; frame_idx < crit->anim_texture->frame_count; ++frame_idx) {
+                                        time_sum += crit->anim_texture->delays[frame_idx];
+                                        if (elapsed_time < time_sum) {
+                                            current_frame = frame_idx;
+                                            break;
+                                        }
                                     }
+                                    crit_texture_to_draw = crit->anim_texture->frames[current_frame];
+                                } else {
+                                    crit_texture_to_draw = crit->anim_texture->frames[0];
                                 }
-                                crit_texture_to_draw = crit->anim_texture->frames[current_frame];
-                            } else {
-                                crit_texture_to_draw = crit->anim_texture->frames[0];
+                            } else if (crit->texture) {
+                                crit_texture_to_draw = crit->texture;
                             }
-                        } else if (crit->texture) {
-                            crit_texture_to_draw = crit->texture;
+
+                            if (crit_texture_to_draw) {
+                                // Get texture dimensions as floats
+                                float tex_w = 0.0f, tex_h = 0.0f;
+                                SDL_GetTextureSize(crit_texture_to_draw, &tex_w, &tex_h);
+
+                                // Define the target box size (32x32 for criteria)
+                                ImVec2 target_box_size = ImVec2(32.0f * t->zoom_level, 32.0f * t->zoom_level);
+
+                                // Calculate scaled dimensions to fit inside the box while maintaining aspect ratio
+                                float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
+                                ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
+
+                                // Center the scaled image within the 32x32 area
+                                ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
+                                                        (target_box_size.y - scaled_size.y) * 0.5f);
+                                ImVec2 p_min = ImVec2(crit_base_pos.x + padding.x, crit_base_pos.y + padding.y);
+                                ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
+
+                                // Choose the tint color for fading completed icons
+                                ImU32 icon_tint = crit->done ? icon_tint_faded : IM_COL32_WHITE;
+
+                                // Draw the final image with correct scaling, centering, and tint
+                                draw_list->AddImage((void *) crit_texture_to_draw, p_min, p_max, ImVec2(0, 0),
+                                                    ImVec2(1, 1),
+                                                    icon_tint);
+                            }
+
+                            current_element_x += 32 * t->zoom_level + 4 * t->zoom_level;
+
+                            // Draw Checkbox for Sub-Stat ONLY if there is more than one.
+                            if (is_stat_section && cat->criteria_count > 1) {
+                                ImVec2 check_pos = ImVec2(current_element_x, crit_base_pos.y + 6 * t->zoom_level);
+                                ImRect checkbox_rect(
+                                    check_pos, ImVec2(check_pos.x + 20 * t->zoom_level,
+                                                      check_pos.y + 20 * t->zoom_level));
+                                bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
+                                ImU32 check_fill_color = is_hovered ? checkbox_hover_color : checkbox_fill_color;
+                                draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill_color,
+                                                         3.0f * t->zoom_level);
+                                draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, text_color,
+                                                   3.0f * t->zoom_level);
+
+                                if (crit->is_manually_completed) {
+                                    ImVec2 p1 = ImVec2(check_pos.x + 5 * t->zoom_level,
+                                                       check_pos.y + 10 * t->zoom_level);
+                                    ImVec2 p2 = ImVec2(check_pos.x + 9 * t->zoom_level,
+                                                       check_pos.y + 15 * t->zoom_level);
+                                    ImVec2 p3 = ImVec2(check_pos.x + 15 * t->zoom_level,
+                                                       check_pos.y + 6 * t->zoom_level);
+                                    draw_list->AddLine(p1, p2, checkmark_color, 2.0f * t->zoom_level);
+                                    draw_list->AddLine(p2, p3, checkmark_color, 2.0f * t->zoom_level);
+                                }
+
+                                if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                                    crit->is_manually_completed = !crit->is_manually_completed;
+                                    crit->done = crit->is_manually_completed
+                                                     ? true
+                                                     : (crit->progress >= crit->goal && crit->goal > 0);
+                                    settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
+                                    SDL_SetAtomicInt(&g_needs_update, 1);
+                                    SDL_SetAtomicInt(&g_game_data_changed, 1);
+                                }
+                                current_element_x += 20 * t->zoom_level + 4 * t->zoom_level;
+                            }
+
+                            // Draw Text and Progress
+                            ImU32 current_text_color = crit->done ? text_color_faded : text_color;
+                            draw_list->AddText(nullptr, 14.0f * t->zoom_level,
+                                               ImVec2(current_element_x, crit_base_pos.y + 8 * t->zoom_level),
+                                               current_text_color, crit->display_name);
+                            current_element_x += ImGui::CalcTextSize(crit->display_name).x * t->zoom_level + 4 * t->
+                                    zoom_level;
+
+                            char crit_progress_text[32] = "";
+                            if (is_stat_section) {
+                                if (crit->goal > 0) {
+                                    snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d / %d)",
+                                             crit->progress,
+                                             crit->goal);
+                                } else if (crit->goal == -1) {
+                                    snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d)", crit->progress);
+                                }
+                                if (crit_progress_text[0] != '\0') {
+                                    draw_list->AddText(nullptr, 14.0f * t->zoom_level,
+                                                       ImVec2(current_element_x, crit_base_pos.y + 8 * t->zoom_level),
+                                                       current_text_color, crit_progress_text);
+                                }
+                            }
+
+                            sub_item_y_offset += 36.0f;
                         }
+                    } else {
+                        // If only a child matched, iterate through and render ONLY the matching children
+                        for (TrackableItem *crit: matching_children) {
+                            if (!crit) continue; // Skip if the criteria is null
 
-                        if (crit_texture_to_draw) {
-                            // Get texture dimensions as floats
-                            float tex_w = 0.0f, tex_h = 0.0f;
-                            SDL_GetTextureSize(crit_texture_to_draw, &tex_w, &tex_h);
+                            // Hide if "Remove Completed Goals" is on and the criterion is either done or marked as hidden
+                            if (settings->remove_completed_goals && (crit->done || crit->is_hidden)) continue;
 
-                            // Define the target box size (32x32 for criteria)
-                            ImVec2 target_box_size = ImVec2(32.0f * t->zoom_level, 32.0f * t->zoom_level);
+                            ImVec2 crit_base_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
+                                                          (sub_item_y_offset * t->zoom_level) + t->camera_offset.y);
+                            float current_element_x = crit_base_pos.x;
 
-                            // Calculate scaled dimensions to fit inside the box while maintaining aspect ratio
-                            float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
-                            ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
 
-                            // Center the scaled image within the 32x32 area
-                            ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
-                                                    (target_box_size.y - scaled_size.y) * 0.5f);
-                            ImVec2 p_min = ImVec2(crit_base_pos.x + padding.x, crit_base_pos.y + padding.y);
-                            ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
+                            // For the small 32x32 icons
 
-                            // Choose the tint color for fading completed icons
-                            ImU32 icon_tint = crit->done ? icon_tint_faded : IM_COL32_WHITE;
+                            SDL_Texture *crit_texture_to_draw = nullptr;
+                            if (crit->anim_texture && crit->anim_texture->frame_count > 0) {
+                                if (crit->anim_texture->delays && crit->anim_texture->total_duration > 0) {
+                                    Uint32 current_time = SDL_GetTicks();
+                                    Uint32 elapsed_time = current_time % crit->anim_texture->total_duration;
+                                    int current_frame = 0;
+                                    Uint32 time_sum = 0;
+                                    for (int frame_idx = 0; frame_idx < crit->anim_texture->frame_count; ++frame_idx) {
+                                        time_sum += crit->anim_texture->delays[frame_idx];
+                                        if (elapsed_time < time_sum) {
+                                            current_frame = frame_idx;
+                                            break;
+                                        }
+                                    }
+                                    crit_texture_to_draw = crit->anim_texture->frames[current_frame];
+                                } else {
+                                    crit_texture_to_draw = crit->anim_texture->frames[0];
+                                }
+                            } else if (crit->texture) {
+                                crit_texture_to_draw = crit->texture;
+                            }
 
-                            // Draw the final image with correct scaling, centering, and tint
-                            draw_list->AddImage((void *) crit_texture_to_draw, p_min, p_max, ImVec2(0, 0), ImVec2(1, 1),
-                                                icon_tint);
+                            if (crit_texture_to_draw) {
+                                // Get texture dimensions as floats
+                                float tex_w = 0.0f, tex_h = 0.0f;
+                                SDL_GetTextureSize(crit_texture_to_draw, &tex_w, &tex_h);
+
+                                // Define the target box size (32x32 for criteria)
+                                ImVec2 target_box_size = ImVec2(32.0f * t->zoom_level, 32.0f * t->zoom_level);
+
+                                // Calculate scaled dimensions to fit inside the box while maintaining aspect ratio
+                                float scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
+                                ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
+
+                                // Center the scaled image within the 32x32 area
+                                ImVec2 padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
+                                                        (target_box_size.y - scaled_size.y) * 0.5f);
+                                ImVec2 p_min = ImVec2(crit_base_pos.x + padding.x, crit_base_pos.y + padding.y);
+                                ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
+
+                                // Choose the tint color for fading completed icons
+                                ImU32 icon_tint = crit->done ? icon_tint_faded : IM_COL32_WHITE;
+
+                                // Draw the final image with correct scaling, centering, and tint
+                                draw_list->AddImage((void *) crit_texture_to_draw, p_min, p_max, ImVec2(0, 0),
+                                                    ImVec2(1, 1),
+                                                    icon_tint);
+                            }
+
+                            current_element_x += 32 * t->zoom_level + 4 * t->zoom_level;
+
+                            // Draw Checkbox for Sub-Stat ONLY if there is more than one.
+                            if (is_stat_section && cat->criteria_count > 1) {
+                                ImVec2 check_pos = ImVec2(current_element_x, crit_base_pos.y + 6 * t->zoom_level);
+                                ImRect checkbox_rect(
+                                    check_pos, ImVec2(check_pos.x + 20 * t->zoom_level,
+                                                      check_pos.y + 20 * t->zoom_level));
+                                bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
+                                ImU32 check_fill_color = is_hovered ? checkbox_hover_color : checkbox_fill_color;
+                                draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill_color,
+                                                         3.0f * t->zoom_level);
+                                draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, text_color,
+                                                   3.0f * t->zoom_level);
+
+                                if (crit->is_manually_completed) {
+                                    ImVec2 p1 = ImVec2(check_pos.x + 5 * t->zoom_level,
+                                                       check_pos.y + 10 * t->zoom_level);
+                                    ImVec2 p2 = ImVec2(check_pos.x + 9 * t->zoom_level,
+                                                       check_pos.y + 15 * t->zoom_level);
+                                    ImVec2 p3 = ImVec2(check_pos.x + 15 * t->zoom_level,
+                                                       check_pos.y + 6 * t->zoom_level);
+                                    draw_list->AddLine(p1, p2, checkmark_color, 2.0f * t->zoom_level);
+                                    draw_list->AddLine(p2, p3, checkmark_color, 2.0f * t->zoom_level);
+                                }
+
+                                if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                                    crit->is_manually_completed = !crit->is_manually_completed;
+                                    crit->done = crit->is_manually_completed
+                                                     ? true
+                                                     : (crit->progress >= crit->goal && crit->goal > 0);
+                                    settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
+                                    SDL_SetAtomicInt(&g_needs_update, 1);
+                                    SDL_SetAtomicInt(&g_game_data_changed, 1);
+                                }
+                                current_element_x += 20 * t->zoom_level + 4 * t->zoom_level;
+                            }
+
+                            // Draw Text and Progress
+                            ImU32 current_text_color = crit->done ? text_color_faded : text_color;
+                            draw_list->AddText(nullptr, 14.0f * t->zoom_level,
+                                               ImVec2(current_element_x, crit_base_pos.y + 8 * t->zoom_level),
+                                               current_text_color, crit->display_name);
+                            current_element_x += ImGui::CalcTextSize(crit->display_name).x * t->zoom_level + 4 * t->
+                                    zoom_level;
+
+                            char crit_progress_text[32] = "";
+                            if (is_stat_section) {
+                                if (crit->goal > 0) {
+                                    snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d / %d)",
+                                             crit->progress,
+                                             crit->goal);
+                                } else if (crit->goal == -1) {
+                                    snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d)", crit->progress);
+                                }
+                                if (crit_progress_text[0] != '\0') {
+                                    draw_list->AddText(nullptr, 14.0f * t->zoom_level,
+                                                       ImVec2(current_element_x, crit_base_pos.y + 8 * t->zoom_level),
+                                                       current_text_color, crit_progress_text);
+                                }
+                            }
+
+                            sub_item_y_offset += 36.0f;
                         }
-
-                        current_element_x += 32 * t->zoom_level + 4 * t->zoom_level;
-
-                        // Draw Checkbox for Sub-Stat ONLY if there is more than one.
-                        if (is_stat_section && cat->criteria_count > 1) {
-                            ImVec2 check_pos = ImVec2(current_element_x, crit_base_pos.y + 6 * t->zoom_level);
-                            ImRect checkbox_rect(
-                                check_pos, ImVec2(check_pos.x + 20 * t->zoom_level, check_pos.y + 20 * t->zoom_level));
-                            bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
-                            ImU32 check_fill_color = is_hovered ? checkbox_hover_color : checkbox_fill_color;
-                            draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill_color,
-                                                     3.0f * t->zoom_level);
-                            draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, text_color, 3.0f * t->zoom_level);
-
-                            if (crit->is_manually_completed) {
-                                ImVec2 p1 = ImVec2(check_pos.x + 5 * t->zoom_level, check_pos.y + 10 * t->zoom_level);
-                                ImVec2 p2 = ImVec2(check_pos.x + 9 * t->zoom_level, check_pos.y + 15 * t->zoom_level);
-                                ImVec2 p3 = ImVec2(check_pos.x + 15 * t->zoom_level, check_pos.y + 6 * t->zoom_level);
-                                draw_list->AddLine(p1, p2, checkmark_color, 2.0f * t->zoom_level);
-                                draw_list->AddLine(p2, p3, checkmark_color, 2.0f * t->zoom_level);
-                            }
-
-                            if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                                crit->is_manually_completed = !crit->is_manually_completed;
-                                crit->done = crit->is_manually_completed
-                                                 ? true
-                                                 : (crit->progress >= crit->goal && crit->goal > 0);
-                                settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
-                                SDL_SetAtomicInt(&g_needs_update, 1);
-                                SDL_SetAtomicInt(&g_game_data_changed, 1);
-                            }
-                            current_element_x += 20 * t->zoom_level + 4 * t->zoom_level;
-                        }
-
-                        // Draw Text and Progress
-                        ImU32 current_text_color = crit->done ? text_color_faded : text_color;
-                        draw_list->AddText(nullptr, 14.0f * t->zoom_level,
-                                           ImVec2(current_element_x, crit_base_pos.y + 8 * t->zoom_level),
-                                           current_text_color, crit->display_name);
-                        current_element_x += ImGui::CalcTextSize(crit->display_name).x * t->zoom_level + 4 * t->
-                                zoom_level;
-
-                        char crit_progress_text[32] = "";
-                        if (is_stat_section) {
-                            if (crit->goal > 0) {
-                                snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d / %d)", crit->progress,
-                                         crit->goal);
-                            } else if (crit->goal == -1) {
-                                snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d)", crit->progress);
-                            }
-                            if (crit_progress_text[0] != '\0') {
-                                draw_list->AddText(nullptr, 14.0f * t->zoom_level,
-                                                   ImVec2(current_element_x, crit_base_pos.y + 8 * t->zoom_level),
-                                                   current_text_color, crit_progress_text);
-                            }
-                        }
-
-                        sub_item_y_offset += 36.0f;
                     }
                 }
 
@@ -2803,14 +3052,14 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
  */
 static void render_simple_item_section(Tracker *t, const AppSettings *settings, float &current_y, TrackableItem **items,
                                        int count, const char *section_title) {
-
     int visible_count = 0;
     for (int i = 0; i < count; ++i) {
         TrackableItem *item = items[i];
         if (item) {
-            // An item is visible if "Remove Completed Goals" is OFF,
-            // or if it's ON, the item must be neither done NOR hidden.
-            if (!settings->remove_completed_goals || (!item->done && !item->is_hidden)) {
+            // An item is visible if it passes the "Remove Completed" check AND the search filter
+            bool passes_hide_filter = !settings->remove_completed_goals || (!item->done && !item->is_hidden);
+            bool passes_search_filter = str_contains_insensitive(item->display_name, t->search_buffer);
+            if (passes_hide_filter && passes_search_filter) {
                 visible_count++;
                 break; // Found at least one visible item, so we can stop counting.
             }
@@ -2833,8 +3082,19 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
     float uniform_item_width = 0.0f;
     for (int i = 0; i < count; i++) {
         TrackableItem *item = items[i];
-        // Hide if setting is on and item is either completed or marked as hidden
-        if (!item || (settings->remove_completed_goals && (item->done || item->is_hidden))) continue;
+
+        // Hide if search doesn't match -> anything matches empty string
+        if (!str_contains_insensitive(item->display_name, t->search_buffer)) {
+            continue; // Skip rendering if it doesn't match the search
+        }
+
+
+        // Hide if setting is on and item is either completed or marked as hidden OR doesn't match search
+        if (!item || (settings->remove_completed_goals && (item->done || item->is_hidden)) || !str_contains_insensitive(
+                item->display_name, t->search_buffer))
+            continue;
+        // TODO: Remove
+        // if (!item || (settings->remove_completed_goals && (item->done || item->is_hidden))) continue;
         uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, ImGui::CalcTextSize(item->display_name).x));
     }
 
@@ -2846,8 +3106,14 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
     for (int i = 0; i < count; i++) {
         TrackableItem *item = items[i];
-        // Hide if setting is on and item is either completed or marked as hidden
-        if (!item || (settings->remove_completed_goals && (item->done || item->is_hidden))) continue;
+
+        // This single check now combines all filtering logic.
+        // If an item fails any of these, we 'continue' before any layout math is done.
+        if (!item ||
+            (settings->remove_completed_goals && (item->done || item->is_hidden)) ||
+            !str_contains_insensitive(item->display_name, t->search_buffer)) {
+            continue;
+        }
 
         float item_height = 96.0f + ImGui::CalcTextSize(item->display_name).y + 4.0f;
         if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
@@ -2948,11 +3214,12 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
     for (int i = 0; i < count; ++i) {
         TrackableItem *item = t->template_data->custom_goals[i];
         if (item) {
-            // An item is visible if "Remove Completed Goals" is OFF,
-            // or if it's ON, the item must be neither done NOR hidden.
-            if (!settings->remove_completed_goals || (!item->done && !item->is_hidden)) {
+            // An item is visible if it passes the "Remove Completed" check AND the search filter
+            bool passes_hide_filter = !settings->remove_completed_goals || (!item->done && !item->is_hidden);
+            bool passes_search_filter = str_contains_insensitive(item->display_name, t->search_buffer);
+            if (passes_hide_filter && passes_search_filter) {
                 visible_count++;
-                break; // Found at least one visible item, so we can stop counting.
+                break;
             }
         }
     }
@@ -2981,7 +3248,17 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
     float uniform_item_width = 0.0f;
     for (int i = 0; i < count; i++) {
         TrackableItem *item = t->template_data->custom_goals[i];
-        if (!item || (item->done && settings->remove_completed_goals)) continue;
+
+        // Hide if search doesn't match -> anything matches empty string
+        if (!str_contains_insensitive(item->display_name, t->search_buffer)) {
+            continue; // Skip rendering if it doesn't match the search
+        }
+
+        if (!item || (item->done && settings->remove_completed_goals) || !str_contains_insensitive(
+                item->display_name, t->search_buffer)) continue;
+
+        // TODO: Remove
+        // if (!item || (item->done && settings->remove_completed_goals)) continue;
         uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, ImGui::CalcTextSize(item->display_name).x));
     }
 
@@ -2993,7 +3270,12 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
     for (int i = 0; i < count; i++) {
         TrackableItem *item = t->template_data->custom_goals[i];
-        if (!item || (item->done && settings->remove_completed_goals)) continue;
+
+        if (!item ||
+            (settings->remove_completed_goals && (item->done || item->is_hidden)) ||
+            !str_contains_insensitive(item->display_name, t->search_buffer)) {
+            continue;
+        }
 
         char progress_text[32] = "";
         if (item->goal > 0) snprintf(progress_text, sizeof(progress_text), "(%d / %d)", item->progress, item->goal);
@@ -3156,11 +3438,16 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
         if (goal) {
             bool is_done = (goal->current_stage >= goal->stage_count - 1);
-            // A goal is visible if "Remove Completed Goals" is OFF,
-            // or if it's ON, the goal must be neither done NOR hidden.
-            if (!settings->remove_completed_goals || (!is_done && !goal->is_hidden)) {
+            bool passes_hide_filter = !settings->remove_completed_goals || (!is_done && !goal->is_hidden);
+
+            SubGoal *active_stage = goal->stages[goal->current_stage];
+            bool name_matches = str_contains_insensitive(goal->display_name, t->search_buffer);
+            bool stage_matches = str_contains_insensitive(active_stage->display_text, t->search_buffer);
+            bool passes_search_filter = name_matches || stage_matches;
+
+            if (passes_hide_filter && passes_search_filter) {
                 visible_count++;
-                break; // Found at least one visible item, so we can stop counting.
+                break;
             }
         }
     }
@@ -3182,13 +3469,22 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
     for (int i = 0; i < count; i++) {
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
         if (!goal) continue;
-        uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, ImGui::CalcTextSize(goal->display_name).x));
+
+        bool is_done = goal && (goal->current_stage >= goal->stage_count - 1);
+        SubGoal *active_stage = goal->stages[goal->current_stage];
+        bool name_matches = str_contains_insensitive(goal->display_name, t->search_buffer);
+        bool stage_matches = str_contains_insensitive(active_stage->display_text, t->search_buffer);
+
+        if ((settings->remove_completed_goals && (is_done || goal->is_hidden)) || (!name_matches && !stage_matches)) {
+            continue;
+        }
+
+        // TODO: Remove
+        // uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, ImGui::CalcTextSize(goal->display_name).x));
 
         // Account for the width of the current stage text (for proper spacing)
         float required_width = ImGui::CalcTextSize(goal->display_name).x;
-
         if (goal->current_stage < goal->stage_count) {
-            SubGoal *active_stage = goal->stages[goal->current_stage];
             char stage_text[256];
             if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress > 0) {
                 snprintf(stage_text, sizeof(stage_text), "%s (%d/%d)", active_stage->display_text,
@@ -3198,7 +3494,6 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             }
             required_width = fmaxf(required_width, ImGui::CalcTextSize(stage_text).x);
         }
-
         uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, required_width));
     }
 
@@ -3210,17 +3505,23 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
     for (int i = 0; i < count; i++) {
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
         bool is_done = goal && (goal->current_stage >= goal->stage_count - 1);
-
-        // Hide if setting is on and goal is either completed or marked as hidden
-        if (!goal || (settings->remove_completed_goals && (is_done || goal->is_hidden))) continue;
-
         SubGoal *active_stage = goal->stages[goal->current_stage];
+
+        // Combine all filters into a single check before proceeding.
+        bool name_matches = str_contains_insensitive(goal->display_name, t->search_buffer);
+        bool stage_matches = str_contains_insensitive(active_stage->display_text, t->search_buffer);
+
+        if (!goal || (settings->remove_completed_goals && (is_done || goal->is_hidden)) || (!name_matches && !stage_matches)) {
+            continue;
+        }
+
         char stage_text[256];
         if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress > 0) {
             snprintf(stage_text, sizeof(stage_text), "%s (%d/%d)", active_stage->display_text,
                      active_stage->current_stat_progress, active_stage->required_progress);
         } else {
-            strncpy(stage_text, active_stage->display_text, sizeof(stage_text));
+            strncpy(stage_text, active_stage->display_text, sizeof(stage_text) - 1);
+            stage_text[sizeof(stage_text) - 1] = '\0';
         }
 
         ImVec2 text_size = ImGui::CalcTextSize(goal->display_name);
@@ -3519,8 +3820,15 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // Pop the two style colors still on the stack (WindowBg and the content's Text color).
     ImGui::PopStyleColor(2);
 
+
+    // TODO: Remove
+    // ImVec2 lock_button_text_size = ImGui::CalcTextSize("Lock Layout");
+    // ImVec2 reset_button_text_size = ImGui::CalcTextSize("Reset Layout");
+    // ImVec2 notes_button_text_size = ImGui::CalcTextSize("Notes");
+
     // Layout Control Buttons
     const float button_padding = 10.0f;
+    const float search_box_width = 250.0f;
     ImVec2 lock_button_text_size = ImGui::CalcTextSize("Lock Layout");
     ImVec2 reset_button_text_size = ImGui::CalcTextSize("Reset Layout");
     ImVec2 notes_button_text_size = ImGui::CalcTextSize("Notes");
@@ -3528,17 +3836,17 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // Add padding and space for the checkbox square
     ImVec2 lock_button_size = ImVec2(lock_button_text_size.x + 25.0f, lock_button_text_size.y + 8.0f);
     ImVec2 reset_button_size = ImVec2(reset_button_text_size.x + 25.0f, reset_button_text_size.y + 8.0f);
-    ImVec2 notes_button_size = ImVec2(notes_button_text_size.x + 0.0f, notes_button_text_size.y + 8.0f);
+    ImVec2 notes_button_size = ImVec2(notes_button_text_size.x - 13.0f, notes_button_text_size.y + 8.0f);
 
     // TODO: Adjust this for more buttons, with 3 buttons it's padding * 2.0f, 4 buttons is 3.0f and so on (in addition to button)
-    float buttons_total_width = lock_button_size.x + reset_button_size.x + notes_button_size.x + (
-                                    button_padding * 2.0f);
+    float controls_total_width = search_box_width + lock_button_size.x + reset_button_size.x + notes_button_size.x + (
+                                     button_padding * 4.0f);
 
 
     // Position a new transparent window in the bottom right to hold the buttons
-    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - buttons_total_width - button_padding,
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - controls_total_width - button_padding,
                                    io.DisplaySize.y - lock_button_size.y - button_padding));
-    ImGui::SetNextWindowSize(ImVec2(buttons_total_width, lock_button_size.y));
+    ImGui::SetNextWindowSize(ImVec2(controls_total_width, lock_button_size.y));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 
     // ImGuiWindowFlags_NoMove could be defined here
@@ -3560,7 +3868,46 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                                                      (float) settings->text_color.g / 255.f,
                                                      (float) settings->text_color.b / 255.f, 1.0f));
 
-    ImGui::SetWindowFontScale(0.9f); // Slightly smaller text for buttons
+    ImGui::SetWindowFontScale(0.9f); // Slightly smaller text for controls
+
+    // Ctrl + F or Cmd + F to focus the search box
+    if (t->focus_search_box_requested) {
+        ImGui::SetKeyboardFocusHere();
+        t->focus_search_box_requested = false; // Reset the flag immediately after use
+    }
+
+    // We use the tracker's main text color but with the faded alpha value.
+    ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4((float)settings->text_color.r / 255.f,
+                                                       (float)settings->text_color.g / 255.f,
+                                                       (float)settings->text_color.b / 255.f,
+                                                       (float)ADVANCELY_FADED_ALPHA / 255.0f)); //
+
+    // Search box
+    ImGui::SetNextItemWidth(search_box_width);
+    ImGui::InputTextWithHint("##SearchBox", "Search...", t->search_buffer, sizeof(t->search_buffer));
+
+    // Pop color
+    ImGui::PopStyleColor();
+
+    if (ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 50.0f); // Helps the text wrap nicely
+
+        ImGui::TextUnformatted("Search for goals by name (case-insensitive). You can also use Ctrl + F (or Cmd + F on macOS).");
+        ImGui::Separator();
+        ImGui::TextUnformatted("How filtering works:");
+
+        ImGui::BulletText("Advancements & Statistics: Shows a category if its title or any of its sub-criteria match.\nIf only a sub-criterion matches, only that specific one will be shown under its parent.");
+
+        ImGui::BulletText("Unlocks & Custom Goals: Shows the goal if its name matches the search term.");
+
+        ImGui::BulletText("Multi-Stage Goals: Shows the goal if its main title or the text of its currently\nactive stage matches the search term.");
+
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
+
+    ImGui::SameLine();
 
     // "Lock Layout" checkbox
     if (ImGui::Checkbox("Lock Layout", &t->layout_locked)) {
@@ -3747,7 +4094,8 @@ bool tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
     // TODO: When template doesn't exist it shouldn't do anything
     if (!template_json) {
         log_message(LOG_ERROR, "[TRACKER] CRITICAL: Template file not found: %s\n", t->advancement_template_path);
-        show_error_message("Template Not Found", "The selected template file could not be found. Please check your settings or create the required template file.");
+        show_error_message("Template Not Found",
+                           "The selected template file could not be found. Please check your settings or create the required template file.");
         return false; // Signal critical failure
     }
 

@@ -50,6 +50,12 @@ It's easiest to just add an optional flag (here it would be `_1`) turning someth
 
 * **Zoom**: Mouse Wheel
 
+* **Search**: Use `Ctrl+F` (or `Cmd+F` on macOS) to focus the search box and filter goals by name. The filter is case-insensitive and works as follows:
+
+  * **Advancements & Statistics**: Shows a category if its title or any of its sub-criteria match. If only a sub-criterion matches, only that specific one will be shown under its parent.
+  * **Unlocks & Custom Goals**: Shows the goal if its name matches the search term.
+  * **Multi-Stage Goals**: Shows the goal if its main title or the text of its currently active stage matches the search term.
+
 * **Lock Layout**: Press `SPACE` to lock the grid layout, preventing it from rearranging when you resize the window or zoom.
 
 * **Comprehensive Tracking**: Advancely isn't limited to just advancements. It tracks multiple data types directly from your save file, including:

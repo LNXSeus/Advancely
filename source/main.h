@@ -40,7 +40,7 @@ void show_error_message(const char *title, const char *message);
 #define TRACKER_TITLE "Advancely"
 
 // This is the version that gets compared with the latest release tag on GitHub
-#define ADVANCELY_VERSION "v0.9.60" // vMAJOR.MINOR.PATCH // TODO: Update this always, SAME FORMAT ON RELEASE TAG!
+#define ADVANCELY_VERSION "v0.9.61" // vMAJOR.MINOR.PATCH // TODO: Update this always, SAME FORMAT ON RELEASE TAG!
 #define ADVANCELY_ICON_PATH "resources/gui/Advancely_Logo_NoText.png" // TODO: Use this in tracker_init_sdl()
 #define ADVANCELY_LOGO_PATH "resources/gui/Advancely_Logo.png"
 #define ADVANCELY_LOGO_SIZE 512.0f // Logo size on startup message window or update successful window

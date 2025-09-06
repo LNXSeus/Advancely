@@ -75,6 +75,8 @@ struct Tracker {
     float locked_layout_width; // The saved width of the layout when it was locked.
     bool notes_window_open; // Flag to control the visibility of the notes window.
     char notes_buffer[65536]; // 64KB buffer to hold the text for the notes.
+    char search_buffer[256]; // Buffer for the search functionality.
+    bool focus_search_box_requested; // Flag for Ctrl+F hotkey
 
     // --- Fonts ---
     ImFont *roboto_font; // ImGui font for the settings window UI.
