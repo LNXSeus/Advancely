@@ -2353,68 +2353,72 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                               bool is_stat_section, MC_Version version) {
     // Pre-computation and Filtering
     int visible_count = 0;
-    for (int i = 0; i < count; ++i) {
-        // TODO: Remove
-        //     TrackableCategory *cat = categories[i];
-        //     if (!cat) continue;
-        //
-        //     bool is_considered_complete = false;
-        //     if (is_stat_section) {
-        //         is_considered_complete = cat->done;
-        //     } else {
-        //         // It's an advancement
-        //         is_considered_complete = (cat->criteria_count > 0 && cat->all_template_criteria_met) || (
-        //             cat->criteria_count == 0 && cat->done);
-        //     }
-        //
-        //     // An item is visible if "Remove Completed Goals" is OFF,
-        //     // or if it's ON, the item must be neither completed NOR hidden.
-        //     if (!settings->remove_completed_goals || (!is_considered_complete && !cat->is_hidden)) {
-        //         visible_count++;
-        //     }
-        // }
-        // if (visible_count == 0) return;
 
+    // TODO: Remove
+    // for (int i = 0; i < count; ++i) {
+    //
+    //     TrackableCategory *cat = categories[i];
+    //     if (!cat) continue;
+    //
+    //     // First, check if the category itself is visible based on the "Remove Completed" setting
+    //     bool is_considered_complete = false;
+    //     if (is_stat_section) {
+    //         is_considered_complete = cat->done;
+    //     } else {
+    //         is_considered_complete = (cat->criteria_count > 0 && cat->all_template_criteria_met) || (
+    //                                      cat->criteria_count == 0 && cat->done);
+    //     }
+    //
+    //     if (settings->remove_completed_goals && (is_considered_complete || cat->is_hidden)) {
+    //         continue; // Skip this category if it's hidden by the main filter
+    //     }
+    //
+    //     // Now, check if this visible category or any of its visible children match the search
+    //     if (str_contains_insensitive(cat->display_name, t->search_buffer)) {
+    //         visible_count++;
+    //         break; // Parent matches, so the section is visible.
+    //     }
+    //
+    //     // If parent doesn't match, check children
+    //     bool child_found = false;
+    //     for (int j = 0; j < cat->criteria_count; j++) {
+    //         TrackableItem *crit = cat->criteria[j];
+    //         if (crit && (!settings->remove_completed_goals || (!crit->done && !crit->is_hidden))) {
+    //             if (str_contains_insensitive(crit->display_name, t->search_buffer)) {
+    //                 child_found = true;
+    //                 break;
+    //             }
+    //         }
+    //     }
+    //     if (child_found) {
+    //         visible_count++;
+    //         break; // A child matches, so the section is visible.
+    //     }
+    // }
+
+    // Section separator remains visible with the same spacing even during search
+    for (int i = 0; i < count; ++i) {
         TrackableCategory *cat = categories[i];
         if (!cat) continue;
 
-        // First, check if the category itself is visible based on the "Remove Completed" setting
+        // Determine if the category should be hidden by the "Remove Completed Goals" setting.
+        // THIS CHECK IGNORES THE SEARCH FILTER INTENTIONALLY.
         bool is_considered_complete = false;
         if (is_stat_section) {
             is_considered_complete = cat->done;
         } else {
-            is_considered_complete = (cat->criteria_count > 0 && cat->all_template_criteria_met) || (
-                                         cat->criteria_count == 0 && cat->done);
+            is_considered_complete = (cat->criteria_count > 0 && cat->all_template_criteria_met) ||
+                                     (cat->criteria_count == 0 && cat->done);
         }
 
-        if (settings->remove_completed_goals && (is_considered_complete || cat->is_hidden)) {
-            continue; // Skip this category if it's hidden by the main filter
-        }
-
-        // Now, check if this visible category or any of its visible children match the search
-        if (str_contains_insensitive(cat->display_name, t->search_buffer)) {
+        if (!settings->remove_completed_goals || (!is_considered_complete && !cat->is_hidden)) {
+            // If we find at least one item that isn't hidden by the general setting, the section is visible.
             visible_count++;
-            break; // Parent matches, so the section is visible.
-        }
-
-        // If parent doesn't match, check children
-        bool child_found = false;
-        for (int j = 0; j < cat->criteria_count; j++) {
-            TrackableItem *crit = cat->criteria[j];
-            if (crit && (!settings->remove_completed_goals || (!crit->done && !crit->is_hidden))) {
-                if (str_contains_insensitive(crit->display_name, t->search_buffer)) {
-                    child_found = true;
-                    break;
-                }
-            }
-        }
-        if (child_found) {
-            visible_count++;
-            break; // A child matches, so the section is visible.
+            break;
         }
     }
 
-    if (visible_count == 0) return; // No items in this entire section are visible with the current filters.
+    if (visible_count == 0) return; // The entire section is empty due to completion, so hide it.
 
     ImGuiIO &io = ImGui::GetIO();
 
@@ -2441,8 +2445,6 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
     float uniform_item_width = 0.0f;
     for (int i = 0; i < count; i++) {
         TrackableCategory *cat = categories[i];
-        // TODO: Remove
-        // if (!cat || (cat->done && settings->remove_completed_goals)) continue;
 
         if (!cat || (settings->remove_completed_goals && (cat->is_hidden || cat->done))) {
             continue;
@@ -3052,22 +3054,37 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
  */
 static void render_simple_item_section(Tracker *t, const AppSettings *settings, float &current_y, TrackableItem **items,
                                        int count, const char *section_title) {
+    // TODO: Remove
+    // int visible_count = 0;
+    // for (int i = 0; i < count; ++i) {
+    //     TrackableItem *item = items[i];
+    //     if (item) {
+    //         // An item is visible if it passes the "Remove Completed" check AND the search filter
+    //         bool passes_hide_filter = !settings->remove_completed_goals || (!item->done && !item->is_hidden);
+    //         bool passes_search_filter = str_contains_insensitive(item->display_name, t->search_buffer);
+    //         if (passes_hide_filter && passes_search_filter) {
+    //             visible_count++;
+    //             break; // Found at least one visible item, so we can stop counting.
+    //         }
+    //     }
+    // }
+    // if (visible_count == 0) return;
+
+    // Section separator remains visible with the same spacing even during search
     int visible_count = 0;
     for (int i = 0; i < count; ++i) {
         TrackableItem *item = items[i];
         if (item) {
-            // An item is visible if it passes the "Remove Completed" check AND the search filter
-            bool passes_hide_filter = !settings->remove_completed_goals || (!item->done && !item->is_hidden);
-            bool passes_search_filter = str_contains_insensitive(item->display_name, t->search_buffer);
-            if (passes_hide_filter && passes_search_filter) {
+            // Only check the "Remove Completed Goals" setting here.
+            if (!settings->remove_completed_goals || (!item->done && !item->is_hidden)) {
                 visible_count++;
-                break; // Found at least one visible item, so we can stop counting.
+                break;
             }
         }
     }
     if (visible_count == 0) return;
 
-    ImGuiIO &io = ImGui::GetIO();
+            ImGuiIO &io = ImGui::GetIO();
 
     // Use locked width if layout is locked
     float wrapping_width = t->layout_locked ? t->locked_layout_width : (io.DisplaySize.x / t->zoom_level);
@@ -3210,14 +3227,29 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                                         const char *section_title) {
     int count = t->template_data->custom_goal_count;
     // Pre-check for visible items
+
+    // TODO: Remove this
+    // int visible_count = 0;
+    // for (int i = 0; i < count; ++i) {
+    //     TrackableItem *item = t->template_data->custom_goals[i];
+    //     if (item) {
+    //         // An item is visible if it passes the "Remove Completed" check AND the search filter
+    //         bool passes_hide_filter = !settings->remove_completed_goals || (!item->done && !item->is_hidden);
+    //         bool passes_search_filter = str_contains_insensitive(item->display_name, t->search_buffer);
+    //         if (passes_hide_filter && passes_search_filter) {
+    //             visible_count++;
+    //             break;
+    //         }
+    //     }
+    // }
+    // if (visible_count == 0) return;
+
     int visible_count = 0;
     for (int i = 0; i < count; ++i) {
         TrackableItem *item = t->template_data->custom_goals[i];
         if (item) {
-            // An item is visible if it passes the "Remove Completed" check AND the search filter
-            bool passes_hide_filter = !settings->remove_completed_goals || (!item->done && !item->is_hidden);
-            bool passes_search_filter = str_contains_insensitive(item->display_name, t->search_buffer);
-            if (passes_hide_filter && passes_search_filter) {
+            // Only check the "Remove Completed Goals" setting here.
+            if (!settings->remove_completed_goals || (!item->done && !item->is_hidden)) {
                 visible_count++;
                 break;
             }
@@ -3225,7 +3257,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
     }
     if (visible_count == 0) return;
 
-    ImGuiIO &io = ImGui::GetIO();
+            ImGuiIO &io = ImGui::GetIO();
 
 
     // Use locked width if layout is locked
@@ -3255,7 +3287,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         }
 
         if (!item || (item->done && settings->remove_completed_goals) || !str_contains_insensitive(
-                item->display_name, t->search_buffer)) continue;
+                item->display_name, t->search_buffer))
+            continue;
 
         // TODO: Remove
         // if (!item || (item->done && settings->remove_completed_goals)) continue;
@@ -3433,19 +3466,35 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                                             const char *section_title) {
     int count = t->template_data->multi_stage_goal_count;
     // Pre-check for visible items
+
+    // TODO: Remove
+    // int visible_count = 0;
+    // for (int i = 0; i < count; ++i) {
+    //     MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+    //     if (goal) {
+    //         bool is_done = (goal->current_stage >= goal->stage_count - 1);
+    //         bool passes_hide_filter = !settings->remove_completed_goals || (!is_done && !goal->is_hidden);
+    //
+    //         SubGoal *active_stage = goal->stages[goal->current_stage];
+    //         bool name_matches = str_contains_insensitive(goal->display_name, t->search_buffer);
+    //         bool stage_matches = str_contains_insensitive(active_stage->display_text, t->search_buffer);
+    //         bool passes_search_filter = name_matches || stage_matches;
+    //
+    //         if (passes_hide_filter && passes_search_filter) {
+    //             visible_count++;
+    //             break;
+    //         }
+    //     }
+    // }
+    // if (visible_count == 0) return;
+
     int visible_count = 0;
     for (int i = 0; i < count; ++i) {
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
         if (goal) {
+            // Only check the "Remove Completed Goals" setting here.
             bool is_done = (goal->current_stage >= goal->stage_count - 1);
-            bool passes_hide_filter = !settings->remove_completed_goals || (!is_done && !goal->is_hidden);
-
-            SubGoal *active_stage = goal->stages[goal->current_stage];
-            bool name_matches = str_contains_insensitive(goal->display_name, t->search_buffer);
-            bool stage_matches = str_contains_insensitive(active_stage->display_text, t->search_buffer);
-            bool passes_search_filter = name_matches || stage_matches;
-
-            if (passes_hide_filter && passes_search_filter) {
+            if (!settings->remove_completed_goals || (!is_done && !goal->is_hidden)) {
                 visible_count++;
                 break;
             }
@@ -3511,7 +3560,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         bool name_matches = str_contains_insensitive(goal->display_name, t->search_buffer);
         bool stage_matches = str_contains_insensitive(active_stage->display_text, t->search_buffer);
 
-        if (!goal || (settings->remove_completed_goals && (is_done || goal->is_hidden)) || (!name_matches && !stage_matches)) {
+        if (!goal || (settings->remove_completed_goals && (is_done || goal->is_hidden)) || (
+                !name_matches && !stage_matches)) {
             continue;
         }
 
@@ -3877,10 +3927,10 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     }
 
     // We use the tracker's main text color but with the faded alpha value.
-    ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4((float)settings->text_color.r / 255.f,
-                                                       (float)settings->text_color.g / 255.f,
-                                                       (float)settings->text_color.b / 255.f,
-                                                       (float)ADVANCELY_FADED_ALPHA / 255.0f)); //
+    ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4((float) settings->text_color.r / 255.f,
+                                                        (float) settings->text_color.g / 255.f,
+                                                        (float) settings->text_color.b / 255.f,
+                                                        (float) ADVANCELY_FADED_ALPHA / 255.0f)); //
 
     // Search box
     ImGui::SetNextItemWidth(search_box_width);
@@ -3893,15 +3943,18 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         ImGui::BeginTooltip();
         ImGui::PushTextWrapPos(ImGui::GetFontSize() * 50.0f); // Helps the text wrap nicely
 
-        ImGui::TextUnformatted("Search for goals by name (case-insensitive). You can also use Ctrl + F (or Cmd + F on macOS).");
+        ImGui::TextUnformatted(
+            "Search for goals by name (case-insensitive). You can also use Ctrl + F (or Cmd + F on macOS).");
         ImGui::Separator();
         ImGui::TextUnformatted("How filtering works:");
 
-        ImGui::BulletText("Advancements & Statistics: Shows a category if its title or any of its sub-criteria match.\nIf only a sub-criterion matches, only that specific one will be shown under its parent.");
+        ImGui::BulletText(
+            "Advancements & Statistics: Shows a category if its title or any of its sub-criteria match.\nIf only a sub-criterion matches, only that specific one will be shown under its parent.");
 
         ImGui::BulletText("Unlocks & Custom Goals: Shows the goal if its name matches the search term.");
 
-        ImGui::BulletText("Multi-Stage Goals: Shows the goal if its main title or the text of its currently\nactive stage matches the search term.");
+        ImGui::BulletText(
+            "Multi-Stage Goals: Shows the goal if its main title or the text of its currently\nactive stage matches the search term.");
 
         ImGui::PopTextWrapPos();
         ImGui::EndTooltip();
