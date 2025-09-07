@@ -1201,18 +1201,14 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         snprintf(debug_buffer, sizeof(debug_buffer), "FPS: %.1f | dT: %.1f ms",
                  current_fps, o->last_delta_time * 1000.0f);
 
-        // Render the text to a texture
+        // Render the text using the cache
         SDL_Color text_color = {255, 0, 255, 255}; // Purple for visibility
-        SDL_Surface *text_surface = TTF_RenderText_Blended(o->font, debug_buffer, 0, text_color);
-        if (text_surface) {
-            SDL_Texture *text_texture = SDL_CreateTextureFromSurface(o->renderer, text_surface);
-            if (text_texture) {
-                SDL_SetTextureScaleMode(text_texture, SDL_SCALEMODE_NEAREST);
-                SDL_FRect dest_rect = {5.0f, 5.0f, (float) text_surface->w, (float) text_surface->h};
-                SDL_RenderTexture(o->renderer, text_texture, nullptr, &dest_rect);
-                SDL_DestroyTexture(text_texture);
-            }
-            SDL_DestroySurface(text_surface);
+        SDL_Texture *text_texture = get_text_texture_from_cache(o, debug_buffer, text_color);
+        if (text_texture) {
+            float w, h;
+            SDL_GetTextureSize(text_texture, &w, &h);
+            SDL_FRect dest_rect = {5.0f, 5.0f, w, h};
+            SDL_RenderTexture(o->renderer, text_texture, nullptr, &dest_rect);
         }
     }
 

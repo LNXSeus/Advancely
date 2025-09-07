@@ -104,10 +104,9 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
 /**
  * @brief Updates the state of the overlay's animations for the current frame.
  *
- * This function handles all time-based updates for the overlay. Its primary roles are:
- * 1.  Updating the horizontal scrolling offsets for all three rows of items.
- * 2.  Managing the timed, independent cycling of sub-stats for any multi-stat categories
- * displayed in the third row.
+ * This function handles all time-based updates for the overlay. It calculates the
+ * horizontal scrolling offsets for all three rows of items based on delta time and
+ * user settings. It also manages the timer for cycling through the social media text.
  *
  * @param o A pointer to the Overlay struct.
  * @param deltaTime A pointer to the frame's delta time.
@@ -119,10 +118,10 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
 /**
  * @brief Renders all visual elements of the overlay window for the current frame.
  *
- * This function is responsible for all drawing. It renders the top info bar (with world name,
- * progress, IGT, etc.) and the three distinct, horizontally-scrolling rows of items.
- * It handles drawing backgrounds, icons (both static .png and animated .gif), and all
- * dynamic text, including the cycling sub-stat display for multi-stat goals.
+ * This function is responsible for all drawing. It renders the top info bar and the
+ * three horizontally-scrolling rows of items. It handles drawing backgrounds, icons
+ * (static and animated), and all dynamic text. For multi-stat goals, it uses the
+ * current time to determine which sub-stat to display, creating the cycling effect.
  *
  * @param o A pointer to the Overlay struct.
  * @param t A pointer to the Tracker struct to get progress data from.

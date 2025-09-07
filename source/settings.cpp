@@ -782,45 +782,49 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         char tooltip_buffer[1024];
 
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                 "Resets all settings (besides window size/position & hotkeys) in this window to their default values.\n"
-                 "This does not modify your template files.\n\n"
-                 "Defaults:\n"
-                 "  - Path Mode: Auto-Detect\n"
-                 "  - Version: %s\n"
-                 "  - StatsPerWorld Mod (1.0-1.6.4): %s\n"
-                 "  - Category: %s\n"
-                 "  - Optional Flag: %s\n"
-                 "  - Section Order: Advancements -> Unlocks -> Statistics -> Custom Goals -> Multi-Stage Goals\n"
-                 "  - Overlay: %s\n"
-                 "  - FPS Limit: %d\n"
-                 "  - Overlay Scroll Speed: %.2f\n"
-                 "  - Sub-Stat Cycle Speed: %.1f s\n"
-                 "  - Speed Up Animation: %s\n"
-                 "  - Hide Completed Row 3 Goals: %s\n"
-                 "  - Always On Top: %s\n"
-                 "  - Remove Completed: %s\n"
-                 "  - Overlay Width: %s\n"
-                 "  - Use Settings Font: %s\n"
-                 "  - Print Debug To Console: %s\n"
-                 "  - Check For Updates: %s",
+         "Resets all settings (besides window size/position & hotkeys) in this window to their default values.\n"
+         "This does not modify your template files.\n\n"
+         "Defaults:\n"
+         "  - Path Mode: Auto-Detect\n"
+         "  - Version: %s\n"
+         "  - Category: %s\n"
+         "  - Optional Flag: %s\n"
+         "  - StatsPerWorld Mod (Legacy): %s\n"
+         "  - Section Order: Advancements -> Unlocks -> Stats -> Custom -> Multi-Stage\n"
+         "  - Enable Overlay: %s\n"
+         "  - Tracker FPS Limit: %d\n"
+         "  - Overlay FPS Limit: %d\n"
+         "  - Overlay Scroll Speed: %.2f\n"
+         "  - Sub-Stat Cycle Speed: %.1f s\n"
+         "  - Speed Up Animation: %s\n"
+         "  - Hide Completed Row 3 Goals: %s\n"
+         "  - Always On Top: %s\n"
+         "  - Remove Completed Goals: %s\n"
+         "  - Overlay Width: %dpx\n"
+         "  - Notes Use Settings Font: %s\n"
+         "  - Print Debug To Console: %s\n"
+         "  - Check For Updates: %s\n"
+         "  - Show Welcome on Startup: %s",
 
-                 DEFAULT_VERSION,
-                 DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
-                 DEFAULT_CATEGORY,
-                 DEFAULT_OPTIONAL_FLAG,
-                 DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
-                 DEFAULT_FPS,
-                 DEFAULT_OVERLAY_SCROLL_SPEED,
-                 DEFAULT_OVERLAY_STAT_CYCLE_SPEED,
-                 DEFAULT_OVERLAY_SPEED_UP ? "Enabled" : "Disabled",
-                 DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
-                 DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
-                 DEFAULT_REMOVE_COMPLETED_GOALS ? "Enabled" : "Disabled",
-                 "1440px",
-                 DEFAULT_NOTES_USE_ROBOTO ? "Enabled" : "Disabled",
-                 DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled",
-                 DEFAULT_CHECK_FOR_UPDATES ? "Enabled" : "Disabled"
-        );
+         DEFAULT_VERSION,
+         DEFAULT_CATEGORY,
+         DEFAULT_OPTIONAL_FLAG,
+         DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
+         DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
+         DEFAULT_FPS,
+         DEFAULT_OVERLAY_FPS,
+         DEFAULT_OVERLAY_SCROLL_SPEED,
+         DEFAULT_OVERLAY_STAT_CYCLE_SPEED,
+         DEFAULT_OVERLAY_SPEED_UP ? "Enabled" : "Disabled",
+         DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
+         DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
+         DEFAULT_REMOVE_COMPLETED_GOALS ? "Enabled" : "Disabled",
+         OVERLAY_DEFAULT_WIDTH,
+         DEFAULT_NOTES_USE_ROBOTO ? "Enabled" : "Disabled",
+         DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled",
+         DEFAULT_CHECK_FOR_UPDATES ? "Enabled" : "Disabled",
+         DEFAULT_SHOW_WELCOME_ON_STARTUP ? "Enabled" : "Disabled"
+);
         ImGui::SetTooltip(tooltip_buffer);
     }
 
