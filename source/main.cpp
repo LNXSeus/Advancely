@@ -1419,42 +1419,6 @@ int main(int argc, char *argv[]) {
                 }
                 ImGui::End();
             }
-            // Post-update logic
-            if (g_show_release_notes_on_startup) {
-                // DEBUG PRINT 2: Confirm we are entering the logic block to read the file.
-                log_message(LOG_ERROR, "[DEBUG] Attempting to open 'update_url.txt'...\n");
-                // Create file with something like: // Will have something like: https://github.com/LNXSeus/Advancely/releases/tag/v0.9.51
-                FILE *f = fopen("update_url.txt", "r");
-                if (f) {
-                    // DEBUG PRINT 3: Confirm the file was opened successfully.
-                    log_message(LOG_ERROR, "[DEBUG] 'update_url.txt' opened successfully.\n");
-                    // Read the URL from the file
-                    fgets(release_url_buffer, sizeof(release_url_buffer), f);
-                    fclose(f);
-
-                    // Trim trailing newline characters
-                    release_url_buffer[strcspn(release_url_buffer, "\r\n")] = 0;
-
-                    // DEBUG PRINT 4: Show the content read from the file.
-                    log_message(LOG_ERROR, "[DEBUG] URL read from file: \"%s\"", release_url_buffer);
-
-                    if (release_url_buffer[0] != '\0') {
-                        show_release_notes_window = true; // Set the flag for the UI loop
-                        // DEBUG PRINT 5: Confirm the flag to show the window is being set.
-                        log_message(LOG_ERROR, "[DEBUG] URL is valid. show_release_notes_window set to true.\n");
-                    } else {
-                        log_message(LOG_ERROR, "[DEBUG] URL is empty. Window will not be shown.\n");
-                    }
-                } else {
-                    // DEBUG PRINT 3 (Failure Case): This is the most likely error when testing manually.
-                    log_message(
-                        LOG_ERROR,
-                        "[DEBUG] FAILED to open 'update_url.txt'. The file does not exist in the current directory.\n");
-                }
-                // Whether it succeeded or not, delete the flag file and unset the global flag
-                remove("update_url.txt");
-                g_show_release_notes_on_startup = false;
-            }
 
 
             // Render the tracker GUI USING ImGui
