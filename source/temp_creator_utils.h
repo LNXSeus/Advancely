@@ -2,8 +2,10 @@
 // Created by Linus on 04.07.2025.
 //
 
-#ifndef TEMP_CREATE_UTILS_H
-#define TEMP_CREATE_UTILS_H
+#ifndef TEMP_CREATOR_UTILS_H
+#define TEMP_CREATOR_UTILS_H
+
+#include <cstddef> // For size_t
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,8 +30,45 @@ void fs_create_empty_template_file(const char *path);
  */
 void fs_create_empty_lang_file(const char *path);
 
+/**
+* @brief Validates inputs and creates a new template with its language file.
+* This is the main function called by the UI to perform the creation logic.
+* @param version The version string, e.g., "1.16.1".
+* @param category The category name, e.g., "all_advancements".
+* @param flag The optional flag, e.g., "_pre1.9".
+* @param error_message A buffer to store any error message if the function fails.
+* @param error_msg_size The size of the error_message buffer.
+* @return true on success, false on failure.
+*/
+bool validate_and_create_template(const char* version, const char* category, const char* flag, char* error_message, size_t error_msg_size);
+
+/**
+* @brief Copies an existing template and its language file to a new destination.
+* @param src_version The version of the template to copy.
+* @param src_category The category of the template to copy.
+* @param src_flag The optional flag of the template to copy.
+* @param dest_version The version for the new template.
+* @param dest_category The category for the new template.
+* @param dest_flag The optional flag for the new template.
+* @param error_message A buffer to store any error message.
+* @param error_msg_size The size of the error_message buffer.
+* @return true on success, false on failure.
+*/
+bool copy_template_files(const char* src_version, const char* src_category, const char* src_flag,
+                         const char* dest_version, const char* dest_category, const char* dest_flag,
+                         char* error_message, size_t error_msg_size);
+
+/**
+ * @brief Deletes a template and its corresponding language file.
+ * @param version The version of the template to delete.
+ * @param category The category of the template to delete.
+ * @param flag The optional flag of the template to delete.
+ * @return true on success, false on failure.
+ */
+bool delete_template_files(const char* version, const char* category, const char* flag);
+
 #ifdef __cplusplus
 }
 #endif
 
-#endif //TEMP_CREATE_UTILS_H
+#endif //TEMP_CREATOR_UTILS_H

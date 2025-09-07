@@ -47,6 +47,11 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     static std::vector<std::string> flag_values;
     static std::vector<const char *> flag_display_names;
 
+    // Force a rescan if the template files have been changed by the creator
+    if (SDL_SetAtomicInt(&g_templates_changed, 0) == 1) {
+        last_scanned_version[0] = '\0';
+    }
+
     // --- State management for window open/close ---
     // Detect the transition from closed to opened state.
     const bool just_opened = *p_open && !was_open_last_frame;

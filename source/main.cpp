@@ -63,6 +63,7 @@ SDL_AtomicInt g_settings_changed; // Watching when settings.json is modified to 
 SDL_AtomicInt g_game_data_changed; // When game data is modified, custom counter is changed or manually override changed
 SDL_AtomicInt g_notes_changed;
 SDL_AtomicInt g_apply_button_clicked;
+SDL_AtomicInt g_templates_changed;
 bool g_force_open_settings = false;
 
 
@@ -1047,6 +1048,7 @@ int main(int argc, char *argv[]) {
         SDL_SetAtomicInt(&g_game_data_changed, 1);
         SDL_SetAtomicInt(&g_notes_changed, 0);
         SDL_SetAtomicInt(&g_apply_button_clicked, 0);
+        SDL_SetAtomicInt(&g_templates_changed, 0);
 
         // HARDCODED SETTINGS DIRECTORY
         log_message(LOG_INFO, "[DMON - MAIN] Watching config directory: resources/config/\n");
