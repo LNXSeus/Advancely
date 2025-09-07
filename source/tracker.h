@@ -73,7 +73,12 @@ struct Tracker {
     float time_since_last_update; // Timer tracking seconds since the last data file update.
     bool layout_locked; // Flag to lock the grid layout width, preventing reflow on window resize.
     float locked_layout_width; // The saved width of the layout when it was locked.
+
+    // --- UI State Flags ---
     bool notes_window_open; // Flag to control the visibility of the notes window.
+    bool temp_creator_window_open; // Flag to control the visibility of the template creator window.
+
+
     char notes_buffer[65536]; // 64KB buffer to hold the text for the notes.
     char search_buffer[256]; // Buffer for the search functionality.
     bool focus_search_box_requested; // Flag for Ctrl+F hotkey

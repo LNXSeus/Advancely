@@ -16,9 +16,10 @@
 #include "global_event_handler.h" // For global variables
 #include "path_utils.h" // For path_exists()
 #include "template_scanner.h"
+#include "temp_creator.h"
 
 void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t,
-                         bool *force_open_flag) {
+                         bool *force_open_flag, bool *p_temp_creator_open) {
     // This static variable tracks the open state from the previous frame
     static bool was_open_last_frame = false;
 
@@ -331,6 +332,16 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Opens the 'resources/templates' folder in your file explorer.");
+    }
+
+    // Place Template Creator Button in same line
+    ImGui::SameLine();
+
+    if (ImGui::Button("Create Template")) {
+        *p_temp_creator_open = true; // Open the template creator window
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Open the Template Creator to build a new custom template.");
     }
 
     ImGui::Separator();

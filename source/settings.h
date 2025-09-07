@@ -18,16 +18,16 @@ struct AppSettings;
 /**
  * @brief Renders the GUI for the settings window within the tracker window using ImGui.
  * The controls stay the same with escape key to open and close.
- * Also refers to temp_create_utils for template creator.
  *
  * @param p_open Provides the 'X' button to close the window.
  * @param app_settings A pointer to the loaded application settings struct.
  * @param roboto_font A pointer to the loaded Roboto font.
  * @param t A pointer to the Tracker struct.
  * @param force_open_flag A pointer to the global flag that forces the window open.
+ * @param p_temp_creator_open A pointer to the boolean controlling the template creator window.
  */
 void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t,
-                         bool *force_open_flag);
+                         bool *force_open_flag, bool *p_temp_creator_open);
 
 
 #ifdef __cplusplus

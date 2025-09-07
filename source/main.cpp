@@ -5,6 +5,8 @@
 #include <ctime>
 #include <direct.h>
 
+#include "temp_creator.h"
+
 extern "C" {
 #define DMON_IMPL // Required for dmon
 #include "dmon.h"
@@ -1420,14 +1422,17 @@ int main(int argc, char *argv[]) {
                 ImGui::End();
             }
 
-
             // Render the tracker GUI USING ImGui
             tracker_render_gui(tracker, &app_settings);
 
+
             // Render settings window in tracker window
             // settings_opened flag is triggered by Esc key -> tracker_events() and global event handler
-            settings_render_gui(&settings_opened, &app_settings, tracker->roboto_font, tracker, &g_force_open_settings);
+            settings_render_gui(&settings_opened, &app_settings, tracker->roboto_font, tracker, &g_force_open_settings,
+                                &tracker->temp_creator_window_open);
 
+            // Render the template creator window
+            temp_creator_render_gui(&tracker->temp_creator_window_open, &app_settings, tracker->roboto_font, tracker);
 
             ImGui::Render();
 
