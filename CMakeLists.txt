@@ -29,7 +29,7 @@ set(SOURCE_FILES
         "source/settings_utils.cpp"
         "source/file_utils.cpp"
         "source/format_utils.cpp" # for formatting strings
-        "source/temp_create_utils.cpp"
+        "source/temp_creator_utils.cpp"
         "source/template_scanner.cpp"
         "source/update_checker.cpp"
 

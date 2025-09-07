@@ -15,7 +15,7 @@
 * [Support Advancely](https://streamlabs.com/lnxseus/tip)
 * [My YouTube](https://www.youtube.com/@lnxs?sub_confirmation=1)
 * [My Twitch](https://www.twitch.tv/lnxseus)
-* [My Twitch Archive](https://www.youtube.com/@lnxsarchive/playlists?view=1&sort=lad&flow=grid&sub_confirmation=1)
+* [My Twitch Archive + Advancely Devlogs](https://www.youtube.com/@lnxsarchive/playlists?view=1&sort=lad&flow=grid&sub_confirmation=1)
 * [My Discord](https://discord.gg/TyNgXDz)
 * [My GitHub](https://github.com/LNXSeus)
 
@@ -135,6 +135,7 @@ Contact me on [Discord @lnxseus](https://discord.gg/TyNgXDz) or [create a new is
 
 ### Running into Issues?
 
+* **Is Windows Defender blocking the application?**: I've contacted Microsoft so windows defender does not falsely detect Advancely.exe as a virus. So make sure your Windows Defender version is up to date. Get the latest version [here](https://docs.microsoft.com/microsoft-365/security/defender-endpoint/manage-updates-baselines-microsoft-defender-antivirus).
 * **Check log file**: First, look into the `advancely_log.txt` file to see if there are any errors that were caused by wrong usage of the application. With the `Print Debug To Console` setting enabled, the log file will also contain detailed progress updates, not just errors.
 * **Report an Issue**: If you have any issues that aren't caused by incorrect usage, please contact me on [Discord @lnxseus](https://discord.gg/TyNgXDz) or [create a new issue](https://github.com/LNXSeus/Advancely/issues/new) on GitHub\!
 
@@ -143,13 +144,14 @@ Contact me on [Discord @lnxseus](https://discord.gg/TyNgXDz) or [create a new is
 Massive thanks to all the beta testers. _Message me on discord @lnxseus with proof of using Advancely before its full release and you'll be added here:_
 
 * ethansplace98
-* yumeko
+* Yumeko
 * zurtletif
 * 3emis
 * MoreTrident
 * ShadowFlower64
 * PhoenixAUS_
 * metal_silver1234
+* 36_Official
 
 ## License
 

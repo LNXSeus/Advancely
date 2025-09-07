@@ -19,7 +19,7 @@
 #include "path_utils.h"
 #include "settings_utils.h"
 #include "file_utils.h" // has the cJSON_from_file function
-#include "temp_create_utils.h"
+#include "temp_creator_utils.h"
 #include "global_event_handler.h"
 #include "format_utils.h"
 #include "logger.h"
