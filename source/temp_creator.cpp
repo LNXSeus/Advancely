@@ -9,9 +9,26 @@
 #include "temp_creator_utils.h"
 #include "path_utils.h"
 #include "global_event_handler.h"
+#include "file_utils.h" // For cJSON_from_file
 
 #include <vector>
 #include <string>
+
+// In-memory representation of a template for editing
+struct EditorTrackableItem {
+    char root_name[192];
+    char display_name[192];
+    char icon_path[256];
+    int goal;
+    bool is_hidden;
+};
+
+struct EditorTemplate {
+    std::vector<EditorTrackableItem> unlocks;
+    std::vector<EditorTrackableItem> custom_goals;
+
+    // TODO: Other sections will be added here later
+};
 
 void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t) {
     (void)t;
@@ -46,6 +63,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static int copy_template_version_idx = -1;
     static char copy_template_category[MAX_PATH_LENGTH] = "";
     static char copy_template_flag[MAX_PATH_LENGTH] = "";
+
+    // State for the editor view
+    static bool editing_template = false;
+    static EditorTemplate current_template_data;
+    static DiscoveredTemplate selected_template_info;
 
     // State for user feedback
     static char status_message[256] = "";
@@ -130,6 +152,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             selected_template_index = i;
             show_create_new_view = false; // Hide the "Create New" view when selecting existing template
             show_copy_view = false;
+            editing_template = false; // Reset to not editing yet
             status_message[0] = '\0';
         }
     }
@@ -160,6 +183,23 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         new_template_flag[0] = '\0';
     }
 
+    ImGui::SameLine();
+
+    ImGui::BeginDisabled(selected_template_index == -1);
+    if (ImGui::Button("Edit Template")) {
+        if (selected_template_index != -1) {
+            editing_template = true;
+            show_create_new_view = false;
+            show_copy_view = false;
+
+
+            // Store the infor of the template being edited for later use
+            selected_template_info = discovered_templates[selected_template_index];
+
+            // TODO: Add logic to load the selected template file into current_template_data
+        }
+    }
+    ImGui::EndDisabled();
     ImGui::SameLine();
 
     // Allow copying of the currently used template
@@ -231,9 +271,40 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::Separator();
 
 
-    // "Create New" Form
+    // "Editing Template" Form
 
-    if (show_create_new_view) {
+    if (editing_template) {
+        // --- CORE EDITOR VIEW ---
+        if (ImGui::BeginTabBar("EditorTabs")) {
+            if (ImGui::BeginTabItem("Advancements")) {
+                ImGui::Text("Advancements editor coming soon.");
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Stats")) {
+                ImGui::Text("Stats editor coming soon.");
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Unlocks")) {
+                ImGui::Text("Manage items in the 'unlocks' array.");
+                // TODO: Implement the editor UI for unlocks
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Custom Goals")) {
+                ImGui::Text("Manage items in the 'custom' array.");
+                // TODO: Implement the editor UI for custom goals
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Multi-Stage Goals")) {
+                ImGui::Text("Multi-Stage Goals editor coming soon.");
+                ImGui::EndTabItem();
+            }
+            ImGui::EndTabBar();
+        }
+
+    }
+
+    // "Create New" Form
+    else if (show_create_new_view) {
         ImGui::Text("Create a New Template for %s", creator_version_str);
         ImGui::Spacing();
 
@@ -307,13 +378,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
             }
         }
-    }
-
-    // Editor View (TEMPORARY)
-    else if (selected_template_index != -1) {
-        // Display optional flag right after category as it would be in the files
-        ImGui::Text("Editing: %s%s", discovered_templates[selected_template_index].category, discovered_templates[selected_template_index].optional_flag);
-        ImGui::Text("This is where the main editor will go.");
     }
 
     // Display status or error messages
