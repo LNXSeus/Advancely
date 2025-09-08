@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <string>
+#include <string.h> // For memcmp on simple sub-structs
 
 #include "logger.h"
 
@@ -17,6 +18,59 @@
 #include "path_utils.h" // For path_exists()
 #include "template_scanner.h"
 #include "temp_creator.h"
+
+// Helper function to robustly compare two AppSettings structs
+// Changing window geometry of overlay and tracker window DO NOT cause the "Unsaved Changes" text to appear.
+static bool are_settings_different(const AppSettings* a, const AppSettings* b) {
+    if (a->path_mode != b->path_mode ||
+        strcmp(a->manual_saves_path, b->manual_saves_path) != 0 ||
+        strcmp(a->version_str, b->version_str) != 0 ||
+        strcmp(a->category, b->category) != 0 ||
+        strcmp(a->optional_flag, b->optional_flag) != 0 ||
+        a->enable_overlay != b->enable_overlay ||
+        a->using_stats_per_world_legacy != b->using_stats_per_world_legacy ||
+        a->fps != b->fps ||
+        a->overlay_fps != b->overlay_fps ||
+        a->tracker_always_on_top != b->tracker_always_on_top ||
+        a->remove_completed_goals != b->remove_completed_goals ||
+        a->print_debug_status != b->print_debug_status ||
+        a->overlay_scroll_speed != b->overlay_scroll_speed ||
+        a->overlay_progress_text_align != b->overlay_progress_text_align ||
+        a->overlay_animation_speedup != b->overlay_animation_speedup ||
+        a->overlay_row3_remove_completed != b->overlay_row3_remove_completed ||
+        a->overlay_stat_cycle_speed != b->overlay_stat_cycle_speed ||
+        a->notes_use_roboto_font != b->notes_use_roboto_font ||
+        a->check_for_updates != b->check_for_updates ||
+        a->show_welcome_on_startup != b->show_welcome_on_startup ||
+        a->overlay_show_world != b->overlay_show_world ||
+        a->overlay_show_run_details != b->overlay_show_run_details ||
+        a->overlay_show_progress != b->overlay_show_progress ||
+        a->overlay_show_igt != b->overlay_show_igt ||
+        a->overlay_show_update_timer != b->overlay_show_update_timer ||
+        // Changes to window geometry of overlay and tracker window DO NOT cause the "Unsaved Changes" text to appear.
+        // memcmp(&a->tracker_window, &b->tracker_window, sizeof(WindowRect)) != 0 ||
+        // memcmp(&a->overlay_window, &b->overlay_window, sizeof(WindowRect)) != 0 ||
+
+        memcmp(&a->tracker_bg_color, &b->tracker_bg_color, sizeof(ColorRGBA)) != 0 ||
+        memcmp(&a->overlay_bg_color, &b->overlay_bg_color, sizeof(ColorRGBA)) != 0 ||
+        memcmp(&a->text_color, &b->text_color, sizeof(ColorRGBA)) != 0 ||
+        memcmp(&a->overlay_text_color, &b->overlay_text_color, sizeof(ColorRGBA)) != 0 ||
+        memcmp(a->section_order, b->section_order, sizeof(a->section_order)) != 0) {
+        return true;
+    }
+
+    // Compare hotkeys separately
+    if (a->hotkey_count != b->hotkey_count) return true;
+    for (int i = 0; i < a->hotkey_count; ++i) {
+        if (strcmp(a->hotkeys[i].target_goal, b->hotkeys[i].target_goal) != 0 ||
+            strcmp(a->hotkeys[i].increment_key, b->hotkeys[i].increment_key) != 0 ||
+            strcmp(a->hotkeys[i].decrement_key, b->hotkeys[i].decrement_key) != 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t,
                          bool *force_open_flag, bool *p_temp_creator_open) {
@@ -69,8 +123,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         show_template_not_found_error = false;
     }
 
+    // use function to properly compare the settings
+    bool has_unsaved_changes =are_settings_different(&temp_settings, app_settings);
 
-    // Begin an ImGui window. The 'p_open' parameter provides the 'X' button to close it.
+    // Window title
     ImGui::Begin("Advancely Settings", p_open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
 
     // If settings were forced open, display a prominent warning message
@@ -760,6 +816,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             "Changes made to the overlay window will cause the overlay to restart,\n"
             "which might lead to OBS not capturing the overlay anymore.\n"
             "It will fail to apply if any warnings are shown.");
+    }
+
+    // If there are unsaved changes, display the indicator
+    if (has_unsaved_changes) {
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Unsaved Changes");
     }
 
     // Show the confirmation message if settings were applied

@@ -410,7 +410,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     // UI RENDERING
 
-    ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_FirstUseEver);
+    // Dynamically create the window title based on unsaved changes
+    // On VERY FIRST OPEN it has this size -> nothing in imgui.ini file
+    ImGui::SetNextWindowSize(ImVec2(1280, 720), ImGuiCond_FirstUseEver);
     ImGui::Begin("Template Creator", p_open);
 
     if (roboto_font) {
@@ -710,6 +712,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Press ENTER to save the currently edited template into the .json files.\n"
                               "Does not save on errors.");
+
+        // Indicator for unsaved changes after the Save button
+        if (editor_has_unsaved_changes) {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Unsaved Changes");
+        }
 
         // Render the success or error message next to the button
         if (save_message_type != MSG_NONE) {
