@@ -82,6 +82,67 @@ static bool load_template_for_editing(const char* version, const DiscoveredTempl
     return true;
 }
 
+// Helper to serialize a vector of items back into a cJSON array, for unlocks and custom goals
+static void serialize_editor_trackable_items(cJSON* parent, const char* key, const std::vector<EditorTrackableItem>& item_vector) {
+    cJSON* array = cJSON_CreateArray();
+    for (const auto& item : item_vector) {
+        cJSON* item_json = cJSON_CreateObject();
+        cJSON_AddStringToObject(item_json, "root_name", item.root_name);
+        cJSON_AddStringToObject(item_json, "icon", item.icon_path);
+        if (item.goal != 0) { // Only add target if it's not 0 (default for unlocks)
+            cJSON_AddNumberToObject(item_json, "target", item.goal);
+        }
+        if (item.is_hidden) {
+            cJSON_AddBoolToObject(item_json, "hidden", item.is_hidden);
+        }
+        cJSON_AddItemToArray(array, item_json);
+    }
+    cJSON_AddItemToObject(parent, key, array);
+}
+
+// Main function to save the in-memory editor data back to a file
+static bool save_template_from_editor(const char* version, const DiscoveredTemplate& template_info, EditorTemplate& editor_data, char* status_message_buffer) {
+    char version_filename[64];
+    strncpy(version_filename, version, sizeof(version_filename) - 1);
+    version_filename[sizeof(version_filename) - 1] = '\0';
+    for (char* p = version_filename; *p; p++) { if (*p == '.') *p = '_'; }
+
+    char template_path[MAX_PATH_LENGTH];
+    snprintf(template_path, sizeof(template_path), "resources/templates/%s/%s/%s_%s%s.json",
+             version, template_info.category, version_filename, template_info.category, template_info.optional_flag);
+
+    // Read the existing file to preserve sections we aren't editing yet
+    cJSON* root = cJSON_from_file(template_path);
+    if (!root) {
+        root = cJSON_CreateObject(); // Create a new object if the file is empty or doesn't exist
+    }
+
+    // Replace the "unlocks" and "custom" sections with our edited data
+    cJSON_DeleteItemFromObject(root, "unlocks");
+    cJSON_DeleteItemFromObject(root, "custom");
+    serialize_editor_trackable_items(root, "unlocks", editor_data.unlocks);
+    serialize_editor_trackable_items(root, "custom", editor_data.custom_goals);
+
+    // Write the modified JSON object back to the file
+    FILE* file = fopen(template_path, "w");
+    if (file) {
+        char* json_str = cJSON_Print(root);
+        if (json_str) {
+            fputs(json_str, file);
+            free(json_str);
+        }
+        fclose(file);
+        snprintf(status_message_buffer, 256, "Template saved successfully!");
+    } else {
+        snprintf(status_message_buffer, 256, "Error: Failed to open template file for writing.");
+        cJSON_Delete(root);
+        return false;
+    }
+
+    cJSON_Delete(root);
+    return true;
+}
+
 
 void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t) {
     (void)t;
@@ -359,6 +420,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     if (editing_template) {
         // --- CORE EDITOR VIEW ---
+        ImGui::PushID(&selected_template_info); // Use address of info struct for a unique ID
+
+        if (ImGui::Button("Save")) {
+            save_template_from_editor(creator_version_str, selected_template_info, current_template_data, status_message);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Save & Close")) {
+            if (save_template_from_editor(creator_version_str, selected_template_info, current_template_data, status_message)) {
+                editing_template = false; // Close editor on successful save
+            }
+        }
+
         if (ImGui::BeginTabBar("EditorTabs")) {
             if (ImGui::BeginTabItem("Advancements")) {
                 ImGui::Text("Advancements editor coming soon.");
@@ -371,14 +444,54 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             // Only show the Unlocks tab for the specific version
             if (strcmp(creator_version_str, "25w14craftmine") == 0) {
                 if (ImGui::BeginTabItem("Unlocks")) {
-                    ImGui::Text("Manage items in the 'unlocks' array.");
-                    // TODO: Implement the editor UI for unlocks
+                    if (ImGui::Button("Add New Unlock")) {
+                        current_template_data.unlocks.push_back({});
+                    }
+                    ImGui::Separator();
+                    int item_to_remove = -1;
+                    for (size_t i = 0; i < current_template_data.unlocks.size(); i++) {
+                        ImGui::PushID(i);
+                        auto &unlock = current_template_data.unlocks[i];
+                        ImGui::InputText("Root Name", unlock.root_name, sizeof(unlock.root_name));
+                        ImGui::InputText("Icon Path", unlock.icon_path, sizeof(unlock.icon_path));
+                        ImGui::Checkbox("Hidden", &unlock.is_hidden);
+                        ImGui::SameLine();
+                        if (ImGui::Button("Remove")) {
+                            item_to_remove = i;
+                        }
+                        ImGui::Separator();
+                        ImGui::PopID();
+                    }
+                    if (item_to_remove != -1) {
+                        current_template_data.unlocks.erase(current_template_data.unlocks.begin() + item_to_remove);
+                    }
                     ImGui::EndTabItem();
                 }
             }
             if (ImGui::BeginTabItem("Custom Goals")) {
-                ImGui::Text("Manage items in the 'custom' array.");
-                // TODO: Implement the editor UI for custom goals
+                if (ImGui::Button("Add New Custom Goal")) {
+                    current_template_data.custom_goals.push_back({});
+                }
+                ImGui::Separator();
+                int item_to_remove = -1;
+                for (size_t i = 0; i < current_template_data.custom_goals.size(); ++i) {
+                    ImGui::PushID(i);
+                    auto& goal = current_template_data.custom_goals[i];
+                    ImGui::InputText("Root Name", goal.root_name, sizeof(goal.root_name));
+                    ImGui::InputText("Icon Path", goal.icon_path, sizeof(goal.icon_path));
+                    ImGui::InputInt("Target Goal", &goal.goal);
+                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("0 for a simple toggle, -1 for an infinite counter, >0 for a progress-based counter.");
+                    ImGui::Checkbox("Hidden", &goal.is_hidden);
+                    ImGui::SameLine();
+                    if (ImGui::Button("Remove")) {
+                        item_to_remove = i;
+                    }
+                    ImGui::Separator();
+                    ImGui::PopID();
+                }
+                if (item_to_remove != -1) {
+                    current_template_data.custom_goals.erase(current_template_data.custom_goals.begin() + item_to_remove);
+                }
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Multi-Stage Goals")) {
@@ -387,8 +500,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
             ImGui::EndTabBar();
         }
+        ImGui::PopID();
 
-    }
+    } // End of editing_template
 
     // "Create New" Form
     else if (show_create_new_view) {
