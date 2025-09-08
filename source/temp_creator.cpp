@@ -767,7 +767,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // This "Unsaved Changes" indicator will appear/disappear automatically
         if (editor_has_unsaved_changes) {
             ImGui::SameLine();
-            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Unsaved Changes");
+            // Replace the TextColored indicator with a Revert button
+            if (ImGui::Button("Revert Changes")) {
+                current_template_data = saved_template_data;
+            }
         }
 
         // Render the success or error message next to the button

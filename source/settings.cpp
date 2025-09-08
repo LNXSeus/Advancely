@@ -829,7 +829,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // If there are unsaved changes, display the indicator
     if (has_unsaved_changes) {
         ImGui::SameLine();
-        ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Unsaved Changes");
+        // Replace the TextColored indicator with a Revert button
+        if (ImGui::Button("Revert Changes")) {
+            memcpy(&temp_settings, &saved_settings, sizeof(AppSettings));
+        }
     }
 
     // Show the confirmation message if settings were applied
