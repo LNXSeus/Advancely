@@ -167,6 +167,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     if (ImGui::Button("Create New Template")) {
         show_create_new_view = true;
         show_copy_view = false; // Hide copy view
+        editing_template = false;
         selected_template_index = -1; // Deselect any existing template
         status_message[0] = '\0';
 
@@ -188,7 +189,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::BeginDisabled(selected_template_index == -1);
     if (ImGui::Button("Edit Template")) {
         if (selected_template_index != -1) {
-            editing_template = true;
+            editing_template = true; // Only true here
             show_create_new_view = false;
             show_copy_view = false;
 
@@ -208,6 +209,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (selected_template_index != -1) {
             show_copy_view = true;
             show_create_new_view = false;
+            editing_template = false; // Still allow clicking other buttons (e.g., copy, delete, ...) when editing
             status_message[0] = '\0';
 
             // Pre-fill with selected template's info
@@ -233,22 +235,45 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
     }
     ImGui::EndDisabled();
-    if (selected_template_index != -1 && is_current_template && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("Cannot delete the template currently in use.");
-    } else if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Delete the currently selected template.");
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        if (selected_template_index != -1 && is_current_template) {
+            ImGui::SetTooltip("Cannot delete the template currently in use.");
+        } else if (selected_template_index != -1) {
+            const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
+            char tooltip_text[512];
+            if (selected.optional_flag[0] != '\0') {
+                snprintf(tooltip_text, sizeof(tooltip_text), "Delete template:\nVersion: %s\nCategory: %s\nFlag: %s",
+                         creator_version_str, selected.category, selected.optional_flag);
+            } else {
+                snprintf(tooltip_text, sizeof(tooltip_text), "Delete template:\nVersion: %s\nCategory: %s",
+                         creator_version_str, selected.category);
+            }
+            ImGui::SetTooltip(tooltip_text);
+        } else {
+            ImGui::SetTooltip("Delete the currently selected template.");
+        }
     }
 
     // Delete Confirmation Popup
     if (ImGui::BeginPopupModal("Delete Template?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         if (selected_template_index != -1) {
+            const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
             ImGui::Text("Are you sure you want to permanently delete this template?\nThis action cannot be undone.");
-            ImGui::Text("Template: %s", discovered_templates[selected_template_index].category);
+
+            // Construct detailed info string
+            char template_info[512];
+            if (selected.optional_flag[0] != '\0') {
+                snprintf(template_info, sizeof(template_info), "Version: %s\nCategory: %s\nFlag: %s",
+                         creator_version_str, selected.category, selected.optional_flag);
+            } else {
+                snprintf(template_info, sizeof(template_info), "Version: %s\nCategory: %s",
+                         creator_version_str, selected.category);
+            }
+            ImGui::TextUnformatted(template_info);
             ImGui::Separator();
 
             if (ImGui::Button("OK", ImVec2(120, 0))) {
-                const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
-                if (delete_template_files(app_settings->version_str, selected.category, selected.optional_flag)) {
+                if (delete_template_files(creator_version_str, selected.category, selected.optional_flag)) {
                     snprintf(status_message, sizeof(status_message), "Template '%s' deleted.", selected.category);
                     SDL_SetAtomicInt(&g_templates_changed, 1); // Signal change
                 } else {
