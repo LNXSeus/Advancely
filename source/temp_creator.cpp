@@ -819,13 +819,41 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 // Handle copying
                 if (advancement_to_copy != -1) {
-                    // C++ copy constructor handles the deep copy of the struct and its vector of criteria
-                    EditorTrackableCategory new_advancement = current_template_data.advancements[advancement_to_copy];
+                    const auto& source_advancement = current_template_data.advancements[advancement_to_copy];
+                    EditorTrackableCategory new_advancement = source_advancement; // Create a deep copy
 
-                    // Append "_copy" to the root name to prevent immediate duplicate errors
-                    strncat(new_advancement.root_name, "_copy", sizeof(new_advancement.root_name) - strlen(new_advancement.root_name) - 1);
+                    char base_name[192];
+                    strncpy(base_name, source_advancement.root_name, sizeof(base_name) - 1);
+                    base_name[sizeof(base_name) - 1] = '\0';
 
-                    // Insert the new copy right after the original
+                    char new_name[192];
+                    int copy_counter = 1;
+
+                    // Loop to find a unique name
+                    while (true) {
+                        if (copy_counter == 1) {
+                            snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
+                        } else {
+                            snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
+                        }
+
+                        // Check if this name already exists
+                        bool name_exists = false;
+                        for (const auto& adv : current_template_data.advancements) {
+                            if (strcmp(adv.root_name, new_name) == 0) {
+                                name_exists = true;
+                                break;
+                            }
+                        }
+
+                        if (!name_exists) {
+                            break; // Found a unique name
+                        }
+                        copy_counter++; // Increment and try the next number
+                    }
+
+                    // Apply the new unique name and insert the copy
+                    strncpy(new_advancement.root_name, new_name, sizeof(new_advancement.root_name) - 1);
                     current_template_data.advancements.insert(current_template_data.advancements.begin() + advancement_to_copy + 1, new_advancement);
                 }
 
