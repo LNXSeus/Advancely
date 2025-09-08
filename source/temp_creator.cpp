@@ -763,38 +763,73 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::Separator();
 
                 int advancement_to_remove = -1;
+                int advancement_to_copy = -1; // To queue a copy action
+
                 for (size_t i = 0; i < current_template_data.advancements.size(); ++i) {
                     ImGui::PushID(i);
                     const char* label = current_template_data.advancements[i].root_name[0] ? current_template_data.advancements[i].root_name : "[New Advancement]";
 
-                    // Calculate the available width for the selectable, leaving space for the button
-                    float button_width = ImGui::CalcTextSize("Remove").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                    float selectable_width = ImGui::GetContentRegionAvail().x - button_width - ImGui::GetStyle().ItemSpacing.x;
-
-                    // Draw the selectable with the calculated size.
-                    // Clicking it simply updates which advancement is shown in the right pane.
-                    if (ImGui::Selectable(label, selected_advancement_index == (int)i, 0, ImVec2(selectable_width, 0))) {
-                        selected_advancement_index = i;
-                    }
-
-                    // Place the button on the same line, right after the selectable
-                    ImGui::SameLine();
-
-                    if (ImGui::Button("Remove")) {
+                    // Draw the "X" (Remove) button
+                    if (ImGui::Button("X")) {
                         advancement_to_remove = i;
                         editor_has_unsaved_changes = true;
                         save_message_type = MSG_NONE;
                     }
+                    ImGui::SameLine();
+
+                    // Draw the "Copy" button
+                    if (ImGui::Button("Copy")) {
+                        advancement_to_copy = i;
+                        editor_has_unsaved_changes = true;
+                        save_message_type = MSG_NONE;
+                    }
+                    ImGui::SameLine();
+
+                    // Draw the selectable, which now takes the remaining space
+                    if (ImGui::Selectable(label, selected_advancement_index == (int)i)) {
+                        // (Logic to handle selection and unsaved changes remains the same)
+                        if (selected_advancement_index != (int)i) {
+                            if (editor_has_unsaved_changes) {
+                                show_unsaved_changes_popup = true;
+                                pending_action = [&, i]() {
+                                    selected_advancement_index = i;
+                                    load_template_for_editing(creator_version_str, discovered_templates[i], current_template_data, status_message);
+                                    editor_has_unsaved_changes = false;
+                                };
+                            } else {
+                                selected_advancement_index = i;
+                            }
+                        }
+                    }
                     ImGui::PopID();
                 }
 
+                // Handle removal
                 if (advancement_to_remove != -1) {
+                    // If the removed item is the selected one, deselect it
                     if (selected_advancement_index == advancement_to_remove) {
-                        selected_advancement_index = -1; // Deselect if it's being removed
+                        selected_advancement_index = -1;
+                    }
+                    // If we remove an item before the selected one, we need to shift the index down
+                    else if (selected_advancement_index > advancement_to_remove) {
+                        selected_advancement_index--;
                     }
                     current_template_data.advancements.erase(current_template_data.advancements.begin() + advancement_to_remove);
                 }
-                ImGui::EndChild();
+
+                // Handle copying
+                if (advancement_to_copy != -1) {
+                    // C++ copy constructor handles the deep copy of the struct and its vector of criteria
+                    EditorTrackableCategory new_advancement = current_template_data.advancements[advancement_to_copy];
+
+                    // Append "_copy" to the root name to prevent immediate duplicate errors
+                    strncat(new_advancement.root_name, "_copy", sizeof(new_advancement.root_name) - strlen(new_advancement.root_name) - 1);
+
+                    // Insert the new copy right after the original
+                    current_template_data.advancements.insert(current_template_data.advancements.begin() + advancement_to_copy + 1, new_advancement);
+                }
+
+                ImGui::EndChild(); // End of Left Pane
                 ImGui::SameLine();
 
                 // RIGHT PANE: Details of Selected Advancement
