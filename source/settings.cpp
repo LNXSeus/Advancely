@@ -303,6 +303,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             // Since category is invalid, the flag must also be reset
             temp_settings.optional_flag[0] = '\0';
         }
+
+        // This change may have altered the hotkey structure. To prevent a false "Unsaved Changes"
+        // flag, we re-sync the snapshot to this new, clean state.
+        memcpy(&saved_settings, &temp_settings, sizeof(AppSettings));
     }
 
     // --- CATEGORY DROPDOWN ---
@@ -690,49 +694,65 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 MAX_HOTKEYS);
         }
 
-        // Ensure the temp_settings has space for all potential hotkeys
-        temp_settings.hotkey_count = custom_counters.size();
-
-        for (int i = 0; i < (int) custom_counters.size(); ++i) {
-            TrackableItem *counter = custom_counters[i];
-            HotkeyBinding *binding = &temp_settings.hotkeys[i];
-
-            // Set the target goal for this binding
-            strncpy(binding->target_goal, counter->root_name, sizeof(binding->target_goal) - 1);
+        // Loop through the counters provided by the LIVE TEMPLATE to build the UI rows
+        for (const auto& counter : custom_counters) {
+            // For each counter, find its corresponding binding in our editable temp_settings
+            HotkeyBinding* binding = nullptr;
+            for (int i = 0; i < temp_settings.hotkey_count; ++i) {
+                if (strcmp(temp_settings.hotkeys[i].target_goal, counter->root_name) == 0) {
+                    binding = &temp_settings.hotkeys[i];
+                    break;
+                }
+            }
 
             ImGui::Text("%s", counter->display_name);
             ImGui::SameLine();
 
-            // Find current index for the increment key
+            // --- Increment Key Combo ---
+            char* inc_key_val = binding ? binding->increment_key : (char*)"None";
             int current_inc_key_idx = 0;
             for (int k = 0; k < key_names_count; ++k) {
-                if (strcmp(binding->increment_key, key_names[k]) == 0) {
-                    current_inc_key_idx = k;
-                    break;
-                }
+                if (strcmp(inc_key_val, key_names[k]) == 0) { current_inc_key_idx = k; break; }
             }
 
-            // Find current index for the decrement key
-            int current_dec_key_idx = 0;
-            for (int k = 0; k < key_names_count; ++k) {
-                if (strcmp(binding->decrement_key, key_names[k]) == 0) {
-                    current_dec_key_idx = k;
-                    break;
-                }
-            }
-
-            // Render dropdowns
             char inc_label[64];
             snprintf(inc_label, sizeof(inc_label), "##inc_%s", counter->root_name);
             if (ImGui::Combo(inc_label, &current_inc_key_idx, key_names, key_names_count)) {
-                strncpy(binding->increment_key, key_names[current_inc_key_idx], sizeof(binding->increment_key) - 1);
+                // User made a change. We now modify temp_settings.
+                if (!binding) { // If binding didn't exist, add a new one.
+                    if (temp_settings.hotkey_count < MAX_HOTKEYS) {
+                        binding = &temp_settings.hotkeys[temp_settings.hotkey_count++];
+                        strncpy(binding->target_goal, counter->root_name, sizeof(binding->target_goal) - 1);
+                        strcpy(binding->decrement_key, "None"); // Set default for the other key
+                    }
+                }
+                if (binding) {
+                    strncpy(binding->increment_key, key_names[current_inc_key_idx], sizeof(binding->increment_key) - 1);
+                }
             }
 
             ImGui::SameLine();
+
+            // --- Decrement Key Combo ---
+            char* dec_key_val = binding ? binding->decrement_key : (char*)"None";
+            int current_dec_key_idx = 0;
+            for (int k = 0; k < key_names_count; ++k) {
+                if (strcmp(dec_key_val, key_names[k]) == 0) { current_dec_key_idx = k; break; }
+            }
+
             char dec_label[64];
             snprintf(dec_label, sizeof(dec_label), "##dec_%s", counter->root_name);
             if (ImGui::Combo(dec_label, &current_dec_key_idx, key_names, key_names_count)) {
-                strncpy(binding->decrement_key, key_names[current_dec_key_idx], sizeof(binding->decrement_key) - 1);
+                // User made a change. We now modify temp_settings.
+                if (!binding) { // If binding didn't exist, add a new one.
+                    if (temp_settings.hotkey_count < MAX_HOTKEYS) {
+                        binding = &temp_settings.hotkeys[temp_settings.hotkey_count++];
+                        strncpy(binding->target_goal, counter->root_name, sizeof(binding->target_goal) - 1);
+                        strcpy(binding->increment_key, "None"); // Set default for the other key
+                    }
+                } else { // if binding exists, update it
+                    strncpy(binding->decrement_key, key_names[current_dec_key_idx], sizeof(binding->decrement_key) - 1);
+                }
             }
         }
 
