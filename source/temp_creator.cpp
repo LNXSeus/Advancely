@@ -708,8 +708,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         // Save button tooltip
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(
-                "Press ENTER to save the currently edited template. Does not save on errors.");
+            ImGui::SetTooltip("Press ENTER to save the currently edited template into the .json files.\n"
+                              "Does not save on errors.");
 
         // Render the success or error message next to the button
         if (save_message_type != MSG_NONE) {
@@ -763,14 +763,23 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::Separator();
 
                 int advancement_to_remove = -1;
-                for (size_t i = 0; i < current_template_data.advancements.size(); i++) {
+                for (size_t i = 0; i < current_template_data.advancements.size(); ++i) {
                     ImGui::PushID(i);
+                    const char* label = current_template_data.advancements[i].root_name[0] ? current_template_data.advancements[i].root_name : "[New Advancement]";
 
-                    // Use root_name for display if available, otherwise show as "New Advancement"
-                    const char *label = current_template_data.advancements[i].root_name[0] ? current_template_data.advancements[i].root_name : "[New Advancement]";
-                    if (ImGui::Selectable(label, selected_advancement_index == (int)i)) selected_advancement_index = i;
+                    // Calculate the available width for the selectable, leaving space for the button
+                    float button_width = ImGui::CalcTextSize("Remove").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                    float selectable_width = ImGui::GetContentRegionAvail().x - button_width - ImGui::GetStyle().ItemSpacing.x;
 
-                    ImGui::SameLine(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Remove").x - ImGui::GetStyle().FramePadding.x * 2);
+                    // Draw the selectable with the calculated size.
+                    // Clicking it simply updates which advancement is shown in the right pane.
+                    if (ImGui::Selectable(label, selected_advancement_index == (int)i, 0, ImVec2(selectable_width, 0))) {
+                        selected_advancement_index = i;
+                    }
+
+                    // Place the button on the same line, right after the selectable
+                    ImGui::SameLine();
+
                     if (ImGui::Button("Remove")) {
                         advancement_to_remove = i;
                         editor_has_unsaved_changes = true;
@@ -778,6 +787,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     ImGui::PopID();
                 }
+
                 if (advancement_to_remove != -1) {
                     if (selected_advancement_index == advancement_to_remove) {
                         selected_advancement_index = -1; // Deselect if it's being removed
