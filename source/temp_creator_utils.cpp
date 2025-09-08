@@ -84,31 +84,6 @@ static bool fs_copy_file(const char* src, const char* dest) {
     return true;
 }
 
-// TODO: Remove
-// void fs_ensure_directory_exists(const char *path) {
-//     char *path_copy = strdup(path);
-//     if (!path_copy) return;
-//
-//     // Iterate through the path and create each directory level
-//     for (char *p = path_copy + 1; *p; p++) {
-//         if (*p == '/' || *p == '\\') {
-//             char original_char = *p;
-//             *p = '\0'; // Temporarily terminate the string
-//
-//             // Check if directory exists, if not, create it
-//             struct stat st;
-//             memset(&st, 0, sizeof(st));
-//             if (stat(path_copy, &st) == -1) {
-//                 MKDIR(path_copy);
-//             }
-//
-//             *p = original_char; // Restore the slash
-//         }
-//     }
-//     free(path_copy);
-//     path_copy = nullptr;
-// }
-
 void fs_create_empty_template_file(const char *path) {
     FILE *file = fopen(path, "w");
     if (!file) {

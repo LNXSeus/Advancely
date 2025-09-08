@@ -92,6 +92,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Holds temporary copy of the settings for editing
     static AppSettings temp_settings;
 
+    // Add a snapshot to compare agains
+    static AppSettings saved_settings;
+
     static DiscoveredTemplate *discovered_templates = nullptr;
     static int discovered_template_count = 0;
     static char last_scanned_version[64] = "";
@@ -118,13 +121,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // we copy the current live settings into our temporary editing struct.
     if (just_opened) {
         memcpy(&temp_settings, app_settings, sizeof(AppSettings));
+        memcpy(&saved_settings, app_settings, sizeof(AppSettings));
         show_applied_message = false; // Reset message visibility
         show_defaults_applied_message = false; // Reset "Defaults Applied" message visibility
         show_template_not_found_error = false;
     }
 
     // use function to properly compare the settings
-    bool has_unsaved_changes =are_settings_different(&temp_settings, app_settings);
+    bool has_unsaved_changes =are_settings_different(&temp_settings, &saved_settings);
 
     // Window title
     ImGui::Begin("Advancely Settings", p_open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
@@ -776,6 +780,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
                     // Copy temp settings to the real settings, save, and trigger a reload
                     memcpy(app_settings, &temp_settings, sizeof(AppSettings));
+                    // Also update our clean snapshot
+                    memcpy(&saved_settings, &temp_settings, sizeof(AppSettings));
                     SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
                     settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
                     SDL_SetAtomicInt(&g_settings_changed, 1); // Trigger a reload
@@ -799,6 +805,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                         *force_open_flag = false;
                     }
                     memcpy(app_settings, &temp_settings, sizeof(AppSettings));
+                    // Also update our clean snapshot
+                    memcpy(&saved_settings, &temp_settings, sizeof(AppSettings));
                     SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
                     settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
                     SDL_SetAtomicInt(&g_settings_changed, 1);

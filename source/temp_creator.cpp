@@ -43,6 +43,49 @@ struct EditorTemplate {
     // TODO: Other sections will be added here later
 };
 
+// Helper function to compare two EditorTrackableItem structs
+static bool are_editor_items_different(const EditorTrackableItem& a, const EditorTrackableItem& b) {
+    return strcmp(a.root_name, b.root_name) != 0 ||
+           strcmp(a.icon_path, b.icon_path) != 0 ||
+           a.goal != b.goal ||
+           a.is_hidden != b.is_hidden;
+}
+
+// Helper function to compare two EditorTrackableCategory structs
+static bool are_editor_categories_different(const EditorTrackableCategory& a, const EditorTrackableCategory& b) {
+    if (strcmp(a.root_name, b.root_name) != 0 ||
+        strcmp(a.icon_path, b.icon_path) != 0 ||
+        a.is_hidden != b.is_hidden ||
+        a.criteria.size() != b.criteria.size()) {
+        return true;
+        }
+    for (size_t i = 0; i < a.criteria.size(); ++i) {
+        if (are_editor_items_different(a.criteria[i], b.criteria[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Main comparison function for the entire editor state
+static bool are_editor_templates_different(const EditorTemplate& a, const EditorTemplate& b) {
+    if (a.unlocks.size() != b.unlocks.size() ||
+        a.custom_goals.size() != b.custom_goals.size() ||
+        a.advancements.size() != b.advancements.size()) {
+        return true;
+        }
+    for (size_t i = 0; i < a.unlocks.size(); ++i) {
+        if (are_editor_items_different(a.unlocks[i], b.unlocks[i])) return true;
+    }
+    for (size_t i = 0; i < a.custom_goals.size(); ++i) {
+        if (are_editor_items_different(a.custom_goals[i], b.custom_goals[i])) return true;
+    }
+    for (size_t i = 0; i < a.advancements.size(); ++i) {
+        if (are_editor_categories_different(a.advancements[i], b.advancements[i])) return true;
+    }
+    return false;
+}
+
 // Helper to check for duplicate root_names in a vector of items
 static bool has_duplicate_root_names(const std::vector<EditorTrackableItem> &items, char *error_message_buffer) {
     std::unordered_set<std::string> seen_names;
@@ -316,10 +359,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     (void) t;
 
     if (!*p_open) {
-        // TODO: Remove
-        // // Reset the open tracker when the window is closed
-        // static bool was_open_last_frame = false;
-        // was_open_last_frame = false;
         return;
     }
 
@@ -349,9 +388,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // State for the editor view
     static bool editing_template = false;
     static EditorTemplate current_template_data;
+    static EditorTemplate saved_template_data; // A snapshot of the last saved state
     static DiscoveredTemplate selected_template_info;
     static int selected_advancement_index = -1; // Tracks which advancement is currently selected in the editor
-    static bool editor_has_unsaved_changes = false;
     static bool show_unsaved_changes_popup = false;
     static std::function<void()> pending_action = nullptr;
 
@@ -379,6 +418,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         last_scanned_version[0] = '\0'; // Force a scan on first open
     }
+
+    // With this block, which correctly calculates the flag:
+    bool editor_has_unsaved_changes = false; // Default to false.
+    if (editing_template) {
+        // Only perform the comparison if we are actually in the editor.
+        editor_has_unsaved_changes = are_editor_templates_different(current_template_data, saved_template_data);
+    }
+
 
     // Handle user trying to close the window with unsaved changes
     if (was_open_last_frame && !(*p_open) && editor_has_unsaved_changes) {
@@ -437,12 +484,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
             // Now, show the popup and set the pending action to apply the change later.
             show_unsaved_changes_popup = true;
-            pending_action = [=]() { // The action to run if user clicks "Save" or "Discard"
+            // Capture by reference, but newly_selected_idx by value to ensure the lambda has access to the latest values
+            pending_action = [&, newly_selected_idx]() { // The action to run if user clicks "Save" or "Discard"
                 creator_version_idx = newly_selected_idx;
                 strncpy(creator_version_str, VERSION_STRINGS[creator_version_idx], sizeof(creator_version_str) - 1);
                 creator_version_str[sizeof(creator_version_str) - 1] = '\0';
                 editing_template = false; // Always exit editor when switching version
-                editor_has_unsaved_changes = false;
             };
         } else {
             // No unsaved changes, so the change is final. Just update the string version.
@@ -477,7 +524,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     selected_template_index = i;
                     selected_template_info = discovered_templates[i];
                     load_template_for_editing(creator_version_str, selected_template_info, current_template_data, status_message);
-                    editor_has_unsaved_changes = false;
                 };
             } else {
                 // If not editing, or no unsaved changes, or re-selecting the same template, just update the index
@@ -485,7 +531,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (editing_template) {
                     // If already editing, reload the data to discard any accidental non-flagged UI changes
                     load_template_for_editing(creator_version_str, discovered_templates[i], current_template_data, status_message);
-                    editor_has_unsaved_changes = false;
                 }
             }
 
@@ -529,13 +574,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             editing_template = true; // Only true here
             show_create_new_view = false;
             show_copy_view = false;
-            editor_has_unsaved_changes = false; // Reset dirty flag on load
 
 
             // Store the info and load the data for the first time
             selected_template_info = discovered_templates[selected_template_index];
-            load_template_for_editing(creator_version_str, selected_template_info, current_template_data,
-                                      status_message);
+            if (load_template_for_editing(creator_version_str, selected_template_info, current_template_data,
+                                      status_message)) {
+                // On successful load, create the snapshot of the clean state
+                saved_template_data = current_template_data;
+            }
 
             // TODO: Add logic to load the selected template file into current_template_data
         }
@@ -697,7 +744,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             // If all checks passed, attempt to save
             if (validation_passed) {
                 if (save_template_from_editor(creator_version_str, selected_template_info, current_template_data, status_message)) {
-                    editor_has_unsaved_changes = false;
+                    // Update snapshot to new clean state
+                    saved_template_data = current_template_data;
                     save_message_type = MSG_SUCCESS;
                     snprintf(status_message, sizeof(status_message), "Saved!");
                 } else {
@@ -713,7 +761,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::SetTooltip("Press ENTER to save the currently edited template into the .json files.\n"
                               "Does not save on errors.");
 
-        // Indicator for unsaved changes after the Save button
+        // Calculate the unsaved changes flag on-the-fly each frame
+        bool editor_has_unsaved_changes = are_editor_templates_different(current_template_data, saved_template_data);
+
+        // This "Unsaved Changes" indicator will appear/disappear automatically
         if (editor_has_unsaved_changes) {
             ImGui::SameLine();
             ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Unsaved Changes");
@@ -738,14 +789,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (ImGui::Button("Save", ImVec2(120, 0))) {
                 if (save_template_from_editor(creator_version_str, selected_template_info, current_template_data,
                                               status_message)) {
-                    editor_has_unsaved_changes = false;
+                    saved_template_data = current_template_data; // Update snapshot on successful save
                     if (pending_action) pending_action();
                 }
                 ImGui::CloseCurrentPopup();
             }
             ImGui::SameLine();
             if (ImGui::Button("Discard", ImVec2(120, 0))) {
-                editor_has_unsaved_changes = false;
+                current_template_data = saved_template_data; // Restore saved data as current
                 if (pending_action) pending_action();
                 ImGui::CloseCurrentPopup();
             }
@@ -765,7 +816,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 // LEFT PANE: List of Advancements
                 if (ImGui::Button("Add New Advancement")) {
                     current_template_data.advancements.push_back({});
-                    editor_has_unsaved_changes = true;
                     save_message_type = MSG_NONE;
                 }
                 ImGui::Separator();
@@ -780,7 +830,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // Draw the "X" (Remove) button
                     if (ImGui::Button("X")) {
                         advancement_to_remove = i;
-                        editor_has_unsaved_changes = true;
                         save_message_type = MSG_NONE;
                     }
                     ImGui::SameLine();
@@ -788,7 +837,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // Draw the "Copy" button
                     if (ImGui::Button("Copy")) {
                         advancement_to_copy = i;
-                        editor_has_unsaved_changes = true;
                         save_message_type = MSG_NONE;
                     }
                     ImGui::SameLine();
@@ -802,7 +850,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 pending_action = [&, i]() {
                                     selected_advancement_index = i;
                                     load_template_for_editing(creator_version_str, discovered_templates[i], current_template_data, status_message);
-                                    editor_has_unsaved_changes = false;
                                 };
                             } else {
                                 selected_advancement_index = i;
@@ -877,15 +924,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::Separator();
 
                     if (ImGui::InputText("Root Name", advancement.root_name, sizeof(advancement.root_name))) {
-                        editor_has_unsaved_changes = true;
                         save_message_type = MSG_NONE;
                     }
                     if (ImGui::InputText("Icon Path", advancement.icon_path, sizeof(advancement.icon_path))) {
-                        editor_has_unsaved_changes = true;
                         save_message_type = MSG_NONE;
                     }
                     if (ImGui::Checkbox("Hidden", &advancement.is_hidden)) {
-                        editor_has_unsaved_changes = true;
                         save_message_type = MSG_NONE;
                     }
                     ImGui::Separator();
@@ -893,7 +937,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     if (ImGui::Button("Add New Criterion")) {
                         advancement.criteria.push_back({});
-                        editor_has_unsaved_changes = true;
                         save_message_type = MSG_NONE;
                     }
 
@@ -904,29 +947,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         auto &criterion = advancement.criteria[j];
                         ImGui::Separator();
                         if(ImGui::InputText("Root Name", criterion.root_name, sizeof(criterion.root_name))) {
-                            editor_has_unsaved_changes = true;
                             save_message_type = MSG_NONE;
                         }
                         if(ImGui::InputText("Icon Path", criterion.icon_path, sizeof(criterion.icon_path))) {
-                            editor_has_unsaved_changes = true;
                             save_message_type = MSG_NONE;
                         }
                         if(ImGui::Checkbox("Hidden", &criterion.is_hidden)) {
-                            editor_has_unsaved_changes = true;
                             save_message_type = MSG_NONE;
                         }
 
                         // "Copy" button for criteria
                         if (ImGui::Button("Copy")) {
                             criterion_to_copy = j;
-                            editor_has_unsaved_changes = true;
                             save_message_type = MSG_NONE;
                         }
                         ImGui::SameLine();
 
                         if (ImGui::Button("Remove")) {
                             criterion_to_remove = j;
-                            editor_has_unsaved_changes = true;
                             save_message_type = MSG_NONE;
                         }
                         ImGui::PopID();
@@ -974,7 +1012,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (ImGui::BeginTabItem("Unlocks")) {
                     if (ImGui::Button("Add New Unlock")) {
                         current_template_data.unlocks.push_back({});
-                        editor_has_unsaved_changes = true;
                         save_message_type = MSG_NONE; // Clear message on new edit
                     }
                     ImGui::Separator();
@@ -984,27 +1021,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::PushID(i);
                         auto &unlock = current_template_data.unlocks[i];
                         if (ImGui::InputText("Root Name", unlock.root_name, sizeof(unlock.root_name))) {
-                            editor_has_unsaved_changes = true;
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
                         if (ImGui::InputText("Icon Path", unlock.icon_path, sizeof(unlock.icon_path))) {
-                            editor_has_unsaved_changes = true;
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
                         if (ImGui::Checkbox("Hidden", &unlock.is_hidden)) {
-                            editor_has_unsaved_changes = true;
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
 
                         if (ImGui::Button("Copy")) {
                             item_to_copy = i;
-                            editor_has_unsaved_changes = true;
                             save_message_type = MSG_NONE;
                         }
                         ImGui::SameLine();
                         if (ImGui::Button("Remove")) {
                             item_to_remove = i;
-                            editor_has_unsaved_changes = true;
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
                         ImGui::Separator();
@@ -1042,7 +1074,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (ImGui::BeginTabItem("Custom Goals")) {
                 if (ImGui::Button("Add New Custom Goal")) {
                     current_template_data.custom_goals.push_back({});
-                    editor_has_unsaved_changes = true;
                     save_message_type = MSG_NONE; // Clear message on new edit
                 }
                 ImGui::SameLine();
@@ -1054,11 +1085,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::PushID(i);
                     auto &goal = current_template_data.custom_goals[i];
                     if (ImGui::InputText("Root Name", goal.root_name, sizeof(goal.root_name))) {
-                        editor_has_unsaved_changes = true;
                         save_message_type = MSG_NONE; // Clear message on new edit
                     }
                     if (ImGui::InputText("Icon Path", goal.icon_path, sizeof(goal.icon_path))) {
-                        editor_has_unsaved_changes = true;
                         save_message_type = MSG_NONE; // Clear message on new edit
                     }
                     if (ImGui::InputInt("Target Goal", &goal.goal)) {
@@ -1066,26 +1095,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (goal.goal < -1) {
                             goal.goal = -1;
                         }
-                        editor_has_unsaved_changes = true;
                         save_message_type = MSG_NONE; // Clear message on new edit
                     }
                     if (ImGui::IsItemHovered()) ImGui::SetTooltip(
                         "0 for a simple toggle, -1 for an infinite counter, >0 for a progress-based counter.");
                     if (ImGui::Checkbox("Hidden", &goal.is_hidden)) {
-                        editor_has_unsaved_changes = true;
                         save_message_type = MSG_NONE; // Clear message on new edit
                     }
 
                     // "Copy" button for custom goals
                     if (ImGui::Button("Copy")) {
                         item_to_copy = i;
-                        editor_has_unsaved_changes = true;
                         save_message_type = MSG_NONE;
                     }
                     ImGui::SameLine();
                     if (ImGui::Button("Remove")) {
                         item_to_remove = i;
-                        editor_has_unsaved_changes = true;
                         save_message_type = MSG_NONE; // Clear message on new edit
                     }
                     ImGui::Separator();
