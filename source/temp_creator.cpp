@@ -419,10 +419,34 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     // Version Selector
     ImGui::SetNextItemWidth(250); // Set a reasonable width for the combo box
+    int original_version_idx = creator_version_idx; // UUse a temporary variable for the combo
     if (ImGui::Combo("Version", &creator_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT)) {
-        if (creator_version_idx >= 0) {
+        // This block runs when the user makes a new selection.
+        // creator_version_idx now holds the NEW index the user clicked.
+
+        // If there are unsaved changes, we must block this action and show a popup.
+        if (editing_template && editor_has_unsaved_changes) {
+            // The user's newly selected index is stored for the pending action.
+            int newly_selected_idx = creator_version_idx;
+
+            // IMMEDIATELY REVERT the change in our state variable.
+            // This makes the combo box snap back to the original value on the next frame.
+            creator_version_idx = original_version_idx;
+
+            // Now, show the popup and set the pending action to apply the change later.
+            show_unsaved_changes_popup = true;
+            pending_action = [=]() { // The action to run if user clicks "Save" or "Discard"
+                creator_version_idx = newly_selected_idx;
+                strncpy(creator_version_str, VERSION_STRINGS[creator_version_idx], sizeof(creator_version_str) - 1);
+                creator_version_str[sizeof(creator_version_str) - 1] = '\0';
+                editing_template = false; // Always exit editor when switching version
+                editor_has_unsaved_changes = false;
+            };
+        } else {
+            // No unsaved changes, so the change is final. Just update the string version.
             strncpy(creator_version_str, VERSION_STRINGS[creator_version_idx], sizeof(creator_version_str) - 1);
             creator_version_str[sizeof(creator_version_str) - 1] = '\0';
+            editing_template = false; // Always exit editor on version change
         }
     }
     ImGui::Separator();
@@ -936,10 +960,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::Text("Create a New Template for %s", creator_version_str);
         ImGui::Spacing();
 
-        // TODO: Remove
-        // if (ImGui::Combo("Version", &new_template_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT)) {
-        //     // Version changed
-        // }
         ImGui::InputText("Category Name", new_template_category, sizeof(new_template_category));
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip(
