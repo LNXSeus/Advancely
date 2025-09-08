@@ -13,6 +13,8 @@
 
 #include <vector>
 #include <string>
+#include <unordered_set> // For checking duplicates
+#include <functional> // For std::function
 
 // In-memory representation of a template for editing
 struct EditorTrackableItem {
@@ -30,8 +32,24 @@ struct EditorTemplate {
     // TODO: Other sections will be added here later
 };
 
+// Helper to check for duplicate root_names in a vector of items
+static bool has_duplicate_root_names(const std::vector<EditorTrackableItem> &items, char *error_message_buffer) {
+    std::unordered_set<std::string> seen_names;
+    for (const auto &item : items) {
+        if (item.root_name[0] == '\0') {
+            snprintf(error_message_buffer, 256, "Error: An item has an empty root name.");
+            return true;
+        }
+        if (!seen_names.insert(item.root_name).second) {
+            snprintf(error_message_buffer, 256, "Error: Duplicate root name found: '%s'", item.root_name);
+            return true;
+        }
+    }
+    return false;
+}
+
 // Helper to parse a simple array like "unlocks" or "custom" from the template JSON
-static void parse_editor_trackable_items(cJSON* json_array, std::vector<EditorTrackableItem>& item_vector) {
+static void parse_editor_trackable_items(cJSON *json_array, std::vector<EditorTrackableItem> &item_vector) {
     item_vector.clear();
     if (!json_array) return;
 
@@ -182,6 +200,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static bool editing_template = false;
     static EditorTemplate current_template_data;
     static DiscoveredTemplate selected_template_info;
+    static bool editor_has_unsaved_changes = false;
+    static bool show_unsaved_changes_popup = false;
+    static std::function<void()> pending_action = nullptr;
 
     // State for user feedback
     static char status_message[256] = "";
@@ -203,6 +224,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
         }
         last_scanned_version[0] = '\0'; // Force a scan on first open
+    }
+
+    // Handle user trying to close the window with unsaved changes
+    if (was_open_last_frame && !(*p_open) && editor_has_unsaved_changes) {
+        *p_open = true; // Prevent window from closing
+        show_unsaved_changes_popup = true;
+        pending_action = [&]() { *p_open = false; }; // The pending action is to close the window
     }
 
     // Check if the selected template is the one currently in use
@@ -263,17 +291,46 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
 
         if (ImGui::Selectable(item_label, selected_template_index == i)) {
-            selected_template_index = i;
-            show_create_new_view = false; // Hide the "Create New" view when selecting existing template
-            show_copy_view = false;
-            status_message[0] = '\0';
-
-            // If already in editor mode, reload the data for the new selection
-            if (editing_template) {
+            // If we are editing and have unsaved changes, trigger the popup.
+            if (editing_template && editor_has_unsaved_changes) {
+                show_unsaved_changes_popup = true;
+                pending_action = [&, i]() { // This action will run if the user saves or discards
+                    selected_template_index = i;
+                    selected_template_info = discovered_templates[i];
+                    load_template_for_editing(creator_version_str, selected_template_info, current_template_data, status_message);
+                    editor_has_unsaved_changes = false;
+                };
+            }
+            // If we are already editing (but have no changes), just load the new template directly.
+            else if (editing_template) {
+                selected_template_index = i;
                 selected_template_info = discovered_templates[i];
                 load_template_for_editing(creator_version_str, selected_template_info, current_template_data, status_message);
             }
+            // Otherwise, just select the template without entering the editor.
+            else {
+                selected_template_index = i;
+            }
+
+            // General state changes on any selection
+            show_create_new_view = false;
+            show_copy_view = false;
+            status_message[0] = '\0';
         }
+
+        // TODO: Remove
+        // if (ImGui::Selectable(item_label, selected_template_index == i)) {
+        //     selected_template_index = i;
+        //     show_create_new_view = false; // Hide the "Create New" view when selecting existing template
+        //     show_copy_view = false;
+        //     status_message[0] = '\0';
+        //
+        //     // If already in editor mode, reload the data for the new selection
+        //     if (editing_template) {
+        //         selected_template_info = discovered_templates[i];
+        //         load_template_for_editing(creator_version_str, selected_template_info, current_template_data, status_message);
+        //     }
+        // }
     }
     ImGui::EndChild();
 
@@ -284,23 +341,41 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::BeginChild("ActionsView", ImVec2(0, 0));
 
     if (ImGui::Button("Create New Template")) {
-        show_create_new_view = true;
-        show_copy_view = false; // Hide copy view
-        editing_template = false;
-        selected_template_index = -1; // Deselect any existing template
-        status_message[0] = '\0';
 
-        // Pre-fill version from main settings
-        for (int i = 0; i < VERSION_STRINGS_COUNT; i++) {
-            if (strcmp(VERSION_STRINGS[i], app_settings->version_str) == 0) {
-                new_template_version_idx = i;
-                break;
-            }
+        auto create_action = [&]() {
+            show_create_new_view = true;
+            show_copy_view = false;
+            editing_template = false;
+            selected_template_index = -1;
+            status_message[0] = '\0';
+            new_template_category[0] = '\0';
+            new_template_flag[0] = '\0';
+        };
+        if (editing_template && editor_has_unsaved_changes) {
+            show_unsaved_changes_popup = true;
+            pending_action = create_action;
+        } else {
+            create_action();
         }
 
-        // Clear old input
-        new_template_category[0] = '\0';
-        new_template_flag[0] = '\0';
+        // TODO: Remove
+        // show_create_new_view = true;
+        // show_copy_view = false; // Hide copy view
+        // editing_template = false;
+        // selected_template_index = -1; // Deselect any existing template
+        // status_message[0] = '\0';
+        //
+        // // Pre-fill version from main settings
+        // for (int i = 0; i < VERSION_STRINGS_COUNT; i++) {
+        //     if (strcmp(VERSION_STRINGS[i], app_settings->version_str) == 0) {
+        //         new_template_version_idx = i;
+        //         break;
+        //     }
+        // }
+        //
+        // // Clear old input
+        // new_template_category[0] = '\0';
+        // new_template_flag[0] = '\0';
     }
 
     ImGui::SameLine();
@@ -311,6 +386,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             editing_template = true; // Only true here
             show_create_new_view = false;
             show_copy_view = false;
+            editor_has_unsaved_changes = false; // Reset dirty flag on load
 
 
             // Store the info and load the data for the first time
@@ -422,14 +498,44 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // --- CORE EDITOR VIEW ---
         ImGui::PushID(&selected_template_info); // Use address of info struct for a unique ID
 
-        if (ImGui::Button("Save")) {
-            save_template_from_editor(creator_version_str, selected_template_info, current_template_data, status_message);
+        // Save when creator window is focused
+        if (ImGui::Button("Save (Enter)") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))) {
+            if (has_duplicate_root_names(current_template_data.unlocks, status_message) ||
+                has_duplicate_root_names(current_template_data.custom_goals, status_message)) {
+                // Error message is set by the helper function, just abort
+                } else {
+                    if (save_template_from_editor(creator_version_str, selected_template_info, current_template_data, status_message)) {
+                        editor_has_unsaved_changes = false;
+                    }
+                }
         }
-        ImGui::SameLine();
-        if (ImGui::Button("Save & Close")) {
-            if (save_template_from_editor(creator_version_str, selected_template_info, current_template_data, status_message)) {
-                editing_template = false; // Close editor on successful save
+
+        // Popup window for unsaved changes
+        if (show_unsaved_changes_popup) {
+            ImGui::OpenPopup("Unsaved Changes");
+            show_unsaved_changes_popup = false;
+        }
+
+        if (ImGui::BeginPopupModal("Unsaved Changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::Text("You have unsaved changes. Do you want to save them?\n\n");
+            if (ImGui::Button("Save", ImVec2(120, 0))) {
+                if (save_template_from_editor(creator_version_str, selected_template_info, current_template_data, status_message)) {
+                    editor_has_unsaved_changes = false;
+                    if (pending_action) pending_action();
+                }
+                ImGui::CloseCurrentPopup();
             }
+            ImGui::SameLine();
+            if (ImGui::Button("Discard", ImVec2(120, 0))) {
+                editor_has_unsaved_changes = false;
+                if (pending_action) pending_action();
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
         }
 
         if (ImGui::BeginTabBar("EditorTabs")) {
@@ -446,18 +552,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (ImGui::BeginTabItem("Unlocks")) {
                     if (ImGui::Button("Add New Unlock")) {
                         current_template_data.unlocks.push_back({});
+                        editor_has_unsaved_changes = true;
                     }
                     ImGui::Separator();
                     int item_to_remove = -1;
                     for (size_t i = 0; i < current_template_data.unlocks.size(); i++) {
                         ImGui::PushID(i);
                         auto &unlock = current_template_data.unlocks[i];
-                        ImGui::InputText("Root Name", unlock.root_name, sizeof(unlock.root_name));
-                        ImGui::InputText("Icon Path", unlock.icon_path, sizeof(unlock.icon_path));
-                        ImGui::Checkbox("Hidden", &unlock.is_hidden);
+                        if (ImGui::InputText("Root Name", unlock.root_name, sizeof(unlock.root_name))) editor_has_unsaved_changes = true;
+                        if (ImGui::InputText("Icon Path", unlock.icon_path, sizeof(unlock.icon_path))) editor_has_unsaved_changes = true;
+                        if (ImGui::Checkbox("Hidden", &unlock.is_hidden)) editor_has_unsaved_changes = true;
                         ImGui::SameLine();
                         if (ImGui::Button("Remove")) {
                             item_to_remove = i;
+                            editor_has_unsaved_changes = true;
                         }
                         ImGui::Separator();
                         ImGui::PopID();
@@ -471,20 +579,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (ImGui::BeginTabItem("Custom Goals")) {
                 if (ImGui::Button("Add New Custom Goal")) {
                     current_template_data.custom_goals.push_back({});
+                    editor_has_unsaved_changes = true;
                 }
+                ImGui::SameLine();
+                ImGui::TextDisabled("(Hotkeys are configured in the main Settings window)");
                 ImGui::Separator();
                 int item_to_remove = -1;
                 for (size_t i = 0; i < current_template_data.custom_goals.size(); ++i) {
                     ImGui::PushID(i);
                     auto& goal = current_template_data.custom_goals[i];
-                    ImGui::InputText("Root Name", goal.root_name, sizeof(goal.root_name));
-                    ImGui::InputText("Icon Path", goal.icon_path, sizeof(goal.icon_path));
-                    ImGui::InputInt("Target Goal", &goal.goal);
+                    if(ImGui::InputText("Root Name", goal.root_name, sizeof(goal.root_name))) editor_has_unsaved_changes = true;
+                    if(ImGui::InputText("Icon Path", goal.icon_path, sizeof(goal.icon_path))) editor_has_unsaved_changes = true;
+                    if(ImGui::InputInt("Target Goal", &goal.goal)) editor_has_unsaved_changes = true;
                     if (ImGui::IsItemHovered()) ImGui::SetTooltip("0 for a simple toggle, -1 for an infinite counter, >0 for a progress-based counter.");
-                    ImGui::Checkbox("Hidden", &goal.is_hidden);
+                    if(ImGui::Checkbox("Hidden", &goal.is_hidden)) editor_has_unsaved_changes = true;
                     ImGui::SameLine();
                     if (ImGui::Button("Remove")) {
                         item_to_remove = i;
+                        editor_has_unsaved_changes = true;
                     }
                     ImGui::Separator();
                     ImGui::PopID();

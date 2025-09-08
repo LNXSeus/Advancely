@@ -680,8 +680,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::Spacing();
     }
 
-    // Apply the changes or pressing Enter key
-    if (ImGui::Button("Apply Settings") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && !ImGui::IsAnyItemActive())) {
+    // Apply the changes or pressing Enter key in the settings window
+    if (ImGui::Button("Apply Settings") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))) {
         // Reset message visibility on each new attempt
         show_applied_message = false;
         show_defaults_applied_message = false; // Reset the other message
