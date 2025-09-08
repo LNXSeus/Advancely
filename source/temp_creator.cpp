@@ -25,7 +25,18 @@ struct EditorTrackableItem {
     bool is_hidden;
 };
 
+// A struct to hold a category (like an advancement) and its criteria
+struct EditorTrackableCategory {
+    char root_name[192];
+    char display_name[192];
+    char icon_path[256];
+    bool is_hidden;
+    std::vector<EditorTrackableItem> criteria; // Criteria then are trackable items
+};
+
 struct EditorTemplate {
+    std::vector<EditorTrackableCategory> advancements;
+    std::vector<EditorTrackableCategory> stats;
     std::vector<EditorTrackableItem> unlocks;
     std::vector<EditorTrackableItem> custom_goals;
 
@@ -48,6 +59,22 @@ static bool has_duplicate_root_names(const std::vector<EditorTrackableItem> &ite
     return false;
 }
 
+// Helper to check for duplicate root_names in a vector of categories
+static bool has_duplicate_category_root_names(const std::vector<EditorTrackableCategory>& items, char* error_message_buffer) {
+    std::unordered_set<std::string> seen_names;
+    for (const auto& item : items) {
+        if (item.root_name[0] == '\0') {
+            snprintf(error_message_buffer, 256, "Error: An advancement has an empty root name.");
+            return true;
+        }
+        if (!seen_names.insert(item.root_name).second) {
+            snprintf(error_message_buffer, 256, "Error: Duplicate advancement root name found: '%s'", item.root_name);
+            return true;
+        }
+    }
+    return false;
+}
+
 // Helper to validate that all icon paths in a vector exist
 static bool validate_icon_paths(const std::vector<EditorTrackableItem>& items, char* error_message_buffer) {
     for (const auto& item : items) {
@@ -59,6 +86,33 @@ static bool validate_icon_paths(const std::vector<EditorTrackableItem>& items, c
         if (!path_exists(full_path)) {
             snprintf(error_message_buffer, 256, "Error: Icon file not found: '%s'", item.icon_path);
             return false;
+        }
+    }
+    return true;
+}
+
+// Helper to validate icon paths for nested categories
+static bool validate_category_icon_paths(const std::vector<EditorTrackableCategory>& categories, char* error_message_buffer) {
+    for (const auto& cat : categories) {
+        // Check parent icon path
+        if (cat.icon_path[0] != '\0') {
+            char full_path[MAX_PATH_LENGTH];
+            snprintf(full_path, sizeof(full_path), "resources/icons/%s", cat.icon_path);
+            if (!path_exists(full_path)) {
+                snprintf(error_message_buffer, 256, "Error: Icon file not found for '%s': '%s'", cat.root_name, cat.icon_path);
+                return false;
+            }
+        }
+        // Check criteria icon paths
+        for (const auto& crit : cat.criteria) {
+            if (crit.icon_path[0] != '\0') {
+                char full_path[MAX_PATH_LENGTH];
+                snprintf(full_path, sizeof(full_path), "resources/icons/%s", crit.icon_path);
+                if (!path_exists(full_path)) {
+                    snprintf(error_message_buffer, 256, "Error: Icon file not found for criterion '%s': '%s'", crit.root_name, crit.icon_path);
+                    return false;
+                }
+            }
         }
     }
     return true;
@@ -89,9 +143,54 @@ static void parse_editor_trackable_items(cJSON *json_array, std::vector<EditorTr
     }
 }
 
+// Helper to parse a category object like "advancements" or "stats"
+static void parse_editor_trackable_categories(cJSON *json_object, std::vector<EditorTrackableCategory> &category_vector) {
+    category_vector.clear();
+    if (!json_object) return;
+
+    cJSON *category_json = nullptr;
+    cJSON_ArrayForEach(category_json, json_object) {
+        EditorTrackableCategory new_cat = {}; // Zero initialize
+
+        // Parse parent item properties
+        strncpy(new_cat.root_name, category_json->string, sizeof(new_cat.root_name) - 1);
+        cJSON *icon = cJSON_GetObjectItem(category_json, "icon");
+        cJSON *hidden = cJSON_GetObjectItem(category_json, "hidden");
+
+        if (cJSON_IsString(icon)) strncpy(new_cat.icon_path, icon->valuestring, sizeof(new_cat.icon_path) - 1);
+        if (cJSON_IsBool(hidden)) new_cat.is_hidden = cJSON_IsTrue(hidden);
+
+        // TODO: Load display_name from lang file
+
+        // Parse the nested criteria using existing helper function
+        cJSON *criteria_object = cJSON_GetObjectItem(category_json, "criteria");
+        if (criteria_object) {
+            // Advancements/Stats store criteria in an object, not an array
+            std::vector<EditorTrackableItem> criteria_items;
+            cJSON *criterion_json = nullptr;
+            cJSON_ArrayForEach(criterion_json, criteria_object) {
+                EditorTrackableItem new_crit = {};
+                strncpy(new_crit.root_name, criterion_json->string, sizeof(new_crit.root_name) - 1);
+
+                cJSON *crit_icon = cJSON_GetObjectItem(criterion_json, "icon");
+                cJSON *crit_hidden = cJSON_GetObjectItem(criterion_json, "hidden");
+
+                if (cJSON_IsString(crit_icon)) strncpy(new_crit.icon_path, crit_icon->valuestring, sizeof(new_crit.icon_path) - 1);
+                if (cJSON_IsBool(crit_hidden)) new_crit.is_hidden = cJSON_IsTrue(crit_hidden);
+
+                criteria_items.push_back(new_crit);
+            }
+            new_cat.criteria = criteria_items;
+        }
+        category_vector.push_back(new_cat);
+    }
+}
+
 // Main function to load a whole template for editing
 static bool load_template_for_editing(const char *version, const DiscoveredTemplate &template_info,
                                       EditorTemplate &editor_data, char *status_message_buffer) {
+    editor_data.advancements.clear();
+    editor_data.stats.clear();
     editor_data.unlocks.clear();
     editor_data.custom_goals.clear();
 
@@ -110,9 +209,10 @@ static bool load_template_for_editing(const char *version, const DiscoveredTempl
         return false;
     }
 
+    parse_editor_trackable_categories(cJSON_GetObjectItem(root, "advancements"), editor_data.advancements);
+    // parse_editor_trackable_categories(cJSON_GetObjectItem(root, "stats"), editor_data.stats); // We'll add this when we build the stats tab
     parse_editor_trackable_items(cJSON_GetObjectItem(root, "unlocks"), editor_data.unlocks);
     parse_editor_trackable_items(cJSON_GetObjectItem(root, "custom"), editor_data.custom_goals);
-    // TODO: Load "advancements" and other arrays
 
     cJSON_Delete(root);
     return true;
@@ -138,6 +238,33 @@ static void serialize_editor_trackable_items(cJSON *parent, const char *key,
     cJSON_AddItemToObject(parent, key, array);
 }
 
+// Helper to serialize a vector of categories back into a cJSON object
+static void serialize_editor_trackable_categories(cJSON* parent, const char* key, const std::vector<EditorTrackableCategory>& category_vector) {
+    cJSON* cat_object = cJSON_CreateObject();
+    for (const auto& cat : category_vector) {
+        cJSON* cat_json = cJSON_CreateObject();
+        cJSON_AddStringToObject(cat_json, "icon", cat.icon_path);
+        if (cat.is_hidden) {
+            cJSON_AddBoolToObject(cat_json, "hidden", cat.is_hidden);
+        }
+
+        // Create the nested criteria object
+        cJSON* criteria_object = cJSON_CreateObject();
+        for (const auto& crit : cat.criteria) {
+            cJSON* crit_json = cJSON_CreateObject();
+            cJSON_AddStringToObject(crit_json, "icon", crit.icon_path);
+            if (crit.is_hidden) {
+                cJSON_AddBoolToObject(crit_json, "hidden", crit.is_hidden);
+            }
+            cJSON_AddItemToObject(criteria_object, crit.root_name, crit_json);
+        }
+        cJSON_AddItemToObject(cat_json, "criteria", criteria_object);
+
+        cJSON_AddItemToObject(cat_object, cat.root_name, cat_json);
+    }
+    cJSON_AddItemToObject(parent, key, cat_object);
+}
+
 // Main function to save the in-memory editor data back to a file
 static bool save_template_from_editor(const char *version, const DiscoveredTemplate &template_info,
                                       EditorTemplate &editor_data, char *status_message_buffer) {
@@ -156,9 +283,11 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
         root = cJSON_CreateObject(); // Create a new object if the file is empty or doesn't exist
     }
 
-    // Replace the "unlocks" and "custom" sections with our edited data
+    // Replace all editable sections with our new data
+    cJSON_DeleteItemFromObject(root, "advancements");
     cJSON_DeleteItemFromObject(root, "unlocks");
     cJSON_DeleteItemFromObject(root, "custom");
+    serialize_editor_trackable_categories(root, "advancements", editor_data.advancements);
     serialize_editor_trackable_items(root, "unlocks", editor_data.unlocks);
     serialize_editor_trackable_items(root, "custom", editor_data.custom_goals);
 
@@ -221,9 +350,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static bool editing_template = false;
     static EditorTemplate current_template_data;
     static DiscoveredTemplate selected_template_info;
+    static int selected_advancement_index = -1; // Tracks which advancement is currently selected in the editor
     static bool editor_has_unsaved_changes = false;
     static bool show_unsaved_changes_popup = false;
-    // static bool show_save_success_message = false; // TODO: Remove
     static std::function<void()> pending_action = nullptr;
 
 
@@ -315,28 +444,23 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
 
         if (ImGui::Selectable(item_label, selected_template_index == i)) {
-            // If we are editing and have unsaved changes, trigger the popup.
-            if (editing_template && editor_has_unsaved_changes) {
+            // Only trigger unsaved changes logic if selecting a DIFFERENT template
+            if (editing_template && editor_has_unsaved_changes && selected_template_index != (int)i) {
                 show_unsaved_changes_popup = true;
                 pending_action = [&, i]() {
-                    // This action will run if the user saves or discards
                     selected_template_index = i;
                     selected_template_info = discovered_templates[i];
-                    load_template_for_editing(creator_version_str, selected_template_info, current_template_data,
-                                              status_message);
+                    load_template_for_editing(creator_version_str, selected_template_info, current_template_data, status_message);
                     editor_has_unsaved_changes = false;
                 };
-            }
-            // If we are already editing (but have no changes), just load the new template directly.
-            else if (editing_template) {
+            } else {
+                // If not editing, or no unsaved changes, or re-selecting the same template, just update the index
                 selected_template_index = i;
-                selected_template_info = discovered_templates[i];
-                load_template_for_editing(creator_version_str, selected_template_info, current_template_data,
-                                          status_message);
-            }
-            // Otherwise, just select the template without entering the editor.
-            else {
-                selected_template_index = i;
+                if (editing_template) {
+                    // If already editing, reload the data to discard any accidental non-flagged UI changes
+                    load_template_for_editing(creator_version_str, discovered_templates[i], current_template_data, status_message);
+                    editor_has_unsaved_changes = false;
+                }
             }
 
             // General state changes on any selection
@@ -344,20 +468,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             show_copy_view = false;
             status_message[0] = '\0';
         }
-
-        // TODO: Remove
-        // if (ImGui::Selectable(item_label, selected_template_index == i)) {
-        //     selected_template_index = i;
-        //     show_create_new_view = false; // Hide the "Create New" view when selecting existing template
-        //     show_copy_view = false;
-        //     status_message[0] = '\0';
-        //
-        //     // If already in editor mode, reload the data for the new selection
-        //     if (editing_template) {
-        //         selected_template_info = discovered_templates[i];
-        //         load_template_for_editing(creator_version_str, selected_template_info, current_template_data, status_message);
-        //     }
-        // }
     }
     ImGui::EndChild();
 
@@ -506,28 +616,76 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // --- CORE EDITOR VIEW ---
         ImGui::PushID(&selected_template_info); // Use address of info struct for a unique ID
 
+        // Display info about the currently edited template
+        char current_file_info[512];
+        if (selected_template_info.optional_flag[0] != '\0') {
+            snprintf(current_file_info, sizeof(current_file_info), "Editing: %s - %s%s", creator_version_str, selected_template_info.category, selected_template_info.optional_flag);
+        } else {
+            snprintf(current_file_info, sizeof(current_file_info), "Editing: %s - %s", creator_version_str, selected_template_info.category);
+        }
+        ImGui::TextDisabled("%s", current_file_info);
+        ImGui::Separator();
+
         // Save when creator window is focused
-        if (ImGui::Button("Save (Enter)") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))) {
+        if (ImGui::Button("Save") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))) {
             // Reset message state on new save attempt
             save_message_type = MSG_NONE;
             status_message[0] = '\0';
+
+            bool validation_passed = true;
             // Perform all validation checks before saving
-            if (has_duplicate_root_names(current_template_data.unlocks, status_message) ||
-                has_duplicate_root_names(current_template_data.custom_goals, status_message) ||
-                !validate_icon_paths(current_template_data.unlocks, status_message) ||
-                !validate_icon_paths(current_template_data.custom_goals, status_message))
-            {
-                save_message_type = MSG_ERROR;
-            } else {
+
+            // 1. Check for duplicate advancement root names
+            if (has_duplicate_category_root_names(current_template_data.advancements, status_message)) {
+                validation_passed = false;
+            }
+
+            // Icon path validation for advancements
+            if (validation_passed) {
+                if (!validate_category_icon_paths(current_template_data.advancements, status_message)) {
+                    validation_passed = false;
+                }
+            }
+
+            // 2. Check for duplicate criteria within each advancement
+            if (validation_passed) {
+                for (const auto& adv : current_template_data.advancements) {
+                    if (has_duplicate_root_names(adv.criteria, status_message)) {
+                        validation_passed = false;
+                        break;
+                    }
+                }
+            }
+
+            // 3. Check other sections (unlocks, custom goals)
+            if (validation_passed) {
+                if (has_duplicate_root_names(current_template_data.unlocks, status_message) ||
+                    has_duplicate_root_names(current_template_data.custom_goals, status_message) ||
+                    !validate_icon_paths(current_template_data.unlocks, status_message) ||
+                    !validate_icon_paths(current_template_data.custom_goals, status_message))
+                {
+                    validation_passed = false;
+                }
+            }
+
+            // If all checks passed, attempt to save
+            if (validation_passed) {
                 if (save_template_from_editor(creator_version_str, selected_template_info, current_template_data, status_message)) {
                     editor_has_unsaved_changes = false;
                     save_message_type = MSG_SUCCESS;
                     snprintf(status_message, sizeof(status_message), "Saved!");
                 } else {
-                    save_message_type = MSG_ERROR; // Save function failed and set error message
+                    save_message_type = MSG_ERROR; // Save function failed
                 }
+            } else {
+                save_message_type = MSG_ERROR; // A validation check failed
             }
         }
+
+        // Save button tooltip
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(
+                "Press ENTER to save the currently edited template. Does not save on errors.");
 
         // Render the success or error message next to the button
         if (save_message_type != MSG_NONE) {
@@ -568,9 +726,108 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         if (ImGui::BeginTabBar("EditorTabs")) {
             if (ImGui::BeginTabItem("Advancements")) {
-                ImGui::Text("Advancements editor coming soon.");
+                // TWO-PANE LAYOUT
+                float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
+                ImGui::BeginChild("AdvancementListPane", ImVec2(pane_width, 0), true);
+
+                // LEFT PANE: List of Advancements
+                if (ImGui::Button("Add New Advancement")) {
+                    current_template_data.advancements.push_back({});
+                    editor_has_unsaved_changes = true;
+                    save_message_type = MSG_NONE;
+                }
+                ImGui::Separator();
+
+                int advancement_to_remove = -1;
+                for (size_t i = 0; i < current_template_data.advancements.size(); i++) {
+                    ImGui::PushID(i);
+
+                    // Use root_name for display if available, otherwise show as "New Advancement"
+                    const char *label = current_template_data.advancements[i].root_name[0] ? current_template_data.advancements[i].root_name : "[New Advancement]";
+                    if (ImGui::Selectable(label, selected_advancement_index == (int)i)) selected_advancement_index = i;
+
+                    ImGui::SameLine(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Remove").x - ImGui::GetStyle().FramePadding.x * 2);
+                    if (ImGui::Button("Remove")) {
+                        advancement_to_remove = i;
+                        editor_has_unsaved_changes = true;
+                        save_message_type = MSG_NONE;
+                    }
+                    ImGui::PopID();
+                }
+                if (advancement_to_remove != -1) {
+                    if (selected_advancement_index == advancement_to_remove) {
+                        selected_advancement_index = -1; // Deselect if it's being removed
+                    }
+                    current_template_data.advancements.erase(current_template_data.advancements.begin() + advancement_to_remove);
+                }
+                ImGui::EndChild();
+                ImGui::SameLine();
+
+                // RIGHT PANE: Details of Selected Advancement
+                ImGui::BeginChild("AdvancementDetailsPane", ImVec2(0, 0), true);
+                if (selected_advancement_index != -1 && (size_t)selected_advancement_index < current_template_data.advancements.size()) {
+                    auto &advancement = current_template_data.advancements[selected_advancement_index];
+
+                    ImGui::Text("Edit Advancement Details");
+                    ImGui::Separator();
+
+                    if (ImGui::InputText("Root Name", advancement.root_name, sizeof(advancement.root_name))) {
+                        editor_has_unsaved_changes = true;
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::InputText("Icon Path", advancement.icon_path, sizeof(advancement.icon_path))) {
+                        editor_has_unsaved_changes = true;
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::Checkbox("Hidden", &advancement.is_hidden)) {
+                        editor_has_unsaved_changes = true;
+                        save_message_type = MSG_NONE;
+                    }
+                    ImGui::Separator();
+                    ImGui::Text("Criteria");
+
+                    if (ImGui::Button("Add New Criterion")) {
+                        advancement.criteria.push_back({});
+                        editor_has_unsaved_changes = true;
+                        save_message_type = MSG_NONE;
+                    }
+
+                    int criterion_to_remove = -1;
+                    for (size_t j = 0; j < advancement.criteria.size(); j++) {
+                        ImGui::PushID(j);
+                        auto &criterion = advancement.criteria[j];
+                        ImGui::Separator();
+                        if(ImGui::InputText("Criterion Root Name", criterion.root_name, sizeof(criterion.root_name))) {
+                            editor_has_unsaved_changes = true;
+                            save_message_type = MSG_NONE;
+                        }
+                        if(ImGui::InputText("Criterion Icon Path", criterion.icon_path, sizeof(criterion.icon_path))) {
+                            editor_has_unsaved_changes = true;
+                            save_message_type = MSG_NONE;
+                        }
+                        if(ImGui::Checkbox("Criterion Hidden", &criterion.is_hidden)) {
+                            editor_has_unsaved_changes = true;
+                            save_message_type = MSG_NONE;
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::Button("Remove Criterion")) {
+                            criterion_to_remove = j;
+                            editor_has_unsaved_changes = true;
+                            save_message_type = MSG_NONE;
+                        }
+                        ImGui::PopID();
+                    }
+                    if (criterion_to_remove != -1) {
+                        advancement.criteria.erase(advancement.criteria.begin() + criterion_to_remove);
+                    }
+                } else {
+                    ImGui::Text("Select an advancement from the list to edit its details.");
+                }
+                ImGui::EndChild();
                 ImGui::EndTabItem();
             }
+
             if (ImGui::BeginTabItem("Stats")) {
                 ImGui::Text("Stats editor coming soon.");
                 ImGui::EndTabItem();
