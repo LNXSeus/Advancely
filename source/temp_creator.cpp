@@ -30,6 +30,59 @@ struct EditorTemplate {
     // TODO: Other sections will be added here later
 };
 
+// Helper to parse a simple array like "unlocks" or "custom" from the template JSON
+static void parse_editor_trackable_items(cJSON* json_array, std::vector<EditorTrackableItem>& item_vector) {
+    item_vector.clear();
+    if (!json_array) return;
+
+    cJSON* item_json = nullptr;
+    cJSON_ArrayForEach(item_json, json_array) {
+        EditorTrackableItem new_item = {}; // Zero-initialize
+        cJSON* root_name = cJSON_GetObjectItem(item_json, "root_name");
+        cJSON* icon = cJSON_GetObjectItem(item_json, "icon");
+        cJSON* target = cJSON_GetObjectItem(item_json, "target");
+        cJSON* hidden = cJSON_GetObjectItem(item_json, "hidden");
+
+        if (cJSON_IsString(root_name)) strncpy(new_item.root_name, root_name->valuestring, sizeof(new_item.root_name) - 1);
+        if (cJSON_IsString(icon)) strncpy(new_item.icon_path, icon->valuestring, sizeof(new_item.icon_path) - 1);
+        if (cJSON_IsNumber(target)) new_item.goal = target->valueint;
+        if (cJSON_IsBool(hidden)) new_item.is_hidden = cJSON_IsTrue(hidden);
+
+        // TODO: Load display_name from lang file
+
+        item_vector.push_back(new_item);
+    }
+}
+
+// Main function to load a whole template for editing
+static bool load_template_for_editing(const char* version, const DiscoveredTemplate& template_info, EditorTemplate& editor_data, char* status_message_buffer) {
+    editor_data.unlocks.clear();
+    editor_data.custom_goals.clear();
+
+    char version_filename[64];
+    strncpy(version_filename, version, sizeof(version_filename) - 1);
+    version_filename[sizeof(version_filename) - 1] = '\0';
+    for (char* p = version_filename; *p; p++) { if (*p == '.') *p = '_'; }
+
+    char template_path[MAX_PATH_LENGTH];
+    snprintf(template_path, sizeof(template_path), "resources/templates/%s/%s/%s_%s%s.json",
+             version, template_info.category, version_filename, template_info.category, template_info.optional_flag);
+
+    cJSON* root = cJSON_from_file(template_path);
+    if (!root) {
+        snprintf(status_message_buffer, 256, "Error: Could not load template file for editing.");
+        return false;
+    }
+
+    parse_editor_trackable_items(cJSON_GetObjectItem(root, "unlocks"), editor_data.unlocks);
+    parse_editor_trackable_items(cJSON_GetObjectItem(root, "custom"), editor_data.custom_goals);
+    // TODO: Load "advancements" and other arrays
+
+    cJSON_Delete(root);
+    return true;
+}
+
+
 void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t) {
     (void)t;
 
@@ -152,8 +205,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             selected_template_index = i;
             show_create_new_view = false; // Hide the "Create New" view when selecting existing template
             show_copy_view = false;
-            editing_template = false; // Reset to not editing yet
             status_message[0] = '\0';
+
+            // If already in editor mode, reload the data for the new selection
+            if (editing_template) {
+                selected_template_info = discovered_templates[i];
+                load_template_for_editing(creator_version_str, selected_template_info, current_template_data, status_message);
+            }
         }
     }
     ImGui::EndChild();
@@ -194,8 +252,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             show_copy_view = false;
 
 
-            // Store the infor of the template being edited for later use
+            // Store the info and load the data for the first time
             selected_template_info = discovered_templates[selected_template_index];
+            load_template_for_editing(creator_version_str, selected_template_info, current_template_data, status_message);
 
             // TODO: Add logic to load the selected template file into current_template_data
         }
@@ -309,10 +368,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::Text("Stats editor coming soon.");
                 ImGui::EndTabItem();
             }
-            if (ImGui::BeginTabItem("Unlocks")) {
-                ImGui::Text("Manage items in the 'unlocks' array.");
-                // TODO: Implement the editor UI for unlocks
-                ImGui::EndTabItem();
+            // Only show the Unlocks tab for the specific version
+            if (strcmp(creator_version_str, "25w14craftmine") == 0) {
+                if (ImGui::BeginTabItem("Unlocks")) {
+                    ImGui::Text("Manage items in the 'unlocks' array.");
+                    // TODO: Implement the editor UI for unlocks
+                    ImGui::EndTabItem();
+                }
             }
             if (ImGui::BeginTabItem("Custom Goals")) {
                 ImGui::Text("Manage items in the 'custom' array.");
@@ -342,7 +404,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::SetTooltip(
                 "The main classification for the template (e.g., 'all_advancements', 'all_trims').\nCannot contain spaces or special characters.");
 
-        ImGui::InputText("Optional Flag (optional)", new_template_flag, sizeof(new_template_flag));
+        ImGui::InputText("Optional Flag", new_template_flag, sizeof(new_template_flag));
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip(
                 "A variant for the category (e.g., '_optimized', '_modded').\nCannot contain spaces or special characters.");
