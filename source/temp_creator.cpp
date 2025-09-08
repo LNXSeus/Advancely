@@ -819,12 +819,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 // LEFT PANE: List of Advancements
                 if (ImGui::Button("Add New Advancement")) {
                     current_template_data.advancements.push_back({});
-                    save_message_type = MSG_NONE;
                 }
                 ImGui::Separator();
 
                 int advancement_to_remove = -1;
                 int advancement_to_copy = -1; // To queue a copy action
+
+                // State for drag and drop
+                int dnd_source_index = -1;
+                int dnd_target_index = -1;
 
                 for (size_t i = 0; i < current_template_data.advancements.size(); ++i) {
                     ImGui::PushID(i);
@@ -859,7 +862,39 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                         }
                     }
+
+                    // DRAG AND DROP LOGIC
+                    // Make the entire row a drag source
+                    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
+                        // Use a unique payload ID for this list
+                        ImGui::SetDragDropPayload("ADVANCEMENT_DND", &i, sizeof(int));
+                        ImGui::Text("Reorder %s", label);
+                        ImGui::EndDragDropSource();
+                    }
+                    // Make the entire row a drop target
+                    if (ImGui::BeginDragDropTarget()) {
+                        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ADVANCEMENT_DND")) {
+                            dnd_source_index = *(const int*)payload->Data;
+                            dnd_target_index = i;
+                        }
+                        ImGui::EndDragDropTarget();
+                    }
+
                     ImGui::PopID();
+                }
+
+                // Handle Drag and Drop reordering after the loop to avoid modifying the vector while iterating
+                if (dnd_source_index != -1 && dnd_target_index != -1) {
+                    EditorTrackableCategory item_to_move = current_template_data.advancements[dnd_source_index];
+                    current_template_data.advancements.erase(current_template_data.advancements.begin() + dnd_source_index);
+                    current_template_data.advancements.insert(current_template_data.advancements.begin() + dnd_target_index, item_to_move);
+
+                    // Update selection to follow the moved item
+                    if (selected_advancement_index == dnd_source_index) {
+                        selected_advancement_index = dnd_target_index;
+                    }
+
+                    save_message_type = MSG_NONE;
                 }
 
                 // Handle removal
@@ -945,10 +980,29 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     int criterion_to_remove = -1;
                     int criterion_to_copy = -1;
+
+                    // State for drag and drop
+                    int criterion_dnd_source_index = -1;
+                    int criterion_dnd_target_index = -1;
+
                     for (size_t j = 0; j < advancement.criteria.size(); j++) {
                         ImGui::PushID(j);
                         auto &criterion = advancement.criteria[j];
-                        ImGui::Separator();
+                        ImGui::Separator(); // This is the drop target for "between items"
+
+                        // We make the separator a drop target to allow dropping between items
+                        if (ImGui::BeginDragDropTarget()) {
+                            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CRITERION_DND")) {
+                                criterion_dnd_source_index = *(const int*)payload->Data;
+                                criterion_dnd_target_index = j;
+                            }
+                            ImGui::EndDragDropTarget();
+                        }
+
+                        // Use an invisible button overlaying the group as a drag handle
+                        ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
+                        ImGui::BeginGroup();
+
                         if(ImGui::InputText("Root Name", criterion.root_name, sizeof(criterion.root_name))) {
                             save_message_type = MSG_NONE;
                         }
@@ -970,8 +1024,54 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             criterion_to_remove = j;
                             save_message_type = MSG_NONE;
                         }
+
+                        ImGui::EndGroup();
+                        ImGui::SetCursorScreenPos(item_start_cursor_pos);
+                        ImGui::InvisibleButton("dnd_handle", ImGui::GetItemRectSize());
+
+                        // Use the flag to make the non-interactive group a drag source
+                        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
+                            ImGui::SetDragDropPayload("CRITERION_DND", &j, sizeof(int));
+                            ImGui::Text("Reorder %s", criterion.root_name);
+                            ImGui::EndDragDropSource();
+                        }
+
                         ImGui::PopID();
                     }
+
+                    // Final drop target to allow dropping at the end of the list
+                    ImGui::Separator();
+                    if (ImGui::BeginDragDropTarget()) {
+                        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CRITERION_DND")) {
+                            criterion_dnd_source_index = *(const int*)payload->Data;
+                            criterion_dnd_target_index = advancement.criteria.size();
+                        }
+                        ImGui::EndDragDropTarget();
+                    }
+
+                    // Handle actions after the loop
+                    if (criterion_dnd_source_index != -1 && criterion_dnd_target_index != -1 && criterion_dnd_source_index != criterion_dnd_target_index) {
+                        EditorTrackableItem item_to_move = advancement.criteria[criterion_dnd_source_index];
+                        advancement.criteria.erase(advancement.criteria.begin() + criterion_dnd_source_index);
+                        if (criterion_dnd_target_index > criterion_dnd_source_index) criterion_dnd_target_index--;
+                        advancement.criteria.insert(advancement.criteria.begin() + criterion_dnd_target_index, item_to_move);
+                        save_message_type = MSG_NONE;
+                    }
+
+                    // TODO: Remove
+                    // // Handle Drag and Drop action after the loop
+                    // if (criterion_dnd_source_index != -1 && criterion_dnd_target_index != -1) {
+                    //     EditorTrackableItem item_to_move = advancement.criteria[criterion_dnd_source_index];
+                    //     advancement.criteria.erase(advancement.criteria.begin() + criterion_dnd_source_index);
+                    //     // Adjust target index if source was before it
+                    //     if (criterion_dnd_target_index > criterion_dnd_source_index) {
+                    //         criterion_dnd_target_index--;
+                    //     }
+                    //     advancement.criteria.insert(advancement.criteria.begin() + criterion_dnd_target_index, item_to_move);
+                    //     save_message_type = MSG_NONE;
+                    // }
+
+
                     if (criterion_to_remove != -1) {
                         advancement.criteria.erase(advancement.criteria.begin() + criterion_to_remove);
                     }
@@ -1020,9 +1120,29 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::Separator();
                     int item_to_remove = -1;
                     int item_to_copy = -1;
+                    int unlocks_dnd_source_index = -1;
+                    int unlocks_dnd_target_index = -1;
                     for (size_t i = 0; i < current_template_data.unlocks.size(); i++) {
                         ImGui::PushID(i);
                         auto &unlock = current_template_data.unlocks[i];
+                        ImGui::Separator(); // The separator now actts as a drop target
+
+                        // Drop target for dropping between items
+                        if (ImGui::BeginDragDropTarget()) {
+                            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("UNLOCK_DND")) {
+                                unlocks_dnd_source_index = *(const int*)payload->Data;
+                                unlocks_dnd_target_index = i;
+                            }
+                            ImGui::EndDragDropTarget();
+                        }
+
+                        // The InvisibleButton is now only a drag SOURCE
+                        ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
+
+                        // Make the whole item group a drag-drop source and target
+                        ImGui::BeginGroup();
+
+
                         if (ImGui::InputText("Root Name", unlock.root_name, sizeof(unlock.root_name))) {
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
@@ -1042,9 +1162,47 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             item_to_remove = i;
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
-                        ImGui::Separator();
+
+                        ImGui::EndGroup();
+
+                        ImGui::SetCursorScreenPos(item_start_cursor_pos);
+                        ImGui::InvisibleButton("dnd_handle", ImGui::GetItemRectSize());
+
+                        if (ImGui::BeginDragDropSource()) {
+                            ImGui::SetDragDropPayload("UNLOCK_DND", &i, sizeof(int));
+                            ImGui::Text("Reorder %s", unlock.root_name);
+                            ImGui::EndDragDropSource();
+                        }
+
+                        // TODO: Remove
+                        // // Add the required flag here
+                        // if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
+                        //     ImGui::SetDragDropPayload("UNLOCK_DND", &i, sizeof(int));
+                        //     ImGui::Text("Reorder %s", unlock.root_name);
+                        //     ImGui::EndDragDropSource();
+                        // }
+
                         ImGui::PopID();
                     }
+
+                    // Final drop target to allow dropping at the end of the list
+                    ImGui::Separator();
+                    if (ImGui::BeginDragDropTarget()) {
+                        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("UNLOCK_DND")) {
+                            unlocks_dnd_source_index = *(const int*)payload->Data;
+                            unlocks_dnd_target_index = current_template_data.unlocks.size();
+                        }
+                        ImGui::EndDragDropTarget();
+                    }
+
+                    if (unlocks_dnd_source_index != -1 && unlocks_dnd_target_index != -1 && unlocks_dnd_source_index != unlocks_dnd_target_index) {
+                        EditorTrackableItem item_to_move = current_template_data.unlocks[unlocks_dnd_source_index];
+                        current_template_data.unlocks.erase(current_template_data.unlocks.begin() + unlocks_dnd_source_index);
+                        if (unlocks_dnd_target_index > unlocks_dnd_source_index) unlocks_dnd_target_index--;
+                        current_template_data.unlocks.insert(current_template_data.unlocks.begin() + unlocks_dnd_target_index, item_to_move);
+                        save_message_type = MSG_NONE;
+                    }
+
                     if (item_to_remove != -1) {
                         current_template_data.unlocks.erase(current_template_data.unlocks.begin() + item_to_remove);
                     }
@@ -1074,7 +1232,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::EndTabItem();
                 }
             }
-            if (ImGui::BeginTabItem("Custom Goals")) {
+            if (ImGui::BeginTabItem
+                ("Custom Goals")) {
                 if (ImGui::Button("Add New Custom Goal")) {
                     current_template_data.custom_goals.push_back({});
                     save_message_type = MSG_NONE; // Clear message on new edit
@@ -1084,9 +1243,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::Separator();
                 int item_to_remove = -1;
                 int item_to_copy = -1;
+                int custom_dnd_source_index = -1;
+                int custom_dnd_target_index = -1;
                 for (size_t i = 0; i < current_template_data.custom_goals.size(); ++i) {
                     ImGui::PushID(i);
                     auto &goal = current_template_data.custom_goals[i];
+                    ImGui::Separator(); // Will act as a drop target
+
+                    // Drop target for dropping between items
+                    if (ImGui::BeginDragDropTarget()) {
+                        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CUSTOM_GOAL_DND")) {
+                            custom_dnd_source_index = *(const int*)payload->Data;
+                            custom_dnd_target_index = i;
+                        }
+                        ImGui::EndDragDropTarget();
+                    }
+
+                    // Get cursor position to overlay the invisible button later
+                    ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
+
+                    ImGui::BeginGroup();
                     if (ImGui::InputText("Root Name", goal.root_name, sizeof(goal.root_name))) {
                         save_message_type = MSG_NONE; // Clear message on new edit
                     }
@@ -1116,9 +1292,52 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         item_to_remove = i;
                         save_message_type = MSG_NONE; // Clear message on new edit
                     }
-                    ImGui::Separator();
+
+                    ImGui::EndGroup();
+
+                    // Create an invisible button over the entire group. This is our drag handle.
+                    ImGui::SetCursorScreenPos(item_start_cursor_pos);
+                    ImGui::InvisibleButton("dnd_handle", ImGui::GetItemRectSize());
+
+
+
+                    // Add the required flag here
+                    if (ImGui::BeginDragDropSource()) {
+                        ImGui::SetDragDropPayload("CUSTOM_GOAL_DND", &i, sizeof(int));
+                        ImGui::Text("Reorder %s", goal.root_name);
+                        ImGui::EndDragDropSource();
+                    }
+
                     ImGui::PopID();
                 }
+
+                // Final drop target for end of list
+                ImGui::Separator();
+                if (ImGui::BeginDragDropTarget()) {
+                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CUSTOM_GOAL_DND")) {
+                        custom_dnd_source_index = *(const int*)payload->Data;
+                        custom_dnd_target_index = current_template_data.custom_goals.size();
+                    }
+                    ImGui::EndDragDropTarget();
+                }
+
+                if (custom_dnd_source_index != -1 && custom_dnd_target_index != -1 && custom_dnd_source_index != custom_dnd_target_index) {
+                    EditorTrackableItem item_to_move = current_template_data.custom_goals[custom_dnd_source_index];
+                    current_template_data.custom_goals.erase(current_template_data.custom_goals.begin() + custom_dnd_source_index);
+                    if (custom_dnd_target_index > custom_dnd_source_index) custom_dnd_target_index--;
+                    current_template_data.custom_goals.insert(current_template_data.custom_goals.begin() + custom_dnd_target_index, item_to_move);
+                    save_message_type = MSG_NONE;
+                }
+
+                // TODO: Remove
+                // if (custom_dnd_source_index != -1 && custom_dnd_target_index != -1) {
+                //     EditorTrackableItem item_to_move = current_template_data.custom_goals[custom_dnd_source_index];
+                //     current_template_data.custom_goals.erase(current_template_data.custom_goals.begin() + custom_dnd_source_index);
+                //     current_template_data.custom_goals.insert(current_template_data.custom_goals.begin() + custom_dnd_target_index, item_to_move);
+                //     save_message_type = MSG_NONE;
+                // }
+
+
                 if (item_to_remove != -1) {
                     current_template_data.custom_goals.erase(
                         current_template_data.custom_goals.begin() + item_to_remove);
