@@ -890,25 +890,33 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     int criterion_to_remove = -1;
+                    int criterion_to_copy = -1;
                     for (size_t j = 0; j < advancement.criteria.size(); j++) {
                         ImGui::PushID(j);
                         auto &criterion = advancement.criteria[j];
                         ImGui::Separator();
-                        if(ImGui::InputText("Criterion Root Name", criterion.root_name, sizeof(criterion.root_name))) {
+                        if(ImGui::InputText("Root Name", criterion.root_name, sizeof(criterion.root_name))) {
                             editor_has_unsaved_changes = true;
                             save_message_type = MSG_NONE;
                         }
-                        if(ImGui::InputText("Criterion Icon Path", criterion.icon_path, sizeof(criterion.icon_path))) {
+                        if(ImGui::InputText("Icon Path", criterion.icon_path, sizeof(criterion.icon_path))) {
                             editor_has_unsaved_changes = true;
                             save_message_type = MSG_NONE;
                         }
-                        if(ImGui::Checkbox("Criterion Hidden", &criterion.is_hidden)) {
+                        if(ImGui::Checkbox("Hidden", &criterion.is_hidden)) {
                             editor_has_unsaved_changes = true;
                             save_message_type = MSG_NONE;
                         }
 
+                        // "Copy" button for criteria
+                        if (ImGui::Button("Copy")) {
+                            criterion_to_copy = j;
+                            editor_has_unsaved_changes = true;
+                            save_message_type = MSG_NONE;
+                        }
                         ImGui::SameLine();
-                        if (ImGui::Button("Remove Criterion")) {
+
+                        if (ImGui::Button("Remove")) {
                             criterion_to_remove = j;
                             editor_has_unsaved_changes = true;
                             save_message_type = MSG_NONE;
@@ -918,6 +926,30 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (criterion_to_remove != -1) {
                         advancement.criteria.erase(advancement.criteria.begin() + criterion_to_remove);
                     }
+
+                    // Logic to handle the copy action after the loop
+                    if (criterion_to_copy != -1) {
+                        const auto& source_criterion = advancement.criteria[criterion_to_copy];
+                        EditorTrackableItem new_criterion = source_criterion; // Create Deepcopy
+                        char base_name[192];
+                        strncpy(base_name, source_criterion.root_name, sizeof(base_name) - 1);
+                        base_name[sizeof(base_name) - 1] = '\0';
+                        char new_name[192];
+                        int copy_counter = 1;
+                        while (true) {
+                            if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
+                            else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
+                            bool name_exists = false;
+                            for (const auto& crit : advancement.criteria) {
+                                if (strcmp(crit.root_name, new_name) == 0) { name_exists = true; break; }
+                            }
+                            if (!name_exists) break;
+                            copy_counter++;
+                        }
+                        strncpy(new_criterion.root_name, new_name, sizeof(new_criterion.root_name) - 1);
+                        advancement.criteria.insert(advancement.criteria.begin() + criterion_to_copy + 1, new_criterion);
+                    }
+
                 } else {
                     ImGui::Text("Select an advancement from the list to edit its details.");
                 }
@@ -939,6 +971,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     ImGui::Separator();
                     int item_to_remove = -1;
+                    int item_to_copy = -1;
                     for (size_t i = 0; i < current_template_data.unlocks.size(); i++) {
                         ImGui::PushID(i);
                         auto &unlock = current_template_data.unlocks[i];
@@ -954,6 +987,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             editor_has_unsaved_changes = true;
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
+
+                        if (ImGui::Button("Copy")) {
+                            item_to_copy = i;
+                            editor_has_unsaved_changes = true;
+                            save_message_type = MSG_NONE;
+                        }
                         ImGui::SameLine();
                         if (ImGui::Button("Remove")) {
                             item_to_remove = i;
@@ -965,6 +1004,29 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     if (item_to_remove != -1) {
                         current_template_data.unlocks.erase(current_template_data.unlocks.begin() + item_to_remove);
+                    }
+
+                    // Logic to handle the copy action after the loop
+                    if (item_to_copy != -1) {
+                        const auto& source_item = current_template_data.unlocks[item_to_copy];
+                        EditorTrackableItem new_item = source_item;
+                        char base_name[192];
+                        strncpy(base_name, source_item.root_name, sizeof(base_name) - 1);
+                        base_name[sizeof(base_name) - 1] = '\0';
+                        char new_name[192];
+                        int copy_counter = 1;
+                        while (true) {
+                            if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
+                            else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
+                            bool name_exists = false;
+                            for (const auto& item : current_template_data.unlocks) {
+                                if (strcmp(item.root_name, new_name) == 0) { name_exists = true; break; }
+                            }
+                            if (!name_exists) break;
+                            copy_counter++;
+                        }
+                        strncpy(new_item.root_name, new_name, sizeof(new_item.root_name) - 1);
+                        current_template_data.unlocks.insert(current_template_data.unlocks.begin() + item_to_copy + 1, new_item);
                     }
                     ImGui::EndTabItem();
                 }
@@ -979,6 +1041,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::TextDisabled("(Hotkeys are configured in the main Settings window)");
                 ImGui::Separator();
                 int item_to_remove = -1;
+                int item_to_copy = -1;
                 for (size_t i = 0; i < current_template_data.custom_goals.size(); ++i) {
                     ImGui::PushID(i);
                     auto &goal = current_template_data.custom_goals[i];
@@ -1004,6 +1067,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         editor_has_unsaved_changes = true;
                         save_message_type = MSG_NONE; // Clear message on new edit
                     }
+
+                    // "Copy" button for custom goals
+                    if (ImGui::Button("Copy")) {
+                        item_to_copy = i;
+                        editor_has_unsaved_changes = true;
+                        save_message_type = MSG_NONE;
+                    }
                     ImGui::SameLine();
                     if (ImGui::Button("Remove")) {
                         item_to_remove = i;
@@ -1016,6 +1086,29 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (item_to_remove != -1) {
                     current_template_data.custom_goals.erase(
                         current_template_data.custom_goals.begin() + item_to_remove);
+                }
+
+                // Logic to handle the copy action after the loop
+                if (item_to_copy != -1) {
+                    const auto& source_item = current_template_data.custom_goals[item_to_copy];
+                    EditorTrackableItem new_item = source_item;
+                    char base_name[192];
+                    strncpy(base_name, source_item.root_name, sizeof(base_name) - 1);
+                    base_name[sizeof(base_name) - 1] = '\0';
+                    char new_name[192];
+                    int copy_counter = 1;
+                    while (true) {
+                        if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
+                        else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
+                        bool name_exists = false;
+                        for (const auto& item : current_template_data.custom_goals) {
+                            if (strcmp(item.root_name, new_name) == 0) { name_exists = true; break; }
+                        }
+                        if (!name_exists) break;
+                        copy_counter++;
+                    }
+                    strncpy(new_item.root_name, new_name, sizeof(new_item.root_name) - 1);
+                    current_template_data.custom_goals.insert(current_template_data.custom_goals.begin() + item_to_copy + 1, new_item);
                 }
                 ImGui::EndTabItem();
             }
