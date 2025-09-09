@@ -74,6 +74,7 @@ static bool are_editor_categories_different(const EditorTrackableCategory &a, co
     if (strcmp(a.root_name, b.root_name) != 0 ||
         strcmp(a.icon_path, b.icon_path) != 0 ||
         a.is_hidden != b.is_hidden ||
+        a.is_simple_stat != b.is_simple_stat ||
         a.criteria.size() != b.criteria.size()) {
         return true;
     }
@@ -847,16 +848,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 pending_action = [&, i]() {
                     selected_template_index = i;
                     selected_template_info = discovered_templates[i];
-                    load_template_for_editing(creator_version_str, selected_template_info, current_template_data,
-                                              status_message);
+                    // After loading the new template into 'current', also update the 'saved' snapshot
+                    if (load_template_for_editing(creator_version_str, selected_template_info, current_template_data,
+                                              status_message)) {
+                        saved_template_data = current_template_data;
+                    }
                 };
             } else {
                 // If not editing, or no unsaved changes, or re-selecting the same template, just update the index
                 selected_template_index = i;
                 if (editing_template) {
                     // If already editing, reload the data to discard any accidental non-flagged UI changes
-                    load_template_for_editing(creator_version_str, discovered_templates[i], current_template_data,
-                                              status_message);
+                    if (load_template_for_editing(creator_version_str, discovered_templates[i], current_template_data,
+                                              status_message)) {
+                        // Update the snapshot here as well upon reloading
+                        saved_template_data = current_template_data;
+                    }
                 }
             }
 
@@ -1102,6 +1109,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     saved_template_data = current_template_data;
                     save_message_type = MSG_SUCCESS;
                     snprintf(status_message, sizeof(status_message), "Saved!");
+
+                    // Check if the saved template is the one currently active in the tracker
+                    bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
+                                               strcmp(selected_template_info.category, app_settings->category) == 0 &&
+                                               strcmp(selected_template_info.optional_flag, app_settings->optional_flag) == 0);
+
+                    if (is_active_template) {
+                        // Signal the main loop to reload the tracker data
+                        SDL_SetAtomicInt(&g_settings_changed, 1);
+                    }
                 } else {
                     save_message_type = MSG_ERROR; // Save function failed
                 }
@@ -1151,6 +1168,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (save_template_from_editor(creator_version_str, selected_template_info, current_template_data,
                                               status_message)) {
                     saved_template_data = current_template_data; // Update snapshot on successful save
+
+                    // Check if the saved template is the one currently active in the tracker
+                    bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
+                                               strcmp(selected_template_info.category, app_settings->category) == 0 &&
+                                               strcmp(selected_template_info.optional_flag, app_settings->optional_flag) == 0);
+
+                    if (is_active_template) {
+                        // Signal the main loop to reload the tracker data
+                        SDL_SetAtomicInt(&g_settings_changed, 1);
+                    }
+
                     if (pending_action) pending_action();
                 }
                 ImGui::CloseCurrentPopup();
