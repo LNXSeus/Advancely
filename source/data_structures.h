@@ -224,7 +224,7 @@ enum SubGoalType{
     SUBGOAL_CRITERION,
     // Allows to complete a stage based on a specific advancement/achievement criterion, e.g., visit plains biome
     // For goals with no automatic trigger, used for final stages (displays once all previous stages are done)
-    SUBGOAL_MANUAL // When it's not "stat" or "advancement"
+    SUBGOAL_MANUAL // When it's the final stage, so not "stat", "advancement", "unlock", "criterion"
 };
 
 // Represents one step in a multi-stage goal
