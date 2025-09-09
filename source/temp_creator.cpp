@@ -1340,7 +1340,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     // Final drop target to allow dropping at the end of the list
-                    ImGui::Separator();
+                    ImGui::InvisibleButton("final_drop_target_adv_crit", ImVec2(-1, 8.0f)); // Added larger drop zone
                     if (ImGui::BeginDragDropTarget()) {
                         if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("CRITERION_DND")) {
                             criterion_dnd_source_index = *(const int *) payload->Data;
@@ -1653,8 +1653,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::PopID();
                         }
 
-                        ImGui::Separator();
-                        ImGui::InvisibleButton("final_drop_target_stat", ImVec2(-1, 8.0f));
+                        ImGui::InvisibleButton("final_drop_target_stat_crit", ImVec2(-1, 8.0f)); // Added larger drop zone
                         if (ImGui::BeginDragDropTarget()) {
                             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("STAT_CRITERION_DND")) {
                                 stat_crit_dnd_source_index = *(const int*)payload->Data;
@@ -1785,7 +1784,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     // Final drop target to allow dropping at the end of the list
-                    ImGui::Separator();
+                    ImGui::InvisibleButton("final_drop_target_unlocks", ImVec2(-1, 8.0f)); // Added larger drop zone
                     if (ImGui::BeginDragDropTarget()) {
                         if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("UNLOCK_DND")) {
                             unlocks_dnd_source_index = *(const int *) payload->Data;
@@ -1924,7 +1923,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
 
                 // Final drop target for end of list
-                ImGui::Separator();
+                ImGui::InvisibleButton("final_drop_target_custom", ImVec2(-1, 8.0f)); // Added larger drop zone
                 if (ImGui::BeginDragDropTarget()) {
                     if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("CUSTOM_GOAL_DND")) {
                         custom_dnd_source_index = *(const int *) payload->Data;
@@ -2194,8 +2193,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
 
                     // Final drop target for the end of the list
-                    ImGui::Separator();
-                    ImGui::InvisibleButton("final_drop_target", ImVec2(-1, 8.0f));
+                    ImGui::InvisibleButton("final_drop_target_stage", ImVec2(-1, 8.0f)); // Added larger drop zone
                     if (ImGui::BeginDragDropTarget()) {
                         if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("MS_STAGE_DND")) {
                             stage_dnd_source_index = *(const int *) payload->Data;
