@@ -700,7 +700,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::Separator();
 
         // Save when creator window is focused
-        if (ImGui::Button("Save") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))) {
+        // Enter key is disabled when a popup is open
+        if (ImGui::Button("Save") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup))) {
             // Reset message state on new save attempt
             save_message_type = MSG_NONE;
             status_message[0] = '\0';
@@ -988,7 +989,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     for (size_t j = 0; j < advancement.criteria.size(); j++) {
                         ImGui::PushID(j);
                         auto &criterion = advancement.criteria[j];
-                        ImGui::Separator(); // This is the drop target for "between items"
+
+                        // Add vertical spacing creating the gap
+                        ImGui::Spacing();
+
+                        // Create a wide, 8-pixel-high invisible button to act as our drop zone
+                        ImGui::InvisibleButton("drop_target", ImVec2(-1, 8.0f));
 
                         // We make the separator a drop target to allow dropping between items
                         if (ImGui::BeginDragDropTarget()) {
@@ -998,6 +1004,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             ImGui::EndDragDropTarget();
                         }
+
+                        // Draw a separator for visual feedback after the drop zone
+                        ImGui::Separator();
 
                         // Use an invisible button overlaying the group as a drag handle
                         ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
@@ -1058,19 +1067,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         save_message_type = MSG_NONE;
                     }
 
-                    // TODO: Remove
-                    // // Handle Drag and Drop action after the loop
-                    // if (criterion_dnd_source_index != -1 && criterion_dnd_target_index != -1) {
-                    //     EditorTrackableItem item_to_move = advancement.criteria[criterion_dnd_source_index];
-                    //     advancement.criteria.erase(advancement.criteria.begin() + criterion_dnd_source_index);
-                    //     // Adjust target index if source was before it
-                    //     if (criterion_dnd_target_index > criterion_dnd_source_index) {
-                    //         criterion_dnd_target_index--;
-                    //     }
-                    //     advancement.criteria.insert(advancement.criteria.begin() + criterion_dnd_target_index, item_to_move);
-                    //     save_message_type = MSG_NONE;
-                    // }
-
 
                     if (criterion_to_remove != -1) {
                         advancement.criteria.erase(advancement.criteria.begin() + criterion_to_remove);
@@ -1125,7 +1121,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     for (size_t i = 0; i < current_template_data.unlocks.size(); i++) {
                         ImGui::PushID(i);
                         auto &unlock = current_template_data.unlocks[i];
-                        ImGui::Separator(); // The separator now actts as a drop target
+
+                        // Add some vertical spacing to create a gap
+                        ImGui::Spacing();
+
+                        // Create a wide, 8-pixel-high invisible button to act as our drop zone
+                        ImGui::InvisibleButton("drop_target", ImVec2(-1, 8.0f));
 
                         // Drop target for dropping between items
                         if (ImGui::BeginDragDropTarget()) {
@@ -1135,6 +1136,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             ImGui::EndDragDropTarget();
                         }
+
+                        // Draw a separator for visual feedback after the drop zone
+                        ImGui::Separator();
 
                         // The InvisibleButton is now only a drag SOURCE
                         ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
@@ -1173,14 +1177,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::Text("Reorder %s", unlock.root_name);
                             ImGui::EndDragDropSource();
                         }
-
-                        // TODO: Remove
-                        // // Add the required flag here
-                        // if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
-                        //     ImGui::SetDragDropPayload("UNLOCK_DND", &i, sizeof(int));
-                        //     ImGui::Text("Reorder %s", unlock.root_name);
-                        //     ImGui::EndDragDropSource();
-                        // }
 
                         ImGui::PopID();
                     }
@@ -1240,7 +1236,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 ImGui::SameLine();
                 ImGui::TextDisabled("(Hotkeys are configured in the main Settings window)");
-                ImGui::Separator();
                 int item_to_remove = -1;
                 int item_to_copy = -1;
                 int custom_dnd_source_index = -1;
@@ -1248,7 +1243,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 for (size_t i = 0; i < current_template_data.custom_goals.size(); ++i) {
                     ImGui::PushID(i);
                     auto &goal = current_template_data.custom_goals[i];
-                    ImGui::Separator(); // Will act as a drop target
+
+                    // Add some vertical spacing to create a gap
+                    ImGui::Spacing();
+                    //Create a wide, 8-pixel-high invisible button to act as our drop zone
+                    ImGui::InvisibleButton("drop_target", ImVec2(-1, 8.0f));
 
                     // Drop target for dropping between items
                     if (ImGui::BeginDragDropTarget()) {
@@ -1258,6 +1257,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         ImGui::EndDragDropTarget();
                     }
+
+                    // Draw a separator for visual feedback after the drop zone
+                    ImGui::Separator();
 
                     // Get cursor position to overlay the invisible button later
                     ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
@@ -1298,8 +1300,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // Create an invisible button over the entire group. This is our drag handle.
                     ImGui::SetCursorScreenPos(item_start_cursor_pos);
                     ImGui::InvisibleButton("dnd_handle", ImGui::GetItemRectSize());
-
-
 
                     // Add the required flag here
                     if (ImGui::BeginDragDropSource()) {
