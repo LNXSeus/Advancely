@@ -1145,13 +1145,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         if (ImGui::BeginPopupModal("Unsaved Changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::Text("You have unsaved changes. Do you want to save them?\n\n");
-            if (ImGui::Button("Save", ImVec2(120, 0))) {
+            if (ImGui::Button("Save", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
                 if (save_template_from_editor(creator_version_str, selected_template_info, current_template_data,
                                               status_message)) {
                     saved_template_data = current_template_data; // Update snapshot on successful save
                     if (pending_action) pending_action();
                 }
                 ImGui::CloseCurrentPopup();
+            }
+            // Save hover text
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Press ENTER to save.");
             }
             ImGui::SameLine();
             if (ImGui::Button("Discard", ImVec2(120, 0))) {
@@ -1160,8 +1164,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::CloseCurrentPopup();
             }
             ImGui::SameLine();
-            if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+            // Cancel or pressing ESC
+            if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
                 ImGui::CloseCurrentPopup();
+            }
+            // Cancel hover text
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Press ESC to cancel.");
             }
             ImGui::EndPopup();
         }
@@ -1213,9 +1222,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (editor_has_unsaved_changes) {
                                 show_unsaved_changes_popup = true;
                                 pending_action = [&, i]() {
+                                    // Pneding action only changes the index
                                     selected_advancement_index = i;
-                                    load_template_for_editing(creator_version_str, discovered_templates[i],
-                                                              current_template_data, status_message);
                                 };
                             } else {
                                 selected_advancement_index = i;
@@ -2090,8 +2098,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         save_message_type = MSG_NONE;
                     }
                     ImGui::SameLine();
+                    ImGui::SameLine();
                     if (ImGui::Selectable(label, selected_ms_goal_index == (int) i)) {
-                        selected_ms_goal_index = i;
+                        if (selected_ms_goal_index != (int) i) {
+                            if (editor_has_unsaved_changes) {
+                                show_unsaved_changes_popup = true;
+                                pending_action = [&, i]() {
+                                    // Only changing the index
+                                    selected_ms_goal_index = i;
+                                };
+                            } else {
+                                selected_ms_goal_index = i;
+                            }
+                        }
                     }
                     // DRAG AND DROP LOGIC
                     if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {

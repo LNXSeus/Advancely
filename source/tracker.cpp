@@ -2178,6 +2178,12 @@ void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settin
 
         case SDL_EVENT_KEY_DOWN:
             if (event->key.repeat == 0) {
+
+                // If any popup is open, block all subsequent hotkeys handled here.
+                if (ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup)) {
+                    break;
+                }
+
                 // Do not process tracker-specific hotkeys if an ImGui item is active.
                 if (ImGui::IsAnyItemActive()) {
                     break;
