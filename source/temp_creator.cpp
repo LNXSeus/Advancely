@@ -1124,6 +1124,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             // Replace the TextColored indicator with a Revert button
             if (ImGui::Button("Revert Changes")) {
                 current_template_data = saved_template_data;
+                save_message_type = MSG_NONE; // Clear any existing message
+                status_message[0] = '\0';     // Clear the message text
             }
         }
 
