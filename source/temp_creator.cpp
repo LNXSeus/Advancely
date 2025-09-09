@@ -170,6 +170,41 @@ static bool has_duplicate_category_root_names(const std::vector<EditorTrackableC
     return false;
 }
 
+// Helper to check for duplicate root_names in a vector of multi-stage goals
+static bool has_duplicate_ms_goal_root_names(const std::vector<EditorMultiStageGoal> &goals,
+                                             char *error_message_buffer) {
+    std::unordered_set<std::string> seen_names;
+    for (const auto &goal: goals) {
+        if (goal.root_name[0] == '\0') {
+            snprintf(error_message_buffer, 256, "Error: A multi-stage goal has an empty root name.");
+            return true;
+        }
+        if (!seen_names.insert(goal.root_name).second) {
+            snprintf(error_message_buffer, 256, "Error: Duplicate multi-stage goal root name found: '%s'",
+                     goal.root_name);
+            return true;
+        }
+    }
+    return false;
+}
+
+// Helper to check for duplicate stage IDs within a single multi-stage goal
+static bool has_duplicate_stage_ids(const std::vector<EditorSubGoal> &stages, char *error_message_buffer) {
+    std::unordered_set<std::string> seen_ids;
+    for (const auto &stage: stages) {
+        if (stage.stage_id[0] == '\0') {
+            snprintf(error_message_buffer, 256, "Error: A stage has an empty ID.");
+            return true;
+        }
+        if (!seen_ids.insert(stage.stage_id).second) {
+            snprintf(error_message_buffer, 256, "Error: Duplicate stage ID found: '%s'", stage.stage_id);
+            return true;
+        }
+    }
+    return false;
+}
+
+
 // Helper to validate that all icon paths in a vector exist
 static bool validate_icon_paths(const std::vector<EditorTrackableItem> &items, char *error_message_buffer) {
     for (const auto &item: items) {
@@ -181,6 +216,22 @@ static bool validate_icon_paths(const std::vector<EditorTrackableItem> &items, c
         if (!path_exists(full_path)) {
             snprintf(error_message_buffer, 256, "Error: Icon file not found: '%s'", item.icon_path);
             return false;
+        }
+    }
+    return true;
+}
+
+// Helper to validate icon paths for multi-stage goals
+static bool validate_ms_goal_icon_paths(const std::vector<EditorMultiStageGoal> &goals, char *error_message_buffer) {
+    for (const auto &goal: goals) {
+        if (goal.icon_path[0] != '\0') {
+            char full_path[MAX_PATH_LENGTH];
+            snprintf(full_path, sizeof(full_path), "resources/icons/%s", goal.icon_path);
+            if (!path_exists(full_path)) {
+                snprintf(error_message_buffer, 256, "Error: Icon file not found for goal '%s': '%s'", goal.root_name,
+                         goal.icon_path);
+                return false;
+            }
         }
     }
     return true;
@@ -986,21 +1037,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             status_message[0] = '\0';
 
             bool validation_passed = true;
-            // Perform all validation checks before saving
 
-            // 1. Check for duplicate advancement root names
-            if (has_duplicate_category_root_names(current_template_data.advancements, status_message)) {
+            // --- Advancements Validation ---
+            if (has_duplicate_category_root_names(current_template_data.advancements, status_message) ||
+                !validate_category_icon_paths(current_template_data.advancements, status_message)) {
                 validation_passed = false;
             }
-
-            // Icon path validation for advancements
-            if (validation_passed) {
-                if (!validate_category_icon_paths(current_template_data.advancements, status_message)) {
-                    validation_passed = false;
-                }
-            }
-
-            // 2. Check for duplicate criteria within each advancement
             if (validation_passed) {
                 for (const auto &adv: current_template_data.advancements) {
                     if (has_duplicate_root_names(adv.criteria, status_message)) {
@@ -1010,13 +1052,45 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
             }
 
-            // 3. Check other sections (unlocks, custom goals)
+            // --- Stats Validation ---
+            if (validation_passed) {
+                if (has_duplicate_category_root_names(current_template_data.stats, status_message) ||
+                    !validate_category_icon_paths(current_template_data.stats, status_message)) {
+                    validation_passed = false;
+                }
+            }
+            if (validation_passed) {
+                for (const auto &stat_cat: current_template_data.stats) {
+                    if (has_duplicate_root_names(stat_cat.criteria, status_message)) {
+                        validation_passed = false;
+                        break;
+                    }
+                }
+            }
+
+            // --- Unlocks & Custom Goals Validation ---
             if (validation_passed) {
                 if (has_duplicate_root_names(current_template_data.unlocks, status_message) ||
-                    has_duplicate_root_names(current_template_data.custom_goals, status_message) ||
                     !validate_icon_paths(current_template_data.unlocks, status_message) ||
+                    has_duplicate_root_names(current_template_data.custom_goals, status_message) ||
                     !validate_icon_paths(current_template_data.custom_goals, status_message)) {
                     validation_passed = false;
+                }
+            }
+
+            // --- Multi-Stage Goals Validation ---
+            if (validation_passed) {
+                if (has_duplicate_ms_goal_root_names(current_template_data.multi_stage_goals, status_message) ||
+                    !validate_ms_goal_icon_paths(current_template_data.multi_stage_goals, status_message)) {
+                    validation_passed = false;
+                }
+            }
+            if (validation_passed) {
+                for (const auto &goal: current_template_data.multi_stage_goals) {
+                    if (has_duplicate_stage_ids(goal.stages, status_message)) {
+                        validation_passed = false;
+                        break;
+                    }
                 }
             }
 
@@ -1608,8 +1682,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::Spacing();
                             ImGui::InvisibleButton("drop_target", ImVec2(-1, 8.0f));
                             if (ImGui::BeginDragDropTarget()) {
-                                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("STAT_CRITERION_DND")) {
-                                    stat_crit_dnd_source_index = *(const int*)payload->Data;
+                                if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("STAT_CRITERION_DND")) {
+                                    stat_crit_dnd_source_index = *(const int *) payload->Data;
                                     stat_crit_dnd_target_index = j;
                                 }
                                 ImGui::EndDragDropTarget();
@@ -1653,20 +1727,23 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::PopID();
                         }
 
-                        ImGui::InvisibleButton("final_drop_target_stat_crit", ImVec2(-1, 8.0f)); // Added larger drop zone
+                        ImGui::InvisibleButton("final_drop_target_stat_crit", ImVec2(-1, 8.0f));
+                        // Added larger drop zone
                         if (ImGui::BeginDragDropTarget()) {
-                            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("STAT_CRITERION_DND")) {
-                                stat_crit_dnd_source_index = *(const int*)payload->Data;
+                            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("STAT_CRITERION_DND")) {
+                                stat_crit_dnd_source_index = *(const int *) payload->Data;
                                 stat_crit_dnd_target_index = stat_cat.criteria.size();
                             }
                             ImGui::EndDragDropTarget();
                         }
 
-                        if (stat_crit_dnd_source_index != -1 && stat_crit_dnd_target_index != -1 && stat_crit_dnd_source_index != stat_crit_dnd_target_index) {
+                        if (stat_crit_dnd_source_index != -1 && stat_crit_dnd_target_index != -1 &&
+                            stat_crit_dnd_source_index != stat_crit_dnd_target_index) {
                             EditorTrackableItem item_to_move = stat_cat.criteria[stat_crit_dnd_source_index];
                             stat_cat.criteria.erase(stat_cat.criteria.begin() + stat_crit_dnd_source_index);
                             if (stat_crit_dnd_target_index > stat_crit_dnd_source_index) stat_crit_dnd_target_index--;
-                            stat_cat.criteria.insert(stat_cat.criteria.begin() + stat_crit_dnd_target_index, item_to_move);
+                            stat_cat.criteria.insert(stat_cat.criteria.begin() + stat_crit_dnd_target_index,
+                                                     item_to_move);
                             save_message_type = MSG_NONE;
                         }
 
@@ -1677,7 +1754,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         // Logic to handle the copy action after the loop
                         if (crit_to_copy != -1) {
-                            const auto& source_criterion = stat_cat.criteria[crit_to_copy];
+                            const auto &source_criterion = stat_cat.criteria[crit_to_copy];
                             EditorTrackableItem new_criterion = source_criterion;
                             char base_name[192];
                             strncpy(base_name, source_criterion.root_name, sizeof(base_name) - 1);
@@ -1688,8 +1765,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
                                 else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
                                 bool name_exists = false;
-                                for (const auto& c : stat_cat.criteria) {
-                                    if (strcmp(c.root_name, new_name) == 0) { name_exists = true; break; }
+                                for (const auto &c: stat_cat.criteria) {
+                                    if (strcmp(c.root_name, new_name) == 0) {
+                                        name_exists = true;
+                                        break;
+                                    }
                                 }
                                 if (!name_exists) break;
                                 copy_counter++;
@@ -2060,7 +2140,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
 
                 if (goal_to_copy != -1) {
-                    const auto& source_goal = current_template_data.multi_stage_goals[goal_to_copy];
+                    const auto &source_goal = current_template_data.multi_stage_goals[goal_to_copy];
                     EditorMultiStageGoal new_goal = source_goal; // Deep copy
                     char base_name[192];
                     strncpy(base_name, source_goal.root_name, sizeof(base_name) - 1);
@@ -2071,14 +2151,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
                         else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
                         bool name_exists = false;
-                        for (const auto& mg : current_template_data.multi_stage_goals) {
-                            if (strcmp(mg.root_name, new_name) == 0) { name_exists = true; break; }
+                        for (const auto &mg: current_template_data.multi_stage_goals) {
+                            if (strcmp(mg.root_name, new_name) == 0) {
+                                name_exists = true;
+                                break;
+                            }
                         }
                         if (!name_exists) break;
                         copy_counter++;
                     }
                     strncpy(new_goal.root_name, new_name, sizeof(new_goal.root_name) - 1);
-                    current_template_data.multi_stage_goals.insert(current_template_data.multi_stage_goals.begin() + goal_to_copy + 1, new_goal);
+                    current_template_data.multi_stage_goals.insert(
+                        current_template_data.multi_stage_goals.begin() + goal_to_copy + 1, new_goal);
                     save_message_type = MSG_NONE;
                 }
 
@@ -2219,7 +2303,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // Logic to handle stage copy action after the loop
                     if (stage_to_copy != -1) {
-                        const auto& source_stage = goal.stages[stage_to_copy];
+                        const auto &source_stage = goal.stages[stage_to_copy];
                         EditorSubGoal new_stage = source_stage;
                         char base_name[64];
                         strncpy(base_name, source_stage.stage_id, sizeof(base_name) - 1);
@@ -2230,8 +2314,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (copy_counter == 1) snprintf(new_id, sizeof(new_id), "%s_copy", base_name);
                             else snprintf(new_id, sizeof(new_id), "%s_copy%d", base_name, copy_counter);
                             bool id_exists = false;
-                            for (const auto& s : goal.stages) {
-                                if (strcmp(s.stage_id, new_id) == 0) { id_exists = true; break; }
+                            for (const auto &s: goal.stages) {
+                                if (strcmp(s.stage_id, new_id) == 0) {
+                                    id_exists = true;
+                                    break;
+                                }
                             }
                             if (!id_exists) break;
                             copy_counter++;
