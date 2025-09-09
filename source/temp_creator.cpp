@@ -842,30 +842,55 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
 
         if (ImGui::Selectable(item_label, selected_template_index == i)) {
-            // Only trigger unsaved changes logic if selecting a DIFFERENT template
-            if (editing_template && editor_has_unsaved_changes && selected_template_index != (int) i) {
-                show_unsaved_changes_popup = true;
-                pending_action = [&, i]() {
-                    selected_template_index = i;
-                    selected_template_info = discovered_templates[i];
-                    // After loading the new template into 'current', also update the 'saved' snapshot
-                    if (load_template_for_editing(creator_version_str, selected_template_info, current_template_data,
-                                              status_message)) {
-                        saved_template_data = current_template_data;
-                    }
-                };
-            } else {
-                // If not editing, or no unsaved changes, or re-selecting the same template, just update the index
+
+            // Define the action of switching to a new template
+            auto switch_template_action = [&, i]() {
                 selected_template_index = i;
+                // If we are in the editor, we must update the loaded data
                 if (editing_template) {
-                    // If already editing, reload the data to discard any accidental non-flagged UI changes
-                    if (load_template_for_editing(creator_version_str, discovered_templates[i], current_template_data,
-                                              status_message)) {
-                        // Update the snapshot here as well upon reloading
+                    selected_template_info = discovered_templates[i];
+                    if (load_template_for_editing(creator_version_str, selected_template_info, current_template_data,
+                                                  status_message)) {
+                        // Also update the 'saved' snapshot to reflect the newly loaded state
                         saved_template_data = current_template_data;
-                    }
+                                                  }
                 }
+            };
+
+            // If switching to a DIFFERENT template with unsaved changes, show popup
+            if (editing_template && editor_has_unsaved_changes && selected_template_index != i) {
+                show_unsaved_changes_popup = true;
+                pending_action = switch_template_action;
+            } else {
+                // Otherwise, perform the switch immediately
+                switch_template_action();
             }
+
+            // TODO: Remove
+            // // Only trigger unsaved changes logic if selecting a DIFFERENT template
+            // if (editing_template && editor_has_unsaved_changes && selected_template_index != (int) i) {
+            //     show_unsaved_changes_popup = true;
+            //     pending_action = [&, i]() {
+            //         selected_template_index = i;
+            //         selected_template_info = discovered_templates[i];
+            //         // After loading the new template into 'current', also update the 'saved' snapshot
+            //         if (load_template_for_editing(creator_version_str, selected_template_info, current_template_data,
+            //                                   status_message)) {
+            //             saved_template_data = current_template_data;
+            //         }
+            //     };
+            // } else {
+            //     // If not editing, or no unsaved changes, or re-selecting the same template, just update the index
+            //     selected_template_index = i;
+            //     if (editing_template) {
+            //         // If already editing, reload the data to discard any accidental non-flagged UI changes
+            //         if (load_template_for_editing(creator_version_str, discovered_templates[i], current_template_data,
+            //                                   status_message)) {
+            //             // Update the snapshot here as well upon reloading
+            //             saved_template_data = current_template_data;
+            //         }
+            //     }
+            // }
 
             // General state changes on any selection
             show_create_new_view = false;
