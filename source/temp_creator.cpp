@@ -866,32 +866,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 switch_template_action();
             }
 
-            // TODO: Remove
-            // // Only trigger unsaved changes logic if selecting a DIFFERENT template
-            // if (editing_template && editor_has_unsaved_changes && selected_template_index != (int) i) {
-            //     show_unsaved_changes_popup = true;
-            //     pending_action = [&, i]() {
-            //         selected_template_index = i;
-            //         selected_template_info = discovered_templates[i];
-            //         // After loading the new template into 'current', also update the 'saved' snapshot
-            //         if (load_template_for_editing(creator_version_str, selected_template_info, current_template_data,
-            //                                   status_message)) {
-            //             saved_template_data = current_template_data;
-            //         }
-            //     };
-            // } else {
-            //     // If not editing, or no unsaved changes, or re-selecting the same template, just update the index
-            //     selected_template_index = i;
-            //     if (editing_template) {
-            //         // If already editing, reload the data to discard any accidental non-flagged UI changes
-            //         if (load_template_for_editing(creator_version_str, discovered_templates[i], current_template_data,
-            //                                   status_message)) {
-            //             // Update the snapshot here as well upon reloading
-            //             saved_template_data = current_template_data;
-            //         }
-            //     }
-            // }
-
             // General state changes on any selection
             show_create_new_view = false;
             show_copy_view = false;
@@ -1450,6 +1424,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE;
                         }
 
+                        ImGui::SameLine();
+
                         // "Copy" button for criteria
                         if (ImGui::Button("Copy")) {
                             criterion_to_copy = j;
@@ -1697,6 +1673,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         save_message_type = MSG_NONE;
                     }
 
+                    ImGui::SameLine();
+
                     // Invert the logic for the checkbox to be more intuitive for the user
                     bool is_multi_stat = !stat_cat.is_simple_stat;
                     if (ImGui::Checkbox("Multi-Stat Category", &is_multi_stat)) {
@@ -1768,6 +1746,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ImGui::Checkbox("Hidden", &crit.is_hidden)) {
                                 save_message_type = MSG_NONE;
                             }
+
+                            ImGui::SameLine();
                             if (ImGui::Button("Copy")) {
                                 crit_to_copy = j;
                                 save_message_type = MSG_NONE;
@@ -1901,6 +1881,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::Checkbox("Hidden", &unlock.is_hidden)) {
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
+
+                        ImGui::SameLine();
 
                         if (ImGui::Button("Copy")) {
                             item_to_copy = i;
@@ -2037,6 +2019,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::Checkbox("Hidden", &goal.is_hidden)) {
                         save_message_type = MSG_NONE; // Clear message on new edit
                     }
+
+                    ImGui::SameLine();
 
                     // "Copy" button for custom goals
                     if (ImGui::Button("Copy")) {
