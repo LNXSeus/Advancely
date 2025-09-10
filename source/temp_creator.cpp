@@ -361,6 +361,15 @@ static void parse_editor_trackable_categories(cJSON *json_object,
                             sizeof(new_crit.icon_path) - 1);
                 if (cJSON_IsBool(crit_hidden)) new_crit.is_hidden = cJSON_IsTrue(crit_hidden);
 
+                // Load display name for the criterion
+                char crit_lang_key[512];
+                snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", lang_key, new_crit.root_name);
+                cJSON* crit_lang_entry = cJSON_GetObjectItem(lang_json, crit_lang_key);
+                if (cJSON_IsString(crit_lang_entry))
+                    strncpy(new_crit.display_name, crit_lang_entry->valuestring, sizeof(new_crit.display_name) - 1);
+                else
+                    strncpy(new_crit.display_name, new_crit.root_name, sizeof(new_crit.display_name) - 1);
+
                 criteria_items.push_back(new_crit);
             }
             new_cat.criteria = criteria_items;
@@ -704,86 +713,6 @@ static void serialize_editor_multi_stage_goals(cJSON *parent, const std::vector<
     cJSON_AddItemToObject(parent, "multi_stage_goals", goals_array);
 }
 
-// Helper to save display names for simple items (unlocks, custom)
-static void serialize_simple_lang_file(cJSON* lang_json, const std::vector<EditorTrackableItem>& items, const char* lang_key_prefix) {
-    for (const auto& item : items) {
-        char lang_key[256];
-        snprintf(lang_key, sizeof(lang_key), "%s%s", lang_key_prefix, item.root_name);
-        // If a key for this item already exists, remove it before adding the new one.
-        if (cJSON_HasObjectItem(lang_json, lang_key)) {
-            cJSON_DeleteItemFromObject(lang_json, lang_key);
-        }
-        cJSON_AddStringToObject(lang_json, lang_key, item.display_name);
-    }
-}
-
-// Helper to save display names for categories (advancements)
-static void serialize_advancement_lang_file(cJSON* lang_json, const std::vector<EditorTrackableCategory>& categories) {
-    for (const auto& cat : categories) {
-        char lang_key[256];
-        char temp_root_name[192];
-        strncpy(temp_root_name, cat.root_name, sizeof(temp_root_name) - 1);
-        char* p = temp_root_name;
-        // Modification only to advancements -> replacing ":" and "/" with "."
-        while ((p = strpbrk(p, ":/")) != nullptr) {
-            *p = '.';
-        }
-        snprintf(lang_key, sizeof(lang_key), "advancement.%s", temp_root_name);
-        if (cJSON_HasObjectItem(lang_json, lang_key)) {
-            cJSON_DeleteItemFromObject(lang_json, lang_key);
-        }
-        cJSON_AddStringToObject(lang_json, lang_key, cat.display_name);
-    }
-}
-
-// Helper to save display names for stats
-static void serialize_stats_lang_file(cJSON* lang_json, const std::vector<EditorTrackableCategory>& categories) {
-    for (const auto& cat : categories) {
-        // Parent Category
-        char cat_lang_key[256];
-        snprintf(cat_lang_key, sizeof(cat_lang_key), "stat.%s", cat.root_name);
-        if (cJSON_HasObjectItem(lang_json, cat_lang_key)) {
-            cJSON_DeleteItemFromObject(lang_json, cat_lang_key);
-        }
-        cJSON_AddStringToObject(lang_json, cat_lang_key, cat.display_name);
-
-        // Criteria (only for complex stats)
-        if (!cat.is_simple_stat) {
-            for (const auto& crit : cat.criteria) {
-                char crit_lang_key[512];
-                snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", cat_lang_key, crit.root_name);
-                if (cJSON_HasObjectItem(lang_json, crit_lang_key)) {
-                    cJSON_DeleteItemFromObject(lang_json, crit_lang_key);
-                }
-                cJSON_AddStringToObject(lang_json, crit_lang_key, crit.display_name);
-            }
-        }
-    }
-}
-
-// Helper to save display names for multi-stage goals
-static void serialize_ms_goals_lang_file(cJSON* lang_json, const std::vector<EditorMultiStageGoal>& goals) {
-    for (const auto& goal : goals) {
-        // Goal display name
-        char goal_lang_key[256];
-        snprintf(goal_lang_key, sizeof(goal_lang_key), "multi_stage_goal.%s.display_name", goal.root_name);
-        if (cJSON_HasObjectItem(lang_json, goal_lang_key)) {
-            cJSON_DeleteItemFromObject(lang_json, goal_lang_key);
-        }
-        cJSON_AddStringToObject(lang_json, goal_lang_key, goal.display_name);
-
-        // Stages display text
-        for (const auto& stage : goal.stages) {
-            char stage_lang_key[512];
-            snprintf(stage_lang_key, sizeof(stage_lang_key), "multi_stage_goal.%s.stage.%s", goal.root_name, stage.stage_id);
-            if (cJSON_HasObjectItem(lang_json, stage_lang_key)) {
-                cJSON_DeleteItemFromObject(lang_json, stage_lang_key);
-            }
-            cJSON_AddStringToObject(lang_json, stage_lang_key, stage.display_text);
-        }
-    }
-}
-
 // Main function to save the in-memory editor data back to a file
 static bool save_template_from_editor(const char *version, const DiscoveredTemplate &template_info,
                                       EditorTemplate &editor_data, char *status_message_buffer) {
@@ -837,17 +766,65 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
     cJSON_Delete(root);
 
 
-    // Save lang file
-    cJSON* lang_json = cJSON_from_file(lang_path);
-    if (!lang_json) {
-        lang_json = cJSON_CreateObject();
+    // SAVE LANG FILE WITH SPECIFIC ORDER
+    cJSON* lang_json = cJSON_CreateObject();
+
+    // 1. Advancements (Parent then Criteria)
+    for (const auto& cat : editor_data.advancements) {
+        char cat_lang_key[256];
+        char temp_root_name[192];
+        strncpy(temp_root_name, cat.root_name, sizeof(temp_root_name) - 1);
+        char* p = temp_root_name;
+        while ((p = strpbrk(p, ":/")) != nullptr) *p = '.';
+        snprintf(cat_lang_key, sizeof(cat_lang_key), "advancement.%s", temp_root_name);
+        cJSON_AddStringToObject(lang_json, cat_lang_key, cat.display_name);
+
+        for (const auto& crit : cat.criteria) {
+            char crit_lang_key[512];
+            snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", cat_lang_key, crit.root_name);
+            cJSON_AddStringToObject(lang_json, crit_lang_key, crit.display_name);
+        }
     }
 
-    serialize_advancement_lang_file(lang_json, editor_data.advancements);
-    serialize_stats_lang_file(lang_json, editor_data.stats);
-    serialize_simple_lang_file(lang_json, editor_data.unlocks, "unlock.");
-    serialize_simple_lang_file(lang_json, editor_data.custom_goals, "custom.");
-    serialize_ms_goals_lang_file(lang_json, editor_data.multi_stage_goals);
+    // 2. Stats (Parent then Criteria)
+    for (const auto& cat : editor_data.stats) {
+        char cat_lang_key[256];
+        snprintf(cat_lang_key, sizeof(cat_lang_key), "stat.%s", cat.root_name);
+        cJSON_AddStringToObject(lang_json, cat_lang_key, cat.display_name);
+        if (!cat.is_simple_stat) {
+            for (const auto& crit : cat.criteria) {
+                char crit_lang_key[512];
+                snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", cat_lang_key, crit.root_name);
+                cJSON_AddStringToObject(lang_json, crit_lang_key, crit.display_name);
+            }
+        }
+    }
+
+    // 3. Unlocks
+    for (const auto& item : editor_data.unlocks) {
+        char lang_key[256];
+        snprintf(lang_key, sizeof(lang_key), "unlock.%s", item.root_name);
+        cJSON_AddStringToObject(lang_json, lang_key, item.display_name);
+    }
+
+    // 4. Custom Goals
+    for (const auto& item : editor_data.custom_goals) {
+        char lang_key[256];
+        snprintf(lang_key, sizeof(lang_key), "custom.%s", item.root_name);
+        cJSON_AddStringToObject(lang_json, lang_key, item.display_name);
+    }
+
+    // 5. Multi-Stage Goals (Parent then Stages)
+    for (const auto& goal : editor_data.multi_stage_goals) {
+        char goal_lang_key[256];
+        snprintf(goal_lang_key, sizeof(goal_lang_key), "multi_stage_goal.%s.display_name", goal.root_name);
+        cJSON_AddStringToObject(lang_json, goal_lang_key, goal.display_name);
+        for (const auto& stage : goal.stages) {
+            char stage_lang_key[512];
+            snprintf(stage_lang_key, sizeof(stage_lang_key), "multi_stage_goal.%s.stage.%s", goal.root_name, stage.stage_id);
+            cJSON_AddStringToObject(lang_json, stage_lang_key, stage.display_text);
+        }
+    }
 
     FILE* lang_file = fopen(lang_path, "w");
     if (lang_file) {
@@ -888,7 +865,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     // State for the "Create New" view
     static bool show_create_new_view = false;
-    static int new_template_version_idx = -1;
+    // static int new_template_version_idx = -1; // TODO: Remove
     static char new_template_category[MAX_PATH_LENGTH] = "";
     static char new_template_flag[MAX_PATH_LENGTH] = "";
 
@@ -1121,12 +1098,50 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             editing_template = false; // Still allow clicking other buttons (e.g., copy, delete, ...) when editing
             status_message[0] = '\0';
 
-            // Pre-fill with selected template's info
+            // Pre-fill with selected template's info and append _copy to the flag
             const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
+            const char* dest_version = creator_version_str;
+
+            // Pre-fill the category and version for the new copy
             strncpy(copy_template_category, selected.category, sizeof(copy_template_category) - 1);
-            strncpy(copy_template_flag, selected.optional_flag, sizeof(copy_template_flag) - 1);
-            // Default copy destination to the currently viewed version
             copy_template_version_idx = creator_version_idx;
+
+            // --- Logic to find a unique name for the new flag ---
+            char base_flag[MAX_PATH_LENGTH];
+            strncpy(base_flag, selected.optional_flag, sizeof(base_flag) - 1);
+            base_flag[sizeof(base_flag) - 1] = '\0';
+
+            char new_flag[MAX_PATH_LENGTH];
+            int copy_counter = 1; // 1 for the first attempt (_copy), 2+ for _copyN
+
+            while (true) {
+                if (copy_counter == 1) {
+                    snprintf(new_flag, sizeof(new_flag), "%s_copy", base_flag);
+                } else {
+                    snprintf(new_flag, sizeof(new_flag), "%s_copy%d", base_flag, copy_counter);
+                }
+
+                // Construct the potential path to check if a template with this name already exists
+                char dest_version_filename[64];
+                strncpy(dest_version_filename, dest_version, sizeof(dest_version_filename) - 1);
+                dest_version_filename[sizeof(dest_version_filename) - 1] = '\0';
+                for (char *p = dest_version_filename; *p; p++) { if (*p == '.') *p = '_'; }
+
+                char dest_template_path[MAX_PATH_LENGTH];
+                snprintf(dest_template_path, sizeof(dest_template_path), "resources/templates/%s/%s/%s_%s%s.json",
+                         dest_version,
+                         selected.category, // Check against the original category
+                         dest_version_filename,
+                         selected.category,
+                         new_flag);
+
+                if (!path_exists(dest_template_path)) {
+                    break; // Found a unique name
+                }
+                copy_counter++; // Increment and try the next number
+            }
+            // Apply the new unique flag to the copy view's buffer
+            strncpy(copy_template_flag, new_flag, sizeof(copy_template_flag) - 1);
         }
     }
     if (ImGui::IsItemHovered())
@@ -2628,7 +2643,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 "A variant for the category (e.g., '_optimized', '_modded').\nCannot contain spaces or special characters.");
 
         if (ImGui::Button("Create Files")) {
-            if (new_template_version_idx >= 0) {
+            if (creator_version_idx >= 0) {
                 char error_msg[256] = "";
 
                 if (validate_and_create_template(creator_version_str, new_template_category, new_template_flag,
@@ -2646,6 +2661,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             } else {
                 strncpy(status_message, "Error: A version must be selected.", sizeof(status_message) - 1);
             }
+        }
+        // Display status/error message
+        if (status_message[0] != '\0') {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", status_message);
         }
     }
 
@@ -2683,6 +2703,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     strncpy(status_message, error_msg, sizeof(status_message) - 1);
                 }
             }
+        }
+        // Display status/error message
+        if (status_message[0] != '\0') {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", status_message);
         }
     }
 
