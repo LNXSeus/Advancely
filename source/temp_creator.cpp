@@ -38,7 +38,7 @@ struct EditorTrackableCategory {
 // Structs for Multi-Stage Goal editing
 struct EditorSubGoal {
     char stage_id[64];
-    // display_text is loaded from the lang file, not stored in the main template
+    char display_text[192]; // is loaded from the lang file, not stored in the main template
     SubGoalType type;
     char parent_advancement[192];
     char root_name[192];
@@ -64,6 +64,7 @@ struct EditorTemplate {
 // Helper function to compare two EditorTrackableItem structs
 static bool are_editor_items_different(const EditorTrackableItem &a, const EditorTrackableItem &b) {
     return strcmp(a.root_name, b.root_name) != 0 ||
+           strcmp(a.display_name, b.display_name) != 0 ||
            strcmp(a.icon_path, b.icon_path) != 0 ||
            a.goal != b.goal ||
            a.is_hidden != b.is_hidden;
@@ -72,6 +73,7 @@ static bool are_editor_items_different(const EditorTrackableItem &a, const Edito
 // Helper function to compare two EditorTrackableCategory structs
 static bool are_editor_categories_different(const EditorTrackableCategory &a, const EditorTrackableCategory &b) {
     if (strcmp(a.root_name, b.root_name) != 0 ||
+        strcmp(a.display_name, b.display_name) != 0 ||
         strcmp(a.icon_path, b.icon_path) != 0 ||
         a.is_hidden != b.is_hidden ||
         a.is_simple_stat != b.is_simple_stat ||
@@ -89,6 +91,7 @@ static bool are_editor_categories_different(const EditorTrackableCategory &a, co
 // Comparison helpers for multi-stage goals
 static bool are_editor_sub_goals_different(const EditorSubGoal &a, const EditorSubGoal &b) {
     return strcmp(a.stage_id, b.stage_id) != 0 ||
+           strcmp(a.display_text, b.display_text) != 0 ||
            a.type != b.type ||
            strcmp(a.parent_advancement, b.parent_advancement) != 0 ||
            strcmp(a.root_name, b.root_name) != 0 ||
@@ -97,6 +100,7 @@ static bool are_editor_sub_goals_different(const EditorSubGoal &a, const EditorS
 
 static bool are_editor_multi_stage_goals_different(const EditorMultiStageGoal &a, const EditorMultiStageGoal &b) {
     if (strcmp(a.root_name, b.root_name) != 0 ||
+        strcmp(a.display_name, b.display_name) != 0 ||
         strcmp(a.icon_path, b.icon_path) != 0 ||
         a.is_hidden != b.is_hidden ||
         a.stages.size() != b.stages.size()) {
@@ -269,7 +273,7 @@ static bool validate_category_icon_paths(const std::vector<EditorTrackableCatego
 }
 
 // Helper to parse a simple array like "unlocks" or "custom" from the template JSON
-static void parse_editor_trackable_items(cJSON *json_array, std::vector<EditorTrackableItem> &item_vector) {
+static void parse_editor_trackable_items(cJSON *json_array, std::vector<EditorTrackableItem> &item_vector, cJSON *lang_json, const char *lang_key_prefix) {
     item_vector.clear();
     if (!json_array) return;
 
@@ -288,7 +292,17 @@ static void parse_editor_trackable_items(cJSON *json_array, std::vector<EditorTr
         if (cJSON_IsNumber(target)) new_item.goal = target->valueint;
         if (cJSON_IsBool(hidden)) new_item.is_hidden = cJSON_IsTrue(hidden);
 
-        // TODO: Load display_name from lang file
+        // Load display_name from lang file
+        char lang_key[256];
+        snprintf(lang_key, sizeof(lang_key), "%s%s", lang_key_prefix, new_item.root_name);
+        cJSON *lang_entry = cJSON_GetObjectItem(lang_json, lang_key);
+        if (cJSON_IsString(lang_entry)) {
+            strncpy(new_item.display_name, lang_entry->valuestring, sizeof(new_item.display_name) - 1);
+        } else {
+            // Take root name if there's no lang entry, shouldn't be the case in editor itself
+            strncpy(new_item.display_name, new_item.root_name, sizeof(new_item.display_name) - 1);
+        }
+
 
         item_vector.push_back(new_item);
     }
@@ -296,7 +310,7 @@ static void parse_editor_trackable_items(cJSON *json_array, std::vector<EditorTr
 
 // Helper to parse a category object like "advancements" or "stats"
 static void parse_editor_trackable_categories(cJSON *json_object,
-                                              std::vector<EditorTrackableCategory> &category_vector) {
+                                              std::vector<EditorTrackableCategory> &category_vector, cJSON *lang_json) {
     category_vector.clear();
     if (!json_object) return;
 
@@ -312,7 +326,22 @@ static void parse_editor_trackable_categories(cJSON *json_object,
         if (cJSON_IsString(icon)) strncpy(new_cat.icon_path, icon->valuestring, sizeof(new_cat.icon_path) - 1);
         if (cJSON_IsBool(hidden)) new_cat.is_hidden = cJSON_IsTrue(hidden);
 
-        // TODO: Load display_name from lang file
+        char lang_key[256];
+        char temp_root_name[291];
+        strncpy(temp_root_name, new_cat.root_name, sizeof(temp_root_name) - 1);
+        char *p = temp_root_name;
+
+        // Replacing ":" and "/" with "." for lang key, ONLY for advancements
+        while ((p = strpbrk(p, ":/")) != nullptr) *p = '.';
+
+        snprintf(lang_key, sizeof(lang_key), "advancement.%s", temp_root_name);
+        cJSON *lang_entry = cJSON_GetObjectItem(lang_json, lang_key);
+        if (cJSON_IsString(lang_entry)) {
+            strncpy(new_cat.display_name, lang_entry->valuestring, sizeof(new_cat.display_name) - 1);
+        } else {
+            strncpy(new_cat.display_name, new_cat.root_name, sizeof(new_cat.display_name) - 1);
+        }
+
 
         // Parse the nested criteria using existing helper function
         cJSON *criteria_object = cJSON_GetObjectItem(category_json, "criteria");
@@ -340,8 +369,9 @@ static void parse_editor_trackable_categories(cJSON *json_object,
     }
 }
 
+
 // Specific parser for stats to handle simple vs complex structures
-static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCategory> &category_vector) {
+static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCategory> &category_vector, cJSON *lang_json) {
     category_vector.clear();
     if (!json_object) return;
 
@@ -358,6 +388,15 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
             strncpy(new_cat.icon_path, icon->valuestring, sizeof(new_cat.icon_path) - 1);
         }
         if (cJSON_IsBool(hidden)) new_cat.is_hidden = cJSON_IsTrue(hidden);
+
+        // Language file
+        char cat_lang_key[256];
+        snprintf(cat_lang_key, sizeof(cat_lang_key), "stat.%s", new_cat.root_name);
+        cJSON* cat_lang_entry = cJSON_GetObjectItem(lang_json, cat_lang_key);
+        if (cJSON_IsString(cat_lang_entry))
+            strncpy(new_cat.display_name, cat_lang_entry->valuestring, sizeof(new_cat.display_name) - 1);
+        else
+            strncpy(new_cat.display_name, new_cat.root_name, sizeof(new_cat.display_name) - 1);
 
 
         cJSON *criteria_object = cJSON_GetObjectItem(category_json, "criteria");
@@ -379,6 +418,15 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
                 if (cJSON_IsBool(crit_hidden)) new_crit.is_hidden = cJSON_IsTrue(crit_hidden);
                 if (cJSON_IsNumber(crit_target)) new_crit.goal = crit_target->valueint;
 
+                // Stat criteria language file
+                char crit_lang_key[512];
+                snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", cat_lang_key, new_crit.root_name);
+                cJSON* crit_lang_entry = cJSON_GetObjectItem(lang_json, crit_lang_key);
+                if (cJSON_IsString(crit_lang_entry))
+                    strncpy(new_crit.display_name, crit_lang_entry->valuestring, sizeof(new_crit.display_name) - 1);
+                else
+                    strncpy(new_crit.display_name, new_crit.root_name, sizeof(new_crit.display_name) - 1);
+
                 new_cat.criteria.push_back(new_crit);
             }
         } else {
@@ -397,6 +445,7 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
 
             if (cJSON_IsNumber(target)) new_crit.goal = target->valueint;
 
+            // For simple stats, the criterion's display name is the same as the category's
             new_cat.criteria.push_back(new_crit);
         }
         category_vector.push_back(new_cat);
@@ -404,7 +453,7 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
 }
 
 // Parser for multi-stage goals
-static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<EditorMultiStageGoal> &goals_vector) {
+static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<EditorMultiStageGoal> &goals_vector, cJSON *lang_json) {
     goals_vector.clear();
     if (!json_array) return;
 
@@ -421,6 +470,15 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
         }
         if (cJSON_IsString(icon)) strncpy(new_goal.icon_path, icon->valuestring, sizeof(new_goal.icon_path) - 1);
         if (cJSON_IsBool(hidden)) new_goal.is_hidden = cJSON_IsTrue(hidden);
+
+        // Language file
+        char goal_lang_key[256];
+        snprintf(goal_lang_key, sizeof(goal_lang_key), "multi_stage_goal.%s.display_name", new_goal.root_name);
+        cJSON* goal_lang_entry = cJSON_GetObjectItem(lang_json, goal_lang_key);
+        if(cJSON_IsString(goal_lang_entry))
+            strncpy(new_goal.display_name, goal_lang_entry->valuestring, sizeof(new_goal.display_name) - 1);
+        else
+            strncpy(new_goal.display_name, new_goal.root_name, sizeof(new_goal.display_name) - 1);
 
         cJSON *stages_array = cJSON_GetObjectItem(goal_json, "stages");
         if (stages_array) {
@@ -446,6 +504,15 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
                 }
                 if (cJSON_IsNumber(target)) new_stage.required_progress = target->valueint;
 
+                // Language file
+                char stage_lang_key[512];
+                snprintf(stage_lang_key, sizeof(stage_lang_key), "multi_stage_goal.%s.stage.%s", new_goal.root_name, new_stage.stage_id);
+                cJSON* stage_lang_entry = cJSON_GetObjectItem(lang_json, stage_lang_key);
+                if (cJSON_IsString(stage_lang_entry))
+                    strncpy(new_stage.display_text, stage_lang_entry->valuestring, sizeof(new_stage.display_text) - 1);
+                else
+                    strncpy(new_stage.display_text, new_stage.stage_id, sizeof(new_stage.display_text) - 1);
+
                 if (cJSON_IsString(type)) {
                     if (strcmp(type->valuestring, "stat") == 0) new_stage.type = SUBGOAL_STAT;
                     else if (strcmp(type->valuestring, "advancement") == 0) new_stage.type = SUBGOAL_ADVANCEMENT;
@@ -469,7 +536,7 @@ static bool load_template_for_editing(const char *version, const DiscoveredTempl
     editor_data.custom_goals.clear();
     editor_data.multi_stage_goals.clear();
 
-    char version_filename[64];
+    char version_filename[64]; // Replacing . with _
     strncpy(version_filename, version, sizeof(version_filename) - 1);
     version_filename[sizeof(version_filename) - 1] = '\0';
     for (char *p = version_filename; *p; p++) { if (*p == '.') *p = '_'; }
@@ -478,19 +545,30 @@ static bool load_template_for_editing(const char *version, const DiscoveredTempl
     snprintf(template_path, sizeof(template_path), "resources/templates/%s/%s/%s_%s%s.json",
              version, template_info.category, version_filename, template_info.category, template_info.optional_flag);
 
+    // Language file
+    char lang_path[MAX_PATH_LENGTH];
+    snprintf(lang_path, sizeof(lang_path), "resources/templates/%s/%s/%s_%s%s_lang.json",
+             version, template_info.category, version_filename, template_info.category, template_info.optional_flag);
+
     cJSON *root = cJSON_from_file(template_path);
     if (!root) {
         snprintf(status_message_buffer, 256, "Error: Could not load template file for editing.");
         return false;
     }
 
-    parse_editor_trackable_categories(cJSON_GetObjectItem(root, "advancements"), editor_data.advancements);
-    parse_editor_stats(cJSON_GetObjectItem(root, "stats"), editor_data.stats);
-    parse_editor_trackable_items(cJSON_GetObjectItem(root, "unlocks"), editor_data.unlocks);
-    parse_editor_trackable_items(cJSON_GetObjectItem(root, "custom"), editor_data.custom_goals);
-    parse_editor_multi_stage_goals(cJSON_GetObjectItem(root, "multi_stage_goals"), editor_data.multi_stage_goals);
+    cJSON* lang_json = cJSON_from_file(lang_path);
+    if (!lang_json) {
+        lang_json = cJSON_CreateObject(); // Create an empty object if it doesn't exist to prevent crashes
+    }
+
+    parse_editor_trackable_categories(cJSON_GetObjectItem(root, "advancements"), editor_data.advancements, lang_json);
+    parse_editor_stats(cJSON_GetObjectItem(root, "stats"), editor_data.stats, lang_json);
+    parse_editor_trackable_items(cJSON_GetObjectItem(root, "unlocks"), editor_data.unlocks, lang_json, "unlock.");
+    parse_editor_trackable_items(cJSON_GetObjectItem(root, "custom"), editor_data.custom_goals, lang_json, "custom.");
+    parse_editor_multi_stage_goals(cJSON_GetObjectItem(root, "multi_stage_goals"), editor_data.multi_stage_goals, lang_json);
 
     cJSON_Delete(root);
+    cJSON_Delete(lang_json);
     return true;
 }
 
@@ -626,6 +704,86 @@ static void serialize_editor_multi_stage_goals(cJSON *parent, const std::vector<
     cJSON_AddItemToObject(parent, "multi_stage_goals", goals_array);
 }
 
+// Helper to save display names for simple items (unlocks, custom)
+static void serialize_simple_lang_file(cJSON* lang_json, const std::vector<EditorTrackableItem>& items, const char* lang_key_prefix) {
+    for (const auto& item : items) {
+        char lang_key[256];
+        snprintf(lang_key, sizeof(lang_key), "%s%s", lang_key_prefix, item.root_name);
+        // If a key for this item already exists, remove it before adding the new one.
+        if (cJSON_HasObjectItem(lang_json, lang_key)) {
+            cJSON_DeleteItemFromObject(lang_json, lang_key);
+        }
+        cJSON_AddStringToObject(lang_json, lang_key, item.display_name);
+    }
+}
+
+// Helper to save display names for categories (advancements)
+static void serialize_advancement_lang_file(cJSON* lang_json, const std::vector<EditorTrackableCategory>& categories) {
+    for (const auto& cat : categories) {
+        char lang_key[256];
+        char temp_root_name[192];
+        strncpy(temp_root_name, cat.root_name, sizeof(temp_root_name) - 1);
+        char* p = temp_root_name;
+        // Modification only to advancements -> replacing ":" and "/" with "."
+        while ((p = strpbrk(p, ":/")) != nullptr) {
+            *p = '.';
+        }
+        snprintf(lang_key, sizeof(lang_key), "advancement.%s", temp_root_name);
+        if (cJSON_HasObjectItem(lang_json, lang_key)) {
+            cJSON_DeleteItemFromObject(lang_json, lang_key);
+        }
+        cJSON_AddStringToObject(lang_json, lang_key, cat.display_name);
+    }
+}
+
+// Helper to save display names for stats
+static void serialize_stats_lang_file(cJSON* lang_json, const std::vector<EditorTrackableCategory>& categories) {
+    for (const auto& cat : categories) {
+        // Parent Category
+        char cat_lang_key[256];
+        snprintf(cat_lang_key, sizeof(cat_lang_key), "stat.%s", cat.root_name);
+        if (cJSON_HasObjectItem(lang_json, cat_lang_key)) {
+            cJSON_DeleteItemFromObject(lang_json, cat_lang_key);
+        }
+        cJSON_AddStringToObject(lang_json, cat_lang_key, cat.display_name);
+
+        // Criteria (only for complex stats)
+        if (!cat.is_simple_stat) {
+            for (const auto& crit : cat.criteria) {
+                char crit_lang_key[512];
+                snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", cat_lang_key, crit.root_name);
+                if (cJSON_HasObjectItem(lang_json, crit_lang_key)) {
+                    cJSON_DeleteItemFromObject(lang_json, crit_lang_key);
+                }
+                cJSON_AddStringToObject(lang_json, crit_lang_key, crit.display_name);
+            }
+        }
+    }
+}
+
+// Helper to save display names for multi-stage goals
+static void serialize_ms_goals_lang_file(cJSON* lang_json, const std::vector<EditorMultiStageGoal>& goals) {
+    for (const auto& goal : goals) {
+        // Goal display name
+        char goal_lang_key[256];
+        snprintf(goal_lang_key, sizeof(goal_lang_key), "multi_stage_goal.%s.display_name", goal.root_name);
+        if (cJSON_HasObjectItem(lang_json, goal_lang_key)) {
+            cJSON_DeleteItemFromObject(lang_json, goal_lang_key);
+        }
+        cJSON_AddStringToObject(lang_json, goal_lang_key, goal.display_name);
+
+        // Stages display text
+        for (const auto& stage : goal.stages) {
+            char stage_lang_key[512];
+            snprintf(stage_lang_key, sizeof(stage_lang_key), "multi_stage_goal.%s.stage.%s", goal.root_name, stage.stage_id);
+            if (cJSON_HasObjectItem(lang_json, stage_lang_key)) {
+                cJSON_DeleteItemFromObject(lang_json, stage_lang_key);
+            }
+            cJSON_AddStringToObject(lang_json, stage_lang_key, stage.display_text);
+        }
+    }
+}
+
 // Main function to save the in-memory editor data back to a file
 static bool save_template_from_editor(const char *version, const DiscoveredTemplate &template_info,
                                       EditorTemplate &editor_data, char *status_message_buffer) {
@@ -636,6 +794,10 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
 
     char template_path[MAX_PATH_LENGTH];
     snprintf(template_path, sizeof(template_path), "resources/templates/%s/%s/%s_%s%s.json",
+             version, template_info.category, version_filename, template_info.category, template_info.optional_flag);
+
+    char lang_path[MAX_PATH_LENGTH];
+    snprintf(lang_path, sizeof(lang_path), "resources/templates/%s/%s/%s_%s%s_lang.json",
              version, template_info.category, version_filename, template_info.category, template_info.optional_flag);
 
     // Read the existing file to preserve sections we aren't editing yet
@@ -673,6 +835,35 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
     }
 
     cJSON_Delete(root);
+
+
+    // Save lang file
+    cJSON* lang_json = cJSON_from_file(lang_path);
+    if (!lang_json) {
+        lang_json = cJSON_CreateObject();
+    }
+
+    serialize_advancement_lang_file(lang_json, editor_data.advancements);
+    serialize_stats_lang_file(lang_json, editor_data.stats);
+    serialize_simple_lang_file(lang_json, editor_data.unlocks, "unlock.");
+    serialize_simple_lang_file(lang_json, editor_data.custom_goals, "custom.");
+    serialize_ms_goals_lang_file(lang_json, editor_data.multi_stage_goals);
+
+    FILE* lang_file = fopen(lang_path, "w");
+    if (lang_file) {
+        char* lang_str = cJSON_Print(lang_json);
+        if (lang_str) {
+            fputs(lang_str, lang_file);
+            free(lang_str);
+        }
+        fclose(lang_file);
+    } else {
+        snprintf(status_message_buffer, 256, "Error: Failed to open lang file for writing.");
+        cJSON_Delete(lang_json);
+        return false;
+    }
+    cJSON_Delete(lang_json);
+
     return true;
 }
 
@@ -842,7 +1033,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
 
         if (ImGui::Selectable(item_label, selected_template_index == i)) {
-
             // Define the action of switching to a new template
             auto switch_template_action = [&, i]() {
                 selected_template_index = i;
@@ -853,7 +1043,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                   status_message)) {
                         // Also update the 'saved' snapshot to reflect the newly loaded state
                         saved_template_data = current_template_data;
-                                                  }
+                    }
                 }
             };
 
@@ -1112,7 +1302,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // Check if the saved template is the one currently active in the tracker
                     bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
                                                strcmp(selected_template_info.category, app_settings->category) == 0 &&
-                                               strcmp(selected_template_info.optional_flag, app_settings->optional_flag) == 0);
+                                               strcmp(selected_template_info.optional_flag,
+                                                      app_settings->optional_flag) == 0);
 
                     if (is_active_template) {
                         // Signal the main loop to reload the tracker data
@@ -1141,7 +1332,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (ImGui::Button("Revert Changes")) {
                 current_template_data = saved_template_data;
                 save_message_type = MSG_NONE; // Clear any existing message
-                status_message[0] = '\0';     // Clear the message text
+                status_message[0] = '\0'; // Clear the message text
             }
         }
 
@@ -1171,7 +1362,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // Check if the saved template is the one currently active in the tracker
                     bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
                                                strcmp(selected_template_info.category, app_settings->category) == 0 &&
-                                               strcmp(selected_template_info.optional_flag, app_settings->optional_flag) == 0);
+                                               strcmp(selected_template_info.optional_flag,
+                                                      app_settings->optional_flag) == 0);
 
                     if (is_active_template) {
                         // Signal the main loop to reload the tracker data
@@ -1367,6 +1559,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::InputText("Root Name", advancement.root_name, sizeof(advancement.root_name))) {
                         save_message_type = MSG_NONE;
                     }
+                    if (ImGui::InputText("Display Name", advancement.display_name, sizeof(advancement.display_name))) {
+                        save_message_type = MSG_NONE;
+                    }
                     if (ImGui::InputText("Icon Path", advancement.icon_path, sizeof(advancement.icon_path))) {
                         save_message_type = MSG_NONE;
                     }
@@ -1415,6 +1610,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::BeginGroup();
 
                         if (ImGui::InputText("Root Name", criterion.root_name, sizeof(criterion.root_name))) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::InputText("Display Name", criterion.display_name, sizeof(criterion.display_name))) {
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::InputText("Icon Path", criterion.icon_path, sizeof(criterion.icon_path))) {
@@ -1698,6 +1896,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::InputText("Stat Root Name", simple_crit.root_name, sizeof(simple_crit.root_name))) {
                             save_message_type = MSG_NONE;
                         }
+                        if (ImGui::InputText("Display Name", stat_cat.display_name, sizeof(stat_cat.display_name))) {
+                            save_message_type = MSG_NONE;
+                        }
                         if (ImGui::InputInt("Target", &simple_crit.goal)) {
                             save_message_type = MSG_NONE;
                         }
@@ -1735,6 +1936,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                             ImGui::Separator();
                             if (ImGui::InputText("Root Name", crit.root_name, sizeof(crit.root_name))) {
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::InputText("Display Name", crit.display_name, sizeof(crit.display_name))) {
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::InputText("Icon Path", crit.icon_path, sizeof(crit.icon_path))) {
@@ -1875,6 +2079,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::InputText("Root Name", unlock.root_name, sizeof(unlock.root_name))) {
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
+                        if (ImGui::InputText("Display Name", unlock.display_name, sizeof(unlock.display_name))) {
+                            save_message_type = MSG_NONE;
+                        }
                         if (ImGui::InputText("Icon Path", unlock.icon_path, sizeof(unlock.icon_path))) {
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
@@ -2000,8 +2207,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
 
                     ImGui::BeginGroup();
-                    if (ImGui::InputText("Root Name", goal.root_name, sizeof(goal.root_name))) {
+                    if (ImGui::InputText("Goal Root Name", goal.root_name, sizeof(goal.root_name))) {
                         save_message_type = MSG_NONE; // Clear message on new edit
+                    }
+                    if (ImGui::InputText("Display Name", goal.display_name, sizeof(goal.display_name))) {
+                        save_message_type = MSG_NONE;
                     }
                     if (ImGui::InputText("Icon Path", goal.icon_path, sizeof(goal.icon_path))) {
                         save_message_type = MSG_NONE; // Clear message on new edit
@@ -2235,6 +2445,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::InputText("Goal Root Name", goal.root_name, sizeof(goal.root_name))) {
                         save_message_type = MSG_NONE;
                     }
+                    if (ImGui::InputText("Display Name", goal.display_name, sizeof(goal.display_name))) {
+                        save_message_type = MSG_NONE;
+                    }
                     if (ImGui::InputText("Icon Path", goal.icon_path, sizeof(goal.icon_path))) {
                         save_message_type = MSG_NONE;
                     }
@@ -2281,6 +2494,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // ImVec2 item_start_cursor_pos = ImGui::GetCursorPos(); // TODO: Not needed?
                         ImGui::BeginGroup();
                         if (ImGui::InputText("Stage ID", stage.stage_id, sizeof(stage.stage_id))) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::InputText("Display Text", stage.display_text, sizeof(stage.display_text))) {
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::Combo("Type", (int *) &stage.type, type_names, IM_ARRAYSIZE(type_names))) {
