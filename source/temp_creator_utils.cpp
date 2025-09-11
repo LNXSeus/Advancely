@@ -11,6 +11,7 @@
 #include <cctype> // For isalnum
 #include "path_utils.h" // For path_exists
 #include "main.h" // For MAX_PATH_LENGTH
+#include "template_scanner.h"
 
 #ifdef _WIN32
 #include <direct.h> // For _mkdir
@@ -129,7 +130,31 @@ bool validate_and_create_template(const char* version, const char* category, con
         return false;
     }
 
-    // 2. Construct Paths
+    // 2. Check for Name Collisions by scanning all templates for the version
+    char new_combo[MAX_PATH_LENGTH];
+    snprintf(new_combo, sizeof(new_combo), "%s%s", category, flag);
+
+    DiscoveredTemplate* existing_templates = nullptr;
+    int existing_count = 0;
+    scan_for_templates(version, &existing_templates, &existing_count);
+
+    if (existing_templates) {
+        for (int i = 0; i < existing_count; ++i) {
+            char existing_combo[MAX_PATH_LENGTH];
+            snprintf(existing_combo, sizeof(existing_combo), "%s%s",
+                     existing_templates[i].category, existing_templates[i].optional_flag);
+
+            if (strcmp(new_combo, existing_combo) == 0) {
+                snprintf(error_message, error_msg_size, "Error: Name collision. The name '%s' is already produced by template (category: '%s', flag: '%s').",
+                         new_combo, existing_templates[i].category, existing_templates[i].optional_flag);
+                free_discovered_templates(&existing_templates, &existing_count);
+                return false;
+            }
+        }
+        free_discovered_templates(&existing_templates, &existing_count);
+    }
+
+    // 3. Construct Paths
     char version_filename[64];
     strncpy(version_filename, version, sizeof(version_filename) - 1);
     for (char *p = version_filename; *p; p++) {
@@ -145,12 +170,6 @@ bool validate_and_create_template(const char* version, const char* category, con
     snprintf(template_path, sizeof(template_path), "%s.json", base_path);
     snprintf(lang_path, sizeof(lang_path), "%s_lang.json", base_path);
 
-    // 3. Check if Template Already Exists
-    if (path_exists(template_path)) {
-        snprintf(error_message, error_msg_size, "Error: A template with this Version, Category, and Flag already exists.");
-        return false;
-    }
-
     // 4. Create Directory and Files
     char dir_path[MAX_PATH_LENGTH];
     snprintf(dir_path, sizeof(dir_path), "resources/templates/%s/%s", version, category);
@@ -161,9 +180,9 @@ bool validate_and_create_template(const char* version, const char* category, con
     return true;
 }
 
-bool copy_template_files(const char* src_version, const char* src_category, const char* src_flag,
-                         const char* dest_version, const char* dest_category, const char* dest_flag,
-                         char* error_message, size_t error_msg_size) {
+bool copy_template_files(const char *src_version, const char *src_category, const char *src_flag,
+                         const char *dest_version, const char *dest_category, const char *dest_flag,
+                         char *error_message, size_t error_msg_size) {
     // 1. Validate Destination Inputs
     if (!dest_category || dest_category[0] == '\0') {
         snprintf(error_message, error_msg_size, "Error: New category name cannot be empty.");
@@ -183,7 +202,32 @@ bool copy_template_files(const char* src_version, const char* src_category, cons
         return false;
     }
 
-    // 2. Construct Source Paths
+    // 2. Check for Name Collisions at Destination
+    char new_combo[MAX_PATH_LENGTH];
+    snprintf(new_combo, sizeof(new_combo), "%s%s", dest_category, dest_flag);
+
+    DiscoveredTemplate* existing_templates = nullptr;
+    int existing_count = 0;
+    scan_for_templates(dest_version, &existing_templates, &existing_count);
+
+    if (existing_templates) {
+        for (int i = 0; i < existing_count; ++i) {
+            char existing_combo[MAX_PATH_LENGTH];
+            snprintf(existing_combo, sizeof(existing_combo), "%s%s",
+                     existing_templates[i].category, existing_templates[i].optional_flag);
+
+            if (strcmp(new_combo, existing_combo) == 0) {
+                snprintf(error_message, error_msg_size, "Error: Name collision. A template with category '%s' and flag '%s' already produces the name '%s'.",
+                         existing_templates[i].category, existing_templates[i].optional_flag, existing_combo);
+                free_discovered_templates(&existing_templates, &existing_count);
+                return false;
+            }
+        }
+        free_discovered_templates(&existing_templates, &existing_count);
+    }
+
+
+    // 3. Construct Source Paths
     char src_version_filename[64];
     strncpy(src_version_filename, src_version, sizeof(src_version_filename) - 1);
     for (char *p = src_version_filename; *p; p++) { if (*p == '.') *p = '_'; }
@@ -196,7 +240,7 @@ bool copy_template_files(const char* src_version, const char* src_category, cons
     snprintf(src_template_path, sizeof(src_template_path), "%s.json", src_base_path);
     snprintf(src_lang_path, sizeof(src_lang_path), "%s_lang.json", src_base_path);
 
-    // 3. Construct Destination Paths
+    // 4. Construct Destination Paths
     char dest_version_filename[64];
     strncpy(dest_version_filename, dest_version, sizeof(dest_version_filename) - 1);
     for (char *p = dest_version_filename; *p; p++) { if (*p == '.') *p = '_'; }
@@ -208,12 +252,6 @@ bool copy_template_files(const char* src_version, const char* src_category, cons
     char dest_template_path[MAX_PATH_LENGTH], dest_lang_path[MAX_PATH_LENGTH];
     snprintf(dest_template_path, sizeof(dest_template_path), "%s.json", dest_base_path);
     snprintf(dest_lang_path, sizeof(dest_lang_path), "%s_lang.json", dest_base_path);
-
-    // 4. Check if Destination Already Exists
-    if (path_exists(dest_template_path)) {
-        snprintf(error_message, error_msg_size, "Error: A template with the new name already exists.");
-        return false;
-    }
 
     // 5. Create Directory and Copy Files
     char dest_dir_path[MAX_PATH_LENGTH];

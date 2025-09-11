@@ -33,6 +33,7 @@ void fs_create_empty_lang_file(const char *path);
 /**
 * @brief Validates inputs and creates a new template with its language file.
 * This is the main function called by the UI to perform the creation logic.
+* It validates the actual filepath and not ambiguous combinations of the category and flag.
 * @param version The version string, e.g., "1.16.1".
 * @param category The category name, e.g., "all_advancements".
 * @param flag The optional flag, e.g., "_pre1.9".
@@ -54,9 +55,9 @@ bool validate_and_create_template(const char* version, const char* category, con
 * @param error_msg_size The size of the error_message buffer.
 * @return true on success, false on failure.
 */
-bool copy_template_files(const char* src_version, const char* src_category, const char* src_flag,
-                         const char* dest_version, const char* dest_category, const char* dest_flag,
-                         char* error_message, size_t error_msg_size);
+    bool copy_template_files(const char* src_version, const char* src_category, const char* src_flag,
+                             const char* dest_version, const char* dest_category, const char* dest_flag,
+                             char* error_message, size_t error_msg_size);
 
 /**
  * @brief Deletes a template and its corresponding language file.
