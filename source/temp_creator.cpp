@@ -273,7 +273,8 @@ static bool validate_category_icon_paths(const std::vector<EditorTrackableCatego
 }
 
 // Helper to parse a simple array like "unlocks" or "custom" from the template JSON
-static void parse_editor_trackable_items(cJSON *json_array, std::vector<EditorTrackableItem> &item_vector, cJSON *lang_json, const char *lang_key_prefix) {
+static void parse_editor_trackable_items(cJSON *json_array, std::vector<EditorTrackableItem> &item_vector,
+                                         cJSON *lang_json, const char *lang_key_prefix) {
     item_vector.clear();
     if (!json_array) return;
 
@@ -364,7 +365,7 @@ static void parse_editor_trackable_categories(cJSON *json_object,
                 // Load display name for the criterion
                 char crit_lang_key[512];
                 snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", lang_key, new_crit.root_name);
-                cJSON* crit_lang_entry = cJSON_GetObjectItem(lang_json, crit_lang_key);
+                cJSON *crit_lang_entry = cJSON_GetObjectItem(lang_json, crit_lang_key);
                 if (cJSON_IsString(crit_lang_entry))
                     strncpy(new_crit.display_name, crit_lang_entry->valuestring, sizeof(new_crit.display_name) - 1);
                 else
@@ -380,7 +381,8 @@ static void parse_editor_trackable_categories(cJSON *json_object,
 
 
 // Specific parser for stats to handle simple vs complex structures
-static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCategory> &category_vector, cJSON *lang_json) {
+static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCategory> &category_vector,
+                               cJSON *lang_json) {
     category_vector.clear();
     if (!json_object) return;
 
@@ -401,7 +403,7 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
         // Language file
         char cat_lang_key[256];
         snprintf(cat_lang_key, sizeof(cat_lang_key), "stat.%s", new_cat.root_name);
-        cJSON* cat_lang_entry = cJSON_GetObjectItem(lang_json, cat_lang_key);
+        cJSON *cat_lang_entry = cJSON_GetObjectItem(lang_json, cat_lang_key);
         if (cJSON_IsString(cat_lang_entry))
             strncpy(new_cat.display_name, cat_lang_entry->valuestring, sizeof(new_cat.display_name) - 1);
         else
@@ -430,7 +432,7 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
                 // Stat criteria language file
                 char crit_lang_key[512];
                 snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", cat_lang_key, new_crit.root_name);
-                cJSON* crit_lang_entry = cJSON_GetObjectItem(lang_json, crit_lang_key);
+                cJSON *crit_lang_entry = cJSON_GetObjectItem(lang_json, crit_lang_key);
                 if (cJSON_IsString(crit_lang_entry))
                     strncpy(new_crit.display_name, crit_lang_entry->valuestring, sizeof(new_crit.display_name) - 1);
                 else
@@ -462,7 +464,8 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
 }
 
 // Parser for multi-stage goals
-static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<EditorMultiStageGoal> &goals_vector, cJSON *lang_json) {
+static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<EditorMultiStageGoal> &goals_vector,
+                                           cJSON *lang_json) {
     goals_vector.clear();
     if (!json_array) return;
 
@@ -483,8 +486,8 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
         // Language file
         char goal_lang_key[256];
         snprintf(goal_lang_key, sizeof(goal_lang_key), "multi_stage_goal.%s.display_name", new_goal.root_name);
-        cJSON* goal_lang_entry = cJSON_GetObjectItem(lang_json, goal_lang_key);
-        if(cJSON_IsString(goal_lang_entry))
+        cJSON *goal_lang_entry = cJSON_GetObjectItem(lang_json, goal_lang_key);
+        if (cJSON_IsString(goal_lang_entry))
             strncpy(new_goal.display_name, goal_lang_entry->valuestring, sizeof(new_goal.display_name) - 1);
         else
             strncpy(new_goal.display_name, new_goal.root_name, sizeof(new_goal.display_name) - 1);
@@ -515,8 +518,9 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
 
                 // Language file
                 char stage_lang_key[512];
-                snprintf(stage_lang_key, sizeof(stage_lang_key), "multi_stage_goal.%s.stage.%s", new_goal.root_name, new_stage.stage_id);
-                cJSON* stage_lang_entry = cJSON_GetObjectItem(lang_json, stage_lang_key);
+                snprintf(stage_lang_key, sizeof(stage_lang_key), "multi_stage_goal.%s.stage.%s", new_goal.root_name,
+                         new_stage.stage_id);
+                cJSON *stage_lang_entry = cJSON_GetObjectItem(lang_json, stage_lang_key);
                 if (cJSON_IsString(stage_lang_entry))
                     strncpy(new_stage.display_text, stage_lang_entry->valuestring, sizeof(new_stage.display_text) - 1);
                 else
@@ -565,7 +569,7 @@ static bool load_template_for_editing(const char *version, const DiscoveredTempl
         return false;
     }
 
-    cJSON* lang_json = cJSON_from_file(lang_path);
+    cJSON *lang_json = cJSON_from_file(lang_path);
     if (!lang_json) {
         lang_json = cJSON_CreateObject(); // Create an empty object if it doesn't exist to prevent crashes
     }
@@ -574,7 +578,8 @@ static bool load_template_for_editing(const char *version, const DiscoveredTempl
     parse_editor_stats(cJSON_GetObjectItem(root, "stats"), editor_data.stats, lang_json);
     parse_editor_trackable_items(cJSON_GetObjectItem(root, "unlocks"), editor_data.unlocks, lang_json, "unlock.");
     parse_editor_trackable_items(cJSON_GetObjectItem(root, "custom"), editor_data.custom_goals, lang_json, "custom.");
-    parse_editor_multi_stage_goals(cJSON_GetObjectItem(root, "multi_stage_goals"), editor_data.multi_stage_goals, lang_json);
+    parse_editor_multi_stage_goals(cJSON_GetObjectItem(root, "multi_stage_goals"), editor_data.multi_stage_goals,
+                                   lang_json);
 
     cJSON_Delete(root);
     cJSON_Delete(lang_json);
@@ -767,19 +772,19 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
 
 
     // SAVE LANG FILE WITH SPECIFIC ORDER
-    cJSON* lang_json = cJSON_CreateObject();
+    cJSON *lang_json = cJSON_CreateObject();
 
     // 1. Advancements (Parent then Criteria)
-    for (const auto& cat : editor_data.advancements) {
+    for (const auto &cat: editor_data.advancements) {
         char cat_lang_key[256];
         char temp_root_name[192];
         strncpy(temp_root_name, cat.root_name, sizeof(temp_root_name) - 1);
-        char* p = temp_root_name;
+        char *p = temp_root_name;
         while ((p = strpbrk(p, ":/")) != nullptr) *p = '.';
         snprintf(cat_lang_key, sizeof(cat_lang_key), "advancement.%s", temp_root_name);
         cJSON_AddStringToObject(lang_json, cat_lang_key, cat.display_name);
 
-        for (const auto& crit : cat.criteria) {
+        for (const auto &crit: cat.criteria) {
             char crit_lang_key[512];
             snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", cat_lang_key, crit.root_name);
             cJSON_AddStringToObject(lang_json, crit_lang_key, crit.display_name);
@@ -787,12 +792,12 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
     }
 
     // 2. Stats (Parent then Criteria)
-    for (const auto& cat : editor_data.stats) {
+    for (const auto &cat: editor_data.stats) {
         char cat_lang_key[256];
         snprintf(cat_lang_key, sizeof(cat_lang_key), "stat.%s", cat.root_name);
         cJSON_AddStringToObject(lang_json, cat_lang_key, cat.display_name);
         if (!cat.is_simple_stat) {
-            for (const auto& crit : cat.criteria) {
+            for (const auto &crit: cat.criteria) {
                 char crit_lang_key[512];
                 snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", cat_lang_key, crit.root_name);
                 cJSON_AddStringToObject(lang_json, crit_lang_key, crit.display_name);
@@ -801,34 +806,35 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
     }
 
     // 3. Unlocks
-    for (const auto& item : editor_data.unlocks) {
+    for (const auto &item: editor_data.unlocks) {
         char lang_key[256];
         snprintf(lang_key, sizeof(lang_key), "unlock.%s", item.root_name);
         cJSON_AddStringToObject(lang_json, lang_key, item.display_name);
     }
 
     // 4. Custom Goals
-    for (const auto& item : editor_data.custom_goals) {
+    for (const auto &item: editor_data.custom_goals) {
         char lang_key[256];
         snprintf(lang_key, sizeof(lang_key), "custom.%s", item.root_name);
         cJSON_AddStringToObject(lang_json, lang_key, item.display_name);
     }
 
     // 5. Multi-Stage Goals (Parent then Stages)
-    for (const auto& goal : editor_data.multi_stage_goals) {
+    for (const auto &goal: editor_data.multi_stage_goals) {
         char goal_lang_key[256];
         snprintf(goal_lang_key, sizeof(goal_lang_key), "multi_stage_goal.%s.display_name", goal.root_name);
         cJSON_AddStringToObject(lang_json, goal_lang_key, goal.display_name);
-        for (const auto& stage : goal.stages) {
+        for (const auto &stage: goal.stages) {
             char stage_lang_key[512];
-            snprintf(stage_lang_key, sizeof(stage_lang_key), "multi_stage_goal.%s.stage.%s", goal.root_name, stage.stage_id);
+            snprintf(stage_lang_key, sizeof(stage_lang_key), "multi_stage_goal.%s.stage.%s", goal.root_name,
+                     stage.stage_id);
             cJSON_AddStringToObject(lang_json, stage_lang_key, stage.display_text);
         }
     }
 
-    FILE* lang_file = fopen(lang_path, "w");
+    FILE *lang_file = fopen(lang_path, "w");
     if (lang_file) {
-        char* lang_str = cJSON_Print(lang_json);
+        char *lang_str = cJSON_Print(lang_json);
         if (lang_str) {
             fputs(lang_str, lang_file);
             free(lang_str);
@@ -842,6 +848,110 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
     cJSON_Delete(lang_json);
 
     return true;
+}
+
+enum SaveMessageType {
+    MSG_NONE,
+    MSG_SUCCESS,
+    MSG_ERROR
+};
+
+// New helper function to centralize validation and saving
+static bool validate_and_save_template(const char *creator_version_str,
+                                       const DiscoveredTemplate &selected_template_info,
+                                       EditorTemplate &current_template_data, EditorTemplate &saved_template_data,
+                                       SaveMessageType &save_message_type, char *status_message,
+                                       AppSettings *app_settings) {
+    // Reset message state on new save attempt
+    save_message_type = MSG_NONE;
+    status_message[0] = '\0';
+
+    bool validation_passed = true;
+
+    // --- Advancements Validation ---
+    if (has_duplicate_category_root_names(current_template_data.advancements, status_message) ||
+        !validate_category_icon_paths(current_template_data.advancements, status_message)) {
+        validation_passed = false;
+    }
+    if (validation_passed) {
+        for (const auto &adv: current_template_data.advancements) {
+            if (has_duplicate_root_names(adv.criteria, status_message)) {
+                validation_passed = false;
+                break;
+            }
+        }
+    }
+
+    // --- Stats Validation ---
+    if (validation_passed) {
+        if (has_duplicate_category_root_names(current_template_data.stats, status_message) ||
+            !validate_category_icon_paths(current_template_data.stats, status_message)) {
+            validation_passed = false;
+        }
+    }
+    if (validation_passed) {
+        for (const auto &stat_cat: current_template_data.stats) {
+            if (has_duplicate_root_names(stat_cat.criteria, status_message)) {
+                validation_passed = false;
+                break;
+            }
+        }
+    }
+
+    // --- Unlocks & Custom Goals Validation ---
+    if (validation_passed) {
+        if (has_duplicate_root_names(current_template_data.unlocks, status_message) ||
+            !validate_icon_paths(current_template_data.unlocks, status_message) ||
+            has_duplicate_root_names(current_template_data.custom_goals, status_message) ||
+            !validate_icon_paths(current_template_data.custom_goals, status_message)) {
+            validation_passed = false;
+        }
+    }
+
+    // --- Multi-Stage Goals Validation ---
+    if (validation_passed) {
+        if (has_duplicate_ms_goal_root_names(current_template_data.multi_stage_goals, status_message) ||
+            !validate_ms_goal_icon_paths(current_template_data.multi_stage_goals, status_message)) {
+            validation_passed = false;
+        }
+    }
+    if (validation_passed) {
+        for (const auto &goal: current_template_data.multi_stage_goals) {
+            if (has_duplicate_stage_ids(goal.stages, status_message)) {
+                validation_passed = false;
+                break;
+            }
+        }
+    }
+
+    // If all checks passed, attempt to save
+    if (validation_passed) {
+        if (save_template_from_editor(creator_version_str, selected_template_info, current_template_data,
+                                      status_message)) {
+            // Update snapshot to new clean state
+            saved_template_data = current_template_data;
+            save_message_type = MSG_SUCCESS;
+            snprintf(status_message, 256, "Saved!");
+
+            // Check if the saved template is the one currently active in the tracker
+            bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
+                                       strcmp(selected_template_info.category, app_settings->category) == 0 &&
+                                       strcmp(selected_template_info.optional_flag,
+                                              app_settings->optional_flag) == 0);
+
+            if (is_active_template) {
+                // Signal the main loop to reload the tracker data
+                SDL_SetAtomicInt(&g_settings_changed, 1);
+            }
+            return true; // Indicate success
+        } else {
+            save_message_type = MSG_ERROR; // Save function failed
+            return false;
+        }
+    } else {
+        save_message_type = MSG_ERROR; // A validation check failed
+        return false;
+    }
 }
 
 
@@ -887,7 +997,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
 
     // State for user feedback next to save button in editor view
-    enum SaveMessageType { MSG_NONE, MSG_SUCCESS, MSG_ERROR };
     static SaveMessageType save_message_type = MSG_NONE;
     static char status_message[256] = "";
 
@@ -1099,7 +1208,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
             // Pre-fill with selected template's info and append _copy to the flag
             const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
-            const char* dest_version = creator_version_str;
+            const char *dest_version = creator_version_str;
 
             // Pre-fill the category and version for the new copy
             strncpy(copy_template_category, selected.category, sizeof(copy_template_category) - 1);
@@ -1243,93 +1352,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::Button("Save") || (ImGui::IsKeyPressed(ImGuiKey_Enter) &&
                                       ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !
                                       ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup))) {
-            // Reset message state on new save attempt
-            save_message_type = MSG_NONE;
-            status_message[0] = '\0';
-
-            bool validation_passed = true;
-
-            // --- Advancements Validation ---
-            if (has_duplicate_category_root_names(current_template_data.advancements, status_message) ||
-                !validate_category_icon_paths(current_template_data.advancements, status_message)) {
-                validation_passed = false;
-            }
-            if (validation_passed) {
-                for (const auto &adv: current_template_data.advancements) {
-                    if (has_duplicate_root_names(adv.criteria, status_message)) {
-                        validation_passed = false;
-                        break;
-                    }
-                }
-            }
-
-            // --- Stats Validation ---
-            if (validation_passed) {
-                if (has_duplicate_category_root_names(current_template_data.stats, status_message) ||
-                    !validate_category_icon_paths(current_template_data.stats, status_message)) {
-                    validation_passed = false;
-                }
-            }
-            if (validation_passed) {
-                for (const auto &stat_cat: current_template_data.stats) {
-                    if (has_duplicate_root_names(stat_cat.criteria, status_message)) {
-                        validation_passed = false;
-                        break;
-                    }
-                }
-            }
-
-            // --- Unlocks & Custom Goals Validation ---
-            if (validation_passed) {
-                if (has_duplicate_root_names(current_template_data.unlocks, status_message) ||
-                    !validate_icon_paths(current_template_data.unlocks, status_message) ||
-                    has_duplicate_root_names(current_template_data.custom_goals, status_message) ||
-                    !validate_icon_paths(current_template_data.custom_goals, status_message)) {
-                    validation_passed = false;
-                }
-            }
-
-            // --- Multi-Stage Goals Validation ---
-            if (validation_passed) {
-                if (has_duplicate_ms_goal_root_names(current_template_data.multi_stage_goals, status_message) ||
-                    !validate_ms_goal_icon_paths(current_template_data.multi_stage_goals, status_message)) {
-                    validation_passed = false;
-                }
-            }
-            if (validation_passed) {
-                for (const auto &goal: current_template_data.multi_stage_goals) {
-                    if (has_duplicate_stage_ids(goal.stages, status_message)) {
-                        validation_passed = false;
-                        break;
-                    }
-                }
-            }
-
-            // If all checks passed, attempt to save
-            if (validation_passed) {
-                if (save_template_from_editor(creator_version_str, selected_template_info, current_template_data,
-                                              status_message)) {
-                    // Update snapshot to new clean state
-                    saved_template_data = current_template_data;
-                    save_message_type = MSG_SUCCESS;
-                    snprintf(status_message, sizeof(status_message), "Saved!");
-
-                    // Check if the saved template is the one currently active in the tracker
-                    bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
-                                               strcmp(selected_template_info.category, app_settings->category) == 0 &&
-                                               strcmp(selected_template_info.optional_flag,
-                                                      app_settings->optional_flag) == 0);
-
-                    if (is_active_template) {
-                        // Signal the main loop to reload the tracker data
-                        SDL_SetAtomicInt(&g_settings_changed, 1);
-                    }
-                } else {
-                    save_message_type = MSG_ERROR; // Save function failed
-                }
-            } else {
-                save_message_type = MSG_ERROR; // A validation check failed
-            }
+            validate_and_save_template(creator_version_str, selected_template_info, current_template_data,
+                                       saved_template_data, save_message_type, status_message, app_settings);
         }
 
         // Save button tooltip
@@ -1370,34 +1394,34 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::BeginPopupModal("Unsaved Changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::Text("You have unsaved changes. Do you want to save them?\n\n");
             if (ImGui::Button("Save", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
-                if (save_template_from_editor(creator_version_str, selected_template_info, current_template_data,
-                                              status_message)) {
-                    saved_template_data = current_template_data; // Update snapshot on successful save
+                // Call the central validation and save function.
+                // It returns true only if validation passes AND the file is saved successfully.
+                bool save_successful = validate_and_save_template(creator_version_str, selected_template_info,
+                                                          current_template_data,
+                                                          saved_template_data, save_message_type, status_message,
+                                                          app_settings);
 
-                    // Check if the saved template is the one currently active in the tracker
-                    bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
-                                               strcmp(selected_template_info.category, app_settings->category) == 0 &&
-                                               strcmp(selected_template_info.optional_flag,
-                                                      app_settings->optional_flag) == 0);
-
-                    if (is_active_template) {
-                        // Signal the main loop to reload the tracker data
-                        SDL_SetAtomicInt(&g_settings_changed, 1);
-                    }
-
+                // Only proceed and close the popup if the save was successful.
+                // If it fails, the popup remains open, and the error message is shown in the main editor view.
+                if (save_successful) {
                     if (pending_action) pending_action();
+                    ImGui::CloseCurrentPopup();
                 }
-                ImGui::CloseCurrentPopup();
             }
             // Save hover text
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("Press ENTER to save.");
             }
             ImGui::SameLine();
-            if (ImGui::Button("Discard", ImVec2(120, 0))) {
+            // Also use spacebar
+            if (ImGui::Button("Discard", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Space)) {
                 current_template_data = saved_template_data; // Restore saved data as current
                 if (pending_action) pending_action();
                 ImGui::CloseCurrentPopup();
+            }
+            // Discard hover text
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Press SPACE to discard.");
             }
             ImGui::SameLine();
             // Cancel or pressing ESC
@@ -2691,7 +2715,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 const char *dest_version = VERSION_STRINGS[copy_template_version_idx];
                 char error_msg[256] = "";
 
-                if (copy_template_files(app_settings->version_str, selected.category, selected.optional_flag,
+                // Properly copy the template selected in the template creator
+                if (copy_template_files(creator_version_str, selected.category, selected.optional_flag,
                                         dest_version, copy_template_category, copy_template_flag,
                                         error_msg, sizeof(error_msg))) {
                     snprintf(status_message, sizeof(status_message), "Success! Template copied to '%s'.",
