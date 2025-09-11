@@ -865,7 +865,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     // State for the "Create New" view
     static bool show_create_new_view = false;
-    // static int new_template_version_idx = -1; // TODO: Remove
     static char new_template_category[MAX_PATH_LENGTH] = "";
     static char new_template_flag[MAX_PATH_LENGTH] = "";
 
@@ -1200,6 +1199,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (delete_template_files(creator_version_str, selected.category, selected.optional_flag)) {
                     snprintf(status_message, sizeof(status_message), "Template '%s' deleted.", selected.category);
                     SDL_SetAtomicInt(&g_templates_changed, 1); // Signal change
+                    editing_template = false; // Exit the editor view
                 } else {
                     snprintf(status_message, sizeof(status_message), "Error: Failed to delete template '%s'.",
                              selected.category);
