@@ -24,7 +24,30 @@
 // Path to the CA certificate bundle
 #define CERT_BUNDLE_PATH "resources/ca_certificates/cacert.pem"
 
-// --- HELPER FUNCTION to recursively delete a directory ---
+// New helper function to numerically compare version strings (e.g., "v0.9.100")
+static int compare_versions(const char* version1, const char* version2) {
+    int major1 = 0, minor1 = 0, patch1 = 0;
+    int major2 = 0, minor2 = 0, patch2 = 0;
+
+    // Parse the version strings, skipping the leading 'v'
+    sscanf(version1, "v%d.%d.%d", &major1, &minor1, &patch1);
+    sscanf(version2, "v%d.%d.%d", &major2, &minor2, &patch2);
+
+    if (major1 < major2) return -1;
+    if (major1 > major2) return 1;
+
+    // Majors are equal, compare minors
+    if (minor1 < minor2) return -1;
+    if (minor1 > minor2) return 1;
+
+    // Minors are equal, compare patches
+    if (patch1 < patch2) return -1;
+    if (patch1 > patch2) return 1;
+
+    return 0; // Versions are identical
+}
+
+// Helper to recursively delete a directory
 void delete_directory_recursively(const char* path) {
 #ifdef _WIN32
     SHFILEOPSTRUCTA sf;
@@ -108,8 +131,8 @@ bool check_for_updates(const char* current_version, char* out_latest_version, si
                     strncpy(out_latest_version, tag_name_json->valuestring, max_len - 1);
                     out_latest_version[max_len - 1] = '\0';
 
-                    // Compare versions, check if current version is less than the new version (lexicographically)
-                    if (strcmp(current_version, out_latest_version) < 0) {
+                    // Compare versions numerically instead of lexicographically
+                    if (compare_versions(current_version, out_latest_version) < 0) {
                         is_new_version_available = true;
 
                         // Find the download URL for the zip asset
