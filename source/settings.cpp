@@ -21,7 +21,7 @@
 
 // Helper function to robustly compare two AppSettings structs
 // Changing window geometry of overlay and tracker window DO NOT cause the "Unsaved Changes" text to appear.
-static bool are_settings_different(const AppSettings* a, const AppSettings* b) {
+static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
     if (a->path_mode != b->path_mode ||
         strcmp(a->manual_saves_path, b->manual_saves_path) != 0 ||
         strcmp(a->version_str, b->version_str) != 0 ||
@@ -89,6 +89,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Flag to show a confirmation message when settings are reset
     static bool show_defaults_applied_message = false;
 
+    // Flag to show a warning about hotkeys needing a settings window restart
+    static bool show_hotkey_warning_message = false;
+
     // Holds temporary copy of the settings for editing
     static AppSettings temp_settings;
 
@@ -124,11 +127,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         memcpy(&saved_settings, app_settings, sizeof(AppSettings));
         show_applied_message = false; // Reset message visibility
         show_defaults_applied_message = false; // Reset "Defaults Applied" message visibility
+        show_hotkey_warning_message = false;
         show_template_not_found_error = false;
     }
 
     // use function to properly compare the settings
-    bool has_unsaved_changes =are_settings_different(&temp_settings, &saved_settings);
+    bool has_unsaved_changes = are_settings_different(&temp_settings, &saved_settings);
 
     // Window title
     ImGui::Begin("Advancely Settings", p_open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
@@ -239,7 +243,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     if (ImGui::IsItemClicked()) {
-        const char* url = "https://github.com/LNXSeus/Advancely#Officially-Added-Templates";
+        const char *url = "https://github.com/LNXSeus/Advancely#Officially-Added-Templates";
         char command[1024];
 #ifdef _WIN32
         snprintf(command, sizeof(command), "start %s", url);
@@ -306,7 +310,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
         // This change may have altered the hotkey structure. To prevent a false "Unsaved Changes"
         // flag, we re-sync the snapshot to this new, clean state.
-        memcpy(&saved_settings, &temp_settings, sizeof(AppSettings));
+        // memcpy(&saved_settings, &temp_settings, sizeof(AppSettings)); // TODO: Critical
     }
 
     // --- CATEGORY DROPDOWN ---
@@ -653,7 +657,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::SameLine();
     ImGui::Checkbox("Auto-Check for Updates", &temp_settings.check_for_updates);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("If enabled, Advancely will check for a new version on startup and notify you if one is available.");
+        ImGui::SetTooltip(
+            "If enabled, Advancely will check for a new version on startup and notify you if one is available.");
     }
 
     ImGui::Separator();
@@ -690,14 +695,16 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::Text("Hotkey Settings");
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip(
+                "IMPORTANT: Hotkeys are remembered between templates.\n"
+                "You might have to restart the settings window for the hotkeys to appear.\n\n"
                 "Assign keys to increment/decrement custom counters\n(only work when tabbed into the tracker). Maximum of %d hotkeys are supported.",
                 MAX_HOTKEYS);
         }
 
         // Loop through the counters provided by the LIVE TEMPLATE to build the UI rows
-        for (const auto& counter : custom_counters) {
+        for (const auto &counter: custom_counters) {
             // For each counter, find its corresponding binding in our editable temp_settings
-            HotkeyBinding* binding = nullptr;
+            HotkeyBinding *binding = nullptr;
             for (int i = 0; i < temp_settings.hotkey_count; ++i) {
                 if (strcmp(temp_settings.hotkeys[i].target_goal, counter->root_name) == 0) {
                     binding = &temp_settings.hotkeys[i];
@@ -709,17 +716,21 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::SameLine();
 
             // --- Increment Key Combo ---
-            char* inc_key_val = binding ? binding->increment_key : (char*)"None";
+            char *inc_key_val = binding ? binding->increment_key : (char *) "None";
             int current_inc_key_idx = 0;
             for (int k = 0; k < key_names_count; ++k) {
-                if (strcmp(inc_key_val, key_names[k]) == 0) { current_inc_key_idx = k; break; }
+                if (strcmp(inc_key_val, key_names[k]) == 0) {
+                    current_inc_key_idx = k;
+                    break;
+                }
             }
 
             char inc_label[64];
             snprintf(inc_label, sizeof(inc_label), "##inc_%s", counter->root_name);
             if (ImGui::Combo(inc_label, &current_inc_key_idx, key_names, key_names_count)) {
                 // User made a change. We now modify temp_settings.
-                if (!binding) { // If binding didn't exist, add a new one.
+                if (!binding) {
+                    // If binding didn't exist, add a new one.
                     if (temp_settings.hotkey_count < MAX_HOTKEYS) {
                         binding = &temp_settings.hotkeys[temp_settings.hotkey_count++];
                         strncpy(binding->target_goal, counter->root_name, sizeof(binding->target_goal) - 1);
@@ -734,23 +745,28 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::SameLine();
 
             // --- Decrement Key Combo ---
-            char* dec_key_val = binding ? binding->decrement_key : (char*)"None";
+            char *dec_key_val = binding ? binding->decrement_key : (char *) "None";
             int current_dec_key_idx = 0;
             for (int k = 0; k < key_names_count; ++k) {
-                if (strcmp(dec_key_val, key_names[k]) == 0) { current_dec_key_idx = k; break; }
+                if (strcmp(dec_key_val, key_names[k]) == 0) {
+                    current_dec_key_idx = k;
+                    break;
+                }
             }
 
             char dec_label[64];
             snprintf(dec_label, sizeof(dec_label), "##dec_%s", counter->root_name);
             if (ImGui::Combo(dec_label, &current_dec_key_idx, key_names, key_names_count)) {
                 // User made a change. We now modify temp_settings.
-                if (!binding) { // If binding didn't exist, add a new one.
+                if (!binding) {
+                    // If binding didn't exist, add a new one.
                     if (temp_settings.hotkey_count < MAX_HOTKEYS) {
                         binding = &temp_settings.hotkeys[temp_settings.hotkey_count++];
                         strncpy(binding->target_goal, counter->root_name, sizeof(binding->target_goal) - 1);
                         strcpy(binding->increment_key, "None"); // Set default for the other key
                     }
-                } else { // if binding exists, update it
+                } else {
+                    // if binding exists, update it
                     strncpy(binding->decrement_key, key_names[current_dec_key_idx], sizeof(binding->decrement_key) - 1);
                 }
             }
@@ -761,10 +777,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     // Apply the changes or pressing Enter key in the settings window when NO popup is shown
-    if (ImGui::Button("Apply Settings") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup))) {
+    if (ImGui::Button("Apply Settings") || (ImGui::IsKeyPressed(ImGuiKey_Enter) &&
+                                            ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !
+                                            ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup))) {
         // Reset message visibility on each new attempt
         show_applied_message = false;
         show_defaults_applied_message = false; // Reset the other message
+        show_hotkey_warning_message = false;
 
         // Assume the error is cleared unless we find one
         show_invalid_manual_path_error = false;
@@ -798,6 +817,20 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                         *force_open_flag = false;
                     }
 
+                    // Hotkey warning logic
+                    // Check if this is a template change AND if there were any active hotkeys
+                    bool is_template_change = (strcmp(temp_settings.version_str, saved_settings.version_str) != 0 ||
+                                               strcmp(temp_settings.category, saved_settings.category) != 0 ||
+                                               strcmp(temp_settings.optional_flag, saved_settings.optional_flag) != 0);
+                    bool had_active_hotkeys = false;
+                    for (int i = 0; i < saved_settings.hotkey_count; ++i) {
+                        if (strcmp(saved_settings.hotkeys[i].increment_key, "None") != 0 ||
+                            strcmp(saved_settings.hotkeys[i].decrement_key, "None") != 0) {
+                            had_active_hotkeys = true;
+                            break;
+                            }
+                    }
+
                     // Copy temp settings to the real settings, save, and trigger a reload
                     memcpy(app_settings, &temp_settings, sizeof(AppSettings));
                     // Also update our clean snapshot
@@ -807,6 +840,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     SDL_SetAtomicInt(&g_settings_changed, 1); // Trigger a reload
                     SDL_SetAtomicInt(&g_apply_button_clicked, 1);
                     show_applied_message = true;
+
+                    // Display hotkey warning
+                    if (is_template_change && had_active_hotkeys) {
+                        show_hotkey_warning_message = true;
+                    } else {
+                        show_applied_message = true;
+                    }
                 }
             } else {
                 // temp_settings.path_mode == PATH_MODE_AUTO
@@ -824,6 +864,20 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     if (force_open_flag) {
                         *force_open_flag = false;
                     }
+
+                    // Hotkey Warning Logic
+                    bool is_template_change = (strcmp(temp_settings.version_str, saved_settings.version_str) != 0 ||
+                                               strcmp(temp_settings.category, saved_settings.category) != 0 ||
+                                               strcmp(temp_settings.optional_flag, saved_settings.optional_flag) != 0);
+                    bool had_active_hotkeys = false;
+                    for (int i = 0; i < saved_settings.hotkey_count; ++i) {
+                        if (strcmp(saved_settings.hotkeys[i].increment_key, "None") != 0 ||
+                            strcmp(saved_settings.hotkeys[i].decrement_key, "None") != 0) {
+                            had_active_hotkeys = true;
+                            break;
+                            }
+                    }
+
                     memcpy(app_settings, &temp_settings, sizeof(AppSettings));
                     // Also update our clean snapshot
                     memcpy(&saved_settings, &temp_settings, sizeof(AppSettings));
@@ -832,6 +886,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     SDL_SetAtomicInt(&g_settings_changed, 1);
                     SDL_SetAtomicInt(&g_apply_button_clicked, 1);
                     show_applied_message = true;
+
+                    // Display hotkey warning message
+                    if (is_template_change && had_active_hotkeys) {
+                        show_hotkey_warning_message = true;
+                    } else {
+                        show_applied_message = true;
+                    }
                 }
             }
         }
@@ -859,6 +920,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (show_applied_message) {
         ImGui::SameLine();
         ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Settings Applied!");
+    }
+
+    // Show the hotkey warning message if needed
+    if (show_hotkey_warning_message) {
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Reopen settings to see updated hotkeys.");
     }
 
     // Show the confirmation message if settings were reset
@@ -891,49 +958,49 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         char tooltip_buffer[1024];
 
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-         "Resets all settings (besides window size/position & hotkeys) in this window to their default values.\n"
-         "This does not modify your template files.\n\n"
-         "Defaults:\n"
-         "  - Path Mode: Auto-Detect\n"
-         "  - Version: %s\n"
-         "  - Category: %s\n"
-         "  - Optional Flag: %s\n"
-         "  - StatsPerWorld Mod (Legacy): %s\n"
-         "  - Section Order: Advancements -> Unlocks -> Stats -> Custom -> Multi-Stage\n"
-         "  - Enable Overlay: %s\n"
-         "  - Tracker FPS Limit: %d\n"
-         "  - Overlay FPS Limit: %d\n"
-         "  - Overlay Scroll Speed: %.2f\n"
-         "  - Sub-Stat Cycle Speed: %.1f s\n"
-         "  - Speed Up Animation: %s\n"
-         "  - Hide Completed Row 3 Goals: %s\n"
-         "  - Always On Top: %s\n"
-         "  - Remove Completed Goals: %s\n"
-         "  - Overlay Width: %dpx\n"
-         "  - Notes Use Settings Font: %s\n"
-         "  - Print Debug To Console: %s\n"
-         "  - Check For Updates: %s\n"
-         "  - Show Welcome on Startup: %s",
+                 "Resets all settings (besides window size/position & hotkeys) in this window to their default values.\n"
+                 "This does not modify your template files.\n\n"
+                 "Defaults:\n"
+                 "  - Path Mode: Auto-Detect\n"
+                 "  - Version: %s\n"
+                 "  - Category: %s\n"
+                 "  - Optional Flag: %s\n"
+                 "  - StatsPerWorld Mod (Legacy): %s\n"
+                 "  - Section Order: Advancements -> Unlocks -> Stats -> Custom -> Multi-Stage\n"
+                 "  - Enable Overlay: %s\n"
+                 "  - Tracker FPS Limit: %d\n"
+                 "  - Overlay FPS Limit: %d\n"
+                 "  - Overlay Scroll Speed: %.2f\n"
+                 "  - Sub-Stat Cycle Speed: %.1f s\n"
+                 "  - Speed Up Animation: %s\n"
+                 "  - Hide Completed Row 3 Goals: %s\n"
+                 "  - Always On Top: %s\n"
+                 "  - Remove Completed Goals: %s\n"
+                 "  - Overlay Width: %dpx\n"
+                 "  - Notes Use Settings Font: %s\n"
+                 "  - Print Debug To Console: %s\n"
+                 "  - Check For Updates: %s\n"
+                 "  - Show Welcome on Startup: %s",
 
-         DEFAULT_VERSION,
-         DEFAULT_CATEGORY,
-         DEFAULT_OPTIONAL_FLAG,
-         DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
-         DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
-         DEFAULT_FPS,
-         DEFAULT_OVERLAY_FPS,
-         DEFAULT_OVERLAY_SCROLL_SPEED,
-         DEFAULT_OVERLAY_STAT_CYCLE_SPEED,
-         DEFAULT_OVERLAY_SPEED_UP ? "Enabled" : "Disabled",
-         DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
-         DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
-         DEFAULT_REMOVE_COMPLETED_GOALS ? "Enabled" : "Disabled",
-         OVERLAY_DEFAULT_WIDTH,
-         DEFAULT_NOTES_USE_ROBOTO ? "Enabled" : "Disabled",
-         DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled",
-         DEFAULT_CHECK_FOR_UPDATES ? "Enabled" : "Disabled",
-         DEFAULT_SHOW_WELCOME_ON_STARTUP ? "Enabled" : "Disabled"
-);
+                 DEFAULT_VERSION,
+                 DEFAULT_CATEGORY,
+                 DEFAULT_OPTIONAL_FLAG,
+                 DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
+                 DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
+                 DEFAULT_FPS,
+                 DEFAULT_OVERLAY_FPS,
+                 DEFAULT_OVERLAY_SCROLL_SPEED,
+                 DEFAULT_OVERLAY_STAT_CYCLE_SPEED,
+                 DEFAULT_OVERLAY_SPEED_UP ? "Enabled" : "Disabled",
+                 DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
+                 DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
+                 DEFAULT_REMOVE_COMPLETED_GOALS ? "Enabled" : "Disabled",
+                 OVERLAY_DEFAULT_WIDTH,
+                 DEFAULT_NOTES_USE_ROBOTO ? "Enabled" : "Disabled",
+                 DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled",
+                 DEFAULT_CHECK_FOR_UPDATES ? "Enabled" : "Disabled",
+                 DEFAULT_SHOW_WELCOME_ON_STARTUP ? "Enabled" : "Disabled"
+        );
         ImGui::SetTooltip(tooltip_buffer);
     }
 
