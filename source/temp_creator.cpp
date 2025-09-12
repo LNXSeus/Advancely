@@ -213,14 +213,22 @@ static bool has_duplicate_stage_ids(const std::vector<EditorSubGoal> &stages, ch
 // Helper to validate that all icon paths in a vector exist
 static bool validate_icon_paths(const std::vector<EditorTrackableItem> &items, char *error_message_buffer) {
     for (const auto &item: items) {
-        if (item.icon_path[0] == '\0') {
-            continue; // Skip empty paths
-        }
-        char full_path[MAX_PATH_LENGTH];
-        snprintf(full_path, sizeof(full_path), "resources/icons/%s", item.icon_path);
-        if (!path_exists(full_path)) {
-            snprintf(error_message_buffer, 256, "Error: Icon file not found: '%s'", item.icon_path);
-            return false;
+        // Validate icon paths for visible items
+        if (!item.is_hidden) {
+            // If path is empty
+            if (item.icon_path[0] == '\0') {
+                snprintf(error_message_buffer, 256, "Error: Visible item '%s' is missing an icon path.",
+                         item.root_name);
+                return false;
+            }
+            // If path is non-empty
+            char full_path[MAX_PATH_LENGTH];
+            snprintf(full_path, sizeof(full_path), "resources/icons/%s", item.icon_path);
+            if (!path_exists(full_path)) {
+                snprintf(error_message_buffer, 256, "Error: Icon file not found for '%s': '%s'", item.root_name,
+                         item.icon_path);
+                return false;
+            }
         }
     }
     return true;
@@ -229,7 +237,16 @@ static bool validate_icon_paths(const std::vector<EditorTrackableItem> &items, c
 // Helper to validate icon paths for multi-stage goals
 static bool validate_ms_goal_icon_paths(const std::vector<EditorMultiStageGoal> &goals, char *error_message_buffer) {
     for (const auto &goal: goals) {
-        if (goal.icon_path[0] != '\0') {
+        // Validate icon paths for visible goals
+        if (!goal.is_hidden) {
+            // When path is empty
+            if (goal.icon_path[0] == '\0') {
+                snprintf(error_message_buffer, 256, "Error: Visible multi-stage goal '%s' is missing an icon path.",
+                         goal.root_name);
+                return false;
+            }
+
+            // When path is wrong
             char full_path[MAX_PATH_LENGTH];
             snprintf(full_path, sizeof(full_path), "resources/icons/%s", goal.icon_path);
             if (!path_exists(full_path)) {
@@ -247,7 +264,14 @@ static bool validate_category_icon_paths(const std::vector<EditorTrackableCatego
                                          char *error_message_buffer) {
     for (const auto &cat: categories) {
         // Check parent icon path
-        if (cat.icon_path[0] != '\0') {
+        // When path is not hidden we validate it
+        if (!cat.is_hidden) {
+            if (cat.icon_path[0] == '\0') {
+                snprintf(error_message_buffer, 256, "Error: Visible category '%s' is missing an icon path.",
+                         cat.root_name);
+                return false;
+            }
+            // When path exists we validate correctness
             char full_path[MAX_PATH_LENGTH];
             snprintf(full_path, sizeof(full_path), "resources/icons/%s", cat.icon_path);
             if (!path_exists(full_path)) {
@@ -256,15 +280,26 @@ static bool validate_category_icon_paths(const std::vector<EditorTrackableCatego
                 return false;
             }
         }
-        // Check criteria icon paths
+        // Check criteria icon paths (excluding simple stats which inherit their icon)
         for (const auto &crit: cat.criteria) {
-            if (crit.icon_path[0] != '\0') {
-                char full_path[MAX_PATH_LENGTH];
-                snprintf(full_path, sizeof(full_path), "resources/icons/%s", crit.icon_path);
-                if (!path_exists(full_path)) {
-                    snprintf(error_message_buffer, 256, "Error: Icon file not found for criterion '%s': '%s'",
-                             crit.root_name, crit.icon_path);
+            // Validate only visible icon paths
+            if (!crit.is_hidden) {
+                // Check for empty path when it's empty and not a simple stat
+                if (crit.icon_path[0] == '\0' && !cat.is_simple_stat) {
+                    snprintf(error_message_buffer, 256,
+                             "Error: Visible criterion '%s' in category '%s' is missing an icon path.", crit.root_name,
+                             cat.root_name);
                     return false;
+                }
+                // check for incorrect path when it's not empty and complex stat
+                if (crit.icon_path[0] != '\0') {
+                    char full_path[MAX_PATH_LENGTH];
+                    snprintf(full_path, sizeof(full_path), "resources/icons/%s", crit.icon_path);
+                    if (!path_exists(full_path)) {
+                        snprintf(error_message_buffer, 256, "Error: Icon file not found for criterion '%s': '%s'",
+                                 crit.root_name, crit.icon_path);
+                        return false;
+                    }
                 }
             }
         }
@@ -1397,9 +1432,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 // Call the central validation and save function.
                 // It returns true only if validation passes AND the file is saved successfully.
                 bool save_successful = validate_and_save_template(creator_version_str, selected_template_info,
-                                                          current_template_data,
-                                                          saved_template_data, save_message_type, status_message,
-                                                          app_settings);
+                                                                  current_template_data,
+                                                                  saved_template_data, save_message_type,
+                                                                  status_message,
+                                                                  app_settings);
 
                 // Only proceed and close the popup if the save was successful.
                 // If it fails, the popup remains open, and the error message is shown in the main editor view.

@@ -1100,12 +1100,16 @@ typedef struct {
     int count;
 } IconPathCounter;
 
-// helper function to process and count all sub-items from a list of categories
+// helper function to process and count all sub-items from a list of categories, simple stats are excluded
 static int count_all_icon_paths(IconPathCounter **counts, int capacity, int current_unique_count,
                                 TrackableCategory **categories, int cat_count) {
     if (!categories) return current_unique_count;
 
     for (int i = 0; i < cat_count; i++) {
+        // Skip simple stat categories, as their criteria are not rendered individually on the overlay
+        if (categories[i]->is_single_stat_category) {
+            continue;
+        }
         for (int j = 0; j < categories[i]->criteria_count; j++) {
             TrackableItem *crit = categories[i]->criteria[j];
             // Only count items that have a valid icon path
@@ -1134,12 +1138,16 @@ static int count_all_icon_paths(IconPathCounter **counts, int capacity, int curr
     return current_unique_count;
 }
 
-// Helper function to flag the items that are shared
+// Helper function to flag the items that are shared, simple stats are excluded
 static void flag_shared_icons(IconPathCounter *counts, int unique_count, TrackableCategory **categories,
                               int cat_count) {
     if (!categories) return;
 
     for (int i = 0; i < cat_count; i++) {
+        // Skip simple stat categories, as their criteria are not rendered individually on the overlay
+        if (categories[i]->is_single_stat_category) {
+            continue;
+        }
         for (int j = 0; j < categories[i]->criteria_count; j++) {
             TrackableItem *crit = categories[i]->criteria[j];
             crit->is_shared = false; // Reset first
