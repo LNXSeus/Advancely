@@ -1951,13 +1951,30 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // Invert the logic for the checkbox to be more intuitive for the user
                     bool is_multi_stat = !stat_cat.is_simple_stat;
                     if (ImGui::Checkbox("Multi-Stat Category", &is_multi_stat)) {
+                        bool was_simple_stat = stat_cat.is_simple_stat;
                         stat_cat.is_simple_stat = !is_multi_stat;
-                        // If we are switching FROM multi-stat TO simple-stat and have more than one criterion,
-                        // we keep the first one and discard the rest.
-                        if (stat_cat.is_simple_stat && stat_cat.criteria.size() > 1) {
-                            EditorTrackableItem first_crit = stat_cat.criteria[0];
-                            stat_cat.criteria.clear();
-                            stat_cat.criteria.push_back(first_crit);
+
+                        // Ensure at least one criterion exists to avoid errors
+                        if (stat_cat.criteria.empty()) {
+                            stat_cat.criteria.push_back({});
+                        }
+
+                        // If switching FROM Simple TO Multi-Stat
+                        if (was_simple_stat && !stat_cat.is_simple_stat) {
+                            // Copy the parent's display name to the first criterion.
+                            strncpy(stat_cat.criteria[0].display_name, stat_cat.display_name, sizeof(stat_cat.criteria[0].display_name) - 1);
+                        }
+                        // If switching FROM Multi-Stat TO Simple Stat
+                        else if (!was_simple_stat && stat_cat.is_simple_stat) {
+                            // Copy the first criterion's display name up to the parent.
+                            strncpy(stat_cat.display_name, stat_cat.criteria[0].display_name, sizeof(stat_cat.display_name) - 1);
+
+                            // If there were multiple criteria, keep only the first one.
+                            if (stat_cat.criteria.size() > 1) {
+                                EditorTrackableItem first_crit = stat_cat.criteria[0];
+                                stat_cat.criteria.clear();
+                                stat_cat.criteria.push_back(first_crit);
+                            }
                         }
                         save_message_type = MSG_NONE;
                     }
