@@ -213,22 +213,21 @@ static bool has_duplicate_stage_ids(const std::vector<EditorSubGoal> &stages, ch
 // Helper to validate that all icon paths in a vector exist
 static bool validate_icon_paths(const std::vector<EditorTrackableItem> &items, char *error_message_buffer) {
     for (const auto &item: items) {
-        // Validate icon paths for visible items
-        if (!item.is_hidden) {
-            // If path is empty
-            if (item.icon_path[0] == '\0') {
-                snprintf(error_message_buffer, 256, "Error: Visible item '%s' is missing an icon path.",
-                         item.root_name);
-                return false;
-            }
-            // If path is non-empty
-            char full_path[MAX_PATH_LENGTH];
-            snprintf(full_path, sizeof(full_path), "resources/icons/%s", item.icon_path);
-            if (!path_exists(full_path)) {
-                snprintf(error_message_buffer, 256, "Error: Icon file not found for '%s': '%s'", item.root_name,
-                         item.icon_path);
-                return false;
-            }
+        // Validate icon paths
+
+        // If path is empty
+        if (item.icon_path[0] == '\0') {
+            snprintf(error_message_buffer, 256, "Error: Visible item '%s' is missing an icon path.",
+                     item.root_name);
+            return false;
+        }
+        // If path is non-empty
+        char full_path[MAX_PATH_LENGTH];
+        snprintf(full_path, sizeof(full_path), "resources/icons/%s", item.icon_path);
+        if (!path_exists(full_path)) {
+            snprintf(error_message_buffer, 256, "Error: Icon file not found for '%s': '%s'", item.root_name,
+                     item.icon_path);
+            return false;
         }
     }
     return true;
@@ -237,23 +236,22 @@ static bool validate_icon_paths(const std::vector<EditorTrackableItem> &items, c
 // Helper to validate icon paths for multi-stage goals
 static bool validate_ms_goal_icon_paths(const std::vector<EditorMultiStageGoal> &goals, char *error_message_buffer) {
     for (const auto &goal: goals) {
-        // Validate icon paths for visible goals
-        if (!goal.is_hidden) {
-            // When path is empty
-            if (goal.icon_path[0] == '\0') {
-                snprintf(error_message_buffer, 256, "Error: Visible multi-stage goal '%s' is missing an icon path.",
-                         goal.root_name);
-                return false;
-            }
+        // Validate icon paths
 
-            // When path is wrong
-            char full_path[MAX_PATH_LENGTH];
-            snprintf(full_path, sizeof(full_path), "resources/icons/%s", goal.icon_path);
-            if (!path_exists(full_path)) {
-                snprintf(error_message_buffer, 256, "Error: Icon file not found for goal '%s': '%s'", goal.root_name,
-                         goal.icon_path);
-                return false;
-            }
+        // When path is empty
+        if (goal.icon_path[0] == '\0') {
+            snprintf(error_message_buffer, 256, "Error: Visible multi-stage goal '%s' is missing an icon path.",
+                     goal.root_name);
+            return false;
+        }
+
+        // When path is wrong
+        char full_path[MAX_PATH_LENGTH];
+        snprintf(full_path, sizeof(full_path), "resources/icons/%s", goal.icon_path);
+        if (!path_exists(full_path)) {
+            snprintf(error_message_buffer, 256, "Error: Icon file not found for goal '%s': '%s'", goal.root_name,
+                     goal.icon_path);
+            return false;
         }
     }
     return true;
@@ -264,42 +262,40 @@ static bool validate_category_icon_paths(const std::vector<EditorTrackableCatego
                                          char *error_message_buffer) {
     for (const auto &cat: categories) {
         // Check parent icon path
-        // When path is not hidden we validate it
-        if (!cat.is_hidden) {
-            if (cat.icon_path[0] == '\0') {
-                snprintf(error_message_buffer, 256, "Error: Visible category '%s' is missing an icon path.",
+
+        if (cat.icon_path[0] == '\0') {
+            snprintf(error_message_buffer, 256, "Error: Visible category '%s' is missing an icon path.",
+                     cat.root_name);
+            return false;
+        }
+        // When path exists we validate correctness
+        char full_path[MAX_PATH_LENGTH];
+        snprintf(full_path, sizeof(full_path), "resources/icons/%s", cat.icon_path);
+        if (!path_exists(full_path)) {
+            snprintf(error_message_buffer, 256, "Error: Icon file not found for '%s': '%s'", cat.root_name,
+                     cat.icon_path);
+            return false;
+        }
+
+        // Check criteria icon paths (excluding simple stats which inherit their icon)
+        for (const auto &crit: cat.criteria) {
+            // Validate icon paths
+
+            // Check for empty path when it's empty and not a simple stat
+            if (crit.icon_path[0] == '\0' && !cat.is_simple_stat) {
+                snprintf(error_message_buffer, 256,
+                         "Error: Visible criterion '%s' in category '%s' is missing an icon path.", crit.root_name,
                          cat.root_name);
                 return false;
             }
-            // When path exists we validate correctness
-            char full_path[MAX_PATH_LENGTH];
-            snprintf(full_path, sizeof(full_path), "resources/icons/%s", cat.icon_path);
-            if (!path_exists(full_path)) {
-                snprintf(error_message_buffer, 256, "Error: Icon file not found for '%s': '%s'", cat.root_name,
-                         cat.icon_path);
-                return false;
-            }
-        }
-        // Check criteria icon paths (excluding simple stats which inherit their icon)
-        for (const auto &crit: cat.criteria) {
-            // Validate only visible icon paths
-            if (!crit.is_hidden) {
-                // Check for empty path when it's empty and not a simple stat
-                if (crit.icon_path[0] == '\0' && !cat.is_simple_stat) {
-                    snprintf(error_message_buffer, 256,
-                             "Error: Visible criterion '%s' in category '%s' is missing an icon path.", crit.root_name,
-                             cat.root_name);
+            // check for incorrect path when it's not empty and complex stat
+            if (crit.icon_path[0] != '\0') {
+                char full_path[MAX_PATH_LENGTH];
+                snprintf(full_path, sizeof(full_path), "resources/icons/%s", crit.icon_path);
+                if (!path_exists(full_path)) {
+                    snprintf(error_message_buffer, 256, "Error: Icon file not found for criterion '%s': '%s'",
+                             crit.root_name, crit.icon_path);
                     return false;
-                }
-                // check for incorrect path when it's not empty and complex stat
-                if (crit.icon_path[0] != '\0') {
-                    char full_path[MAX_PATH_LENGTH];
-                    snprintf(full_path, sizeof(full_path), "resources/icons/%s", crit.icon_path);
-                    if (!path_exists(full_path)) {
-                        snprintf(error_message_buffer, 256, "Error: Icon file not found for criterion '%s': '%s'",
-                                 crit.root_name, crit.icon_path);
-                        return false;
-                    }
                 }
             }
         }
@@ -1962,12 +1958,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // If switching FROM Simple TO Multi-Stat
                         if (was_simple_stat && !stat_cat.is_simple_stat) {
                             // Copy the parent's display name to the first criterion.
-                            strncpy(stat_cat.criteria[0].display_name, stat_cat.display_name, sizeof(stat_cat.criteria[0].display_name) - 1);
+                            strncpy(stat_cat.criteria[0].display_name, stat_cat.display_name,
+                                    sizeof(stat_cat.criteria[0].display_name) - 1);
                         }
                         // If switching FROM Multi-Stat TO Simple Stat
                         else if (!was_simple_stat && stat_cat.is_simple_stat) {
                             // Copy the first criterion's display name up to the parent.
-                            strncpy(stat_cat.display_name, stat_cat.criteria[0].display_name, sizeof(stat_cat.display_name) - 1);
+                            strncpy(stat_cat.display_name, stat_cat.criteria[0].display_name,
+                                    sizeof(stat_cat.display_name) - 1);
 
                             // If there were multiple criteria, keep only the first one.
                             if (stat_cat.criteria.size() > 1) {
