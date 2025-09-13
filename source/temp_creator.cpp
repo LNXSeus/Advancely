@@ -2831,7 +2831,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::SetTooltip(
                 "A variant for the category (e.g., '_optimized', '_modded').\nCannot contain spaces or special characters.");
 
-        if (ImGui::Button("Create Files")) {
+        // Also allow enter key ONLY WHEN the window is focused
+        if (ImGui::Button("Create Files") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))) {
             if (creator_version_idx >= 0) {
                 char error_msg[256] = "";
 
@@ -2874,7 +2875,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::InputText("New Category Name", copy_template_category, sizeof(copy_template_category));
         ImGui::InputText("New Optional Flag", copy_template_flag, sizeof(copy_template_flag));
 
-        if (ImGui::Button("Confirm Copy")) {
+        // Allowing enter key to confirm copy WHEN the window is focused
+        if (ImGui::Button("Confirm Copy") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))) {
             if (selected_template_index != -1 && copy_template_version_idx >= 0) {
                 const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
                 const char *dest_version = VERSION_STRINGS[copy_template_version_idx];
@@ -2913,7 +2915,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", popup_error_msg);
         }
 
-        if (ImGui::Button("OK", ImVec2(120, 0))) {
+        if (ImGui::Button("OK", ImVec2(120, 0)) || (!ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
             popup_error_msg[0] = '\0';
             if (validate_and_create_lang_file(creator_version_str, selected.category, selected.optional_flag, lang_flag_buffer, popup_error_msg, sizeof(popup_error_msg))) {
                 SDL_SetAtomicInt(&g_templates_changed, 1);
@@ -2922,11 +2924,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 show_create_lang_popup = false;
             }
         }
+        // Cancel hover text
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Press ENTER to confirm.");
+        }
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+        if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             popup_error_msg[0] = '\0';
             ImGui::CloseCurrentPopup();
             show_create_lang_popup = false;
+        }
+        // Cancel hover text
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Press ESC to cancel.");
         }
         ImGui::EndPopup();
     }
@@ -2951,7 +2961,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Warning: Source was empty. Copied from Default instead.");
         }
 
-        if (ImGui::Button("OK", ImVec2(120, 0))) {
+        if (ImGui::Button("OK", ImVec2(120, 0)) || (!ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
             if (show_fallback_warning) {
                 // This is the second OK click, just close the popup
                 ImGui::CloseCurrentPopup();
@@ -2975,12 +2985,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 // On COPY_LANG_FAIL, the error message is set and the popup remains open
             }
         }
+        // Cancel hover text
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Press ENTER to confirm.");
+        }
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+        if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             popup_error_msg[0] = '\0';
             show_fallback_warning = false; // Reset state
             ImGui::CloseCurrentPopup();
             show_copy_lang_popup = false;
+        }
+        // Cancel hover text
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Press ESC to cancel.");
         }
         ImGui::EndPopup();
     }
@@ -2990,7 +3008,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         const auto& lang_to_delete = selected.available_lang_flags[selected_lang_index];
         ImGui::Text("Are you sure you want to delete the '%s' language file?", lang_to_delete.c_str());
         ImGui::Separator();
-        if (ImGui::Button("OK", ImVec2(120, 0))) {
+        if (ImGui::Button("OK", ImVec2(120, 0)) || (!ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
             char error_msg[256];
             if (delete_lang_file(creator_version_str, selected.category, selected.optional_flag, lang_to_delete.c_str(), error_msg, sizeof(error_msg))) {
                 SDL_SetAtomicInt(&g_templates_changed, 1);
@@ -3001,9 +3019,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
             ImGui::CloseCurrentPopup();
         }
+        // Cancel hover text
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Press ENTER to confirm.");
+        }
         ImGui::SameLine();
-        if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+        if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             ImGui::CloseCurrentPopup();
+        }
+        // Cancel hover text
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Press ESC to cancel.");
         }
         ImGui::EndPopup();
     }
