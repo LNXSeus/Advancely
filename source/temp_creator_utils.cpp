@@ -14,6 +14,8 @@
 #include "path_utils.h" // For path_exists
 #include "main.h" // For MAX_PATH_LENGTH
 #include "template_scanner.h"
+#include "file_utils.h" // For cJSON_from_file
+#include "settings_utils.h" // For version checking
 
 #ifdef _WIN32
 #include <direct.h> // For _mkdir
@@ -32,6 +34,19 @@ static bool is_valid_filename_part(const char* part) {
         }
     }
     return true;
+}
+
+// NLocal helper to check if a string ends with a specific suffix
+static bool ends_with(const char *str, const char *suffix) {
+    if (!str || !suffix) {
+        return false;
+    }
+    size_t str_len = strlen(str);
+    size_t suffix_len = strlen(suffix);
+    if (suffix_len > str_len) {
+        return false;
+    }
+    return strncmp(str + str_len - suffix_len, suffix, suffix_len) == 0;
 }
 
 void fs_ensure_directory_exists(const char *path) {
@@ -132,6 +147,17 @@ bool validate_and_create_template(const char* version, const char* category, con
         return false;
     }
 
+    // Prevent using reserved "_snapshot" suffix in legacy versions
+    MC_Version version_enum = settings_get_version_from_string(version);
+    if (version_enum <= MC_VERSION_1_6_4) {
+        char combined_name[MAX_PATH_LENGTH];
+        snprintf(combined_name, sizeof(combined_name), "%s%s", category, flag);
+        if (ends_with(combined_name, "_snapshot")) {
+            snprintf(error_message, error_msg_size, "Error: Template name cannot end with '_snapshot' for legacy versions.");
+            return false;
+        }
+    }
+
     // 2. Check for Name Collisions by scanning all templates for the version
     char new_combo[MAX_PATH_LENGTH];
     snprintf(new_combo, sizeof(new_combo), "%s%s", category, flag);
@@ -204,6 +230,17 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
         return false;
     }
 
+    // Prevent copying to a reserved "_snapshot" suffix in legacy versions
+    MC_Version dest_version_enum = settings_get_version_from_string(dest_version);
+    if (dest_version_enum <= MC_VERSION_1_6_4) {
+        char combined_name[MAX_PATH_LENGTH];
+        snprintf(combined_name, sizeof(combined_name), "%s%s", dest_category, dest_flag);
+        if (ends_with(combined_name, "_snapshot")) {
+            snprintf(error_message, error_msg_size, "Error: Template name cannot end with '_snapshot' for legacy versions.");
+            return false;
+        }
+    }
+
     // 2. Check for Name Collisions at Destination
     char new_combo[MAX_PATH_LENGTH];
     snprintf(new_combo, sizeof(new_combo), "%s%s", dest_category, dest_flag);
@@ -238,9 +275,8 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
     snprintf(src_base_path, sizeof(src_base_path), "resources/templates/%s/%s/%s_%s%s",
              src_version, src_category, src_version_filename, src_category, src_flag);
 
-    char src_template_path[MAX_PATH_LENGTH], src_lang_path[MAX_PATH_LENGTH];
+    char src_template_path[MAX_PATH_LENGTH];
     snprintf(src_template_path, sizeof(src_template_path), "%s.json", src_base_path);
-    snprintf(src_lang_path, sizeof(src_lang_path), "%s_lang.json", src_base_path);
 
     // 4. Check if source template is empty or invalid
     cJSON* src_template_json = cJSON_from_file(src_template_path);
@@ -261,26 +297,55 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
     snprintf(dest_base_path, sizeof(dest_base_path), "resources/templates/%s/%s/%s_%s%s",
              dest_version, dest_category, dest_version_filename, dest_category, dest_flag);
 
-    char dest_template_path[MAX_PATH_LENGTH], dest_lang_path[MAX_PATH_LENGTH];
+    char dest_template_path[MAX_PATH_LENGTH];
     snprintf(dest_template_path, sizeof(dest_template_path), "%s.json", dest_base_path);
-    snprintf(dest_lang_path, sizeof(dest_lang_path), "%s_lang.json", dest_base_path);
 
     // 6. Create Directory and Copy Files
     char dest_dir_path[MAX_PATH_LENGTH];
     snprintf(dest_dir_path, sizeof(dest_dir_path), "resources/templates/%s/%s", dest_version, dest_category);
     fs_ensure_directory_exists(dest_dir_path);
 
+    // Copy the main template file
     if (!fs_copy_file(src_template_path, dest_template_path)) {
-        snprintf(error_message, error_msg_size, "Error: Failed to copy template file.");
+        snprintf(error_message, error_msg_size, "Error: Failed to copy main template file.");
         return false;
     }
-    if (path_exists(src_lang_path)) {
-        if (!fs_copy_file(src_lang_path, dest_lang_path)) {
-            // This is not a critical failure, but we should warn the user.
-            log_message(LOG_ERROR, "[TEMP CREATE UTILS] Failed to copy language file for %s.\n", src_category);
-        }
-    }
 
+    // 7. Find and copy ALL associated language files
+    DiscoveredTemplate* src_templates = nullptr;
+    int src_template_count = 0;
+    scan_for_templates(src_version, &src_templates, &src_template_count);
+    if (src_templates) {
+        for (int i = 0; i < src_template_count; ++i) {
+            // Find the specific template we are copying from in the scanned list
+            if (strcmp(src_templates[i].category, src_category) == 0 && strcmp(src_templates[i].optional_flag, src_flag) == 0) {
+                // Now, iterate through all its found language files and copy them
+                for (const auto& lang_flag : src_templates[i].available_lang_flags) {
+                    char src_lang_path[MAX_PATH_LENGTH];
+                    char dest_lang_path[MAX_PATH_LENGTH];
+
+                    char lang_suffix[70];
+                    if (!lang_flag.empty()) {
+                        snprintf(lang_suffix, sizeof(lang_suffix), "_%s", lang_flag.c_str());
+                    } else {
+                        lang_suffix[0] = '\0';
+                    }
+
+                    snprintf(src_lang_path, sizeof(src_lang_path), "%s_lang%s.json", src_base_path, lang_suffix);
+                    snprintf(dest_lang_path, sizeof(dest_lang_path), "%s_lang%s.json", dest_base_path, lang_suffix);
+
+                    if (path_exists(src_lang_path)) {
+                        if (!fs_copy_file(src_lang_path, dest_lang_path)) {
+                            log_message(LOG_ERROR, "[TEMP CREATE UTILS] Failed to copy language file: %s\n", src_lang_path);
+                            // Not a critical failure, so we just log it and continue
+                        }
+                    }
+                }
+                break; // Found our template, no need to check others
+            }
+        }
+        free_discovered_templates(&src_templates, &src_template_count);
+    }
     return true;
 }
 

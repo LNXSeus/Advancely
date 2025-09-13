@@ -272,6 +272,20 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         }
     }
 
+    // Only show the StatsPerWorld checkbox for legacy versions
+    MC_Version selected_version = settings_get_version_from_string(temp_settings.version_str);
+    if (selected_version <= MC_VERSION_1_6_4) {
+        ImGui::Checkbox("Using StatsPerWorld Mod", &temp_settings.using_stats_per_world_legacy);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "The StatsPerWorld Mod (with Legacy Fabric) allows legacy Minecraft versions\n"
+                "to track stats locally per world. Check this if you're using this mod.\n\n"
+                "If unchecked, the tracker will use a snapshot system to simulate per-world\n"
+                "progress, and achievements will indicate if they were completed on a previous world."
+            );
+        }
+    }
+
     // --- SCANNING & UI LOGIC ---
     if (strcmp(last_scanned_version, temp_settings.version_str) != 0) {
         free_discovered_templates(&discovered_templates, &discovered_template_count);
@@ -307,6 +321,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             }
             // Since category is invalid, the flag must also be reset
             temp_settings.optional_flag[0] = '\0';
+            temp_settings.lang_flag[0] = '\0';
         }
 
         // This change may have altered the hotkey structure. To prevent a false "Unsaved Changes"

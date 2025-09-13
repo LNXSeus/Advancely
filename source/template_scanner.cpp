@@ -80,10 +80,9 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
             while ((file_entry = readdir(cat_dir)) != nullptr) {
                 const char* filename = D_FILENAME(file_entry);
 #endif
-                // --- COMMON LOGIC FOR BOTH PLATFORMS ---
-                const char *ext = strrchr(filename, '.');
-                if (!ext || strcmp(ext, ".json") != 0 || strstr(filename, "_lang") || strstr(filename, "_snapshot") ||
-                    strstr(filename, "_notes")) continue;
+                // --- Phase 1: Find main template files ---
+                const char* ext = strrchr(filename, '.');
+                if (!ext || strcmp(ext, ".json") != 0 || strstr(filename, "_lang") || strstr(filename, "_snapshot") || strstr(filename, "_notes")) continue;
 
                 char base_name[MAX_PATH_LENGTH];
                 strncpy(base_name, filename, ext - filename);
@@ -102,7 +101,7 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
                 strncpy(dt.category, category, sizeof(dt.category) - 1);
                 strncpy(dt.optional_flag, flag_start, sizeof(dt.optional_flag) - 1);
 
-                // Phase 2: Find all associated language files for this template
+                // --- Phase 2: Find all associated language files for this template ---
                 #ifdef _WIN32
                     WIN32_FIND_DATAA find_lang_data;
                     HANDLE h_find_lang = FindFirstFileA(file_search_path, &find_lang_data);
@@ -115,11 +114,16 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
                     while ((lang_entry = readdir(cat_dir)) != nullptr) {
                         const char* lang_filename = lang_entry->d_name;
                 #endif
-                        if (strncmp(lang_filename, base_name, strlen(base_name)) == 0) {
-                            const char* lang_part = strstr(lang_filename, "_lang");
-                            if (lang_part) {
+                        const char* lang_part = strstr(lang_filename, "_lang");
+                        if (lang_part) {
+                            char lang_base_name[MAX_PATH_LENGTH];
+                            strncpy(lang_base_name, lang_filename, lang_part - lang_filename);
+                            lang_base_name[lang_part - lang_filename] = '\0';
+
+                            // This is the crucial check: ensure the base name is an EXACT match
+                            if (strcmp(base_name, lang_base_name) == 0) {
                                 if (strcmp(lang_part, "_lang.json") == 0) {
-                                    dt.available_lang_flags.push_back(""); // Default
+                                    dt.available_lang_flags.emplace_back(""); // Default
                                 } else if (strncmp(lang_part, "_lang_", strlen("_lang_")) == 0) {
                                     const char* lang_flag_start = lang_part + strlen("_lang_");
                                     const char* lang_flag_end = strstr(lang_flag_start, ".json");
@@ -138,7 +142,7 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
                 #endif
 
                 if (dt.available_lang_flags.empty()) {
-                    dt.available_lang_flags.push_back("");
+                    dt.available_lang_flags.emplace_back("");
                 }
                 std::sort(dt.available_lang_flags.begin(), dt.available_lang_flags.end());
                 found_templates_vec.push_back(std::move(dt));

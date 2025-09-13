@@ -1329,7 +1329,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     }
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip(
-            "Copy the currently selected template. You can modify its version, category or optional flag.");
+            "Creates a copy of the selected template. You can then change its version, category, or flag.\n\n"
+            "Note: This action copies the main template file and all of its\n"
+            "associated language files (e.g., _lang.json, _lang_eng.json)."
+        );
 
     ImGui::EndDisabled();
     ImGui::SameLine();
@@ -1520,7 +1523,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
         }
 
-        if (ImGui::Combo("Editing Language", &current_lang_idx, lang_display_names.data(),
+        if (ImGui::Combo("Display Language", &current_lang_idx, lang_display_names.data(),
                          (int) lang_display_names.size())) {
             auto switch_action = [&, current_lang_idx]() {
                 selected_lang_flag = selected_template_info.available_lang_flags[current_lang_idx];
@@ -1539,6 +1542,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 switch_action();
             }
         }
+        // Display language tooltip
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(
+                "Select the language file for editing display names.\n\n"
+                "• Loading: Changing this selection will reload all 'Display Name' fields in the editor from the chosen file.\n"
+                "• Saving: Edits to display names are saved to the language selected here when you click the main 'Save' button.\n\n"
+                "This keeps the template's core structure separate from its translations."
+            );
         ImGui::Separator();
 
         // Save when creator window is focused
