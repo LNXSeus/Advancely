@@ -9,6 +9,7 @@
 #include <string>
 #include <algorithm>
 #include <cstring>
+#include "settings_utils.h" // For version checking
 
 #ifdef _WIN32
 #include <windows.h>
@@ -37,6 +38,11 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
     *out_templates = nullptr;
     *out_count = 0;
     if (!version_str || version_str[0] == '\0') return;
+
+    // Determine if we are scanning for a legacy version up front
+    MC_Version version_enum = settings_get_version_from_string(version_str);
+    bool is_legacy_version = (version_enum <= MC_VERSION_1_6_4);
+
 
     std::vector<DiscoveredTemplate> found_templates_vec;
     char base_path[MAX_PATH_LENGTH];
@@ -82,7 +88,11 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
 #endif
                 // --- Phase 1: Find main template files ---
                 const char* ext = strrchr(filename, '.');
-                if (!ext || strcmp(ext, ".json") != 0 || strstr(filename, "_lang") || strstr(filename, "_snapshot") || strstr(filename, "_notes")) continue;
+                // Universal filters for language, notes, and non-json files
+                if (!ext || strcmp(ext, ".json") != 0 || strstr(filename, "_lang") || strstr(filename, "_notes")) continue;
+
+                // Legacy-only filter for _snapshot files
+                if (is_legacy_version && strstr(filename, "_snapshot")) continue;
 
                 char base_name[MAX_PATH_LENGTH];
                 strncpy(base_name, filename, ext - filename);

@@ -230,7 +230,7 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
         return false;
     }
 
-    // Prevent copying to a reserved "_snapshot" suffix in legacy versions
+    // Prevent copying to a reserved "_snapshot" suffix
     MC_Version dest_version_enum = settings_get_version_from_string(dest_version);
     if (dest_version_enum <= MC_VERSION_1_6_4) {
         char combined_name[MAX_PATH_LENGTH];

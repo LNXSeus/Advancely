@@ -225,12 +225,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::Text("Template Settings");
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip(
-            "Select the Version, Category, and an Optional Flag to construct the path to your template files.\n"
-            "The final path will look like: resources/templates/Version/Category/Version_CategoryOptionalFlag.json\n"
-            "The corresponding language file must end in _lang.json and holds all the formatted text that displays in the UI.\n\n"
-            "You can create new categories and templates by creating new folders and files that follow this structure.\n"
-            "Feel free to modify the .json files to customize your goals.\n"
-            "(Template creator built into this tracker coming soon!)"
+            "Select the Version, Category, Optional Flag, and Language to use for the tracker.\n\n"
+            "These settings construct the path to your template files, which looks like:\n"
+            "resources/templates/Version/Category/Version_CategoryOptionalFlag.json\n\n"
+            "Each template has one or more language files (e.g., ..._lang.json for default, ..._lang_eng.json for English)\n"
+            "that store all the display names shown in the UI.\n\n"
+            "Use the 'Create Template' button to build new templates, edit existing ones, and manage their language files."
         );
     }
 
