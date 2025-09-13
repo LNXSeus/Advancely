@@ -7,7 +7,7 @@
 
 #include <algorithm>
 #include <string>
-#include <string.h> // For memcmp on simple sub-structs
+#include <cstring> // For memcmp on simple sub-structs
 
 #include "logger.h"
 
@@ -27,6 +27,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         strcmp(a->version_str, b->version_str) != 0 ||
         strcmp(a->category, b->category) != 0 ||
         strcmp(a->optional_flag, b->optional_flag) != 0 ||
+        strcmp(a->lang_flag, b->lang_flag) != 0 ||
         a->enable_overlay != b->enable_overlay ||
         a->using_stats_per_world_legacy != b->using_stats_per_world_legacy ||
         a->fps != b->fps ||
@@ -377,6 +378,41 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (flag_idx >= 0 && (size_t) flag_idx < flag_values.size()) {
             strncpy(temp_settings.optional_flag, flag_values[flag_idx].c_str(),
                     sizeof(temp_settings.optional_flag) - 1);
+        }
+    }
+
+    // --- LANGUAGE DROPDOWN ---
+    if (category_idx != -1) {
+        // Find the selected template to get its available languages
+        DiscoveredTemplate* selected_template = nullptr;
+        for (int i = 0; i < discovered_template_count; ++i) {
+            if (strcmp(discovered_templates[i].category, temp_settings.category) == 0 &&
+                strcmp(discovered_templates[i].optional_flag, temp_settings.optional_flag) == 0) {
+                selected_template = &discovered_templates[i];
+                break;
+                }
+        }
+
+        if (selected_template) {
+            std::vector<const char*> lang_display_names;
+            for (const auto& flag : selected_template->available_lang_flags) {
+                lang_display_names.push_back(flag.empty() ? "Default" : flag.c_str());
+            }
+
+            int lang_idx = -1;
+            for (size_t i = 0; i < selected_template->available_lang_flags.size(); ++i) {
+                if (selected_template->available_lang_flags[i] == temp_settings.lang_flag) {
+                    lang_idx = (int)i;
+                    break;
+                }
+            }
+
+            if (ImGui::Combo("Language", &lang_idx, lang_display_names.data(), (int)lang_display_names.size())) {
+                if (lang_idx >= 0 && (size_t)lang_idx < selected_template->available_lang_flags.size()) {
+                    const std::string& selected_flag_str = selected_template->available_lang_flags[lang_idx];
+                    strncpy(temp_settings.lang_flag, selected_flag_str.c_str(), sizeof(temp_settings.lang_flag) - 1);
+                }
+            }
         }
     }
 
@@ -965,6 +1001,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Version: %s\n"
                  "  - Category: %s\n"
                  "  - Optional Flag: %s\n"
+                 "  - Language: Default\n"
                  "  - StatsPerWorld Mod (Legacy): %s\n"
                  "  - Section Order: Advancements -> Unlocks -> Stats -> Custom -> Multi-Stage\n"
                  "  - Enable Overlay: %s\n"

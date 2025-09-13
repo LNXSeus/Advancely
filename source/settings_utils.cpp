@@ -219,6 +219,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->manual_saves_path[0] = '\0';
     strncpy(settings->category, DEFAULT_CATEGORY, sizeof(settings->category) - 1);
     strncpy(settings->optional_flag, DEFAULT_OPTIONAL_FLAG, sizeof(settings->optional_flag) - 1);
+    settings->lang_flag[0] = '\0';
 
     // Set the default section order
     for (int i = 0; i < SECTION_COUNT; i++) {
@@ -323,6 +324,14 @@ bool settings_load(AppSettings *settings) {
                 sizeof(settings->optional_flag) - 1);
     else {
         settings->optional_flag[0] = '\0';
+        defaults_were_used = true;
+    }
+
+    const cJSON *lang_flag_json = cJSON_GetObjectItem(json, "lang_flag");
+    if (lang_flag_json && cJSON_IsString(lang_flag_json))
+        strncpy(settings->lang_flag, lang_flag_json->valuestring, sizeof(settings->lang_flag) - 1);
+    else {
+        settings->lang_flag[0] = '\0';
         defaults_were_used = true;
     }
 
@@ -565,6 +574,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(root, "category", cJSON_CreateString(settings->category));
         cJSON_DeleteItemFromObject(root, "optional_flag");
         cJSON_AddItemToObject(root, "optional_flag", cJSON_CreateString(settings->optional_flag));
+        cJSON_DeleteItemFromObject(root, "lang_flag");
+        cJSON_AddItemToObject(root, "lang_flag", cJSON_CreateString(settings->lang_flag));
 
         // Update General Settings
         cJSON *general_obj = get_or_create_object(root, "general");
@@ -747,9 +758,17 @@ void construct_template_paths(AppSettings *settings) {
              settings->optional_flag
     );
 
+    // Construct the language file suffix (e.g., "_eng" or "")
+    char lang_suffix[70];
+    if (settings->lang_flag[0] != '\0') {
+        snprintf(lang_suffix, sizeof(lang_suffix), "_%s", settings->lang_flag);
+    } else {
+        lang_suffix[0] = '\0';
+    }
+
     // Construct the main template, language file and (if needed) legacy snapshot paths
     snprintf(settings->template_path, MAX_PATH_LENGTH, "%s.json", base_path);
-    snprintf(settings->lang_path, MAX_PATH_LENGTH, "%s_lang.json", base_path);
+    snprintf(settings->lang_path, MAX_PATH_LENGTH, "%s_lang%s.json", base_path, lang_suffix);
     snprintf(settings->snapshot_path, MAX_PATH_LENGTH, "%s_snapshot.json", base_path);
     snprintf(settings->notes_path, MAX_PATH_LENGTH, "%s_notes.txt", base_path);
 }

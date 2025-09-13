@@ -4,6 +4,7 @@
   "version":	"1.16.1",
   "category":	"all_advancements",
   "optional_flag":	"",
+  "lang_flag": "",
   "general":	{
     "section_order":	[0, 1, 2, 3, 4],
     "enable_overlay":	false,

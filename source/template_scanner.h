@@ -6,6 +6,8 @@
 #define TEMPLATE_SCANNER_H
 
 #include "main.h" // For MAX_PATH_LENGTH
+#include <vector>
+#include <string>
 
 #ifdef __cplusplus
 extern "C" {
@@ -14,11 +16,11 @@ extern "C" {
 typedef struct {
     char category[MAX_PATH_LENGTH];
     char optional_flag[MAX_PATH_LENGTH];
-    bool lang_file_exists;
+    std::vector<std::string> available_lang_flags;
 } DiscoveredTemplate;
 
 /**
-* @brief Scans the template directory for a given version to find all valid templates.
+* @brief Scans the template directory for a given version to find all valid templates and all of their associated language files.
 * It allocates memory for the results, which must be freed by the caller using free_discovered_templates().
 * @param version_str The Minecraft version string (e.g., "1.16.1").
 * @param out_templates A pointer to an array of DiscoveredTemplate structs that will be allocated.

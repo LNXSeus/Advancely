@@ -105,6 +105,7 @@ struct AppSettings {
     char manual_saves_path[MAX_PATH_LENGTH]; // The user-defined path to the saves folder if path_mode is manual.
     char category[MAX_PATH_LENGTH]; // The speedrun or goal category, used to build the template file name.
     char optional_flag[MAX_PATH_LENGTH]; // An optional string appended to the template file name for variants.
+    char lang_flag[64]; // Selected language flag (e.g., "eng", "pl") empty for default
 
     // --- Section Order ---
     int section_order[SECTION_COUNT]; // Stores the display order of the tracker sections.

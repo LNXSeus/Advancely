@@ -8,6 +8,7 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <cstring>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -32,36 +33,38 @@ static void version_to_filename_format(const char *version_in, char *version_out
     }
 }
 
-void scan_for_templates(const char* version_str, DiscoveredTemplate** out_templates, int* out_count) {
+void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templates, int *out_count) {
     *out_templates = nullptr;
     *out_count = 0;
     if (!version_str || version_str[0] == '\0') return;
 
+    std::vector<DiscoveredTemplate> found_templates_vec;
     char base_path[MAX_PATH_LENGTH];
     snprintf(base_path, sizeof(base_path), "resources/templates/%s", version_str);
-
-    std::vector<DiscoveredTemplate> found_templates;
 
 #ifdef _WIN32
     char search_path[MAX_PATH_LENGTH];
     snprintf(search_path, sizeof(search_path), "%s/*", base_path);
     WIN32_FIND_DATAA find_cat_data;
     HANDLE h_find_cat = FindFirstFileA(search_path, &find_cat_data);
-
     if (h_find_cat == INVALID_HANDLE_VALUE) return;
 
     do {
-        if ((find_cat_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && strcmp(find_cat_data.cFileName, ".") != 0 && strcmp(find_cat_data.cFileName, "..") != 0) {
-            const char* category = find_cat_data.cFileName;
-            char cat_path[MAX_PATH_LENGTH];
-            snprintf(cat_path, sizeof(cat_path), "%s/%s/*", base_path, category);
+        if ((find_cat_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && strcmp(find_cat_data.cFileName, ".") != 0 &&
+            strcmp(find_cat_data.cFileName, "..") != 0) {
+            const char *category = find_cat_data.cFileName;
+            char cat_path_str[MAX_PATH_LENGTH];
+            snprintf(cat_path_str, sizeof(cat_path_str), "%s/%s", base_path, category);
+
+            char file_search_path[MAX_PATH_LENGTH];
+            snprintf(file_search_path, sizeof(file_search_path), "%s/*", cat_path_str);
 
             WIN32_FIND_DATAA find_file_data;
-            HANDLE h_find_file = FindFirstFileA(cat_path, &find_file_data);
+            HANDLE h_find_file = FindFirstFileA(file_search_path, &find_file_data);
             if (h_find_file == INVALID_HANDLE_VALUE) continue;
 
             do {
-                const char* filename = D_FILENAME(find_file_data);
+                const char *filename = D_FILENAME(find_file_data);
 #else // POSIX
     DIR* version_dir = opendir(base_path);
     if (!version_dir) return;
@@ -69,53 +72,77 @@ void scan_for_templates(const char* version_str, DiscoveredTemplate** out_templa
     while ((cat_entry = readdir(version_dir)) != nullptr) {
         if (cat_entry->d_type == DT_DIR && strcmp(cat_entry->d_name, ".") != 0 && strcmp(cat_entry->d_name, "..") != 0) {
             const char* category = cat_entry->d_name;
-            char cat_path[MAX_PATH_LENGTH];
-            snprintf(cat_path, sizeof(cat_path), "%s/%s", base_path, category);
-            DIR* cat_dir = opendir(cat_path);
+            char cat_path_str[MAX_PATH_LENGTH];
+            snprintf(cat_path_str, sizeof(cat_path_str), "%s/%s", base_path, category);
+            DIR* cat_dir = opendir(cat_path_str);
             if (!cat_dir) continue;
             struct dirent* file_entry;
             while ((file_entry = readdir(cat_dir)) != nullptr) {
                 const char* filename = D_FILENAME(file_entry);
 #endif
                 // --- COMMON LOGIC FOR BOTH PLATFORMS ---
-                const char* ext = strrchr(filename, '.');
-                if (!ext || strcmp(ext, ".json") != 0) continue;
-                if (strstr(filename, "_lang.json") || strstr(filename, "_snapshot.json") || strstr(filename, "_notes.json")) continue;
+                const char *ext = strrchr(filename, '.');
+                if (!ext || strcmp(ext, ".json") != 0 || strstr(filename, "_lang") || strstr(filename, "_snapshot") ||
+                    strstr(filename, "_notes")) continue;
 
                 char base_name[MAX_PATH_LENGTH];
                 strncpy(base_name, filename, ext - filename);
                 base_name[ext - filename] = '\0';
 
-                char lang_path[MAX_PATH_LENGTH];
-                snprintf(lang_path, sizeof(lang_path), "%s/%s/%s_lang.json", base_path, category, base_name);
-                bool lang_exists = path_exists(lang_path);
-                if (!lang_exists) {
-                    log_message(LOG_INFO, "[TEMPLATE SCAN] WARNING: Template '%s' is missing a _lang.json file.\n", filename);
-                }
-
-                // --- REVERTED AND CORRECTED VALIDATION LOGIC ---
                 char version_fmt[64];
                 version_to_filename_format(version_str, version_fmt, sizeof(version_fmt));
 
                 char expected_prefix[MAX_PATH_LENGTH];
                 snprintf(expected_prefix, sizeof(expected_prefix), "%s_%s", version_fmt, category);
-                size_t expected_prefix_len = strlen(expected_prefix);
+                if (strncmp(base_name, expected_prefix, strlen(expected_prefix)) != 0) continue;
 
-                if (strncmp(base_name, expected_prefix, expected_prefix_len) != 0) {
-                    log_message(LOG_ERROR, "[TEMPLATE SCAN] ERROR: Template file '%s' in category '%s' has a naming mismatch. Expected prefix: '%s'. Skipping.\n", filename, category, expected_prefix);
-                    continue;
-                }
+                const char* flag_start = base_name + strlen(expected_prefix);
 
-                // The optional flag is simply the entire rest of the string after the prefix.
-                const char* flag_start = base_name + expected_prefix_len;
-
-                DiscoveredTemplate dt;
+                DiscoveredTemplate dt = {};
                 strncpy(dt.category, category, sizeof(dt.category) - 1);
-                dt.category[sizeof(dt.category) - 1] = '\0';
                 strncpy(dt.optional_flag, flag_start, sizeof(dt.optional_flag) - 1);
-                dt.optional_flag[sizeof(dt.optional_flag) - 1] = '\0';
-                dt.lang_file_exists = lang_exists;
-                found_templates.push_back(dt);
+
+                // Phase 2: Find all associated language files for this template
+                #ifdef _WIN32
+                    WIN32_FIND_DATAA find_lang_data;
+                    HANDLE h_find_lang = FindFirstFileA(file_search_path, &find_lang_data);
+                    if (h_find_lang != INVALID_HANDLE_VALUE) {
+                        do {
+                            const char* lang_filename = D_FILENAME(find_lang_data);
+                #else
+                    rewinddir(cat_dir);
+                    struct dirent* lang_entry;
+                    while ((lang_entry = readdir(cat_dir)) != nullptr) {
+                        const char* lang_filename = lang_entry->d_name;
+                #endif
+                        if (strncmp(lang_filename, base_name, strlen(base_name)) == 0) {
+                            const char* lang_part = strstr(lang_filename, "_lang");
+                            if (lang_part) {
+                                if (strcmp(lang_part, "_lang.json") == 0) {
+                                    dt.available_lang_flags.push_back(""); // Default
+                                } else if (strncmp(lang_part, "_lang_", strlen("_lang_")) == 0) {
+                                    const char* lang_flag_start = lang_part + strlen("_lang_");
+                                    const char* lang_flag_end = strstr(lang_flag_start, ".json");
+                                    if (lang_flag_end) {
+                                        dt.available_lang_flags.emplace_back(lang_flag_start, lang_flag_end - lang_flag_start);
+                                    }
+                                }
+                            }
+                        }
+                #ifdef _WIN32
+                        } while (FindNextFileA(h_find_lang, &find_lang_data) != 0);
+                        FindClose(h_find_lang);
+                    }
+                #else
+                    }
+                #endif
+
+                if (dt.available_lang_flags.empty()) {
+                    dt.available_lang_flags.push_back("");
+                }
+                std::sort(dt.available_lang_flags.begin(), dt.available_lang_flags.end());
+                found_templates_vec.push_back(std::move(dt));
+
 #ifdef _WIN32
             } while (FindNextFileA(h_find_file, &find_file_data) != 0);
             FindClose(h_find_file);
@@ -130,18 +157,18 @@ void scan_for_templates(const char* version_str, DiscoveredTemplate** out_templa
     closedir(version_dir);
 #endif
 
-    if (!found_templates.empty()) {
-        *out_count = found_templates.size();
-        *out_templates = (DiscoveredTemplate*)malloc(sizeof(DiscoveredTemplate) * (*out_count));
-        for (size_t i = 0; i < found_templates.size(); ++i) {
-            (*out_templates)[i] = found_templates[i];
+    if (!found_templates_vec.empty()) {
+        *out_count = found_templates_vec.size();
+        *out_templates = new DiscoveredTemplate[*out_count];
+        for (size_t i = 0; i < found_templates_vec.size(); ++i) {
+            (*out_templates)[i] = std::move(found_templates_vec[i]);
         }
     }
 }
 
 void free_discovered_templates(DiscoveredTemplate** templates, int* count) {
     if (*templates) {
-        free(*templates);
+        delete[] *templates;
         *templates = nullptr;
     }
     *count = 0;

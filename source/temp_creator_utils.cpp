@@ -9,6 +9,8 @@
 #include <cstring>
 #include <sys/stat.h> // For stat and mkdir
 #include <cctype> // For isalnum
+
+#include "file_utils.h"
 #include "path_utils.h" // For path_exists
 #include "main.h" // For MAX_PATH_LENGTH
 #include "template_scanner.h"
@@ -240,7 +242,17 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
     snprintf(src_template_path, sizeof(src_template_path), "%s.json", src_base_path);
     snprintf(src_lang_path, sizeof(src_lang_path), "%s_lang.json", src_base_path);
 
-    // 4. Construct Destination Paths
+    // 4. Check if source template is empty or invalid
+    cJSON* src_template_json = cJSON_from_file(src_template_path);
+    if (src_template_json == nullptr || src_template_json->child == nullptr) {
+        snprintf(error_message, error_msg_size, "Error: Source template file is empty or invalid and cannot be copied.");
+        cJSON_Delete(src_template_json); // Delete and return
+        return false;
+    }
+    cJSON_Delete(src_template_json); // We only needed to check it, now we free it.
+
+
+    // 5. Construct Destination Paths
     char dest_version_filename[64];
     strncpy(dest_version_filename, dest_version, sizeof(dest_version_filename) - 1);
     for (char *p = dest_version_filename; *p; p++) { if (*p == '.') *p = '_'; }
@@ -253,7 +265,7 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
     snprintf(dest_template_path, sizeof(dest_template_path), "%s.json", dest_base_path);
     snprintf(dest_lang_path, sizeof(dest_lang_path), "%s_lang.json", dest_base_path);
 
-    // 5. Create Directory and Copy Files
+    // 6. Create Directory and Copy Files
     char dest_dir_path[MAX_PATH_LENGTH];
     snprintf(dest_dir_path, sizeof(dest_dir_path), "resources/templates/%s/%s", dest_version, dest_category);
     fs_ensure_directory_exists(dest_dir_path);
@@ -307,3 +319,130 @@ bool delete_template_files(const char* version, const char* category, const char
     return success;
 }
 
+// Helper to construct the base path for a template's files, reducing code duplication.
+static void construct_template_base_path(const char* version, const char* category, const char* flag, char* out_path, size_t max_len) {
+    char version_filename[64];
+    strncpy(version_filename, version, sizeof(version_filename) - 1);
+    version_filename[sizeof(version_filename) - 1] = '\0';
+    for (char* p = version_filename; *p; p++) {
+        if (*p == '.') *p = '_';
+    }
+    snprintf(out_path, max_len, "resources/templates/%s/%s/%s_%s%s",
+        version, category, version_filename, category, flag);
+}
+
+bool validate_and_create_lang_file(const char* version, const char* category, const char* flag, const char* new_lang_flag, char* error_message, size_t error_msg_size) {
+    // 1. Validate new_lang_flag
+    if (!new_lang_flag || new_lang_flag[0] == '\0') {
+        snprintf(error_message, error_msg_size, "Error: Language flag cannot be empty.");
+        return false;
+    }
+    if (!is_valid_filename_part(new_lang_flag)) {
+        snprintf(error_message, error_msg_size, "Error: Language flag contains invalid characters.");
+        return false;
+    }
+
+    // 2. Construct path and check if it already exists
+    char base_path[MAX_PATH_LENGTH];
+    construct_template_base_path(version, category, flag, base_path, sizeof(base_path));
+
+    char new_lang_path[MAX_PATH_LENGTH];
+    snprintf(new_lang_path, sizeof(new_lang_path), "%s_lang_%s.json", base_path, new_lang_flag);
+
+    if (path_exists(new_lang_path)) {
+        snprintf(error_message, error_msg_size, "Error: A language file with the flag '%s' already exists.", new_lang_flag);
+        return false;
+    }
+
+    // 3. Create the empty file
+    fs_create_empty_lang_file(new_lang_path);
+    return true;
+}
+
+CopyLangResult copy_lang_file(const char* version, const char* category, const char* flag, const char* src_lang_flag, const char* dest_lang_flag, char* error_message, size_t error_msg_size) {
+    // 1. Validate dest_lang_flag
+    if (!dest_lang_flag || dest_lang_flag[0] == '\0') {
+        snprintf(error_message, error_msg_size, "Error: Destination language flag cannot be empty.");
+        return COPY_LANG_FAIL;
+    }
+    if (!is_valid_filename_part(dest_lang_flag)) {
+        snprintf(error_message, error_msg_size, "Error: Destination language flag contains invalid characters.");
+        return COPY_LANG_FAIL;
+    }
+    if (strcmp(src_lang_flag, dest_lang_flag) == 0) {
+        snprintf(error_message, error_msg_size, "Error: Destination flag must be different from the source.");
+        return COPY_LANG_FAIL;
+    }
+
+    // 2. Construct paths
+    char base_path[MAX_PATH_LENGTH];
+    construct_template_base_path(version, category, flag, base_path, sizeof(base_path));
+
+    char src_path[MAX_PATH_LENGTH];
+    if (src_lang_flag[0] == '\0') {
+        snprintf(src_path, sizeof(src_path), "%s_lang.json", base_path);
+    } else {
+        snprintf(src_path, sizeof(src_path), "%s_lang_%s.json", base_path, src_lang_flag);
+    }
+
+    // --- Fallback to default if source is empty ---
+    bool used_fallback = false;
+    if (src_lang_flag[0] != '\0') { // Only check for fallback if the source is not already the default
+        cJSON* src_json = cJSON_from_file(src_path);
+        if (src_json == nullptr || src_json->child == nullptr) {
+            used_fallback = true;
+        }
+        cJSON_Delete(src_json); // Safely delete after check
+    }
+
+    if (used_fallback) {
+        log_message(LOG_INFO, "[TEMP CREATE UTILS] Source language '%s' is empty, falling back to default for copy.", src_lang_flag);
+        snprintf(src_path, sizeof(src_path), "%s_lang.json", base_path); // Point src_path to the default
+    }
+
+    char dest_path[MAX_PATH_LENGTH];
+    snprintf(dest_path, sizeof(dest_path), "%s_lang_%s.json", base_path, dest_lang_flag);
+
+    /// 3. Validate existence
+    if (!path_exists(src_path)) {
+        snprintf(error_message, error_msg_size, "Error: Source language file not found.");
+        return COPY_LANG_FAIL;
+    }
+    if (path_exists(dest_path)) {
+        snprintf(error_message, error_msg_size, "Error: A language file with the flag '%s' already exists.", dest_lang_flag);
+        return COPY_LANG_FAIL;
+    }
+
+    // 4. Copy the file
+    if (!fs_copy_file(src_path, dest_path)) {
+        snprintf(error_message, error_msg_size, "Error: Failed to copy the language file.");
+        return COPY_LANG_FAIL;
+    }
+
+    return used_fallback ? COPY_LANG_SUCCESS_FALLBACK : COPY_LANG_SUCCESS_DIRECT;
+}
+
+bool delete_lang_file(const char* version, const char* category, const char* flag, const char* lang_flag_to_delete, char* error_message, size_t error_msg_size) {
+    // 1. Validate flag (cannot delete default)
+    if (!lang_flag_to_delete || lang_flag_to_delete[0] == '\0') {
+        snprintf(error_message, error_msg_size, "Error: Cannot delete the default language file.");
+        return false;
+    }
+
+    // 2. Construct path
+    char base_path[MAX_PATH_LENGTH];
+    construct_template_base_path(version, category, flag, base_path, sizeof(base_path));
+
+    char lang_path[MAX_PATH_LENGTH];
+    snprintf(lang_path, sizeof(lang_path), "%s_lang_%s.json", base_path, lang_flag_to_delete);
+
+    // 3. Delete file
+    if (remove(lang_path) != 0) {
+        snprintf(error_message, error_msg_size, "Error: Failed to delete language file: %s", lang_path);
+        log_message(LOG_ERROR, "[TEMP CREATE UTILS] Failed to delete lang file: %s\n", lang_path);
+        return false;
+    }
+
+    log_message(LOG_INFO, "[TEMP CREATE UTILS] Deleted lang file: %s\n", lang_path);
+    return true;
+}

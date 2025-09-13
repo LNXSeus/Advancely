@@ -55,9 +55,9 @@ bool validate_and_create_template(const char* version, const char* category, con
 * @param error_msg_size The size of the error_message buffer.
 * @return true on success, false on failure.
 */
-    bool copy_template_files(const char* src_version, const char* src_category, const char* src_flag,
-                             const char* dest_version, const char* dest_category, const char* dest_flag,
-                             char* error_message, size_t error_msg_size);
+bool copy_template_files(const char* src_version, const char* src_category, const char* src_flag,
+                         const char* dest_version, const char* dest_category, const char* dest_flag,
+                         char* error_message, size_t error_msg_size);
 
 /**
  * @brief Deletes a template and its corresponding language file.
@@ -67,6 +67,52 @@ bool validate_and_create_template(const char* version, const char* category, con
  * @return true on success, false on failure.
  */
 bool delete_template_files(const char* version, const char* category, const char* flag);
+
+/**
+ * @brief Enum to represent the result of a language file copy operation.
+*/
+typedef enum {
+    COPY_LANG_FAIL = 0,             // The copy operation failed.
+    COPY_LANG_SUCCESS_DIRECT,       // The copy was successful using the specified source.
+    COPY_LANG_SUCCESS_FALLBACK      // The copy was successful but used the default language as a fallback.
+} CopyLangResult;
+
+/**
+* @brief Validates inputs and creates a new, empty language file for an existing template.
+* @param version The version string of the parent template.
+* @param category The category of the parent template.
+* @param flag The optional flag of the parent template.
+* @param new_lang_flag The new language flag to create (e.g., "eng", "de"). Cannot be empty.
+* @param error_message A buffer to store any error message.
+* @param error_msg_size The size of the error_message buffer.
+* @return true on success, false on failure.
+*/
+bool validate_and_create_lang_file(const char* version, const char* category, const char* flag, const char* new_lang_flag, char* error_message, size_t error_msg_size);
+
+/**
+* @brief Copies an existing language file to a new language file for the same template.
+* @param version The version string of the parent template.
+* @param category The category of the parent template.
+* @param flag The optional flag of the parent template.
+* @param src_lang_flag The source language flag to copy from (e.g., "" for default, "eng").
+* @param dest_lang_flag The new destination language flag (e.g., "de").
+* @param error_message A buffer to store any error message.
+* @param error_msg_size The size of the error_message buffer.
+* @return CopyLangResult enum value indicating the result of the operation.
+*/
+CopyLangResult copy_lang_file(const char* version, const char* category, const char* flag, const char* src_lang_flag, const char* dest_lang_flag, char* error_message, size_t error_msg_size);
+
+/**
+* @brief Deletes a specific, non-default language file for a template.
+* @param version The version string of the parent template.
+* @param category The category of the parent template.
+* @param flag The optional flag of the parent template.
+* @param lang_flag_to_delete The language flag to delete (e.g., "eng"). Cannot be the default.
+* @param error_message A buffer to store any error message.
+* @param error_msg_size The size of the error_message buffer.
+* @return true on success, false on failure.
+*/
+bool delete_lang_file(const char* version, const char* category, const char* flag, const char* lang_flag_to_delete, char* error_message, size_t error_msg_size);
 
 #ifdef __cplusplus
 }
