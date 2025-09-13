@@ -572,7 +572,8 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
 }
 
 // Main function to load a whole template for editing
-static bool load_template_for_editing(const char *version, const DiscoveredTemplate &template_info, const std::string& lang_flag,
+static bool load_template_for_editing(const char *version, const DiscoveredTemplate &template_info,
+                                      const std::string &lang_flag,
                                       EditorTemplate &editor_data, char *status_message_buffer) {
     editor_data.advancements.clear();
     editor_data.stats.clear();
@@ -757,7 +758,8 @@ static void serialize_editor_multi_stage_goals(cJSON *parent, const std::vector<
 }
 
 // Main function to save the in-memory editor data back to a file
-static bool save_template_from_editor(const char *version, const DiscoveredTemplate &template_info, const std::string& lang_flag,
+static bool save_template_from_editor(const char *version, const DiscoveredTemplate &template_info,
+                                      const std::string &lang_flag,
                                       EditorTemplate &editor_data, char *status_message_buffer) {
     char version_filename[64];
     strncpy(version_filename, version, sizeof(version_filename) - 1);
@@ -905,7 +907,7 @@ enum SaveMessageType {
 // New helper function to centralize validation and saving
 static bool validate_and_save_template(const char *creator_version_str,
                                        const DiscoveredTemplate &selected_template_info,
-                                       const std::string& lang_flag,
+                                       const std::string &lang_flag,
                                        EditorTemplate &current_template_data, EditorTemplate &saved_template_data,
                                        SaveMessageType &save_message_type, char *status_message,
                                        AppSettings *app_settings) {
@@ -1182,7 +1184,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 // If we are in the editor, we must update the loaded data
                 if (editing_template) {
                     selected_template_info = discovered_templates[i];
-                    if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag, current_template_data,
+                    if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag,
+                                                  current_template_data,
                                                   status_message)) {
                         // Also update the 'saved' snapshot to reflect the newly loaded state
                         saved_template_data = current_template_data;
@@ -1253,7 +1256,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 selected_template_info = discovered_templates[selected_template_index];
                 selected_lang_flag = selected_template_info.available_lang_flags[selected_lang_index];
 
-                if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag, current_template_data, status_message)) {
+                if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag,
+                                              current_template_data, status_message)) {
                     saved_template_data = current_template_data;
                 }
             }
@@ -1401,20 +1405,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     // --- Language Management UI (appears when a template is selected) ---
     if (selected_template_index != -1 && !editing_template && !show_create_new_view && !show_copy_view) {
-        const DiscoveredTemplate& selected = discovered_templates[selected_template_index];
+        const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
         ImGui::Text("Languages for '%s%s'", selected.category, selected.optional_flag);
 
-        std::vector<const char*> lang_display_names;
-        for (const auto& flag : selected.available_lang_flags) {
+        std::vector<const char *> lang_display_names;
+        for (const auto &flag: selected.available_lang_flags) {
             lang_display_names.push_back(flag.empty() ? "Default (_lang.json)" : flag.c_str());
         }
 
         ImGui::SetNextItemWidth(-1);
-        ImGui::ListBox("##LangList", &selected_lang_index, lang_display_names.data(), (int)lang_display_names.size(), 5);
+        ImGui::ListBox("##LangList", &selected_lang_index, lang_display_names.data(), (int) lang_display_names.size(),
+                       5);
 
-        auto create_action = [&]() { show_create_lang_popup = true; lang_flag_buffer[0] = '\0'; status_message[0] = '\0'; };
+        auto create_action = [&]() {
+            show_create_lang_popup = true;
+            lang_flag_buffer[0] = '\0';
+            status_message[0] = '\0';
+        };
         if (ImGui::Button("Create Language")) {
-            if(editor_has_unsaved_changes) { show_unsaved_changes_popup = true; pending_action = create_action; } else { create_action(); }
+            if (editor_has_unsaved_changes) {
+                show_unsaved_changes_popup = true;
+                pending_action = create_action;
+            } else { create_action(); }
         }
         ImGui::SameLine();
         ImGui::BeginDisabled(selected_lang_index == -1);
@@ -1425,17 +1437,52 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             lang_to_copy_from = selected.available_lang_flags[selected_lang_index];
         };
         if (ImGui::Button("Copy Language")) {
-            if(editor_has_unsaved_changes) { show_unsaved_changes_popup = true; pending_action = copy_action; } else { copy_action(); }
+            if (editor_has_unsaved_changes) {
+                show_unsaved_changes_popup = true;
+                pending_action = copy_action;
+            } else { copy_action(); }
         }
         ImGui::SameLine();
 
-        bool can_delete = selected_lang_index != -1 && !selected.available_lang_flags[selected_lang_index].empty();
+        // DELETION LOGIC FOR LANGUAGES -> Only allow deletion if not default and not currently active
+        bool can_delete = false;
+        const char* disabled_tooltip = "";
+        if (selected_lang_index != -1) {
+            const std::string& selected_lang_in_creator = selected.available_lang_flags[selected_lang_index];
+
+            // Rule 1: Cannot delete the default language file.
+            bool is_default_lang = selected_lang_in_creator.empty();
+            if (is_default_lang) {
+                disabled_tooltip = "Cannot delete the default language file.";
+            }
+
+            // Rule 2: Cannot delete the language file currently active in the main settings.
+            bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
+                                       strcmp(selected.category, app_settings->category) == 0 &&
+                                       strcmp(selected.optional_flag, app_settings->optional_flag) == 0);
+            bool is_active_lang = (selected_lang_in_creator == app_settings->lang_flag);
+
+            if (is_active_template && is_active_lang) {
+                disabled_tooltip = "Cannot delete the language currently in use by the tracker.";
+            }
+
+            // The button is enabled only if neither rule is broken.
+            if (!is_default_lang && !(is_active_template && is_active_lang)) {
+                can_delete = true;
+            }
+        } else {
+            disabled_tooltip = "Select a language to delete.";
+        }
+
         ImGui::BeginDisabled(!can_delete);
         auto delete_action = [&]() { ImGui::OpenPopup("Delete Language?"); };
         if (ImGui::Button("Delete Language")) {
             if(editor_has_unsaved_changes) { show_unsaved_changes_popup = true; pending_action = delete_action; } else { delete_action(); }
         }
         ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && !can_delete) {
+            ImGui::SetTooltip("%s", disabled_tooltip);
+        }
         ImGui::EndDisabled();
         ImGui::Separator();
     }
@@ -1461,8 +1508,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         // --- Language Selector inside Editor ---
         ImGui::SetNextItemWidth(250);
-        std::vector<const char*> lang_display_names;
-        for (const auto& flag : selected_template_info.available_lang_flags) {
+        std::vector<const char *> lang_display_names;
+        for (const auto &flag: selected_template_info.available_lang_flags) {
             lang_display_names.push_back(flag.empty() ? "Default" : flag.c_str());
         }
         int current_lang_idx = -1;
@@ -1473,10 +1520,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
         }
 
-        if (ImGui::Combo("Editing Language", &current_lang_idx, lang_display_names.data(), (int)lang_display_names.size())) {
+        if (ImGui::Combo("Editing Language", &current_lang_idx, lang_display_names.data(),
+                         (int) lang_display_names.size())) {
             auto switch_action = [&, current_lang_idx]() {
                 selected_lang_flag = selected_template_info.available_lang_flags[current_lang_idx];
-                if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag, current_template_data, status_message)) {
+                if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag,
+                                              current_template_data, status_message)) {
                     saved_template_data = current_template_data;
                     save_message_type = MSG_NONE;
                     status_message[0] = '\0';
@@ -1497,7 +1546,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::Button("Save") || (ImGui::IsKeyPressed(ImGuiKey_Enter) &&
                                       ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !
                                       ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup))) {
-            validate_and_save_template(creator_version_str, selected_template_info, selected_lang_flag, current_template_data,
+            validate_and_save_template(creator_version_str, selected_template_info, selected_lang_flag,
+                                       current_template_data,
                                        saved_template_data, save_message_type, status_message, app_settings);
         }
 
@@ -1541,7 +1591,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (ImGui::Button("Save", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
                 // Call the central validation and save function.
                 // It returns true only if validation passes AND the file is saved successfully.
-                bool save_successful = validate_and_save_template(creator_version_str, selected_template_info, selected_lang_flag,
+                bool save_successful = validate_and_save_template(creator_version_str, selected_template_info,
+                                                                  selected_lang_flag,
                                                                   current_template_data,
                                                                   saved_template_data, save_message_type,
                                                                   status_message,
@@ -2832,7 +2883,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 "A variant for the category (e.g., '_optimized', '_modded').\nCannot contain spaces or special characters.");
 
         // Also allow enter key ONLY WHEN the window is focused
-        if (ImGui::Button("Create Files") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))) {
+        if (ImGui::Button("Create Files") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(
+                                                  ImGuiFocusedFlags_RootAndChildWindows))) {
             if (creator_version_idx >= 0) {
                 char error_msg[256] = "";
 
@@ -2876,7 +2928,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::InputText("New Optional Flag", copy_template_flag, sizeof(copy_template_flag));
 
         // Allowing enter key to confirm copy WHEN the window is focused
-        if (ImGui::Button("Confirm Copy") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))) {
+        if (ImGui::Button("Confirm Copy") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(
+                                                  ImGuiFocusedFlags_RootAndChildWindows))) {
             if (selected_template_index != -1 && copy_template_version_idx >= 0) {
                 const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
                 const char *dest_version = VERSION_STRINGS[copy_template_version_idx];
@@ -2906,10 +2959,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     if (show_create_lang_popup) ImGui::OpenPopup("Create New Language");
     if (ImGui::BeginPopupModal("Create New Language", &show_create_lang_popup, ImGuiWindowFlags_AlwaysAutoResize)) {
         static char popup_error_msg[256] = "";
-        const auto& selected = discovered_templates[selected_template_index];
+        const auto &selected = discovered_templates[selected_template_index];
         ImGui::Text("Create new language for '%s%s'", selected.category, selected.optional_flag);
         ImGui::InputText("New Language Flag", lang_flag_buffer, sizeof(lang_flag_buffer));
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("E.g., 'de', 'fr_ca'. Cannot be empty or contain special characters.");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip(
+            "E.g., 'de', 'fr_ca'. Cannot be empty or contain special characters.");
 
         if (popup_error_msg[0] != '\0') {
             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", popup_error_msg);
@@ -2917,7 +2971,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         if (ImGui::Button("OK", ImVec2(120, 0)) || (!ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
             popup_error_msg[0] = '\0';
-            if (validate_and_create_lang_file(creator_version_str, selected.category, selected.optional_flag, lang_flag_buffer, popup_error_msg, sizeof(popup_error_msg))) {
+            if (validate_and_create_lang_file(creator_version_str, selected.category, selected.optional_flag,
+                                              lang_flag_buffer, popup_error_msg, sizeof(popup_error_msg))) {
                 SDL_SetAtomicInt(&g_templates_changed, 1);
                 last_scanned_version[0] = '\0';
                 ImGui::CloseCurrentPopup();
@@ -2946,8 +3001,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         static char popup_error_msg[256] = "";
         static bool show_fallback_warning = false;
 
-        const auto& selected = discovered_templates[selected_template_index];
-        ImGui::Text("Copy language '%s' to a new flag.", lang_to_copy_from.empty() ? "Default" : lang_to_copy_from.c_str());
+        const auto &selected = discovered_templates[selected_template_index];
+        ImGui::Text("Copy language '%s' to a new flag.",
+                    lang_to_copy_from.empty() ? "Default" : lang_to_copy_from.c_str());
 
         // Disable input and show warning after a successful fallback
         ImGui::BeginDisabled(show_fallback_warning);
@@ -2958,7 +3014,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", popup_error_msg);
         }
         if (show_fallback_warning) {
-            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Warning: Source was empty. Copied from Default instead.");
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
+                               "Warning: Source was empty. Copied from Default instead.");
         }
 
         if (ImGui::Button("OK", ImVec2(120, 0)) || (!ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
@@ -2970,7 +3027,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             } else {
                 // This is the first OK click, attempt the copy
                 popup_error_msg[0] = '\0'; // Clear previous errors
-                CopyLangResult result = copy_lang_file(creator_version_str, selected.category, selected.optional_flag, lang_to_copy_from.c_str(), lang_flag_buffer, popup_error_msg, sizeof(popup_error_msg));
+                CopyLangResult result = copy_lang_file(creator_version_str, selected.category, selected.optional_flag,
+                                                       lang_to_copy_from.c_str(), lang_flag_buffer, popup_error_msg,
+                                                       sizeof(popup_error_msg));
 
                 if (result == COPY_LANG_SUCCESS_DIRECT) {
                     SDL_SetAtomicInt(&g_templates_changed, 1);
@@ -3004,13 +3063,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     }
 
     if (ImGui::BeginPopupModal("Delete Language?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        const auto& selected = discovered_templates[selected_template_index];
-        const auto& lang_to_delete = selected.available_lang_flags[selected_lang_index];
+        const auto &selected = discovered_templates[selected_template_index];
+        const auto &lang_to_delete = selected.available_lang_flags[selected_lang_index];
         ImGui::Text("Are you sure you want to delete the '%s' language file?", lang_to_delete.c_str());
         ImGui::Separator();
         if (ImGui::Button("OK", ImVec2(120, 0)) || (!ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
             char error_msg[256];
-            if (delete_lang_file(creator_version_str, selected.category, selected.optional_flag, lang_to_delete.c_str(), error_msg, sizeof(error_msg))) {
+            if (delete_lang_file(creator_version_str, selected.category, selected.optional_flag, lang_to_delete.c_str(),
+                                 error_msg, sizeof(error_msg))) {
                 SDL_SetAtomicInt(&g_templates_changed, 1);
                 last_scanned_version[0] = '\0';
                 selected_lang_index = -1;
