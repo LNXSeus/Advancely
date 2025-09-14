@@ -307,8 +307,12 @@ target_compile_options(${EXECUTABLE_NAME} PRIVATE
         -Wpedantic              # Warn on non-standard language extensions
         -Werror                 # Treat all warnings as errors, forcing you to fix them
         -Wno-format-truncation  # Ignore truncation warnings
-        -Wno-stringop-truncation # To ignore potentially unsafe string operations
 )
+
+# Add GCC-specific warning suppressions only when using the GCC compiler
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(${EXECUTABLE_NAME} PRIVATE -Wno-stringop-truncation)
+endif()
 
 # Add sanitizers for Debug builds on non-Windows platforms
 if(NOT WIN32)
