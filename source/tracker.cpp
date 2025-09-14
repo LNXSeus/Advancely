@@ -10,6 +10,7 @@
 #include <cstring>
 #include <cJSON.h>
 #include <cmath>
+#include <ctime>
 
 #include "tracker.h"
 
@@ -17,7 +18,7 @@
 
 #include "init_sdl.h"
 #include "path_utils.h"
-#include "settings_utils.h"
+#include "settings_utils.h" // For note related defaults as well
 #include "file_utils.h" // has the cJSON_from_file function
 #include "temp_creator_utils.h"
 #include "global_event_handler.h"
@@ -26,6 +27,104 @@
 #include "main.h" // For show_error_message
 
 #include "imgui_internal.h"
+
+// Simple string hashing function (djb2) to create a safe filename from a world path
+static unsigned long hash_string(const char *str) {
+    unsigned long hash = 5381;
+    int c;
+    while ((c = *str++))
+        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+    return hash;
+}
+
+// Manages the per-world notes manifest and determines the correct notes file path
+static void tracker_update_notes_path(Tracker *t, const AppSettings *settings) {
+    if (settings->per_world_notes) {
+        // Per World Mode
+        if (t->world_name[0] == '\0' || t->saves_path[0] == '\0') {
+            t->notes_path[0] = '\0'; // Cannot determine püath if world/saves path is unknown
+            return;
+        }
+
+        // Create a unique identifier for the world from the saves path and world name
+        char full_world_path[MAX_PATH_LENGTH * 2];
+        snprintf(full_world_path, sizeof(full_world_path), "%s/%s", t->saves_path, t->world_name);
+
+        // Hash the full path to create a safe filename
+        unsigned long world_hash = hash_string(full_world_path);
+        snprintf(t->notes_path, MAX_PATH_LENGTH, "%s/%lu.txt", NOTES_DIR, world_hash);
+
+        // Manifest Management
+        fs_ensure_directory_exists(NOTES_DIR);
+        cJSON *manifest = cJSON_from_file(NOTES_MANIFEST_PATH);
+        if (!manifest) manifest = cJSON_CreateArray();
+
+        cJSON *entry_to_update = nullptr;
+        cJSON *entry = nullptr;
+        cJSON_ArrayForEach(entry, manifest) {
+            cJSON *hash_item = cJSON_GetObjectItem(entry, "hash");
+            if (cJSON_IsNumber(hash_item) && (unsigned long)hash_item->valuedouble == world_hash) {
+                entry_to_update = entry;
+                break;
+            }
+        }
+
+        if (entry_to_update) {
+            // World exists, update its timestamp
+            cJSON_ReplaceItemInObject(entry_to_update, "last_used", cJSON_CreateNumber((double)time(0)));
+        } else {
+            // new world, add a new entry
+            cJSON *new_entry = cJSON_CreateObject();
+            cJSON_AddNumberToObject(new_entry, "hash", (double)world_hash);
+            cJSON_AddStringToObject(new_entry, "path", full_world_path);
+            cJSON_AddNumberToObject(new_entry, "last_used",(double)time(0));
+            cJSON_AddItemToArray(manifest, new_entry);
+
+            // Check if we need to prune old notes (LRU - least recently used)
+            if (cJSON_GetArraySize(manifest) > MAX_WORLD_NOTES) {
+                cJSON *oldest_entry = nullptr;
+                double oldest_time = -1;
+                int oldest_index = -1;
+
+                int current_index = 0;
+                cJSON_ArrayForEach(entry, manifest) {
+                    double last_used = cJSON_GetObjectItem(entry, "last_used")->valuedouble;
+                    if (oldest_time == -1 ||last_used < oldest_time) {
+                        oldest_time = last_used;
+                        oldest_entry = entry;
+                        oldest_index = current_index;
+                    }
+                    current_index++;
+                }
+
+                if (oldest_entry && oldest_index != -1) {
+                    unsigned long hash_to_delete = (unsigned long)cJSON_GetObjectItem(oldest_entry, "hash")->valuedouble;
+                    char path_to_delete[MAX_PATH_LENGTH];
+                    snprintf(path_to_delete, sizeof(path_to_delete), "%s/%lu.txt", NOTES_DIR, hash_to_delete);
+                    if (remove(path_to_delete) == 0) {
+                        log_message(LOG_INFO, "[NOTES] Pruned old notes file: %s\n", path_to_delete);
+                    }
+                    cJSON_DeleteItemFromArray(manifest, oldest_index);
+                }
+            }
+        }
+
+        // Save the updated manifest
+        FILE* manifest_file = fopen(NOTES_MANIFEST_PATH, "w");
+        if (manifest_file) {
+            char* manifest_str = cJSON_Print(manifest);
+            fputs(manifest_str, manifest_file);
+            fclose(manifest_file);
+            free(manifest_str);
+        }
+        cJSON_Delete(manifest);
+    } else {
+        // Per template mode
+        construct_template_paths((AppSettings *)settings); // This will update the template paths
+        strncpy(t->notes_path, settings->notes_path, MAX_PATH_LENGTH - 1);
+    }
+}
+
 
 
 /**
@@ -2070,8 +2169,7 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     // Allocate memory for the tracker itself
     // Calloc assures null initialization
     *tracker = (Tracker *) calloc(1, sizeof(Tracker));
-    // TODO: Remove
-    // *tracker = (Tracker *) malloc(sizeof(Tracker));
+
     if (*tracker == nullptr) {
         log_message(LOG_ERROR, "[TRACKER] Failed to allocate memory for tracker.\n");
         return false;
@@ -2082,6 +2180,7 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     // Initialize notes state
     t->notes_window_open = false;
     t->notes_buffer[0] = '\0';
+    t->notes_path[0] = '\0'; // Initialize the new notes path
     t->search_buffer[0] = '\0';
     t->focus_search_box_requested = false;
 
@@ -2231,12 +2330,16 @@ void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
     // game logic goes here
 
     // Detect if the world has changed since the last update.
-    if (t->template_data->last_known_world_name[0] != '\0' &&
-        // If world name is different
+    if (t->template_data->last_known_world_name[0] == '\0' || // Handle first-time load
         strcmp(t->world_name, t->template_data->last_known_world_name) != 0) {
-        // Reset custom progress and manual stat overrides
+
+        // Reset custom progress and manual stat overrides on world change
         tracker_reset_progress_on_world_change(t, settings);
-    }
+
+        // Update the notes path to the new world and reload the notes content
+        tracker_update_notes_path(t, settings);
+        tracker_load_notes(t, settings);
+        }
     // After the check, update the last known world name to the current one for the next cycle.
     strncpy(t->template_data->last_known_world_name, t->world_name,
             sizeof(t->template_data->last_known_world_name) - 1);
@@ -4029,14 +4132,17 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // --- Render Notes Window ---
     if (t->notes_window_open) {
         // Dynamically create the window title to show which template the notes belong to.
-        char notes_title[256];
-        char formatted_category[128];
-        format_category_string(settings->category, formatted_category, sizeof(formatted_category));
-        snprintf(notes_title, sizeof(notes_title), "Notes: %s - %s%s%s",
-                 settings->version_str,
-                 formatted_category,
-                 *settings->optional_flag ? " - " : "",
-                 settings->optional_flag);
+        char notes_title[512];
+        if (settings->per_world_notes) {
+            snprintf(notes_title, sizeof(notes_title), "Notes: %s", t->world_name[0] != '\0' ? t->world_name : "No World Loaded");
+        } else {
+            char formatted_category[128];
+            format_category_string(settings->category, formatted_category, sizeof(formatted_category));
+            snprintf(notes_title, sizeof(notes_title), "Notes: %s - %s%s",
+                     settings->version_str,
+                     formatted_category,
+                     settings->optional_flag);
+        }
 
         ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
 
@@ -4060,18 +4166,29 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                 tracker_save_notes(t, settings);
             }
 
-            // Draw the checkbox in the bottom right corner.
+            // --- Controls at the bottom of the window ---
+            // Per-World Toggle
+            if (ImGui::Checkbox("Per-World Notes", &settings->per_world_notes)) {
+                // When toggled, immediately update the path and reload the notes
+                tracker_update_notes_path(t, settings);
+                tracker_load_notes(t, settings);
+                settings_save(settings, nullptr, SAVE_CONTEXT_ALL); // Save the setting change
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("When enabled, notes are saved for each world individually.\nWhen disabled, notes are shared for the current template.");
+            }
+
+            ImGui::SameLine();
+
+            // Font Toggle (aligned to the right)
             const char *checkbox_label = "Use Settings Font";
             float checkbox_width = ImGui::CalcTextSize(checkbox_label).x + ImGui::GetFrameHeightWithSpacing();
             ImGui::SetCursorPosX(ImGui::GetWindowWidth() - checkbox_width - ImGui::GetStyle().WindowPadding.x);
-            // The checkbox still modifies the original setting directly.
             if (ImGui::Checkbox(checkbox_label, &settings->notes_use_roboto_font)) {
-                if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip(
-                        "Toggle whether to use the settings window font for the notes editor (better readability).");
-                }
-                // Save the setting immediately when it's changed.
                 settings_save(settings, nullptr, SAVE_CONTEXT_ALL);
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Toggle whether to use the settings window font for the notes editor (better readability).");
             }
 
             // Use the captured state to decide whether to pop the font.
@@ -4168,31 +4285,6 @@ bool tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
                            "The selected template file could not be found. Please check your settings or create the required template file.");
         return false; // Signal critical failure
     }
-
-    // TODO: Template Creator will be added separately
-    // // Check if template file exists otherwise create it using temp_create_utils.c
-    // if (!template_json) {
-    //     log_message(LOG_ERROR, "[TRACKER] Template file not found: %s\n", t->advancement_template_path);
-    //     log_message(LOG_ERROR, "[TRACKER] Attempting to create new template and language files...\n");
-    //
-    //     // Ensure directory structure exists
-    //     fs_ensure_directory_exists(t->advancement_template_path);
-    //
-    //     // Create the empty template and language files
-    //     // TODO: Allow user to populate the language and template files through the settings
-    //     fs_create_empty_template_file(t->advancement_template_path);
-    //     fs_create_empty_lang_file(t->lang_path);
-    //
-    //     // Try to load the newly create template file again
-    //     template_json = cJSON_from_file(t->advancement_template_path);
-    //
-    //     if (!template_json) {
-    //         log_message(LOG_ERROR, "[TRACKER] CRITICAL: Failed to load the newly created template file.\n");
-    //         show_error_message("Template Error",
-    //                            "The selected template file is missing or corrupted and could not be recreated.\nPlease check the file path in your settings or the file's contents.");
-    //         return false; // Signal critical failure
-    //     }
-    // }
 
     // Declare lang_json as a local variable, this prevents memory leaks
     cJSON *lang_json = cJSON_from_file(t->lang_path);
@@ -4357,7 +4449,8 @@ bool tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
         cJSON_Delete(lang_json);
     }
 
-    // After parsing everything, do an initial load of the notes file.
+    // After parsing everything, determine the correct notes path and do an initial load.
+    tracker_update_notes_path(t, settings);
     tracker_load_notes(t, settings);
 
     // Prime the 'last_known_world_name' with the initial world on first load.
@@ -4491,14 +4584,15 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
 }
 
 void tracker_load_notes(Tracker *t, const AppSettings *settings) {
-    if (!t || !settings || settings->notes_path[0] == '\0') {
+    (void)settings; // Settings parameter is no longer used for the path
+    if (!t || t->notes_path[0] == '\0') {
         if (t) t->notes_buffer[0] = '\0';
         return;
     }
 
-    FILE *file = fopen(settings->notes_path, "r");
+    FILE *file = fopen(t->notes_path, "r");
     if (!file) {
-        // File doesn't exist, which is fine. Ensure buffer is empty.
+        // File doesn't exist, which is fine for a new world. Ensure buffer is empty.
         t->notes_buffer[0] = '\0';
         return;
     }
@@ -4510,16 +4604,17 @@ void tracker_load_notes(Tracker *t, const AppSettings *settings) {
 }
 
 void tracker_save_notes(const Tracker *t, const AppSettings *settings) {
-    if (!t || !settings || settings->notes_path[0] == '\0') {
+    (void)settings; // Settings parameter is no longer used for the path
+    if (!t || t->notes_path[0] == '\0') {
         return;
     }
 
-    FILE *file = fopen(settings->notes_path, "w");
+    FILE *file = fopen(t->notes_path, "w");
     if (file) {
         fputs(t->notes_buffer, file);
         fclose(file);
     } else {
-        log_message(LOG_ERROR, "[TRACKER] Failed to open notes file for writing: %s\n", settings->notes_path);
+        log_message(LOG_ERROR, "[TRACKER] Failed to open notes file for writing: %s\n", t->notes_path);
     }
 }
 

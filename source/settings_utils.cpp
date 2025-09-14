@@ -241,6 +241,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_row3_remove_completed = DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED;
     settings->overlay_stat_cycle_speed = DEFAULT_OVERLAY_STAT_CYCLE_SPEED;
     settings->notes_use_roboto_font = DEFAULT_NOTES_USE_ROBOTO;
+    settings->per_world_notes = DEFAULT_PER_WORLD_NOTES;
     settings->check_for_updates = DEFAULT_CHECK_FOR_UPDATES;
     settings->show_welcome_on_startup = DEFAULT_SHOW_WELCOME_ON_STARTUP;
 
@@ -463,6 +464,13 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
+        const cJSON *per_world = cJSON_GetObjectItem(general_settings, "per_world_notes");
+        if (per_world && cJSON_IsBool(per_world)) settings->per_world_notes = cJSON_IsTrue(per_world);
+        else {
+            settings->per_world_notes = true; // Default to true
+            defaults_were_used = true;
+        }
+
         const cJSON *check_updates = cJSON_GetObjectItem(general_settings, "check_for_updates");
         if (check_updates && cJSON_IsBool(check_updates)) settings->check_for_updates = cJSON_IsTrue(check_updates);
         else {
@@ -613,6 +621,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(general_obj, "overlay_stat_cycle_speed", cJSON_CreateNumber(settings->overlay_stat_cycle_speed));
         cJSON_DeleteItemFromObject(general_obj, "notes_use_roboto_font");
         cJSON_AddItemToObject(general_obj, "notes_use_roboto_font", cJSON_CreateBool(settings->notes_use_roboto_font));
+        cJSON_DeleteItemFromObject(general_obj, "per_world_notes");
+        cJSON_AddItemToObject(general_obj, "per_world_notes", cJSON_CreateBool(settings->per_world_notes));
         cJSON_DeleteItemFromObject(general_obj, "check_for_updates");
         cJSON_AddItemToObject(general_obj, "check_for_updates", cJSON_CreateBool(settings->check_for_updates));
         cJSON_DeleteItemFromObject(general_obj, "show_welcome_on_startup");

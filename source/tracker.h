@@ -80,6 +80,7 @@ struct Tracker {
 
 
     char notes_buffer[65536]; // 64KB buffer to hold the text for the notes.
+    char notes_path[MAX_PATH_LENGTH]; // The dynamic path to the current notes file.
     char search_buffer[256]; // Buffer for the search functionality.
     bool focus_search_box_requested; // Flag for Ctrl+F hotkey
 

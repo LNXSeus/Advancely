@@ -53,8 +53,14 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED false
 #define DEFAULT_OVERLAY_STAT_CYCLE_SPEED 3.0f // Default: cycle every 3 seconds
 #define DEFAULT_NOTES_USE_ROBOTO false // Default: use the standard Minecraft font for notes otherwise roboto
+#define DEFAULT_PER_WORLD_NOTES true // When true the notes are per world, otherwise per template
 #define DEFAULT_CHECK_FOR_UPDATES true
 #define DEFAULT_SHOW_WELCOME_ON_STARTUP true
+
+// Define notes
+#define MAX_WORLD_NOTES 32
+#define NOTES_DIR "resources/notes"
+#define NOTES_MANIFEST_PATH "resources/notes/manifest.json"
 
 // DEFINE DEFAULT SETTINGS
 #define DEFAULT_VERSION "1.16.1"  // Also needs to be changed in settings_load()
@@ -138,6 +144,7 @@ struct AppSettings {
     bool overlay_row3_remove_completed; // If true, the third row will also hide completed goals as row 2 does.
     float overlay_stat_cycle_speed; // Time in seconds between cycling sub-stats on the overlay.
     bool notes_use_roboto_font; // If true, the notes window uses the Roboto font instead of the default.
+    bool per_world_notes; // If true, notes are saved per world instead of per template
 
     // --- Window Geometry ---
     WindowRect tracker_window; // The saved position and size of the main tracker window.
