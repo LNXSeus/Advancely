@@ -1,0 +1,62 @@
+name: Build Advancely
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Install dependencies (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libsdl3-dev libsdl3-image-dev libsdl3-ttf-dev libcurl4-openssl-dev
+
+    - name: Install dependencies (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        brew install sdl3 sdl3_image sdl3_ttf curl
+
+    - name: Install dependencies (Windows)
+      if: runner.os == 'Windows'
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgGitCommitId: '1d28de8707106a25c1995a32973449335a4d61c2'
+        vcpkgJsonGlob: '**/vcpkg.json'
+
+    - name: Configure CMake
+      run: cmake -B build
+
+    - name: Build Project
+      run: cmake --build build --config Release
+
+    - name: Package Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: Advancely-${{ matrix.os }}
+        path: |
+          build/
+          !build/resources/
+          !build/**/CMakeFiles/
+          !build/**/*.cmake
+          !build/**/Makefile
+          !build/**/*.a
+          !build/**/*.lib
+
+    - name: Package Resources
+      if: matrix.os == 'windows-latest'
+      uses: actions/upload-artifact@v3
+      with:
+        name: Advancely-Resources
+        path: build/resources/
