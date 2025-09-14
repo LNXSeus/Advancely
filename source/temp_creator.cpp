@@ -1046,6 +1046,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static EditorTemplate saved_template_data; // A snapshot of the last saved state
     static DiscoveredTemplate selected_template_info;
     static std::string selected_lang_flag = ""; // The language currently being edited
+    static bool show_advancement_display_names = true;
+    static bool show_stat_display_names = true;
+    static bool show_ms_goal_display_names = true;
     static int selected_advancement_index = -1; // Tracks which advancement is currently selected in the editor
     static int selected_stat_index = -1;
     static int selected_ms_goal_index = -1;
@@ -1654,6 +1657,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     current_template_data.advancements.push_back({});
                     save_message_type = MSG_NONE;
                 }
+                ImGui::SameLine();
+                ImGui::Checkbox("Show Display Names", &show_advancement_display_names);
                 ImGui::Separator();
 
                 int advancement_to_remove = -1;
@@ -1665,9 +1670,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 for (size_t i = 0; i < current_template_data.advancements.size(); ++i) {
                     ImGui::PushID(i);
-                    const char *label = current_template_data.advancements[i].root_name[0]
-                                            ? current_template_data.advancements[i].root_name
-                                            : "[New Advancement]";
+
+                    const auto &advancement = current_template_data.advancements[i];
+                    const char *display_name = advancement.display_name;
+                    const char *root_name = advancement.root_name;
+
+                    // Show display names based on setting
+                    const char* label = show_advancement_display_names ? (display_name[0] ? display_name : root_name) : root_name;
+                    if (label[0] == '\0') {
+                        label = "[New Advancement]";
+                    }
 
                     // Draw the "X" (Remove) button
                     if (ImGui::Button("X")) {
@@ -1969,6 +1981,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     current_template_data.stats.push_back(new_stat);
                     save_message_type = MSG_NONE;
                 }
+                ImGui::SameLine();
+                ImGui::Checkbox("Show Display Names", &show_stat_display_names);
                 ImGui::Separator();
 
                 int stat_to_remove = -1;
@@ -1980,9 +1994,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 for (size_t i = 0; i < current_template_data.stats.size(); i++) {
                     ImGui::PushID(i);
-                    const char *label = current_template_data.stats[i].root_name[0]
-                                            ? current_template_data.stats[i].root_name
-                                            : "[New Stat]";
+
+                    const auto& stat = current_template_data.stats[i];
+                    const char* display_name = stat.display_name;
+                    const char* root_name = stat.root_name;
+
+                    const char* label = show_stat_display_names ? (display_name[0] ? display_name : root_name) : root_name;
+                    if (label[0] == '\0') {
+                        label = "[New Stat]";
+                    }
 
                     // Draw the "X" (Remove) button
                     if (ImGui::Button("X")) {
@@ -2590,6 +2610,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     current_template_data.multi_stage_goals.push_back({});
                     save_message_type = MSG_NONE;
                 }
+                ImGui::SameLine();
+                ImGui::Checkbox("Show Display Names", &show_ms_goal_display_names);
                 ImGui::Separator();
 
                 int goal_to_remove = -1;
@@ -2600,9 +2622,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 for (size_t i = 0; i < current_template_data.multi_stage_goals.size(); ++i) {
                     ImGui::PushID(i);
-                    const char *label = current_template_data.multi_stage_goals[i].root_name[0]
-                                            ? current_template_data.multi_stage_goals[i].root_name
-                                            : "[New Goal]";
+                    const auto& goal = current_template_data.multi_stage_goals[i];
+                    const char* display_name = goal.display_name;
+                    const char* root_name = goal.root_name;
+
+                    const char* label = show_ms_goal_display_names ? (display_name[0] ? display_name : root_name) : root_name;
+                    if (label[0] == '\0') {
+                        label = "[New Goal]";
+                    }
+
                     if (ImGui::Button("X")) {
                         goal_to_remove = i;
                         save_message_type = MSG_NONE;
