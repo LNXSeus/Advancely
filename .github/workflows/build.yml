@@ -15,7 +15,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Install dependencies (Linux)
       if: runner.os == 'Linux'
@@ -42,7 +42,7 @@ jobs:
       run: cmake --build build --config Release
 
     - name: Package Artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Advancely-${{ matrix.os }}
         path: |
@@ -56,7 +56,7 @@ jobs:
 
     - name: Package Resources
       if: matrix.os == 'windows-latest'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Advancely-Resources
         path: build/resources/
