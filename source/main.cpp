@@ -2,15 +2,11 @@
 // Created by Linus on 24.06.2025.
 //
 
-#include <ctime>
-#include <direct.h>
-
-#include "temp_creator.h"
-
 extern "C" {
 #define DMON_IMPL // Required for dmon
 #include "dmon.h"
 #include <cJSON.h>
+#include <ctime>
 
 // #define MINIZ_IMPLEMENTATION // TODO: Remove
 #include "external/miniz.h"
@@ -28,6 +24,7 @@ extern "C" {
 
 // Local includes
 #include "tracker.h" // includes main.h
+#include "temp_creator.h"
 #include "overlay.h"
 #include "settings.h"
 #include "global_event_handler.h"
@@ -44,6 +41,7 @@ extern "C" {
 // Platform specific includes
 #ifdef _WIN32
 #include <windows.h>
+#include <direct.h>
 #else
 #include <unistd.h> // For fork, execv, kill
 #include <sys/types.h> // For pid_t
