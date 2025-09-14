@@ -1,6 +1,7 @@
 {
   "name": "advancely",
   "version-string": "1.0.0",
+  "builtin-baseline": "a18a9c378622de76229b92b67942475a8f2a245c",
   "dependencies": [
     "sdl3",
     "sdl3-image",
