@@ -143,15 +143,7 @@ Contact me on [Discord @lnxseus](https://discord.gg/TyNgXDz) or [create a new is
 
 Massive thanks to all the beta testers. _Message me on discord @lnxseus with proof of using Advancely before its full release and you'll be added here:_
 
-* ethansplace98
-* Yumeko
-* zurtletif
-* 3emis
-* MoreTrident
-* ShadowFlower64
-* PhoenixAUS_
-* metal_silver1234
-* 36_Official
+* ethansplace98, Yumeko, zurtletif, 3emis, MoreTrident, ShadowFlower64, PhoenixAUS_, metal_silver1234, 36_Official, me_nx, Slackow, DesktopFolder
 
 ## License
 
@@ -166,6 +158,7 @@ This project is proprietary software. You are granted a license to use the softw
 *This project also uses the SDL3 library suite and cJSON. More information can be found in the LICENSES.txt file.*
 *This project uses [curl/libcurl](https://curl.se/libcurl) to download the latest update from github.*
 *This project uses the [miniz](https://github.com/mongoose-os-libs/miniz) compression library to unzip the downloaded files.*
+*This project uses [tiny file dialogs](https://sourceforge.net/projects/tinyfiledialogs) to open file dialogs.*
 *Lots of assistance was provided by Gemini 2.5 Pro.*
 *Minecraft item .png files downloaded from [Minecraft Asset Cloud](https://mcasset.cloud/1.0/) and block renders from the [Minecraft Wiki](https://www.minecraft.wiki) (downloaded by [Dogmaster](https://www.twitch.tv/thedogmaster28))*
 *Shoutout to [Oskar](https://github.com/Oskar3141) for providing me his project files (kAAmel) and Darwin Baker for creating [AATool](https://github.com/DarwinBaker/AATool), which served as inspiration\!*

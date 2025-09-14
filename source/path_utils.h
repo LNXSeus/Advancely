@@ -92,6 +92,15 @@ bool get_parent_directory(const char *original_path, char *out_path, size_t max_
 */
 void path_to_windows_native(char *path);
 
+/**
+* @brief Gets the full absolute path of the currently running executable.
+* This function is cross-platform.
+* @param out_path A buffer to store the resulting path.
+* @param max_len The size of the out_path buffer.
+* @return true on success, false on failure.
+*/
+bool get_executable_path(char* out_path, size_t max_len);
+
 #ifdef __cplusplus
 }
 #endif

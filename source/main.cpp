@@ -351,31 +351,6 @@ static void notes_watch_callback(dmon_watch_id watch_id, dmon_action action, con
     }
 }
 
-// This cross-platform function gets the full path of the currently running executable.
-static bool get_executable_path(char *out_path, size_t max_len) {
-#ifdef _WIN32
-    DWORD result = GetModuleFileNameA(nullptr, out_path, (DWORD) max_len);
-    if (result == 0 || result >= max_len) {
-        return false;
-    }
-    return true;
-#elif defined(__APPLE__)
-    uint32_t size = (uint32_t)max_len;
-    if (_NSGetExecutablePath(out_path, &size) != 0) {
-        // Buffer was too small.
-        return false;
-    }
-    return true;
-#else // For Linux
-    ssize_t len = readlink("/proc/self/exe", out_path, max_len - 1);
-    if (len != -1) {
-        out_path[len] = '\0';
-        return true;
-    }
-    return false;
-#endif
-}
-
 
 // Renders a welcome message window with the advancely logo and a small tutorial on startup depending on setting
 static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker *tracker, SDL_Texture *logo_texture) {

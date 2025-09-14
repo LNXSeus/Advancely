@@ -10,6 +10,7 @@
 #include "path_utils.h"
 #include "global_event_handler.h"
 #include "file_utils.h" // For cJSON_from_file
+#include "dialog_utils.h" // For open_icon_file_dialog()
 
 #include <vector>
 #include <string>
@@ -1888,6 +1889,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::InputText("Icon Path", advancement.icon_path, sizeof(advancement.icon_path))) {
                         save_message_type = MSG_NONE;
                     }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Browse##AdvIcon")) {
+                        char new_path[MAX_PATH_LENGTH];
+                        if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                            strncpy(advancement.icon_path, new_path, sizeof(advancement.icon_path) - 1);
+                            save_message_type = MSG_NONE;
+                        }
+                    }
+                    // resource folder tooltip
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("The icon must be inside the 'resources/icons' folder!");
+                    }
                     if (ImGui::Checkbox("Hidden", &advancement.is_hidden)) {
                         save_message_type = MSG_NONE;
                     }
@@ -1940,6 +1953,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         if (ImGui::InputText("Icon Path", criterion.icon_path, sizeof(criterion.icon_path))) {
                             save_message_type = MSG_NONE;
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Browse##CritIcon")) {
+                            char new_path[MAX_PATH_LENGTH];
+                            if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                strncpy(criterion.icon_path, new_path, sizeof(criterion.icon_path) - 1);
+                                save_message_type = MSG_NONE;
+                            }
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            ImGui::SetTooltip("The icon must be inside the 'resources/icons' folder!");
                         }
                         if (ImGui::Checkbox("Hidden", &criterion.is_hidden)) {
                             save_message_type = MSG_NONE;
@@ -2204,6 +2228,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::InputText("Icon Path", stat_cat.icon_path, sizeof(stat_cat.icon_path))) {
                         save_message_type = MSG_NONE;
                     }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Browse##StatIcon")) {
+                        char new_path[MAX_PATH_LENGTH];
+                        if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                            strncpy(stat_cat.icon_path, new_path, sizeof(stat_cat.icon_path) - 1);
+                            save_message_type = MSG_NONE;
+                        }
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("The icon must be inside the 'resources/icons' folder!");
+                    }
                     if (ImGui::Checkbox("Hidden", &stat_cat.is_hidden)) {
                         save_message_type = MSG_NONE;
                     }
@@ -2299,6 +2334,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             if (ImGui::InputText("Icon Path", crit.icon_path, sizeof(crit.icon_path))) {
                                 save_message_type = MSG_NONE;
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Button("Browse##StatCritIcon")) {
+                                char new_path[MAX_PATH_LENGTH];
+                                if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                    strncpy(crit.icon_path, new_path, sizeof(crit.icon_path) - 1);
+                                    save_message_type = MSG_NONE;
+                                }
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("The icon must be inside the 'resources/icons' folder!");
                             }
                             if (ImGui::InputInt("Target", &crit.goal)) {
                                 save_message_type = MSG_NONE;
@@ -2441,6 +2487,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::InputText("Icon Path", unlock.icon_path, sizeof(unlock.icon_path))) {
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Browse##UnlockIcon")) {
+                            char new_path[MAX_PATH_LENGTH];
+                            if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                strncpy(unlock.icon_path, new_path, sizeof(unlock.icon_path));
+                                save_message_type = MSG_NONE;
+                            }
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            ImGui::SetTooltip("The icon must be inside the 'resources/icons' folder!");
+                        }
                         if (ImGui::Checkbox("Hidden", &unlock.is_hidden)) {
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
@@ -2571,6 +2628,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     if (ImGui::InputText("Icon Path", goal.icon_path, sizeof(goal.icon_path))) {
                         save_message_type = MSG_NONE; // Clear message on new edit
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Browse##CritIcon")) {
+                        char new_path[MAX_PATH_LENGTH];
+                        if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                            strncpy(goal.icon_path, new_path, sizeof(goal.icon_path) - 1);
+                            save_message_type = MSG_NONE;
+                        }
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("The icon must be inside the 'resources/icons' folder!");
                     }
                     if (ImGui::InputInt("Target Goal", &goal.goal)) {
                         // No values below -1 allowed
@@ -2818,6 +2886,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     if (ImGui::InputText("Icon Path", goal.icon_path, sizeof(goal.icon_path))) {
                         save_message_type = MSG_NONE;
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Browse##MSGoalIcon")) {
+                        char new_path[MAX_PATH_LENGTH];
+                        if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                            strncpy(goal.icon_path, new_path, sizeof(goal.icon_path) - 1);
+                            save_message_type = MSG_NONE;
+                        }
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("The icon must be inside the 'resources/icons' folder!");
                     }
                     if (ImGui::Checkbox("Hidden", &goal.is_hidden)) {
                         save_message_type = MSG_NONE;

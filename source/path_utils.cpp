@@ -22,6 +22,10 @@
 #include <pwd.h>
 #endif
 
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
+
 // LOCAL HELPER FUNCTIONS
 /**
  * @brief Converts DOUBLE backslashes in a path to SINGLE forward slashes.
@@ -454,4 +458,29 @@ void path_to_windows_native(char *path) {
             *p = '\\';
         }
     }
+}
+
+// This cross-platform function gets the full path of the currently running executable.
+bool get_executable_path(char *out_path, size_t max_len) {
+#ifdef _WIN32
+    DWORD result = GetModuleFileNameA(nullptr, out_path, (DWORD) max_len);
+    if (result == 0 || result >= max_len) {
+        return false;
+    }
+    return true;
+#elif defined(__APPLE__)
+    uint32_t size = (uint32_t)max_len;
+    if (_NSGetExecutablePath(out_path, &size) != 0) {
+        // Buffer was too small.
+        return false;
+    }
+    return true;
+#else // For Linux
+    ssize_t len = readlink("/proc/self/exe", out_path, max_len - 1);
+    if (len != -1) {
+        out_path[len] = '\0';
+        return true;
+    }
+    return false;
+#endif
 }

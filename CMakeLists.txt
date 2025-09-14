@@ -33,10 +33,13 @@ set(SOURCE_FILES
         "source/temp_creator_utils.cpp"
         "source/template_scanner.cpp"
         "source/update_checker.cpp"
+        "source/logger.cpp"
+        "source/dialog_utils.cpp"
 
         # External libraries included as source and stay in C
         "source/external/cJSON.c"
         "source/external/miniz.c"
+        "source/external/tinyfiledialogs.c"
         # dmon.h is header-only and included in main.cpp, so it doesn't need to be listed here.
 
         # --- Add all the ImGui source files ---
@@ -47,7 +50,6 @@ set(SOURCE_FILES
         "source/imgui/imgui_demo.cpp" # Recommended for development
         "source/imgui/imgui_impl_sdl3.cpp"
         "source/imgui/imgui_impl_sdlrenderer3.cpp"
-        "source/logger.cpp"
 )
 
 # append windows specific source files
@@ -74,6 +76,13 @@ set_source_files_properties(
         # This adds a compiler flag ONLY when compiling this specific file.
         # -Wno-type-limits will disable the "comparison is always false" warning.
         COMPILE_FLAGS "-Wno-type-limits"
+)
+
+# Add a specific rule for tinyfiledialogs.c to ignore the function cast warning.
+set_source_files_properties(
+        source/external/tinyfiledialogs.c
+        PROPERTIES
+        COMPILE_FLAGS "-Wno-cast-function-type"
 )
 
 # Tell the compiler where to find your project's header files.
