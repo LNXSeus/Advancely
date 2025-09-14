@@ -2,15 +2,28 @@
 // Created by Linus on 24.06.2025.
 //
 
+#include <ctime>
+
+// Temporarily disable specific warnings for the dmon.h library inclusion on Clang (macOS)
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#pragma clang diagnostic ignored "-Wmissing-field-initializers"
+#endif
+
 extern "C" {
 #define DMON_IMPL // Required for dmon
 #include "dmon.h"
 #include <cJSON.h>
-#include <ctime>
 
 // #define MINIZ_IMPLEMENTATION // TODO: Remove
 #include "external/miniz.h"
 }
+
+// Restore the warnings
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 // SDL imports
 #include <SDL3/SDL.h>
@@ -54,6 +67,7 @@ extern "C" {
 
 #if defined(__APPLE__)
 #include <mach-o/dyld.h>
+#include <libgen.h>
 #endif
 
 SDL_AtomicInt g_needs_update;
@@ -415,12 +429,39 @@ static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker 
     ImGui::End();
 }
 
+
+// Changes the working directory to the parent of the executable on macOS
+void mac_change_dir() {
+#ifdef __APPLE__
+    char path[MAX_PATH_LENGTH]; // Buffer to store the path
+    uint32_t size = sizeof(path); // Size of the buffer
+
+    // Call _NSGetExecutablePath to get the path
+    if (_NSGetExecutablePath(path, &size) == 0) {
+        log_message(LOG_INFO, "Executable path: %s\n", path);
+        chdir(dirname(path));
+        chdir("../../..");
+    } else {
+        log_message(LOG_ERROR, "Buffer too small or error getting executable path.\n");
+        // Handle the case where the buffer might be too small
+        // In this case, 'size' will contain the required buffer size
+    }
+
+    log_message(LOG_INFO, "%s\n", getcwd(nullptr, 0));
+#endif
+}
+
 // ------------------------------------ END OF STATIC FUNCTIONS ------------------------------------
 
 
 int main(int argc, char *argv[]) {
     // As we're not only using SDL_main() as our entry point
     SDL_SetMainReady();
+
+    // Change working directory on macOS
+#ifdef __APPLE__
+    mac_change_dir();
+#endif
 
     // Check for --updated flag on startup
     if (argc > 1 && strcmp(argv[1], "--updated") == 0) {

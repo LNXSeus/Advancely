@@ -13,7 +13,11 @@
 
 #ifdef _WIN32
 #include <windows.h> // For PROCESS_INFORMATION
+#else
+#include <sys/types.h> // For pid_t
+#include <sys/semaphore.h>
 #endif
+
 
 #include "ipc_data.h" // For SharedData
 

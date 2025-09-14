@@ -143,7 +143,9 @@ Contact me on [Discord @lnxseus](https://discord.gg/TyNgXDz) or [create a new is
 
 Massive thanks to all the beta testers. _Message me on discord @lnxseus with proof of using Advancely before its full release and you'll be added here:_
 
-* ethansplace98, Yumeko, zurtletif, 3emis, MoreTrident, ShadowFlower64, PhoenixAUS_, metal_silver1234, 36_Official, me_nx, Slackow, DesktopFolder
+* Windows: ethansplace98, Yumeko, zurtletif, 3emis, MoreTrident, PhoenixAUS_, metal_silver1234, 36_Official, me_nx, 
+* macOS: Slackow
+* Linux: DesktopFolder, ShadowFlower64
 
 ## License
 
