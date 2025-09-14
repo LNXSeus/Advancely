@@ -21,7 +21,35 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential libsdl3-dev libsdl3-image-dev libsdl3-ttf-dev libcurl4-openssl-dev
+        # Install build tools and curl, but not SDL3 from apt
+        sudo apt-get install -y build-essential cmake git libcurl4-openssl-dev
+        
+        # Build SDL3 from source
+        echo "Building SDL3 from source..."
+        git clone https://github.com/libsdl-org/SDL.git -b main
+        cd SDL
+        cmake -B build
+        cmake --build build
+        sudo cmake --install build
+        cd ..
+
+        # Build SDL3_image from source
+        echo "Building SDL3_image from source..."
+        git clone https://github.com/libsdl-org/SDL_image.git -b main
+        cd SDL_image
+        cmake -B build
+        cmake --build build
+        sudo cmake --install build
+        cd ..
+        
+        # Build SDL3_ttf from source
+        echo "Building SDL3_ttf from source..."
+        git clone https://github.com/libsdl-org/SDL_ttf.git -b main
+        cd SDL_ttf
+        cmake -B build
+        cmake --build build
+        sudo cmake --install build
+        cd ..
 
     - name: Install dependencies (macOS)
       if: runner.os == 'macOS'
@@ -32,9 +60,9 @@ jobs:
       if: runner.os == 'Windows'
       uses: lukka/run-vcpkg@v11
       with:
-        vcpkgGitCommitId: '1d28de8707106a25c1995a32973449335a4d61c2'
+        # We remove the specific commit ID to let the action use its more stable default setup
         vcpkgJsonGlob: '**/vcpkg.json'
-
+        
     - name: Configure CMake
       run: cmake -B build
 
@@ -53,7 +81,7 @@ jobs:
           !build/**/Makefile
           !build/**/*.a
           !build/**/*.lib
-
+          
     - name: Package Resources
       if: matrix.os == 'windows-latest'
       uses: actions/upload-artifact@v4
