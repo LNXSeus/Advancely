@@ -1060,6 +1060,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static SaveMessageType save_message_type = MSG_NONE;
     static char status_message[256] = "";
 
+    // --- Version-dependent labels ---
+    MC_Version creator_selected_version = settings_get_version_from_string(creator_version_str);
+    const char* advancement_label = (creator_selected_version <= MC_VERSION_1_11_2) ? "Achievement" : "Advancement";
+
+    // TODO: Currently not used
+    const char* advancements_label_plural = (creator_selected_version <= MC_VERSION_1_11_2) ? "Achievements" : "Advancements";
+
     // LOGIC
 
     // Add state management for window open/close
@@ -1647,18 +1654,25 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
 
         if (ImGui::BeginTabBar("EditorTabs")) {
-            if (ImGui::BeginTabItem("Advancements")) {
+            // "Advancements" or "Achievements" tab depending on version
+            if (ImGui::BeginTabItem(advancements_label_plural)) {
                 // TWO-PANE LAYOUT
                 float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                 ImGui::BeginChild("AdvancementListPane", ImVec2(pane_width, 0), true);
 
-                // LEFT PANE: List of Advancements
-                if (ImGui::Button("Add New Advancement")) {
+                // LEFT PANE: List of Advancements/Achievements
+                char button_label[64];
+                snprintf(button_label, sizeof(button_label), "Add New %s", advancement_label);
+                if (ImGui::Button(button_label)) {
                     current_template_data.advancements.push_back({});
                     save_message_type = MSG_NONE;
                 }
                 ImGui::SameLine();
                 ImGui::Checkbox("Show Display Names", &show_advancement_display_names);
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("When checked shows the display names as you see then on the tracker.\n"
+                                      "Otherwise it shows the root names.");
+                }
                 ImGui::Separator();
 
                 int advancement_to_remove = -1;
@@ -1678,7 +1692,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // Show display names based on setting
                     const char* label = show_advancement_display_names ? (display_name[0] ? display_name : root_name) : root_name;
                     if (label[0] == '\0') {
-                        label = "[New Advancement]";
+                        char placeholder[64];
+                        snprintf(placeholder, sizeof(placeholder), "[New %s]", advancement_label);
+                        label = placeholder;
                     }
 
                     // Draw the "X" (Remove) button
@@ -1812,7 +1828,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     advancements.size()) {
                     auto &advancement = current_template_data.advancements[selected_advancement_index];
 
-                    ImGui::Text("Edit Advancement Details");
+                    char details_title[64];
+                    snprintf(details_title, sizeof(details_title), "Edit %s Details", advancement_label);
+                    ImGui::Text("%s", details_title);
                     ImGui::Separator();
 
                     if (ImGui::InputText("Root Name", advancement.root_name, sizeof(advancement.root_name))) {
@@ -1963,7 +1981,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                     new_criterion);
                     }
                 } else {
-                    ImGui::Text("Select an advancement from the list to edit its details.");
+                    char select_prompt[128];
+                    snprintf(select_prompt, sizeof(select_prompt), "Select an %s from the list to edit its details.", advancement_label);
+                    ImGui::Text("%s", select_prompt);
                 }
                 ImGui::EndChild();
                 ImGui::EndTabItem();
@@ -1983,6 +2003,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 ImGui::SameLine();
                 ImGui::Checkbox("Show Display Names", &show_stat_display_names);
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("When checked shows the display names as you see then on the tracker.\n"
+                                      "Otherwise it shows the root names.");
+                }
                 ImGui::Separator();
 
                 int stat_to_remove = -1;
@@ -2612,6 +2636,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 ImGui::SameLine();
                 ImGui::Checkbox("Show Display Names", &show_ms_goal_display_names);
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("When checked shows the display names as you see them on the tracker.\n"
+                                      "Otherwise it shows the root names.");
+                }
                 ImGui::Separator();
 
                 int goal_to_remove = -1;
@@ -2763,7 +2791,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     int stage_dnd_target_index = -1;
 
                     // TODO: Only show "Unlock" in this list if the version is craftmine
-                    const char *type_names[] = {"Stat", "Advancement", "Unlock", "Criterion", "Final"};
+                    // const char *type_names[] = {"Stat", "Advancement", "Unlock", "Criterion", "Final"};
 
                     for (size_t j = 0; j < goal.stages.size(); ++j) {
                         auto &stage = goal.stages[j];
@@ -2793,17 +2821,31 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::InputText("Display Text", stage.display_text, sizeof(stage.display_text))) {
                             save_message_type = MSG_NONE;
                         }
-                        if (ImGui::Combo("Type", (int *) &stage.type, type_names, IM_ARRAYSIZE(type_names))) {
-                            // Clear parent_advancement if type is not criterion
-                            if (stage.type != SUBGOAL_CRITERION) {
-                                stage.parent_advancement[0] = '\0';
+                        // --- Dynamic Type Dropdown, unlocks only for 25w14craftmine ---
+                        const char* current_type_name = "Unknown";
+                        switch (stage.type) {
+                            case SUBGOAL_STAT: current_type_name = "Stat"; break;
+                            case SUBGOAL_ADVANCEMENT: current_type_name = advancement_label; break;
+                            case SUBGOAL_UNLOCK: current_type_name = "Unlock"; break;
+                            case SUBGOAL_CRITERION: current_type_name = "Criterion"; break;
+                            case SUBGOAL_MANUAL: current_type_name = "Final"; break;
+                        }
+
+                        if (ImGui::BeginCombo("Type", current_type_name)) {
+                            if (ImGui::Selectable("Stat", stage.type == SUBGOAL_STAT)) { stage.type = SUBGOAL_STAT; save_message_type = MSG_NONE; }
+                            if (ImGui::Selectable(advancement_label, stage.type == SUBGOAL_ADVANCEMENT)) { stage.type = SUBGOAL_ADVANCEMENT; save_message_type = MSG_NONE; }
+                            if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
+                                if (ImGui::Selectable("Unlock", stage.type == SUBGOAL_UNLOCK)) { stage.type = SUBGOAL_UNLOCK; save_message_type = MSG_NONE; }
                             }
-                            save_message_type = MSG_NONE;
+                            if (ImGui::Selectable("Criterion", stage.type == SUBGOAL_CRITERION)) { stage.type = SUBGOAL_CRITERION; save_message_type = MSG_NONE; }
+                            if (ImGui::Selectable("Final", stage.type == SUBGOAL_MANUAL)) { stage.type = SUBGOAL_MANUAL; save_message_type = MSG_NONE; }
+                            ImGui::EndCombo();
                         }
 
                         if (stage.type == SUBGOAL_CRITERION) {
-                            if (ImGui::InputText("Parent Advancement", stage.parent_advancement,
-                                                 sizeof(stage.parent_advancement))) {
+                            char parent_label[64];
+                            snprintf(parent_label, sizeof(parent_label), "Parent %s", advancement_label);
+                            if (ImGui::InputText(parent_label, stage.parent_advancement, sizeof(stage.parent_advancement))) {
                                 save_message_type = MSG_NONE;
                             }
                         }

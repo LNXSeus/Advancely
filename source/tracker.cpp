@@ -3814,8 +3814,16 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         auto section_id = (TrackerSection) settings->section_order[i];
         switch (section_id) {
             case SECTION_ADVANCEMENTS:
-                render_trackable_category_section(t, settings, current_y, t->template_data->advancements,
-                                                  t->template_data->advancement_count, "Advancements", false, version);
+                if (version <= MC_VERSION_1_11_2) {
+                    // Achievements section title
+                    render_trackable_category_section(t, settings, current_y, t->template_data->advancements,
+                                                      t->template_data->advancement_count, "Achievements", false, version);
+                } else {
+                    // Advancements section title
+                    render_trackable_category_section(t, settings, current_y, t->template_data->advancements,
+                                                      t->template_data->advancement_count, "Advancements", false, version);
+
+                }
                 break;
             case SECTION_UNLOCKS:
                 render_simple_item_section(t, settings, current_y, t->template_data->unlocks,
@@ -4118,11 +4126,15 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // Add the "Notes" checkbox
     ImGui::Checkbox("Notes", &t->notes_window_open);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Toggle the template-specific notes window.\n"
-            "Once you type inside the window all hotkeys are disabled.\n"
-            "Anything you type is immediately saved to the notes file in the template folder.\n"
-            "This window can arbitrarily be resized.\n"
-            "There's a 64KB limit on the size of the notes file.");
+        ImGui::SetTooltip(
+            "Toggle the notes window.\n\n"
+            "The notes system has two modes, configurable inside the window:\n"
+            "  • Per-World (Default): Notes are saved for each world individually. The last 32 worlds are remembered.\n"
+            "  • Per-Template: Notes are shared for the currently loaded template permanently.\n\n"
+            "The window's size and position are remembered across sessions.\n"
+            "Hotkeys are disabled while typing in the notes window.\n"
+            "The maximum note size is 64KB."
+        );
     }
 
     ImGui::PopStyleColor(5); // Pop the style colors, there's 5 of them
@@ -4131,22 +4143,30 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
     // --- Render Notes Window ---
     if (t->notes_window_open) {
-        // Dynamically create the window title to show which template the notes belong to.
-        char notes_title[512];
-        if (settings->per_world_notes) {
-            snprintf(notes_title, sizeof(notes_title), "Notes: %s", t->world_name[0] != '\0' ? t->world_name : "No World Loaded");
-        } else {
-            char formatted_category[128];
-            format_category_string(settings->category, formatted_category, sizeof(formatted_category));
-            snprintf(notes_title, sizeof(notes_title), "Notes: %s - %s%s",
-                     settings->version_str,
-                     formatted_category,
-                     settings->optional_flag);
-        }
+        // A static title with a hidden ID (##AdvancelyNotes) ensures the window's size
+        // and position are always remembered by ImGui.
+        const char* notes_window_title = "Notes##AdvancelyNotes";
 
         ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
 
-        if (ImGui::Begin(notes_title, &t->notes_window_open)) {
+        if (ImGui::Begin(notes_window_title, &t->notes_window_open)) {
+            // Display the dynamic context (world or template name) inside the window.
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f)); // Dim the context text
+            if (settings->per_world_notes) {
+                ImGui::Text("World: %s", t->world_name[0] != '\0' ? t->world_name : "No World Loaded");
+            } else {
+                char formatted_category[128];
+                format_category_string(settings->category, formatted_category, sizeof(formatted_category));
+                char formatted_flag[128];
+                format_category_string(settings->optional_flag, formatted_flag, sizeof(formatted_flag));
+                ImGui::Text("Template: %s - %s%s",
+                         settings->version_str,
+                         formatted_category,
+                         *settings->optional_flag ? formatted_flag : "");
+            }
+            ImGui::PopStyleColor();
+            ImGui::Separator();
+
             // Capture the font setting at the beginning of the frame.
             // This ensures PushFont and PopFont are always balanced, even if the setting changes mid-frame.
             const bool use_roboto = settings->notes_use_roboto_font;
