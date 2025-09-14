@@ -12,7 +12,7 @@ endif()
 # Set C standard
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED True)
-set(CMAKE_CXX_STANDARD 26) # Use the latest C++ standard
+set(CMAKE_CXX_STANDARD 17) # Use widely supported C++ 17
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 
