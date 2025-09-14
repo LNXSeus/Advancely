@@ -209,6 +209,44 @@ static bool has_duplicate_stage_ids(const std::vector<EditorSubGoal> &stages, ch
     return false;
 }
 
+// Helper to validate the structure of stages within multi-stage goals, especially asuring proper final stage
+static bool validate_multi_stage_goal_stages(const std::vector<EditorMultiStageGoal> &goals, char *error_message_buffer) {
+    for (const auto& goal : goals) {
+        if (goal.stages.empty()) {
+            // It's valid for a new goal to have no stages yet, so we don't flag this as an error.
+            continue;
+        }
+
+        int final_stage_count = 0;
+        int final_stage_index = -1;
+        for (size_t i = 0; i < goal.stages.size(); ++i) {
+            if (goal.stages[i].type == SUBGOAL_MANUAL) {
+                final_stage_count++;
+                final_stage_index = (int)i;
+            }
+        }
+
+        // Rule 1: Must have one 'Final' stage.
+        if (final_stage_count == 0) {
+            snprintf(error_message_buffer, 256, "Error: Goal '%s' must have one stage of type 'Final'.", goal.root_name);
+            return false;
+        }
+
+        // Rule 3: Can only have one 'Final' stage.
+        if (final_stage_count > 1) {
+            snprintf(error_message_buffer, 256, "Error: Goal '%s' has more than one 'Final' stage.", goal.root_name);
+            return false;
+        }
+
+        // Rule 2: The 'Final' stage must be the last one.
+        if (final_stage_index != (int)goal.stages.size() - 1) {
+            snprintf(error_message_buffer, 256, "Error: The 'Final' stage in goal '%s' must be the last in the list.", goal.root_name);
+            return false;
+        }
+    }
+    return true;
+}
+
 
 // Helper to validate that all icon paths in a vector exist
 static bool validate_icon_paths(const std::vector<EditorTrackableItem> &items, char *error_message_buffer) {
@@ -960,7 +998,8 @@ static bool validate_and_save_template(const char *creator_version_str,
     // --- Multi-Stage Goals Validation ---
     if (validation_passed) {
         if (has_duplicate_ms_goal_root_names(current_template_data.multi_stage_goals, status_message) ||
-            !validate_ms_goal_icon_paths(current_template_data.multi_stage_goals, status_message)) {
+            !validate_ms_goal_icon_paths(current_template_data.multi_stage_goals, status_message) ||
+            !validate_multi_stage_goal_stages(current_template_data.multi_stage_goals, status_message)) {
             validation_passed = false;
         }
     }
@@ -1517,6 +1556,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                      selected_template_info.category);
         }
         ImGui::TextDisabled("%s", current_file_info);
+
+        // Add the Drag & Drop notice, aligned to the right
+        const char* dnd_notice = "(Drag & drop list items to reorder)";
+        float text_width = ImGui::CalcTextSize(dnd_notice).x;
+        ImGui::SameLine(ImGui::GetWindowWidth() - text_width - ImGui::GetStyle().WindowPadding.x);
+        ImGui::TextDisabled("%s", dnd_notice);
+
         ImGui::Separator();
 
         // --- Language Selector inside Editor ---
@@ -2850,12 +2896,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                         }
 
-                        if (ImGui::InputText("Trigger Root Name", stage.root_name, sizeof(stage.root_name))) {
-                            save_message_type = MSG_NONE;
-                        }
-
+                        // "Final" stages don't need a target or Root Name
                         if (stage.type != SUBGOAL_MANUAL) {
-                            // "Final" stages don't need a target
+                            if (ImGui::InputText("Trigger Root Name", stage.root_name, sizeof(stage.root_name))) {
+                                save_message_type = MSG_NONE;
+                            }
                             if (ImGui::InputInt("Target Value", &stage.required_progress)) {
                                 save_message_type = MSG_NONE;
                             }
