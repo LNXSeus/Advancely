@@ -13,12 +13,12 @@ file(READ "${CMAKE_SOURCE_DIR}/source/main.h" MAIN_H_CONTENTS)
 string(REGEX MATCH "#define ADVANCELY_VERSION \"v([0-9]+\\.[0-9]+\\.[0-9]+)\"" _ ${MAIN_H_CONTENTS})
 
 # The captured version number is now in the variable CMAKE_MATCH_1
-if(CMAKE_MATCH_1)
+if (CMAKE_MATCH_1)
     set(PROJECT_VERSION ${CMAKE_MATCH_1})
     message(STATUS "Project version set from main.h: ${PROJECT_VERSION}")
-else()
+else ()
     message(FATAL_ERROR "Could not parse ADVANCELY_VERSION from source/main.h!")
-endif()
+endif ()
 
 # Enable the RC (Resource Compiler) language for Windows executables
 if (WIN32)
@@ -86,7 +86,7 @@ else ()
 endif ()
 
 # This command targets a specific source file and sets its properties ONLY FOR GCC
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set_source_files_properties(
             source/external/miniz.c
             PROPERTIES
@@ -94,7 +94,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
             # -Wno-type-limits will disable the "comparison is always false" warning.
             COMPILE_FLAGS "-Wno-type-limits"
     )
-endif()
+endif ()
 
 
 # Add a specific rule for tinyfiledialogs.c to ignore the function cast warning.
@@ -322,31 +322,32 @@ if (NOT APPLE)
     )
 endif ()
 
-# Move the _PLEASE_READ_ME.txt file to the output directory
-add_custom_command(TARGET Advancely POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_SOURCE_DIR}/_PLEASE_READ_ME.txt"
-        "$<TARGET_FILE_DIR:Advancely>"
-        COMMENT "[CMAKE] Copying _PLEASE_READ_ME.txt to output directory..."
-)
-
-add_custom_command(TARGET Advancely POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_SOURCE_DIR}/LICENSES.txt"
-        "$<TARGET_FILE_DIR:Advancely>"
-        COMMENT "[CMAKE] Copying LICENSES.txt to output directory..."
-)
-
-add_custom_command(TARGET Advancely POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_SOURCE_DIR}/README.md"
-        "$<TARGET_FILE_DIR:Advancely>"
-        COMMENT "[CMAKE] Copying README.md to output directory..."
-)
+# TODO: Remove
+## Move the _PLEASE_READ_ME.txt file to the output directory
+#add_custom_command(TARGET Advancely POST_BUILD
+#        COMMAND ${CMAKE_COMMAND} -E copy
+#        "${CMAKE_SOURCE_DIR}/_PLEASE_READ_ME.txt"
+#        "$<TARGET_FILE_DIR:Advancely>"
+#        COMMENT "[CMAKE] Copying _PLEASE_READ_ME.txt to output directory..."
+#)
+#
+#add_custom_command(TARGET Advancely POST_BUILD
+#        COMMAND ${CMAKE_COMMAND} -E copy
+#        "${CMAKE_SOURCE_DIR}/LICENSES.txt"
+#        "$<TARGET_FILE_DIR:Advancely>"
+#        COMMENT "[CMAKE] Copying LICENSES.txt to output directory..."
+#)
+#
+#add_custom_command(TARGET Advancely POST_BUILD
+#        COMMAND ${CMAKE_COMMAND} -E copy
+#        "${CMAKE_SOURCE_DIR}/README.md"
+#        "$<TARGET_FILE_DIR:Advancely>"
+#        COMMENT "[CMAKE] Copying README.md to output directory..."
+#)
 
 
 # --- 6. COMPILER FLAGS & SANITIZERS ---
-if(MSVC)
+if (MSVC)
     # Apply MSVC-specific warning flags
     target_compile_options(${EXECUTABLE_NAME} PRIVATE
             /W4     # Equivalent to -Wall / -Wextra, sets a high warning level
@@ -361,7 +362,7 @@ if(MSVC)
             /wd4101 # Disable "unreferenced local variable" warning
             /wd4505 # Disable "unreferenced function" warning
     )
-else()
+else ()
     # Apply GCC/Clang-specific warning flags
     target_compile_options(${EXECUTABLE_NAME} PRIVATE
             -Wall                   # Enable all standard warnings
@@ -372,19 +373,19 @@ else()
     )
 
     # Add GCC-specific warning suppressions only when using the GCC compiler
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         target_compile_options(${EXECUTABLE_NAME} PRIVATE -Wno-stringop-truncation)
-    endif()
-endif()
+    endif ()
+endif ()
 
 # Add sanitizers for Debug builds on non-Windows platforms (Linux, macOS)
-if(NOT WIN32)
+if (NOT WIN32)
     # This injects code to detect memory errors (like leaks, buffer overflows) at runtime.
     target_compile_options(${EXECUTABLE_NAME} PRIVATE $<$<CONFIG:Debug>:-fsanitize=address>)
 
     # Link the AddressSanitizer library for Debug builds.
     target_link_options(${EXECUTABLE_NAME} PRIVATE $<$<CONFIG:Debug>:-fsanitize=address>)
-endif()
+endif ()
 
 
 # --- 7. INSTALLATION AND PACKAGING ---
@@ -393,20 +394,31 @@ endif()
 include(InstallRequiredSystemLibraries)
 
 # Define where to install the files
-if(WIN32 OR UNIX AND NOT APPLE)
-    # Rule to install the main executable
-    install(TARGETS ${EXECUTABLE_NAME} DESTINATION bin)
+if (WIN32 OR UNIX AND NOT APPLE)
+    # Rule to install the main executable and its runtime dlls
+    install(TARGETS ${EXECUTABLE_NAME}
+            DESTINATION bin
+            BUNDLE DESTINATION .
+    )
 
     # Rule to install the entire resources directory
     install(DIRECTORY resources/ DESTINATION share/advancely/resources)
-endif()
 
-if(UNIX AND NOT APPLE)
+    # Rule to install the text files alongside the executable
+    install(FILES
+            "${CMAKE_SOURCE_DIR}/_PLEASE_READ_ME.txt"
+            "${CMAKE_SOURCE_DIR}/LICENSES.txt"
+            "${CMAKE_SOURCE_DIR}/README.md"
+            DESTINATION bin
+    )
+endif ()
+
+if (UNIX AND NOT APPLE)
     # Rules for Linux desktop integration
     install(FILES "packaging/linux/advancely.desktop" DESTINATION share/applications)
     install(FILES "resources/gui/Advancely_Logo_NoText.png" DESTINATION share/icons/hicolor/256x256/apps RENAME advancely.png)
     install(FILES "packaging/linux/dev.LNXSeus.Advancely.metainfo.xml" DESTINATION share/metainfo)
-endif()
+endif ()
 
 # --- CPack Configuration for creating a .deb package ---
 set(CPACK_GENERATOR "DEB")

@@ -85,20 +85,8 @@ jobs:
         cpack -C Release
 
     # Create and package the release, resources are included per OS
-    - name: Create and Package Release
-      shell: bash
-      run: |
-        mkdir release
-        if [ "$RUNNER_OS" == "Windows" ]; then
-          cp build/Release/Advancely.exe release/
-          cp build/Release/*.dll release/
-          cp -r build/resources release/
-        elif [ "$RUNNER_OS" == "macOS" ]; then
-          cp -r build/Advancely.app release/
-        else
-          # For Linux, find and copy the generated .deb file
-          find build -name "*.deb" -exec cp {} release/ \;
-        fi
+    - name: Install Project
+      run: cmake --install build --prefix ./release --config Release
 
     - name: Upload Release Artifact
       uses: actions/upload-artifact@v4
