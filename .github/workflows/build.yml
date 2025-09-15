@@ -86,6 +86,7 @@ jobs:
 
     # Create and package the release, resources are included per OS
     - name: Create and Package Release
+      shell: bash
       run: |
         mkdir release
         if [ "$RUNNER_OS" == "Windows" ]; then
