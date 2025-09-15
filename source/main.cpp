@@ -551,7 +551,7 @@ int main(int argc, char *argv[]) {
             // DEBUG PRINT 3: Confirm the file was opened successfully.
             log_message(LOG_ERROR, "[DEBUG] 'update_url.txt' opened successfully.\n");
             // Read the URL from the file
-            fgets(release_url_buffer, sizeof(release_url_buffer), f);
+            (void)fgets(release_url_buffer, sizeof(release_url_buffer), f);
             fclose(f);
 
             // Trim trailing newline characters
@@ -894,7 +894,7 @@ int main(int argc, char *argv[]) {
 #else
                             snprintf(command, sizeof(command), "xdg-open \"%s\"", templates_path);
 #endif
-                            system(command);
+                            (void)system(command);
                             break; // Re-shows the message box
                         }
 
@@ -909,7 +909,7 @@ int main(int argc, char *argv[]) {
 #else
                                     snprintf(command, sizeof(command), "xdg-open %s", url);
 #endif
-                            system(command);
+                            (void)system(command);
                         }
                         break; // Re-shows the message box
                     }
@@ -1076,7 +1076,7 @@ int main(int argc, char *argv[]) {
 
         // Create the shared memory object
         tracker->shm_fd = shm_open(SHARED_MEM_NAME, O_CREAT | O_RDWR, 0666);
-        ftruncate(tracker->shm_fd, sizeof(SharedData));
+        (void)ftruncate(tracker->shm_fd, sizeof(SharedData));
 
         // Map the shared memory object
         tracker->p_shared_data = (SharedData*)mmap(0, sizeof(SharedData), PROT_WRITE, MAP_SHARED, tracker->shm_fd, 0);
