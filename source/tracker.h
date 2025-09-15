@@ -15,7 +15,10 @@
 #include <windows.h> // For PROCESS_INFORMATION
 #else
 #include <sys/types.h> // For pid_t
-#include <sys/semaphore.h>
+#endif
+
+#if defined(__APPLE__)
+#include <semaphore.h> // For named semaphores (acting as mutexes)
 #endif
 
 

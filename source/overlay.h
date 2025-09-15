@@ -8,10 +8,8 @@
 #include "tracker.h" // Has main.h
 #include "ipc_data.h" // For SharedData
 
-#ifdef _WIN32
-// No specific includes needed for the Windows handles in this struct
-#else
-#include <semaphore.h> // For sem_t
+#if defined(__APPLE__)
+#include <semaphore.h> // For named semaphores (acting as mutexes)
 #endif
 
 #ifdef __cplusplus
