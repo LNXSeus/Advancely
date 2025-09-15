@@ -211,8 +211,9 @@ static bool has_duplicate_stage_ids(const std::vector<EditorSubGoal> &stages, ch
 }
 
 // Helper to validate the structure of stages within multi-stage goals, especially asuring proper final stage
-static bool validate_multi_stage_goal_stages(const std::vector<EditorMultiStageGoal> &goals, char *error_message_buffer) {
-    for (const auto& goal : goals) {
+static bool validate_multi_stage_goal_stages(const std::vector<EditorMultiStageGoal> &goals,
+                                             char *error_message_buffer) {
+    for (const auto &goal: goals) {
         if (goal.stages.empty()) {
             // It's valid for a new goal to have no stages yet, so we don't flag this as an error.
             continue;
@@ -223,13 +224,14 @@ static bool validate_multi_stage_goal_stages(const std::vector<EditorMultiStageG
         for (size_t i = 0; i < goal.stages.size(); ++i) {
             if (goal.stages[i].type == SUBGOAL_MANUAL) {
                 final_stage_count++;
-                final_stage_index = (int)i;
+                final_stage_index = (int) i;
             }
         }
 
         // Rule 1: Must have one 'Final' stage.
         if (final_stage_count == 0) {
-            snprintf(error_message_buffer, 256, "Error: Goal '%s' must have one stage of type 'Final'.", goal.root_name);
+            snprintf(error_message_buffer, 256, "Error: Goal '%s' must have one stage of type 'Final'.",
+                     goal.root_name);
             return false;
         }
 
@@ -240,8 +242,9 @@ static bool validate_multi_stage_goal_stages(const std::vector<EditorMultiStageG
         }
 
         // Rule 2: The 'Final' stage must be the last one.
-        if (final_stage_index != (int)goal.stages.size() - 1) {
-            snprintf(error_message_buffer, 256, "Error: The 'Final' stage in goal '%s' must be the last in the list.", goal.root_name);
+        if (final_stage_index != (int) goal.stages.size() - 1) {
+            snprintf(error_message_buffer, 256, "Error: The 'Final' stage in goal '%s' must be the last in the list.",
+                     goal.root_name);
             return false;
         }
     }
@@ -262,7 +265,7 @@ static bool validate_icon_paths(const std::vector<EditorTrackableItem> &items, c
         }
         // If path is non-empty
         char full_path[MAX_PATH_LENGTH];
-        snprintf(full_path, sizeof(full_path), "resources/icons/%s", item.icon_path);
+        snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_resources_path(), item.icon_path);
         if (!path_exists(full_path)) {
             snprintf(error_message_buffer, 256, "Error: Icon file not found for '%s': '%s'", item.root_name,
                      item.icon_path);
@@ -286,7 +289,7 @@ static bool validate_ms_goal_icon_paths(const std::vector<EditorMultiStageGoal> 
 
         // When path is wrong
         char full_path[MAX_PATH_LENGTH];
-        snprintf(full_path, sizeof(full_path), "resources/icons/%s", goal.icon_path);
+        snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_resources_path(), goal.icon_path);
         if (!path_exists(full_path)) {
             snprintf(error_message_buffer, 256, "Error: Icon file not found for goal '%s': '%s'", goal.root_name,
                      goal.icon_path);
@@ -309,7 +312,7 @@ static bool validate_category_icon_paths(const std::vector<EditorTrackableCatego
         }
         // When path exists we validate correctness
         char full_path[MAX_PATH_LENGTH];
-        snprintf(full_path, sizeof(full_path), "resources/icons/%s", cat.icon_path);
+        snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_resources_path(), cat.icon_path);
         if (!path_exists(full_path)) {
             snprintf(error_message_buffer, 256, "Error: Icon file not found for '%s': '%s'", cat.root_name,
                      cat.icon_path);
@@ -330,7 +333,7 @@ static bool validate_category_icon_paths(const std::vector<EditorTrackableCatego
             // check for incorrect path when it's not empty and complex stat
             if (crit.icon_path[0] != '\0') {
                 char full_path[MAX_PATH_LENGTH];
-                snprintf(full_path, sizeof(full_path), "resources/icons/%s", crit.icon_path);
+                snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_resources_path(), crit.icon_path);
                 if (!path_exists(full_path)) {
                     snprintf(error_message_buffer, 256, "Error: Icon file not found for criterion '%s': '%s'",
                              crit.root_name, crit.icon_path);
@@ -626,7 +629,7 @@ static bool load_template_for_editing(const char *version, const DiscoveredTempl
     for (char *p = version_filename; *p; p++) { if (*p == '.') *p = '_'; }
 
     char base_path_str[MAX_PATH_LENGTH];
-    snprintf(base_path_str, sizeof(base_path_str), "resources/templates/%s/%s/%s_%s%s",
+    snprintf(base_path_str, sizeof(base_path_str), "%s/templates/%s/%s/%s_%s%s", get_resources_path(),
              version, template_info.category, version_filename, template_info.category, template_info.optional_flag);
 
     char template_path[MAX_PATH_LENGTH];
@@ -806,7 +809,7 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
     for (char *p = version_filename; *p; p++) { if (*p == '.') *p = '_'; }
 
     char base_path_str[MAX_PATH_LENGTH];
-    snprintf(base_path_str, sizeof(base_path_str), "resources/templates/%s/%s/%s_%s%s",
+    snprintf(base_path_str, sizeof(base_path_str), "%s/templates/%s/%s/%s_%s%s", get_resources_path(),
              version, template_info.category, version_filename, template_info.category, template_info.optional_flag);
 
     char template_path[MAX_PATH_LENGTH];
@@ -1102,10 +1105,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     // --- Version-dependent labels ---
     MC_Version creator_selected_version = settings_get_version_from_string(creator_version_str);
-    const char* advancement_label = (creator_selected_version <= MC_VERSION_1_11_2) ? "Achievement" : "Advancement";
+    const char *advancement_label = (creator_selected_version <= MC_VERSION_1_11_2) ? "Achievement" : "Advancement";
 
     // TODO: Currently not used
-    const char* advancements_label_plural = (creator_selected_version <= MC_VERSION_1_11_2) ? "Achievements" : "Advancements";
+    const char *advancements_label_plural = (creator_selected_version <= MC_VERSION_1_11_2)
+                                                ? "Achievements"
+                                                : "Advancements";
 
     // LOGIC
 
@@ -1361,7 +1366,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 for (char *p = dest_version_filename; *p; p++) { if (*p == '.') *p = '_'; }
 
                 char dest_template_path[MAX_PATH_LENGTH];
-                snprintf(dest_template_path, sizeof(dest_template_path), "resources/templates/%s/%s/%s_%s%s.json",
+                snprintf(dest_template_path, sizeof(dest_template_path), "%s/templates/%s/%s/%s_%s%s.json",
+                         get_resources_path(),
                          dest_version,
                          selected.category, // Check against the original category
                          dest_version_filename,
@@ -1380,9 +1386,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     if (ImGui::IsItemHovered()) {
         char copy_template_tooltip_buffer[1024];
         snprintf(copy_template_tooltip_buffer, sizeof(copy_template_tooltip_buffer),
-        "Creates a copy of the selected template. You can then change its version, category, or flag.\n\n"
-        "Note: This action copies the main template file and all of its\n"
-        "associated language files (e.g., _lang.json, _lang_eng.json).");
+                 "Creates a copy of the selected template. You can then change its version, category, or flag.\n\n"
+                 "Note: This action copies the main template file and all of its\n"
+                 "associated language files (e.g., _lang.json, _lang_eng.json).");
         ImGui::SetTooltip(
             "%s", copy_template_tooltip_buffer);
     }
@@ -1402,7 +1408,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (selected_template_index != -1 && is_current_template) {
             char cannot_delete_template_tooltip_buffer[1024];
             snprintf(cannot_delete_template_tooltip_buffer, sizeof(cannot_delete_template_tooltip_buffer),
-                "Cannot delete the template currently in use.");
+                     "Cannot delete the template currently in use.");
             ImGui::SetTooltip("%s", cannot_delete_template_tooltip_buffer);
         } else if (selected_template_index != -1) {
             const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
@@ -1418,7 +1424,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         } else {
             char delete_curent_template_tooltip_buffer[1024];
             snprintf(delete_curent_template_tooltip_buffer, sizeof(delete_curent_template_tooltip_buffer),
-                "Delete the currently selected template.");
+                     "Delete the currently selected template.");
             ImGui::SetTooltip("%s", delete_curent_template_tooltip_buffer);
         }
     }
@@ -1508,9 +1514,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         // DELETION LOGIC FOR LANGUAGES -> Only allow deletion if not default and not currently active
         bool can_delete = false;
-        const char* disabled_tooltip = "";
+        const char *disabled_tooltip = "";
         if (selected_lang_index != -1) {
-            const std::string& selected_lang_in_creator = selected.available_lang_flags[selected_lang_index];
+            const std::string &selected_lang_in_creator = selected.available_lang_flags[selected_lang_index];
 
             // Rule 1: Cannot delete the default language file.
             bool is_default_lang = selected_lang_in_creator.empty();
@@ -1539,7 +1545,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::BeginDisabled(!can_delete);
         auto delete_action = [&]() { ImGui::OpenPopup("Delete Language?"); };
         if (ImGui::Button("Delete Language")) {
-            if(editor_has_unsaved_changes) { show_unsaved_changes_popup = true; pending_action = delete_action; } else { delete_action(); }
+            if (editor_has_unsaved_changes) {
+                show_unsaved_changes_popup = true;
+                pending_action = delete_action;
+            } else { delete_action(); }
         }
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && !can_delete) {
@@ -1568,7 +1577,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::TextDisabled("%s", current_file_info);
 
         // Add the Drag & Drop notice, aligned to the right
-        const char* dnd_notice = "(Drag & drop list items to reorder)";
+        const char *dnd_notice = "(Drag & drop list items to reorder)";
         float text_width = ImGui::CalcTextSize(dnd_notice).x;
         ImGui::SameLine(ImGui::GetWindowWidth() - text_width - ImGui::GetStyle().WindowPadding.x);
         ImGui::TextDisabled("%s", dnd_notice);
@@ -1612,10 +1621,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char select_lang_file_tooltip_buffer[1024];
             snprintf(select_lang_file_tooltip_buffer, sizeof(select_lang_file_tooltip_buffer),
-            "Select the language file for editing display names.\n\n"
-            "• Loading: Changing this selection will reload all 'Display Name' fields in the editor from the chosen file.\n"
-            "• Saving: Edits to display names are saved to the language selected here when you click the main 'Save' button.\n\n"
-            "This keeps the template's core structure separate from its translations.");
+                     "Select the language file for editing display names.\n\n"
+                     "• Loading: Changing this selection will reload all 'Display Name' fields in the editor from the chosen file.\n"
+                     "• Saving: Edits to display names are saved to the language selected here when you click the main 'Save' button.\n\n"
+                     "This keeps the template's core structure separate from its translations.");
             ImGui::SetTooltip("%s", select_lang_file_tooltip_buffer);
         }
         ImGui::Separator();
@@ -1634,8 +1643,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char save_template_tooltip_buffer[1024];
             snprintf(save_template_tooltip_buffer, sizeof(save_template_tooltip_buffer),
-            "Press ENTER to save the currently edited template into the .json files.\n"
-            "Does not save on errors.");
+                     "Press ENTER to save the currently edited template into the .json files.\n"
+                     "Does not save on errors.");
             ImGui::SetTooltip("%s", save_template_tooltip_buffer);
         }
 
@@ -1692,7 +1701,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (ImGui::IsItemHovered()) {
                 char press_enter_save_tooltip_buffer[1024];
                 snprintf(press_enter_save_tooltip_buffer, sizeof(press_enter_save_tooltip_buffer),
-                    "Press ENTER to save.");
+                         "Press ENTER to save.");
                 ImGui::SetTooltip("%s", press_enter_save_tooltip_buffer);
             }
             ImGui::SameLine();
@@ -1706,7 +1715,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (ImGui::IsItemHovered()) {
                 char press_space_discard_tooltip_buffer[1024];
                 snprintf(press_space_discard_tooltip_buffer, sizeof(press_space_discard_tooltip_buffer),
-                    "Press SPACE to discard.");
+                         "Press SPACE to discard.");
                 ImGui::SetTooltip("%s", press_space_discard_tooltip_buffer);
             }
             ImGui::SameLine();
@@ -1718,7 +1727,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (ImGui::IsItemHovered()) {
                 char press_esc_cancel_tooltip_buffer[1024];
                 snprintf(press_esc_cancel_tooltip_buffer, sizeof(press_esc_cancel_tooltip_buffer),
-                    "Press ESC to cancel.");
+                         "Press ESC to cancel.");
                 ImGui::SetTooltip("%s", press_esc_cancel_tooltip_buffer);
             }
             ImGui::EndPopup();
@@ -1743,8 +1752,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (ImGui::IsItemHovered()) {
                     char show_display_names_tooltip_buffer[1024];
                     snprintf(show_display_names_tooltip_buffer, sizeof(show_display_names_tooltip_buffer),
-                    "When checked shows the display names as you see then on the tracker.\n"
-                                  "Otherwise it shows the root names.");
+                             "When checked shows the display names as you see then on the tracker.\n"
+                             "Otherwise it shows the root names.");
                     ImGui::SetTooltip("%s", show_display_names_tooltip_buffer);
                 }
                 ImGui::Separator();
@@ -1764,7 +1773,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     const char *root_name = advancement.root_name;
 
                     // Show display names based on setting
-                    const char* label = show_advancement_display_names ? (display_name[0] ? display_name : root_name) : root_name;
+                    const char *label = show_advancement_display_names
+                                            ? (display_name[0] ? display_name : root_name)
+                                            : root_name;
                     if (label[0] == '\0') {
                         char placeholder[64];
                         snprintf(placeholder, sizeof(placeholder), "[New %s]", advancement_label);
@@ -1928,7 +1939,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::IsItemHovered()) {
                         char resource_folder_tooltip_buffer[1024];
                         snprintf(resource_folder_tooltip_buffer, sizeof(resource_folder_tooltip_buffer),
-                            "The icon must be inside the 'resources/icons' folder!");
+                                 "The icon must be inside the 'resources/icons' folder!");
                         ImGui::SetTooltip("%s", resource_folder_tooltip_buffer);
                     }
                     if (ImGui::Checkbox("Hidden", &advancement.is_hidden)) {
@@ -1995,7 +2006,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::IsItemHovered()) {
                             char icon_path_tooltip_buffer[1024];
                             snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                "The icon must be inside the 'resources/icons' folder!");
+                                     "The icon must be inside the 'resources/icons' folder!");
                             ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                         }
                         if (ImGui::Checkbox("Hidden", &criterion.is_hidden)) {
@@ -2085,7 +2096,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                 } else {
                     char select_prompt[128];
-                    snprintf(select_prompt, sizeof(select_prompt), "Select an %s from the list to edit its details.", advancement_label);
+                    snprintf(select_prompt, sizeof(select_prompt), "Select an %s from the list to edit its details.",
+                             advancement_label);
                     ImGui::Text("%s", select_prompt);
                 }
                 ImGui::EndChild();
@@ -2109,8 +2121,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (ImGui::IsItemHovered()) {
                     char show_display_names_tooltip_buffer[1024];
                     snprintf(show_display_names_tooltip_buffer, sizeof(show_display_names_tooltip_buffer),
-                    "When checked shows the display names as you see then on the tracker.\n"
-                                  "Otherwise it shows the root names.");
+                             "When checked shows the display names as you see then on the tracker.\n"
+                             "Otherwise it shows the root names.");
                     ImGui::SetTooltip("%s", show_display_names_tooltip_buffer);
                 }
                 ImGui::Separator();
@@ -2125,11 +2137,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 for (size_t i = 0; i < current_template_data.stats.size(); i++) {
                     ImGui::PushID(i);
 
-                    const auto& stat = current_template_data.stats[i];
-                    const char* display_name = stat.display_name;
-                    const char* root_name = stat.root_name;
+                    const auto &stat = current_template_data.stats[i];
+                    const char *display_name = stat.display_name;
+                    const char *root_name = stat.root_name;
 
-                    const char* label = show_stat_display_names ? (display_name[0] ? display_name : root_name) : root_name;
+                    const char *label = show_stat_display_names
+                                            ? (display_name[0] ? display_name : root_name)
+                                            : root_name;
                     if (label[0] == '\0') {
                         label = "[New Stat]";
                     }
@@ -2275,7 +2289,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::IsItemHovered()) {
                         char icon_path_tooltip_buffer[1024];
                         snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                            "The icon must be inside the 'resources/icons' folder!");
+                                 "The icon must be inside the 'resources/icons' folder!");
                         ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                     }
                     if (ImGui::Checkbox("Hidden", &stat_cat.is_hidden)) {
@@ -2385,7 +2399,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ImGui::IsItemHovered()) {
                                 char icon_path_tooltip_buffer[1024];
                                 snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                    "The icon must be inside the 'resources/icons' folder!");
+                                         "The icon must be inside the 'resources/icons' folder!");
                                 ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                             }
                             if (ImGui::InputInt("Target", &crit.goal)) {
@@ -2540,7 +2554,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::IsItemHovered()) {
                             char icon_path_tooltip_buffer[1024];
                             snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                "The icon must be inside the 'resources/icons' folder!");
+                                     "The icon must be inside the 'resources/icons' folder!");
                             ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                         }
                         if (ImGui::Checkbox("Hidden", &unlock.is_hidden)) {
@@ -2685,7 +2699,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::IsItemHovered()) {
                         char icon_path_tooltip_buffer[1024];
                         snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                            "The icon must be inside the 'resources/icons' folder!");
+                                 "The icon must be inside the 'resources/icons' folder!");
                         ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                     }
                     if (ImGui::InputInt("Target Goal", &goal.goal)) {
@@ -2698,7 +2712,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::IsItemHovered()) {
                         char target_goal_tooltip_buffer[1024];
                         snprintf(target_goal_tooltip_buffer, sizeof(target_goal_tooltip_buffer),
-                            "0 for a simple toggle, -1 for an infinite counter, >0 for a progress-based counter.");
+                                 "0 for a simple toggle, -1 for an infinite counter, >0 for a progress-based counter.");
                         ImGui::SetTooltip("%s", target_goal_tooltip_buffer);
                     }
                     if (ImGui::Checkbox("Hidden", &goal.is_hidden)) {
@@ -2804,8 +2818,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (ImGui::IsItemHovered()) {
                     char show_display_names_tooltip_buffer[1024];
                     snprintf(show_display_names_tooltip_buffer, sizeof(show_display_names_tooltip_buffer),
-                    "When checked shows the display names as you see them on the tracker.\n"
-                                  "Otherwise it shows the root names.");
+                             "When checked shows the display names as you see them on the tracker.\n"
+                             "Otherwise it shows the root names.");
                     ImGui::SetTooltip("%s", show_display_names_tooltip_buffer);
                 }
                 ImGui::Separator();
@@ -2818,11 +2832,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 for (size_t i = 0; i < current_template_data.multi_stage_goals.size(); ++i) {
                     ImGui::PushID(i);
-                    const auto& goal = current_template_data.multi_stage_goals[i];
-                    const char* display_name = goal.display_name;
-                    const char* root_name = goal.root_name;
+                    const auto &goal = current_template_data.multi_stage_goals[i];
+                    const char *display_name = goal.display_name;
+                    const char *root_name = goal.root_name;
 
-                    const char* label = show_ms_goal_display_names ? (display_name[0] ? display_name : root_name) : root_name;
+                    const char *label = show_ms_goal_display_names
+                                            ? (display_name[0] ? display_name : root_name)
+                                            : root_name;
                     if (label[0] == '\0') {
                         label = "[New Goal]";
                     }
@@ -2952,7 +2968,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::IsItemHovered()) {
                         char icon_path_tooltip_buffer[1024];
                         snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                            "The icon must be inside the 'resources/icons' folder!");
+                                 "The icon must be inside the 'resources/icons' folder!");
                         ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                     }
                     if (ImGui::Checkbox("Hidden", &goal.is_hidden)) {
@@ -3004,30 +3020,51 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE;
                         }
                         // --- Dynamic Type Dropdown, unlocks only for 25w14craftmine ---
-                        const char* current_type_name = "Unknown";
+                        const char *current_type_name = "Unknown";
                         switch (stage.type) {
-                            case SUBGOAL_STAT: current_type_name = "Stat"; break;
-                            case SUBGOAL_ADVANCEMENT: current_type_name = advancement_label; break;
-                            case SUBGOAL_UNLOCK: current_type_name = "Unlock"; break;
-                            case SUBGOAL_CRITERION: current_type_name = "Criterion"; break;
-                            case SUBGOAL_MANUAL: current_type_name = "Final"; break;
+                            case SUBGOAL_STAT: current_type_name = "Stat";
+                                break;
+                            case SUBGOAL_ADVANCEMENT: current_type_name = advancement_label;
+                                break;
+                            case SUBGOAL_UNLOCK: current_type_name = "Unlock";
+                                break;
+                            case SUBGOAL_CRITERION: current_type_name = "Criterion";
+                                break;
+                            case SUBGOAL_MANUAL: current_type_name = "Final";
+                                break;
                         }
 
                         if (ImGui::BeginCombo("Type", current_type_name)) {
-                            if (ImGui::Selectable("Stat", stage.type == SUBGOAL_STAT)) { stage.type = SUBGOAL_STAT; save_message_type = MSG_NONE; }
-                            if (ImGui::Selectable(advancement_label, stage.type == SUBGOAL_ADVANCEMENT)) { stage.type = SUBGOAL_ADVANCEMENT; save_message_type = MSG_NONE; }
-                            if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
-                                if (ImGui::Selectable("Unlock", stage.type == SUBGOAL_UNLOCK)) { stage.type = SUBGOAL_UNLOCK; save_message_type = MSG_NONE; }
+                            if (ImGui::Selectable("Stat", stage.type == SUBGOAL_STAT)) {
+                                stage.type = SUBGOAL_STAT;
+                                save_message_type = MSG_NONE;
                             }
-                            if (ImGui::Selectable("Criterion", stage.type == SUBGOAL_CRITERION)) { stage.type = SUBGOAL_CRITERION; save_message_type = MSG_NONE; }
-                            if (ImGui::Selectable("Final", stage.type == SUBGOAL_MANUAL)) { stage.type = SUBGOAL_MANUAL; save_message_type = MSG_NONE; }
+                            if (ImGui::Selectable(advancement_label, stage.type == SUBGOAL_ADVANCEMENT)) {
+                                stage.type = SUBGOAL_ADVANCEMENT;
+                                save_message_type = MSG_NONE;
+                            }
+                            if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
+                                if (ImGui::Selectable("Unlock", stage.type == SUBGOAL_UNLOCK)) {
+                                    stage.type = SUBGOAL_UNLOCK;
+                                    save_message_type = MSG_NONE;
+                                }
+                            }
+                            if (ImGui::Selectable("Criterion", stage.type == SUBGOAL_CRITERION)) {
+                                stage.type = SUBGOAL_CRITERION;
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::Selectable("Final", stage.type == SUBGOAL_MANUAL)) {
+                                stage.type = SUBGOAL_MANUAL;
+                                save_message_type = MSG_NONE;
+                            }
                             ImGui::EndCombo();
                         }
 
                         if (stage.type == SUBGOAL_CRITERION) {
                             char parent_label[64];
                             snprintf(parent_label, sizeof(parent_label), "Parent %s", advancement_label);
-                            if (ImGui::InputText(parent_label, stage.parent_advancement, sizeof(stage.parent_advancement))) {
+                            if (ImGui::InputText(parent_label, stage.parent_advancement,
+                                                 sizeof(stage.parent_advancement))) {
                                 save_message_type = MSG_NONE;
                             }
                         }
@@ -3138,7 +3175,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char template_category_name_tooltip_buffer[1024];
             snprintf(template_category_name_tooltip_buffer, sizeof(template_category_name_tooltip_buffer),
-                "The main classification for the template (e.g., 'all_advancements', 'all_trims').\nCannot contain spaces or special characters.");
+                     "The main classification for the template (e.g., 'all_advancements', 'all_trims').\nCannot contain spaces or special characters.");
             ImGui::SetTooltip("%s", template_category_name_tooltip_buffer);
         }
 
@@ -3146,7 +3183,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char optional_flag_tooltip_buffer[1024];
             snprintf(optional_flag_tooltip_buffer, sizeof(optional_flag_tooltip_buffer),
-                "A variant for the category (e.g., '_optimized', '_modded').\nCannot contain spaces or special characters.");
+                     "A variant for the category (e.g., '_optimized', '_modded').\nCannot contain spaces or special characters.");
             ImGui::SetTooltip("%s", optional_flag_tooltip_buffer);
         }
 
@@ -3233,7 +3270,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char create_language_tooltip_buffer[1024];
             snprintf(create_language_tooltip_buffer, sizeof(create_language_tooltip_buffer),
-                "E.g., 'de', 'fr_ca'. Cannot be empty or contain special characters.");
+                     "E.g., 'de', 'fr_ca'. Cannot be empty or contain special characters.");
             ImGui::SetTooltip("%s", create_language_tooltip_buffer);
         }
 
@@ -3255,7 +3292,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char press_enter_confirm_tooltip_buffer[1024];
             snprintf(press_enter_confirm_tooltip_buffer, sizeof(press_enter_confirm_tooltip_buffer),
-                "Press ENTER to confirm.");
+                     "Press ENTER to confirm.");
             ImGui::SetTooltip("%s", press_enter_confirm_tooltip_buffer);
         }
         ImGui::SameLine();
@@ -3268,7 +3305,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char press_esc_cancel_tooltip_buffer[1024];
             snprintf(press_esc_cancel_tooltip_buffer, sizeof(press_esc_cancel_tooltip_buffer),
-                "Press ESC to cancel.");
+                     "Press ESC to cancel.");
             ImGui::SetTooltip("%s", press_esc_cancel_tooltip_buffer);
         }
         ImGui::EndPopup();
@@ -3326,7 +3363,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char press_enter_confirm_tooltip_buffer[1024];
             snprintf(press_enter_confirm_tooltip_buffer, sizeof(press_enter_confirm_tooltip_buffer),
-                "Press ENTER to confirm.");
+                     "Press ENTER to confirm.");
             ImGui::SetTooltip("%s", press_enter_confirm_tooltip_buffer);
         }
         ImGui::SameLine();
@@ -3340,7 +3377,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char press_esc_cancel_tooltip_buffer[1024];
             snprintf(press_esc_cancel_tooltip_buffer, sizeof(press_esc_cancel_tooltip_buffer),
-               "Press ESC to cancel.");
+                     "Press ESC to cancel.");
             ImGui::SetTooltip("%s", press_esc_cancel_tooltip_buffer);
         }
         ImGui::EndPopup();
@@ -3367,7 +3404,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char press_enter_confirm_tooltip_buffer[1024];
             snprintf(press_enter_confirm_tooltip_buffer, sizeof(press_enter_confirm_tooltip_buffer),
-                "Press ENTER to confirm.");
+                     "Press ENTER to confirm.");
             ImGui::SetTooltip("%s", press_enter_confirm_tooltip_buffer);
         }
         ImGui::SameLine();
@@ -3378,7 +3415,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char press_esc_cancel_tooltip_buffer[1024];
             snprintf(press_esc_cancel_tooltip_buffer, sizeof(press_esc_cancel_tooltip_buffer),
-                "Press ESC to cancel.");
+                     "Press ESC to cancel.");
             ImGui::SetTooltip("%s", press_esc_cancel_tooltip_buffer);
         }
         ImGui::EndPopup();

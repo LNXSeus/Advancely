@@ -46,7 +46,7 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
 
     std::vector<DiscoveredTemplate> found_templates_vec;
     char base_path[MAX_PATH_LENGTH];
-    snprintf(base_path, sizeof(base_path), "resources/templates/%s", version_str);
+    snprintf(base_path, sizeof(base_path), "%s/templates/%s", get_resources_path(), version_str);
 
 #ifdef _WIN32
     char search_path[MAX_PATH_LENGTH];

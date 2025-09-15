@@ -53,11 +53,11 @@ static void tracker_update_notes_path(Tracker *t, const AppSettings *settings) {
 
         // Hash the full path to create a safe filename
         unsigned long world_hash = hash_string(full_world_path);
-        snprintf(t->notes_path, MAX_PATH_LENGTH, "%s/%lu.txt", NOTES_DIR, world_hash);
+        snprintf(t->notes_path, MAX_PATH_LENGTH, "%s/%lu.txt", get_notes_dir_path(), world_hash);
 
         // Manifest Management
-        fs_ensure_directory_exists(NOTES_DIR);
-        cJSON *manifest = cJSON_from_file(NOTES_MANIFEST_PATH);
+        fs_ensure_directory_exists(get_notes_dir_path());
+        cJSON *manifest = cJSON_from_file(get_notes_manifest_path());
         if (!manifest) manifest = cJSON_CreateArray();
 
         cJSON *entry_to_update = nullptr;
@@ -102,7 +102,7 @@ static void tracker_update_notes_path(Tracker *t, const AppSettings *settings) {
                     unsigned long hash_to_delete = (unsigned long) cJSON_GetObjectItem(oldest_entry, "hash")->
                             valuedouble;
                     char path_to_delete[MAX_PATH_LENGTH];
-                    snprintf(path_to_delete, sizeof(path_to_delete), "%s/%lu.txt", NOTES_DIR, hash_to_delete);
+                    snprintf(path_to_delete, sizeof(path_to_delete), "%s/%lu.txt", get_notes_dir_path(), hash_to_delete);
                     if (remove(path_to_delete) == 0) {
                         log_message(LOG_INFO, "[NOTES] Pruned old notes file: %s\n", path_to_delete);
                     }
@@ -112,7 +112,7 @@ static void tracker_update_notes_path(Tracker *t, const AppSettings *settings) {
         }
 
         // Save the updated manifest
-        FILE *manifest_file = fopen(NOTES_MANIFEST_PATH, "w");
+        FILE *manifest_file = fopen(get_notes_manifest_path(), "w");
         if (manifest_file) {
             char *manifest_str = cJSON_Print(manifest);
             fputs(manifest_str, manifest_file);
@@ -591,7 +591,7 @@ static void tracker_update_stats_legacy(Tracker *t, const cJSON *player_stats_js
         if (ach->done) t->template_data->advancements_completed_count++;
     }
 
-    cJSON *settings_json = cJSON_from_file(SETTINGS_FILE_PATH);
+    cJSON *settings_json = cJSON_from_file(get_settings_file_path());
     cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : nullptr;
 
     t->template_data->play_time_ticks = 0;
@@ -744,7 +744,7 @@ static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *p
     }
 
     // Stats logic with sub-stats
-    cJSON *settings_json = cJSON_from_file(SETTINGS_FILE_PATH);
+    cJSON *settings_json = cJSON_from_file(get_settings_file_path());
     cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : nullptr;
 
     t->template_data->stats_completed_count = 0;
@@ -1065,7 +1065,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
             char full_icon_path[sizeof(new_cat->icon_path)];
 
             // Put whatever is in "icon" into "resources/icons/"
-            snprintf(full_icon_path, sizeof(full_icon_path), "resources/icons/%s", icon->valuestring);
+            snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_resources_path(), icon->valuestring);
             strncpy(new_cat->icon_path, full_icon_path, sizeof(new_cat->icon_path) - 1);
 
             if (strstr(full_icon_path, ".gif")) {
@@ -1130,7 +1130,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                         cJSON *crit_icon = cJSON_GetObjectItem(crit_item, "icon");
                         if (cJSON_IsString(crit_icon) && crit_icon->valuestring[0] != '\0') {
                             char full_crit_icon_path[sizeof(new_crit->icon_path)];
-                            snprintf(full_crit_icon_path, sizeof(full_crit_icon_path), "resources/icons/%s",
+                            snprintf(full_crit_icon_path, sizeof(full_crit_icon_path), "%s/icons/%s", get_resources_path(),
                                      crit_icon->valuestring);
                             strncpy(new_crit->icon_path, full_crit_icon_path, sizeof(new_crit->icon_path) - 1);
 
@@ -1375,7 +1375,7 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
             if (cJSON_IsString(icon)) {
                 // Append "icon" to "resources/icons/"
                 char full_icon_path[sizeof(new_item->icon_path)];
-                snprintf(full_icon_path, sizeof(full_icon_path), "resources/icons/%s", icon->valuestring);
+                snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_resources_path(), icon->valuestring);
                 strncpy(new_item->icon_path, full_icon_path, sizeof(new_item->icon_path) - 1);
 
                 if (strstr(full_icon_path, ".gif")) {
@@ -1465,7 +1465,7 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
                     sizeof(new_goal->root_name) - 1);
         if (cJSON_IsString(icon)) {
             char full_icon_path[sizeof(new_goal->icon_path)];
-            snprintf(full_icon_path, sizeof(full_icon_path), "resources/icons/%s", icon->valuestring);
+            snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_resources_path(), icon->valuestring);
             strncpy(new_goal->icon_path, full_icon_path, sizeof(new_goal->icon_path) - 1);
 
             if (strstr(full_icon_path, ".gif")) {
@@ -2228,7 +2228,9 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     }
 
     // Initialize SDL_ttf
-    t->minecraft_font = TTF_OpenFont("resources/fonts/Minecraft.ttf", 24);
+    char font_path[MAX_PATH_LENGTH];
+    snprintf(font_path, sizeof(font_path),"%s/fonts/Minecraft.ttf", get_resources_path());
+    t->minecraft_font = TTF_OpenFont(font_path, 24);
     if (!t->minecraft_font) {
         log_message(LOG_ERROR, "[TRACKER] Failed to load Minecraft font: %s\n", SDL_GetError());
         tracker_free(tracker, settings);
@@ -2238,13 +2240,16 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     // Load global background textures
     // It's fine that this is calling load_texture_with_scale_mode directly instead of tracker_get_texture
     // as this texture doesn't run risk of being loaded multiple times
-    t->adv_bg = load_texture_with_scale_mode(t->renderer, "resources/gui/advancement_background.png",
-                                             SDL_SCALEMODE_NEAREST);
-    t->adv_bg_half_done = load_texture_with_scale_mode(t->renderer,
-                                                       "resources/gui/advancement_background_half_done.png",
-                                                       SDL_SCALEMODE_NEAREST);
-    t->adv_bg_done = load_texture_with_scale_mode(t->renderer, "resources/gui/advancement_background_done.png",
-                                                  SDL_SCALEMODE_NEAREST);
+    char adv_bg_path[MAX_PATH_LENGTH];
+    snprintf(adv_bg_path, sizeof(adv_bg_path), "%s/gui/advancement_background.png", get_resources_path());
+    t->adv_bg = load_texture_with_scale_mode(t->renderer, adv_bg_path, SDL_SCALEMODE_NEAREST);
+
+    snprintf(adv_bg_path, sizeof(adv_bg_path), "%s/gui/advancement_background_half_done.png", get_resources_path());
+    t->adv_bg_half_done = load_texture_with_scale_mode(t->renderer, adv_bg_path,SDL_SCALEMODE_NEAREST);
+
+    snprintf(adv_bg_path, sizeof(adv_bg_path), "%s/gui/advancement_background_done.png", get_resources_path());
+    t->adv_bg_done = load_texture_with_scale_mode(t->renderer, adv_bg_path, SDL_SCALEMODE_NEAREST);
+
     if (!t->adv_bg || !t->adv_bg_half_done || !t->adv_bg_done) {
         log_message(LOG_ERROR, "[TRACKER] Failed to load advancement background textures.\n");
         tracker_free(tracker, settings);
@@ -2366,7 +2371,7 @@ void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
     // (strlen(t->advancements_path) > 0) ? cJSON_from_file(t->advancements_path) : nullptr;
     cJSON *player_stats_json = (strlen(t->stats_path) > 0) ? cJSON_from_file(t->stats_path) : nullptr;
     cJSON *player_unlocks_json = (strlen(t->unlocks_path) > 0) ? cJSON_from_file(t->unlocks_path) : nullptr;
-    cJSON *settings_json = cJSON_from_file(SETTINGS_FILE_PATH);
+    cJSON *settings_json = cJSON_from_file(get_settings_file_path());
 
     // Version-based Dispatch
     if (version <= MC_VERSION_1_6_4) {
@@ -2557,8 +2562,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     float crit_progress_width = ImGui::CalcTextSize(crit_progress_text).x;
                     // Icon(32) + pad + Checkbox(20) + pad + Text + pad + Progress
                     float total_crit_width = 32 + 4 + 20 + 4 + crit_text_width + (crit_progress_width > 0
-                                                 ? 4 + crit_progress_width
-                                                 : 0);
+                                                     ? 4 + crit_progress_width
+                                                     : 0);
                     required_width = fmaxf(required_width, total_crit_width);
                 }
             }
@@ -4221,7 +4226,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             if (ImGui::IsItemHovered()) {
                 char use_settings_font_tooltip_buffer[1024];
                 snprintf(use_settings_font_tooltip_buffer, sizeof(use_settings_font_tooltip_buffer),
-                    "Toggle whether to use the settings window font for the notes editor (better readability).");
+                         "Toggle whether to use the settings window font for the notes editor (better readability).");
                 ImGui::SetTooltip(
                     "%s", use_settings_font_tooltip_buffer);
             }
@@ -4329,7 +4334,7 @@ bool tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
     }
 
     // Load settings.json to check for custom progress
-    cJSON *settings_json = cJSON_from_file(SETTINGS_FILE_PATH);
+    cJSON *settings_json = cJSON_from_file(get_settings_file_path());
     if (!settings_json) {
         log_message(LOG_ERROR, "[TRACKER] Failed to load or parse settings file.\n");
         return false;
@@ -4372,7 +4377,7 @@ bool tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
     tracker_detect_shared_icons(t, settings);
 
     // Automatically synchronize settings.json with the newly loaded template
-    cJSON *settings_root = cJSON_from_file(SETTINGS_FILE_PATH);
+    cJSON *settings_root = cJSON_from_file(get_settings_file_path());
     if (!settings_root) settings_root = cJSON_CreateObject();
 
     // Sync custom_progress
@@ -4464,7 +4469,7 @@ bool tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
     cJSON_ReplaceItemInObject(settings_root, "hotkeys", new_hotkeys_array);
 
     // Write the synchronized settings back to the file
-    FILE *file = fopen(SETTINGS_FILE_PATH, "w");
+    FILE *file = fopen(get_settings_file_path(), "w");
     if (file) {
         char *json_str = cJSON_Print(settings_root);
         fputs(json_str, file);
@@ -4656,7 +4661,7 @@ void tracker_save_notes(const Tracker *t, const AppSettings *settings) {
 void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
     if (!t || !t->template_data) return;
 
-    cJSON *settings_json = cJSON_from_file(SETTINGS_FILE_PATH);
+    cJSON *settings_json = cJSON_from_file(get_settings_file_path());
     cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : nullptr;
 
     // Also load the current game version used

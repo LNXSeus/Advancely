@@ -30,19 +30,11 @@ static void normalize_path(std::string& path) {
 
 // Gets the absolute path to the application's resources/icons directory
 static bool get_icons_start_path(std::string& out_path) {
-    char exe_path[MAX_PATH_LENGTH];
-    if (!get_executable_path(exe_path, sizeof(exe_path))) {
-        return false;
-    }
-
-    char exe_dir[MAX_PATH_LENGTH];
-    // Go up one level to get the directory of the executable
-    if (!get_parent_directory(exe_path, exe_dir, sizeof(exe_dir), 1)) {
-        return false;
-    }
-
-    out_path = std::string(exe_dir) + "/resources/icons/";
-    normalize_path(out_path);
+    char icons_path[MAX_PATH_LENGTH];
+    snprintf(icons_path, sizeof(icons_path), "%s/icons/", get_resources_path());
+    if (!path_exists(icons_path)) return false;
+    out_path = icons_path;
+    normalize_path(out_path); // normalize_path is still useful here
     return true;
 }
 
@@ -87,6 +79,7 @@ bool open_icon_file_dialog(char* out_relative_path, size_t max_len) {
     std::string full_path_str = selected_path;
     normalize_path(full_path_str);
 
+    // THIS DOES NOT NEED TO BE CHANGED TO HAVE g_resources_path
     size_t found_pos = full_path_str.find("resources/icons/");
     if (found_pos != std::string::npos) {
         // Extract the path relative to the "icons" folder

@@ -3,6 +3,7 @@
 //
 
 #include <ctime>
+#include "path_utils.h"
 
 // Temporarily disable specific warnings for the dmon.h library inclusion on Clang (macOS)
 #ifdef __clang__
@@ -85,6 +86,57 @@ static bool show_release_notes_window = false; // For rendering the release note
 static bool show_welcome_window = false; // For rendering the welcome window on startup
 static char release_url_buffer[256] = {0};
 static SDL_Texture *g_logo_texture = nullptr; // Loading the advancely logo
+
+// Initializes g_resources_path to the correct location for the resources folder.
+// The resulting path does NOT have a trailing slash.
+// Initialize resources path for Windows/Linux and macOS
+// Linux install layout (/usr/local/bin/Advancely and /usr/local/share/advancely/resources)
+// macOS install layout (/Applications/Advancely.app/Contents/MacOS/Advancely and /Applications/Advancely.app/Contents/Resources)
+// This helper function is now fully self-contained. It has ONE job: find the
+// resources path and write it into the buffer it is given.
+static void find_and_set_resource_path(char* path_buffer, size_t buffer_size) {
+    char exe_path[MAX_PATH_LENGTH];
+    if (!get_executable_path(exe_path, sizeof(exe_path))) {
+        strncpy(path_buffer, "resources", buffer_size - 1); // Fallback
+        return;
+    }
+
+    char exe_dir[MAX_PATH_LENGTH];
+    if (!get_parent_directory(exe_path, exe_dir, sizeof(exe_dir), 1)) {
+        strncpy(path_buffer, "resources", buffer_size - 1);
+        return;
+    }
+
+#if defined(__APPLE__)
+    // For macOS, the executable is inside Advancely.app/Contents/MacOS/
+    // The resources are in Advancely.app/Contents/Resources/
+    char contents_dir[MAX_PATH_LENGTH];
+    if (get_parent_directory(exe_dir, contents_dir, sizeof(contents_dir), 1)) {
+        snprintf(path_buffer, buffer_size, "%s/Resources", contents_dir);
+        if (path_exists(path_buffer)) {
+            return; // Found resources in the app bundle
+        }
+    }
+#endif
+
+    // Check for development environment (resources folder is a sibling to the exe's dir)
+    snprintf(path_buffer, buffer_size, "%s/resources", exe_dir);
+    if (path_exists(path_buffer)) {
+        return; // Found it, we're done
+    }
+
+    // Check for Linux install layout (/usr/local/bin/Advancely and /usr/local/share/advancely/resources)
+    char share_dir[MAX_PATH_LENGTH];
+    if (get_parent_directory(exe_dir, share_dir, sizeof(share_dir), 1)) {
+        snprintf(path_buffer, buffer_size, "%s/share/advancely/resources", share_dir);
+        if (path_exists(path_buffer)) {
+            return; // Found it
+        }
+    }
+
+    // Ultimate fallback to a relative path
+    strncpy(path_buffer, "resources", buffer_size - 1);
+}
 
 
 /**
@@ -411,7 +463,8 @@ static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker 
         char project_main_page_tooltip_buffer[1024];
         snprintf(project_main_page_tooltip_buffer, sizeof(project_main_page_tooltip_buffer),
                  "Opens the project's main page in your browser.");
-        ImGui::SetTooltip("%s", project_main_page_tooltip_buffer); // ALWAYS SET TOOLTIPS LIKE THIS WITH %s for macOS compiler
+        ImGui::SetTooltip("%s", project_main_page_tooltip_buffer);
+        // ALWAYS SET TOOLTIPS LIKE THIS WITH %s for macOS compiler
     }
     ImGui::SameLine();
     ImGui::Text(".");
@@ -432,39 +485,50 @@ static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker 
     ImGui::End();
 }
 
-
-// Changes the working directory to the parent of the executable on macOS
-void mac_change_dir() {
-#ifdef __APPLE__
-    char path[MAX_PATH_LENGTH]; // Buffer to store the path
-    uint32_t size = sizeof(path); // Size of the buffer
-
-    // Call _NSGetExecutablePath to get the path
-    if (_NSGetExecutablePath(path, &size) == 0) {
-        log_message(LOG_INFO, "Executable path: %s\n", path);
-        chdir(dirname(path));
-        chdir("../../..");
-    } else {
-        log_message(LOG_ERROR, "Buffer too small or error getting executable path.\n");
-        // Handle the case where the buffer might be too small
-        // In this case, 'size' will contain the required buffer size
-    }
-
-    log_message(LOG_INFO, "%s\n", getcwd(nullptr, 0));
-#endif
-}
-
 // ------------------------------------ END OF STATIC FUNCTIONS ------------------------------------
 
+
+// ACCESSOR FUNCTIONS
+
+// This is the single source of truth for the resources path.
+const char* get_resources_path() {
+    static char path[MAX_PATH_LENGTH] = "";
+    if (path[0] == '\0') {
+        // This runs only ONCE, the very first time this function is called.
+        find_and_set_resource_path(path, sizeof(path));
+    }
+    return path;
+}
+
+const char* get_settings_file_path() {
+    static char path[MAX_PATH_LENGTH] = "";
+    if (path[0] == '\0') {
+        // It calls the function above to get the base path and builds its own path.
+        snprintf(path, sizeof(path), "%s/config/settings.json", get_resources_path());
+    }
+    return path;
+}
+
+const char* get_notes_dir_path() {
+    static char path[MAX_PATH_LENGTH] = "";
+    if (path[0] == '\0') {
+        snprintf(path, sizeof(path), "%s/notes", get_resources_path());
+    }
+    return path;
+}
+
+const char* get_notes_manifest_path() {
+    static char path[MAX_PATH_LENGTH] = "";
+    if (path[0] == '\0') {
+        // This one cleverly builds on another accessor function.
+        snprintf(path, sizeof(path), "%s/manifest.json", get_notes_dir_path());
+    }
+    return path;
+}
 
 int main(int argc, char *argv[]) {
     // As we're not only using SDL_main() as our entry point
     SDL_SetMainReady();
-
-    // Change working directory on macOS to not be root
-#ifdef __APPLE__
-    mac_change_dir();
-#endif
 
     // Check for --updated flag on startup
     if (argc > 1 && strcmp(argv[1], "--updated") == 0) {
@@ -818,14 +882,21 @@ int main(int argc, char *argv[]) {
                             break;
 
                         case 2: // Open Template Folder
+                        {
+                            char templates_path[MAX_PATH_LENGTH];
+                            snprintf(templates_path, sizeof(templates_path), "%s/templates", get_resources_path());
+                            char command[MAX_PATH_LENGTH + 32];
 #ifdef _WIN32
-                            system("explorer resources\\templates");
+                            path_to_windows_native(templates_path); // Convert to backslashes for explorer
+                            snprintf(command, sizeof(command), "explorer \"%s\"", templates_path);
 #elif __APPLE__
-                                system("open resources/templates");
+                            snprintf(command, sizeof(command), "open \"%s\"", templates_path);
 #else
-                                system("xdg-open resources/templates");
+                            snprintf(command, sizeof(command), "xdg-open \"%s\"", templates_path);
 #endif
+                            system(command);
                             break; // Re-shows the message box
+                        }
 
                         case 3: // View Templates Online
                         {
@@ -1026,20 +1097,26 @@ int main(int argc, char *argv[]) {
         ImGui_ImplSDLRenderer3_Init(tracker->renderer);
 
         // Load the logo texture once at statup
-        if (path_exists(ADVANCELY_LOGO_PATH)) {
-            g_logo_texture = IMG_LoadTexture(tracker->renderer, ADVANCELY_LOGO_PATH);
+        char logo_path[MAX_PATH_LENGTH];
+        snprintf(logo_path, sizeof(logo_path), "%s%s", get_resources_path(), ADVANCELY_LOGO_PATH);
+        if (path_exists(logo_path)) {
+            g_logo_texture = IMG_LoadTexture(tracker->renderer, logo_path);
             if (g_logo_texture == nullptr) {
                 log_message(LOG_ERROR, "[MAIN] Failed to load logo texture: %s\n", SDL_GetError());
             }
         } else {
-            log_message(LOG_ERROR, "[MAIN] Could not find logo texture at %s\n", ADVANCELY_LOGO_PATH);
+            log_message(LOG_ERROR, "[MAIN] Could not find logo texture at %s\n", logo_path);
         }
 
         // Load Fonts
-        io.Fonts->AddFontFromFileTTF("resources/fonts/Minecraft.ttf", 16.0f);
+        char minecraft_font_path[MAX_PATH_LENGTH];
+        snprintf(minecraft_font_path, sizeof(minecraft_font_path), "%s/fonts/Minecraft.ttf", get_resources_path());
+        io.Fonts->AddFontFromFileTTF(minecraft_font_path, 16.0f);
 
         // Roboto Font is for the settings inside the tracker
-        tracker->roboto_font = io.Fonts->AddFontFromFileTTF("resources/fonts/Roboto-Regular.ttf", 16.0f);
+        char roboto_font_path[MAX_PATH_LENGTH];
+        snprintf(roboto_font_path, sizeof(roboto_font_path), "%s/fonts/Roboto-Regular.ttf", get_resources_path());
+        tracker->roboto_font = io.Fonts->AddFontFromFileTTF(roboto_font_path, 16.0f);
         if (tracker->roboto_font == nullptr) {
             log_message(LOG_ERROR,
                         "[MAIN - IMGUI] Failed to load font: resources/fonts/Roboto-Regular.ttf. Settings window will use default font.\n");
@@ -1070,7 +1147,9 @@ int main(int argc, char *argv[]) {
         // HARDCODED SETTINGS DIRECTORY
         log_message(LOG_INFO, "[DMON - MAIN] Watching config directory: resources/config/\n");
 
-        dmon_watch("resources/config/", settings_watch_callback, 0, nullptr);
+        char dmon_config_path[MAX_PATH_LENGTH];
+        snprintf(dmon_config_path, sizeof(dmon_config_path), "%s%s", get_resources_path(), "/config/");
+        dmon_watch(dmon_config_path, settings_watch_callback, 0, nullptr);
 
 
         // Watch saves directory and store the watcher ID, ONLY if the path is valid
@@ -1279,7 +1358,7 @@ int main(int argc, char *argv[]) {
                 dmon_init();
 
                 // Re-watch the config directory first
-                dmon_watch("resources/config/", settings_watch_callback, 0, nullptr);
+                dmon_watch(dmon_config_path, settings_watch_callback, 0, nullptr);
 
                 // Reload settings from file to get the latest changes.
                 settings_load(&app_settings);

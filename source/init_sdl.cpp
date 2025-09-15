@@ -38,11 +38,13 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
     }
 
     // Window Icon Cross-platform
-    SDL_Surface *icon_surface = IMG_Load(ADVANCELY_ICON_PATH);
+    char icon_path[MAX_PATH_LENGTH];
+    snprintf(icon_path, sizeof(icon_path), "%s%s", get_resources_path(), ADVANCELY_ICON_PATH);
+    SDL_Surface *icon_surface = IMG_Load(icon_path);
     if (icon_surface) {
         SDL_SetWindowIcon(t->window, icon_surface);
         SDL_DestroySurface(icon_surface);
-        log_message(LOG_INFO, "[INIT SDL] Tracker window icon set to %s\n", ADVANCELY_ICON_PATH);
+        log_message(LOG_INFO, "[INIT SDL] Tracker window icon set to %s\n", icon_path);
         log_message(LOG_INFO, "[INIT SDL] Tracker window icon size: %dx%d\n", icon_surface->w, icon_surface->h);
     } else {
         log_message(LOG_ERROR, "[INIT SDL] Failed to load tracker window icon: %s\n", SDL_GetError());
@@ -91,11 +93,13 @@ bool overlay_init_sdl(Overlay *o, const AppSettings *settings) {
     }
 
     // Window Icon Cross-platform
-    SDL_Surface *icon_surface = IMG_Load(ADVANCELY_ICON_PATH);
+    char icon_path[MAX_PATH_LENGTH];
+    snprintf(icon_path, sizeof(icon_path), "%s%s", get_resources_path(), ADVANCELY_ICON_PATH);
+    SDL_Surface *icon_surface = IMG_Load(icon_path);
     if (icon_surface) {
         SDL_SetWindowIcon(o->window, icon_surface);
         SDL_DestroySurface(icon_surface);
-        log_message(LOG_INFO, "[INIT SDL] Overlay window icon set to %s\n", ADVANCELY_ICON_PATH);
+        log_message(LOG_INFO, "[INIT SDL] Overlay window icon set to %s%s\n", get_resources_path(), ADVANCELY_ICON_PATH);
     } else {
         log_message(LOG_ERROR, "[INIT SDL] Failed to load overlay window icon: %s\n", SDL_GetError());
     }

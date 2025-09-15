@@ -461,13 +461,18 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
 
     if (ImGui::Button("Open Template Folder")) {
+        char templates_path[MAX_PATH_LENGTH];
+        snprintf(templates_path, sizeof(templates_path), "%s/templates", get_resources_path());
+        char command[MAX_PATH_LENGTH + 32];
 #ifdef _WIN32
-        system("explorer resources\\templates");
+        path_to_windows_native(templates_path); // Convert to backslashes for explorer
+        snprintf(command, sizeof(command), "explorer \"%s\"", templates_path);
 #elif __APPLE__
-        system("open resources/templates");
+        snprintf(command, sizeof(command), "open \"%s\"", templates_path);
 #else
-        system("xdg-open resources/templates");
+        snprintf(command, sizeof(command), "xdg-open \"%s\"", templates_path);
 #endif
+        system(command);
     }
     if (ImGui::IsItemHovered()) {
         char open_templates_folder_tooltip_buffer[1024];

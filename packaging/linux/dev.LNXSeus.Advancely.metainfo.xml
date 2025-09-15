@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.LNXSeus.Advancely</id>
+  <name>Advancely</name>
+  <summary>A highly customizable and interactive tool to track Minecraft progress beyond just Advancements.</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Copyright (c) 2025 LNXSeus. All Rights Reserved.</project_license>
+  <description>
+    <p>
+      Advancely is a sophisticated, data-driven progress tracker designed for Minecraft speedrunners, completionists, and content creators. Unlike other tools that only track vanilla advancements, Advancely can be configured to monitor virtually any goal you can imagine. It operates in real-time by watching your singleplayer save files for changes, meaning your progress is always up-to-date without any manual intervention. Its true power lies in its .json template system, which allows you to define exactly what you want to track for any version, mod, or playstyle.
+    </p>
+  </description>
+  <launchable type="desktop-id">advancely.desktop</launchable>
+  <screenshots>
+    </screenshots>
+  <url type="homepage">https://github.com/LNXSeus/Advancely</url>
+</component>

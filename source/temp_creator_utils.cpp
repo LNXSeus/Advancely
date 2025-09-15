@@ -190,7 +190,7 @@ bool validate_and_create_template(const char* version, const char* category, con
     }
 
     char base_path[MAX_PATH_LENGTH];
-    snprintf(base_path, sizeof(base_path), "resources/templates/%s/%s/%s_%s%s",
+    snprintf(base_path, sizeof(base_path), "%s/templates/%s/%s/%s_%s%s", get_resources_path(),
              version, category, version_filename, category, flag);
 
     char template_path[MAX_PATH_LENGTH];
@@ -200,7 +200,7 @@ bool validate_and_create_template(const char* version, const char* category, con
 
     // 4. Create Directory and Files
     char dir_path[MAX_PATH_LENGTH];
-    snprintf(dir_path, sizeof(dir_path), "resources/templates/%s/%s", version, category);
+    snprintf(dir_path, sizeof(dir_path), "%s/templates/%s/%s", get_resources_path(), version, category);
     fs_ensure_directory_exists(dir_path);
     fs_create_empty_template_file(template_path);
     fs_create_empty_lang_file(lang_path);
@@ -272,7 +272,7 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
     for (char *p = src_version_filename; *p; p++) { if (*p == '.') *p = '_'; }
 
     char src_base_path[MAX_PATH_LENGTH];
-    snprintf(src_base_path, sizeof(src_base_path), "resources/templates/%s/%s/%s_%s%s",
+    snprintf(src_base_path, sizeof(src_base_path), "%s/templates/%s/%s/%s_%s%s", get_resources_path(),
              src_version, src_category, src_version_filename, src_category, src_flag);
 
     char src_template_path[MAX_PATH_LENGTH];
@@ -294,7 +294,7 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
     for (char *p = dest_version_filename; *p; p++) { if (*p == '.') *p = '_'; }
 
     char dest_base_path[MAX_PATH_LENGTH];
-    snprintf(dest_base_path, sizeof(dest_base_path), "resources/templates/%s/%s/%s_%s%s",
+    snprintf(dest_base_path, sizeof(dest_base_path), "%s/templates/%s/%s/%s_%s%s", get_resources_path(),
              dest_version, dest_category, dest_version_filename, dest_category, dest_flag);
 
     char dest_template_path[MAX_PATH_LENGTH];
@@ -302,7 +302,7 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
 
     // 6. Create Directory and Copy Files
     char dest_dir_path[MAX_PATH_LENGTH];
-    snprintf(dest_dir_path, sizeof(dest_dir_path), "resources/templates/%s/%s", dest_version, dest_category);
+    snprintf(dest_dir_path, sizeof(dest_dir_path), "%s/templates/%s/%s", get_resources_path(), dest_version, dest_category);
     fs_ensure_directory_exists(dest_dir_path);
 
     // Copy the main template file
@@ -357,7 +357,7 @@ bool delete_template_files(const char* version, const char* category, const char
     for (char *p = version_filename; *p; p++) { if (*p == '.') *p = '_'; }
 
     char base_path[MAX_PATH_LENGTH];
-    snprintf(base_path, sizeof(base_path), "resources/templates/%s/%s/%s_%s%s",
+    snprintf(base_path, sizeof(base_path), "%s/templates/%s/%s/%s_%s%s", get_resources_path(),
              version, category, version_filename, category, flag);
 
     char template_path[MAX_PATH_LENGTH], lang_path[MAX_PATH_LENGTH];
@@ -392,7 +392,7 @@ static void construct_template_base_path(const char* version, const char* catego
     for (char* p = version_filename; *p; p++) {
         if (*p == '.') *p = '_';
     }
-    snprintf(out_path, max_len, "resources/templates/%s/%s/%s_%s%s",
+    snprintf(out_path, max_len, "%s/templates/%s/%s/%s_%s%s", get_resources_path(),
         version, category, version_filename, category, flag);
 }
 

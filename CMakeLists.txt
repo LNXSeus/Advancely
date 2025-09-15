@@ -4,6 +4,22 @@ cmake_minimum_required(VERSION 3.20)
 # Project name and language
 project(Advancely C CXX) # c for cJSON, C++ for the rest
 
+# Read the content of main.h into a variable for version
+file(READ "${CMAKE_SOURCE_DIR}/source/main.h" MAIN_H_CONTENTS)
+
+# Use a regular expression to find the line with the version and capture the number
+# This specifically looks for the pattern #define ADVANCELY_VERSION "vX.Y.Z"
+# and captures only the "X.Y.Z" part.
+string(REGEX MATCH "#define ADVANCELY_VERSION \"v([0-9]+\\.[0-9]+\\.[0-9]+)\"" _ ${MAIN_H_CONTENTS})
+
+# The captured version number is now in the variable CMAKE_MATCH_1
+if(CMAKE_MATCH_1)
+    set(PROJECT_VERSION ${CMAKE_MATCH_1})
+    message(STATUS "Project version set from main.h: ${PROJECT_VERSION}")
+else()
+    message(FATAL_ERROR "Could not parse ADVANCELY_VERSION from source/main.h!")
+endif()
+
 # Enable the RC (Resource Compiler) language for Windows executables
 if (WIN32)
     enable_language(RC)
@@ -69,14 +85,17 @@ else ()
     add_executable(${EXECUTABLE_NAME} ${SOURCE_FILES})
 endif ()
 
-# This command targets a specific source file and sets its properties.
-set_source_files_properties(
-        source/external/miniz.c
-        PROPERTIES
-        # This adds a compiler flag ONLY when compiling this specific file.
-        # -Wno-type-limits will disable the "comparison is always false" warning.
-        COMPILE_FLAGS "-Wno-type-limits"
-)
+# This command targets a specific source file and sets its properties ONLY FOR GCC
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set_source_files_properties(
+            source/external/miniz.c
+            PROPERTIES
+            # This adds a compiler flag ONLY when compiling this specific file.
+            # -Wno-type-limits will disable the "comparison is always false" warning.
+            COMPILE_FLAGS "-Wno-type-limits"
+    )
+endif()
+
 
 # Add a specific rule for tinyfiledialogs.c to ignore the function cast warning.
 set_source_files_properties(
@@ -345,11 +364,49 @@ else()
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         target_compile_options(${EXECUTABLE_NAME} PRIVATE -Wno-stringop-truncation)
     endif()
+endif()
 
-    # Add sanitizers for Debug builds on non-Windows platforms
+# Add sanitizers for Debug builds on non-Windows platforms (Linux, macOS)
+if(NOT WIN32)
     # This injects code to detect memory errors (like leaks, buffer overflows) at runtime.
     target_compile_options(${EXECUTABLE_NAME} PRIVATE $<$<CONFIG:Debug>:-fsanitize=address>)
 
     # Link the AddressSanitizer library for Debug builds.
     target_link_options(${EXECUTABLE_NAME} PRIVATE $<$<CONFIG:Debug>:-fsanitize=address>)
 endif()
+
+
+# --- 7. INSTALLATION AND PACKAGING ---
+
+# This command ensures that CMake's install features are available.
+include(InstallRequiredSystemLibraries)
+
+# Define where to install the files
+if(WIN32 OR UNIX AND NOT APPLE)
+    # Rule to install the main executable
+    install(TARGETS ${EXECUTABLE_NAME} DESTINATION bin)
+
+    # Rule to install the entire resources directory
+    install(DIRECTORY resources/ DESTINATION share/advancely/resources)
+endif()
+
+if(UNIX AND NOT APPLE)
+    # Rules for Linux desktop integration
+    install(FILES "packaging/linux/advancely.desktop" DESTINATION share/applications)
+    install(FILES "resources/gui/Advancely_Logo_NoText.png" DESTINATION share/icons/hicolor/256x256/apps RENAME advancely.png)
+    install(FILES "packaging/linux/dev.LNXSeus.Advancely.metainfo.xml" DESTINATION share/metainfo)
+endif()
+
+# --- CPack Configuration for creating a .deb package ---
+set(CPACK_GENERATOR "DEB")
+set(CPACK_PACKAGE_NAME "advancely")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}") # version directly from main.h
+set(CPACK_PACKAGE_VENDOR "LNXSeus")
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "LNXSeus <https://youtube.com/@lnxs>")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A highly customizable and interactive tool to track your Minecraft progress beyond just Advancements.")
+set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/LNXSeus/Advancely")
+
+# This is important: it lists the runtime libraries the .deb package depends on
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libsdl3-0 (>= 3.0.0), libcurl4 (>= 7.68)")
+
+include(CPack)

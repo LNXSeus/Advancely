@@ -36,7 +36,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 
 #include <cJSON.h>
 
-#define SETTINGS_FILE_PATH "resources/config/settings.json"
+#define MAX_WORLD_NOTES 32 // Limit for amount of per-world notes until they delete itself
 #define MAX_HOTKEYS 32 // Limit for amount of hotkeys
 
 // DEFAULT values
@@ -56,11 +56,6 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_PER_WORLD_NOTES true // When true the notes are per world, otherwise per template
 #define DEFAULT_CHECK_FOR_UPDATES true
 #define DEFAULT_SHOW_WELCOME_ON_STARTUP true
-
-// Define notes
-#define MAX_WORLD_NOTES 32
-#define NOTES_DIR "resources/notes"
-#define NOTES_MANIFEST_PATH "resources/notes/manifest.json"
 
 // DEFINE DEFAULT SETTINGS
 #define DEFAULT_VERSION "1.16.1"  // Also needs to be changed in settings_load()

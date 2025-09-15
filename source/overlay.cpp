@@ -56,7 +56,7 @@ static SDL_Texture *get_text_texture_from_cache(Overlay *o, const char *text, SD
             entry->color.r == color.r && entry->color.g == color.g &&
             entry->color.b == color.b && entry->color.a == color.a) {
             return entry->texture;
-            }
+        }
     }
 
     // 2. If not in cache, create it and add it
@@ -191,13 +191,15 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     }
 
     // Load global background textures using the overlay's renderer
-    o->adv_bg = load_texture_with_scale_mode(o->renderer, "resources/gui/advancement_background.png",
-                                             SDL_SCALEMODE_NEAREST);
-    o->adv_bg_half_done = load_texture_with_scale_mode(o->renderer,
-                                                       "resources/gui/advancement_background_half_done.png",
-                                                       SDL_SCALEMODE_NEAREST);
-    o->adv_bg_done = load_texture_with_scale_mode(o->renderer, "resources/gui/advancement_background_done.png",
-                                                  SDL_SCALEMODE_NEAREST);
+    char adv_bg_path[MAX_PATH_LENGTH];
+    snprintf(adv_bg_path, sizeof(adv_bg_path), "%s/gui/advancement_background.png", get_resources_path());
+    o->adv_bg = load_texture_with_scale_mode(o->renderer, adv_bg_path, SDL_SCALEMODE_NEAREST);
+
+    snprintf(adv_bg_path, sizeof(adv_bg_path), "%s/gui/advancement_background_half_done.png", get_resources_path());
+    o->adv_bg_half_done = load_texture_with_scale_mode(o->renderer, adv_bg_path, SDL_SCALEMODE_NEAREST);
+
+    snprintf(adv_bg_path, sizeof(adv_bg_path), "%s/gui/advancement_background_done.png", get_resources_path());
+    o->adv_bg_done = load_texture_with_scale_mode(o->renderer, adv_bg_path, SDL_SCALEMODE_NEAREST);
     if (!o->adv_bg || !o->adv_bg_half_done || !o->adv_bg_done) {
         log_message(LOG_ERROR, "[OVERLAY] Failed to load advancement background textures.\n");
         overlay_free(overlay, settings);
@@ -207,7 +209,9 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     // Make font HiDPI aware by loading it at a base point size (e.g., 24).
     // SDL_ttf will automatically scale it correctly on any monitor at render time.
     const float base_font_size = 24.0f;
-    o->font = TTF_OpenFont("resources/fonts/Minecraft.ttf", base_font_size);
+    char minecraft_font_path[1024];
+    snprintf(minecraft_font_path, sizeof(minecraft_font_path), "%s/fonts/Minecraft.ttf", get_resources_path());
+    o->font = TTF_OpenFont(minecraft_font_path, base_font_size);
     if (!o->font) {
         log_message(LOG_ERROR, "[OVERLAY] Failed to load font: %s\n", SDL_GetError());
         overlay_free(overlay, settings);
@@ -218,16 +222,19 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
 
 
 void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *deltaTime, AppSettings *settings) {
-    (void) o; (void) settings; (void) deltaTime;
+    (void) o;
+    (void) settings;
+    (void) deltaTime;
     switch (event->type) {
-        case SDL_EVENT_WINDOW_CLOSE_REQUESTED: *is_running = false; break;
+        case SDL_EVENT_WINDOW_CLOSE_REQUESTED: *is_running = false;
+            break;
         case SDL_EVENT_KEY_DOWN:
             if (event->key.scancode == SDL_SCANCODE_SPACE) {
                 *deltaTime *= OVERLAY_SPEEDUP_FACTOR;
             }
             break;
 
-            // Properly save the window position and size
+        // Properly save the window position and size
         case SDL_EVENT_WINDOW_MOVED:
         case SDL_EVENT_WINDOW_RESIZED: {
             // Get the current window position and size
@@ -398,10 +405,12 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
                 if (scroll_delta > 0) {
                     for (int i = 0; i < items_scrolled; ++i) {
                         size_t loop_guard = 0;
-                        do { // Only rendering item if it is not done AND its parent category is not hidden.
+                        do {
+                            // Only rendering item if it is not done AND its parent category is not hidden.
                             o->start_index_row1 = (o->start_index_row1 + 1) % row1_items.size();
                             loop_guard++;
-                        } while ((row1_items[o->start_index_row1].first->done || row1_items[o->start_index_row1].second->is_hidden) && loop_guard < row1_items.size() * 2);
+                        } while ((row1_items[o->start_index_row1].first->done || row1_items[o->start_index_row1].second
+                                  ->is_hidden) && loop_guard < row1_items.size() * 2);
                     }
                 } else {
                     for (int i = 0; i < items_scrolled; ++i) {
@@ -409,7 +418,8 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
                         do {
                             o->start_index_row1 = (o->start_index_row1 - 1 + row1_items.size()) % row1_items.size();
                             loop_guard++;
-                        } while ((row1_items[o->start_index_row1].first->done || row1_items[o->start_index_row1].second->is_hidden) && loop_guard < row1_items.size() * 2);
+                        } while ((row1_items[o->start_index_row1].first->done || row1_items[o->start_index_row1].second
+                                  ->is_hidden) && loop_guard < row1_items.size() * 2);
                     }
                 }
             }
@@ -452,13 +462,12 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
             int w;
             if (name_buf[0] != '\0') {
                 TTF_MeasureString(o->font, name_buf, 0, 0, &w, nullptr);
-                max_text_width = fmaxf(max_text_width, (float)w);
+                max_text_width = fmaxf(max_text_width, (float) w);
             }
             if (progress_buf[0] != '\0') {
                 TTF_MeasureString(o->font, progress_buf, 0, 0, &w, nullptr);
-                max_text_width = fmaxf(max_text_width, (float)w);
+                max_text_width = fmaxf(max_text_width, (float) w);
             }
-
         }
 
         // Only run the animation logic if there is something to show
@@ -601,11 +610,14 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         if (text_texture) {
             float w, h;
             SDL_GetTextureSize(text_texture, &w, &h);
-            int overlay_w; SDL_GetWindowSize(o->window, &overlay_w, nullptr);
+            int overlay_w;
+            SDL_GetWindowSize(o->window, &overlay_w, nullptr);
             const float padding = 10.0f;
             SDL_FRect dest_rect = {padding, padding, w, h};
-            if (settings->overlay_progress_text_align == OVERLAY_PROGRESS_TEXT_ALIGN_CENTER) dest_rect.x = ((float)overlay_w - w) / 2.0f;
-            else if (settings->overlay_progress_text_align == OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT) dest_rect.x = (float)overlay_w - w - padding;
+            if (settings->overlay_progress_text_align == OVERLAY_PROGRESS_TEXT_ALIGN_CENTER)
+                dest_rect.x = ((float) overlay_w - w) / 2.0f;
+            else if (settings->overlay_progress_text_align == OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT)
+                dest_rect.x = (float) overlay_w - w - padding;
             SDL_RenderTexture(o->renderer, text_texture, nullptr, &dest_rect);
         }
     }
@@ -617,7 +629,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
     int window_w;
     SDL_GetWindowSizeInPixels(o->window, &window_w, nullptr);
-    SDL_Color text_color = {settings->overlay_text_color.r, settings->overlay_text_color.g, settings->overlay_text_color.b, 255};
+    SDL_Color text_color = {
+        settings->overlay_text_color.r, settings->overlay_text_color.g, settings->overlay_text_color.b, 255
+    };
 
     // --- ROW 1: Criteria & Sub-stats Icons ---
     {
@@ -782,11 +796,11 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 int w;
                 if (name_buf[0] != '\0') {
                     TTF_MeasureString(o->font, name_buf, 0, 0, &w, nullptr);
-                    max_text_width = fmaxf(max_text_width, (float)w);
+                    max_text_width = fmaxf(max_text_width, (float) w);
                 }
                 if (progress_buf[0] != '\0') {
                     TTF_MeasureString(o->font, progress_buf, 0, 0, &w, nullptr);
-                    max_text_width = fmaxf(max_text_width, (float)w);
+                    max_text_width = fmaxf(max_text_width, (float) w);
                 }
             }
 
@@ -918,7 +932,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         if (visible_item_count > 0) {
             float max_text_width = 0.0f;
             // First pass: calculate the max width required by any visible item in the row
-            for (const auto &display_item: row3_items) { // This is the layout calculation loop
+            for (const auto &display_item: row3_items) {
+                // This is the layout calculation loop
                 if (is_display_item_done(display_item, settings)) continue;
 
                 char name_buf[256] = {0};
@@ -997,11 +1012,11 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 int w;
                 if (name_buf[0] != '\0') {
                     TTF_MeasureString(o->font, name_buf, 0, 0, &w, nullptr);
-                    max_text_width = fmaxf(max_text_width, (float)w);
+                    max_text_width = fmaxf(max_text_width, (float) w);
                 }
                 if (progress_buf[0] != '\0') {
                     TTF_MeasureString(o->font, progress_buf, 0, 0, &w, nullptr);
-                    max_text_width = fmaxf(max_text_width, (float)w);
+                    max_text_width = fmaxf(max_text_width, (float) w);
                 }
             }
 
@@ -1173,7 +1188,6 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     }
 
                     visible_item_index++;
-
                 }
             }
         }
