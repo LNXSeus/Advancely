@@ -101,7 +101,8 @@ endif()
 set_source_files_properties(
         source/external/tinyfiledialogs.c
         PROPERTIES
-        COMPILE_FLAGS "-Wno-cast-function-type"
+        # This generator expression applies the flag ONLY when the compiler is NOT MSVC.
+        COMPILE_FLAGS "$<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wno-cast-function-type>"
 )
 
 # This command targets a specific source file and sets its properties.
