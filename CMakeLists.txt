@@ -171,145 +171,28 @@ endif ()
 
 # --- 5. POST-BUILD COMMANDS ---
 
-if (WIN32)
-    # This block will only run if the compiler is gcc (MinGW)
-    if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
-        # Get the directory where the MinGW compiler is located
-        get_filename_component(MINGW_BIN_DIR ${CMAKE_C_COMPILER} DIRECTORY)
-
-        # This copies the .dll files to the build folder so the .exe can run.
-        # This is only needed if SDL was built as a shared library.
+# This block will ONLY run for MinGW/GCC compilers (your local setup)
+# and will copy your exact list of required DLLs.
+if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    get_filename_component(MINGW_BIN_DIR ${CMAKE_C_COMPILER} DIRECTORY)
+    set(MINGW_DLLS
+            "libbrotlicommon.dll" "libbrotlidec.dll" "libbz2-1.dll" "libcrypto-3-x64.dll"
+            "libcurl-4.dll" "libfreetype-6.dll" "libgcc_s_seh-1.dll" "libglib-2.0-0.dll"
+            "libgraphite2.dll" "libharfbuzz-0.dll" "libiconv-2.dll" "libidn2-0.dll"
+            "libintl-8.dll" "libnghttp2-14.dll" "libnghttp3-9.dll" "libngtcp2_crypto_ossl.dll"
+            "libngtcp2-16.dll" "libpcre2-8-0.dll" "libpng16-16.dll" "libpsl-5.dll"
+            "libsharpyuv-0.dll" "libssh2-1.dll" "libssl-3-x64.dll" "libstdc++-6.dll"
+            "libunistring-5.dll" "libwebp-7.dll" "libwebpdemux-2.dll" "libwinpthread-1.dll"
+            "libzstd.dll" "zlib1.dll"
+    )
+    foreach(DLL_NAME ${MINGW_DLLS})
         add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "$<TARGET_FILE:SDL3::SDL3>"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "$<TARGET_FILE:SDL3_image::SDL3_image>"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "$<TARGET_FILE:SDL3_ttf::SDL3_ttf>"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-                # --- Copy MinGW Runtime DLLs (Add these lines) ---
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libgcc_s_seh-1.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libstdc++-6.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libwinpthread-1.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libfreetype-6.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libharfbuzz-0.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libintl-8.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libbz2-1.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libiconv-2.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libbrotlidec.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libpng16-16.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libglib-2.0-0.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libgraphite2.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libpcre2-8-0.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libbrotlicommon.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/zlib1.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-
-                # Libcurl
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libcurl-4.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libnghttp2-14.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libngtcp2-16.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libidn2-0.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libnghttp3-9.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libngtcp2_crypto_ossl.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libpsl-5.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libssh2-1.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libzstd.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libcrypto-3-x64.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libunistring-5.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libssl-3-x64.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-
-                # For 1.11.2 Biomes not displaying
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libwebpdemux-2.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libwebp-7.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${MINGW_BIN_DIR}/libsharpyuv-0.dll"
-                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-                # END of 1.11.2
-
-                COMMENT "[CMAKE] Copying DLLs to build directory"
+                "${MINGW_BIN_DIR}/${DLL_NAME}"
+                "$<TARGET_FILE_DIR:${EXECUTABLE_NAME}>"
         )
-    endif () # End of MinGW specific post-build commands
-endif ()
+    endforeach()
+endif()
 
 # This command is needed on Windows/Linux platforms to copy the resources to where executable is
 # macOS .app bundle is handled further above
@@ -322,28 +205,27 @@ if (NOT APPLE)
     )
 endif ()
 
-# TODO: Remove
-## Move the _PLEASE_READ_ME.txt file to the output directory
-#add_custom_command(TARGET Advancely POST_BUILD
-#        COMMAND ${CMAKE_COMMAND} -E copy
-#        "${CMAKE_SOURCE_DIR}/_PLEASE_READ_ME.txt"
-#        "$<TARGET_FILE_DIR:Advancely>"
-#        COMMENT "[CMAKE] Copying _PLEASE_READ_ME.txt to output directory..."
-#)
-#
-#add_custom_command(TARGET Advancely POST_BUILD
-#        COMMAND ${CMAKE_COMMAND} -E copy
-#        "${CMAKE_SOURCE_DIR}/LICENSES.txt"
-#        "$<TARGET_FILE_DIR:Advancely>"
-#        COMMENT "[CMAKE] Copying LICENSES.txt to output directory..."
-#)
-#
-#add_custom_command(TARGET Advancely POST_BUILD
-#        COMMAND ${CMAKE_COMMAND} -E copy
-#        "${CMAKE_SOURCE_DIR}/README.md"
-#        "$<TARGET_FILE_DIR:Advancely>"
-#        COMMENT "[CMAKE] Copying README.md to output directory..."
-#)
+# Move the _PLEASE_READ_ME.txt file to the output directory
+add_custom_command(TARGET Advancely POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        "${CMAKE_SOURCE_DIR}/_PLEASE_READ_ME.txt"
+        "$<TARGET_FILE_DIR:Advancely>"
+        COMMENT "[CMAKE] Copying _PLEASE_READ_ME.txt to output directory..."
+)
+
+add_custom_command(TARGET Advancely POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        "${CMAKE_SOURCE_DIR}/LICENSES.txt"
+        "$<TARGET_FILE_DIR:Advancely>"
+        COMMENT "[CMAKE] Copying LICENSES.txt to output directory..."
+)
+
+add_custom_command(TARGET Advancely POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        "${CMAKE_SOURCE_DIR}/README.md"
+        "$<TARGET_FILE_DIR:Advancely>"
+        COMMENT "[CMAKE] Copying README.md to output directory..."
+)
 
 
 # --- 6. COMPILER FLAGS & SANITIZERS ---
