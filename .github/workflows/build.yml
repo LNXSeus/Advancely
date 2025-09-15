@@ -80,8 +80,8 @@ jobs:
 
     - name: Create Debian Package
       if: runner.os == 'Linux'
-      run:
-        cd build # Change to build directory
+      run: |
+        cd build
         cpack -C Release
 
     # Create and package the release, resources are included per OS
