@@ -325,10 +325,11 @@ if(MSVC)
             # Acceptable warnings
             /wd4244 # Disable "possible loss of data" conversion warning
             /wd4996 # Disable "unsafe function" warnings (for fopen, strncpy, etc.)
-            /wd4267 # ADD: Disable "size_t to int" conversion warning
-            /wd4456 # ADD: Disable "hides previous local declaration" warning
-            /wd4458 # ADD: Disable "hides class member" warning
-            /wd4101 # ADD: Disable "unreferenced local variable" warning
+            /wd4267 # Disable "size_t to int" conversion warning
+            /wd4456 # Disable "hides previous local declaration" warning
+            /wd4458 # Disable "hides class member" warning
+            /wd4101 # Disable "unreferenced local variable" warning
+            /wd4505 # Disable "unreferenced function" warning
     )
 else()
     # Apply GCC/Clang-specific warning flags
