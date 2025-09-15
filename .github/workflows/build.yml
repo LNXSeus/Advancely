@@ -10,6 +10,7 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false # so that all jobs run even if one fails
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
 

@@ -321,6 +321,9 @@ if(MSVC)
     target_compile_options(${EXECUTABLE_NAME} PRIVATE
             /W4     # Equivalent to -Wall / -Wextra, sets a high warning level
             /WX     # Equivalent to -Werror, treats warnings as errors
+
+            /wd4244 # Disable "possible loss of data" conversion warning
+            /wd4996 # Disable "unsafe function" warnings (for fopen, strncpy, etc.)
     )
 else()
     # Apply GCC/Clang-specific warning flags
