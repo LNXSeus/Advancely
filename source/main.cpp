@@ -405,7 +405,7 @@ static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker 
     ImGui::PopStyleColor();
     // Make the text clickable
     if (ImGui::IsItemClicked()) {
-        SDL_OpenURL("https://github.com/LNXSeus/Advancely"); //
+        SDL_OpenURL("https://github.com/LNXSeus/Advancely");
     }
     if (ImGui::IsItemHovered()) {
         char project_main_page_tooltip_buffer[1024];
@@ -461,7 +461,7 @@ int main(int argc, char *argv[]) {
     // As we're not only using SDL_main() as our entry point
     SDL_SetMainReady();
 
-    // Change working directory on macOS
+    // Change working directory on macOS to not be root
 #ifdef __APPLE__
     mac_change_dir();
 #endif
