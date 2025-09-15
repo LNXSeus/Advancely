@@ -24,11 +24,39 @@ jobs:
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
+          # Step 1: Install build tools and SDL's own dependencies
           sudo apt-get update
           sudo apt-get install -y build-essential cmake git libcurl4-openssl-dev \
-            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
-            libxi-dev libxss-dev libwayland-dev libdecor-0-dev libxkbcommon-dev \
-            libfreetype6-dev libharfbuzz-dev libasound2-dev
+          libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+          libxi-dev libxss-dev libwayland-dev libdecor-0-dev libxkbcommon-dev \
+          libfreetype6-dev libharfbuzz-dev libasound2-dev
+          
+          # Step 2: Build and install SDL3 from source
+          echo "Building SDL3 from source..."
+          git clone https://github.com/libsdl-org/SDL.git -b main
+          cd SDL
+          cmake -B build
+          cmake --build build
+          sudo cmake --install build
+          cd ..
+          
+          # Step 3: Build and install SDL3_image from source
+          echo "Building SDL3_image from source..."
+          git clone https://github.com/libsdl-org/SDL_image.git -b main
+          cd SDL_image
+          cmake -B build
+          cmake --build build
+          sudo cmake --install build
+          cd ..
+          
+          # Step 4: Build and install SDL3_ttf from source
+          echo "Building SDL3_ttf from source..."
+          git clone https://github.com/libsdl-org/SDL_ttf.git -b main
+          cd SDL_ttf
+          cmake -B build
+          cmake --build build
+          sudo cmake --install build
+          cd ..
 
       # --- MACOS STEPS ---
       - name: Install dependencies (macOS)
