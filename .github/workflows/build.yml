@@ -97,7 +97,7 @@ jobs:
               --appdir AppDir \
               --executable build/Advancely \
               --desktop-file packaging/linux/advancely.desktop \
-              --icon-file resources/gui/Advancely_Logo_NoText.png \
+              --icon-file resources/gui/advancely.png \
               --output appimage
           
             # Copy the final AppImage and text files to the release folder
