@@ -10,6 +10,7 @@ file(READ "${CMAKE_SOURCE_DIR}/source/main.h" MAIN_H_CONTENTS)
 # Use a regular expression to find the line with the version and capture the number
 # This specifically looks for the pattern #define ADVANCELY_VERSION "vX.Y.Z"
 # and captures only the "X.Y.Z" part.
+# TODO: Currently not used
 string(REGEX MATCH "#define ADVANCELY_VERSION \"v([0-9]+\\.[0-9]+\\.[0-9]+)\"" _ ${MAIN_H_CONTENTS})
 
 # The captured version number is now in the variable CMAKE_MATCH_1
@@ -302,16 +303,16 @@ if (UNIX AND NOT APPLE)
     install(FILES "packaging/linux/dev.LNXSeus.Advancely.metainfo.xml" DESTINATION share/metainfo)
 endif ()
 
-# --- CPack Configuration for creating a .deb package ---
-set(CPACK_GENERATOR "DEB")
-set(CPACK_PACKAGE_NAME "advancely")
-set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}") # version directly from main.h
-set(CPACK_PACKAGE_VENDOR "LNXSeus")
-set(CPACK_DEBIAN_PACKAGE_MAINTAINER "LNXSeus <https://youtube.com/@lnxs>")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A highly customizable and interactive tool to track your Minecraft progress beyond just Advancements.")
-set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/LNXSeus/Advancely")
-
-# This is important: it lists the runtime libraries the .deb package depends on
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "libsdl3-0 (>= 3.0.0), libcurl4 (>= 7.68)")
-
-include(CPack)
+## --- CPack Configuration for creating a .deb package ---
+#set(CPACK_GENERATOR "DEB")
+#set(CPACK_PACKAGE_NAME "advancely")
+#set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}") # version directly from main.h
+#set(CPACK_PACKAGE_VENDOR "LNXSeus")
+#set(CPACK_DEBIAN_PACKAGE_MAINTAINER "LNXSeus <https://youtube.com/@lnxs>")
+#set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A highly customizable and interactive tool to track your Minecraft progress beyond just Advancements.")
+#set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/LNXSeus/Advancely")
+#
+## This is important: it lists the runtime libraries the .deb package depends on
+#set(CPACK_DEBIAN_PACKAGE_DEPENDS "libsdl3-0 (>= 3.0.0), libcurl4 (>= 7.68)")
+#
+#include(CPack)

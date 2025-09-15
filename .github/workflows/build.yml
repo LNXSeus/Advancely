@@ -1,3 +1,111 @@
+#name: Build Advancely
+#
+#on:
+#  push:
+#    branches: [ "main" ]
+#  pull_request:
+#    branches: [ "main" ]
+#
+#jobs:
+#  build:
+#    runs-on: ${{ matrix.os }}
+#    strategy:
+#      fail-fast: false # so that all jobs run even if one fails
+#      matrix:
+#        os: [windows-latest, ubuntu-latest, macos-latest]
+#
+#    steps:
+#    - name: Checkout repository
+#      uses: actions/checkout@v4
+#
+#    - name: Install dependencies (Linux)
+#      if: runner.os == 'Linux'
+#      run: |
+#        sudo apt-get update
+#        # Install build tools and curl, AND NOW the required X11/Wayland dev libraries
+#        sudo apt-get install -y build-essential cmake git libcurl4-openssl-dev \
+#          libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+#          libxi-dev libxss-dev libwayland-dev libdecor-0-dev libxkbcommon-dev \
+#          libfreetype6-dev libharfbuzz-dev
+#
+#        # Build SDL3 from source
+#        echo "Building SDL3 from source..."
+#        git clone https://github.com/libsdl-org/SDL.git -b main
+#        cd SDL
+#        cmake -B build
+#        cmake --build build
+#        sudo cmake --install build
+#        cd ..
+#
+#        # Build SDL3_image from source
+#        echo "Building SDL3_image from source..."
+#        git clone https://github.com/libsdl-org/SDL_image.git -b main
+#        cd SDL_image
+#        cmake -B build
+#        cmake --build build
+#        sudo cmake --install build
+#        cd ..
+#
+#        # Build SDL3_ttf from source
+#        echo "Building SDL3_ttf from source..."
+#        git clone https://github.com/libsdl-org/SDL_ttf.git -b main
+#        cd SDL_ttf
+#        cmake -B build
+#        cmake --build build
+#        sudo cmake --install build
+#        cd ..
+#
+#    - name: Install dependencies (macOS)
+#      if: runner.os == 'macOS'
+#      run: |
+#        brew install sdl3 sdl3_image sdl3_ttf curl
+#
+#    - name: Install dependencies (Windows)
+#      if: runner.os == 'Windows'
+#      uses: lukka/run-vcpkg@v11
+#      with:
+#        # We remove the specific commit ID to let the action use its more stable default setup
+#        vcpkgJsonGlob: '**/vcpkg.json'
+#
+#    - name: Configure CMake (Windows)
+#      if: runner.os == 'Windows'
+#      run: cmake -B build -D CMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
+#
+#    - name: Configure CMake (Linux/macOS)
+#      if: runner.os != 'Windows'
+#      run: cmake -B build
+#
+#    - name: Build Project
+#      run: cmake --build build --config Release
+#
+#    - name: Create Debian Package
+#      if: runner.os == 'Linux'
+#      run: |
+#        cd build
+#        cpack -C Release
+#
+#    # Create and package the release, resources are included per OS
+#    - name: Create and Package Release
+#      shell: bash
+#      run: |
+#        mkdir release
+#        if [ "$RUNNER_OS" == "Windows" ]; then
+#          cp build/Release/Advancely.exe release/
+#          cp build/Release/*.dll release/
+#          cp -r build/resources release/
+#        elif [ "$RUNNER_OS" == "macOS" ]; then
+#          cp -r build/Advancely.app release/
+#        else
+#          # For Linux, find and copy the generated .deb file
+#          find build -name "*.deb" -exec cp {} release/ \;
+#        fi
+#
+#    - name: Upload Release Artifact
+#      uses: actions/upload-artifact@v4
+#      with:
+#        name: Advancely-${{ matrix.os }}
+#        path: release/
+
 name: Build Advancely
 
 on:
@@ -10,98 +118,83 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false # so that all jobs run even if one fails
+      fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive # Important if you add submodules later
 
-    - name: Install dependencies (Linux)
-      if: runner.os == 'Linux'
-      run: |
-        sudo apt-get update
-        # Install build tools and curl, AND NOW the required X11/Wayland dev libraries
-        sudo apt-get install -y build-essential cmake git libcurl4-openssl-dev \
-          libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
-          libxi-dev libxss-dev libwayland-dev libdecor-0-dev libxkbcommon-dev \
-          libfreetype6-dev libharfbuzz-dev
-        
-        # Build SDL3 from source
-        echo "Building SDL3 from source..."
-        git clone https://github.com/libsdl-org/SDL.git -b main
-        cd SDL
-        cmake -B build
-        cmake --build build
-        sudo cmake --install build
-        cd ..
+      # --- LINUX STEPS ---
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake git libcurl4-openssl-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+            libxi-dev libxss-dev libwayland-dev libdecor-0-dev libxkbcommon-dev \
+            libfreetype6-dev libharfbuzz-dev libasound2-dev
+          # NOTE: SDL build steps are no longer needed here, as they'll be part of the AppImage
 
-        # Build SDL3_image from source
-        echo "Building SDL3_image from source..."
-        git clone https://github.com/libsdl-org/SDL_image.git -b main
-        cd SDL_image
-        cmake -B build
-        cmake --build build
-        sudo cmake --install build
-        cd ..
-        
-        # Build SDL3_ttf from source
-        echo "Building SDL3_ttf from source..."
-        git clone https://github.com/libsdl-org/SDL_ttf.git -b main
-        cd SDL_ttf
-        cmake -B build
-        cmake --build build
-        sudo cmake --install build
-        cd ..
+      # --- MACOS STEPS ---
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install sdl3 sdl3_image sdl3_ttf curl
 
-    - name: Install dependencies (macOS)
-      if: runner.os == 'macOS'
-      run: |
-        brew install sdl3 sdl3_image sdl3_ttf curl
+      # --- WINDOWS STEPS ---
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: '**/vcpkg.json'
 
-    - name: Install dependencies (Windows)
-      if: runner.os == 'Windows'
-      uses: lukka/run-vcpkg@v11
-      with:
-        # We remove the specific commit ID to let the action use its more stable default setup
-        vcpkgJsonGlob: '**/vcpkg.json'
-        
-    - name: Configure CMake (Windows)
-      if: runner.os == 'Windows'
-      run: cmake -B build -D CMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
+      # --- BUILD STEPS (All Platforms) ---
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
 
-    - name: Configure CMake (Linux/macOS)
-      if: runner.os != 'Windows'
-      run: cmake -B build
+      - name: Build Project
+        run: cmake --build build --config Release
 
-    - name: Build Project
-      run: cmake --build build --config Release
+      # --- PACKAGING STEP (REPLACES OLD SCRIPT) ---
+      - name: Create and Package Release
+        shell: bash
+        run: |
+          mkdir release
+          
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            # For Windows, copy the exe, all DLLs from vcpkg, resources, and text files
+            cp build/Release/Advancely.exe release/
+            cp vcpkg_installed/x64-windows/bin/*.dll release/
+            cp -r resources release/
+            cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            # For macOS, copy the .app bundle and the text files
+            cp -r build/Advancely.app release/
+            cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
+          else # Linux - AppImage Creation
+            # Download the AppImage creation tool
+            wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+            chmod +x linuxdeploy-x86_64.AppImage
+          
+            # Run linuxdeploy to bundle the app and all dependencies
+            # It creates a self-contained AppDir directory
+            ./linuxdeploy-x86_64.AppImage \
+              --appdir AppDir \
+              --executable build/Advancely \
+              --desktop-file packaging/linux/advancely.desktop \
+              --icon-file resources/gui/Advancely_Logo_NoText.png \
+              --output appimage
+          
+            # Copy the final AppImage and text files to the release folder
+            cp Advancely*.AppImage release/
+            cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
+          fi
 
-    - name: Create Debian Package
-      if: runner.os == 'Linux'
-      run: |
-        cd build
-        cpack -C Release
-
-    # Create and package the release, resources are included per OS
-    - name: Create and Package Release
-      shell: bash
-      run: |
-        mkdir release
-        if [ "$RUNNER_OS" == "Windows" ]; then
-          cp build/Release/Advancely.exe release/
-          cp build/Release/*.dll release/
-          cp -r build/resources release/
-        elif [ "$RUNNER_OS" == "macOS" ]; then
-          cp -r build/Advancely.app release/
-        else
-          # For Linux, find and copy the generated .deb file
-          find build -name "*.deb" -exec cp {} release/ \;
-        fi
-
-    - name: Upload Release Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: Advancely-${{ matrix.os }}
-        path: release/
+      - name: Upload Release Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Advancely-${{ matrix.os }}
+          path: release/
