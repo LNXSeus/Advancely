@@ -300,7 +300,7 @@ endif ()
 if (UNIX AND NOT APPLE)
     # Rules for Linux desktop integration
     install(FILES "packaging/linux/advancely.desktop" DESTINATION share/applications)
-    install(FILES "resources/gui/Advancely_Logo_NoText.png" DESTINATION share/icons/hicolor/256x256/apps RENAME advancely.png)
+    install(FILES "resources/gui/Advancely_Logo_NoText_512_Linux.png" DESTINATION share/icons/hicolor/512x512/apps RENAME advancely.png)
     install(FILES "packaging/linux/dev.LNXSeus.Advancely.metainfo.xml" DESTINATION share/metainfo)
 endif ()
 
