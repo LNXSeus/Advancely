@@ -104,6 +104,16 @@ set_source_files_properties(
         COMPILE_FLAGS "-Wno-cast-function-type"
 )
 
+# This command targets a specific source file and sets its properties.
+set_source_files_properties(
+        source/external/miniz.c
+        PROPERTIES
+        # This uses a generator expression to apply the correct flags for each compiler.
+        # For MSVC, it disables warnings 4132 and 4127.
+        # For other compilers (like GCC/Clang), it applies -Wno-type-limits.
+        COMPILE_FLAGS "$<$<CXX_COMPILER_ID:MSVC>:/wd4132 /wd4127> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wno-type-limits>"
+)
+
 # Tell the compiler where to find your project's header files.
 target_include_directories(Advancely PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/source"

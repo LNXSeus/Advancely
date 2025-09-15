@@ -78,6 +78,10 @@ jobs:
     - name: Build Project
       run: cmake --build build --config Release
 
+    - name: Create Debian Package
+      if: runner.os == 'Linux'
+      run: cpack --config build/CPackConfig.cmake
+
     # Create and package the release, resources are included per OS
     - name: Create and Package Release
       run: |

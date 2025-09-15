@@ -36,15 +36,6 @@ void show_error_message(const char *title, const char *message);
 
 // Not including any utility headers here
 
-#define MAX_PATH_LENGTH 1024
-
-    // TODO: Remove these later
-// extern char g_resources_path[MAX_PATH_LENGTH] = ""; // Path to resources folder (for all platforms) with NO TRAILING SLASH
-// extern char g_settings_file_path[MAX_PATH_LENGTH];
-// extern char g_notes_dir_path[MAX_PATH_LENGTH];
-// extern char g_notes_manifest_path[MAX_PATH_LENGTH];
-
-
 const char* get_resources_path();
 const char* get_settings_file_path();
 const char* get_notes_dir_path();
@@ -56,7 +47,7 @@ const char* get_notes_manifest_path();
 #define TRACKER_TITLE "Advancely"
 
 // This is the version that gets compared with the latest release tag on GitHub
-#define ADVANCELY_VERSION "v0.9.135" // vMAJOR.MINOR.PATCH // TODO: Update this always, SAME FORMAT ON RELEASE TAG!
+#define ADVANCELY_VERSION "v0.9.137" // vMAJOR.MINOR.PATCH // TODO: Update this always, SAME FORMAT ON RELEASE TAG!
 // Starting from /gui folder
 #define ADVANCELY_ICON_PATH "/gui/Advancely_Logo_NoText.png" // TODO: Use this in tracker_init_sdl()
 // Starting from /gui folder
@@ -76,6 +67,7 @@ const char* get_notes_manifest_path();
 #define OVERLAY_SPEEDUP_FACTOR 5.0f // Both the setting and SPACEBAR use this value
 #define OVERLAY_FADE_DURATION 0.5f // Duration of the fade-out animation in seconds
 
+#define MAX_PATH_LENGTH 1024
 
 
 #ifdef __cplusplus
