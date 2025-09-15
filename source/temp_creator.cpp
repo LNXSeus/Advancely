@@ -1377,12 +1377,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             strncpy(copy_template_flag, new_flag, sizeof(copy_template_flag) - 1);
         }
     }
-    if (ImGui::IsItemHovered())
+    if (ImGui::IsItemHovered()) {
+        char copy_template_tooltip_buffer[1024];
+        snprintf(copy_template_tooltip_buffer, sizeof(copy_template_tooltip_buffer),
+        "Creates a copy of the selected template. You can then change its version, category, or flag.\n\n"
+        "Note: This action copies the main template file and all of its\n"
+        "associated language files (e.g., _lang.json, _lang_eng.json).");
         ImGui::SetTooltip(
-            "Creates a copy of the selected template. You can then change its version, category, or flag.\n\n"
-            "Note: This action copies the main template file and all of its\n"
-            "associated language files (e.g., _lang.json, _lang_eng.json)."
-        );
+            "%s", copy_template_tooltip_buffer);
+    }
 
     ImGui::EndDisabled();
     ImGui::SameLine();
@@ -1397,7 +1400,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         if (selected_template_index != -1 && is_current_template) {
-            ImGui::SetTooltip("Cannot delete the template currently in use.");
+            char cannot_delete_template_tooltip_buffer[1024];
+            snprintf(cannot_delete_template_tooltip_buffer, sizeof(cannot_delete_template_tooltip_buffer),
+                "Cannot delete the template currently in use.");
+            ImGui::SetTooltip("%s", cannot_delete_template_tooltip_buffer);
         } else if (selected_template_index != -1) {
             const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
             char tooltip_text[512];
@@ -1408,9 +1414,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 snprintf(tooltip_text, sizeof(tooltip_text), "Delete template:\nVersion: %s\nCategory: %s",
                          creator_version_str, selected.category);
             }
-            ImGui::SetTooltip(tooltip_text);
+            ImGui::SetTooltip("%s", tooltip_text);
         } else {
-            ImGui::SetTooltip("Delete the currently selected template.");
+            char delete_curent_template_tooltip_buffer[1024];
+            snprintf(delete_curent_template_tooltip_buffer, sizeof(delete_curent_template_tooltip_buffer),
+                "Delete the currently selected template.");
+            ImGui::SetTooltip("%s", delete_curent_template_tooltip_buffer);
         }
     }
 
@@ -1600,13 +1609,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
         }
         // Display language tooltip
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(
-                "Select the language file for editing display names.\n\n"
-                "• Loading: Changing this selection will reload all 'Display Name' fields in the editor from the chosen file.\n"
-                "• Saving: Edits to display names are saved to the language selected here when you click the main 'Save' button.\n\n"
-                "This keeps the template's core structure separate from its translations."
-            );
+        if (ImGui::IsItemHovered()) {
+            char select_lang_file_tooltip_buffer[1024];
+            snprintf(select_lang_file_tooltip_buffer, sizeof(select_lang_file_tooltip_buffer),
+            "Select the language file for editing display names.\n\n"
+            "• Loading: Changing this selection will reload all 'Display Name' fields in the editor from the chosen file.\n"
+            "• Saving: Edits to display names are saved to the language selected here when you click the main 'Save' button.\n\n"
+            "This keeps the template's core structure separate from its translations.");
+            ImGui::SetTooltip("%s", select_lang_file_tooltip_buffer);
+        }
         ImGui::Separator();
 
         // Save when creator window is focused
@@ -1620,9 +1631,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
 
         // Save button tooltip
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Press ENTER to save the currently edited template into the .json files.\n"
-                "Does not save on errors.");
+        if (ImGui::IsItemHovered()) {
+            char save_template_tooltip_buffer[1024];
+            snprintf(save_template_tooltip_buffer, sizeof(save_template_tooltip_buffer),
+            "Press ENTER to save the currently edited template into the .json files.\n"
+            "Does not save on errors.");
+            ImGui::SetTooltip("%s", save_template_tooltip_buffer);
+        }
 
         // Calculate the unsaved changes flag on-the-fly each frame
         bool editor_has_unsaved_changes = are_editor_templates_different(current_template_data, saved_template_data);
@@ -1675,7 +1690,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
             // Save hover text
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Press ENTER to save.");
+                char press_enter_save_tooltip_buffer[1024];
+                snprintf(press_enter_save_tooltip_buffer, sizeof(press_enter_save_tooltip_buffer),
+                    "Press ENTER to save.");
+                ImGui::SetTooltip("%s", press_enter_save_tooltip_buffer);
             }
             ImGui::SameLine();
             // Also use spacebar
@@ -1686,7 +1704,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
             // Discard hover text
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Press SPACE to discard.");
+                char press_space_discard_tooltip_buffer[1024];
+                snprintf(press_space_discard_tooltip_buffer, sizeof(press_space_discard_tooltip_buffer),
+                    "Press SPACE to discard.");
+                ImGui::SetTooltip("%s", press_space_discard_tooltip_buffer);
             }
             ImGui::SameLine();
             // Cancel or pressing ESC
@@ -1695,7 +1716,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
             // Cancel hover text
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Press ESC to cancel.");
+                char press_esc_cancel_tooltip_buffer[1024];
+                snprintf(press_esc_cancel_tooltip_buffer, sizeof(press_esc_cancel_tooltip_buffer),
+                    "Press ESC to cancel.");
+                ImGui::SetTooltip("%s", press_esc_cancel_tooltip_buffer);
             }
             ImGui::EndPopup();
         }
@@ -1717,8 +1741,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::SameLine();
                 ImGui::Checkbox("Show Display Names", &show_advancement_display_names);
                 if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("When checked shows the display names as you see then on the tracker.\n"
-                                      "Otherwise it shows the root names.");
+                    char show_display_names_tooltip_buffer[1024];
+                    snprintf(show_display_names_tooltip_buffer, sizeof(show_display_names_tooltip_buffer),
+                    "When checked shows the display names as you see then on the tracker.\n"
+                                  "Otherwise it shows the root names.");
+                    ImGui::SetTooltip("%s", show_display_names_tooltip_buffer);
                 }
                 ImGui::Separator();
 
@@ -1899,7 +1926,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     // resource folder tooltip
                     if (ImGui::IsItemHovered()) {
-                        ImGui::SetTooltip("The icon must be inside the 'resources/icons' folder!");
+                        char resource_folder_tooltip_buffer[1024];
+                        snprintf(resource_folder_tooltip_buffer, sizeof(resource_folder_tooltip_buffer),
+                            "The icon must be inside the 'resources/icons' folder!");
+                        ImGui::SetTooltip("%s", resource_folder_tooltip_buffer);
                     }
                     if (ImGui::Checkbox("Hidden", &advancement.is_hidden)) {
                         save_message_type = MSG_NONE;
@@ -1963,7 +1993,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                         }
                         if (ImGui::IsItemHovered()) {
-                            ImGui::SetTooltip("The icon must be inside the 'resources/icons' folder!");
+                            char icon_path_tooltip_buffer[1024];
+                            snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                "The icon must be inside the 'resources/icons' folder!");
+                            ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                         }
                         if (ImGui::Checkbox("Hidden", &criterion.is_hidden)) {
                             save_message_type = MSG_NONE;
@@ -2074,8 +2107,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::SameLine();
                 ImGui::Checkbox("Show Display Names", &show_stat_display_names);
                 if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("When checked shows the display names as you see then on the tracker.\n"
-                                      "Otherwise it shows the root names.");
+                    char show_display_names_tooltip_buffer[1024];
+                    snprintf(show_display_names_tooltip_buffer, sizeof(show_display_names_tooltip_buffer),
+                    "When checked shows the display names as you see then on the tracker.\n"
+                                  "Otherwise it shows the root names.");
+                    ImGui::SetTooltip("%s", show_display_names_tooltip_buffer);
                 }
                 ImGui::Separator();
 
@@ -2237,7 +2273,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
                     if (ImGui::IsItemHovered()) {
-                        ImGui::SetTooltip("The icon must be inside the 'resources/icons' folder!");
+                        char icon_path_tooltip_buffer[1024];
+                        snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                            "The icon must be inside the 'resources/icons' folder!");
+                        ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                     }
                     if (ImGui::Checkbox("Hidden", &stat_cat.is_hidden)) {
                         save_message_type = MSG_NONE;
@@ -2344,7 +2383,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                             if (ImGui::IsItemHovered()) {
-                                ImGui::SetTooltip("The icon must be inside the 'resources/icons' folder!");
+                                char icon_path_tooltip_buffer[1024];
+                                snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                    "The icon must be inside the 'resources/icons' folder!");
+                                ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                             }
                             if (ImGui::InputInt("Target", &crit.goal)) {
                                 save_message_type = MSG_NONE;
@@ -2496,7 +2538,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                         }
                         if (ImGui::IsItemHovered()) {
-                            ImGui::SetTooltip("The icon must be inside the 'resources/icons' folder!");
+                            char icon_path_tooltip_buffer[1024];
+                            snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                "The icon must be inside the 'resources/icons' folder!");
+                            ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                         }
                         if (ImGui::Checkbox("Hidden", &unlock.is_hidden)) {
                             save_message_type = MSG_NONE; // Clear message on new edit
@@ -2638,7 +2683,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
                     if (ImGui::IsItemHovered()) {
-                        ImGui::SetTooltip("The icon must be inside the 'resources/icons' folder!");
+                        char icon_path_tooltip_buffer[1024];
+                        snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                            "The icon must be inside the 'resources/icons' folder!");
+                        ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                     }
                     if (ImGui::InputInt("Target Goal", &goal.goal)) {
                         // No values below -1 allowed
@@ -2647,9 +2695,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         save_message_type = MSG_NONE; // Clear message on new edit
                     }
-                    if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip(
+                    if (ImGui::IsItemHovered()) {
+                        char target_goal_tooltip_buffer[1024];
+                        snprintf(target_goal_tooltip_buffer, sizeof(target_goal_tooltip_buffer),
                             "0 for a simple toggle, -1 for an infinite counter, >0 for a progress-based counter.");
+                        ImGui::SetTooltip("%s", target_goal_tooltip_buffer);
+                    }
                     if (ImGui::Checkbox("Hidden", &goal.is_hidden)) {
                         save_message_type = MSG_NONE; // Clear message on new edit
                     }
@@ -2751,8 +2802,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::SameLine();
                 ImGui::Checkbox("Show Display Names", &show_ms_goal_display_names);
                 if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("When checked shows the display names as you see them on the tracker.\n"
-                                      "Otherwise it shows the root names.");
+                    char show_display_names_tooltip_buffer[1024];
+                    snprintf(show_display_names_tooltip_buffer, sizeof(show_display_names_tooltip_buffer),
+                    "When checked shows the display names as you see them on the tracker.\n"
+                                  "Otherwise it shows the root names.");
+                    ImGui::SetTooltip("%s", show_display_names_tooltip_buffer);
                 }
                 ImGui::Separator();
 
@@ -2896,7 +2950,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
                     if (ImGui::IsItemHovered()) {
-                        ImGui::SetTooltip("The icon must be inside the 'resources/icons' folder!");
+                        char icon_path_tooltip_buffer[1024];
+                        snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                            "The icon must be inside the 'resources/icons' folder!");
+                        ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                     }
                     if (ImGui::Checkbox("Hidden", &goal.is_hidden)) {
                         save_message_type = MSG_NONE;
@@ -3078,14 +3135,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::Spacing();
 
         ImGui::InputText("Category Name", new_template_category, sizeof(new_template_category));
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(
+        if (ImGui::IsItemHovered()) {
+            char template_category_name_tooltip_buffer[1024];
+            snprintf(template_category_name_tooltip_buffer, sizeof(template_category_name_tooltip_buffer),
                 "The main classification for the template (e.g., 'all_advancements', 'all_trims').\nCannot contain spaces or special characters.");
+            ImGui::SetTooltip("%s", template_category_name_tooltip_buffer);
+        }
 
         ImGui::InputText("Optional Flag", new_template_flag, sizeof(new_template_flag));
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(
+        if (ImGui::IsItemHovered()) {
+            char optional_flag_tooltip_buffer[1024];
+            snprintf(optional_flag_tooltip_buffer, sizeof(optional_flag_tooltip_buffer),
                 "A variant for the category (e.g., '_optimized', '_modded').\nCannot contain spaces or special characters.");
+            ImGui::SetTooltip("%s", optional_flag_tooltip_buffer);
+        }
 
         // Also allow enter key ONLY WHEN the window is focused
         if (ImGui::Button("Create Files") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(
@@ -3167,8 +3230,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         const auto &selected = discovered_templates[selected_template_index];
         ImGui::Text("Create new language for '%s%s'", selected.category, selected.optional_flag);
         ImGui::InputText("New Language Flag", lang_flag_buffer, sizeof(lang_flag_buffer));
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip(
-            "E.g., 'de', 'fr_ca'. Cannot be empty or contain special characters.");
+        if (ImGui::IsItemHovered()) {
+            char create_language_tooltip_buffer[1024];
+            snprintf(create_language_tooltip_buffer, sizeof(create_language_tooltip_buffer),
+                "E.g., 'de', 'fr_ca'. Cannot be empty or contain special characters.");
+            ImGui::SetTooltip("%s", create_language_tooltip_buffer);
+        }
 
         if (popup_error_msg[0] != '\0') {
             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", popup_error_msg);
@@ -3186,7 +3253,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         // Cancel hover text
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Press ENTER to confirm.");
+            char press_enter_confirm_tooltip_buffer[1024];
+            snprintf(press_enter_confirm_tooltip_buffer, sizeof(press_enter_confirm_tooltip_buffer),
+                "Press ENTER to confirm.");
+            ImGui::SetTooltip("%s", press_enter_confirm_tooltip_buffer);
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
@@ -3196,7 +3266,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         // Cancel hover text
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Press ESC to cancel.");
+            char press_esc_cancel_tooltip_buffer[1024];
+            snprintf(press_esc_cancel_tooltip_buffer, sizeof(press_esc_cancel_tooltip_buffer),
+                "Press ESC to cancel.");
+            ImGui::SetTooltip("%s", press_esc_cancel_tooltip_buffer);
         }
         ImGui::EndPopup();
     }
@@ -3251,7 +3324,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         // Cancel hover text
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Press ENTER to confirm.");
+            char press_enter_confirm_tooltip_buffer[1024];
+            snprintf(press_enter_confirm_tooltip_buffer, sizeof(press_enter_confirm_tooltip_buffer),
+                "Press ENTER to confirm.");
+            ImGui::SetTooltip("%s", press_enter_confirm_tooltip_buffer);
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
@@ -3262,7 +3338,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         // Cancel hover text
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Press ESC to cancel.");
+            char press_esc_cancel_tooltip_buffer[1024];
+            snprintf(press_esc_cancel_tooltip_buffer, sizeof(press_esc_cancel_tooltip_buffer),
+               "Press ESC to cancel.");
+            ImGui::SetTooltip("%s", press_esc_cancel_tooltip_buffer);
         }
         ImGui::EndPopup();
     }
@@ -3286,7 +3365,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         // Cancel hover text
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Press ENTER to confirm.");
+            char press_enter_confirm_tooltip_buffer[1024];
+            snprintf(press_enter_confirm_tooltip_buffer, sizeof(press_enter_confirm_tooltip_buffer),
+                "Press ENTER to confirm.");
+            ImGui::SetTooltip("%s", press_enter_confirm_tooltip_buffer);
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
@@ -3294,7 +3376,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         // Cancel hover text
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Press ESC to cancel.");
+            char press_esc_cancel_tooltip_buffer[1024];
+            snprintf(press_esc_cancel_tooltip_buffer, sizeof(press_esc_cancel_tooltip_buffer),
+                "Press ESC to cancel.");
+            ImGui::SetTooltip("%s", press_esc_cancel_tooltip_buffer);
         }
         ImGui::EndPopup();
     }

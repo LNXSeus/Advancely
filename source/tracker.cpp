@@ -14,6 +14,7 @@
 
 #include "tracker.h"
 
+#include <set>
 #include <vector>
 
 #include "init_sdl.h"
@@ -63,7 +64,7 @@ static void tracker_update_notes_path(Tracker *t, const AppSettings *settings) {
         cJSON *entry = nullptr;
         cJSON_ArrayForEach(entry, manifest) {
             cJSON *hash_item = cJSON_GetObjectItem(entry, "hash");
-            if (cJSON_IsNumber(hash_item) && (unsigned long)hash_item->valuedouble == world_hash) {
+            if (cJSON_IsNumber(hash_item) && (unsigned long) hash_item->valuedouble == world_hash) {
                 entry_to_update = entry;
                 break;
             }
@@ -71,13 +72,13 @@ static void tracker_update_notes_path(Tracker *t, const AppSettings *settings) {
 
         if (entry_to_update) {
             // World exists, update its timestamp
-            cJSON_ReplaceItemInObject(entry_to_update, "last_used", cJSON_CreateNumber((double)time(0)));
+            cJSON_ReplaceItemInObject(entry_to_update, "last_used", cJSON_CreateNumber((double) time(0)));
         } else {
             // new world, add a new entry
             cJSON *new_entry = cJSON_CreateObject();
-            cJSON_AddNumberToObject(new_entry, "hash", (double)world_hash);
+            cJSON_AddNumberToObject(new_entry, "hash", (double) world_hash);
             cJSON_AddStringToObject(new_entry, "path", full_world_path);
-            cJSON_AddNumberToObject(new_entry, "last_used",(double)time(0));
+            cJSON_AddNumberToObject(new_entry, "last_used", (double) time(0));
             cJSON_AddItemToArray(manifest, new_entry);
 
             // Check if we need to prune old notes (LRU - least recently used)
@@ -89,7 +90,7 @@ static void tracker_update_notes_path(Tracker *t, const AppSettings *settings) {
                 int current_index = 0;
                 cJSON_ArrayForEach(entry, manifest) {
                     double last_used = cJSON_GetObjectItem(entry, "last_used")->valuedouble;
-                    if (oldest_time == -1 ||last_used < oldest_time) {
+                    if (oldest_time == -1 || last_used < oldest_time) {
                         oldest_time = last_used;
                         oldest_entry = entry;
                         oldest_index = current_index;
@@ -98,7 +99,8 @@ static void tracker_update_notes_path(Tracker *t, const AppSettings *settings) {
                 }
 
                 if (oldest_entry && oldest_index != -1) {
-                    unsigned long hash_to_delete = (unsigned long)cJSON_GetObjectItem(oldest_entry, "hash")->valuedouble;
+                    unsigned long hash_to_delete = (unsigned long) cJSON_GetObjectItem(oldest_entry, "hash")->
+                            valuedouble;
                     char path_to_delete[MAX_PATH_LENGTH];
                     snprintf(path_to_delete, sizeof(path_to_delete), "%s/%lu.txt", NOTES_DIR, hash_to_delete);
                     if (remove(path_to_delete) == 0) {
@@ -110,9 +112,9 @@ static void tracker_update_notes_path(Tracker *t, const AppSettings *settings) {
         }
 
         // Save the updated manifest
-        FILE* manifest_file = fopen(NOTES_MANIFEST_PATH, "w");
+        FILE *manifest_file = fopen(NOTES_MANIFEST_PATH, "w");
         if (manifest_file) {
-            char* manifest_str = cJSON_Print(manifest);
+            char *manifest_str = cJSON_Print(manifest);
             fputs(manifest_str, manifest_file);
             fclose(manifest_file);
             free(manifest_str);
@@ -120,11 +122,10 @@ static void tracker_update_notes_path(Tracker *t, const AppSettings *settings) {
         cJSON_Delete(manifest);
     } else {
         // Per template mode
-        construct_template_paths((AppSettings *)settings); // This will update the template paths
+        construct_template_paths((AppSettings *) settings); // This will update the template paths
         strncpy(t->notes_path, settings->notes_path, MAX_PATH_LENGTH - 1);
     }
 }
-
 
 
 /**
@@ -2285,7 +2286,6 @@ void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settin
 
         case SDL_EVENT_KEY_DOWN:
             if (event->key.repeat == 0) {
-
                 // If any popup is open, block all subsequent hotkeys handled here.
                 if (ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup)) {
                     break;
@@ -2332,14 +2332,13 @@ void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
     // Detect if the world has changed since the last update.
     if (t->template_data->last_known_world_name[0] == '\0' || // Handle first-time load
         strcmp(t->world_name, t->template_data->last_known_world_name) != 0) {
-
         // Reset custom progress and manual stat overrides on world change
         tracker_reset_progress_on_world_change(t, settings);
 
         // Update the notes path to the new world and reload the notes content
         tracker_update_notes_path(t, settings);
         tracker_load_notes(t, settings);
-        }
+    }
     // After the check, update the last known world name to the current one for the next cycle.
     strncpy(t->template_data->last_known_world_name, t->world_name,
             sizeof(t->template_data->last_known_world_name) - 1);
@@ -2636,8 +2635,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     // A child must pass the standard hide filter AND the search filter to be included
                     if (crit &&
                         (!settings->remove_completed_goals || (!crit->done && !crit->is_hidden)) &&
-                        str_contains_insensitive(crit->display_name, t->search_buffer))
-                    {
+                        str_contains_insensitive(crit->display_name, t->search_buffer)) {
                         matching_children.push_back(crit);
                     }
                     // TODO: Remove
@@ -2694,7 +2692,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 if (parent_matches) {
                     // If parent matches, count all children that pass the standard hide filter.
                     for (int j = 0; j < cat->criteria_count; j++) {
-                        TrackableItem* crit = cat->criteria[j];
+                        TrackableItem *crit = cat->criteria[j];
                         if (crit && (!settings->remove_completed_goals || (!crit->done && !crit->is_hidden))) {
                             visible_criteria++;
                         }
@@ -3817,12 +3815,13 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                 if (version <= MC_VERSION_1_11_2) {
                     // Achievements section title
                     render_trackable_category_section(t, settings, current_y, t->template_data->advancements,
-                                                      t->template_data->advancement_count, "Achievements", false, version);
+                                                      t->template_data->advancement_count, "Achievements", false,
+                                                      version);
                 } else {
                     // Advancements section title
                     render_trackable_category_section(t, settings, current_y, t->template_data->advancements,
-                                                      t->template_data->advancement_count, "Advancements", false, version);
-
+                                                      t->template_data->advancement_count, "Advancements", false,
+                                                      version);
                 }
                 break;
             case SECTION_UNLOCKS:
@@ -4032,7 +4031,10 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             t->search_buffer[0] = '\0'; // Clear the buffer
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Clear Search");
+            char clear_search_tooltip_buffer[1024];
+            snprintf(clear_search_tooltip_buffer, sizeof(clear_search_tooltip_buffer),
+                     "Clear Search");
+            ImGui::SetTooltip("%s", clear_search_tooltip_buffer);
         }
     } else {
         // Render an invisible widget of the same size to hold the space
@@ -4099,11 +4101,13 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     }
 
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip(
-            "Also toggled by pressing SPACE.\n"
-            "Prevents the layout from rearranging when zooming or resizing the window.\n"
-            "Adjusting the window width gives more control over\n"
-            "the exact amount of goals displayed per row.");
+        char lock_layout_tooltip_buffer[1024];
+        snprintf(lock_layout_tooltip_buffer, sizeof(lock_layout_tooltip_buffer),
+                 "Also toggled by pressing SPACE.\n"
+                 "Prevents the layout from rearranging when zooming or resizing the window.\n"
+                 "Adjusting the window width gives more control over\n"
+                 "the exact amount of goals displayed per row.");
+        ImGui::SetTooltip("%s", lock_layout_tooltip_buffer);
     }
 
     ImGui::SameLine();
@@ -4118,7 +4122,10 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     }
 
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Resets camera position and zoom level to their defaults.");
+        char reset_layout_tooltip_buffer[1024];
+        snprintf(reset_layout_tooltip_buffer, sizeof(reset_layout_tooltip_buffer),
+                 "Resets camera position and zoom level to their defaults.");
+        ImGui::SetTooltip("%s", reset_layout_tooltip_buffer);
     }
 
     ImGui::SameLine();
@@ -4126,15 +4133,16 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // Add the "Notes" checkbox
     ImGui::Checkbox("Notes", &t->notes_window_open);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip(
-            "Toggle the notes window.\n\n"
-            "The notes system has two modes, configurable inside the window:\n"
-            "  • Per-World (Default): Notes are saved for each world individually. The last 32 worlds are remembered.\n"
-            "  • Per-Template: Notes are shared for the currently loaded template permanently.\n\n"
-            "The window's size and position are remembered across sessions.\n"
-            "Hotkeys are disabled while typing in the notes window.\n"
-            "The maximum note size is 64KB."
-        );
+        char notes_tooltip_buffer[1024];
+        snprintf(notes_tooltip_buffer, sizeof(notes_tooltip_buffer),
+                 "Toggle the notes window.\n\n"
+                 "The notes system has two modes, configurable inside the window:\n"
+                 "  • Per-World (Default): Notes are saved for each world individually. The last 32 worlds are remembered.\n"
+                 "  • Per-Template: Notes are shared for the currently loaded template permanently.\n\n"
+                 "The window's size and position are remembered across sessions.\n"
+                 "Hotkeys are disabled while typing in the notes window.\n"
+                 "The maximum note size is 64KB.");
+        ImGui::SetTooltip("%s", notes_tooltip_buffer);
     }
 
     ImGui::PopStyleColor(5); // Pop the style colors, there's 5 of them
@@ -4145,7 +4153,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     if (t->notes_window_open) {
         // A static title with a hidden ID (##AdvancelyNotes) ensures the window's size
         // and position are always remembered by ImGui.
-        const char* notes_window_title = "Notes##AdvancelyNotes";
+        const char *notes_window_title = "Notes##AdvancelyNotes";
 
         ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
 
@@ -4160,9 +4168,9 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                 char formatted_flag[128];
                 format_category_string(settings->optional_flag, formatted_flag, sizeof(formatted_flag));
                 ImGui::Text("Template: %s - %s%s",
-                         settings->version_str,
-                         formatted_category,
-                         *settings->optional_flag ? formatted_flag : "");
+                            settings->version_str,
+                            formatted_category,
+                            *settings->optional_flag ? formatted_flag : "");
             }
             ImGui::PopStyleColor();
             ImGui::Separator();
@@ -4195,7 +4203,10 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                 settings_save(settings, nullptr, SAVE_CONTEXT_ALL); // Save the setting change
             }
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("When enabled, notes are saved for each world individually.\nWhen disabled, notes are shared for the current template.");
+                char per_world_notes_tooltip_buffer[1024];
+                snprintf(per_world_notes_tooltip_buffer, sizeof(per_world_notes_tooltip_buffer),
+                         "When enabled, notes are saved for each world individually.\nWhen disabled, notes are shared for the current template.");
+                ImGui::SetTooltip("%s", per_world_notes_tooltip_buffer);
             }
 
             ImGui::SameLine();
@@ -4208,7 +4219,11 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                 settings_save(settings, nullptr, SAVE_CONTEXT_ALL);
             }
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Toggle whether to use the settings window font for the notes editor (better readability).");
+                char use_settings_font_tooltip_buffer[1024];
+                snprintf(use_settings_font_tooltip_buffer, sizeof(use_settings_font_tooltip_buffer),
+                    "Toggle whether to use the settings window font for the notes editor (better readability).");
+                ImGui::SetTooltip(
+                    "%s", use_settings_font_tooltip_buffer);
             }
 
             // Use the captured state to decide whether to pop the font.
@@ -4604,7 +4619,7 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
 }
 
 void tracker_load_notes(Tracker *t, const AppSettings *settings) {
-    (void)settings; // Settings parameter is no longer used for the path
+    (void) settings; // Settings parameter is no longer used for the path
     if (!t || t->notes_path[0] == '\0') {
         if (t) t->notes_buffer[0] = '\0';
         return;
@@ -4624,7 +4639,7 @@ void tracker_load_notes(Tracker *t, const AppSettings *settings) {
 }
 
 void tracker_save_notes(const Tracker *t, const AppSettings *settings) {
-    (void)settings; // Settings parameter is no longer used for the path
+    (void) settings; // Settings parameter is no longer used for the path
     if (!t || t->notes_path[0] == '\0') {
         return;
     }

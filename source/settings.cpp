@@ -163,10 +163,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Automatically finds the default Minecraft saves path for your OS:\n"
-            "Windows: %%APPDATA%%\\.minecraft\\saves\n"
-            "Linux: ~/.minecraft/saves\n"
-            "macOS: ~/Library/Application Support/minecraft/saves");
+        char default_saves_path_tooltip_buffer[1024];
+        snprintf(default_saves_path_tooltip_buffer, sizeof(default_saves_path_tooltip_buffer),
+                 "Automatically finds the default Minecraft saves path for your OS:\n"
+                 "Windows: %%APPDATA%%\\.minecraft\\saves\n"
+                 "Linux: ~/.minecraft/saves\n"
+                 "macOS: ~/Library/Application Support/minecraft/saves");
+        ImGui::SetTooltip("%s", default_saves_path_tooltip_buffer);
     }
 
     if (temp_settings.path_mode == PATH_MODE_MANUAL) {
@@ -174,9 +177,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::InputText("Manual Saves Path", temp_settings.manual_saves_path, MAX_PATH_LENGTH);
 
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Enter the path to your '.minecraft/saves' folder.\n"
-                "You can just paste it in.\n"
-                "Doesn't matter if the path uses forward- or backward slashes.");
+            char manual_saves_path_tooltip_buffer[1024];
+            snprintf(manual_saves_path_tooltip_buffer, sizeof(manual_saves_path_tooltip_buffer),
+                     "Enter the path to your '.minecraft/saves' folder.\n"
+                     "You can just paste it in.\n"
+                     "Doesn't matter if the path uses forward- or backward slashes.");
+            ImGui::SetTooltip("%s", manual_saves_path_tooltip_buffer);
         }
 
         if (show_invalid_manual_path_error) {
@@ -211,10 +217,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             }
         }
         if (ImGui::IsItemHovered()) {
+            char open_instance_folder_tooltip_buffer[1024];
+            snprintf(open_instance_folder_tooltip_buffer, sizeof(open_instance_folder_tooltip_buffer),
+                     "IMPORTANT: If you just changed your saves path you'll need to hit 'Apply Settings' first.\n"
+                     "Attempts to open the parent 'instances' folder (goes up 3 directories from your saves path).\n"
+                     "Useful for quickly switching between instances in custom launchers.");
             ImGui::SetTooltip(
-                "IMPORTANT: If you just changed your saves path you'll need to hit 'Apply Settings' first.\n"
-                "Attempts to open the parent 'instances' folder (goes up 3 directories from your saves path).\n"
-                "Useful for quickly switching between instances in custom launchers.");
+                "%s", open_instance_folder_tooltip_buffer);
         }
     }
 
@@ -224,14 +233,16 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Template Settings
     ImGui::Text("Template Settings");
     if (ImGui::IsItemHovered()) {
+        char template_settings_tooltip_buffer[1024];
+        snprintf(template_settings_tooltip_buffer, sizeof(template_settings_tooltip_buffer),
+                 "Select the Version, Category, Optional Flag, and Language to use for the tracker.\n\n"
+                 "These settings construct the path to your template files, which looks like:\n"
+                 "resources/templates/Version/Category/Version_CategoryOptionalFlag.json\n\n"
+                 "Each template has one or more language files (e.g., ..._lang.json for default, ..._lang_eng.json for English)\n"
+                 "that store all the display names shown in the UI.\n\n"
+                 "Use the 'Create Template' button to build new templates, edit existing ones, and manage their language files.");
         ImGui::SetTooltip(
-            "Select the Version, Category, Optional Flag, and Language to use for the tracker.\n\n"
-            "These settings construct the path to your template files, which looks like:\n"
-            "resources/templates/Version/Category/Version_CategoryOptionalFlag.json\n\n"
-            "Each template has one or more language files (e.g., ..._lang.json for default, ..._lang_eng.json for English)\n"
-            "that store all the display names shown in the UI.\n\n"
-            "Use the 'Create Template' button to build new templates, edit existing ones, and manage their language files."
-        );
+            "%s", template_settings_tooltip_buffer);
     }
 
     ImGui::SameLine();
@@ -240,7 +251,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::PopStyleColor();
 
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Opens a table of officially added templates in your browser.");
+        char open_official_templates_tooltip_buffer[1024];
+        snprintf(open_official_templates_tooltip_buffer, sizeof(open_official_templates_tooltip_buffer),
+                 "Opens a table of officially added templates in your browser.");
+        ImGui::SetTooltip("%s", open_official_templates_tooltip_buffer);
     }
 
     if (ImGui::IsItemClicked()) {
@@ -277,12 +291,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (selected_version <= MC_VERSION_1_6_4) {
         ImGui::Checkbox("Using StatsPerWorld Mod", &temp_settings.using_stats_per_world_legacy);
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(
-                "The StatsPerWorld Mod (with Legacy Fabric) allows legacy Minecraft versions\n"
-                "to track stats locally per world. Check this if you're using this mod.\n\n"
-                "If unchecked, the tracker will use a snapshot system to simulate per-world\n"
-                "progress, and achievements will indicate if they were completed on a previous world."
-            );
+            char stats_per_world_tooltip_buffer[1024];
+            snprintf(stats_per_world_tooltip_buffer, sizeof(stats_per_world_tooltip_buffer),
+                     "The StatsPerWorld Mod (with Legacy Fabric) allows legacy Minecraft versions\n"
+                     "to track stats locally per world. Check this if you're using this mod.\n\n"
+                     "If unchecked, the tracker will use a snapshot system to simulate per-world\n"
+                     "progress, and achievements will indicate if they were completed on a previous world.");
+            ImGui::SetTooltip("%s", stats_per_world_tooltip_buffer);
         }
     }
 
@@ -399,32 +414,32 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // --- LANGUAGE DROPDOWN ---
     if (category_idx != -1) {
         // Find the selected template to get its available languages
-        DiscoveredTemplate* selected_template = nullptr;
+        DiscoveredTemplate *selected_template = nullptr;
         for (int i = 0; i < discovered_template_count; ++i) {
             if (strcmp(discovered_templates[i].category, temp_settings.category) == 0 &&
                 strcmp(discovered_templates[i].optional_flag, temp_settings.optional_flag) == 0) {
                 selected_template = &discovered_templates[i];
                 break;
-                }
+            }
         }
 
         if (selected_template) {
-            std::vector<const char*> lang_display_names;
-            for (const auto& flag : selected_template->available_lang_flags) {
+            std::vector<const char *> lang_display_names;
+            for (const auto &flag: selected_template->available_lang_flags) {
                 lang_display_names.push_back(flag.empty() ? "Default" : flag.c_str());
             }
 
             int lang_idx = -1;
             for (size_t i = 0; i < selected_template->available_lang_flags.size(); ++i) {
                 if (selected_template->available_lang_flags[i] == temp_settings.lang_flag) {
-                    lang_idx = (int)i;
+                    lang_idx = (int) i;
                     break;
                 }
             }
 
-            if (ImGui::Combo("Language", &lang_idx, lang_display_names.data(), (int)lang_display_names.size())) {
-                if (lang_idx >= 0 && (size_t)lang_idx < selected_template->available_lang_flags.size()) {
-                    const std::string& selected_flag_str = selected_template->available_lang_flags[lang_idx];
+            if (ImGui::Combo("Language", &lang_idx, lang_display_names.data(), (int) lang_display_names.size())) {
+                if (lang_idx >= 0 && (size_t) lang_idx < selected_template->available_lang_flags.size()) {
+                    const std::string &selected_flag_str = selected_template->available_lang_flags[lang_idx];
                     strncpy(temp_settings.lang_flag, selected_flag_str.c_str(), sizeof(temp_settings.lang_flag) - 1);
                 }
             }
@@ -455,7 +470,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 #endif
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Opens the 'resources/templates' folder in your file explorer.");
+        char open_templates_folder_tooltip_buffer[1024];
+        snprintf(open_templates_folder_tooltip_buffer, sizeof(open_templates_folder_tooltip_buffer),
+                 "Opens the 'resources/templates' folder in your file explorer.");
+        ImGui::SetTooltip("%s", open_templates_folder_tooltip_buffer);
     }
 
     // Place Template Creator Button in same line
@@ -465,7 +483,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         *p_temp_creator_open = true; // Open the template creator window
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Open the Template Creator to build a new custom template.");
+        char open_template_creator_tooltip_buffer[1024];
+        snprintf(open_template_creator_tooltip_buffer, sizeof(open_template_creator_tooltip_buffer),
+                 "Open the Template Creator to build a new custom template.");
+        ImGui::SetTooltip("%s", open_template_creator_tooltip_buffer);
     }
 
     ImGui::Separator();
@@ -477,45 +498,60 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     ImGui::Checkbox("Enable Overlay", &temp_settings.enable_overlay);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Enables a separate window to show your progress in your stream.\n"
-            "More settings related to the overlay window become available once enabled.\n"
-            "Use a color key filter in your streaming software on the 'Overlay BG' hex color.\n"
-            "A negative scroll speed animates from right-to-left.\n"
-            "To adjust the horizontal spacing between items per row,\n"
-            "you can shorten the display names in the language (*_lang.json) file.\n"
-            "To turn off the overlay, disable this checkbox and hit 'Apply Settings'!\n\n"
-            "IMPORTANT FOR STREAMERS: Applying and settings restarts the overlay window,\n"
-            "which might lead to OBS capturing the main tracker window instead.");
+        char enable_overlay_tooltip_buffer[1024];
+        snprintf(enable_overlay_tooltip_buffer, sizeof(enable_overlay_tooltip_buffer),
+                 "Enables a separate window to show your progress in your stream.\n"
+                 "More settings related to the overlay window become available once enabled.\n"
+                 "Use a color key filter in your streaming software on the 'Overlay BG' hex color.\n"
+                 "A negative scroll speed animates from right-to-left.\n"
+                 "To adjust the horizontal spacing between items per row,\n"
+                 "you can shorten the display names in the language (*_lang.json) file.\n"
+                 "To turn off the overlay, disable this checkbox and hit 'Apply Settings'!\n\n"
+                 "IMPORTANT FOR STREAMERS: Applying and settings restarts the overlay window,\n"
+                 "which might lead to OBS capturing the main tracker window instead.");
+        ImGui::SetTooltip("%s", enable_overlay_tooltip_buffer);
     }
 
     // This toggles the framerate of everything
     ImGui::DragFloat("Tracker FPS Limit", &temp_settings.fps, 1.0f, 10.0f, 540.0f, "%.0f");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Limits the frames per second of the tracker window. Default is 60 FPS.\n"
-            "Higher values may result in higher GPU usage.");
+        char tracker_fps_limit_tooltip_buffer[1024];
+        snprintf(tracker_fps_limit_tooltip_buffer, sizeof(tracker_fps_limit_tooltip_buffer),
+                 "Limits the frames per second of the tracker window. Default is 60 FPS.\n"
+                 "Higher values may result in higher GPU usage.");
+        ImGui::SetTooltip("%s", tracker_fps_limit_tooltip_buffer);
     }
 
     // Conditionally display overlay related settings
     if (temp_settings.enable_overlay) {
         ImGui::DragFloat("Overlay FPS Limit", &temp_settings.overlay_fps, 1.0f, 10.0f, 540.0f, "%.0f");
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Limits the frames per second of the overlay window. Default is 60 FPS.\n"
-                "Higher values may result in higher GPU usage.");
+            char overlay_fps_limit_tooltip_buffer[1024];
+            snprintf(overlay_fps_limit_tooltip_buffer, sizeof(overlay_fps_limit_tooltip_buffer),
+                     "Limits the frames per second of the overlay window. Default is 60 FPS.\n"
+                     "Higher values may result in higher GPU usage.");
+            ImGui::SetTooltip("%s", overlay_fps_limit_tooltip_buffer);
         }
 
         ImGui::DragFloat("Overlay Scroll Speed", &temp_settings.overlay_scroll_speed, 0.001f, -25.00f, 25.00f, "%.3f");
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("A negative scroll speed animates from right-to-left\n"
-                "(items always appear in the same order as they are on the tracker).\n"
-                "A scroll speed of 0.0 is static.\n"
-                "Default of 1.0 scrolls 1440 pixels (default width) in 24 seconds.");
+            char overlay_scroll_speed_tooltip_buffer[1024];
+            snprintf(overlay_scroll_speed_tooltip_buffer, sizeof(overlay_scroll_speed_tooltip_buffer),
+                     "A negative scroll speed animates from right-to-left\n"
+                     "(items always appear in the same order as they are on the tracker).\n"
+                     "A scroll speed of 0.0 is static.\n"
+                     "Default of 1.0 scrolls 1440 pixels (default width) in 24 seconds.");
+            ImGui::SetTooltip("%s", overlay_scroll_speed_tooltip_buffer);
         }
 
         ImGui::DragFloat("Sub-Stat Cycle Interval (s)", &temp_settings.overlay_stat_cycle_speed, 0.1f, 0.1f, 60.0f,
                          "%.3f s");
         if (ImGui::IsItemHovered()) {
+            char substat_cycling_interval_tooltip_buffer[1024];
+            snprintf(substat_cycling_interval_tooltip_buffer, sizeof(substat_cycling_interval_tooltip_buffer),
+                     "The time in seconds before cycling to the next sub-stat on a multi-stat goal on the overlay.\n");
             ImGui::SetTooltip(
-                "The time in seconds before cycling to the next sub-stat on a multi-stat goal on the overlay.\n");
+                "%s", substat_cycling_interval_tooltip_buffer);
         }
 
         if (ImGui::Checkbox("Speed Up Animation", &temp_settings.overlay_animation_speedup)) {
@@ -526,28 +562,38 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                      "Toggles speeding up the overlay animation by a factor of %.1f. Don't forget to hit apply!\nOn top of that you can also hold SPACE (also %.1f) when tabbed into the overlay window.",
                      OVERLAY_SPEEDUP_FACTOR, OVERLAY_SPEEDUP_FACTOR);
 
-            ImGui::SetTooltip(speed_up_tooltip_buffer);
+            ImGui::SetTooltip("%s", speed_up_tooltip_buffer);
         }
 
         ImGui::SameLine();
 
         ImGui::Checkbox("Hide Completed Row 3 Goals", &temp_settings.overlay_row3_remove_completed);
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(
-                "If checked, all Goals (Stats, Custom Goals and Multi-Stage Goals) will disappear from Row 3 of the overlay.\nThis is independent of the main 'Remove Completed Goals' setting.");
+            char hide_completed_row_3_tooltip_buffer[1024];
+            snprintf(hide_completed_row_3_tooltip_buffer, sizeof(hide_completed_row_3_tooltip_buffer),
+                     "If checked, all Goals (Stats, Custom Goals and Multi-Stage Goals) will disappear from Row 3 of the overlay.\nThis is independent of the main 'Remove Completed Goals' setting.");
+
+
+            ImGui::SetTooltip("%s", hide_completed_row_3_tooltip_buffer);
         }
     }
 
     ImGui::Checkbox("Always On Top", &temp_settings.tracker_always_on_top);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Forces the tracker window to always display above any other window.");
+        char always_on_top_tooltip_buffer[1024];
+        snprintf(always_on_top_tooltip_buffer, sizeof(always_on_top_tooltip_buffer),
+                 "Forces the tracker window to always display above any other window.");
+        ImGui::SetTooltip("%s", always_on_top_tooltip_buffer);
     }
     ImGui::SameLine();
     ImGui::Checkbox("Remove Completed Goals", &temp_settings.remove_completed_goals);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Hides fully completed goals and sub-goals from the tracker window to tidy up the view.\n"
-            "Unchecking this setting will make all goals visible,\n"
-            "even ones set to - \"hidden\": true - in the template.");
+        char remove_completed_goals_tooltip_buffer[1024];
+        snprintf(remove_completed_goals_tooltip_buffer, sizeof(remove_completed_goals_tooltip_buffer),
+                 "Hides fully completed goals and sub-goals from the tracker window to tidy up the view.\n"
+                 "Unchecking this setting will make all goals visible,\n"
+                 "even ones set to - \"hidden\": true - in the template.");
+        ImGui::SetTooltip("%s", remove_completed_goals_tooltip_buffer);
     }
 
     ImGui::Separator();
@@ -644,7 +690,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             }
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Adjusts the width of the overlay window.\nDefault: %dpx", OVERLAY_DEFAULT_WIDTH);
+            char overlay_width_tooltip_buffer[1024];
+            snprintf(overlay_width_tooltip_buffer, sizeof(overlay_width_tooltip_buffer),
+                     "Adjusts the width of the overlay window.\nDefault: %dpx", OVERLAY_DEFAULT_WIDTH);
+            ImGui::SetTooltip("%s", overlay_width_tooltip_buffer);
         }
     }
 
@@ -654,7 +703,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // --- Section Order ---
     ImGui::Text("Section Order");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Drag and drop to reorder the sections in the main tracker window.");
+        char section_order_tooltip_buffer[1024];
+        snprintf(section_order_tooltip_buffer, sizeof(section_order_tooltip_buffer),
+                 "Drag and drop to reorder the sections in the main tracker window.");
+        ImGui::SetTooltip("%s", section_order_tooltip_buffer);
     }
 
     for (int n = 0; n < SECTION_COUNT; n++) {
@@ -694,22 +746,26 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     ImGui::Checkbox("Print Debug To Console", &temp_settings.print_debug_status);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip(
-            "This toggles printing a detailed progress report to the console after every file update.\n"
-            "Currently it also toggles an FPS counter for the overlay window.\n\n"
-            "IMPORTANT: This can spam the console with a large amount of text if your template files contain many entries.\n\n"
-            "This setting only affects the detailed report. General status messages and errors\n"
-            "Progress on advancements is only printed if the game sends an update.\n"
-            "are always printed to the console and saved to advancely_log.txt.\n"
-            "The log is flushed after every message and reset on startup, making it ideal for diagnosing crashes.\n"
-            "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.");
+        char debug_print_tooltip_buffer[1024];
+        snprintf(debug_print_tooltip_buffer, sizeof(debug_print_tooltip_buffer),
+        "This toggles printing a detailed progress report to the console after every file update.\n"
+        "Currently it also toggles an FPS counter for the overlay window.\n\n"
+        "IMPORTANT: This can spam the console with a large amount of text if your template files contain many entries.\n\n"
+        "This setting only affects the detailed report. General status messages and errors\n"
+        "Progress on advancements is only printed if the game sends an update.\n"
+        "are always printed to the console and saved to advancely_log.txt.\n"
+        "The log is flushed after every message and reset on startup, making it ideal for diagnosing crashes.\n"
+        "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.");
+        ImGui::SetTooltip("%s", debug_print_tooltip_buffer);
     }
 
     ImGui::SameLine();
     ImGui::Checkbox("Auto-Check for Updates", &temp_settings.check_for_updates);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip(
+        char auto_update_tooltip_buffer[1024];
+        snprintf(auto_update_tooltip_buffer, sizeof(auto_update_tooltip_buffer),
             "If enabled, Advancely will check for a new version on startup and notify you if one is available.");
+        ImGui::SetTooltip("%s", auto_update_tooltip_buffer);
     }
 
     ImGui::Separator();
@@ -745,11 +801,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (!custom_counters.empty()) {
         ImGui::Text("Hotkey Settings");
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(
-                "IMPORTANT: Hotkeys are remembered between templates.\n"
-                "You might have to restart the settings window for the hotkeys to appear.\n\n"
-                "Assign keys to increment/decrement custom counters\n(only work when tabbed into the tracker). Maximum of %d hotkeys are supported.",
-                MAX_HOTKEYS);
+            char hotkey_settings_tooltip_buffer[1024];
+            snprintf(hotkey_settings_tooltip_buffer, sizeof(hotkey_settings_tooltip_buffer),
+            "IMPORTANT: Hotkeys are remembered between templates.\n"
+            "You might have to restart the settings window for the hotkeys to appear.\n\n"
+            "Assign keys to increment/decrement custom counters\n(only work when tabbed into the tracker). Maximum of %d hotkeys are supported.",
+            MAX_HOTKEYS);
+            ImGui::SetTooltip("%s", hotkey_settings_tooltip_buffer);
         }
 
         // Loop through the counters provided by the LIVE TEMPLATE to build the UI rows
@@ -879,7 +937,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                             strcmp(saved_settings.hotkeys[i].decrement_key, "None") != 0) {
                             had_active_hotkeys = true;
                             break;
-                            }
+                        }
                     }
 
                     // Copy temp settings to the real settings, save, and trigger a reload
@@ -926,7 +984,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                             strcmp(saved_settings.hotkeys[i].decrement_key, "None") != 0) {
                             had_active_hotkeys = true;
                             break;
-                            }
+                        }
                     }
 
                     memcpy(app_settings, &temp_settings, sizeof(AppSettings));
@@ -951,11 +1009,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // Hover text for the apply button
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip(
-            "Apply any changes made in this window. You can also press 'Enter' to apply.\n"
-            "Changes made to the overlay window will cause the overlay to restart,\n"
-            "which might lead to OBS not capturing the overlay anymore.\n"
-            "It will fail to apply if any warnings are shown.");
+        char apply_button_tooltip_buffer[1024];
+        snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
+        )"Apply any changes made in this window. You can also press 'Enter' to apply.\n"
+        "Changes made to the overlay window will cause the overlay to restart,\n"
+        "which might lead to OBS not capturing the overlay anymore.\n"
+        "It will fail to apply if any warnings are shown.";
+        ImGui::SetTooltip("%s", apply_button_tooltip_buffer);
     }
 
     // If there are unsaved changes, display the indicator
@@ -1053,7 +1113,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_CHECK_FOR_UPDATES ? "Enabled" : "Disabled",
                  DEFAULT_SHOW_WELCOME_ON_STARTUP ? "Enabled" : "Disabled"
         );
-        ImGui::SetTooltip(tooltip_buffer);
+        ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
     if (roboto_font) {

@@ -408,7 +408,10 @@ static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker 
         SDL_OpenURL("https://github.com/LNXSeus/Advancely"); //
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Opens the project's main page in your browser.");
+        char project_main_page_tooltip_buffer[1024];
+        snprintf(project_main_page_tooltip_buffer, sizeof(project_main_page_tooltip_buffer),
+                 "Opens the project's main page in your browser.");
+        ImGui::SetTooltip("%s", project_main_page_tooltip_buffer); // ALWAYS SET TOOLTIPS LIKE THIS WITH %s for macOS compiler
     }
     ImGui::SameLine();
     ImGui::Text(".");
