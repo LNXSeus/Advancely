@@ -129,6 +129,8 @@ endif()
 
 # --- 5. POST-BUILD COMMANDS ---
 if(WIN32)
+    # This block will only run if the compiler is gcc (MinGW)
+    if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
     # Get the directory where the MinGW compiler is located
     get_filename_component(MINGW_BIN_DIR ${CMAKE_C_COMPILER} DIRECTORY)
 
@@ -263,6 +265,7 @@ if(WIN32)
 
             COMMENT "[CMAKE] Copying DLLs to build directory"
     )
+        endif() # End of MinGW specific post-build commands
 endif()
 
 # This command is needed on ALL platforms to copy your game's resources.

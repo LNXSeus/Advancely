@@ -63,7 +63,12 @@ jobs:
         # We remove the specific commit ID to let the action use its more stable default setup
         vcpkgJsonGlob: '**/vcpkg.json'
         
-    - name: Configure CMake
+    - name: Configure CMake (Windows)
+      if: runner.os == 'Windows'
+      run: cmake -B build -D CMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
+
+    - name: Configure CMake (Linux/macOS)
+      if: runner.os != 'Windows'
       run: cmake -B build
 
     - name: Build Project

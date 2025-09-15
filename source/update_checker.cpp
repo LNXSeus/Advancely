@@ -280,6 +280,13 @@ bool apply_update(const char* main_executable_path) {
         return false;
     }
 
+    const char* exe_filename = strrchr(main_executable_path, '/');
+    if (exe_filename) {
+        exe_filename++; // Move pointer past the slash
+    } else {
+        exe_filename = main_executable_path; // Fallback if no slash is found
+    }
+
     pid_t pid = getpid();
 
     fprintf(updater_script, "#!/bin/bash\n");
