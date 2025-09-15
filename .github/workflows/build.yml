@@ -78,38 +78,11 @@ jobs:
     - name: Build Project
       run: cmake --build build --config Release
 
-    - name: Package Artifacts
-      shell: bash
+    - name: Create Debian Package
+      if: runner.os == 'Linux'
       run: |
-        # Create a staging directory for the release
-        mkdir staging
-
-        # --- Platform-specific packaging logic ---
-        if [ "$RUNNER_OS" == "Windows" ]; then
-          # For Windows, copy the exe, all DLLs from vcpkg, resources, and text files
-          cp build/Release/Advancely.exe staging/
-          cp vcpkg_installed/x64-windows/bin/*.dll staging/
-          cp -r build/resources staging/
-          cp build/Release/*.txt staging/
-          cp build/Release/*.md staging/
-        elif [ "$RUNNER_OS" == "macOS" ]; then
-          # For macOS, copy the .app bundle and the text files
-          cp -r build/Advancely.app staging/
-          cp build/*.txt staging/
-          cp build/*.md staging/
-        else # Linux
-          # For Linux, copy the executable, resources, and text files
-          cp build/Advancely staging/
-          cp -r build/resources staging/
-          cp build/*.txt staging/
-          cp build/*.md staging/
-        fi
-
-    - name: Upload Release Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: Advancely-${{ matrix.os }}
-        path: staging/
+        cd build
+        cpack -C Release
 
     # Create and package the release, resources are included per OS
     - name: Create and Package Release
