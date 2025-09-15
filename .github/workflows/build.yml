@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest]
 
     steps:
       - name: Checkout repository
@@ -63,27 +63,15 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install sdl3 sdl3_image sdl3_ttf curl
 
-      # --- WINDOWS STEPS ---
-      - name: Install dependencies (Windows)
-        if: runner.os == 'Windows'
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgJsonGlob: '**/vcpkg.json'
-
-      # --- CONFIGURE CMAKE (CORRECTED CONDITIONAL LOGIC) ---
-      - name: Configure CMake (Windows)
-        if: runner.os == 'Windows'
-        run: cmake -B build -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
-
       - name: Configure CMake (Linux/macOS)
         if: runner.os != 'Windows'
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
 
-      # --- BUILD STEP (Unchanged) ---
+      # --- BUILD STEP ---
       - name: Build Project
         run: cmake --build build --config Release
 
-      # --- PACKAGING STEPS (CORRECTED) ---
+      # --- PACKAGING STEPS ---
       - name: Package Artifacts
         shell: bash
         run: |
