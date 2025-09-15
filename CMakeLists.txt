@@ -253,6 +253,7 @@ else ()
             -Wpedantic              # Warn on non-standard language extensions
             -Werror                 # Treat all warnings as errors, forcing you to fix them
             -Wno-format-truncation  # Ignore truncation warnings
+            -Wno-unused-result      # Ignore unused result warnings
     )
 
     # Add GCC-specific warning suppressions only when using the GCC compiler
