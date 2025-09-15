@@ -5,9 +5,9 @@ cmake_minimum_required(VERSION 3.20)
 project(Advancely C CXX) # c for cJSON, C++ for the rest
 
 # Enable the RC (Resource Compiler) language for Windows executables
-if(WIN32)
+if (WIN32)
     enable_language(RC)
-endif()
+endif ()
 
 # Set C standard
 set(CMAKE_C_STANDARD 11)
@@ -53,21 +53,21 @@ set(SOURCE_FILES
 )
 
 # append windows specific source files
-if(WIN32)
+if (WIN32)
     list(APPEND SOURCE_FILES
             # Windows-specific resource file
             "icon.rc"
     )
-endif()
+endif ()
 
 # --- 2. CREATE THE EXECUTABLE ---
 
 # Use the WIN32 keyword for graphical apps on Windows to hide the console.
-if(WIN32)
+if (WIN32)
     add_executable(${EXECUTABLE_NAME} WIN32 ${SOURCE_FILES})
-else()
+else ()
     add_executable(${EXECUTABLE_NAME} ${SOURCE_FILES})
-endif()
+endif ()
 
 # This command targets a specific source file and sets its properties.
 set_source_files_properties(
@@ -94,7 +94,6 @@ target_include_directories(Advancely PRIVATE
 )
 
 
-
 # --- 3. FIND DEPENDENCIES (Cross-Platform) ---
 # Use the modern find_package command. This will find system-installed libraries.
 # You will need to install these dependencies on your system (see notes below).
@@ -118,163 +117,180 @@ target_link_libraries(${EXECUTABLE_NAME} PRIVATE
 )
 
 # Add platform-specific system libraries
-if(WIN32)
+if (WIN32)
     # Link against common Windows libraries needed by SDL
     target_link_libraries(${EXECUTABLE_NAME} PRIVATE gdi32 user32 winmm shell32 version)
-elseif(APPLE)
+elseif (APPLE)
     # On macOS, link against required system frameworks
     target_link_libraries(${EXECUTABLE_NAME} PRIVATE "-framework Cocoa" "-framework Metal" "-framework IOKit")
-endif()
+
+    # creating .app bundle
+    set_target_properties(${EXECUTABLE_NAME} PROPERTIES
+            MACOSX_BUNDLE TRUE
+            MACOSX_BUNDLE_ICON_FILE "${CMAKE_SOURCE_DIR}/resources/gui/Advancely_Logo_NoText.icns" # icon f. macOS bundle
+    )
+
+    add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_SOURCE_DIR}/resources"
+            "$<TARGET_FILE_DIR:${EXECUTABLE_NAME}>/../Resources" # This path is specific to .app bundles
+            COMMENT "[CMAKE] Copying resources into macOS app bundle"
+    )
+endif ()
 # On Linux, find_package usually handles all necessary system library dependencies.
 
 # --- 5. POST-BUILD COMMANDS ---
-if(WIN32)
+
+if (WIN32)
     # This block will only run if the compiler is gcc (MinGW)
-    if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
-    # Get the directory where the MinGW compiler is located
-    get_filename_component(MINGW_BIN_DIR ${CMAKE_C_COMPILER} DIRECTORY)
+    if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
+        # Get the directory where the MinGW compiler is located
+        get_filename_component(MINGW_BIN_DIR ${CMAKE_C_COMPILER} DIRECTORY)
 
-    # This copies the .dll files to the build folder so the .exe can run.
-    # This is only needed if SDL was built as a shared library.
+        # This copies the .dll files to the build folder so the .exe can run.
+        # This is only needed if SDL was built as a shared library.
+        add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "$<TARGET_FILE:SDL3::SDL3>"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "$<TARGET_FILE:SDL3_image::SDL3_image>"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "$<TARGET_FILE:SDL3_ttf::SDL3_ttf>"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+                # --- Copy MinGW Runtime DLLs (Add these lines) ---
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libgcc_s_seh-1.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libstdc++-6.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libwinpthread-1.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libfreetype-6.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libharfbuzz-0.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libintl-8.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libbz2-1.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libiconv-2.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libbrotlidec.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libpng16-16.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libglib-2.0-0.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libgraphite2.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libpcre2-8-0.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libbrotlicommon.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/zlib1.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+
+                # Libcurl
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libcurl-4.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libnghttp2-14.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libngtcp2-16.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libidn2-0.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libnghttp3-9.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libngtcp2_crypto_ossl.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libpsl-5.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libssh2-1.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libzstd.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libcrypto-3-x64.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libunistring-5.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libssl-3-x64.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+
+                # For 1.11.2 Biomes not displaying
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libwebpdemux-2.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libwebp-7.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_BIN_DIR}/libsharpyuv-0.dll"
+                $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
+                # END of 1.11.2
+
+                COMMENT "[CMAKE] Copying DLLs to build directory"
+        )
+    endif () # End of MinGW specific post-build commands
+endif ()
+
+# This command is needed on Windows/Linux platforms to copy the resources to where executable is
+# macOS .app bundle is handled further above
+if (NOT APPLE)
     add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "$<TARGET_FILE:SDL3::SDL3>"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "$<TARGET_FILE:SDL3_image::SDL3_image>"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "$<TARGET_FILE:SDL3_ttf::SDL3_ttf>"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-            # --- Copy MinGW Runtime DLLs (Add these lines) ---
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libgcc_s_seh-1.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libstdc++-6.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libwinpthread-1.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libfreetype-6.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libharfbuzz-0.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libintl-8.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libbz2-1.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libiconv-2.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libbrotlidec.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libpng16-16.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libglib-2.0-0.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libgraphite2.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libpcre2-8-0.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libbrotlicommon.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/zlib1.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-
-            # Libcurl
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libcurl-4.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libnghttp2-14.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libngtcp2-16.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libidn2-0.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libnghttp3-9.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libngtcp2_crypto_ossl.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libpsl-5.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libssh2-1.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libzstd.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libcrypto-3-x64.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libunistring-5.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libssl-3-x64.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-
-            # For 1.11.2 Biomes not displaying
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libwebpdemux-2.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libwebp-7.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_BIN_DIR}/libsharpyuv-0.dll"
-            $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
-            # END of 1.11.2
-
-            COMMENT "[CMAKE] Copying DLLs to build directory"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_SOURCE_DIR}/resources"
+            "${CMAKE_BINARY_DIR}/resources"
+            COMMENT "[CMAKE] Copying resources to build directory"
     )
-        endif() # End of MinGW specific post-build commands
-endif()
-
-# This command is needed on ALL platforms to copy your game's resources.
-add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/resources"
-        "${CMAKE_BINARY_DIR}/resources"
-        COMMENT "[CMAKE] Copying resources to build directory"
-)
+endif ()
 
 # Move the _PLEASE_READ_ME.txt file to the output directory
 add_custom_command(TARGET Advancely POST_BUILD
@@ -299,8 +315,6 @@ add_custom_command(TARGET Advancely POST_BUILD
 )
 
 
-
-
 # --- 6. COMPILER FLAGS & SANITIZERS ---
 # These flags add strict warnings to help you write better code.
 # They apply to all build types (Debug, Release, etc.).
@@ -313,15 +327,15 @@ target_compile_options(${EXECUTABLE_NAME} PRIVATE
 )
 
 # Add GCC-specific warning suppressions only when using the GCC compiler
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(${EXECUTABLE_NAME} PRIVATE -Wno-stringop-truncation)
-endif()
+endif ()
 
 # Add sanitizers for Debug builds on non-Windows platforms
-if(NOT WIN32)
+if (NOT WIN32)
     # This injects code to detect memory errors (like leaks, buffer overflows) at runtime.
     target_compile_options(${EXECUTABLE_NAME} PRIVATE $<$<CONFIG:Debug>:-fsanitize=address>)
 
     # Link the AddressSanitizer library for Debug builds.
     target_link_options(${EXECUTABLE_NAME} PRIVATE $<$<CONFIG:Debug>:-fsanitize=address>)
-endif()
+endif ()

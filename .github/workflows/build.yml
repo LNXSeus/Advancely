@@ -21,8 +21,10 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        # Install build tools and curl, but not SDL3 from apt
-        sudo apt-get install -y build-essential cmake git libcurl4-openssl-dev
+        # Install build tools and curl, AND NOW the required X11/Wayland dev libraries
+        sudo apt-get install -y build-essential cmake git libcurl4-openssl-dev \
+          libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+          libxi-dev libxss-dev libwayland-dev libdecor-0-dev libxkbcommon-dev
         
         # Build SDL3 from source
         echo "Building SDL3 from source..."
@@ -74,21 +76,23 @@ jobs:
     - name: Build Project
       run: cmake --build build --config Release
 
-    - name: Package Artifacts
+    # Create and package the release, resources are included per OS
+    - name: Create and Package Release
+      run: |
+        mkdir release
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          cp build/Release/Advancely.exe release/
+          cp build/Release/*.dll release/
+          cp -r build/resources release/
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          cp -r build/Advancely.app release/
+        else
+          cp build/Advancely release/
+          cp -r build/resources release/
+        fi
+
+    - name: Upload Release Artifact
       uses: actions/upload-artifact@v4
       with:
         name: Advancely-${{ matrix.os }}
-        path: |
-          build/
-          !build/resources/
-          !build/**/CMakeFiles/
-          !build/**/*.cmake
-          !build/**/Makefile
-          !build/**/*.a
-          !build/**/*.lib
-          
-    - name: Package Resources
-      uses: actions/upload-artifact@v4
-      with:
-        name: Advancely-Resources
-        path: build/resources/
+        path: release/
