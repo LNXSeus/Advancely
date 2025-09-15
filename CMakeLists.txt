@@ -316,26 +316,31 @@ add_custom_command(TARGET Advancely POST_BUILD
 
 
 # --- 6. COMPILER FLAGS & SANITIZERS ---
-# These flags add strict warnings to help you write better code.
-# They apply to all build types (Debug, Release, etc.).
-target_compile_options(${EXECUTABLE_NAME} PRIVATE
-        -Wall                   # Enable all standard warnings
-        -Wextra                 # Enable even more warnings
-        -Wpedantic              # Warn on non-standard language extensions
-        -Werror                 # Treat all warnings as errors, forcing you to fix them
-        -Wno-format-truncation  # Ignore truncation warnings
-)
+if(MSVC)
+    # Apply MSVC-specific warning flags
+    target_compile_options(${EXECUTABLE_NAME} PRIVATE
+            /W4     # Equivalent to -Wall / -Wextra, sets a high warning level
+            /WX     # Equivalent to -Werror, treats warnings as errors
+    )
+else()
+    # Apply GCC/Clang-specific warning flags
+    target_compile_options(${EXECUTABLE_NAME} PRIVATE
+            -Wall                   # Enable all standard warnings
+            -Wextra                 # Enable even more warnings
+            -Wpedantic              # Warn on non-standard language extensions
+            -Werror                 # Treat all warnings as errors, forcing you to fix them
+            -Wno-format-truncation  # Ignore truncation warnings
+    )
 
-# Add GCC-specific warning suppressions only when using the GCC compiler
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(${EXECUTABLE_NAME} PRIVATE -Wno-stringop-truncation)
-endif ()
+    # Add GCC-specific warning suppressions only when using the GCC compiler
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(${EXECUTABLE_NAME} PRIVATE -Wno-stringop-truncation)
+    endif()
 
-# Add sanitizers for Debug builds on non-Windows platforms
-if (NOT WIN32)
+    # Add sanitizers for Debug builds on non-Windows platforms
     # This injects code to detect memory errors (like leaks, buffer overflows) at runtime.
     target_compile_options(${EXECUTABLE_NAME} PRIVATE $<$<CONFIG:Debug>:-fsanitize=address>)
 
     # Link the AddressSanitizer library for Debug builds.
     target_link_options(${EXECUTABLE_NAME} PRIVATE $<$<CONFIG:Debug>:-fsanitize=address>)
-endif ()
+endif()
