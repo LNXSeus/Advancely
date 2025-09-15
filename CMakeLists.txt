@@ -322,8 +322,13 @@ if(MSVC)
             /W4     # Equivalent to -Wall / -Wextra, sets a high warning level
             /WX     # Equivalent to -Werror, treats warnings as errors
 
+            # Acceptable warnings
             /wd4244 # Disable "possible loss of data" conversion warning
             /wd4996 # Disable "unsafe function" warnings (for fopen, strncpy, etc.)
+            /wd4267 # ADD: Disable "size_t to int" conversion warning
+            /wd4456 # ADD: Disable "hides previous local declaration" warning
+            /wd4458 # ADD: Disable "hides class member" warning
+            /wd4101 # ADD: Disable "unreferenced local variable" warning
     )
 else()
     # Apply GCC/Clang-specific warning flags

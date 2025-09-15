@@ -62,10 +62,10 @@ extern "C" {
 #include <signal.h> // For SIGKILL
 #include <fcntl.h>     // For O_* constants
 #include <sys/mman.h>  // For shared memory
+#include <semaphore.h> // For named semaphores (acting as mutexes)
 #endif
 
 #if defined(__APPLE__)
-#include <semaphore.h> // For named semaphores (acting as mutexes)
 #include <mach-o/dyld.h>
 #include <libgen.h>
 #endif

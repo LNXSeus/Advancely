@@ -5,12 +5,8 @@
 #ifndef OVERLAY_H
 #define OVERLAY_H
 
-#include "tracker.h" // Has main.h
+#include "tracker.h" // Has main.h, also has semaphore.h for Linux and macOS
 #include "ipc_data.h" // For SharedData
-
-#if defined(__APPLE__)
-#include <semaphore.h> // For named semaphores (acting as mutexes)
-#endif
 
 #ifdef __cplusplus
 extern "C" {
