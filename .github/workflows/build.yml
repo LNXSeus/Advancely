@@ -62,10 +62,6 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install sdl3 sdl3_image sdl3_ttf curl
 
-      - name: Configure CMake (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
-
       # --- BUILD STEP ---
       - name: Build Project
         run: cmake --build build --config Release
@@ -93,26 +89,43 @@ jobs:
             cp -r resources "release/"
             cp _PLEASE_READ_ME.txt LICENSES.txt README.md "release/"
 
-            # 3. Create lists for tracking dependencies
+            # 3. Setup for recursive dependency search
+            LIBS_TO_PROCESS=()
             PROCESSED_LIBS=()
 
-            # 4. Find all transitive dependencies recursively
-            ALL_DEPS=$(otool -L "$EXE_DEST_PATH" | grep "$BREW_PREFIX" | awk '{print $1}')
-          
-            # 5. Copy libs and fix paths
-            for lib_path in $ALL_DEPS; do
+            # 4. Find DIRECT dependencies of the executable to start the queue
+            DIRECT_DEPS=$(otool -L "$EXE_DEST_PATH" | grep "$BREW_PREFIX" | awk '{print $1}')
+            for dep in $DIRECT_DEPS; do
+              LIBS_TO_PROCESS+=("$dep")
+            done
+
+            # 5. Process the queue until it's empty
+            while [ ${#LIBS_TO_PROCESS[@]} -gt 0 ]; do
+              # Dequeue the next library to process
+              lib_path=${LIBS_TO_PROCESS[0]}
               lib_name=$(basename "$lib_path")
+              LIBS_TO_PROCESS=("${LIBS_TO_PROCESS[@]:1}")
+
+              # Skip if we've already processed this library
+              if [[ " ${PROCESSED_LIBS[*]} " =~ " ${lib_path} " ]]; then
+                continue
+              fi
+
               echo "Processing dependency: $lib_path"
           
-              # Copy lib into the bundle
+              # Copy the library into the bundle and fix the executable's reference to it
               cp "$lib_path" "$LIBS_DEST_DIR/"
-          
-              # Fix the executable's reference to this lib
               install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$EXE_DEST_PATH"
               PROCESSED_LIBS+=("$lib_path")
+
+              # Find THIS library's dependencies (transitive dependencies) and add them to the queue
+              TRANSITIVE_DEPS=$(otool -L "$lib_path" | grep "$BREW_PREFIX" | awk '{print $1}')
+              for transitive_dep in $TRANSITIVE_DEPS; do
+                LIBS_TO_PROCESS+=("$transitive_dep")
+              done
             done
-          
-            # 6. Final fixup: Update all copied libraries to link against each other correctly
+
+            # 6. Final fixup: Make all copied libraries reference each other correctly
             for copied_lib_path in "$LIBS_DEST_DIR"/lib*.dylib; do
               for original_lib_path in "${PROCESSED_LIBS[@]}"; do
                 original_lib_name=$(basename "$original_lib_path")

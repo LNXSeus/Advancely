@@ -170,6 +170,14 @@ elseif (APPLE)
             # Use your custom Info.plist as a template
             MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/Info.plist"
     )
+
+    # Manually ensure the icon is copied to the bundle's Resources directory as a safeguard.
+    add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/resources/gui/Advancely_Logo_NoText.icns"
+            "$<TARGET_FILE_DIR:${EXECUTABLE_NAME}>/../Resources/Advancely_Logo_NoText.icns"
+            COMMENT "[CMAKE] Manually copying icon to macOS app bundle."
+    )
 endif ()
 # On Linux, find_package usually handles all necessary system library dependencies.
 
