@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os: [ ubuntu-latest, macos-13, macos-latest ]
 
     steps:
       - name: Checkout repository
@@ -158,31 +158,31 @@ jobs:
               fi
             fi
           
-          else # Linux
-            # For Linux, create a portable folder with the executable, resources, and libraries
-            cp build/Advancely release/
-            cp -r resources release/
-            cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
-            
-            # Copy the required SDL shared libraries (.so files) into the release folder
-            cp /usr/local/lib/libSDL3.so.0 release/
-            cp /usr/local/lib/libSDL3_image.so.0 release/
-            cp /usr/local/lib/libSDL3_ttf.so.0 release/
-            # Force-rename the template directory and key files to lowercase if they got capitalized
-            # This runs on the source 'resources' folder before it's copied into the AppImage
-            TEMPLATE_DIR="resources/templates/1.16.1"
-            if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
-              echo "Correcting folder capitalization for Linux..."
-              mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/all_advancements"
+            else # Linux
+              # For Linux, create a portable folder with the executable, resources, and libraries
+              cp build/Advancely release/
+              cp -r resources release/
+              cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
+              
+              # Copy the required SDL shared libraries (.so files) into the release folder
+              cp /usr/local/lib/libSDL3.so.0 release/
+              cp /usr/local/lib/libSDL3_image.so.0 release/
+              cp /usr/local/lib/libSDL3_ttf.so.0 release/
+              # Force-rename the template directory and key files to lowercase if they got capitalized
+              # This runs on the source 'resources' folder before it's copied into the AppImage
+              TEMPLATE_DIR="resources/templates/1.16.1"
+              if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
+                echo "Correcting folder capitalization for Linux..."
+                mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/all_advancements"
+              fi
+              # Now check for files inside the (now lowercase) directory
+              if [ -f "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements.json" ]; then
+                mv "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements.json" "$TEMPLATE_DIR/all_advancements/1_16_1_all_advancements.json"
+              fi
+              if [ -f "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements_lang.json" ]; then
+                mv "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements_lang.json" "$TEMPLATE_DIR/all_advancements/1_16_1_all_advancements_lang.json"
+              fi
             fi
-            # Now check for files inside the (now lowercase) directory
-            if [ -f "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements.json" ]; then
-              mv "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements.json" "$TEMPLATE_DIR/all_advancements/1_16_1_all_advancements.json"
-            fi
-            if [ -f "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements_lang.json" ]; then
-              mv "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements_lang.json" "$TEMPLATE_DIR/all_advancements/1_16_1_all_advancements_lang.json"
-            fi
-          fi
 
       - name: Upload Release Artifact
         uses: actions/upload-artifact@v4
