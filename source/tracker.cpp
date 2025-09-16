@@ -3913,17 +3913,6 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
         format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time));
 
-        int total_ach_to_display = t->template_data->advancement_count;
-        if (version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy) {
-            int obtainable_count = 0;
-            for (int i = 0; i < t->template_data->advancement_count; i++) {
-                if (!t->template_data->advancements[i]->done_in_snapshot) {
-                    obtainable_count++;
-                }
-            }
-            total_ach_to_display = obtainable_count;
-        }
-
         snprintf(info_buffer, sizeof(info_buffer),
                  "%s  |  %s - %s%s%s  |  %s: %d/%d  -  Prog: %.2f%%  |  %s IGT  |  Upd: %s",
                  t->world_name,
@@ -3933,7 +3922,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                  formatted_flag,
                  adv_ach_label,
                  t->template_data->advancements_completed_count,
-                 total_ach_to_display,
+                 t->template_data->advancement_count,
                  t->template_data->overall_progress_percentage,
                  formatted_time,
                  formatted_update_time);
@@ -4590,18 +4579,6 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
     MC_Version version = settings_get_version_from_string(settings->version_str);
     const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
 
-    // Determine the correct total for the achievement counter
-    int total_ach_to_display = t->template_data->advancement_count;
-    if (version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy) {
-        int obtainable_count = 0;
-        for (int i = 0; i < t->template_data->advancement_count; i++) {
-            if (!t->template_data->advancements[i]->done_in_snapshot) {
-                obtainable_count++;
-            }
-        }
-        total_ach_to_display = obtainable_count;
-    }
-
     // Creating the title buffer
     // Displaying last update time doesn't make sense here, so only done in Tracker Info window in tracker_render_gui()
     snprintf(title_buffer, sizeof(title_buffer),
@@ -4614,7 +4591,7 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
              formatted_flag,
              adv_ach_label,
              t->template_data->advancements_completed_count,
-             total_ach_to_display,
+             t->template_data->advancement_count,
              t->template_data->overall_progress_percentage,
              formatted_time);
 
