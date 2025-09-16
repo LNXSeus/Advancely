@@ -95,6 +95,15 @@ static SDL_Texture *g_logo_texture = nullptr; // Loading the advancely logo
 // This helper function is now fully self-contained. It has ONE job: find the
 // resources path and write it into the buffer it is given.
 static void find_and_set_resource_path(char* path_buffer, size_t buffer_size) {
+
+    // First, check for the AppImage environment variable. This is the standard.
+    const char* appdir_env = getenv("APPDIR");
+    if (appdir_env) {
+        // If APPDIR is set, we are in an AppImage. The path is predictable.
+        snprintf(path_buffer, buffer_size, "%s/usr/share/advancely/resources", appdir_env);
+        return; // We've found the path, no other checks are needed.
+    }
+
     char exe_path[MAX_PATH_LENGTH];
     if (!get_executable_path(exe_path, sizeof(exe_path))) {
         strncpy(path_buffer, "resources", buffer_size - 1); // Fallback
