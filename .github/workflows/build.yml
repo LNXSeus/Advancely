@@ -65,7 +65,8 @@ jobs:
             cp _PLEASE_READ_ME.txt LICENSES.txt README.md "release/"
 
             LIBS_TO_PROCESS=()
-            PROCESSED_LIBS=()
+            PROCESSED_LIBS=() # Tracks full original paths
+            COPIED_LIBS_BASENAMES=() # Tracks filenames to prevent duplicates
           
             DIRECT_DEPS=$(otool -L "$EXE_DEST_PATH" | grep "$BREW_PREFIX" | awk '{gsub(/:$/, ""); print $1}')
             for dep in $DIRECT_DEPS; do
@@ -77,14 +78,20 @@ jobs:
               lib_name=$(basename "$lib_path")
               LIBS_TO_PROCESS=("${LIBS_TO_PROCESS[@]:1}")
 
-              if [[ " ${PROCESSED_LIBS[*]} " =~ " ${lib_path} " ]]; then
+              # FIX: Check if we have already copied a library with this FILENAME.
+              if [[ " ${COPIED_LIBS_BASENAMES[*]} " =~ " ${lib_name} " ]]; then
+                # If we have, we don't need to copy it again. But we still must ensure
+                # the executable knows to look for the version we already copied.
+                install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$EXE_DEST_PATH"
                 continue
               fi
-          
+
               echo "Processing dependency: $lib_path"
               cp "$lib_path" "$LIBS_DEST_DIR/"
               install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$EXE_DEST_PATH"
+          
               PROCESSED_LIBS+=("$lib_path")
+              COPIED_LIBS_BASENAMES+=("$lib_name")
           
               TRANSITIVE_DEPS=$(otool -L "$lib_path" | grep "$BREW_PREFIX" | awk '{gsub(/:$/, ""); print $1}')
               for transitive_dep in $TRANSITIVE_DEPS; do
