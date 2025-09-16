@@ -162,10 +162,13 @@ elseif (APPLE)
     # On macOS, link against required system frameworks
     target_link_libraries(${EXECUTABLE_NAME} PRIVATE "-framework Cocoa" "-framework Metal" "-framework IOKit")
 
-    # creating .app bundle to get the icon, but resources will stay outside
+    # This block now creates the .app bundle using your custom Info.plist
     set_target_properties(${EXECUTABLE_NAME} PROPERTIES
             MACOSX_BUNDLE TRUE
-            MACOSX_BUNDLE_ICON_FILE "${CMAKE_SOURCE_DIR}/resources/gui/Advancely_Logo_NoText.icns" # icon f. macOS bundle
+            # Copy the icon file into the bundle's Resources directory
+            MACOSX_BUNDLE_ICON_FILE "${CMAKE_SOURCE_DIR}/resources/gui/Advancely_Logo_NoText.icns"
+            # Use your custom Info.plist as a template
+            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/Info.plist"
     )
 endif ()
 # On Linux, find_package usually handles all necessary system library dependencies.

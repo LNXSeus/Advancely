@@ -8,11 +8,30 @@ on:
     branches: [ main, master ]
 
 jobs:
+  # (This is a new job that should run before the build job when a tag is pushed)
+  create_release:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
   build:
+    needs: create_release
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        # macos-13 is the last intel runner. macos-latest is Apple Silicon
         os: [ ubuntu-latest, macos-13, macos-latest ]
 
     steps:
@@ -150,7 +169,7 @@ jobs:
             cp build/Advancely release/
             cp -r resources release/
             cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
-            
+          
             # Copy the required SDL shared libraries (.so files) into the release folder
             cp /usr/local/lib/libSDL3.so.0 release/
             cp /usr/local/lib/libSDL3_image.so.0 release/
@@ -174,8 +193,29 @@ jobs:
             fi
           fi
 
-      - name: Upload Release Artifact
-        uses: actions/upload-artifact@v4
+      - name: Create ZIP archive
+        run: |
+          # Use a consistent OS and Architecture identifier for the zip name
+          OS_NAME=""
+          ARCH_NAME="" # This will be X64 or ARM64 on macOS
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            OS_NAME="macOS"
+            ARCH_NAME="-${{ runner.arch }}" # Adds -X64 or -ARM64
+          elif [ "$RUNNER_OS" == "Linux" ]; then
+            OS_NAME="Linux"
+          fi
+          
+          cd release
+          zip -r ../Advancely-v${{ env.PROJECT_VERSION }}-${OS_NAME}${ARCH_NAME}.zip .
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: Advancely-v${{ env.PROJECT_VERSION }}-${{ matrix.os }}
-          path: release/
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          # This now uses the runner's architecture to build the asset name, ensuring a perfect match
+          asset_path: ./Advancely-v${{ env.PROJECT_VERSION }}-${{ runner.os == 'macOS' && 'macOS' || 'Linux' }}${{ runner.os == 'macOS' && format('-{0}', runner.arch) || '' }}.zip
+          asset_name: Advancely-v${{ env.PROJECT_VERSION }}-${{ runner.os == 'macOS' && 'macOS' || 'Linux' }}${{ runner.os == 'macOS' && format('-{0}', runner.arch) || '' }}.zip
+          asset_content_type: application/zip
