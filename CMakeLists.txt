@@ -10,8 +10,9 @@ file(READ "${CMAKE_SOURCE_DIR}/source/main.h" MAIN_H_CONTENTS)
 # Use a regular expression to find the line with the version and capture the number
 # This specifically looks for the pattern #define ADVANCELY_VERSION "vX.Y.Z"
 # and captures only the "X.Y.Z" part.
-# TODO: Currently not used
 string(REGEX MATCH "#define ADVANCELY_VERSION \"v([0-9]+\\.[0-9]+\\.[0-9]+)\"" _ ${MAIN_H_CONTENTS})
+
+
 
 # The captured version number is now in the variable CMAKE_MATCH_1
 if (CMAKE_MATCH_1)
@@ -20,6 +21,12 @@ if (CMAKE_MATCH_1)
 else ()
     message(FATAL_ERROR "Could not parse ADVANCELY_VERSION from source/main.h!")
 endif ()
+
+# If running in GitHub Actions, export the version to the environment
+if(DEFINED ENV{GITHUB_ENV})
+    file(APPEND "$ENV{GITHUB_ENV}" "PROJECT_VERSION=${PROJECT_VERSION}\n")
+    message(STATUS "Exporting PROJECT_VERSION=${PROJECT_VERSION} to GITHUB_ENV")
+endif()
 
 # Enable the RC (Resource Compiler) language for Windows executables
 if (WIN32)

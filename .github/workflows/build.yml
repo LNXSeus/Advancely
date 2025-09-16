@@ -77,82 +77,84 @@ jobs:
           # Create a staging directory for the release artifact
           mkdir release
           
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            # For Windows, copy the exe, all DLLs from the build output, resources, and text files
-            cp build/Release/Advancely.exe release/
-            cp build/Release/*.dll release/
-            cp -r resources release/
-            cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
-          elif [ "$RUNNER_OS" == "macOS" ]; then
-          # MACOS
-          # 1. Define paths
-          APP_BUNDLE="build/Advancely.app"
-          EXE_PATH="$APP_BUNDLE/Contents/MacOS/Advancely"
-          FRAMEWORKS_PATH="$APP_BUNDLE/Contents/Frameworks"
-          
-          # 2. Create the Frameworks directory
-          mkdir -p "$FRAMEWORKS_PATH"
-
-          # 3. Create lists for tracking dependencies
-          LIBS_TO_PROCESS=()
-          PROCESSED_LIBS=() # Tracks full paths for fixup
-          COPIED_LIBS_BASENAMES=() # Tracks filenames to prevent duplicates
-
-          # 4. Find direct dependencies
-          DIRECT_DEPS=$(otool -L "$EXE_PATH" | grep '/opt/homebrew' | awk '{print $1}' | sed 's/://')
-          for dep in $DIRECT_DEPS; do
-            LIBS_TO_PROCESS+=("$dep")
-          done
-          
-          # 5. Recursively find all transitive dependencies
-          while [ ${#LIBS_TO_PROCESS[@]} -gt 0 ]; do
-            lib_path=${LIBS_TO_PROCESS[0]}
-            lib_name=$(basename "$lib_path")
-            LIBS_TO_PROCESS=("${LIBS_TO_PROCESS[@]:1}")
-
-            # --- THIS IS THE FIX ---
-            # Check if a library with this FILENAME has already been copied.
-            if [[ " ${COPIED_LIBS_BASENAMES[*]} " =~ " ${lib_name} " ]]; then
-              # Already copied, so just update the executable's path and skip the rest
-              install_name_tool -change "$lib_path" "@rpath/$lib_name" "$EXE_PATH"
-              continue
-            fi
-          
-            echo "Processing dependency: $lib_path"
-            cp "$lib_path" "$FRAMEWORKS_PATH/"
-            install_name_tool -change "$lib_path" "@rpath/$lib_name" "$EXE_PATH"
-          
-            TRANSITIVE_DEPS=$(otool -L "$lib_path" | grep '/opt/homebrew' | awk '{print $1}' | sed 's/://')
-            for transitive_dep in $TRANSITIVE_DEPS; do
-              LIBS_TO_PROCESS+=("$transitive_dep")
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            # MACOS
+            # 1. Define paths
+            APP_BUNDLE="build/Advancely.app"
+            EXE_PATH="$APP_BUNDLE/Contents/MacOS/Advancely"
+            FRAMEWORKS_PATH="$APP_BUNDLE/Contents/Frameworks"
+            
+            # 2. Create the Frameworks directory
+            mkdir -p "$FRAMEWORKS_PATH"
+  
+            # 3. Create lists for tracking dependencies
+            LIBS_TO_PROCESS=()
+            PROCESSED_LIBS=() # Tracks full paths for fixup
+            COPIED_LIBS_BASENAMES=() # Tracks filenames to prevent duplicates
+  
+            # 4. Find direct dependencies
+            DIRECT_DEPS=$(otool -L "$EXE_PATH" | grep '/opt/homebrew' | awk '{print $1}' | sed 's/://')
+            for dep in $DIRECT_DEPS; do
+              LIBS_TO_PROCESS+=("$dep")
             done
-
-            PROCESSED_LIBS+=("$lib_path")
-            COPIED_LIBS_BASENAMES+=("$lib_name")
-          done
-
-          # 6. Final fixup of all copied libraries
-          for copied_lib in "$FRAMEWORKS_PATH"/*; do
-            lib_name=$(basename "$copied_lib")
-            install_name_tool -id "@rpath/$lib_name" "$copied_lib"
-          
-            for original_lib_path in "${PROCESSED_LIBS[@]}"; do
-              original_lib_name=$(basename "$original_lib_path")
-              if [ -f "$FRAMEWORKS_PATH/$original_lib_name" ]; then
-                install_name_tool -change "$original_lib_path" "@rpath/$original_lib_name" "$copied_lib"
+            
+            # 5. Recursively find all transitive dependencies
+            while [ ${#LIBS_TO_PROCESS[@]} -gt 0 ]; do
+              lib_path=${LIBS_TO_PROCESS[0]}
+              lib_name=$(basename "$lib_path")
+              LIBS_TO_PROCESS=("${LIBS_TO_PROCESS[@]:1}")
+  
+              # --- THIS IS THE FIX ---
+              # Check if a library with this FILENAME has already been copied.
+              if [[ " ${COPIED_LIBS_BASENAMES[*]} " =~ " ${lib_name} " ]]; then
+                # Already copied, so just update the executable's path and skip the rest
+                install_name_tool -change "$lib_path" "@rpath/$lib_name" "$EXE_PATH"
+                continue
               fi
+            
+              echo "Processing dependency: $lib_path"
+              cp "$lib_path" "$FRAMEWORKS_PATH/"
+              install_name_tool -change "$lib_path" "@rpath/$lib_name" "$EXE_PATH"
+            
+              TRANSITIVE_DEPS=$(otool -L "$lib_path" | grep '/opt/homebrew' | awk '{print $1}' | sed 's/://')
+              for transitive_dep in $TRANSITIVE_DEPS; do
+                LIBS_TO_PROCESS+=("$transitive_dep")
+              done
+  
+              PROCESSED_LIBS+=("$lib_path")
+              COPIED_LIBS_BASENAMES+=("$lib_name")
             done
-          done
-
-          # 7. Copy final .app bundle to release folder
-          cp -r "$APP_BUNDLE" release/
-          cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
-          
-          # Force-rename the templates directory to lowercase if it got capitalized
-          if [ -d "release/Advancely.app/Contents/Resources/templates/1.16.1/All_Advancements" ]; then
-            echo "Correcting folder capitalization..."
-            mv "release/Advancely.app/Contents/Resources/templates/1.16.1/All_Advancements" "release/Advancely.app/Contents/Resources/templates/1.16.1/all_advancements"
-          fi
+  
+            # 6. Final fixup of all copied libraries
+            for copied_lib in "$FRAMEWORKS_PATH"/*; do
+              lib_name=$(basename "$copied_lib")
+              install_name_tool -id "@rpath/$lib_name" "$copied_lib"
+            
+              for original_lib_path in "${PROCESSED_LIBS[@]}"; do
+                original_lib_name=$(basename "$original_lib_path")
+                if [ -f "$FRAMEWORKS_PATH/$original_lib_name" ]; then
+                  install_name_tool -change "$original_lib_path" "@rpath/$original_lib_name" "$copied_lib"
+                fi
+              done
+            done
+  
+            # 7. Copy final .app bundle to release folder
+            cp -r "$APP_BUNDLE" release/
+            cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
+            
+            # Force-rename the template directory and key files to lowercase if they got capitalized
+            TEMPLATE_DIR="release/Advancely.app/Contents/Resources/templates/1.16.1"
+            if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
+              echo "Correcting folder capitalization for macOS..."
+              mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/all_advancements"
+            fi
+            # Now check for files inside the (now lowercase) directory
+            if [ -f "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements.json" ]; then
+              mv "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements.json" "$TEMPLATE_DIR/all_advancements/1_16_1_all_advancements.json"
+            fi
+            if [ -f "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements_lang.json" ]; then
+              mv "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements_lang.json" "$TEMPLATE_DIR/all_advancements/1_16_1_all_advancements_lang.json"
+            fi
           
           else # Linux
             # For Linux, create a portable folder with the executable, resources, and libraries
@@ -164,15 +166,24 @@ jobs:
             cp /usr/local/lib/libSDL3.so.0 release/
             cp /usr/local/lib/libSDL3_image.so.0 release/
             cp /usr/local/lib/libSDL3_ttf.so.0 release/
-            # Force-rename the templates directory to lowercase if it got capitalized
-            if [ -d "release/resources/templates/1.16.1/All_Advancements" ]; then
-              echo "Correcting folder capitalization..."
-              mv "release/resources/templates/1.16.1/All_Advancements" "release/resources/templates/1.16.1/all_advancements"
+            # Force-rename the template directory and key files to lowercase if they got capitalized
+            # This runs on the source 'resources' folder before it's copied into the AppImage
+            TEMPLATE_DIR="resources/templates/1.16.1"
+            if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
+              echo "Correcting folder capitalization for Linux..."
+              mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/all_advancements"
+            fi
+            # Now check for files inside the (now lowercase) directory
+            if [ -f "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements.json" ]; then
+              mv "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements.json" "$TEMPLATE_DIR/all_advancements/1_16_1_all_advancements.json"
+            fi
+            if [ -f "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements_lang.json" ]; then
+              mv "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements_lang.json" "$TEMPLATE_DIR/all_advancements/1_16_1_all_advancements_lang.json"
             fi
           fi
 
       - name: Upload Release Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Advancely-${{ matrix.os }}
+          name: Advancely-v${{ env.PROJECT_VERSION }}-${{ matrix.os }}
           path: release/
