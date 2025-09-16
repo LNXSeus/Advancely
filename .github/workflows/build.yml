@@ -148,16 +148,23 @@ jobs:
           cp -r "$APP_BUNDLE" release/
           cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
           
-          else # Linux
-          # For Linux, create a portable folder with the executable, resources, and libraries
-          cp build/Advancely release/
-          cp -r resources release/
-          cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
+          # Force-rename the templates directory to lowercase if it got capitalized
+          if [ -d "release/Advancely.app/Contents/Resources/templates/1.16.1/All_Advancements" ]; then
+            echo "Correcting folder capitalization..."
+            mv "release/Advancely.app/Contents/Resources/templates/1.16.1/All_Advancements" "release/Advancely.app/Contents/Resources/templates/1.16.1/all_advancements"
+          fi
           
-          # Copy the required SDL shared libraries (.so files) into the release folder
-          cp /usr/local/lib/libSDL3.so.0 release/
-          cp /usr/local/lib/libSDL3_image.so.0 release/
-          cp /usr/local/lib/libSDL3_ttf.so.0 release/
+          else # Linux
+            # For Linux, create a portable folder with the executable, resources, and libraries
+            cp build/Advancely release/
+            cp -r resources release/
+            cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
+            
+            # Copy the required SDL shared libraries (.so files) into the release folder
+            cp /usr/local/lib/libSDL3.so.0 release/
+            cp /usr/local/lib/libSDL3_image.so.0 release/
+            cp /usr/local/lib/libSDL3_ttf.so.0 release/
+            # Force-rename the templates directory to lowercase if it got capitalized
           fi
 
       - name: Upload Release Artifact
