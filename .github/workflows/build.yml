@@ -57,6 +57,9 @@ jobs:
           sudo cmake --install build
           cd ..
 
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
       # --- MACOS STEPS ---
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
