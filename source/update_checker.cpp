@@ -269,6 +269,7 @@ bool apply_update(const char *main_executable_path) {
     ShellExecuteA(nullptr, "open", "updater.bat", nullptr, nullptr, SW_HIDE);
 
 #else
+    (void)main_executable_path; // Unused on Linux or macOS
     // On Linux/macOS, create a shell script.
     FILE* updater_script = fopen("updater.sh", "w");
     if (!updater_script) {
