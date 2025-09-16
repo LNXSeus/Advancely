@@ -165,6 +165,10 @@ jobs:
             cp /usr/local/lib/libSDL3_image.so.0 release/
             cp /usr/local/lib/libSDL3_ttf.so.0 release/
             # Force-rename the templates directory to lowercase if it got capitalized
+            if [ -d "release/resources/templates/1.16.1/All_Advancements" ]; then
+              echo "Correcting folder capitalization..."
+              mv "release/resources/templates/1.16.1/All_Advancements" "release/resources/templates/1.16.1/all_advancements"
+            fi
           fi
 
       - name: Upload Release Artifact
