@@ -1,83 +1,118 @@
 name: Build and Package
 
+# Controls when the workflow will run
 on:
   push:
     branches: [ main, master ]
-    tags: [ 'v*' ]
   pull_request:
     branches: [ main, master ]
 
 jobs:
-  create_release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-    steps:
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
-
-  build_and_test:
-    name: Build and Create Artifact
-    if: "!(startsWith(github.ref, 'refs/tags/'))"
+  build:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ ubuntu-latest, macos-13, macos-latest ]
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # --- LINUX STEPS ---
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
+          # Step 1: Install build tools and SDL's own dependencies
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake git libcurl4-openssl-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libwayland-dev libdecor-0-dev libxkbcommon-dev libfreetype6-dev libharfbuzz-dev libasound2-dev
-          git clone https://github.com/libsdl-org/SDL.git -b main && cd SDL && cmake -B build && cmake --build build && sudo cmake --install build && cd ..
-          git clone https://github.com/libsdl-org/SDL_image.git -b main && cd SDL_image && cmake -B build && cmake --build build && sudo cmake --install build && cd ..
-          git clone https://github.com/libsdl-org/SDL_ttf.git -b main && cd SDL_ttf && cmake -B build && cmake --build build && sudo cmake --install build && cd ..
+          sudo apt-get install -y build-essential cmake git libcurl4-openssl-dev \
+          libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+          libxi-dev libxss-dev libwayland-dev libdecor-0-dev libxkbcommon-dev \
+          libfreetype6-dev libharfbuzz-dev libasound2-dev
+          
+          # Step 2: Build and install SDL3 from source
+          echo "Building SDL3 from source..."
+          git clone https://github.com/libsdl-org/SDL.git -b main
+          cd SDL
+          cmake -B build
+          cmake --build build
+          sudo cmake --install build
+          cd ..
+          
+          # Step 3: Build and install SDL3_image from source
+          echo "Building SDL3_image from source..."
+          git clone https://github.com/libsdl-org/SDL_image.git -b main
+          cd SDL_image
+          cmake -B build
+          cmake --build build
+          sudo cmake --install build
+          cd ..
+          
+          # Step 4: Build and install SDL3_ttf from source
+          echo "Building SDL3_ttf from source..."
+          git clone https://github.com/libsdl-org/SDL_ttf.git -b main
+          cd SDL_ttf
+          cmake -B build
+          cmake --build build
+          sudo cmake --install build
+          cd ..
 
+      # --- MACOS STEPS ---
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: brew install sdl3 sdl3_image sdl3_ttf curl
 
-      - name: Configure CMake
+      - name: Configure CMake (Linux/macOS)
+        if: runner.os != 'Windows'
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
 
+      # --- BUILD STEP ---
       - name: Build Project
         run: cmake --build build --config Release
 
-      - name: Package Test Artifacts
+      # --- PACKAGING STEPS ---
+      - name: Package Artifacts
         shell: bash
         run: |
+          # Create a staging directory for the release artifact
           mkdir release
+          
           if [ "$RUNNER_OS" == "macOS" ]; then
+            # --- SCRIPT TO CREATE A PORTABLE FOLDER FOR MACOS ---
+
+            # 1. Define paths
             BUNDLE_SRC_PATH="build/Advancely.app"
             BUNDLE_DEST_PATH="release/Advancely.app"
             EXE_DEST_PATH="$BUNDLE_DEST_PATH/Contents/MacOS/Advancely"
-            LIBS_DEST_DIR="$BUNDLE_DEST_PATH/Contents/MacOS"
+            LIBS_DEST_DIR="$BUNDLE_DEST_PATH/Contents/MacOS" # Place libs next to the executable
             BREW_PREFIX=$(brew --prefix)
+            echo "Using Homebrew prefix: $BREW_PREFIX"
+          
+            # 2. Copy the main files and folders into the release folder
             cp -R "$BUNDLE_SRC_PATH" "release/"
             cp -r resources "release/"
             cp _PLEASE_READ_ME.txt LICENSES.txt README.md "release/"
-            ALL_DEPS=$(otool -L "$EXE_DEST_PATH" | grep "$BREW_PREFIX" | awk '{print $1}')
+
+            # 3. Create lists for tracking dependencies
             PROCESSED_LIBS=()
+
+            # 4. Find all transitive dependencies recursively
+            ALL_DEPS=$(otool -L "$EXE_DEST_PATH" | grep "$BREW_PREFIX" | awk '{print $1}')
+          
+            # 5. Copy libs and fix paths
             for lib_path in $ALL_DEPS; do
               lib_name=$(basename "$lib_path")
+              echo "Processing dependency: $lib_path"
+          
+              # Copy lib into the bundle
               cp "$lib_path" "$LIBS_DEST_DIR/"
+          
+              # Fix the executable's reference to this lib
               install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$EXE_DEST_PATH"
               PROCESSED_LIBS+=("$lib_path")
             done
+          
+            # 6. Final fixup: Update all copied libraries to link against each other correctly
             for copied_lib_path in "$LIBS_DEST_DIR"/lib*.dylib; do
               for original_lib_path in "${PROCESSED_LIBS[@]}"; do
                 original_lib_name=$(basename "$original_lib_path")
@@ -86,32 +121,50 @@ jobs:
                 fi
               done
             done
+          
+            # 7. Ad-hoc code sign all bundled dylibs and the main app bundle
+            echo "Ad-hoc signing bundled items..."
             codesign --force --sign - "$LIBS_DEST_DIR"/lib*.dylib
             codesign --force --deep --sign - "$BUNDLE_DEST_PATH"
+          
+            # 8. Force-rename the template directory/files in the EXTERNAL resources folder
             TEMPLATE_DIR="release/resources/templates/1.16.1"
             if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
               echo "Correcting folder capitalization for macOS..."
-              mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/advancements_temp" && mv "$TEMPLATE_DIR/advancements_temp" "$TEMPLATE_DIR/all_advancements"
+              mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/advancements_temp"
+              mv "$TEMPLATE_DIR/advancements_temp" "$TEMPLATE_DIR/all_advancements"
             fi
+          
             LOWERCASE_DIR="$TEMPLATE_DIR/all_advancements"
             if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements.json" ]; then
-              mv "$LOWERCASE_DIR/1_16_1_All_Advancements.json" "$LOWERCASE_DIR/temp.json" && mv "$LOWERCASE_DIR/temp.json" "$LOWERCASE_DIR/1_16_1_all_advancements.json"
+              mv "$LOWERCASE_DIR/1_16_1_All_Advancements.json" "$LOWERCASE_DIR/temp.json"
+              mv "$LOWERCASE_DIR/temp.json" "$LOWERCASE_DIR/1_16_1_all_advancements.json"
             fi
             if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" ]; then
-              mv "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" "$LOWERCASE_DIR/temp_lang.json" && mv "$LOWERCASE_DIR/temp_lang.json" "$LOWERCASE_DIR/1_16_1_all_advancements_lang.json"
+              mv "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" "$LOWERCASE_DIR/temp_lang.json"
+              mv "$LOWERCASE_DIR/temp_lang.json" "$LOWERCASE_DIR/1_16_1_all_advancements_lang.json"
             fi
-          elif [ "$RUNNER_OS" == "Linux" ]; then
+          
+          elif [ "$RUNNER_OS" == "Linux" ]; then # Linux
+            # For Linux, create a portable folder with the executable, resources, and libraries
             cp build/Advancely release/
             cp -r resources release/
             cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
+            
+            # Copy the required SDL shared libraries (.so files) into the release folder
             cp /usr/local/lib/libSDL3.so.0 release/
             cp /usr/local/lib/libSDL3_image.so.0 release/
             cp /usr/local/lib/libSDL3_ttf.so.0 release/
+          
+            # Perform renaming on the DESTINATION directory to avoid altering the source
+            # and ensure the logic always runs.
             TEMPLATE_DIR="release/resources/templates/1.16.1"
             if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
               echo "Correcting folder capitalization for Linux..."
               mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/all_advancements"
             fi
+
+            # Now check for files inside the (now lowercase) directory
             LOWERCASE_DIR="$TEMPLATE_DIR/all_advancements"
             if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements.json" ]; then
               mv "$LOWERCASE_DIR/1_16_1_All_Advancements.json" "$LOWERCASE_DIR/1_16_1_all_advancements.json"
@@ -121,119 +174,30 @@ jobs:
             fi
           fi
 
-      - name: Upload Test Artifact
+      - name: Set Final Archive Name
+        id: set_filename
+        shell: bash
+        run: |
+          # Determine the correct suffix based on OS and architecture
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            SUFFIX="macOS-${{ runner.arch }}" # Results in "macOS-X64" or "macOS-ARM64"
+          elif [ "$RUNNER_OS" == "Linux" ]; then
+            SUFFIX="Linux"
+          fi
+          # Construct the full filename and save it as an environment variable for the next steps
+          FILENAME="Advancely-v${{ env.PROJECT_VERSION }}-${SUFFIX}.zip"
+          echo "FILENAME=$FILENAME" >> $GITHUB_ENV
+
+      - name: Create ZIP Archive
+        shell: bash
+        run: |
+          # Use the filename from the previous step to create the zip
+          zip -r ${{ env.FILENAME }} release
+
+      - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Advancely-Test-Artifact-${{ matrix.os }}
-          path: release/
-
-  build_and_release:
-    name: Build and Upload to Release
-    needs: create_release
-    if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ ubuntu-latest, macos-13, macos-latest ]
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake git libcurl4-openssl-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libwayland-dev libdecor-0-dev libxkbcommon-dev libfreetype6-dev libharfbuzz-dev libasound2-dev
-          git clone https://github.com/libsdl-org/SDL.git -b main && cd SDL && cmake -B build && cmake --build build && sudo cmake --install build && cd ..
-          git clone https://github.com/libsdl-org/SDL_image.git -b main && cd SDL_image && cmake -B build && cmake --build build && sudo cmake --install build && cd ..
-          git clone https://github.com/libsdl-org/SDL_ttf.git -b main && cd SDL_ttf && cmake -B build && cmake --build build && sudo cmake --install build && cd ..
-
-      - name: Install dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: brew install sdl3 sdl3_image sdl3_ttf curl
-
-      - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build Project
-        run: cmake --build build --config Release
-
-      - name: Package Release Artifacts
-        shell: bash
-        run: |
-          mkdir release
-          if [ "$RUNNER_OS" == "macOS" ]; then
-            BUNDLE_SRC_PATH="build/Advancely.app"
-            BUNDLE_DEST_PATH="release/Advancely.app"
-            EXE_DEST_PATH="$BUNDLE_DEST_PATH/Contents/MacOS/Advancely"
-            LIBS_DEST_DIR="$BUNDLE_DEST_PATH/Contents/MacOS"
-            BREW_PREFIX=$(brew --prefix)
-            cp -R "$BUNDLE_SRC_PATH" "release/"
-            cp -r resources "release/"
-            cp _PLEASE_READ_ME.txt LICENSES.txt README.md "release/"
-            ALL_DEPS=$(otool -L "$EXE_DEST_PATH" | grep "$BREW_PREFIX" | awk '{print $1}')
-            PROCESSED_LIBS=()
-            for lib_path in $ALL_DEPS; do
-              lib_name=$(basename "$lib_path")
-              cp "$lib_path" "$LIBS_DEST_DIR/"
-              install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$EXE_DEST_PATH"
-              PROCESSED_LIBS+=("$lib_path")
-            done
-            for copied_lib_path in "$LIBS_DEST_DIR"/lib*.dylib; do
-              for original_lib_path in "${PROCESSED_LIBS[@]}"; do
-                original_lib_name=$(basename "$original_lib_path")
-                if [ -f "$LIBS_DEST_DIR/$original_lib_name" ]; then
-                  install_name_tool -change "$original_lib_path" "@executable_path/$original_lib_name" "$copied_lib_path"
-                fi
-              done
-            done
-            codesign --force --sign - "$LIBS_DEST_DIR"/lib*.dylib
-            codesign --force --deep --sign - "$BUNDLE_DEST_PATH"
-            TEMPLATE_DIR="release/resources/templates/1.16.1"
-            if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
-              echo "Correcting folder capitalization for macOS..."
-              mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/advancements_temp" && mv "$TEMPLATE_DIR/advancements_temp" "$TEMPLATE_DIR/all_advancements"
-            fi
-            LOWERCASE_DIR="$TEMPLATE_DIR/all_advancements"
-            if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements.json" ]; then
-              mv "$LOWERCASE_DIR/1_16_1_All_Advancements.json" "$LOWERCASE_DIR/temp.json" && mv "$LOWERCASE_DIR/temp.json" "$LOWERCASE_DIR/1_16_1_all_advancements.json"
-            fi
-            if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" ]; then
-              mv "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" "$LOWERCASE_DIR/temp_lang.json" && mv "$LOWERCASE_DIR/temp_lang.json" "$LOWERCASE_DIR/1_16_1_all_advancements_lang.json"
-            fi
-          elif [ "$RUNNER_OS" == "Linux" ]; then
-            cp build/Advancely release/
-            cp -r resources release/
-            cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
-            cp /usr/local/lib/libSDL3.so.0 release/
-            cp /usr/local/lib/libSDL3_image.so.0 release/
-            cp /usr/local/lib/libSDL3_ttf.so.0 release/
-            TEMPLATE_DIR="release/resources/templates/1.16.1"
-            if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
-              echo "Correcting folder capitalization for Linux..."
-              mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/all_advancements"
-            fi
-            LOWERCASE_DIR="$TEMPLATE_DIR/all_advancements"
-            if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements.json" ]; then
-              mv "$LOWERCASE_DIR/1_16_1_All_Advancements.json" "$LOWERCASE_DIR/1_16_1_all_advancements.json"
-            fi
-            if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" ]; then
-              mv "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" "$LOWERCASE_DIR/1_16_1_all_advancements_lang.json"
-            fi
-          fi
-
-      - name: Create ZIP archive
-        run: |
-          cd release
-          zip -r ../Advancely-v${{ env.PROJECT_VERSION }}-${{ matrix.os }}.zip .
-
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: ./Advancely-v${{ env.PROJECT_VERSION }}-${{ matrix.os }}.zip
-          asset_name: Advancely-v${{ env.PROJECT_VERSION }}-${{ matrix.os }}.zip
-          asset_content_type: application/zip
+          # The artifact will be named with the final, correct filename
+          name: ${{ env.FILENAME }}
+          # The path points to the zip file we just created
+          path: ${{ env.FILENAME }}
