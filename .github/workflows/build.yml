@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ ubuntu-latest, macos-latest ]
 
     steps:
       - name: Checkout repository
@@ -87,23 +87,34 @@ jobs:
             # For macOS, copy the .app bundle and the text files
             cp -r build/Advancely.app release/
             cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
-          else # Linux - AppImage Creation
-            # Download the AppImage creation tool
+          
+          else # Linux - A more robust AppImage Creation script
+            # 1. Download the AppImage tool
             wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
             chmod +x linuxdeploy-x86_64.AppImage
-          
-            # Run linuxdeploy to bundle the app and all dependencies
-            ./linuxdeploy-x86_64.AppImage \
-              --appdir AppDir \
-              --executable build/Advancely \
-              --desktop-file packaging/linux/advancely.desktop \
-              --icon-file packaging/linux/advancely.png \
-              --output appimage
-          
-            # Copy the final AppImage and text files to the release folder
+            
+            # 2. Create the staging directory with the standard structure
+            mkdir -p AppDir/usr/bin
+            mkdir -p AppDir/usr/share/advancely
+            mkdir -p AppDir/usr/share/applications
+            mkdir -p AppDir/usr/share/icons/hicolor/512x512/apps
+            
+            # 3. Copy ALL necessary files into the AppDir
+            cp build/Advancely AppDir/usr/bin/
+            cp -r resources AppDir/usr/share/advancely/
+            
+            # 4. Copy over the desktop integration files
+            cp packaging/linux/advancely.desktop AppDir/usr/share/applications/
+            cp packaging/linux/advancely.png AppDir/usr/share/icons/hicolor/512x512/apps/
+            
+            # 5. Run linuxdeploy to bundle library dependencies and create the AppImage
+            # It automatically finds the executable and desktop file inside the AppDir
+            ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
+            
+            # 6. Move the final AppImage and text files to the release folder
             cp Advancely*.AppImage release/
             cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
-          fi
+            fi
 
       - name: Upload Release Artifact
         uses: actions/upload-artifact@v4
