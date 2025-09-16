@@ -87,16 +87,61 @@ static bool show_welcome_window = false; // For rendering the welcome window on 
 static char release_url_buffer[256] = {0};
 static SDL_Texture *g_logo_texture = nullptr; // Loading the advancely logo
 
-// Initializes g_resources_path to the correct location for the resources folder.
-// The resulting path does NOT have a trailing slash.
-// Initialize resources path for Windows/Linux and macOS
-// Linux install layout (/usr/local/bin/Advancely and /usr/local/share/advancely/resources)
-// macOS install layout (/Applications/Advancely.app/Contents/MacOS/Advancely and /Applications/Advancely.app/Contents/Resources)
-// This helper function is now fully self-contained. It has ONE job: find the
-// resources path and write it into the buffer it is given.
-static void find_and_set_resource_path(char* path_buffer, size_t buffer_size) {
+// TODO: Remove
+// // Initializes g_resources_path to the correct location for the resources folder.
+// // The resulting path does NOT have a trailing slash.
+// // Initialize resources path for Windows/Linux and macOS
+// // Linux install layout (/usr/local/bin/Advancely and /usr/local/share/advancely/resources)
+// // macOS install layout (/Applications/Advancely.app/Contents/MacOS/Advancely and /Applications/Advancely.app/Contents/Resources)
+// // This helper function is now fully self-contained. It has ONE job: find the
+// // resources path and write it into the buffer it is given.
+// static void find_and_set_resource_path(char* path_buffer, size_t buffer_size) {
+//
+//     // First, check for the AppImage environment variable. This is the standard.
+//     const char* appdir_env = getenv("APPDIR");
+//     if (appdir_env) {
+//         // If APPDIR is set, we are in an AppImage. The path is predictable.
+//         snprintf(path_buffer, buffer_size, "%s/usr/share/advancely/resources", appdir_env);
+//         return; // We've found the path, no other checks are needed.
+//     }
+//
+//     char exe_path[MAX_PATH_LENGTH];
+//     if (!get_executable_path(exe_path, sizeof(exe_path))) {
+//         strncpy(path_buffer, "resources", buffer_size - 1); // Fallback
+//         return;
+//     }
+//
+//     char exe_dir[MAX_PATH_LENGTH];
+//     if (!get_parent_directory(exe_path, exe_dir, sizeof(exe_dir), 1)) {
+//         strncpy(path_buffer, "resources", buffer_size - 1);
+//         return;
+//     }
+//
+// #if defined(__APPLE__)
+//     // For macOS, the executable is inside Advancely.app/Contents/MacOS/
+//     // The resources are in Advancely.app/Contents/Resources/
+//     char contents_dir[MAX_PATH_LENGTH];
+//     if (get_parent_directory(exe_dir, contents_dir, sizeof(contents_dir), 1)) {
+//         snprintf(path_buffer, buffer_size, "%s/Resources", contents_dir);
+//         if (path_exists(path_buffer)) {
+//             return; // Found resources in the app bundle
+//         }
+//     }
+// #endif
+//
+//     // For Windows and portable Linux, the 'resources' folder is always a sibling
+//     // of the executable's directory. This is our primary check.
+//     snprintf(path_buffer, buffer_size, "%s/resources", exe_dir);
+//     if (path_exists(path_buffer)) {
+//         return; // Found it, we're done
+//     }
+//
+//     // Ultimate fallback to a relative path
+//     strncpy(path_buffer, "resources", buffer_size - 1);
+// }
 
-    // First, check for the AppImage environment variable. This is the standard.
+static void find_and_set_resource_path(char* path_buffer, size_t buffer_size) {
+    // First, check for the AppImage environment variable. This is standard for that format.
     const char* appdir_env = getenv("APPDIR");
     if (appdir_env) {
         // If APPDIR is set, we are in an AppImage. The path is predictable.
@@ -104,6 +149,7 @@ static void find_and_set_resource_path(char* path_buffer, size_t buffer_size) {
         return; // We've found the path, no other checks are needed.
     }
 
+    // For all other builds (Windows, macOS, and local dev), find the executable's path.
     char exe_path[MAX_PATH_LENGTH];
     if (!get_executable_path(exe_path, sizeof(exe_path))) {
         strncpy(path_buffer, "resources", buffer_size - 1); // Fallback
@@ -116,26 +162,14 @@ static void find_and_set_resource_path(char* path_buffer, size_t buffer_size) {
         return;
     }
 
-#if defined(__APPLE__)
-    // For macOS, the executable is inside Advancely.app/Contents/MacOS/
-    // The resources are in Advancely.app/Contents/Resources/
-    char contents_dir[MAX_PATH_LENGTH];
-    if (get_parent_directory(exe_dir, contents_dir, sizeof(contents_dir), 1)) {
-        snprintf(path_buffer, buffer_size, "%s/Resources", contents_dir);
-        if (path_exists(path_buffer)) {
-            return; // Found resources in the app bundle
-        }
-    }
-#endif
-
-    // For Windows and portable Linux, the 'resources' folder is always a sibling
-    // of the executable's directory. This is our primary check.
+    // For Windows, macOS, and portable Linux, the 'resources' folder is
+    // always a sibling of the executable's directory. This is our primary check.
     snprintf(path_buffer, buffer_size, "%s/resources", exe_dir);
     if (path_exists(path_buffer)) {
         return; // Found it, we're done
     }
 
-    // Ultimate fallback to a relative path
+    // Ultimate fallback to a relative path if all else fails.
     strncpy(path_buffer, "resources", buffer_size - 1);
 }
 

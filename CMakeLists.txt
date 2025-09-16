@@ -185,6 +185,7 @@ endif ()
 if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     get_filename_component(MINGW_BIN_DIR ${CMAKE_C_COMPILER} DIRECTORY)
     set(MINGW_DLLS
+            "SDL3.dll" "SDL3_image.dll" "SDL3_ttf.dll"
             "libbrotlicommon.dll" "libbrotlidec.dll" "libbz2-1.dll" "libcrypto-3-x64.dll"
             "libcurl-4.dll" "libfreetype-6.dll" "libgcc_s_seh-1.dll" "libglib-2.0-0.dll"
             "libgraphite2.dll" "libharfbuzz-0.dll" "libiconv-2.dll" "libidn2-0.dll"
