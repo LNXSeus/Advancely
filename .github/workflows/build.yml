@@ -85,33 +85,71 @@ jobs:
             cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
           elif [ "$RUNNER_OS" == "macOS" ]; then
           # MACOS
-          # 1. Define paths for clarity
+                    # 1. Define paths for clarity
           APP_BUNDLE="build/Advancely.app"
           EXE_PATH="$APP_BUNDLE/Contents/MacOS/Advancely"
           FRAMEWORKS_PATH="$APP_BUNDLE/Contents/Frameworks"
           
-          # 2. Create the Frameworks directory inside the .app bundle
+          # 2. Create the Frameworks directory
           mkdir -p "$FRAMEWORKS_PATH"
 
-          # 3. Find all Homebrew-linked .dylib files, copy them into the bundle,
-          #    and change the executable to look for them there.
-          for lib in $(otool -L "$EXE_PATH" | grep '/opt/homebrew' | awk '{print $1}'); do
-            echo "Processing $lib..."
-            # Get just the filename of the library
-            lib_name=$(basename "$lib")
-          
-            # Copy the library file into our Frameworks folder
-            cp "$lib" "$FRAMEWORKS_PATH/"
-          
-            # Change the executable's reference to this library
-            # It will now look for the library inside the bundle relative to the executable
-            install_name_tool -change "$lib" "@rpath/$lib_name" "$EXE_PATH"
+          # 3. Create a list of libraries to process and a list of ones already processed
+          LIBS_TO_PROCESS=()
+          PROCESSED_LIBS=()
 
-            # Fix the copied library's own ID so it knows where it is
-            install_name_tool -id "@rpath/$lib_name" "$FRAMEWORKS_PATH/$lib_name"
+          # 4. Start by finding the direct dependencies of the main executable
+          DIRECT_DEPS=$(otool -L "$EXE_PATH" | grep '/opt/homebrew' | awk '{print $1}')
+          for dep in $DIRECT_DEPS; do
+            LIBS_TO_PROCESS+=("$dep")
+          done
+          
+          # 5. Recursively find all transitive dependencies
+          while [ ${#LIBS_TO_PROCESS[@]} -gt 0 ]; do
+            # Get the next library to process
+            lib_path=${LIBS_TO_PROCESS[0]}
+            LIBS_TO_PROCESS=("${LIBS_TO_PROCESS[@]:1}")
+
+            # Check if we've already processed this library
+            if [[ " ${PROCESSED_LIBS[*]} " =~ " ${lib_path} " ]]; then
+              continue
+            fi
+          
+            echo "Processing dependency: $lib_path"
+            lib_name=$(basename "$lib_path")
+          
+            # Copy the library into the bundle
+            cp "$lib_path" "$FRAMEWORKS_PATH/"
+          
+            # Update the executable to point to the new local copy
+            install_name_tool -change "$lib_path" "@rpath/$lib_name" "$EXE_PATH"
+          
+            # Find dependencies OF THIS LIBRARY and add them to the queue
+            TRANSITIVE_DEPS=$(otool -L "$lib_path" | grep '/opt/homebrew' | awk '{print $1}')
+            for transitive_dep in $TRANSITIVE_DEPS; do
+              LIBS_TO_PROCESS+=("$transitive_dep")
+            done
+
+            # Mark this library as processed
+            PROCESSED_LIBS+=("$lib_path")
           done
 
-          # 4. Copy the final, self-contained .app bundle and text files to the release folder
+          # 6. Final fixup: Update all copied libraries to link against each other correctly
+          for copied_lib in "$FRAMEWORKS_PATH"/*; do
+            lib_name=$(basename "$copied_lib")
+          
+            # Fix the library's own ID
+            install_name_tool -id "@rpath/$lib_name" "$copied_lib"
+          
+            # Fix its references to other libraries in the bundle
+            for original_lib_path in "${PROCESSED_LIBS[@]}"; do
+              original_lib_name=$(basename "$original_lib_path")
+              if [ -f "$FRAMEWORKS_PATH/$original_lib_name" ]; then
+                install_name_tool -change "$original_lib_path" "@rpath/$original_lib_name" "$copied_lib"
+              fi
+            done
+          done
+
+          # 7. Copy the final, self-contained .app bundle and text files to the release folder
           cp -r "$APP_BUNDLE" release/
           cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
           
