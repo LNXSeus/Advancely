@@ -128,19 +128,11 @@ static void find_and_set_resource_path(char* path_buffer, size_t buffer_size) {
     }
 #endif
 
-    // Check for development environment (resources folder is a sibling to the exe's dir)
+    // For Windows and portable Linux, the 'resources' folder is always a sibling
+    // of the executable's directory. This is our primary check.
     snprintf(path_buffer, buffer_size, "%s/resources", exe_dir);
     if (path_exists(path_buffer)) {
         return; // Found it, we're done
-    }
-
-    // Check for Linux install layout (/usr/local/bin/Advancely and /usr/local/share/advancely/resources)
-    char share_dir[MAX_PATH_LENGTH];
-    if (get_parent_directory(exe_dir, share_dir, sizeof(share_dir), 1)) {
-        snprintf(path_buffer, buffer_size, "%s/share/advancely/resources", share_dir);
-        if (path_exists(path_buffer)) {
-            return; // Found it
-        }
     }
 
     // Ultimate fallback to a relative path
