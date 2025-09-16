@@ -84,9 +84,36 @@ jobs:
             cp -r resources release/
             cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
           elif [ "$RUNNER_OS" == "macOS" ]; then
-            # For macOS, copy the .app bundle and the text files
-            cp -r build/Advancely.app release/
-            cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
+          # MACOS
+          # 1. Define paths for clarity
+          APP_BUNDLE="build/Advancely.app"
+          EXE_PATH="$APP_BUNDLE/Contents/MacOS/Advancely"
+          FRAMEWORKS_PATH="$APP_BUNDLE/Contents/Frameworks"
+          
+          # 2. Create the Frameworks directory inside the .app bundle
+          mkdir -p "$FRAMEWORKS_PATH"
+
+          # 3. Find all Homebrew-linked .dylib files, copy them into the bundle,
+          #    and change the executable to look for them there.
+          for lib in $(otool -L "$EXE_PATH" | grep '/opt/homebrew' | awk '{print $1}'); do
+            echo "Processing $lib..."
+            # Get just the filename of the library
+            lib_name=$(basename "$lib")
+          
+            # Copy the library file into our Frameworks folder
+            cp "$lib" "$FRAMEWORKS_PATH/"
+          
+            # Change the executable's reference to this library
+            # It will now look for the library inside the bundle relative to the executable
+            install_name_tool -change "$lib" "@rpath/$lib_name" "$EXE_PATH"
+
+            # Fix the copied library's own ID so it knows where it is
+            install_name_tool -id "@rpath/$lib_name" "$FRAMEWORKS_PATH/$lib_name"
+          done
+
+          # 4. Copy the final, self-contained .app bundle and text files to the release folder
+          cp -r "$APP_BUNDLE" release/
+          cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
           
           else # Linux - A more robust AppImage Creation script
             # 1. Download the AppImage tool

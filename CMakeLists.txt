@@ -206,6 +206,7 @@ if (NOT APPLE)
     )
 endif ()
 
+if(NOT APPLE)
 # Move the _PLEASE_READ_ME.txt file to the output directory
 add_custom_command(TARGET Advancely POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy
@@ -227,6 +228,7 @@ add_custom_command(TARGET Advancely POST_BUILD
         "$<TARGET_FILE_DIR:Advancely>"
         COMMENT "[CMAKE] Copying README.md to output directory..."
 )
+endif()
 
 
 # --- 6. COMPILER FLAGS & SANITIZERS ---
