@@ -77,78 +77,74 @@ jobs:
           # Create a staging directory for the release artifact
           mkdir release
           
-          if [ "$RUNNER_OS" == "macOS" ]; then
-            # MACOS
-            # 1. Define paths
-            APP_BUNDLE="build/Advancely.app"
-            EXE_PATH="$APP_BUNDLE/Contents/MacOS/Advancely"
-            FRAMEWORKS_PATH="$APP_BUNDLE/Contents/Frameworks"
-            
-            # 2. Create the Frameworks directory
-            mkdir -p "$FRAMEWORKS_PATH"
-  
+            if [ "$RUNNER_OS" == "macOS" ]; then
+            # --- SCRIPT TO CREATE A PORTABLE FOLDER FOR MACOS ---
+
+            # 1. Define paths for the executable and the final release folder
+            EXE_PATH="build/Advancely"
+            DEST_DIR="release" # All files will go into the 'release' folder
+          
+            # 2. Copy the main files into the release folder first
+            cp "$EXE_PATH" "$DEST_DIR/"
+            cp -r resources "$DEST_DIR/"
+            cp _PLEASE_READ_ME.txt LICENSES.txt README.md "$DEST_DIR/"
+
             # 3. Create lists for tracking dependencies
             LIBS_TO_PROCESS=()
-            PROCESSED_LIBS=() # Tracks full paths for fixup
+            PROCESSED_LIBS=() # Tracks full original paths for fixup
             COPIED_LIBS_BASENAMES=() # Tracks filenames to prevent duplicates
-  
-            # 4. Find direct dependencies
+
+            # 4. Find direct dependencies of the executable
             DIRECT_DEPS=$(otool -L "$EXE_PATH" | grep '/opt/homebrew' | awk '{print $1}' | sed 's/://')
             for dep in $DIRECT_DEPS; do
               LIBS_TO_PROCESS+=("$dep")
             done
-            
+          
             # 5. Recursively find all transitive dependencies
             while [ ${#LIBS_TO_PROCESS[@]} -gt 0 ]; do
               lib_path=${LIBS_TO_PROCESS[0]}
               lib_name=$(basename "$lib_path")
               LIBS_TO_PROCESS=("${LIBS_TO_PROCESS[@]:1}")
-  
-              # --- THIS IS THE FIX ---
-              # Check if a library with this FILENAME has already been copied.
+
+              # Check if a library with this FILENAME has already been copied
               if [[ " ${COPIED_LIBS_BASENAMES[*]} " =~ " ${lib_name} " ]]; then
-                # Already copied, so just update the executable's path and skip the rest
-                install_name_tool -change "$lib_path" "@rpath/$lib_name" "$EXE_PATH"
+                # Already processed, but we still need to fix the executable's link to it
+                install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$DEST_DIR/Advancely"
                 continue
               fi
-            
+          
               echo "Processing dependency: $lib_path"
-              cp "$lib_path" "$FRAMEWORKS_PATH/"
-              install_name_tool -change "$lib_path" "@rpath/$lib_name" "$EXE_PATH"
-            
+              # Copy the library directly into the release folder
+              cp "$lib_path" "$DEST_DIR/"
+              # Update the executable to look for the library in its own directory
+              install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$DEST_DIR/Advancely"
+          
+              # Find dependencies OF THIS LIBRARY and add them to the queue
               TRANSITIVE_DEPS=$(otool -L "$lib_path" | grep '/opt/homebrew' | awk '{print $1}' | sed 's/://')
               for transitive_dep in $TRANSITIVE_DEPS; do
                 LIBS_TO_PROCESS+=("$transitive_dep")
               done
-  
+
               PROCESSED_LIBS+=("$lib_path")
               COPIED_LIBS_BASENAMES+=("$lib_name")
             done
-  
-            # 6. Final fixup of all copied libraries
-            for copied_lib in "$FRAMEWORKS_PATH"/*; do
-              lib_name=$(basename "$copied_lib")
-              install_name_tool -id "@rpath/$lib_name" "$copied_lib"
-            
+          
+            # 6. Final fixup: Update all copied libraries to link against each other correctly
+            for copied_lib in "$DEST_DIR"/lib*.dylib; do
               for original_lib_path in "${PROCESSED_LIBS[@]}"; do
                 original_lib_name=$(basename "$original_lib_path")
-                if [ -f "$FRAMEWORKS_PATH/$original_lib_name" ]; then
-                  install_name_tool -change "$original_lib_path" "@rpath/$original_lib_name" "$copied_lib"
+                if [ -f "$DEST_DIR/$original_lib_name" ]; then
+                  install_name_tool -change "$original_lib_path" "@executable_path/$original_lib_name" "$copied_lib"
                 fi
               done
             done
-  
-            # 7. Copy final .app bundle to release folder
-            cp -r "$APP_BUNDLE" release/
-            cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
-            
-            # Force-rename the template directory and key files to lowercase if they got capitalized
-            TEMPLATE_DIR="release/Advancely.app/Contents/Resources/templates/1.16.1"
+          
+            # 7. Force-rename the template directory and key files to lowercase
+            TEMPLATE_DIR="$DEST_DIR/resources/templates/1.16.1"
             if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
               echo "Correcting folder capitalization for macOS..."
               mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/all_advancements"
             fi
-            # Now check for files inside the (now lowercase) directory
             if [ -f "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements.json" ]; then
               mv "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements.json" "$TEMPLATE_DIR/all_advancements/1_16_1_all_advancements.json"
             fi
