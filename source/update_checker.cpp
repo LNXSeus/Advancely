@@ -224,16 +224,15 @@ bool download_update_zip(const char *url) {
     return success;
 }
 
-bool apply_update(const char *main_executable_path) {
-    const char *temp_dir = "update_temp";
+bool apply_update(const char* main_executable_path) {
+    const char* temp_dir = "update_temp";
     if (!path_exists(temp_dir)) {
         log_message(LOG_ERROR, "[UPDATE] Update directory '%s' not found.\n", temp_dir);
         return false;
     }
 
 #ifdef _WIN32
-    // On Windows, create a batch file to perform the update.
-    FILE *updater_script = fopen("updater.bat", "w");
+    FILE* updater_script = fopen("updater.bat", "w");
     if (!updater_script) {
         log_message(LOG_ERROR, "[UPDATE] Could not create updater.bat script.\n");
         return false;
@@ -253,8 +252,18 @@ bool apply_update(const char *main_executable_path) {
     fprintf(updater_script, "if \"%%ERRORLEVEL%%\"==\"0\" (timeout /t 1 /nobreak > NUL && goto :wait_loop)\n");
 
     fprintf(updater_script, "echo Applying update...\n");
-    // Replace the main executable, DLLs, and text files
-    fprintf(updater_script, "xcopy /Y /E \"%s\\*.*\" .\\\n", temp_dir);
+    // Safely overwrite root-level files
+    fprintf(updater_script, "copy /Y \"%s\\*.exe\" .\\\n", temp_dir);
+    fprintf(updater_script, "copy /Y \"%s\\*.dll\" .\\\n", temp_dir);
+    fprintf(updater_script, "copy /Y \"%s\\*.txt\" .\\\n", temp_dir);
+    fprintf(updater_script, "copy /Y \"%s\\*.md\" .\\\n", temp_dir);
+
+    // Safely merge resource subfolders using robocopy. This will overwrite existing files
+    // but will NOT delete user-created files or the config/notes folders.
+    fprintf(updater_script, "robocopy \"%s\\resources\\templates\" \".\\resources\\templates\" /E /IS /NFL /NDL\n", temp_dir);
+    fprintf(updater_script, "robocopy \"%s\\resources\\fonts\" \".\\resources\\fonts\" /E /IS /NFL /NDL\n", temp_dir);
+    fprintf(updater_script, "robocopy \"%s\\resources\\gui\" \".\\resources\\gui\" /E /IS /NFL /NDL\n", temp_dir);
+    fprintf(updater_script, "robocopy \"%s\\resources\\icons\" \".\\resources\\icons\" /E /IS /NFL /NDL\n", temp_dir);
 
     fprintf(updater_script, "echo Cleaning up temporary files...\n");
     fprintf(updater_script, "rmdir /S /Q \"%s\"\n", temp_dir);
@@ -265,12 +274,10 @@ bool apply_update(const char *main_executable_path) {
     fprintf(updater_script, "del \"%%~f0\"\n");
 
     fclose(updater_script);
-
     ShellExecuteA(nullptr, "open", "updater.bat", nullptr, nullptr, SW_HIDE);
 
 #else
-    (void)main_executable_path; // Unused on Linux or macOS
-    // On Linux/macOS, create a shell script.
+    (void)main_executable_path;
     FILE* updater_script = fopen("updater.sh", "w");
     if (!updater_script) {
         log_message(LOG_ERROR, "[UPDATE] Could not create updater.sh script.\n");
@@ -286,17 +293,25 @@ bool apply_update(const char *main_executable_path) {
     fprintf(updater_script, "echo \"Applying update...\"\n");
 
 #if defined(__APPLE__)
-    // macOS: Remove old bundle and resources, then copy new ones.
+    // macOS: Replace the .app bundle, but merge the resources folder.
     fprintf(updater_script, "rm -rf ./Advancely.app\n");
-    fprintf(updater_script, "rm -rf ./resources\n");
     fprintf(updater_script, "cp -R ./%s/Advancely.app ./\n", temp_dir);
-    fprintf(updater_script, "cp -R ./%s/resources ./\n", temp_dir);
     fprintf(updater_script, "cp ./%s/*.txt ./\n", temp_dir);
     fprintf(updater_script, "cp ./%s/*.md ./\n", temp_dir);
 #else
-    // Linux: Overwrite files. `rsync` is robust for this.
-    fprintf(updater_script, "rsync -av --delete ./%s/ ./\n", temp_dir);
+    // Linux: Overwrite main executable and libraries.
+    fprintf(updater_script, "cp ./%s/Advancely ./\n", temp_dir);
+    fprintf(updater_script, "cp ./%s/*.so* ./\n", temp_dir);
+    fprintf(updater_script, "cp ./%s/*.txt ./\n", temp_dir);
+    fprintf(updater_script, "cp ./%s/*.md ./\n", temp_dir);
 #endif
+
+    // For both Linux and macOS, safely merge the resource subdirectories using rsync.
+    // This overwrites official files but leaves user-created files and the config/notes folders alone.
+    fprintf(updater_script, "rsync -av ./%s/resources/fonts/ ./resources/fonts/\n", temp_dir);
+    fprintf(updater_script, "rsync -av ./%s/resources/gui/ ./resources/gui/\n", temp_dir);
+    fprintf(updater_script, "rsync -av ./%s/resources/icons/ ./resources/icons/\n", temp_dir);
+    fprintf(updater_script, "rsync -av ./%s/resources/templates/ ./resources/templates/\n", temp_dir);
 
     fprintf(updater_script, "echo \"Cleaning up temporary files...\"\n");
     fprintf(updater_script, "rm -rf ./%s\n", temp_dir);
@@ -305,7 +320,6 @@ bool apply_update(const char *main_executable_path) {
 #if defined(__APPLE__)
     fprintf(updater_script, "open ./Advancely.app --args --updated &\n");
 #else
-    // Assumes the executable name is Advancely on Linux
     fprintf(updater_script, "chmod +x ./Advancely\n");
     fprintf(updater_script, "./Advancely --updated &\n");
 #endif
@@ -318,5 +332,5 @@ bool apply_update(const char *main_executable_path) {
 #endif
 
     log_message(LOG_INFO, "[UPDATE] Updater script created. The application will now exit.\n");
-    return true; // Signal to the main loop to exit
+    return true;
 }
