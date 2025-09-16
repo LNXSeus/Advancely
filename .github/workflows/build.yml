@@ -81,83 +81,60 @@ jobs:
             # --- SCRIPT TO CREATE A PORTABLE FOLDER FOR MACOS ---
 
             # 1. Define paths
-            EXE_PATH="build/Advancely"
-            DEST_DIR="release"
-
-            # 1a. Dynamically get the Homebrew prefix to support both Intel and Apple Silicon
+            BUNDLE_SRC_PATH="build/Advancely.app"
+            BUNDLE_DEST_PATH="release/Advancely.app"
+            EXE_DEST_PATH="$BUNDLE_DEST_PATH/Contents/MacOS/Advancely"
+            LIBS_DEST_DIR="$BUNDLE_DEST_PATH/Contents/MacOS" # Place libs next to the executable
             BREW_PREFIX=$(brew --prefix)
             echo "Using Homebrew prefix: $BREW_PREFIX"
           
-            # 2. Copy the main files into the release folder first
-            cp "$EXE_PATH" "$DEST_DIR/"
-            cp -r resources "$DEST_DIR/"
-            cp _PLEASE_READ_ME.txt LICENSES.txt README.md "$DEST_DIR/"
+            # 2. Copy the main files and folders into the release folder
+            cp -R "$BUNDLE_SRC_PATH" "release/"
+            cp -r resources "release/"
+            cp _PLEASE_READ_ME.txt LICENSES.txt README.md "release/"
 
             # 3. Create lists for tracking dependencies
-            LIBS_TO_PROCESS=()
-            PROCESSED_LIBS=() # Tracks full original paths for fixup
-            COPIED_LIBS_BASENAMES=() # Tracks filenames to prevent duplicates
+            PROCESSED_LIBS=()
 
-            # 4. Find direct dependencies of the executable, using the dynamic prefix
-            DIRECT_DEPS=$(otool -L "$EXE_PATH" | grep "$BREW_PREFIX" | awk '{print $1}' | sed 's/://')
-            for dep in $DIRECT_DEPS; do
-              LIBS_TO_PROCESS+=("$dep")
-            done
+            # 4. Find all transitive dependencies recursively
+            ALL_DEPS=$(otool -L "$EXE_DEST_PATH" | grep "$BREW_PREFIX" | awk '{print $1}')
           
-            # 5. Recursively find all transitive dependencies
-            while [ ${#LIBS_TO_PROCESS[@]} -gt 0 ]; do
-              lib_path=${LIBS_TO_PROCESS[0]}
+            # 5. Copy libs and fix paths
+            for lib_path in $ALL_DEPS; do
               lib_name=$(basename "$lib_path")
-              LIBS_TO_PROCESS=("${LIBS_TO_PROCESS[@]:1}")
-
-              # Check if a library with this FILENAME has already been copied
-              if [[ " ${COPIED_LIBS_BASENAMES[*]} " =~ " ${lib_name} " ]]; then
-                # Already processed, but we still need to fix the executable's link to it
-                install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$DEST_DIR/Advancely"
-                continue
-              fi
-          
               echo "Processing dependency: $lib_path"
-              cp "$lib_path" "$DEST_DIR/"
-              install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$DEST_DIR/Advancely"
           
-              # Find dependencies OF THIS LIBRARY and add them to the queue
-              TRANSITIVE_DEPS=$(otool -L "$lib_path" | grep "$BREW_PREFIX" | awk '{print $1}' | sed 's/://')
-              for transitive_dep in $TRANSITIVE_DEPS; do
-                LIBS_TO_PROCESS+=("$transitive_dep")
-              done
-
+              # Copy lib into the bundle
+              cp "$lib_path" "$LIBS_DEST_DIR/"
+          
+              # Fix the executable's reference to this lib
+              install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$EXE_DEST_PATH"
               PROCESSED_LIBS+=("$lib_path")
-              COPIED_LIBS_BASENAMES+=("$lib_name")
             done
           
             # 6. Final fixup: Update all copied libraries to link against each other correctly
-            for copied_lib in "$DEST_DIR"/lib*.dylib; do
+            for copied_lib_path in "$LIBS_DEST_DIR"/lib*.dylib; do
               for original_lib_path in "${PROCESSED_LIBS[@]}"; do
                 original_lib_name=$(basename "$original_lib_path")
-                if [ -f "$DEST_DIR/$original_lib_name" ]; then
-                  install_name_tool -change "$original_lib_path" "@executable_path/$original_lib_name" "$copied_lib"
+                if [ -f "$LIBS_DEST_DIR/$original_lib_name" ]; then
+                  install_name_tool -change "$original_lib_path" "@executable_path/$original_lib_name" "$copied_lib_path"
                 fi
               done
             done
           
-            # 7. Ad-hoc code sign all bundled libraries and the executable
-            echo "Ad-hoc signing bundled libraries and executable..."
-            codesign --force --sign - "$DEST_DIR"/lib*.dylib
-            codesign --force --deep --sign - "$DEST_DIR/Advancely"
+            # 7. Ad-hoc code sign all bundled dylibs and the main app bundle
+            echo "Ad-hoc signing bundled items..."
+            codesign --force --sign - "$LIBS_DEST_DIR"/lib*.dylib
+            codesign --force --deep --sign - "$BUNDLE_DEST_PATH"
           
-            # 8. Force-rename the template directory and key files to lowercase
-            # This is done on the DESTINATION directory
-            TEMPLATE_DIR="$DEST_DIR/resources/templates/1.16.1"
+            # 8. Force-rename the template directory/files in the EXTERNAL resources folder
+            TEMPLATE_DIR="release/resources/templates/1.16.1"
             if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
               echo "Correcting folder capitalization for macOS..."
-              # Use a two-step rename for case-insensitive filesystems
               mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/advancements_temp"
               mv "$TEMPLATE_DIR/advancements_temp" "$TEMPLATE_DIR/all_advancements"
             fi
           
-            # Now, check for files inside the (now guaranteed lowercase) directory
-            # and rename them using the same two-step process.
             LOWERCASE_DIR="$TEMPLATE_DIR/all_advancements"
             if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements.json" ]; then
               mv "$LOWERCASE_DIR/1_16_1_All_Advancements.json" "$LOWERCASE_DIR/temp.json"

@@ -162,19 +162,11 @@ elseif (APPLE)
     # On macOS, link against required system frameworks
     target_link_libraries(${EXECUTABLE_NAME} PRIVATE "-framework Cocoa" "-framework Metal" "-framework IOKit")
 
-    # TODO: Remove
-#    # creating .app bundle
-#    set_target_properties(${EXECUTABLE_NAME} PROPERTIES
-#            MACOSX_BUNDLE TRUE
-#            MACOSX_BUNDLE_ICON_FILE "${CMAKE_SOURCE_DIR}/resources/gui/Advancely_Logo_NoText.icns" # icon f. macOS bundle
-#    )
-#
-#    add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
-#            COMMAND ${CMAKE_COMMAND} -E copy_directory
-#            "${CMAKE_SOURCE_DIR}/resources"
-#            "$<TARGET_FILE_DIR:${EXECUTABLE_NAME}>/../Resources" # This path is specific to .app bundles
-#            COMMENT "[CMAKE] Copying resources into macOS app bundle"
-#    )
+    # creating .app bundle to get the icon, but resources will stay outside
+    set_target_properties(${EXECUTABLE_NAME} PROPERTIES
+            MACOSX_BUNDLE TRUE
+            MACOSX_BUNDLE_ICON_FILE "${CMAKE_SOURCE_DIR}/resources/gui/Advancely_Logo_NoText.icns" # icon f. macOS bundle
+    )
 endif ()
 # On Linux, find_package usually handles all necessary system library dependencies.
 
