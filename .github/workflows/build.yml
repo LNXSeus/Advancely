@@ -188,11 +188,11 @@ jobs:
           FILENAME="Advancely-v${{ env.PROJECT_VERSION }}-${SUFFIX}.zip"
           echo "FILENAME=$FILENAME" >> $GITHUB_ENV
 
-      - name: Create ZIP Archive
-        shell: bash
-        run: |
-          # Use the filename from the previous step to create the zip
-          zip -r ${{ env.FILENAME }} release
+#      - name: Create ZIP Archive
+#        shell: bash
+#        run: |
+#          # Use the filename from the previous step to create the zip
+#          zip -r ${{ env.FILENAME }} release
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
