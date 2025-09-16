@@ -255,6 +255,8 @@ if (MSVC)
             /wd4458 # Disable "hides class member" warning
             /wd4101 # Disable "unreferenced local variable" warning
             /wd4505 # Disable "unreferenced function" warning
+            /wd4132
+            /wd4127
     )
 else ()
     # Apply GCC/Clang-specific warning flags
@@ -263,13 +265,15 @@ else ()
             -Wextra                 # Enable even more warnings
             -Wpedantic              # Warn on non-standard language extensions
             -Werror                 # Treat all warnings as errors, forcing you to fix them
-            -Wno-format-truncation  # Ignore truncation warnings
             -Wno-unused-result      # Ignore unused result warnings
     )
 
     # Add GCC-specific warning suppressions only when using the GCC compiler
     if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-        target_compile_options(${EXECUTABLE_NAME} PRIVATE -Wno-stringop-truncation)
+        target_compile_options(${EXECUTABLE_NAME} PRIVATE
+                -Wno-stringop-truncation
+                -Wno-format-truncation  # Ignore truncation warnings
+        )
     endif ()
 endif ()
 
