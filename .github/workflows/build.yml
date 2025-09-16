@@ -147,16 +147,25 @@ jobs:
             codesign --force --deep --sign - "$DEST_DIR/Advancely"
           
             # 8. Force-rename the template directory and key files to lowercase
+            # This is done on the DESTINATION directory
             TEMPLATE_DIR="$DEST_DIR/resources/templates/1.16.1"
             if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
               echo "Correcting folder capitalization for macOS..."
-              mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/all_advancements"
+              # Use a two-step rename for case-insensitive filesystems
+              mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/advancements_temp"
+              mv "$TEMPLATE_DIR/advancements_temp" "$TEMPLATE_DIR/all_advancements"
             fi
-            if [ -f "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements.json" ]; then
-              mv "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements.json" "$TEMPLATE_DIR/all_advancements/1_16_1_all_advancements.json"
+          
+            # Now, check for files inside the (now guaranteed lowercase) directory
+            # and rename them using the same two-step process.
+            LOWERCASE_DIR="$TEMPLATE_DIR/all_advancements"
+            if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements.json" ]; then
+              mv "$LOWERCASE_DIR/1_16_1_All_Advancements.json" "$LOWERCASE_DIR/temp.json"
+              mv "$LOWERCASE_DIR/temp.json" "$LOWERCASE_DIR/1_16_1_all_advancements.json"
             fi
-            if [ -f "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements_lang.json" ]; then
-              mv "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements_lang.json" "$TEMPLATE_DIR/all_advancements/1_16_1_all_advancements_lang.json"
+            if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" ]; then
+              mv "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" "$LOWERCASE_DIR/temp_lang.json"
+              mv "$LOWERCASE_DIR/temp_lang.json" "$LOWERCASE_DIR/1_16_1_all_advancements_lang.json"
             fi
           
           elif [ "$RUNNER_OS" == "Linux" ]; then # Linux
@@ -169,19 +178,22 @@ jobs:
             cp /usr/local/lib/libSDL3.so.0 release/
             cp /usr/local/lib/libSDL3_image.so.0 release/
             cp /usr/local/lib/libSDL3_ttf.so.0 release/
-            # Force-rename the template directory and key files to lowercase if they got capitalized
-            # This runs on the source 'resources' folder before it's copied into the AppImage
-            TEMPLATE_DIR="resources/templates/1.16.1"
+          
+            # Perform renaming on the DESTINATION directory to avoid altering the source
+            # and ensure the logic always runs.
+            TEMPLATE_DIR="release/resources/templates/1.16.1"
             if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
               echo "Correcting folder capitalization for Linux..."
               mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/all_advancements"
             fi
+
             # Now check for files inside the (now lowercase) directory
-            if [ -f "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements.json" ]; then
-              mv "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements.json" "$TEMPLATE_DIR/all_advancements/1_16_1_all_advancements.json"
+            LOWERCASE_DIR="$TEMPLATE_DIR/all_advancements"
+            if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements.json" ]; then
+              mv "$LOWERCASE_DIR/1_16_1_All_Advancements.json" "$LOWERCASE_DIR/1_16_1_all_advancements.json"
             fi
-            if [ -f "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements_lang.json" ]; then
-              mv "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements_lang.json" "$TEMPLATE_DIR/all_advancements/1_16_1_all_advancements_lang.json"
+            if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" ]; then
+              mv "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" "$LOWERCASE_DIR/1_16_1_all_advancements_lang.json"
             fi
           fi
 
