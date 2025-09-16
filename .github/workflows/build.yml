@@ -62,6 +62,9 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install sdl3 sdl3_image sdl3_ttf curl
 
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
       # --- BUILD STEP ---
       - name: Build Project
         run: cmake --build build --config Release
