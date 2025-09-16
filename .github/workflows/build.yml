@@ -156,7 +156,6 @@ jobs:
             if [ -f "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements_lang.json" ]; then
               mv "$TEMPLATE_DIR/all_advancements/1_16_1_All_Advancements_lang.json" "$TEMPLATE_DIR/all_advancements/1_16_1_all_advancements_lang.json"
             fi
-          fi
           
           else # Linux
             # For Linux, create a portable folder with the executable, resources, and libraries
