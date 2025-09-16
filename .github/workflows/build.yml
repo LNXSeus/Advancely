@@ -85,7 +85,7 @@ jobs:
             cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
           elif [ "$RUNNER_OS" == "macOS" ]; then
           # MACOS
-          # 1. Define paths for clarity
+          # 1. Define paths
           APP_BUNDLE="build/Advancely.app"
           EXE_PATH="$APP_BUNDLE/Contents/MacOS/Advancely"
           FRAMEWORKS_PATH="$APP_BUNDLE/Contents/Frameworks"
@@ -93,11 +93,12 @@ jobs:
           # 2. Create the Frameworks directory
           mkdir -p "$FRAMEWORKS_PATH"
 
-          # 3. Create lists for dependency processing
+          # 3. Create lists for tracking dependencies
           LIBS_TO_PROCESS=()
-          PROCESSED_LIBS=()
+          PROCESSED_LIBS=() # Tracks full paths for fixup
+          COPIED_LIBS_BASENAMES=() # Tracks filenames to prevent duplicates
 
-          # 4. Find direct dependencies, stripping any colons
+          # 4. Find direct dependencies
           DIRECT_DEPS=$(otool -L "$EXE_PATH" | grep '/opt/homebrew' | awk '{print $1}' | sed 's/://')
           for dep in $DIRECT_DEPS; do
             LIBS_TO_PROCESS+=("$dep")
@@ -106,24 +107,28 @@ jobs:
           # 5. Recursively find all transitive dependencies
           while [ ${#LIBS_TO_PROCESS[@]} -gt 0 ]; do
             lib_path=${LIBS_TO_PROCESS[0]}
+            lib_name=$(basename "$lib_path")
             LIBS_TO_PROCESS=("${LIBS_TO_PROCESS[@]:1}")
 
-            if [[ " ${PROCESSED_LIBS[*]} " =~ " ${lib_path} " ]]; then
+            # --- THIS IS THE FIX ---
+            # Check if a library with this FILENAME has already been copied.
+            if [[ " ${COPIED_LIBS_BASENAMES[*]} " =~ " ${lib_name} " ]]; then
+              # Already copied, so just update the executable's path and skip the rest
+              install_name_tool -change "$lib_path" "@rpath/$lib_name" "$EXE_PATH"
               continue
             fi
           
             echo "Processing dependency: $lib_path"
-            lib_name=$(basename "$lib_path")
             cp "$lib_path" "$FRAMEWORKS_PATH/"
             install_name_tool -change "$lib_path" "@rpath/$lib_name" "$EXE_PATH"
           
-            # Find dependencies OF THIS LIBRARY, also stripping any colons
             TRANSITIVE_DEPS=$(otool -L "$lib_path" | grep '/opt/homebrew' | awk '{print $1}' | sed 's/://')
             for transitive_dep in $TRANSITIVE_DEPS; do
               LIBS_TO_PROCESS+=("$transitive_dep")
             done
 
             PROCESSED_LIBS+=("$lib_path")
+            COPIED_LIBS_BASENAMES+=("$lib_name")
           done
 
           # 6. Final fixup of all copied libraries
@@ -139,7 +144,7 @@ jobs:
             done
           done
 
-          # 7. Copy final .app bundle and text files to release folder
+          # 7. Copy final .app bundle to release folder
           cp -r "$APP_BUNDLE" release/
           cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
           
