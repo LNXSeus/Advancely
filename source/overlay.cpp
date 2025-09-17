@@ -19,6 +19,7 @@
 
 // TODO: Add more socials here
 const char *SOCIALS[] = {
+    "Advancely " ADVANCELY_VERSION "!",
     "Advance to the",
     "next level with",
     "Advancely!",
@@ -33,7 +34,7 @@ const char *SOCIALS[] = {
     "Support LNXSeus on",
     "discord.gg/TyNgXDz",
     "Donate to Advancely on",
-    "streamlabs.com/lnxseus/tip"
+    "streamlabs.com/lnxseus/tip",
 };
 const int NUM_SOCIALS = sizeof(SOCIALS) / sizeof(char *);
 
