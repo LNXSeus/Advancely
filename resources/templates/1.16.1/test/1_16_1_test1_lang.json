@@ -242,11 +242,6 @@
 
   "stat.stat_cat:gold_blocks_picked_up": "Get gold blocks!",
 
-  "stat.stat_cat:whatever": "WHATEVER!",
-  "stat.stat_cat:whatever.criteria.minecraft:custom/minecraft:open_chest": "Open 1 chest",
-  "stat.stat_cat:whatever.criteria.minecraft:used/minecraft:oak_door": "Place an oak door",
-  "stat.stat_cat:whatever.criteria.minecraft:custom/minecraft:sneak_time": "Sneak for 10 seconds",
-
   "stat.stat_cat:whatever2": "WHATEVER 2.0!",
   "stat.stat_cat:whatever2.criteria.minecraft:custom/minecraft:open_chest": "Open 3 chest",
   "stat.stat_cat:whatever2.criteria.minecraft:custom/minecraft:sneak_time": "Sneak for 20 seconds",

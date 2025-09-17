@@ -234,7 +234,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_fps = DEFAULT_OVERLAY_FPS;
     settings->tracker_always_on_top = DEFAULT_TRACKER_ALWAYS_ON_TOP;
     settings->overlay_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
-    settings->remove_completed_goals = DEFAULT_REMOVE_COMPLETED_GOALS;
+    settings->goal_hiding_mode = DEFAULT_GOAL_HIDING_MODE;
     settings->print_debug_status = DEFAULT_PRINT_DEBUG_STATUS;
     settings->overlay_progress_text_align = DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN;
     settings->overlay_animation_speedup = DEFAULT_OVERLAY_SPEED_UP;
@@ -415,11 +415,17 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
-        const cJSON *remove_completed = cJSON_GetObjectItem(general_settings, "remove_completed_goals");
-        if (remove_completed && cJSON_IsBool(remove_completed))
-            settings->remove_completed_goals = cJSON_IsTrue(remove_completed);
-        else {
-            settings->remove_completed_goals = DEFAULT_REMOVE_COMPLETED_GOALS;
+        const cJSON *hiding_mode = cJSON_GetObjectItem(general_settings, "goal_hiding_mode");
+        if (hiding_mode && cJSON_IsNumber(hiding_mode)) {
+            settings->goal_hiding_mode = (GoalHidingMode)hiding_mode->valueint;
+        } else {
+            // Backwards compatibility: Check for the old boolean key
+            const cJSON *remove_completed = cJSON_GetObjectItem(general_settings, "remove_completed_goals");
+            if (remove_completed && cJSON_IsBool(remove_completed)) {
+                settings->goal_hiding_mode = cJSON_IsTrue(remove_completed) ? HIDE_ALL_COMPLETED : SHOW_ALL;
+            } else {
+                settings->goal_hiding_mode = HIDE_ALL_COMPLETED; // Default value
+            }
             defaults_were_used = true;
         }
 
@@ -621,9 +627,11 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(general_obj, "overlay_fps", cJSON_CreateNumber(settings->overlay_fps));
         cJSON_DeleteItemFromObject(general_obj, "always_on_top");
         cJSON_AddItemToObject(general_obj, "always_on_top", cJSON_CreateBool(settings->tracker_always_on_top));
+        // Save the new goal hiding mode as a number
+        cJSON_DeleteItemFromObject(general_obj, "goal_hiding_mode");
+        cJSON_AddItemToObject(general_obj, "goal_hiding_mode", cJSON_CreateNumber(settings->goal_hiding_mode));
+        // Remove the old key to keep the settings file clean
         cJSON_DeleteItemFromObject(general_obj, "remove_completed_goals");
-        cJSON_AddItemToObject(general_obj, "remove_completed_goals",
-                              cJSON_CreateBool(settings->remove_completed_goals));
         cJSON_DeleteItemFromObject(general_obj, "print_debug_status");
         cJSON_AddItemToObject(general_obj, "print_debug_status", cJSON_CreateBool(settings->print_debug_status));
 

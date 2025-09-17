@@ -13,7 +13,7 @@
     "overlay_fps": 60,
     "always_on_top":	true,
     "overlay_scroll_speed":	1,
-    "remove_completed_goals":	true,
+    "goal_hiding_mode":	"HIDE_ALL_COMPLETED",
     "print_debug_status":	false,
     "overlay_progress_text_align":	"left",
     "overlay_animation_speedup":	false,

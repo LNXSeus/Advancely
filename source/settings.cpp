@@ -33,7 +33,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->fps != b->fps ||
         a->overlay_fps != b->overlay_fps ||
         a->tracker_always_on_top != b->tracker_always_on_top ||
-        a->remove_completed_goals != b->remove_completed_goals ||
+        a->goal_hiding_mode != b->goal_hiding_mode ||
         a->print_debug_status != b->print_debug_status ||
         a->overlay_scroll_speed != b->overlay_scroll_speed ||
         a->overlay_progress_text_align != b->overlay_progress_text_align ||
@@ -590,15 +590,22 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "Forces the tracker window to always display above any other window.");
         ImGui::SetTooltip("%s", always_on_top_tooltip_buffer);
     }
-    ImGui::SameLine();
-    ImGui::Checkbox("Remove Completed Goals", &temp_settings.remove_completed_goals);
+    ImGui::SeparatorText("Goal Visibility");
+    ImGui::RadioButton("Hide All Completed", (int *)&temp_settings.goal_hiding_mode, HIDE_ALL_COMPLETED);
     if (ImGui::IsItemHovered()) {
-        char remove_completed_goals_tooltip_buffer[1024];
-        snprintf(remove_completed_goals_tooltip_buffer, sizeof(remove_completed_goals_tooltip_buffer),
-                 "Hides fully completed goals and sub-goals from the tracker window to tidy up the view.\n"
-                 "Unchecking this setting will make all goals visible,\n"
-                 "even ones set to - \"hidden\": true - in the template.");
-        ImGui::SetTooltip("%s", remove_completed_goals_tooltip_buffer);
+        ImGui::SetTooltip("Strictest hiding. Hides goals when they are completed AND hides goals marked as \"hidden\" in the template file.");
+    }
+
+    ImGui::SameLine();
+    ImGui::RadioButton("Hide Template-Hidden Only", (int *)&temp_settings.goal_hiding_mode, HIDE_ONLY_TEMPLATE_HIDDEN);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Hides goals marked as \"hidden\" in the template file, but keeps all other completed goals visible.");
+    }
+
+    ImGui::SameLine();
+    ImGui::RadioButton("Show All", (int *)&temp_settings.goal_hiding_mode, SHOW_ALL);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Shows everything. No goals will be hidden, regardless of their completion or template status.");
     }
 
     ImGui::Separator();
@@ -1092,7 +1099,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Speed Up Animation: %s\n"
                  "  - Hide Completed Row 3 Goals: %s\n"
                  "  - Always On Top: %s\n"
-                 "  - Remove Completed Goals: %s\n"
+                 "  - Goal Visibility: Hide All Completed\n"
                  "  - Overlay Width: %dpx\n"
                  "  - Notes Use Settings Font: %s\n"
                  "  - Print Debug To Console: %s\n"
@@ -1111,7 +1118,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_OVERLAY_SPEED_UP ? "Enabled" : "Disabled",
                  DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
                  DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
-                 DEFAULT_REMOVE_COMPLETED_GOALS ? "Enabled" : "Disabled",
                  OVERLAY_DEFAULT_WIDTH,
                  DEFAULT_NOTES_USE_ROBOTO ? "Enabled" : "Disabled",
                  DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled",

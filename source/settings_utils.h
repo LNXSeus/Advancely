@@ -21,6 +21,14 @@ typedef enum {
     SAVE_CONTEXT_OVERLAY_GEOM // Save only overlay window's positin/size
 } SettingsSaveContext;
 
+enum GoalHidingMode {
+    HIDE_ALL_COMPLETED, // Hides both "done" items and hidden within template
+    HIDE_ONLY_TEMPLATE_HIDDEN, // Hides only hidden within template, but shows completed
+    SHOW_ALL // Shows hidden and completed
+};
+
+//
+
 // Enum to identify the tracker sections
 enum TrackerSection {
     SECTION_ADVANCEMENTS,
@@ -46,8 +54,8 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_OVERLAY_FPS 60
 #define DEFAULT_TRACKER_ALWAYS_ON_TOP true
 #define DEFAULT_OVERLAY_SCROLL_SPEED 1.0f
+#define DEFAULT_GOAL_HIDING_MODE HIDE_ALL_COMPLETED
 #define DEFAULT_OVERLAY_SPEED_UP false // Boolean controls whether speed up is enabled
-#define DEFAULT_REMOVE_COMPLETED_GOALS true
 #define DEFAULT_PRINT_DEBUG_STATUS false
 #define DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_LEFT
 #define DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED false
@@ -133,7 +141,7 @@ struct AppSettings {
     // Logic is used in logger.cpp in log_message() function
     bool print_debug_status;
     float overlay_scroll_speed; // The speed and direction of the scrolling animation in the overlay.
-    bool remove_completed_goals; // If true, completed goals are hidden from the tracker view.
+    GoalHidingMode goal_hiding_mode; // 3 Stages of hiding goals
     OverlayProgressTextAlignment overlay_progress_text_align; // Alignment for the progress text in the overlay.
     bool overlay_animation_speedup; // If true, the overlay animation speed is increased.
     bool overlay_row3_remove_completed; // If true, the third row will also hide completed goals as row 2 does.

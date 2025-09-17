@@ -2482,18 +2482,26 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
         // Determine if the category should be hidden by the "Remove Completed Goals" setting.
         // THIS CHECK IGNORES THE SEARCH FILTER INTENTIONALLY.
-        bool is_considered_complete = false;
-        if (is_stat_section) {
-            is_considered_complete = cat->done;
-        } else {
-            is_considered_complete = (cat->criteria_count > 0 && cat->all_template_criteria_met) ||
-                                     (cat->criteria_count == 0 && cat->done);
+        bool is_considered_complete = is_stat_section
+                    ? cat->done
+                    : ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (cat->criteria_count == 0 && cat->done));
+
+        bool should_hide = false;
+        switch (settings->goal_hiding_mode) {
+            case HIDE_ALL_COMPLETED:
+                should_hide = cat->is_hidden || is_considered_complete;
+                break;
+            case HIDE_ONLY_TEMPLATE_HIDDEN:
+                should_hide = cat->is_hidden;
+                break;
+            case SHOW_ALL:
+                should_hide = false;
+                break;
         }
 
-        if (!settings->remove_completed_goals || (!is_considered_complete && !cat->is_hidden)) {
-            // If we find at least one item that isn't hidden by the general setting, the section is visible.
+        if (!should_hide) {
             visible_count++;
-            break;
+            break; // Found at least one visible item, so the section should be rendered.
         }
     }
 
@@ -2525,30 +2533,76 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
     for (int i = 0; i < count; i++) {
         TrackableCategory *cat = categories[i];
 
-        if (!cat || (settings->remove_completed_goals && (cat->is_hidden || cat->done))) {
-            continue;
+        if (!cat) continue;
+
+        // Parent Hiding Logic
+        bool is_considered_complete = is_stat_section
+            ? cat->done
+            : ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (cat->criteria_count == 0 && cat->done));
+
+        bool parent_should_hide = false;
+        switch (settings->goal_hiding_mode) {
+            case HIDE_ALL_COMPLETED:
+                parent_should_hide = cat->is_hidden || is_considered_complete;
+                break;
+            case HIDE_ONLY_TEMPLATE_HIDDEN:
+                parent_should_hide = cat->is_hidden;
+                break;
+            case SHOW_ALL:
+                parent_should_hide = false;
+                break;
         }
-        // Also filter by search term here
+        if (parent_should_hide) continue;
+
+        // Search Filter
         bool parent_matches = str_contains_insensitive(cat->display_name, t->search_buffer);
         bool child_matches = false;
         if (!parent_matches) {
             for (int j = 0; j < cat->criteria_count; j++) {
-                if (cat->criteria[j] && str_contains_insensitive(cat->criteria[j]->display_name, t->search_buffer)) {
+                TrackableItem *crit = cat->criteria[j];
+                if (!crit) continue;
+
+                // Apply the same hiding logic here as in the rendering pass
+                bool crit_should_hide = false;
+                switch (settings->goal_hiding_mode) {
+                    case HIDE_ALL_COMPLETED:
+                        crit_should_hide = crit->is_hidden || crit->done;
+                        break;
+                    case HIDE_ONLY_TEMPLATE_HIDDEN:
+                        crit_should_hide = crit->is_hidden;
+                        break;
+                    case SHOW_ALL:
+                        crit_should_hide = false;
+                        break;
+                }
+
+                // Now, check both hiding status AND the search term
+                if (!crit_should_hide && str_contains_insensitive(crit->display_name, t->search_buffer)) {
                     child_matches = true;
                     break;
                 }
             }
         }
-        if (!parent_matches && !child_matches) {
-            continue;
-        }
+        if (!parent_matches && !child_matches) continue;
 
         float required_width = ImGui::CalcTextSize(cat->display_name).x;
-        if (cat->criteria_count > 1) {
+        if (cat->criteria_count > 0) {
             for (int j = 0; j < cat->criteria_count; j++) {
                 TrackableItem *crit = cat->criteria[j];
-                if (crit && (!crit->done || !settings->remove_completed_goals)) {
-                    // Update width calculation for new layout: [Icon] [Checkbox] [Text] (Progress)
+                // Child Hiding Logic (for width calculation)
+                bool crit_should_hide = false;
+                switch (settings->goal_hiding_mode) {
+                    case HIDE_ALL_COMPLETED:
+                        crit_should_hide = crit->is_hidden || crit->done;
+                        break;
+                    case HIDE_ONLY_TEMPLATE_HIDDEN:
+                        crit_should_hide = crit->is_hidden;
+                        break;
+                    case SHOW_ALL:
+                        crit_should_hide = false;
+                        break;
+                }
+                if (crit && !crit_should_hide) {
                     char crit_progress_text[32] = "";
                     if (is_stat_section) {
                         if (crit->goal > 0) {
@@ -2560,7 +2614,6 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     }
                     float crit_text_width = ImGui::CalcTextSize(crit->display_name).x;
                     float crit_progress_width = ImGui::CalcTextSize(crit_progress_text).x;
-                    // Icon(32) + pad + Checkbox(20) + pad + Text + pad + Progress
                     float total_crit_width = 32 + 4 + 20 + 4 + crit_text_width + (crit_progress_width > 0
                                                      ? 4 + crit_progress_width
                                                      : 0);
@@ -2583,79 +2636,56 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         for (int i = 0; i < count; i++) {
             TrackableCategory *cat = categories[i];
 
-            // Skip rendering hidden legacy stats (helper for multi-stage goals in legacy), no target value or set to 0
-            if (is_stat_section && version <= MC_VERSION_1_6_4 && cat && cat->criteria_count == 1 && cat->criteria[0]->
-                goal == 0) {
+            if (!cat) continue;
+
+            if (is_stat_section && version <= MC_VERSION_1_6_4 && cat->criteria_count == 1 && cat->criteria[0]->goal == 0) {
                 continue;
             }
 
-
-            bool is_complex;
-
-            if (is_stat_section) {
-                // A stat is "complex" (shows sub-items) if the parser identified it as a multi-stat category.
-                is_complex = !cat->is_single_stat_category;
-            } else {
-                // An advancement is "complex" if it has one or more criteria.
-                is_complex = cat->criteria_count > 0;
-            }
-
-            // Check for the correct pass BEFORE checking if we should hide
+            bool is_complex = is_stat_section ? !cat->is_single_stat_category : (cat->criteria_count > 0);
             if (is_complex != complex_pass) continue;
 
-            // HIDE WHEN "hidden" in template -> "Remove Completed Goals" off WILL SHOW IT
-            // Determine if the item should be hidden by "Remove completed goals"
-            // DOES NOT HIDE when advancement has wrong criteria, that are not in the game (modern versions)
-            // DOES NOT HIDE when achievement value is 1 or higher and some template criteria are not met (mid-era versions)
-            // this can act as a way to debug wrong criteria in template file that can be removed
-            // For the main category:
-            bool should_hide = false;
-            if (cat && settings->remove_completed_goals) {
-                // First, check if the item itself is marked as hidden
-                if (cat->is_hidden) {
-                    should_hide = true;
-                } else {
-                    // If not, apply the existing logic for hiding completed items
-                    if (is_stat_section) {
-                        if (cat->done) should_hide = true;
-                    } else {
-                        if ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (
-                                cat->criteria_count == 0 && cat->done)) {
-                            should_hide = true;
-                        }
-                    }
-                }
+            // --- Parent Hiding Logic ---
+            bool is_considered_complete = is_stat_section
+                ? cat->done
+                : ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (cat->criteria_count == 0 && cat->done));
+
+            bool should_hide_parent = false;
+            switch(settings->goal_hiding_mode) {
+                case HIDE_ALL_COMPLETED:
+                    should_hide_parent = cat->is_hidden || is_considered_complete;
+                    break;
+                case HIDE_ONLY_TEMPLATE_HIDDEN:
+                    should_hide_parent = cat->is_hidden;
+                    break;
+                case SHOW_ALL:
+                    should_hide_parent = false;
+                    break;
             }
+            if (should_hide_parent) continue;
 
-            // If we should hide it, skip the rendering
-            if (should_hide) continue;
-
+            // --- Search Filtering ---
             bool parent_matches = str_contains_insensitive(cat->display_name, t->search_buffer);
-
-            // We only need to find matching children if the parent itself doesn't match the search.
             std::vector<TrackableItem *> matching_children;
             if (!parent_matches) {
                 for (int j = 0; j < cat->criteria_count; j++) {
                     TrackableItem *crit = cat->criteria[j];
-                    // A child must pass the standard hide filter AND the search filter to be included
-                    if (crit &&
-                        (!settings->remove_completed_goals || (!crit->done && !crit->is_hidden)) &&
-                        str_contains_insensitive(crit->display_name, t->search_buffer)) {
+                    if (!crit) continue;
+
+                    bool should_hide_crit = false;
+                    switch(settings->goal_hiding_mode) {
+                        case HIDE_ALL_COMPLETED: should_hide_crit = crit->is_hidden || crit->done; break;
+                        case HIDE_ONLY_TEMPLATE_HIDDEN: should_hide_crit = crit->is_hidden; break;
+                        case SHOW_ALL: should_hide_crit = false; break;
+                    }
+
+                    if (!should_hide_crit && str_contains_insensitive(crit->display_name, t->search_buffer)) {
                         matching_children.push_back(crit);
                     }
-                    // TODO: Remove
-                    // if (crit && str_contains_insensitive(crit->display_name, t->search_buffer)) {
-                    //     matching_children.push_back(crit);
-                    // }
                 }
             }
-
             bool child_matches = !matching_children.empty();
-
-            // If nothing in this category tree matches the search term, skip rendering it entirely.
-            if (!parent_matches && !child_matches) {
-                continue;
-            }
+            if (!parent_matches && !child_matches) continue;
 
             // Prepare snapshot status text for legacy achievements (without mod)
             char snapshot_text[8] = "";
@@ -2694,13 +2724,22 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             ImVec2 snapshot_text_size = ImGui::CalcTextSize(snapshot_text);
             int visible_criteria = 0;
             if (is_complex) {
+                // FILTER CHILDREN
                 if (parent_matches) {
                     // If parent matches, count all children that pass the standard hide filter.
                     for (int j = 0; j < cat->criteria_count; j++) {
                         TrackableItem *crit = cat->criteria[j];
-                        if (crit && (!settings->remove_completed_goals || (!crit->done && !crit->is_hidden))) {
-                            visible_criteria++;
+                        if (!crit) continue;
+
+                        bool should_hide_crit = false;
+                        switch (settings->goal_hiding_mode) {
+                            case HIDE_ALL_COMPLETED: should_hide_crit = crit->is_hidden || crit->done; break;
+                            case HIDE_ONLY_TEMPLATE_HIDDEN: should_hide_crit = crit->is_hidden; break;
+                            case SHOW_ALL: should_hide_crit = false; break;
                         }
+                        if (should_hide_crit) continue;
+
+                        visible_criteria++;
                     }
                 } else {
                     // If only children match, the number of visible criteria is the size of our pre-filtered list.
@@ -2837,8 +2876,16 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                             if (!crit) continue; // Skip if the criteria is null
 
-                            // Hide if "Remove Completed Goals" is on and the criterion is either done or marked as hidden
-                            if (settings->remove_completed_goals && (crit->done || crit->is_hidden)) continue;
+                            bool should_hide_crit = false;
+                            switch (settings->goal_hiding_mode) {
+                                case HIDE_ALL_COMPLETED: should_hide_crit = crit->is_hidden || crit->done; break;
+                                case HIDE_ONLY_TEMPLATE_HIDDEN: should_hide_crit = crit->is_hidden; break;
+                                case SHOW_ALL: should_hide_crit = false; break;
+                            }
+
+                            if (should_hide_crit) continue;
+
+                            visible_criteria++;
 
                             ImVec2 crit_base_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
                                                           (sub_item_y_offset * t->zoom_level) + t->camera_offset.y);
@@ -2965,8 +3012,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         for (TrackableItem *crit: matching_children) {
                             if (!crit) continue; // Skip if the criteria is null
 
-                            // Hide if "Remove Completed Goals" is on and the criterion is either done or marked as hidden
-                            if (settings->remove_completed_goals && (crit->done || crit->is_hidden)) continue;
+                            // No need to hide check here, because children are already filtered
 
                             ImVec2 crit_base_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
                                                           (sub_item_y_offset * t->zoom_level) + t->camera_offset.y);
@@ -3147,29 +3193,25 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
  */
 static void render_simple_item_section(Tracker *t, const AppSettings *settings, float &current_y, TrackableItem **items,
                                        int count, const char *section_title) {
-    // TODO: Remove
-    // int visible_count = 0;
-    // for (int i = 0; i < count; ++i) {
-    //     TrackableItem *item = items[i];
-    //     if (item) {
-    //         // An item is visible if it passes the "Remove Completed" check AND the search filter
-    //         bool passes_hide_filter = !settings->remove_completed_goals || (!item->done && !item->is_hidden);
-    //         bool passes_search_filter = str_contains_insensitive(item->display_name, t->search_buffer);
-    //         if (passes_hide_filter && passes_search_filter) {
-    //             visible_count++;
-    //             break; // Found at least one visible item, so we can stop counting.
-    //         }
-    //     }
-    // }
-    // if (visible_count == 0) return;
 
     // Section separator remains visible with the same spacing even during search
     int visible_count = 0;
     for (int i = 0; i < count; ++i) {
         TrackableItem *item = items[i];
         if (item) {
-            // Only check the "Remove Completed Goals" setting here.
-            if (!settings->remove_completed_goals || (!item->done && !item->is_hidden)) {
+            bool should_hide = false;
+            switch(settings->goal_hiding_mode) {
+                case HIDE_ALL_COMPLETED:
+                    should_hide = item->is_hidden || item->done;
+                    break;
+                case HIDE_ONLY_TEMPLATE_HIDDEN:
+                    should_hide = item->is_hidden;
+                    break;
+                case SHOW_ALL:
+                    should_hide = false;
+                    break;
+            }
+            if (!should_hide) {
                 visible_count++;
                 break;
             }
@@ -3193,18 +3235,27 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
     for (int i = 0; i < count; i++) {
         TrackableItem *item = items[i];
 
-        // Hide if search doesn't match -> anything matches empty string
-        if (!str_contains_insensitive(item->display_name, t->search_buffer)) {
-            continue; // Skip rendering if it doesn't match the search
+        if (!item) continue;
+
+        // New Refactored Hiding Logic
+        bool should_hide = false;
+        switch(settings->goal_hiding_mode) {
+            case HIDE_ALL_COMPLETED:
+                should_hide = item->is_hidden || item->done;
+                break;
+            case HIDE_ONLY_TEMPLATE_HIDDEN:
+                should_hide = item->is_hidden;
+                break;
+            case SHOW_ALL:
+                should_hide = false;
+                break;
         }
 
-
-        // Hide if setting is on and item is either completed or marked as hidden OR doesn't match search
-        if (!item || (settings->remove_completed_goals && (item->done || item->is_hidden)) || !str_contains_insensitive(
-                item->display_name, t->search_buffer))
+        // Combine hiding filter and search filter
+        if (should_hide || !str_contains_insensitive(item->display_name, t->search_buffer)) {
             continue;
-        // TODO: Remove
-        // if (!item || (settings->remove_completed_goals && (item->done || item->is_hidden))) continue;
+        }
+
         uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, ImGui::CalcTextSize(item->display_name).x));
     }
 
@@ -3216,12 +3267,24 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
     for (int i = 0; i < count; i++) {
         TrackableItem *item = items[i];
+        if (!item) continue;
 
-        // This single check now combines all filtering logic.
-        // If an item fails any of these, we 'continue' before any layout math is done.
-        if (!item ||
-            (settings->remove_completed_goals && (item->done || item->is_hidden)) ||
-            !str_contains_insensitive(item->display_name, t->search_buffer)) {
+        // New Refactored Hiding Logic
+        bool should_hide = false;
+        switch(settings->goal_hiding_mode) {
+            case HIDE_ALL_COMPLETED:
+                should_hide = item->is_hidden || item->done;
+                break;
+            case HIDE_ONLY_TEMPLATE_HIDDEN:
+                should_hide = item->is_hidden;
+                break;
+            case SHOW_ALL:
+                should_hide = false;
+                break;
+        }
+
+        // Combine hiding filter and search filter
+        if (should_hide || !str_contains_insensitive(item->display_name, t->search_buffer)) {
             continue;
         }
 
@@ -3321,28 +3384,24 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
     int count = t->template_data->custom_goal_count;
     // Pre-check for visible items
 
-    // TODO: Remove this
-    // int visible_count = 0;
-    // for (int i = 0; i < count; ++i) {
-    //     TrackableItem *item = t->template_data->custom_goals[i];
-    //     if (item) {
-    //         // An item is visible if it passes the "Remove Completed" check AND the search filter
-    //         bool passes_hide_filter = !settings->remove_completed_goals || (!item->done && !item->is_hidden);
-    //         bool passes_search_filter = str_contains_insensitive(item->display_name, t->search_buffer);
-    //         if (passes_hide_filter && passes_search_filter) {
-    //             visible_count++;
-    //             break;
-    //         }
-    //     }
-    // }
-    // if (visible_count == 0) return;
-
     int visible_count = 0;
     for (int i = 0; i < count; ++i) {
         TrackableItem *item = t->template_data->custom_goals[i];
         if (item) {
-            // Only check the "Remove Completed Goals" setting here.
-            if (!settings->remove_completed_goals || (!item->done && !item->is_hidden)) {
+            bool should_hide = false;
+            switch (settings->goal_hiding_mode) {
+                case HIDE_ALL_COMPLETED:
+                    should_hide = item->is_hidden || item->done;
+                    break;
+                case HIDE_ONLY_TEMPLATE_HIDDEN:
+                    should_hide = item->is_hidden;
+                    break;
+                case SHOW_ALL:
+                    should_hide = false;
+                    break;
+            }
+
+            if (!should_hide) {
                 visible_count++;
                 break;
             }
@@ -3373,18 +3432,27 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
     float uniform_item_width = 0.0f;
     for (int i = 0; i < count; i++) {
         TrackableItem *item = t->template_data->custom_goals[i];
+        if (!item) continue;
 
-        // Hide if search doesn't match -> anything matches empty string
-        if (!str_contains_insensitive(item->display_name, t->search_buffer)) {
-            continue; // Skip rendering if it doesn't match the search
+        // New Refactored Hiding Logic
+        bool should_hide = false;
+        switch(settings->goal_hiding_mode) {
+            case HIDE_ALL_COMPLETED:
+                should_hide = item->is_hidden || item->done;
+                break;
+            case HIDE_ONLY_TEMPLATE_HIDDEN:
+                should_hide = item->is_hidden;
+                break;
+            case SHOW_ALL:
+                should_hide = false;
+                break;
         }
 
-        if (!item || (item->done && settings->remove_completed_goals) || !str_contains_insensitive(
-                item->display_name, t->search_buffer))
+        // Combine hiding filter and search filter
+        if (should_hide || !str_contains_insensitive(item->display_name, t->search_buffer)) {
             continue;
+        }
 
-        // TODO: Remove
-        // if (!item || (item->done && settings->remove_completed_goals)) continue;
         uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, ImGui::CalcTextSize(item->display_name).x));
     }
 
@@ -3396,10 +3464,24 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
     for (int i = 0; i < count; i++) {
         TrackableItem *item = t->template_data->custom_goals[i];
+        if (!item) continue;
 
-        if (!item ||
-            (settings->remove_completed_goals && (item->done || item->is_hidden)) ||
-            !str_contains_insensitive(item->display_name, t->search_buffer)) {
+        // New Refactored Hiding Logic
+        bool should_hide = false;
+        switch(settings->goal_hiding_mode) {
+            case HIDE_ALL_COMPLETED:
+                should_hide = item->is_hidden || item->done;
+                break;
+            case HIDE_ONLY_TEMPLATE_HIDDEN:
+                should_hide = item->is_hidden;
+                break;
+            case SHOW_ALL:
+                should_hide = false;
+                break;
+        }
+
+        // Combine hiding filter and search filter
+        if (should_hide || !str_contains_insensitive(item->display_name, t->search_buffer)) {
             continue;
         }
 
@@ -3560,34 +3642,25 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
     int count = t->template_data->multi_stage_goal_count;
     // Pre-check for visible items
 
-    // TODO: Remove
-    // int visible_count = 0;
-    // for (int i = 0; i < count; ++i) {
-    //     MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
-    //     if (goal) {
-    //         bool is_done = (goal->current_stage >= goal->stage_count - 1);
-    //         bool passes_hide_filter = !settings->remove_completed_goals || (!is_done && !goal->is_hidden);
-    //
-    //         SubGoal *active_stage = goal->stages[goal->current_stage];
-    //         bool name_matches = str_contains_insensitive(goal->display_name, t->search_buffer);
-    //         bool stage_matches = str_contains_insensitive(active_stage->display_text, t->search_buffer);
-    //         bool passes_search_filter = name_matches || stage_matches;
-    //
-    //         if (passes_hide_filter && passes_search_filter) {
-    //             visible_count++;
-    //             break;
-    //         }
-    //     }
-    // }
-    // if (visible_count == 0) return;
-
     int visible_count = 0;
     for (int i = 0; i < count; ++i) {
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
         if (goal) {
-            // Only check the "Remove Completed Goals" setting here.
             bool is_done = (goal->current_stage >= goal->stage_count - 1);
-            if (!settings->remove_completed_goals || (!is_done && !goal->is_hidden)) {
+            bool should_hide = false;
+            switch(settings->goal_hiding_mode) {
+                case HIDE_ALL_COMPLETED:
+                    should_hide = goal->is_hidden || is_done;
+                    break;
+                case HIDE_ONLY_TEMPLATE_HIDDEN:
+                    should_hide = goal->is_hidden;
+                    break;
+                case SHOW_ALL:
+                    should_hide = false;
+                    break;
+            }
+
+            if (!should_hide) {
                 visible_count++;
                 break;
             }
@@ -3612,17 +3685,31 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
         if (!goal) continue;
 
-        bool is_done = goal && (goal->current_stage >= goal->stage_count - 1);
+        bool is_done = (goal->current_stage >= goal->stage_count - 1);
+
+        // New Refactored Hiding Logic
+        bool should_hide = false;
+        switch(settings->goal_hiding_mode) {
+            case HIDE_ALL_COMPLETED:
+                should_hide = goal->is_hidden || is_done;
+                break;
+            case HIDE_ONLY_TEMPLATE_HIDDEN:
+                should_hide = goal->is_hidden;
+                break;
+            case SHOW_ALL:
+                should_hide = false;
+                break;
+        }
+
+        // Search Filter Logic
         SubGoal *active_stage = goal->stages[goal->current_stage];
         bool name_matches = str_contains_insensitive(goal->display_name, t->search_buffer);
         bool stage_matches = str_contains_insensitive(active_stage->display_text, t->search_buffer);
 
-        if ((settings->remove_completed_goals && (is_done || goal->is_hidden)) || (!name_matches && !stage_matches)) {
+        // Combine Hiding and Search Filters
+        if (should_hide || (!name_matches && !stage_matches)) {
             continue;
         }
-
-        // TODO: Remove
-        // uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, ImGui::CalcTextSize(goal->display_name).x));
 
         // Account for the width of the current stage text (for proper spacing)
         float required_width = ImGui::CalcTextSize(goal->display_name).x;
@@ -3646,15 +3733,30 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
     for (int i = 0; i < count; i++) {
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
-        bool is_done = goal && (goal->current_stage >= goal->stage_count - 1);
-        SubGoal *active_stage = goal->stages[goal->current_stage];
+        if (!goal) continue;
 
-        // Combine all filters into a single check before proceeding.
+        bool is_done = (goal->current_stage >= goal->stage_count - 1);
+
+        // New Refactored Hiding Logic
+        bool should_hide = false;
+        switch(settings->goal_hiding_mode) {
+            case HIDE_ALL_COMPLETED:
+                should_hide = goal->is_hidden || is_done;
+                break;
+            case HIDE_ONLY_TEMPLATE_HIDDEN:
+                should_hide = goal->is_hidden;
+                break;
+            case SHOW_ALL:
+                should_hide = false;
+                break;
+        }
+
+        // Search Filter
+        SubGoal *active_stage = goal->stages[goal->current_stage];
         bool name_matches = str_contains_insensitive(goal->display_name, t->search_buffer);
         bool stage_matches = str_contains_insensitive(active_stage->display_text, t->search_buffer);
 
-        if (!goal || (settings->remove_completed_goals && (is_done || goal->is_hidden)) || (
-                !name_matches && !stage_matches)) {
+        if (should_hide || (!name_matches && !stage_matches)) {
             continue;
         }
 
