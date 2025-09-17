@@ -3879,6 +3879,24 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
     current_y += row_max_height;
 }
 
+// Helper struct to pass necessary data to the ImGui callback
+typedef struct {
+    Tracker *t;
+    const AppSettings *settings;
+} NotesCallbackData;
+
+// This is the callback function that ImGui will call on every edit of the notes window
+static int NotesEditCallback(ImGuiInputTextCallbackData *data) {
+    // The 'UserData' field contains the pointer we passed to InputTextMultiline.
+    // We cast it back to our struct type to get access to our tracker and settings.
+    auto *callback_data = (NotesCallbackData*)data->UserData;
+
+    // The buffer has been edited, so we save the notes immediately.
+    tracker_save_notes(callback_data->t, callback_data->settings);
+
+    return 0;
+}
+
 
 // END OF STATIC FUNCTIONS ------------------------------------
 
@@ -4298,11 +4316,15 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             char widget_id[64];
             snprintf(widget_id, sizeof(widget_id), "##NotesEditor%d", t->notes_widget_id_counter);
 
-            if (ImGui::InputTextMultiline(widget_id, t->notes_buffer, sizeof(t->notes_buffer),
-                                          editor_size, ImGuiInputTextFlags_AllowTabInput)) {
-                // Text was edited, save it to the file immediately.
-                tracker_save_notes(t, settings);
-            }
+            // Prepare the data packet to pass to our callback function.
+            NotesCallbackData callback_data = {t, settings};
+
+            // The ImGuiInputTextFlags_CallbackEdit flag tells ImGui to call our function on every modification.
+            ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackEdit;
+
+            ImGui::InputTextMultiline(widget_id, t->notes_buffer, sizeof(t->notes_buffer),
+                                          editor_size, flags, NotesEditCallback, &callback_data);
+
 
             // --- Controls at the bottom of the window ---
             // Per-World Toggle
