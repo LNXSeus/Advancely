@@ -591,21 +591,24 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SetTooltip("%s", always_on_top_tooltip_buffer);
     }
     ImGui::SeparatorText("Goal Visibility");
-    ImGui::RadioButton("Hide All Completed", (int *)&temp_settings.goal_hiding_mode, HIDE_ALL_COMPLETED);
+    ImGui::RadioButton("Hide All Completed", (int *) &temp_settings.goal_hiding_mode, HIDE_ALL_COMPLETED);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Strictest hiding. Hides goals when they are completed AND hides goals marked as \"hidden\" in the template file.");
+        ImGui::SetTooltip(
+            "Strictest hiding. Hides goals when they are completed AND hides goals marked as \"hidden\" in the template file.");
     }
 
     ImGui::SameLine();
-    ImGui::RadioButton("Hide Template-Hidden Only", (int *)&temp_settings.goal_hiding_mode, HIDE_ONLY_TEMPLATE_HIDDEN);
+    ImGui::RadioButton("Hide Template-Hidden Only", (int *) &temp_settings.goal_hiding_mode, HIDE_ONLY_TEMPLATE_HIDDEN);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Hides goals marked as \"hidden\" in the template file, but keeps all other completed goals visible.");
+        ImGui::SetTooltip(
+            "Hides goals marked as \"hidden\" in the template file, but keeps all other completed goals visible.");
     }
 
     ImGui::SameLine();
-    ImGui::RadioButton("Show All", (int *)&temp_settings.goal_hiding_mode, SHOW_ALL);
+    ImGui::RadioButton("Show All", (int *) &temp_settings.goal_hiding_mode, SHOW_ALL);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Shows everything. No goals will be hidden, regardless of their completion or template status.");
+        ImGui::SetTooltip(
+            "Shows everything. No goals will be hidden, regardless of their completion or template status.");
     }
 
     ImGui::Separator();
@@ -721,16 +724,38 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SetTooltip("%s", section_order_tooltip_buffer);
     }
 
-    for (int n = 0; n < SECTION_COUNT; n++) {
-        int item_type_id = temp_settings.section_order[n];
-        const char *item_name = TRACKER_SECTION_NAMES[item_type_id];
+    // Create a temporary list of the indices of sections that should be visible for this version.
+    std::vector<int> visible_section_indices;
+    for (int i = 0; i < SECTION_COUNT; ++i) {
+        int section_id = temp_settings.section_order[i];
+        bool is_visible = true;
 
-        // Make each item a selectable that can be dragged
+        if (section_id == SECTION_UNLOCKS && selected_version != MC_VERSION_25W14CRAFTMINE) {
+            is_visible = false; // Hide "Unlocks" if the version is not 25w14craftmine
+        }
+
+        if (is_visible) {
+            visible_section_indices.push_back(i);
+        }
+    }
+
+    // Now, loop through only the visible sections to render them.
+    for (size_t n = 0; n < visible_section_indices.size(); ++n) {
+        int original_array_index = visible_section_indices[n];
+        int item_type_id = temp_settings.section_order[original_array_index];
+
+        // Determine the correct display name (Advancements vs. Achievements)
+        const char *item_name;
+        if (item_type_id == SECTION_ADVANCEMENTS) {
+            item_name = (selected_version <= MC_VERSION_1_11_2) ? "Achievements" : "Advancements";
+        } else {
+            item_name = TRACKER_SECTION_NAMES[item_type_id];
+        }
+
         ImGui::Selectable(item_name);
 
-        // Drag Source
+        // Drag Source: The payload is the index 'n' from our visible list.
         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
-            // Set payload to carry the index of the item being dragged
             ImGui::SetDragDropPayload("DND_SECTION_ORDER", &n, sizeof(int));
             ImGui::Text("Reorder %s", item_name);
             ImGui::EndDragDropSource();
@@ -740,12 +765,19 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (ImGui::BeginDragDropTarget()) {
             if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("DND_SECTION_ORDER")) {
                 IM_ASSERT(payload->DataSize == sizeof(int));
-                int source_n = *(const int *) payload->Data;
+                int source_visible_index = *(const int *) payload->Data;
+                int target_visible_index = n;
 
-                // Swap the items in the temporary settings
-                int temp = temp_settings.section_order[n];
-                temp_settings.section_order[n] = temp_settings.section_order[source_n];
-                temp_settings.section_order[source_n] = temp;
+                // Map the visible list indices back to their original positions in the full section_order array.
+                int source_original_index = visible_section_indices[source_visible_index];
+                int target_original_index = visible_section_indices[target_visible_index];
+
+                // Swap the items in the actual temp_settings.section_order array.
+                int temp = temp_settings.section_order[target_original_index];
+                temp_settings.section_order[target_original_index] = temp_settings.section_order[source_original_index];
+                temp_settings.section_order[source_original_index] = temp;
+
+                // The list will correctly re-render on the next frame.
             }
             ImGui::EndDragDropTarget();
         }
@@ -760,14 +792,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char debug_print_tooltip_buffer[1024];
         snprintf(debug_print_tooltip_buffer, sizeof(debug_print_tooltip_buffer),
-        "This toggles printing a detailed progress report to the console after every file update.\n"
-        "Currently it also toggles an FPS counter for the overlay window.\n\n"
-        "IMPORTANT: This can spam the console with a large amount of text if your template files contain many entries.\n\n"
-        "This setting only affects the detailed report. General status messages and errors\n"
-        "Progress on advancements is only printed if the game sends an update.\n"
-        "are always printed to the console and saved to advancely_log.txt.\n"
-        "The log is flushed after every message and reset on startup, making it ideal for diagnosing crashes.\n"
-        "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.");
+                 "This toggles printing a detailed progress report to the console after every file update.\n"
+                 "Currently it also toggles an FPS counter for the overlay window.\n\n"
+                 "IMPORTANT: This can spam the console with a large amount of text if your template files contain many entries.\n\n"
+                 "This setting only affects the detailed report. General status messages and errors\n"
+                 "Progress on advancements is only printed if the game sends an update.\n"
+                 "are always printed to the console and saved to advancely_log.txt.\n"
+                 "The log is flushed after every message and reset on startup, making it ideal for diagnosing crashes.\n"
+                 "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.");
         ImGui::SetTooltip("%s", debug_print_tooltip_buffer);
     }
 
@@ -776,7 +808,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char auto_update_tooltip_buffer[1024];
         snprintf(auto_update_tooltip_buffer, sizeof(auto_update_tooltip_buffer),
-            "If enabled, Advancely will check for a new version on startup and notify you if one is available.");
+                 "If enabled, Advancely will check for a new version on startup and notify you if one is available.");
         ImGui::SetTooltip("%s", auto_update_tooltip_buffer);
     }
 
@@ -815,10 +847,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (ImGui::IsItemHovered()) {
             char hotkey_settings_tooltip_buffer[1024];
             snprintf(hotkey_settings_tooltip_buffer, sizeof(hotkey_settings_tooltip_buffer),
-            "IMPORTANT: Hotkeys are remembered between templates.\n"
-            "You might have to restart the settings window for the hotkeys to appear.\n\n"
-            "Assign keys to increment/decrement custom counters\n(only work when tabbed into the tracker). Maximum of %d hotkeys are supported.",
-            MAX_HOTKEYS);
+                     "IMPORTANT: Hotkeys are remembered between templates.\n"
+                     "You might have to restart the settings window for the hotkeys to appear.\n\n"
+                     "Assign keys to increment/decrement custom counters\n(only work when tabbed into the tracker). Maximum of %d hotkeys are supported.",
+                     MAX_HOTKEYS);
             ImGui::SetTooltip("%s", hotkey_settings_tooltip_buffer);
         }
 
@@ -1023,10 +1055,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char apply_button_tooltip_buffer[1024];
         snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
-        "Apply any changes made in this window. You can also press 'Enter' to apply.\n"
-        "Changes made to the overlay window will cause the overlay to restart,\n"
-        "which might lead to OBS not capturing the overlay anymore.\n"
-        "It will fail to apply if any warnings are shown.");
+                 "Apply any changes made in this window. You can also press 'Enter' to apply.\n"
+                 "Changes made to the overlay window will cause the overlay to restart,\n"
+                 "which might lead to OBS not capturing the overlay anymore.\n"
+                 "It will fail to apply if any warnings are shown.");
         ImGui::SetTooltip("%s", apply_button_tooltip_buffer);
     }
 
