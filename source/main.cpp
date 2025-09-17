@@ -476,6 +476,29 @@ static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker 
     ImGui::End();
 }
 
+void macos_set_cwd() {
+#if defined(__APPLE__)
+    char exe_path[MAX_PATH_LENGTH];
+    if (get_executable_path(exe_path, sizeof(exe_path))) {
+        // Check if we are running from a .app bundle
+        if (strstr(exe_path, ".app/") != NULL) {
+            char bundle_parent_dir[MAX_PATH_LENGTH];
+            // The executable is at .../Advancely.app/Contents/MacOS/Advancely
+            // We need to go up 3 levels to get to the directory containing the .app
+            if (get_parent_directory(exe_path, bundle_parent_dir, sizeof(bundle_parent_dir), 3)) {
+                if (chdir(bundle_parent_dir) == 0) {
+                    // Log the successful change for easier debugging
+                    log_message(LOG_INFO, "[MAIN] macOS: Working directory changed to %s\n", bundle_parent_dir);
+                } else {
+                    // This is a fallback and shouldn't happen, but is good practice
+                    log_message(LOG_ERROR, "[MAIN] macOS: Failed to change working directory to %s\n", bundle_parent_dir);
+                }
+            }
+        }
+    }
+#endif
+}
+
 // ------------------------------------ END OF STATIC FUNCTIONS ------------------------------------
 
 
@@ -520,6 +543,11 @@ const char* get_notes_manifest_path() {
 int main(int argc, char *argv[]) {
     // As we're not only using SDL_main() as our entry point
     SDL_SetMainReady();
+
+    // Set the working directory on macOS to be the app bundle's directory
+#if defined(__APPLE__)
+    macos_set_cwd();
+#endif
 
     // Check for --updated flag on startup
     if (argc > 1 && strcmp(argv[1], "--updated") == 0) {
