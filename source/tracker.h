@@ -87,6 +87,7 @@ struct Tracker {
     char notes_path[MAX_PATH_LENGTH]; // The dynamic path to the current notes file.
     char search_buffer[256]; // Buffer for the search functionality.
     bool focus_search_box_requested; // Flag for Ctrl+F hotkey
+    int notes_widget_id_counter; // Used to force-reset the notes widget UI state
 
     // --- Fonts ---
     ImFont *roboto_font; // ImGui font for the settings window UI.

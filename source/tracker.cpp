@@ -2184,6 +2184,7 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     t->notes_path[0] = '\0'; // Initialize the new notes path
     t->search_buffer[0] = '\0';
     t->focus_search_box_requested = false;
+    t->notes_widget_id_counter = 0;
 
 
     // Explicitly initialize all members
@@ -2337,12 +2338,21 @@ void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
     // Detect if the world has changed since the last update.
     if (t->template_data->last_known_world_name[0] == '\0' || // Handle first-time load
         strcmp(t->world_name, t->template_data->last_known_world_name) != 0) {
+
+        // Save notes for the OLD world before doing anything else
+        tracker_save_notes(t, settings);
+
         // Reset custom progress and manual stat overrides on world change
         tracker_reset_progress_on_world_change(t, settings);
 
         // Update the notes path to the new world and reload the notes content
         tracker_update_notes_path(t, settings);
+
+        // Load from new file into buffer
         tracker_load_notes(t, settings);
+
+        // Invalidate the old UI widget state by changing its future ID
+        t->notes_widget_id_counter++;
     }
     // After the check, update the last known world name to the current one for the next cycle.
     strncpy(t->template_data->last_known_world_name, t->world_name,
@@ -4246,6 +4256,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
 
     // --- Render Notes Window ---
+
     if (t->notes_window_open) {
         // A static title with a hidden ID (##AdvancelyNotes) ensures the window's size
         // and position are always remembered by ImGui.
@@ -4283,8 +4294,11 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             float bottom_widget_height = ImGui::GetFrameHeightWithSpacing();
             ImVec2 editor_size = ImVec2(-FLT_MIN, -bottom_widget_height);
 
-            // Draw the text editor.
-            if (ImGui::InputTextMultiline("##NotesEditor", t->notes_buffer, sizeof(t->notes_buffer),
+            // Draw the text editor and generate dynamic IDs for widgets
+            char widget_id[64];
+            snprintf(widget_id, sizeof(widget_id), "##NotesEditor%d", t->notes_widget_id_counter);
+
+            if (ImGui::InputTextMultiline(widget_id, t->notes_buffer, sizeof(t->notes_buffer),
                                           editor_size, ImGuiInputTextFlags_AllowTabInput)) {
                 // Text was edited, save it to the file immediately.
                 tracker_save_notes(t, settings);
