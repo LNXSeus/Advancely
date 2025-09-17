@@ -3113,10 +3113,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
                         }
-                        // --- Dynamic Type Dropdown, unlocks only for 25w14craftmine ---
+                        // --- Version-Aware Type Dropdown ---
                         const char *current_type_name = "Unknown";
                         switch (stage.type) {
-                            case SUBGOAL_STAT: current_type_name = "Stat";
+                            case SUBGOAL_STAT:
+                                // Use the clearer "Stat / Achievement" label for older versions
+                                current_type_name = (creator_selected_version <= MC_VERSION_1_11_2)
+                                                        ? "Stat / Achievement"
+                                                        : "Stat";
                                 break;
                             case SUBGOAL_ADVANCEMENT: current_type_name = advancement_label;
                                 break;
@@ -3129,16 +3133,34 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         if (ImGui::BeginCombo("Type", current_type_name)) {
-                            if (ImGui::Selectable("Stat", stage.type == SUBGOAL_STAT)) {
-                                stage.type = SUBGOAL_STAT;
-                                ms_goal_data_changed = true; // ONLY NEEDED FOR HIDDEN MS GOAL STATS LEGACY VERSION
-                                save_message_type = MSG_NONE;
+                            // Show "Stat / Achievement" for legacy and mid-era versions
+                            if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                if (ImGui::Selectable("Stat / Achievement", stage.type == SUBGOAL_STAT)) {
+                                    stage.type = SUBGOAL_STAT;
+                                    ms_goal_data_changed = true;
+                                    save_message_type = MSG_NONE;
+                                }
                             }
-                            if (ImGui::Selectable(advancement_label, stage.type == SUBGOAL_ADVANCEMENT)) {
-                                stage.type = SUBGOAL_ADVANCEMENT;
-                                ms_goal_data_changed = true;
-                                save_message_type = MSG_NONE;
+
+                            // Show plain "Stat" for modern versions
+                            if (creator_selected_version >= MC_VERSION_1_12) {
+                                if (ImGui::Selectable("Stat", stage.type == SUBGOAL_STAT)) {
+                                    stage.type = SUBGOAL_STAT;
+                                    ms_goal_data_changed = true;
+                                    save_message_type = MSG_NONE;
+                                }
                             }
+
+                            // "Advancement" type is only available for 1.12+
+                            if (creator_selected_version >= MC_VERSION_1_12) {
+                                if (ImGui::Selectable(advancement_label, stage.type == SUBGOAL_ADVANCEMENT)) {
+                                    stage.type = SUBGOAL_ADVANCEMENT;
+                                    ms_goal_data_changed = true;
+                                    save_message_type = MSG_NONE;
+                                }
+                            }
+
+                            // "Unlock" type is only for 25w14craftmine
                             if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
                                 if (ImGui::Selectable("Unlock", stage.type == SUBGOAL_UNLOCK)) {
                                     stage.type = SUBGOAL_UNLOCK;
@@ -3146,11 +3168,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     save_message_type = MSG_NONE;
                                 }
                             }
-                            if (ImGui::Selectable("Criterion", stage.type == SUBGOAL_CRITERION)) {
-                                stage.type = SUBGOAL_CRITERION;
-                                ms_goal_data_changed = true;
-                                save_message_type = MSG_NONE;
+
+                            // "Criterion" type is available from mid-era (1.7.2) onwards
+                            if (creator_selected_version >= MC_VERSION_1_7_2) {
+                                if (ImGui::Selectable("Criterion", stage.type == SUBGOAL_CRITERION)) {
+                                    stage.type = SUBGOAL_CRITERION;
+                                    ms_goal_data_changed = true;
+                                    save_message_type = MSG_NONE;
+                                }
                             }
+
+                            // "Final" type is always available
                             if (ImGui::Selectable("Final", stage.type == SUBGOAL_MANUAL)) {
                                 stage.type = SUBGOAL_MANUAL;
                                 ms_goal_data_changed = true;
