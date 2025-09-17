@@ -5,6 +5,8 @@
 #include <ctime>
 #include "path_utils.h"
 
+#define MANUAL_UPDATE_TEST // Add this line to enable the test
+
 // Temporarily disable specific warnings for the dmon.h library inclusion on Clang (macOS)
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -541,6 +543,26 @@ const char* get_notes_manifest_path() {
 }
 
 int main(int argc, char *argv[]) {
+
+    // TODO: DEBUG FOR AUTO-UPDATE TESTING -> SET FLAG AT THE TOP OF THE FILE
+#ifdef MANUAL_UPDATE_TEST
+    log_init(); // Init logger to see update messages
+    printf("[MANUAL TEST] Triggering apply_update()...\n");
+    char exe_path[MAX_PATH_LENGTH];
+    if (get_executable_path(exe_path, sizeof(exe_path))) {
+        if (apply_update(exe_path)) {
+            printf("[MANUAL TEST] apply_update() initiated. Exiting application to allow updater to run.\n");
+            log_close();
+            return EXIT_SUCCESS; // Exit cleanly to let the script take over
+        } else {
+            printf("[MANUAL TEST] apply_update() failed to start.\n");
+        }
+    }
+    log_close();
+    return EXIT_FAILURE; // Exit if it failed
+#endif
+    // --- END OF TEST BLOCK ---
+
     // As we're not only using SDL_main() as our entry point
     SDL_SetMainReady();
 
