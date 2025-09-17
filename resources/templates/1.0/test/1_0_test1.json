@@ -186,16 +186,16 @@
       "root_name": "16974093",
       "target": 1
     },
-    "stat_category:hidden_ms_mine_wood": {
+    "hidden_ms_stat_5242881": {
       "root_name": "5242881"
     },
-    "stat_category:hidden_ms_craft_wood_pick": {
+    "hidden_ms_stat_5242883": {
       "root_name": "5242883"
     },
-    "stat_category:hidden_ms_mine_stone": {
+    "hidden_ms_stat_16777217": {
       "root_name": "16777217"
     },
-    "stat_category:hidden_ms_craft_cobble_slab": {
+    "hidden_ms_stat_16843026": {
       "root_name": "16843026"
     }
   },

@@ -3,6 +3,9 @@
 //
 
 #include "temp_creator.h"
+
+#include <algorithm>
+
 #include "settings_utils.h"
 #include "logger.h"
 #include "template_scanner.h"
@@ -301,14 +304,28 @@ static bool validate_ms_goal_icon_paths(const std::vector<EditorMultiStageGoal> 
 
 // Helper to validate icon paths for nested categories
 static bool validate_category_icon_paths(const std::vector<EditorTrackableCategory> &categories,
-                                         char *error_message_buffer) {
+                                         MC_Version version, char *error_message_buffer) {
     for (const auto &cat: categories) {
         // Check parent icon path
 
         if (cat.icon_path[0] == '\0') {
-            snprintf(error_message_buffer, 256, "Error: Visible category '%s' is missing an icon path.",
-                     cat.root_name);
-            return false;
+            // This is only an error if it's NOT a special legacy hidden stat.
+            bool is_legacy_hidden_stat_exception = false;
+
+            // The exception applies if:
+            // 1. It's a legacy version.
+            // 2. It's a simple stat with one criterion.
+            // 3. That criterion has a goal of 0. (also has no icon ofc)
+            if (version <= MC_VERSION_1_6_4 && cat.is_simple_stat && cat.criteria.size() == 1 && cat.criteria[0].goal ==
+                0) {
+                is_legacy_hidden_stat_exception = true;
+            }
+
+            if (!is_legacy_hidden_stat_exception) {
+                snprintf(error_message_buffer, 256, "Error: Visible category '%s' is missing an icon path.",
+                         cat.root_name);
+                return false;
+            }
         }
         // When path exists we validate correctness
         char full_path[MAX_PATH_LENGTH];
@@ -960,8 +977,10 @@ static bool validate_and_save_template(const char *creator_version_str,
     bool validation_passed = true;
 
     // --- Advancements Validation ---
+    MC_Version version = settings_get_version_from_string(creator_version_str); // Get version from string
+
     if (has_duplicate_category_root_names(current_template_data.advancements, status_message) ||
-        !validate_category_icon_paths(current_template_data.advancements, status_message)) {
+        !validate_category_icon_paths(current_template_data.advancements, version, status_message)) {
         validation_passed = false;
     }
     if (validation_passed) {
@@ -976,7 +995,7 @@ static bool validate_and_save_template(const char *creator_version_str,
     // --- Stats Validation ---
     if (validation_passed) {
         if (has_duplicate_category_root_names(current_template_data.stats, status_message) ||
-            !validate_category_icon_paths(current_template_data.stats, status_message)) {
+            !validate_category_icon_paths(current_template_data.stats, version, status_message)) {
             validation_passed = false;
         }
     }
@@ -1046,6 +1065,68 @@ static bool validate_and_save_template(const char *creator_version_str,
     }
 }
 
+// New function to automatically manage hidden legacy stats for multi-stage goals
+static void synchronize_legacy_ms_goal_stats(EditorTemplate &editor_data) {
+    // 1. Gather all unique stat root_names required by all multi-stage goal stages
+    std::unordered_set<std::string> required_stat_root_names;
+    for (const auto &goal: editor_data.multi_stage_goals) {
+        for (const auto &stage: goal.stages) {
+            if (stage.type == SUBGOAL_STAT && stage.root_name[0] != '\0') {
+                required_stat_root_names.insert(stage.root_name);
+            }
+        }
+    }
+
+    // 2. Remove orphaned hidden stats that are no longer required
+    // We use the erase-remove idiom to safely remove elements while iterating
+    editor_data.stats.erase(
+        std::remove_if(editor_data.stats.begin(), editor_data.stats.end(),
+                       [&](const EditorTrackableCategory &stat_cat) {
+                           // Check if this is one of our special hidden stats
+                           if (strncmp(stat_cat.root_name, "hidden_ms_stat_", 15) == 0) {
+                               if (stat_cat.criteria.empty()) return true; // Malformed, remove
+
+                               // If this stat's tracked root_name is NOT in our required set, it's an orphan
+                               if (required_stat_root_names.find(stat_cat.criteria[0].root_name) ==
+                                   required_stat_root_names.end()) {
+                                   return true; // Mark for removal
+                               }
+                           }
+                           return false; // Keep this stat
+                       }),
+        editor_data.stats.end()
+    );
+
+    // 3. Add any required hidden stats that are missing.
+    for (const auto &required_root_name: required_stat_root_names) {
+        bool found = false;
+        for (const auto &stat_cat: editor_data.stats) {
+            if (strncmp(stat_cat.root_name, "hidden_ms_stat_", 15) == 0 && !stat_cat.criteria.empty() && stat_cat.
+                criteria[0].root_name == required_root_name) {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            // This required stat doesn't exist yet, so create it
+            EditorTrackableCategory new_hidden_stat = {};
+            snprintf(new_hidden_stat.root_name, sizeof(new_hidden_stat.root_name), "hidden_ms_stat_%s",
+                     required_root_name.c_str());
+            new_hidden_stat.is_simple_stat = true; // Hidden stats are always simple stats
+            new_hidden_stat.is_hidden = true; // Mark as hidden in template for consistency
+
+            EditorTrackableItem new_crit = {};
+            strncpy(new_crit.root_name, required_root_name.c_str(), sizeof(new_crit.root_name) - 1);
+            new_hidden_stat.criteria.push_back(new_crit);
+
+            editor_data.stats.push_back(new_hidden_stat);
+        }
+    }
+}
+
+
+// -------------------------------------------- END OF STATIC FUNCTIONS --------------------------------------------
 
 void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t) {
     (void) t;
@@ -2805,12 +2886,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Multi-Stage Goals")) {
+                // Flag to track changes in this version
+                // Specifically for hidden legacy stats for multi-stage goals
+                // This flag still tracks ALL CHANGES within multi-stage goals
+                bool ms_goal_data_changed = false;
+
                 // TWO-PANE LAYOUT for Multi-Stage Goals
                 float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                 ImGui::BeginChild("MSGoalListPane", ImVec2(pane_width, 0), true);
 
                 if (ImGui::Button("Add New Multi-Stage Goal")) {
                     current_template_data.multi_stage_goals.push_back({});
+                    ms_goal_data_changed = true; // Change was made
                     save_message_type = MSG_NONE;
                 }
                 ImGui::SameLine();
@@ -2902,6 +2989,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                ms_goal_dnd_target_index) {
                         selected_ms_goal_index++;
                     }
+                    ms_goal_data_changed = true;
                     save_message_type = MSG_NONE;
                 }
 
@@ -2910,6 +2998,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     else if (selected_ms_goal_index > goal_to_remove) selected_ms_goal_index--;
                     current_template_data.multi_stage_goals.erase(
                         current_template_data.multi_stage_goals.begin() + goal_to_remove);
+                    ms_goal_data_changed = true;
                     save_message_type = MSG_NONE;
                 }
 
@@ -2937,6 +3026,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     strncpy(new_goal.root_name, new_name, sizeof(new_goal.root_name) - 1);
                     current_template_data.multi_stage_goals.insert(
                         current_template_data.multi_stage_goals.begin() + goal_to_copy + 1, new_goal);
+                    ms_goal_data_changed = true;
                     save_message_type = MSG_NONE;
                 }
 
@@ -2949,12 +3039,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     auto &goal = current_template_data.multi_stage_goals[selected_ms_goal_index];
 
                     if (ImGui::InputText("Goal Root Name", goal.root_name, sizeof(goal.root_name))) {
+                        ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
                     }
                     if (ImGui::InputText("Display Name", goal.display_name, sizeof(goal.display_name))) {
+                        ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
                     }
                     if (ImGui::InputText("Icon Path", goal.icon_path, sizeof(goal.icon_path))) {
+                        ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
                     }
                     ImGui::SameLine();
@@ -2962,6 +3055,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         char new_path[MAX_PATH_LENGTH];
                         if (open_icon_file_dialog(new_path, sizeof(new_path))) {
                             strncpy(goal.icon_path, new_path, sizeof(goal.icon_path) - 1);
+                            ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
                         }
                     }
@@ -2972,6 +3066,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                     }
                     if (ImGui::Checkbox("Hidden", &goal.is_hidden)) {
+                        ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
                     }
                     ImGui::Separator();
@@ -2979,6 +3074,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::Text("Stages");
                     if (ImGui::Button("Add New Stage")) {
                         goal.stages.push_back({});
+                        ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
                     }
 
@@ -2987,9 +3083,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     int stage_dnd_source_index = -1;
                     int stage_dnd_target_index = -1;
-
-                    // TODO: Only show "Unlock" in this list if the version is craftmine
-                    // const char *type_names[] = {"Stat", "Advancement", "Unlock", "Criterion", "Final"};
 
                     for (size_t j = 0; j < goal.stages.size(); ++j) {
                         auto &stage = goal.stages[j];
@@ -3011,12 +3104,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::Separator();
 
                         // Group all stage controls to make them a single drag source
-                        // ImVec2 item_start_cursor_pos = ImGui::GetCursorPos(); // TODO: Not needed?
                         ImGui::BeginGroup();
                         if (ImGui::InputText("Stage ID", stage.stage_id, sizeof(stage.stage_id))) {
+                            ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::InputText("Display Text", stage.display_text, sizeof(stage.display_text))) {
+                            ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
                         }
                         // --- Dynamic Type Dropdown, unlocks only for 25w14craftmine ---
@@ -3037,24 +3131,29 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::BeginCombo("Type", current_type_name)) {
                             if (ImGui::Selectable("Stat", stage.type == SUBGOAL_STAT)) {
                                 stage.type = SUBGOAL_STAT;
+                                ms_goal_data_changed = true; // ONLY NEEDED FOR HIDDEN MS GOAL STATS LEGACY VERSION
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::Selectable(advancement_label, stage.type == SUBGOAL_ADVANCEMENT)) {
                                 stage.type = SUBGOAL_ADVANCEMENT;
+                                ms_goal_data_changed = true;
                                 save_message_type = MSG_NONE;
                             }
                             if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
                                 if (ImGui::Selectable("Unlock", stage.type == SUBGOAL_UNLOCK)) {
                                     stage.type = SUBGOAL_UNLOCK;
+                                    ms_goal_data_changed = true;
                                     save_message_type = MSG_NONE;
                                 }
                             }
                             if (ImGui::Selectable("Criterion", stage.type == SUBGOAL_CRITERION)) {
                                 stage.type = SUBGOAL_CRITERION;
+                                ms_goal_data_changed = true;
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::Selectable("Final", stage.type == SUBGOAL_MANUAL)) {
                                 stage.type = SUBGOAL_MANUAL;
+                                ms_goal_data_changed = true;
                                 save_message_type = MSG_NONE;
                             }
                             ImGui::EndCombo();
@@ -3065,6 +3164,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             snprintf(parent_label, sizeof(parent_label), "Parent %s", advancement_label);
                             if (ImGui::InputText(parent_label, stage.parent_advancement,
                                                  sizeof(stage.parent_advancement))) {
+                                ms_goal_data_changed = true;
                                 save_message_type = MSG_NONE;
                             }
                         }
@@ -3072,15 +3172,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // "Final" stages don't need a target or Root Name
                         if (stage.type != SUBGOAL_MANUAL) {
                             if (ImGui::InputText("Trigger Root Name", stage.root_name, sizeof(stage.root_name))) {
+                                ms_goal_data_changed = true;
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::InputInt("Target Value", &stage.required_progress)) {
+                                ms_goal_data_changed = true;
                                 save_message_type = MSG_NONE;
                             }
                         }
 
                         if (ImGui::Button("Copy")) {
                             stage_to_copy = j;
+                            ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
                         }
 
@@ -3088,6 +3191,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ImGui::Button("Remove")) {
                             stage_to_remove = j;
+                            ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
                         }
 
@@ -3121,11 +3225,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         goal.stages.erase(goal.stages.begin() + stage_dnd_source_index);
                         if (stage_dnd_target_index > stage_dnd_source_index) stage_dnd_target_index--;
                         goal.stages.insert(goal.stages.begin() + stage_dnd_target_index, item_to_move);
+                        ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
                     }
 
                     if (stage_to_remove != -1) {
                         goal.stages.erase(goal.stages.begin() + stage_to_remove);
+                        ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
                     }
 
@@ -3153,12 +3259,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         strncpy(new_stage.stage_id, new_id, sizeof(new_stage.stage_id) - 1);
                         goal.stages.insert(goal.stages.begin() + stage_to_copy + 1, new_stage);
+                        ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
                     }
                 } else {
                     ImGui::Text("Select a multi-stage goal from the list to edit.");
                 }
                 ImGui::EndChild();
+
+                // Call the synchronization function at the end of the tab if changes were made
+                // Properly synchronize hidden legacy multi-stage goal stats
+                if (ms_goal_data_changed && creator_selected_version <= MC_VERSION_1_6_4) {
+                    synchronize_legacy_ms_goal_stats(current_template_data);
+                }
+
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();
