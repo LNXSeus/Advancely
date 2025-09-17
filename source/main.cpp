@@ -5,7 +5,10 @@
 #include <ctime>
 #include "path_utils.h"
 
-#define MANUAL_UPDATE_TEST // Add this line to enable the test
+// TODO: Add this line to enable the update test
+// Make update_temp folder in the same directory as the executable and put .zip file extracted in there
+// This flag needs to be enabled ONLY on the version before the update
+// #define MANUAL_UPDATE_TEST
 
 // Temporarily disable specific warnings for the dmon.h library inclusion on Clang (macOS)
 #ifdef __clang__
