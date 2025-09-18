@@ -2446,6 +2446,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                              "Otherwise it shows the root names.");
                     ImGui::SetTooltip("%s", show_display_names_tooltip_buffer);
                 }
+
+                ImGui::Separator();
+
                 // 1. Create a list of pointers to render from.
                 std::vector<EditorTrackableCategory *> stats_to_render;
 
@@ -2624,6 +2627,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::BeginChild("StatDetailsPane", ImVec2(0, 0), true);
                 if (selected_stat != nullptr) {
                     auto &stat_cat = *selected_stat;
+
+                    ImGui::Text("Edit Stat Details");
+                    ImGui::Separator();
 
                     if (ImGui::InputText("Category Key", stat_cat.root_name, sizeof(stat_cat.root_name))) {
                         save_message_type = MSG_NONE;
@@ -2838,7 +2844,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
                 } else {
-                    ImGui::Text("Select a stat from the list to edit its details.");
+                    ImGui::Text("Select a Stat from the list to edit its details.");
                 }
 
                 ImGui::EndChild();
@@ -3396,6 +3402,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (selected_ms_goal != nullptr) {
                     auto &goal = *selected_ms_goal;
 
+                    ImGui::Text("Edit Multi-Stage Goal Details");
+                    ImGui::Separator();
+
                     if (ImGui::InputText("Goal Root Name", goal.root_name, sizeof(goal.root_name))) {
                         ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
@@ -3649,7 +3658,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         save_message_type = MSG_NONE;
                     }
                 } else {
-                    ImGui::Text("Select a multi-stage goal from the list to edit.");
+                    ImGui::Text("Select a Multi-Stage Goal from the list to edit its details.");
                 }
                 ImGui::EndChild();
 
