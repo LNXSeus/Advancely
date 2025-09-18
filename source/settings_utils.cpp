@@ -245,6 +245,11 @@ void settings_set_defaults(AppSettings *settings) {
     settings->check_for_updates = DEFAULT_CHECK_FOR_UPDATES;
     settings->show_welcome_on_startup = DEFAULT_SHOW_WELCOME_ON_STARTUP;
 
+    strncpy(settings->tracker_font_name, DEFAULT_TRACKER_FONT, sizeof(settings->tracker_font_name) - 1);
+    settings->tracker_font_size = DEFAULT_TRACKER_FONT_SIZE;
+    strncpy(settings->ui_font_name, DEFAULT_UI_FONT, sizeof(settings->ui_font_name) - 1);
+    settings->ui_font_size = DEFAULT_UI_FONT_SIZE;
+
     // Default Geometry
     WindowRect default_window = {DEFAULT_WINDOW_POS, DEFAULT_WINDOW_POS, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE};
     settings->tracker_window = default_window;
@@ -417,7 +422,7 @@ bool settings_load(AppSettings *settings) {
 
         const cJSON *hiding_mode = cJSON_GetObjectItem(general_settings, "goal_hiding_mode");
         if (hiding_mode && cJSON_IsNumber(hiding_mode)) {
-            settings->goal_hiding_mode = (GoalHidingMode)hiding_mode->valueint;
+            settings->goal_hiding_mode = (GoalHidingMode) hiding_mode->valueint;
         } else {
             // Backwards compatibility: Check for the old boolean key
             const cJSON *remove_completed = cJSON_GetObjectItem(general_settings, "remove_completed_goals");
@@ -530,6 +535,38 @@ bool settings_load(AppSettings *settings) {
             settings->overlay_show_update_timer = true;
             defaults_were_used = true;
         }
+
+        const cJSON *tracker_font = cJSON_GetObjectItem(general_settings, "tracker_font_name");
+        if (tracker_font && cJSON_IsString(tracker_font)) strncpy(settings->tracker_font_name,
+                                                                  tracker_font->valuestring,
+                                                                  sizeof(settings->tracker_font_name) - 1);
+        else {
+            strncpy(settings->tracker_font_name, DEFAULT_TRACKER_FONT, sizeof(settings->tracker_font_name) - 1);
+            defaults_were_used = true;
+        }
+
+        const cJSON *tracker_font_size = cJSON_GetObjectItem(general_settings, "tracker_font_size");
+        if (tracker_font_size && cJSON_IsNumber(tracker_font_size))
+            settings->tracker_font_size = (float) tracker_font_size->valuedouble;
+        else {
+            settings->tracker_font_size = DEFAULT_TRACKER_FONT_SIZE;
+            defaults_were_used = true;
+        }
+
+        const cJSON *ui_font = cJSON_GetObjectItem(general_settings, "ui_font_name");
+        if (ui_font && cJSON_IsString(ui_font)) strncpy(settings->ui_font_name, ui_font->valuestring,
+                                                        sizeof(settings->ui_font_name) - 1);
+        else {
+            strncpy(settings->ui_font_name, DEFAULT_UI_FONT, sizeof(settings->ui_font_name) - 1);
+            defaults_were_used = true;
+        }
+
+        const cJSON *ui_font_size = cJSON_GetObjectItem(general_settings, "ui_font_size");
+        if (ui_font_size && cJSON_IsNumber(ui_font_size)) settings->ui_font_size = (float) ui_font_size->valuedouble;
+        else {
+            settings->ui_font_size = DEFAULT_UI_FONT_SIZE;
+            defaults_were_used = true;
+        }
     } else {
         defaults_were_used = true;
     }
@@ -612,6 +649,16 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
 
         // Update General Settings
         cJSON *general_obj = get_or_create_object(root, "general");
+
+        // Update Font Settings
+        cJSON_DeleteItemFromObject(general_obj, "tracker_font_name");
+        cJSON_AddItemToObject(general_obj, "tracker_font_name", cJSON_CreateString(settings->tracker_font_name));
+        cJSON_DeleteItemFromObject(general_obj, "tracker_font_size");
+        cJSON_AddItemToObject(general_obj, "tracker_font_size", cJSON_CreateNumber(settings->tracker_font_size));
+        cJSON_DeleteItemFromObject(general_obj, "ui_font_name");
+        cJSON_AddItemToObject(general_obj, "ui_font_name", cJSON_CreateString(settings->ui_font_name));
+        cJSON_DeleteItemFromObject(general_obj, "ui_font_size");
+        cJSON_AddItemToObject(general_obj, "ui_font_size", cJSON_CreateNumber(settings->ui_font_size));
 
         // Add section order to general settings
         cJSON_DeleteItemFromObject(general_obj, "section_order");
@@ -778,7 +825,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         }
         fclose(file);
     } else {
-        log_message(LOG_ERROR, "[SETTINGS UTILS] Failed to open settings file for writing: %s\n", get_settings_file_path());
+        log_message(LOG_ERROR, "[SETTINGS UTILS] Failed to open settings file for writing: %s\n",
+                    get_settings_file_path());
     }
     cJSON_Delete(root);
 }

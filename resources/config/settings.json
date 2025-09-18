@@ -27,7 +27,11 @@
     "notes_use_roboto_font":	false,
     "per_world_notes": true,
     "check_for_updates": true,
-    "show_welcome_on_startup": true
+    "show_welcome_on_startup": true,
+    "tracker_font_name": "Minecraft.ttf",
+    "tracker_font_size": 16.0,
+    "ui_font_name": "Roboto-Regular.ttf",
+    "ui_font_size": 16.0
   },
   "stat_progress_override":	{
     "stat:gold_blocks_picked_up":	false,

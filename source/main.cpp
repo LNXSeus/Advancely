@@ -1152,18 +1152,27 @@ int main(int argc, char *argv[]) {
             log_message(LOG_ERROR, "[MAIN] Could not find logo texture at %s\n", logo_path);
         }
 
-        // Load Fonts
-        char minecraft_font_path[MAX_PATH_LENGTH];
-        snprintf(minecraft_font_path, sizeof(minecraft_font_path), "%s/fonts/Minecraft.ttf", get_resources_path());
-        io.Fonts->AddFontFromFileTTF(minecraft_font_path, 16.0f);
+        // 1. Load the UI Font (replaces Roboto).
+        // The first font loaded becomes the default for ImGui. We also get a pointer to it.
+        char ui_font_path[MAX_PATH_LENGTH];
+        snprintf(ui_font_path, sizeof(ui_font_path), "%s/fonts/%s", get_resources_path(), app_settings.ui_font_name);
+        if (path_exists(ui_font_path)) {
+            tracker->roboto_font = io.Fonts->AddFontFromFileTTF(ui_font_path, app_settings.ui_font_size);
+        } else { // Fallback to default if user-selected font is not found
+            snprintf(ui_font_path, sizeof(ui_font_path), "%s/fonts/%s", get_resources_path(), DEFAULT_UI_FONT);
+            tracker->roboto_font = io.Fonts->AddFontFromFileTTF(ui_font_path, DEFAULT_UI_FONT_SIZE);
+            log_message(LOG_ERROR, "[MAIN] UI Font '%s' not found. Falling back to default.\n", app_settings.ui_font_name);
+        }
 
-        // Roboto Font is for the settings inside the tracker
-        char roboto_font_path[MAX_PATH_LENGTH];
-        snprintf(roboto_font_path, sizeof(roboto_font_path), "%s/fonts/Roboto-Regular.ttf", get_resources_path());
-        tracker->roboto_font = io.Fonts->AddFontFromFileTTF(roboto_font_path, 16.0f);
-        if (tracker->roboto_font == nullptr) {
-            log_message(LOG_ERROR,
-                        "[MAIN - IMGUI] Failed to load font: resources/fonts/Roboto-Regular.ttf. Settings window will use default font.\n");
+        // 2. Load the Tracker Font (replaces Minecraft) as a secondary font.
+        char tracker_font_path[MAX_PATH_LENGTH];
+        snprintf(tracker_font_path, sizeof(tracker_font_path), "%s/fonts/%s", get_resources_path(), app_settings.tracker_font_name);
+        if (path_exists(tracker_font_path)) {
+            tracker->tracker_font = io.Fonts->AddFontFromFileTTF(tracker_font_path, app_settings.tracker_font_size);
+        } else { // Fallback to default if user-selected font is not found
+            snprintf(tracker_font_path, sizeof(tracker_font_path), "%s/fonts/%s", get_resources_path(), DEFAULT_TRACKER_FONT);
+            tracker->tracker_font = io.Fonts->AddFontFromFileTTF(tracker_font_path, DEFAULT_TRACKER_FONT_SIZE);
+            log_message(LOG_ERROR, "[MAIN] Tracker Font '%s' not found. Falling back to default.\n", app_settings.tracker_font_name);
         }
 
         // Check if the currently configured saves path is valid, regardless of mode.

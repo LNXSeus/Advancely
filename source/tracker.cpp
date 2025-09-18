@@ -2851,7 +2851,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 // TODO: Here you can adjust the padding between goal background texture and text, change the float value
                 // You need to apply it to all four rendering functions render_*_section
                 float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
-                draw_list->AddText(nullptr, 16.0f * t->zoom_level,
+                // After
+                float main_text_size = settings->tracker_font_size;
+                float sub_text_size = main_text_size * 0.875f; // e.g., 14pt for a 16pt base
+
+                draw_list->AddText(nullptr, main_text_size * t->zoom_level,
                                    ImVec2(
                                        screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
                                        text_y_pos), text_color, cat->display_name);
@@ -2859,7 +2863,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 // Render snapshot text on a new line
                 if (snapshot_text[0] != '\0') {
                     text_y_pos += text_size.y * t->zoom_level + 4.0f;
-                    draw_list->AddText(nullptr, 14.0f * t->zoom_level,
+                    draw_list->AddText(nullptr, sub_text_size * t->zoom_level,
                                        ImVec2(
                                            screen_pos.x + (
                                                bg_size.x * t->zoom_level - snapshot_text_size.x * t->zoom_level)
@@ -2868,7 +2872,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                 if (progress_text[0] != '\0') {
                     text_y_pos += text_size.y * t->zoom_level + 4.0f;
-                    draw_list->AddText(nullptr, 14.0f * t->zoom_level,
+                    draw_list->AddText(nullptr, sub_text_size * t->zoom_level,
                                        ImVec2(
                                            screen_pos.x + (
                                                bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level)
@@ -2993,7 +2997,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                             // Draw Text and Progress
                             ImU32 current_text_color = crit->done ? text_color_faded : text_color;
-                            draw_list->AddText(nullptr, 14.0f * t->zoom_level,
+                            draw_list->AddText(nullptr, sub_text_size * t->zoom_level,
                                                ImVec2(current_element_x, crit_base_pos.y + 8 * t->zoom_level),
                                                current_text_color, crit->display_name);
                             current_element_x += ImGui::CalcTextSize(crit->display_name).x * t->zoom_level + 4 * t->
@@ -3009,7 +3013,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                     snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d)", crit->progress);
                                 }
                                 if (crit_progress_text[0] != '\0') {
-                                    draw_list->AddText(nullptr, 14.0f * t->zoom_level,
+                                    draw_list->AddText(nullptr, sub_text_size * t->zoom_level,
                                                        ImVec2(current_element_x, crit_base_pos.y + 8 * t->zoom_level),
                                                        current_text_color, crit_progress_text);
                                 }
@@ -3120,7 +3124,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                             // Draw Text and Progress
                             ImU32 current_text_color = crit->done ? text_color_faded : text_color;
-                            draw_list->AddText(nullptr, 14.0f * t->zoom_level,
+                            draw_list->AddText(nullptr, sub_text_size * t->zoom_level,
                                                ImVec2(current_element_x, crit_base_pos.y + 8 * t->zoom_level),
                                                current_text_color, crit->display_name);
                             current_element_x += ImGui::CalcTextSize(crit->display_name).x * t->zoom_level + 4 * t->
@@ -3136,7 +3140,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                     snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d)", crit->progress);
                                 }
                                 if (crit_progress_text[0] != '\0') {
-                                    draw_list->AddText(nullptr, 14.0f * t->zoom_level,
+                                    draw_list->AddText(nullptr, sub_text_size * t->zoom_level,
                                                        ImVec2(current_element_x, crit_base_pos.y + 8 * t->zoom_level),
                                                        current_text_color, crit_progress_text);
                                 }
@@ -3374,8 +3378,11 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
             ImVec2 text_size = ImGui::CalcTextSize(item->display_name);
 
+            float main_text_size = settings->tracker_font_size;
+
+
             // The 4.0f is for padding between the text and the background
-            draw_list->AddText(nullptr, 16.0f * t->zoom_level,
+            draw_list->AddText(nullptr, main_text_size * t->zoom_level,
                                ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
                                       screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level)), text_color,
                                item->display_name);
@@ -3589,14 +3596,17 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
             }
 
+            float main_text_size = settings->tracker_font_size;
+            float sub_text_size = main_text_size * 0.875f; // e.g., 14pt for a 16pt base
+
 
             // The 4.0f is for padding, can be adjusted
-            draw_list->AddText(nullptr, 16.0f * t->zoom_level,
+            draw_list->AddText(nullptr, main_text_size * t->zoom_level,
                                ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
                                       screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level)), text_color,
                                item->display_name);
             if (progress_text[0] != '\0') {
-                draw_list->AddText(nullptr, 14.0f * t->zoom_level,
+                draw_list->AddText(nullptr, sub_text_size * t->zoom_level,
                                    ImVec2(
                                        screen_pos.x + (bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level)
                                        *
@@ -3860,12 +3870,15 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                 draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
             }
 
+            float main_text_size = settings->tracker_font_size;
+            float sub_text_size = main_text_size * 0.875f; // e.g., 14pt for a 16pt base
+
             // The 4.0f is for padding, can be adjusted
-            draw_list->AddText(nullptr, 16.0f * t->zoom_level,
+            draw_list->AddText(nullptr, main_text_size * t->zoom_level,
                                ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
                                       screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level)), text_color,
                                goal->display_name);
-            draw_list->AddText(nullptr, 14.0f * t->zoom_level,
+            draw_list->AddText(nullptr, sub_text_size * t->zoom_level,
                                ImVec2(
                                    screen_pos.x + (bg_size.x * t->zoom_level - stage_text_size.x * t->zoom_level) *
                                    0.5f,
@@ -3915,6 +3928,11 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     ImGui::Begin("TrackerMap", nullptr,
                  ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoMove |
                  ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+    // Push the tracker font
+    if (t->tracker_font) {
+        ImGui::PushFont(t->tracker_font);
+    }
 
     // Pan and zoom logic
     if (ImGui::IsWindowHovered()) {
@@ -4300,11 +4318,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             ImGui::PopStyleColor();
             ImGui::Separator();
 
-            // Capture the font setting at the beginning of the frame.
-            // This ensures PushFont and PopFont are always balanced, even if the setting changes mid-frame.
-            const bool use_roboto = settings->notes_use_roboto_font;
-
-            if (use_roboto && t->roboto_font) {
+            // If the "Use Settings Font" option is enabled, push the UI font.
+            if (settings->notes_use_roboto_font && t->roboto_font) {
                 ImGui::PushFont(t->roboto_font);
             }
 
@@ -4358,13 +4373,18 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                     "%s", use_settings_font_tooltip_buffer);
             }
 
-            // Use the captured state to decide whether to pop the font.
-            if (use_roboto && t->roboto_font) {
+            // Pop the UI font only if we pushed it.
+            if (settings->notes_use_roboto_font && t->roboto_font) {
                 ImGui::PopFont();
             }
         }
         // End() must always be called to match a Begin(), regardless of its return value.
         ImGui::End();
+    }
+
+    // Pop the font at the very end, so everything inside TrackerMap uses it.
+    if (t->tracker_font) {
+        ImGui::PopFont();
     }
 
 

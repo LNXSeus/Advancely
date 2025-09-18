@@ -18,6 +18,7 @@
 #include "path_utils.h" // For path_exists()
 #include "template_scanner.h"
 #include "temp_creator.h"
+#include "tinyfiledialogs.h"
 
 // Helper function to robustly compare two AppSettings structs
 // Changing window geometry of overlay and tracker window DO NOT cause the "Unsaved Changes" text to appear.
@@ -51,6 +52,11 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         // Changes to window geometry of overlay and tracker window DO NOT cause the "Unsaved Changes" text to appear.
         // memcmp(&a->tracker_window, &b->tracker_window, sizeof(WindowRect)) != 0 ||
         // memcmp(&a->overlay_window, &b->overlay_window, sizeof(WindowRect)) != 0 ||
+
+        strcmp(a->tracker_font_name, b->tracker_font_name) != 0 ||
+        a->tracker_font_size != b->tracker_font_size ||
+        strcmp(a->ui_font_name, a->ui_font_name) != 0 ||
+        a->ui_font_size != a->ui_font_size ||
 
         memcmp(&a->tracker_bg_color, &b->tracker_bg_color, sizeof(ColorRGBA)) != 0 ||
         memcmp(&a->overlay_bg_color, &b->overlay_bg_color, sizeof(ColorRGBA)) != 0 ||
@@ -712,6 +718,59 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         }
     }
 
+    ImGui::SeparatorText("Fonts");
+
+    // --- Tracker/Overlay Font ---
+    ImGui::Text("Tracker/Overlay Font: %s", temp_settings.tracker_font_name);
+    ImGui::SameLine();
+    if (ImGui::Button("Browse##TrackerFont")) {
+        const char *filterPatterns[2] = {"*.ttf", "*.otf"};
+        // We assume a helper function open_file_dialog exists, similar to your icon dialog
+        // It should open in the resources/fonts directory
+        const char *result = tinyfd_openFileDialog("Select Tracker/Overlay Font", "", 2, filterPatterns, "Font Files",
+                                                   0);
+        if (result) {
+            // Extract just the filename from the full path
+            const char *filename = strrchr(result, '/');
+            if (!filename) filename = strrchr(result, '\\'); // Fallback for Windows paths
+            filename = filename ? filename + 1 : result; // If no slash, it's already the filename
+
+            strncpy(temp_settings.tracker_font_name, filename, sizeof(temp_settings.tracker_font_name) - 1);
+        }
+    }
+    // TODO: Implement later with proper relative spacing, just need to enable setting again
+    // ImGui::DragFloat("Tracker Font Size", &temp_settings.tracker_font_size, 0.5f, 8.0f, 72.0f, "%.1f");
+
+
+    // --- Settings/UI Font ---
+    ImGui::Text("Settings/UI Font: %s", temp_settings.ui_font_name);
+    ImGui::SameLine();
+    if (ImGui::Button("Browse##UIFont")) {
+        const char *filterPatterns[2] = {"*.ttf", "*.otf"};
+        const char *result = tinyfd_openFileDialog("Select Settings/UI Font", "", 2, filterPatterns, "Font Files", 0);
+        if (result) {
+            const char *filename = strrchr(result, '/');
+            if (!filename) filename = strrchr(result, '\\');
+            filename = filename ? filename + 1 : result;
+
+            strncpy(temp_settings.ui_font_name, filename, sizeof(temp_settings.ui_font_name) - 1);
+        }
+    }
+    // TODO: Implement later with proper relative spacing, just need to enable setting again
+    // ImGui::DragFloat("Settings Font Size", &temp_settings.ui_font_size, 0.5f, 8.0f, 72.0f, "%.1f");
+
+    // --- Restart Warning ---
+    bool font_settings_changed =
+            strcmp(temp_settings.tracker_font_name, saved_settings.tracker_font_name) != 0 ||
+            temp_settings.tracker_font_size != saved_settings.tracker_font_size ||
+            strcmp(temp_settings.ui_font_name, saved_settings.ui_font_name) != 0 ||
+            temp_settings.ui_font_size != saved_settings.ui_font_size;
+
+    if (font_settings_changed) {
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
+                           "First apply the settings then restart the app to apply font changes.");
+    }
+
     ImGui::Separator();
     ImGui::Spacing();
 
@@ -1131,6 +1190,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Speed Up Animation: %s\n"
                  "  - Hide Completed Row 3 Goals: %s\n"
                  "  - Always On Top: %s\n"
+                 "  - Tracker Font: %s\n"
+                 "  - UI Font: %s\n"
                  "  - Goal Visibility: Hide All Completed\n"
                  "  - Overlay Width: %dpx\n"
                  "  - Notes Use Settings Font: %s\n"
@@ -1150,6 +1211,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_OVERLAY_SPEED_UP ? "Enabled" : "Disabled",
                  DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
                  DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
+                 DEFAULT_TRACKER_FONT,
+                 DEFAULT_UI_FONT,
                  OVERLAY_DEFAULT_WIDTH,
                  DEFAULT_NOTES_USE_ROBOTO ? "Enabled" : "Disabled",
                  DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled",

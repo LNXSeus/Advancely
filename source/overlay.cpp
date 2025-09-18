@@ -209,10 +209,16 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
 
     // Make font HiDPI aware by loading it at a base point size (e.g., 24).
     // SDL_ttf will automatically scale it correctly on any monitor at render time.
-    const float base_font_size = 24.0f;
-    char minecraft_font_path[1024];
-    snprintf(minecraft_font_path, sizeof(minecraft_font_path), "%s/fonts/Minecraft.ttf", get_resources_path());
-    o->font = TTF_OpenFont(minecraft_font_path, base_font_size);
+    const float base_font_size = DEFAULT_OVERLAY_FONT_SIZE;
+    char overlay_font_path[1024];
+    snprintf(overlay_font_path, sizeof(overlay_font_path), "%s/fonts/%s", get_resources_path(), settings->tracker_font_name);
+
+    if (!path_exists(overlay_font_path)) {
+        log_message(LOG_ERROR, "[OVERLAY] Tracker/Overlay Font '%s' not found. Falling back to default Minecraft font.\n", settings->tracker_font_name);
+        snprintf(overlay_font_path, sizeof(overlay_font_path), "%s/fonts/Minecraft.ttf", get_resources_path());
+    }
+
+    o->font = TTF_OpenFont(overlay_font_path, base_font_size);
     if (!o->font) {
         log_message(LOG_ERROR, "[OVERLAY] Failed to load font: %s\n", SDL_GetError());
         overlay_free(overlay, settings);

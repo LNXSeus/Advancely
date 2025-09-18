@@ -70,6 +70,13 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_CATEGORY "all_advancements" // Also needs to be changed in settings_load()
 #define DEFAULT_OPTIONAL_FLAG ""  // Also needs to be changed in settings_load()
 
+#define DEFAULT_TRACKER_FONT "Minecraft.ttf" // The overlay also uses this font
+#define DEFAULT_TRACKER_FONT_SIZE 16.0f
+#define DEFAULT_UI_FONT "Roboto-Regular.ttf"
+#define DEFAULT_UI_FONT_SIZE 16.0f
+
+#define DEFAULT_OVERLAY_FONT_SIZE 24.0f // This is fixed currently
+
 // Default window positions/sizes. -1 means centered or default size.
 #define DEFAULT_WINDOW_POS (-1)
 #define DEFAULT_WINDOW_SIZE (-1)
@@ -148,6 +155,12 @@ struct AppSettings {
     float overlay_stat_cycle_speed; // Time in seconds between cycling sub-stats on the overlay.
     bool notes_use_roboto_font; // If true, the notes window uses the Roboto font instead of the default.
     bool per_world_notes; // If true, notes are saved per world instead of per template
+
+    // --- Font Settings --- (require restart)
+    char tracker_font_name[256];      // Filename of the font for the trackermap/overlay.
+    float tracker_font_size;          // Base size for the main trackermap font. Overlay is fixed.
+    char ui_font_name[256];           // Filename of the font for ImGui UI (settings, etc.).
+    float ui_font_size;               // Base size for the UI font.
 
     // --- Window Geometry ---
     WindowRect tracker_window; // The saved position and size of the main tracker window.

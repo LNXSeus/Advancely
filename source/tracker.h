@@ -90,7 +90,8 @@ struct Tracker {
     int notes_widget_id_counter; // Used to force-reset the notes widget UI state
 
     // --- Fonts ---
-    ImFont *roboto_font; // ImGui font for the settings window UI.
+    ImFont *roboto_font; // ImGui font for the settings window UI. Now loaded from ui_font_name.
+    ImFont *tracker_font; // ImGui font for the main tracker grid display. Loaded from tracker_font_name.
     TTF_Font *minecraft_font; // SDL_TTF font for the overlay window.
 
     // --- Core Data ---
