@@ -1425,6 +1425,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::Text("Existing Templates");
     ImGui::Separator();
 
+    // Determine if search is active for the template list
+    bool is_template_search_active = (current_search_scope == SCOPE_TEMPLATES && tc_search_buffer[0] != '\0');
+
     for (int i = 0; i < discovered_template_count; i++) {
         char item_label[MAX_PATH_LENGTH * 2];
         if (discovered_templates[i].optional_flag[0] != '\0') {
@@ -1434,6 +1437,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         } else {
             // Without optional flag
             snprintf(item_label, sizeof(item_label), "%s", discovered_templates[i].category);
+        }
+
+        // Search Filter
+        // If search is active and the label doesn't match, skip rendering this item.
+        if (is_template_search_active && !str_contains_insensitive(item_label, tc_search_buffer)) {
+            continue;
         }
 
         if (ImGui::Selectable(item_label, selected_template_index == i)) {
@@ -1694,14 +1703,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
         ImGui::Text("Languages for '%s%s'", selected.category, selected.optional_flag);
 
-        std::vector<const char *> lang_display_names;
-        for (const auto &flag: selected.available_lang_flags) {
-            lang_display_names.push_back(flag.empty() ? "Default (_lang.json)" : flag.c_str());
-        }
+        // Replace ListBox with a filterable list
+        bool is_lang_search_active = (current_search_scope == SCOPE_LANGUAGES && tc_search_buffer[0] != '\0');
 
-        ImGui::SetNextItemWidth(-1);
-        ImGui::ListBox("##LangList", &selected_lang_index, lang_display_names.data(), (int) lang_display_names.size(),
-                       5);
+        // Use a child window to create a scrollable area for the list
+        ImGui::BeginChild("LanguageListChild", ImVec2(-1, 125), true); // 125px height
+
+        for (size_t i = 0; i < selected.available_lang_flags.size(); ++i) {
+            const auto& flag = selected.available_lang_flags[i];
+            const char* display_name = flag.empty() ? "Default (_lang.json)" : flag.c_str();
+
+            // --- SEARCH FILTER ---
+            if (is_lang_search_active && !str_contains_insensitive(display_name, tc_search_buffer)) {
+                continue;
+            }
+
+            if (ImGui::Selectable(display_name, selected_lang_index == (int)i)) {
+                selected_lang_index = i;
+            }
+        }
+        ImGui::EndChild();
 
         auto create_action = [&]() {
             show_create_lang_popup = true;
