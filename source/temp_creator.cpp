@@ -1710,15 +1710,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::BeginChild("LanguageListChild", ImVec2(-1, 125), true); // 125px height
 
         for (size_t i = 0; i < selected.available_lang_flags.size(); ++i) {
-            const auto& flag = selected.available_lang_flags[i];
-            const char* display_name = flag.empty() ? "Default (_lang.json)" : flag.c_str();
+            const auto &flag = selected.available_lang_flags[i];
+            const char *display_name = flag.empty() ? "Default (_lang.json)" : flag.c_str();
 
             // --- SEARCH FILTER ---
             if (is_lang_search_active && !str_contains_insensitive(display_name, tc_search_buffer)) {
                 continue;
             }
 
-            if (ImGui::Selectable(display_name, selected_lang_index == (int)i)) {
+            if (ImGui::Selectable(display_name, selected_lang_index == (int) i)) {
                 selected_lang_index = i;
             }
         }
@@ -2846,9 +2846,25 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     int item_to_copy = -1;
                     int unlocks_dnd_source_index = -1;
                     int unlocks_dnd_target_index = -1;
+
+                    // Determine if search is active for this scope
+                    bool is_unlock_search_active = (
+                        current_search_scope == SCOPE_UNLOCKS && tc_search_buffer[0] != '\0');
+
                     for (size_t i = 0; i < current_template_data.unlocks.size(); i++) {
-                        ImGui::PushID(i);
                         auto &unlock = current_template_data.unlocks[i];
+
+                        // SEARCH FILTER
+                        // If search is active, check both display name and root name.
+                        // If neither matches, skip rendering this item.
+                        if (is_unlock_search_active) {
+                            if (!str_contains_insensitive(unlock.display_name, tc_search_buffer) &&
+                                !str_contains_insensitive(unlock.root_name, tc_search_buffer)) {
+                                continue;
+                            }
+                        }
+
+                        ImGui::PushID(i);
 
                         // Add some vertical spacing to create a gap
                         ImGui::Spacing();
@@ -2995,9 +3011,25 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 int item_to_copy = -1;
                 int custom_dnd_source_index = -1;
                 int custom_dnd_target_index = -1;
+
+                // Determine if search is active for this scope
+                bool is_custom_search_active = (current_search_scope == SCOPE_CUSTOM && tc_search_buffer[0] != '\0');
+
+
                 for (size_t i = 0; i < current_template_data.custom_goals.size(); ++i) {
-                    ImGui::PushID(i);
                     auto &goal = current_template_data.custom_goals[i];
+
+                    // SEARCH FILTER
+                    // If search is active, check both display name and root name.
+                    // If neither matches, skip rendering this item.
+                    if (is_custom_search_active) {
+                        if (!str_contains_insensitive(goal.display_name, tc_search_buffer) &&
+                            !str_contains_insensitive(goal.root_name, tc_search_buffer)) {
+                            continue;
+                        }
+                    }
+
+                    ImGui::PushID(i);
 
                     // Add some vertical spacing to create a gap
                     ImGui::Spacing();

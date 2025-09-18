@@ -1,6 +1,6 @@
 ![readme_assets/Advancely_Logo.png](readme_assets/Advancely_Logo.png)
 
-# [**DOWNLOAD ADVANCELY NOW\! (Windows, Linux & macOS, any MC Java Version)**](https://github.com/LNXSeus/Advancely/releases)
+# [**DOWNLOAD ADVANCELY NOW\! (Windows, Linux & macOS (X64 & ARM64), any MC Java Version)**](https://github.com/LNXSeus/Advancely/releases)
 
 # A highly customizable and interactive tool to track Minecraft progress beyond just Advancements.
 
