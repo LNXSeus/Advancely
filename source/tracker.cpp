@@ -128,14 +128,9 @@ static void tracker_update_notes_path(Tracker *t, const AppSettings *settings) {
 }
 
 
-/**
- * @brief Performs a case-insensitive check to see if a string contains another string.
- * Empty search querry matches everything
- * @param haystack The string to search within.
- * @param needle The string to search for.
- * @return True if the needle is found in the haystack, false otherwise.
- */
-static bool str_contains_insensitive(const char *haystack, const char *needle) {
+// NON STATIC FUNCTION -------------------------------------------------------------------
+
+bool str_contains_insensitive(const char *haystack, const char *needle) {
     if (!needle || *needle == '\0') return true; // An empty search query matches everything
     if (!haystack) return false;
 
@@ -149,6 +144,8 @@ static bool str_contains_insensitive(const char *haystack, const char *needle) {
 
     return haystack_lower.find(needle_lower) != std::string::npos;
 }
+
+// END OF NON STATIC FUNCTION -------------------------------------------------------------------
 
 
 /**

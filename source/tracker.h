@@ -110,6 +110,14 @@ struct Tracker {
     char snapshot_path[MAX_PATH_LENGTH]; // Full path to the snapshot file for legacy stat tracking.
 };
 
+/**
+ * @brief Performs a case-insensitive check to see if a string contains another string.
+ * Empty search querry matches everything
+ * @param haystack The string to search within.
+ * @param needle The string to search for.
+ * @return True if the needle is found in the haystack, false otherwise.
+ */
+bool str_contains_insensitive(const char *haystack, const char *needle);
 
 /**
  * @brief Loads an SDL_Texture from a file and sets its scale mode.

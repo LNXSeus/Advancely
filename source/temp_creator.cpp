@@ -1173,9 +1173,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static bool show_advancement_display_names = true;
     static bool show_stat_display_names = true;
     static bool show_ms_goal_display_names = true;
-    static int selected_advancement_index = -1; // Tracks which advancement is currently selected in the editor
-    static int selected_stat_index = -1;
-    static int selected_ms_goal_index = -1;
+    static EditorTrackableCategory *selected_advancement = nullptr;
+    static EditorTrackableCategory *selected_stat = nullptr;
+    static EditorMultiStageGoal *selected_ms_goal = nullptr;
     static bool show_unsaved_changes_popup = false;
     static std::function<void()> pending_action = nullptr;
 
@@ -1269,7 +1269,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::SetNextWindowSize(ImVec2(1280, 720), ImGuiCond_FirstUseEver);
     ImGui::Begin("Template Creator", p_open);
 
-    if (t) { // For global event handler to not clash with the other Ctrl + F or Cmd + F
+    if (t) {
+        // For global event handler to not clash with the other Ctrl + F or Cmd + F
         t->is_temp_creator_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
     }
 
@@ -1951,17 +1952,59 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 ImGui::Separator();
 
-                int advancement_to_remove = -1;
-                int advancement_to_copy = -1; // To queue a copy action
+                // Filtering and Rendering Logic
+
+                // 1. Create a list of pointers to render from
+                std::vector<EditorTrackableCategory *> advancements_to_render;
+
+                // 2. Populate the list: either with all items, or with filtered items.
+                bool search_active = (tc_search_buffer[0] != '\0' && current_search_scope == SCOPE_ADVANCEMENTS);
+
+                if (search_active) {
+                    // Search is active for this scope: populate with filtered results.
+                    for (auto &advancement: current_template_data.advancements) {
+                        bool parent_match = str_contains_insensitive(advancement.display_name, tc_search_buffer) ||
+                                            str_contains_insensitive(advancement.root_name, tc_search_buffer);
+
+                        if (parent_match) {
+                            advancements_to_render.push_back(&advancement);
+                            continue; // Parent matches, no need to check children
+                        }
+
+                        // If parent doesn't match, check its children (criteria)
+                        bool child_match = false;
+                        for (const auto &criterion: advancement.criteria) {
+                            if (str_contains_insensitive(criterion.display_name, tc_search_buffer) ||
+                                str_contains_insensitive(criterion.root_name, tc_search_buffer)) {
+                                child_match = true;
+                                break;
+                            }
+                        }
+
+                        if (child_match) {
+                            advancements_to_render.push_back(&advancement);
+                        }
+                    }
+                } else {
+                    // Search is not active: populate with pointers to all items.
+                    for (auto &advancement: current_template_data.advancements) {
+                        advancements_to_render.push_back(&advancement);
+                    }
+                }
+
+                int advancement_to_remove_idx = -1;
+                int advancement_to_copy_idx = -1; // To queue a copy action
 
                 // State for drag and drop
                 int adv_dnd_source_index = -1;
                 int adv_dnd_target_index = -1;
 
-                for (size_t i = 0; i < current_template_data.advancements.size(); ++i) {
-                    ImGui::PushID(i);
+                for (size_t i = 0; i < advancements_to_render.size(); ++i) {
+                    auto &advancement = *advancements_to_render[i]; // Dereference the pointer
+                    ImGui::PushID(&advancement); // Use pointer for a stable ID
 
-                    const auto &advancement = current_template_data.advancements[i];
+                    // TODO: Remove?
+                    // const auto &advancement = current_template_data.advancements[i];
                     const char *display_name = advancement.display_name;
                     const char *root_name = advancement.root_name;
 
@@ -1977,30 +2020,34 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // Draw the "X" (Remove) button
                     if (ImGui::Button("X")) {
-                        advancement_to_remove = i;
+                        advancement_to_remove_idx = i;
                         save_message_type = MSG_NONE;
                     }
                     ImGui::SameLine();
 
                     // Draw the "Copy" button
                     if (ImGui::Button("Copy")) {
-                        advancement_to_copy = i;
+                        advancement_to_copy_idx = i;
                         save_message_type = MSG_NONE;
                     }
                     ImGui::SameLine();
 
-                    // Draw the selectable, which now takes the remaining space
-                    if (ImGui::Selectable(label, selected_advancement_index == (int) i)) {
-                        // (Logic to handle selection and unsaved changes remains the same)
-                        if (selected_advancement_index != (int) i) {
+                    // `advancement_ptr` is the pointer from the `advancements_to_render` vector
+                    // auto& advancement = *advancement_ptr;
+
+                    if (ImGui::Selectable(label, &advancement == selected_advancement)) {
+                        // Compare pointers
+                        // Check if the user is selecting a *different* item than the one currently selected
+                        if (&advancement != selected_advancement) {
                             if (editor_has_unsaved_changes) {
                                 show_unsaved_changes_popup = true;
-                                pending_action = [&, i]() {
-                                    // Pneding action only changes the index
-                                    selected_advancement_index = i;
+                                // The pending action now captures the pointer to the newly selected advancement
+                                pending_action = [&, new_selection = &advancement]() {
+                                    selected_advancement = new_selection;
                                 };
                             } else {
-                                selected_advancement_index = i;
+                                // No unsaved changes, so we can select the new item immediately
+                                selected_advancement = &advancement;
                             }
                         }
                     }
@@ -2025,50 +2072,74 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::PopID();
                 }
 
-                // Handle Drag and Drop reordering after the loop to avoid modifying the vector while iterating
+                // Handle Drag and Drop reordering after the loop
                 if (adv_dnd_source_index != -1 && adv_dnd_target_index != -1) {
-                    EditorTrackableCategory item_to_move = current_template_data.advancements[adv_dnd_source_index];
-                    current_template_data.advancements.erase(
-                        current_template_data.advancements.begin() + adv_dnd_source_index);
-                    current_template_data.advancements.insert(
-                        current_template_data.advancements.begin() + adv_dnd_target_index, item_to_move);
+                    // Get pointers to the source and target items from the list that was rendered
+                    EditorTrackableCategory *source_item_ptr = advancements_to_render[adv_dnd_source_index];
+                    EditorTrackableCategory *target_item_ptr = advancements_to_render[adv_dnd_target_index];
 
-                    // Update selection to follow the moved item
-                    if (selected_advancement_index == adv_dnd_source_index) {
-                        selected_advancement_index = adv_dnd_target_index;
-                    }
+                    // Find the iterator for the source item in the original data vector
+                    auto source_it = std::find_if(current_template_data.advancements.begin(),
+                                                  current_template_data.advancements.end(),
+                                                  [&](const EditorTrackableCategory &adv) {
+                                                      return &adv == source_item_ptr;
+                                                  });
+
+                    // Create a copy of the item to move, then erase it
+                    EditorTrackableCategory item_to_move = *source_item_ptr;
+                    current_template_data.advancements.erase(source_it);
+
+                    // Find the iterator for the target item in the (now modified) original vector
+                    auto target_it = std::find_if(current_template_data.advancements.begin(),
+                                                  current_template_data.advancements.end(),
+                                                  [&](const EditorTrackableCategory &adv) {
+                                                      return &adv == target_item_ptr;
+                                                  });
+
+                    // Insert the copied item at the target's position
+                    current_template_data.advancements.insert(target_it, item_to_move);
 
                     save_message_type = MSG_NONE;
                 }
 
                 // Handle removal
-                if (advancement_to_remove != -1) {
-                    // If the removed item is the selected one, deselect it
-                    if (selected_advancement_index == advancement_to_remove) {
-                        selected_advancement_index = -1;
+                if (advancement_to_remove_idx != -1) {
+                    // Get a pointer to the item that was marked for removal
+                    EditorTrackableCategory *adv_to_remove = advancements_to_render[advancement_to_remove_idx];
+
+                    // If the removed item was the currently selected one, deselect it (set pointer to null)
+                    if (selected_advancement == adv_to_remove) {
+                        selected_advancement = nullptr;
                     }
-                    // If we remove an item before the selected one, we need to shift the index down
-                    else if (selected_advancement_index > advancement_to_remove) {
-                        selected_advancement_index--;
-                    }
+
+                    // Use the C++ erase-remove idiom to find and remove the correct object
+                    // from the original data source by comparing its memory address.
                     current_template_data.advancements.erase(
-                        current_template_data.advancements.begin() + advancement_to_remove);
+                        std::remove_if(current_template_data.advancements.begin(),
+                                       current_template_data.advancements.end(),
+                                       [&](const EditorTrackableCategory &adv) {
+                                           return &adv == adv_to_remove;
+                                       }),
+                        current_template_data.advancements.end()
+                    );
                     save_message_type = MSG_NONE;
                 }
 
                 // Handle copying
-                if (advancement_to_copy != -1) {
-                    const auto &source_advancement = current_template_data.advancements[advancement_to_copy];
-                    EditorTrackableCategory new_advancement = source_advancement; // Create a deep copy
+                if (advancement_to_copy_idx != -1) {
+                    // Get a pointer to the source item to copy from the filtered list
+                    const EditorTrackableCategory *source_adv_ptr = advancements_to_render[advancement_to_copy_idx];
 
+                    // Create a deep copy of the object
+                    EditorTrackableCategory new_advancement = *source_adv_ptr;
+
+                    // --- Generate a unique root_name for the copy ---
                     char base_name[192];
-                    strncpy(base_name, source_advancement.root_name, sizeof(base_name) - 1);
+                    strncpy(base_name, source_adv_ptr->root_name, sizeof(base_name) - 1);
                     base_name[sizeof(base_name) - 1] = '\0';
 
                     char new_name[192];
                     int copy_counter = 1;
-
-                    // Loop to find a unique name
                     while (true) {
                         if (copy_counter == 1) {
                             snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
@@ -2076,7 +2147,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
                         }
 
-                        // Check if this name already exists
+                        // Check against the full original list to ensure the name is truly unique
                         bool name_exists = false;
                         for (const auto &adv: current_template_data.advancements) {
                             if (strcmp(adv.root_name, new_name) == 0) {
@@ -2084,17 +2155,29 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 break;
                             }
                         }
-
                         if (!name_exists) {
                             break; // Found a unique name
                         }
-                        copy_counter++; // Increment and try the next number
+                        copy_counter++;
                     }
-
-                    // Apply the new unique name and insert the copy
                     strncpy(new_advancement.root_name, new_name, sizeof(new_advancement.root_name) - 1);
-                    current_template_data.advancements.insert(
-                        current_template_data.advancements.begin() + advancement_to_copy + 1, new_advancement);
+                    // --- End of unique name generation ---
+
+                    // Find the position of the source item in the original vector
+                    auto it = std::find_if(current_template_data.advancements.begin(),
+                                           current_template_data.advancements.end(),
+                                           [&](const EditorTrackableCategory &adv) {
+                                               return &adv == source_adv_ptr;
+                                           });
+
+                    // Insert the new copy right after the source item
+                    if (it != current_template_data.advancements.end()) {
+                        current_template_data.advancements.insert(it + 1, new_advancement);
+                    } else {
+                        // Fallback: if source not found (shouldn't happen), add to the end
+                        current_template_data.advancements.push_back(new_advancement);
+                    }
+                    save_message_type = MSG_NONE;
                 }
 
                 ImGui::EndChild(); // End of Left Pane
@@ -2102,9 +2185,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 // RIGHT PANE: Details of Selected Advancement
                 ImGui::BeginChild("AdvancementDetailsPane", ImVec2(0, 0), true);
-                if (selected_advancement_index != -1 && (size_t) selected_advancement_index < current_template_data.
-                    advancements.size()) {
-                    auto &advancement = current_template_data.advancements[selected_advancement_index];
+                if (selected_advancement != nullptr) {
+                    auto &advancement = *selected_advancement; // Dereference pointer
 
                     char details_title[64];
                     snprintf(details_title, sizeof(details_title), "Edit %s Details", advancement_label);
@@ -2318,22 +2400,57 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                              "Otherwise it shows the root names.");
                     ImGui::SetTooltip("%s", show_display_names_tooltip_buffer);
                 }
-                ImGui::Separator();
+                // 1. Create a list of pointers to render from.
+                std::vector<EditorTrackableCategory *> stats_to_render;
 
-                int stat_to_remove = -1;
-                int stat_to_copy = -1; // To queue a copy action
+                // 2. Populate the list based on the search criteria.
+                bool search_active = (tc_search_buffer[0] != '\0' && current_search_scope == SCOPE_STATS);
 
-                // State for drag and drop
+                if (search_active) {
+                    for (auto &stat_cat: current_template_data.stats) {
+                        bool parent_match = str_contains_insensitive(stat_cat.display_name, tc_search_buffer) ||
+                                            str_contains_insensitive(stat_cat.root_name, tc_search_buffer);
+
+                        if (parent_match) {
+                            stats_to_render.push_back(&stat_cat);
+                            continue;
+                        }
+
+                        bool child_match = false;
+                        if (!stat_cat.is_simple_stat) {
+                            // Only search criteria for multi-stats
+                            for (const auto &criterion: stat_cat.criteria) {
+                                if (str_contains_insensitive(criterion.display_name, tc_search_buffer) ||
+                                    str_contains_insensitive(criterion.root_name, tc_search_buffer)) {
+                                    child_match = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (child_match) {
+                            stats_to_render.push_back(&stat_cat);
+                        }
+                    }
+                } else {
+                    // Search is inactive, so show all stats.
+                    for (auto &stat_cat: current_template_data.stats) {
+                        stats_to_render.push_back(&stat_cat);
+                    }
+                }
+
+                // 3. Render the list using pointers.
+                int stat_to_remove_idx = -1;
+                int stat_to_copy_idx = -1;
                 int stat_dnd_source_index = -1;
                 int stat_dnd_target_index = -1;
 
-                for (size_t i = 0; i < current_template_data.stats.size(); i++) {
-                    ImGui::PushID(i);
+                for (size_t i = 0; i < stats_to_render.size(); i++) {
+                    auto &stat = *stats_to_render[i];
+                    ImGui::PushID(&stat);
 
-                    const auto &stat = current_template_data.stats[i];
                     const char *display_name = stat.display_name;
                     const char *root_name = stat.root_name;
-
                     const char *label = show_stat_display_names
                                             ? (display_name[0] ? display_name : root_name)
                                             : root_name;
@@ -2341,44 +2458,29 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         label = "[New Stat]";
                     }
 
-                    // Draw the "X" (Remove) button
-                    if (ImGui::Button("X")) {
-                        stat_to_remove = i;
-                        save_message_type = MSG_NONE;
-                    }
+                    if (ImGui::Button("X")) { stat_to_remove_idx = i; }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Copy")) { stat_to_copy_idx = i; }
                     ImGui::SameLine();
 
-                    // Draw the "Copy" button
-                    if (ImGui::Button("Copy")) {
-                        stat_to_copy = i;
-                        save_message_type = MSG_NONE;
-                    }
-                    ImGui::SameLine();
-
-                    // Draw the selectable, which now takes the remaining space
-                    if (ImGui::Selectable(label, selected_stat_index == (int) i)) {
-                        // (Logic to handle selection and unsaved changes remains the same)
-                        if (selected_stat_index != (int) i) {
+                    if (ImGui::Selectable(label, &stat == selected_stat)) {
+                        if (&stat != selected_stat) {
                             if (editor_has_unsaved_changes) {
                                 show_unsaved_changes_popup = true;
-                                pending_action = [&, i]() {
-                                    selected_stat_index = i;
+                                pending_action = [&, new_selection = &stat]() {
+                                    selected_stat = new_selection;
                                 };
                             } else {
-                                selected_stat_index = i;
+                                selected_stat = &stat;
                             }
                         }
                     }
 
-                    // DRAG AND DROP LOGIC
-                    // Make the entire row a drag source
                     if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
-                        // Use a unique payload ID for this list
                         ImGui::SetDragDropPayload("STAT_DND", &i, sizeof(int));
                         ImGui::Text("Reorder %s", label);
                         ImGui::EndDragDropSource();
                     }
-                    // Make the entire row a drop target
                     if (ImGui::BeginDragDropTarget()) {
                         if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("STAT_DND")) {
                             stat_dnd_source_index = *(const int *) payload->Data;
@@ -2386,84 +2488,86 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         ImGui::EndDragDropTarget();
                     }
-
                     ImGui::PopID();
                 }
 
-                // Handle Drag and Drop reordering after the loop to avoid modifying the vector while iterating
+                // Handle Drag and Drop
                 if (stat_dnd_source_index != -1 && stat_dnd_target_index != -1) {
-                    EditorTrackableCategory item_to_move = current_template_data.stats[stat_dnd_source_index];
-                    current_template_data.stats.erase(
-                        current_template_data.stats.begin() + stat_dnd_source_index);
-                    current_template_data.stats.insert(
-                        current_template_data.stats.begin() + stat_dnd_target_index, item_to_move);
+                    EditorTrackableCategory *source_item_ptr = stats_to_render[stat_dnd_source_index];
+                    EditorTrackableCategory *target_item_ptr = stats_to_render[stat_dnd_target_index];
 
-                    if (selected_stat_index == stat_dnd_source_index) {
-                        selected_stat_index = stat_dnd_target_index;
-                    } else if (selected_stat_index > stat_dnd_source_index && selected_stat_index <=
-                               stat_dnd_target_index) {
-                        selected_stat_index--;
-                    } else if (selected_stat_index < stat_dnd_source_index && selected_stat_index >=
-                               stat_dnd_target_index) {
-                        selected_stat_index++;
+                    auto source_it = std::find_if(current_template_data.stats.begin(),
+                                                  current_template_data.stats.end(),
+                                                  [&](const EditorTrackableCategory &s) {
+                                                      return &s == source_item_ptr;
+                                                  });
+
+                    EditorTrackableCategory item_to_move = *source_item_ptr;
+                    current_template_data.stats.erase(source_it);
+
+                    auto target_it = std::find_if(current_template_data.stats.begin(),
+                                                  current_template_data.stats.end(),
+                                                  [&](const EditorTrackableCategory &s) {
+                                                      return &s == target_item_ptr;
+                                                  });
+
+                    current_template_data.stats.insert(target_it, item_to_move);
+                    save_message_type = MSG_NONE;
+                }
+
+                // Handle Removal
+                if (stat_to_remove_idx != -1) {
+                    EditorTrackableCategory *stat_to_remove = stats_to_render[stat_to_remove_idx];
+                    if (selected_stat == stat_to_remove) {
+                        selected_stat = nullptr;
                     }
+                    current_template_data.stats.erase(
+                        std::remove_if(current_template_data.stats.begin(), current_template_data.stats.end(),
+                                       [&](const EditorTrackableCategory &s) { return &s == stat_to_remove; }),
+                        current_template_data.stats.end()
+                    );
                     save_message_type = MSG_NONE;
                 }
 
-                if (stat_to_remove != -1) {
-                    if (selected_stat_index == stat_to_remove) selected_stat_index = -1;
-                    else if (selected_stat_index > stat_to_remove) selected_stat_index--;
-                    current_template_data.stats.erase(current_template_data.stats.begin() + stat_to_remove);
-                    save_message_type = MSG_NONE;
-                }
-
-                // Handle copying
-                if (stat_to_copy != -1) {
-                    const auto &source_stat = current_template_data.stats[stat_to_copy];
-                    EditorTrackableCategory new_stat = source_stat; // Create a deep copy
-
+                // Handle Copying
+                if (stat_to_copy_idx != -1) {
+                    const EditorTrackableCategory *source_stat_ptr = stats_to_render[stat_to_copy_idx];
+                    EditorTrackableCategory new_stat = *source_stat_ptr;
                     char base_name[192];
-                    strncpy(base_name, source_stat.root_name, sizeof(base_name) - 1);
+                    strncpy(base_name, source_stat_ptr->root_name, sizeof(base_name) - 1);
                     base_name[sizeof(base_name) - 1] = '\0';
-
                     char new_name[192];
                     int copy_counter = 1;
-
-                    // Loop to find a unique name
                     while (true) {
-                        if (copy_counter == 1) {
-                            snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
-                        } else {
-                            snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
-                        }
-
-                        // Check if this name already exists
+                        snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter++);
                         bool name_exists = false;
-                        for (const auto &stat: current_template_data.stats) {
-                            if (strcmp(stat.root_name, new_name) == 0) {
+                        for (const auto &s: current_template_data.stats) {
+                            if (strcmp(s.root_name, new_name) == 0) {
                                 name_exists = true;
                                 break;
                             }
                         }
-
-                        if (!name_exists) {
-                            break; // Found a unique name
-                        }
-                        copy_counter++; // Increment and try the next number
+                        if (!name_exists) break;
                     }
-
-                    // Apply the new unique name and insert the copy
                     strncpy(new_stat.root_name, new_name, sizeof(new_stat.root_name) - 1);
-                    current_template_data.stats.insert(
-                        current_template_data.stats.begin() + stat_to_copy + 1, new_stat);
+
+                    auto it = std::find_if(current_template_data.stats.begin(), current_template_data.stats.end(),
+                                           [&](const EditorTrackableCategory &s) { return &s == source_stat_ptr; });
+
+                    if (it != current_template_data.stats.end()) {
+                        current_template_data.stats.insert(it + 1, new_stat);
+                    } else {
+                        current_template_data.stats.push_back(new_stat);
+                    }
+                    save_message_type = MSG_NONE;
                 }
 
                 ImGui::EndChild();
                 ImGui::SameLine();
 
                 ImGui::BeginChild("StatDetailsPane", ImVec2(0, 0), true);
-                if (selected_stat_index != -1 && (size_t) selected_stat_index < current_template_data.stats.size()) {
-                    auto &stat_cat = current_template_data.stats[selected_stat_index];
+                if (selected_stat != nullptr) {
+                    auto &stat_cat = *selected_stat;
 
                     if (ImGui::InputText("Category Key", stat_cat.root_name, sizeof(stat_cat.root_name))) {
                         save_message_type = MSG_NONE;
@@ -3023,18 +3127,54 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 ImGui::Separator();
 
-                int goal_to_remove = -1;
-                int goal_to_copy = -1;
+                // 1. Create a list of pointers to render from.
+                std::vector<EditorMultiStageGoal *> goals_to_render;
 
+                // 2. Populate the list based on search criteria.
+                bool search_active = (tc_search_buffer[0] != '\0' && current_search_scope == SCOPE_MULTISTAGE);
+
+                if (search_active) {
+                    for (auto &goal: current_template_data.multi_stage_goals) {
+                        bool parent_match = str_contains_insensitive(goal.display_name, tc_search_buffer) ||
+                                            str_contains_insensitive(goal.root_name, tc_search_buffer);
+
+                        if (parent_match) {
+                            goals_to_render.push_back(&goal);
+                            continue;
+                        }
+
+                        bool stage_match = false;
+                        for (const auto &stage: goal.stages) {
+                            if (str_contains_insensitive(stage.display_text, tc_search_buffer) ||
+                                str_contains_insensitive(stage.stage_id, tc_search_buffer)) {
+                                stage_match = true;
+                                break;
+                            }
+                        }
+
+                        if (stage_match) {
+                            goals_to_render.push_back(&goal);
+                        }
+                    }
+                } else {
+                    // Search is inactive, show all goals.
+                    for (auto &goal: current_template_data.multi_stage_goals) {
+                        goals_to_render.push_back(&goal);
+                    }
+                }
+
+                // 3. Render the list using pointers.
+                int goal_to_remove_idx = -1;
+                int goal_to_copy_idx = -1;
                 int ms_goal_dnd_source_index = -1;
                 int ms_goal_dnd_target_index = -1;
 
-                for (size_t i = 0; i < current_template_data.multi_stage_goals.size(); ++i) {
-                    ImGui::PushID(i);
-                    const auto &goal = current_template_data.multi_stage_goals[i];
+                for (size_t i = 0; i < goals_to_render.size(); ++i) {
+                    auto &goal = *goals_to_render[i];
+                    ImGui::PushID(&goal);
+
                     const char *display_name = goal.display_name;
                     const char *root_name = goal.root_name;
-
                     const char *label = show_ms_goal_display_names
                                             ? (display_name[0] ? display_name : root_name)
                                             : root_name;
@@ -3042,31 +3182,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         label = "[New Goal]";
                     }
 
-                    if (ImGui::Button("X")) {
-                        goal_to_remove = i;
-                        save_message_type = MSG_NONE;
-                    }
+                    if (ImGui::Button("X")) { goal_to_remove_idx = i; }
                     ImGui::SameLine();
-                    if (ImGui::Button("Copy")) {
-                        goal_to_copy = i;
-                        save_message_type = MSG_NONE;
-                    }
+                    if (ImGui::Button("Copy")) { goal_to_copy_idx = i; }
                     ImGui::SameLine();
-                    ImGui::SameLine();
-                    if (ImGui::Selectable(label, selected_ms_goal_index == (int) i)) {
-                        if (selected_ms_goal_index != (int) i) {
+
+                    if (ImGui::Selectable(label, &goal == selected_ms_goal)) {
+                        if (&goal != selected_ms_goal) {
                             if (editor_has_unsaved_changes) {
                                 show_unsaved_changes_popup = true;
-                                pending_action = [&, i]() {
-                                    // Only changing the index
-                                    selected_ms_goal_index = i;
+                                pending_action = [&, new_selection = &goal]() {
+                                    selected_ms_goal = new_selection;
                                 };
                             } else {
-                                selected_ms_goal_index = i;
+                                selected_ms_goal = &goal;
                             }
                         }
                     }
-                    // DRAG AND DROP LOGIC
+
                     if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
                         ImGui::SetDragDropPayload("MS_GOAL_DND", &i, sizeof(int));
                         ImGui::Text("Reorder %s", label);
@@ -3082,62 +3215,74 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::PopID();
                 }
 
-                // Handle Drag and Drop reordering after the loop
+                // Handle Drag and Drop
                 if (ms_goal_dnd_source_index != -1 && ms_goal_dnd_target_index != -1) {
-                    EditorMultiStageGoal item_to_move = current_template_data.multi_stage_goals[
-                        ms_goal_dnd_source_index];
-                    current_template_data.multi_stage_goals.erase(
-                        current_template_data.multi_stage_goals.begin() + ms_goal_dnd_source_index);
-                    current_template_data.multi_stage_goals.insert(
-                        current_template_data.multi_stage_goals.begin() + ms_goal_dnd_target_index, item_to_move);
+                    EditorMultiStageGoal *source_item_ptr = goals_to_render[ms_goal_dnd_source_index];
+                    EditorMultiStageGoal *target_item_ptr = goals_to_render[ms_goal_dnd_target_index];
 
-                    // Update selection to follow the moved item
-                    if (selected_ms_goal_index == ms_goal_dnd_source_index) {
-                        selected_ms_goal_index = ms_goal_dnd_target_index;
-                    } else if (selected_ms_goal_index > ms_goal_dnd_source_index && selected_ms_goal_index <=
-                               ms_goal_dnd_target_index) {
-                        selected_ms_goal_index--;
-                    } else if (selected_ms_goal_index < ms_goal_dnd_source_index && selected_ms_goal_index >=
-                               ms_goal_dnd_target_index) {
-                        selected_ms_goal_index++;
+                    auto source_it = std::find_if(current_template_data.multi_stage_goals.begin(),
+                                                  current_template_data.multi_stage_goals.end(),
+                                                  [&](const EditorMultiStageGoal &g) { return &g == source_item_ptr; });
+
+                    EditorMultiStageGoal item_to_move = *source_item_ptr;
+                    current_template_data.multi_stage_goals.erase(source_it);
+
+                    auto target_it = std::find_if(current_template_data.multi_stage_goals.begin(),
+                                                  current_template_data.multi_stage_goals.end(),
+                                                  [&](const EditorMultiStageGoal &g) { return &g == target_item_ptr; });
+
+                    current_template_data.multi_stage_goals.insert(target_it, item_to_move);
+                    ms_goal_data_changed = true;
+                    save_message_type = MSG_NONE;
+                }
+
+                // Handle Removal
+                if (goal_to_remove_idx != -1) {
+                    EditorMultiStageGoal *goal_to_remove = goals_to_render[goal_to_remove_idx];
+                    if (selected_ms_goal == goal_to_remove) {
+                        selected_ms_goal = nullptr;
                     }
-                    ms_goal_data_changed = true;
-                    save_message_type = MSG_NONE;
-                }
-
-                if (goal_to_remove != -1) {
-                    if (selected_ms_goal_index == goal_to_remove) selected_ms_goal_index = -1;
-                    else if (selected_ms_goal_index > goal_to_remove) selected_ms_goal_index--;
                     current_template_data.multi_stage_goals.erase(
-                        current_template_data.multi_stage_goals.begin() + goal_to_remove);
+                        std::remove_if(current_template_data.multi_stage_goals.begin(),
+                                       current_template_data.multi_stage_goals.end(),
+                                       [&](const EditorMultiStageGoal &g) { return &g == goal_to_remove; }),
+                        current_template_data.multi_stage_goals.end()
+                    );
                     ms_goal_data_changed = true;
                     save_message_type = MSG_NONE;
                 }
 
-                if (goal_to_copy != -1) {
-                    const auto &source_goal = current_template_data.multi_stage_goals[goal_to_copy];
-                    EditorMultiStageGoal new_goal = source_goal; // Deep copy
+                // Handle Copying
+                if (goal_to_copy_idx != -1) {
+                    const EditorMultiStageGoal *source_goal_ptr = goals_to_render[goal_to_copy_idx];
+                    EditorMultiStageGoal new_goal = *source_goal_ptr;
+                    // ... (logic to generate unique name for new_goal) ...
                     char base_name[192];
-                    strncpy(base_name, source_goal.root_name, sizeof(base_name) - 1);
-                    base_name[sizeof(base_name) - 1] = '\0';
+                    strncpy(base_name, source_goal_ptr->root_name, sizeof(base_name) - 1);
                     char new_name[192];
                     int copy_counter = 1;
                     while (true) {
-                        if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
-                        else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
+                        snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter++);
                         bool name_exists = false;
-                        for (const auto &mg: current_template_data.multi_stage_goals) {
-                            if (strcmp(mg.root_name, new_name) == 0) {
+                        for (const auto &g: current_template_data.multi_stage_goals) {
+                            if (strcmp(g.root_name, new_name) == 0) {
                                 name_exists = true;
                                 break;
                             }
                         }
                         if (!name_exists) break;
-                        copy_counter++;
                     }
                     strncpy(new_goal.root_name, new_name, sizeof(new_goal.root_name) - 1);
-                    current_template_data.multi_stage_goals.insert(
-                        current_template_data.multi_stage_goals.begin() + goal_to_copy + 1, new_goal);
+
+                    auto it = std::find_if(current_template_data.multi_stage_goals.begin(),
+                                           current_template_data.multi_stage_goals.end(),
+                                           [&](const EditorMultiStageGoal &g) { return &g == source_goal_ptr; });
+
+                    if (it != current_template_data.multi_stage_goals.end()) {
+                        current_template_data.multi_stage_goals.insert(it + 1, new_goal);
+                    } else {
+                        current_template_data.multi_stage_goals.push_back(new_goal);
+                    }
                     ms_goal_data_changed = true;
                     save_message_type = MSG_NONE;
                 }
@@ -3146,9 +3291,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::SameLine();
 
                 ImGui::BeginChild("MSGoalDetailsPane", ImVec2(0, 0), true);
-                if (selected_ms_goal_index != -1 && (size_t) selected_ms_goal_index < current_template_data.
-                    multi_stage_goals.size()) {
-                    auto &goal = current_template_data.multi_stage_goals[selected_ms_goal_index];
+                if (selected_ms_goal != nullptr) {
+                    auto &goal = *selected_ms_goal;
 
                     if (ImGui::InputText("Goal Root Name", goal.root_name, sizeof(goal.root_name))) {
                         ms_goal_data_changed = true;
