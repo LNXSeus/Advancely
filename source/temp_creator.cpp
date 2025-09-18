@@ -1179,6 +1179,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static bool show_unsaved_changes_popup = false;
     static std::function<void()> pending_action = nullptr;
 
+    // Searching within template creator
+    static char tc_search_buffer[256] = "";
+    static bool focus_tc_search_box = false; // Using Ctrl + F to focus the search box
+    enum TemplateSearchScope {
+        SCOPE_TEMPLATES,
+        SCOPE_LANGUAGES,
+        SCOPE_ADVANCEMENTS,
+        SCOPE_STATS,
+        SCOPE_UNLOCKS,
+        SCOPE_CUSTOM,
+        SCOPE_MULTISTAGE
+    };
+    static TemplateSearchScope current_search_scope = SCOPE_TEMPLATES;
+
 
     // State for user feedback next to save button in editor view
     static SaveMessageType save_message_type = MSG_NONE;
@@ -1188,7 +1202,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     MC_Version creator_selected_version = settings_get_version_from_string(creator_version_str);
     const char *advancement_label = (creator_selected_version <= MC_VERSION_1_11_2) ? "Achievement" : "Advancement";
 
-    // TODO: Currently not used
     const char *advancements_label_plural = (creator_selected_version <= MC_VERSION_1_11_2)
                                                 ? "Achievements"
                                                 : "Advancements";
@@ -1256,6 +1269,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::SetNextWindowSize(ImVec2(1280, 720), ImGuiCond_FirstUseEver);
     ImGui::Begin("Template Creator", p_open);
 
+    if (t) { // For global event handler to not clash with the other Ctrl + F or Cmd + F
+        t->is_temp_creator_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+    }
+
+    // Handle Ctrl+F / Cmd+F to focus the search box, but only when this window is active.
+    if (t && t->is_temp_creator_focused && !ImGui::IsAnyItemActive() &&
+        (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
+        ImGui::IsKeyPressed(ImGuiKey_F)) {
+        focus_tc_search_box = true;
+    }
+
     if (roboto_font) {
         ImGui::PushFont(roboto_font);
     }
@@ -1293,7 +1317,95 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             editing_template = false; // Always exit editor on version change
         }
     }
+
+    ImGui::SameLine();
+
+    // TEMPLATE CREATOR SEARCH BOX
+    {
+        const float search_bar_width = 250.0f;
+        const float scope_dropdown_width = 150.0f;
+        const float clear_button_width = ImGui::GetFrameHeight();
+        const float spacing = ImGui::GetStyle().ItemSpacing.x;
+
+        float total_controls_width = clear_button_width + spacing + search_bar_width + spacing + scope_dropdown_width;
+
+        // Position cursor to the top-right
+        ImGui::SetCursorPosX(ImGui::GetWindowWidth() - total_controls_width - ImGui::GetStyle().WindowPadding.x);
+
+        // 1. Clear Button ('X')
+        if (tc_search_buffer[0] != '\0') {
+            if (ImGui::Button("X##ClearTCSearch")) {
+                tc_search_buffer[0] = '\0';
+            }
+        } else {
+            // Invisible dummy to maintain layout
+            ImGui::Dummy(ImVec2(clear_button_width, ImGui::GetFrameHeight()));
+        }
+        ImGui::SameLine();
+
+        // 2. Search Input Text Bar
+        ImGui::SetNextItemWidth(search_bar_width);
+        if (focus_tc_search_box) {
+            ImGui::SetKeyboardFocusHere();
+            focus_tc_search_box = false;
+        }
+        ImGui::InputTextWithHint("##TCSearch", "Search...", tc_search_buffer, sizeof(tc_search_buffer));
+        ImGui::SameLine();
+
+        // 3. Dynamic Scope Dropdown
+        ImGui::SetNextItemWidth(scope_dropdown_width);
+
+        // TODO: Use creator_selected_version to determine scope names
+
+        // --- Version-Aware Type Dropdown ---
+        const char *adv_ach_scope_name = "Advancements";
+
+        // Use Achievements for older versions
+        if (creator_selected_version <= MC_VERSION_1_11_2) adv_ach_scope_name = "Achievements";
+
+        const char *scope_names[] = {
+            "Templates", "Languages", adv_ach_scope_name, "Stats", "Unlocks", "Custom Goals", "Multi-Stage Goals"
+        };
+        if (ImGui::BeginCombo("##Scope", scope_names[current_search_scope])) {
+            // Always available
+            if (ImGui::Selectable(scope_names[SCOPE_TEMPLATES], current_search_scope == SCOPE_TEMPLATES)) {
+                current_search_scope = SCOPE_TEMPLATES;
+            }
+
+            // Available only when viewing a template's language list
+            if (selected_template_index != -1 && !editing_template && !show_create_new_view && !show_copy_view) {
+                if (ImGui::Selectable(scope_names[SCOPE_LANGUAGES], current_search_scope == SCOPE_LANGUAGES)) {
+                    current_search_scope = SCOPE_LANGUAGES;
+                }
+            }
+
+            // Available only when the editor is active
+            if (editing_template) {
+                if (ImGui::Selectable(advancements_label_plural, current_search_scope == SCOPE_ADVANCEMENTS)) {
+                    current_search_scope = SCOPE_ADVANCEMENTS; // Achievements or Advancements
+                }
+                if (ImGui::Selectable(scope_names[SCOPE_STATS], current_search_scope == SCOPE_STATS)) {
+                    current_search_scope = SCOPE_STATS;
+                }
+                if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
+                    // Only show Unlocks for this version
+                    if (ImGui::Selectable(scope_names[SCOPE_UNLOCKS], current_search_scope == SCOPE_UNLOCKS)) {
+                        current_search_scope = SCOPE_UNLOCKS;
+                    }
+                }
+                if (ImGui::Selectable(scope_names[SCOPE_CUSTOM], current_search_scope == SCOPE_CUSTOM)) {
+                    current_search_scope = SCOPE_CUSTOM;
+                }
+                if (ImGui::Selectable(scope_names[SCOPE_MULTISTAGE], current_search_scope == SCOPE_MULTISTAGE)) {
+                    current_search_scope = SCOPE_MULTISTAGE;
+                }
+            }
+            ImGui::EndCombo();
+        }
+    }
+
     ImGui::Separator();
+
 
     // Left Pane: Template List
     ImGui::BeginChild("TemplateList", ImVec2(250, 0), true);

@@ -81,12 +81,14 @@ struct Tracker {
     // --- UI State Flags ---
     bool notes_window_open; // Flag to control the visibility of the notes window.
     bool temp_creator_window_open; // Flag to control the visibility of the template creator window.
+    bool is_temp_creator_focused;  // Flag to track if the template creator window has focus.
 
 
     char notes_buffer[65536]; // 64KB buffer to hold the text for the notes.
     char notes_path[MAX_PATH_LENGTH]; // The dynamic path to the current notes file.
     char search_buffer[256]; // Buffer for the search functionality.
-    bool focus_search_box_requested; // Flag for Ctrl+F hotkey
+    bool focus_search_box_requested; // Flag for Ctrl+F hotkey of tracker
+    bool focus_tc_search_box; // CURRENTLY UNUSED Flag for Ctrl+F hotkey in the template creator
     int notes_widget_id_counter; // Used to force-reset the notes widget UI state
 
     // --- Fonts ---

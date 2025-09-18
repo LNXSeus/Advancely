@@ -2184,6 +2184,8 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     t->notes_path[0] = '\0'; // Initialize the new notes path
     t->search_buffer[0] = '\0';
     t->focus_search_box_requested = false;
+    t->focus_tc_search_box = false; // CURRENTLY UNUSED
+    t->is_temp_creator_focused = false;
     t->notes_widget_id_counter = 0;
 
 

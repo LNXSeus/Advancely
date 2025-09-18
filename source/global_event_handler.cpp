@@ -34,12 +34,16 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
             // Global hotkey for focusing the search box (Ctrl+F or Cmd+F)
             bool is_ctrl_or_cmd = (mod_state & SDL_KMOD_CTRL) || (mod_state & SDL_KMOD_GUI);
 
-            // Don't trigger if any popup is open
             if (is_ctrl_or_cmd && event.key.scancode == SDL_SCANCODE_F && !ImGui::IsPopupOpen(
-                    nullptr, ImGuiPopupFlags_AnyPopup)) {
-                // if the user is currently typing in another text box (like the settings or notes).
-                if (t) t->focus_search_box_requested = true;
+                    nullptr, ImGuiPopupFlags_AnyPopup) && t) {
+                // TRACKER SEARCH BOX -> only if the template creator is not focused
+                if (!t->is_temp_creator_focused) {
+                    // if the user is currently typing in another text box (like the settings or notes).
+                    t->focus_search_box_requested = true;
+                }
             }
+
+            // TEMPLATE CREATOR SEARCH BOX IMPLEMENTED IN TEMP_CREATOR.CPP -> TOP main gui function
             // If any ImGui widget is inactive active (e.g., not typing in a text box), then process hotkeys.
             if (!ImGui::IsAnyItemActive()) {
                 // We don't break here; we want other event processing to continue,
