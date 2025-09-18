@@ -2009,7 +2009,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // Search is active for this scope: populate with filtered results.
                     for (auto &advancement: current_template_data.advancements) {
                         bool parent_match = str_contains_insensitive(advancement.display_name, tc_search_buffer) ||
-                                            str_contains_insensitive(advancement.root_name, tc_search_buffer);
+                                            str_contains_insensitive(advancement.root_name, tc_search_buffer) ||
+                                            str_contains_insensitive(advancement.icon_path, tc_search_buffer);
 
                         if (parent_match) {
                             advancements_to_render.push_back(&advancement);
@@ -2020,7 +2021,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         bool child_match = false;
                         for (const auto &criterion: advancement.criteria) {
                             if (str_contains_insensitive(criterion.display_name, tc_search_buffer) ||
-                                str_contains_insensitive(criterion.root_name, tc_search_buffer)) {
+                                str_contains_insensitive(criterion.root_name, tc_search_buffer) ||
+                                str_contains_insensitive(criterion.icon_path, tc_search_buffer)) {
                                 child_match = true;
                                 break;
                             }
@@ -2453,27 +2455,37 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 if (search_active) {
                     for (auto &stat_cat: current_template_data.stats) {
-                        bool parent_match = str_contains_insensitive(stat_cat.display_name, tc_search_buffer) ||
-                                            str_contains_insensitive(stat_cat.root_name, tc_search_buffer);
+                        bool should_render = false;
 
-                        if (parent_match) {
-                            stats_to_render.push_back(&stat_cat);
-                            continue;
+                        // Always check parent-level fields first
+                        // This covers the display name for both simple and complex stats.
+                        if (str_contains_insensitive(stat_cat.display_name, tc_search_buffer) ||
+                            str_contains_insensitive(stat_cat.root_name, tc_search_buffer) ||
+                            str_contains_insensitive(stat_cat.icon_path, tc_search_buffer)) {
+                            should_render = true;
                         }
 
-                        bool child_match = false;
-                        if (!stat_cat.is_simple_stat) {
-                            // Only search criteria for multi-stats
+                        // If parent didn't match, check child-level fields
+                        if (!should_render) {
                             for (const auto &criterion: stat_cat.criteria) {
-                                if (str_contains_insensitive(criterion.display_name, tc_search_buffer) ||
-                                    str_contains_insensitive(criterion.root_name, tc_search_buffer)) {
-                                    child_match = true;
-                                    break;
+                                char goal_str[32];
+                                snprintf(goal_str, sizeof(goal_str), "%d", criterion.goal);
+
+                                // For complex stats, we also check the criterion's own display name.
+                                bool name_match = !stat_cat.is_simple_stat && str_contains_insensitive(criterion.display_name, tc_search_buffer);
+
+                                // The core check for root name, icon path, and target goal, which applies to both simple and complex stats.
+                                if (name_match ||
+                                    str_contains_insensitive(criterion.root_name, tc_search_buffer) ||
+                                    str_contains_insensitive(criterion.icon_path, tc_search_buffer) ||
+                                    (criterion.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr)) {
+                                    should_render = true;
+                                    break; // A matching child was found, no need to check others.
                                 }
                             }
                         }
 
-                        if (child_match) {
+                        if (should_render) {
                             stats_to_render.push_back(&stat_cat);
                         }
                     }
@@ -2858,8 +2870,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // If search is active, check both display name and root name.
                         // If neither matches, skip rendering this item.
                         if (is_unlock_search_active) {
+
                             if (!str_contains_insensitive(unlock.display_name, tc_search_buffer) &&
-                                !str_contains_insensitive(unlock.root_name, tc_search_buffer)) {
+                                !str_contains_insensitive(unlock.root_name, tc_search_buffer) &&
+                                !str_contains_insensitive(unlock.icon_path, tc_search_buffer)) {
                                 continue;
                             }
                         }
@@ -3015,7 +3029,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 // Determine if search is active for this scope
                 bool is_custom_search_active = (current_search_scope == SCOPE_CUSTOM && tc_search_buffer[0] != '\0');
 
-
                 for (size_t i = 0; i < current_template_data.custom_goals.size(); ++i) {
                     auto &goal = current_template_data.custom_goals[i];
 
@@ -3023,8 +3036,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // If search is active, check both display name and root name.
                     // If neither matches, skip rendering this item.
                     if (is_custom_search_active) {
+                        // Convert goal value into a string
+                        char goal_str[32];
+                        snprintf(goal_str, sizeof(goal_str), "%d", goal.goal);
+
                         if (!str_contains_insensitive(goal.display_name, tc_search_buffer) &&
-                            !str_contains_insensitive(goal.root_name, tc_search_buffer)) {
+                            !str_contains_insensitive(goal.root_name, tc_search_buffer) &&
+                            !str_contains_insensitive(goal.icon_path, tc_search_buffer) &&
+                            strstr(goal_str, tc_search_buffer) == nullptr) {
                             continue;
                         }
                     }
@@ -3212,7 +3231,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (search_active) {
                     for (auto &goal: current_template_data.multi_stage_goals) {
                         bool parent_match = str_contains_insensitive(goal.display_name, tc_search_buffer) ||
-                                            str_contains_insensitive(goal.root_name, tc_search_buffer);
+                                            str_contains_insensitive(goal.root_name, tc_search_buffer) ||
+                                            str_contains_insensitive(goal.icon_path, tc_search_buffer);
 
                         if (parent_match) {
                             goals_to_render.push_back(&goal);
@@ -3221,11 +3241,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         bool stage_match = false;
                         for (const auto &stage: goal.stages) {
+                            // Convert target value into a string
+                            char target_val_str[32];
+                            snprintf(target_val_str, sizeof(target_val_str), "%d", stage.required_progress);
+
                             if (str_contains_insensitive(stage.display_text, tc_search_buffer) ||
-                                str_contains_insensitive(stage.stage_id, tc_search_buffer)) {
+                                str_contains_insensitive(stage.stage_id, tc_search_buffer) ||
+                                str_contains_insensitive(stage.root_name, tc_search_buffer) ||
+                                str_contains_insensitive(stage.parent_advancement, tc_search_buffer) ||
+                                strstr(target_val_str, tc_search_buffer) != nullptr) {
                                 stage_match = true;
                                 break;
-                            }
+                                }
                         }
 
                         if (stage_match) {

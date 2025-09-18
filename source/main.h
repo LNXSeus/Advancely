@@ -34,8 +34,6 @@ extern "C" {
 // Global error message function, accessible for other files
 void show_error_message(const char *title, const char *message);
 
-// Not including any utility headers here
-
 const char* get_resources_path();
 const char* get_settings_file_path();
 const char* get_notes_dir_path();
@@ -47,7 +45,7 @@ const char* get_notes_manifest_path();
 #define TRACKER_TITLE "Advancely"
 
 // This is the version that gets compared with the latest release tag on GitHub
-#define ADVANCELY_VERSION "v0.9.211" // vMAJOR.MINOR.PATCH // TODO: Update this always, SAME FORMAT ON RELEASE TAG!
+#define ADVANCELY_VERSION "v0.9.212" // vMAJOR.MINOR.PATCH // TODO: Update this always, SAME FORMAT ON RELEASE TAG!
 // Starting from /gui folder
 #define ADVANCELY_ICON_PATH "/gui/Advancely_Logo_NoText.png" // TODO: Use this in tracker_init_sdl()
 // Starting from /gui folder
