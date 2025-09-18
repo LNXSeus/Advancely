@@ -2019,6 +2019,9 @@ static void tracker_free_template_data(TemplateData *td) {
     td->unlocks = nullptr;
     td->custom_goals = nullptr;
     td->multi_stage_goals = nullptr;
+
+    // Zero out the entire struct to reset all pointers and counts safely.
+    memset(td, 0, sizeof(TemplateData));
 }
 
 

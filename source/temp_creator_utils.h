@@ -60,7 +60,7 @@ bool copy_template_files(const char* src_version, const char* src_category, cons
                          char* error_message, size_t error_msg_size);
 
 /**
- * @brief Deletes a template and its corresponding language file.
+ * @brief Deletes a template and its corresponding language files.
  * @param version The version of the template to delete.
  * @param category The category of the template to delete.
  * @param flag The optional flag of the template to delete.
