@@ -2629,6 +2629,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::InputText("Category Key", stat_cat.root_name, sizeof(stat_cat.root_name))) {
                         save_message_type = MSG_NONE;
                     }
+                    if (ImGui::InputText("Display Name", stat_cat.display_name, sizeof(stat_cat.display_name))) {
+                        save_message_type = MSG_NONE;
+                    }
                     if (ImGui::InputText("Icon Path", stat_cat.icon_path, sizeof(stat_cat.icon_path))) {
                         save_message_type = MSG_NONE;
                     }
@@ -2692,9 +2695,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         auto &simple_crit = stat_cat.criteria[0];
                         if (ImGui::InputText("Stat Root Name", simple_crit.root_name, sizeof(simple_crit.root_name))) {
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::InputText("Display Name", stat_cat.display_name, sizeof(stat_cat.display_name))) {
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::InputInt("Target", &simple_crit.goal)) {
