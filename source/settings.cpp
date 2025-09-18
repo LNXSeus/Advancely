@@ -20,6 +20,7 @@
 #include "template_scanner.h"
 #include "temp_creator.h"
 #include "tinyfiledialogs.h"
+#include "update_checker.h"
 
 // Helper function to robustly compare two AppSettings structs
 // Changing window geometry of overlay and tracker window DO NOT cause the "Unsaved Changes" text to appear.
@@ -1249,6 +1250,32 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_CHECK_FOR_UPDATES ? "Enabled" : "Disabled",
                  DEFAULT_SHOW_WELCOME_ON_STARTUP ? "Enabled" : "Disabled"
         );
+        ImGui::SetTooltip("%s", tooltip_buffer);
+    }
+
+    ImGui::SameLine();
+
+    if (ImGui::Button("Restart Advancely")) {
+        // 1. Save any pending changes from the settings window first.
+        memcpy(app_settings, &temp_settings, sizeof(AppSettings));
+        settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
+
+        // 2. Initiate the restart process.
+        if (application_restart()) {
+            // 3. If the script was launched successfully, post a quit event to close the app.
+            SDL_Event quit_event;
+            quit_event.type = SDL_EVENT_QUIT;
+            SDL_PushEvent(&quit_event);
+        } else {
+            // If creating the script failed, notify the user.
+            show_error_message("Restart Failed", "Could not create the restart script. Please restart the application manually.");
+        }
+    }
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buffer[1024];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Saves all current settings and restarts the application.\n"
+                 "This is required to apply changes to fonts.");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
 

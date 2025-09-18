@@ -63,6 +63,14 @@ bool download_update_zip(const char* url);
 */
 bool apply_update(const char* main_executable_path);
 
+/**
+* @brief Initiates an application restart.
+*
+* Creates a platform-specific script that waits for the main application to close
+* and then relaunches it. The main app should exit after calling this.
+* @return true if the restart process was successfully initiated, false on error.
+*/
+bool application_restart();
 #ifdef __cplusplus
 }
 #endif

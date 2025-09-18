@@ -334,3 +334,68 @@ bool apply_update(const char* main_executable_path) {
     log_message(LOG_INFO, "[UPDATE] Updater script created. The application will now exit.\n");
     return true;
 }
+
+
+bool application_restart() {
+    char main_executable_path[MAX_PATH_LENGTH];
+    if (!get_executable_path(main_executable_path, sizeof(main_executable_path))) {
+        log_message(LOG_ERROR, "[RESTART] Could not get executable path to restart.\n");
+        return false;
+    }
+
+#ifdef _WIN32
+    FILE* restarter_script = fopen("restarter.bat", "w");
+    if (!restarter_script) {
+        log_message(LOG_ERROR, "[RESTART] Could not create restarter.bat script.\n");
+        return false;
+    }
+
+    const char* exe_filename = strrchr(main_executable_path, '\\');
+    if (!exe_filename) exe_filename = strrchr(main_executable_path, '/');
+    exe_filename = exe_filename ? exe_filename + 1 : main_executable_path;
+
+    DWORD pid = GetCurrentProcessId();
+
+    fprintf(restarter_script, "@echo off\n");
+    fprintf(restarter_script, "echo Waiting for Advancely to close...\n");
+    fprintf(restarter_script, ":wait_loop\n");
+    fprintf(restarter_script, "tasklist /FI \"PID eq %lu\" 2>NUL | find /I /N \"%lu\">NUL\n", pid, pid);
+    fprintf(restarter_script, "if \"%%ERRORLEVEL%%\"==\"0\" (timeout /t 1 /nobreak > NUL && goto :wait_loop)\n");
+    fprintf(restarter_script, "echo Relaunching Advancely...\n");
+    fprintf(restarter_script, "start \"\" \"%s\"\n", exe_filename); // Relaunch without the --updated flag
+    fprintf(restarter_script, "del \"%%~f0\"\n"); // Delete self
+
+    fclose(restarter_script);
+    ShellExecuteA(nullptr, "open", "restarter.bat", nullptr, nullptr, SW_HIDE);
+
+#else // For macOS and Linux
+    FILE* restarter_script = fopen("restarter.sh", "w");
+    if (!restarter_script) {
+        log_message(LOG_ERROR, "[RESTART] Could not create restarter.sh script.\n");
+        return false;
+    }
+
+    pid_t pid = getpid();
+
+    fprintf(restarter_script, "#!/bin/bash\n");
+    fprintf(restarter_script, "echo \"Waiting for Advancely to close...\"\n");
+    fprintf(restarter_script, "while ps -p %d > /dev/null; do sleep 1; done\n", pid);
+    fprintf(restarter_script, "echo \"Relaunching Advancely...\"\n");
+
+#if defined(__APPLE__)
+    fprintf(restarter_script, "open ./Advancely.app &\n");
+#else
+    fprintf(restarter_script, "chmod +x ./Advancely\n");
+    fprintf(restarter_script, "./Advancely &\n");
+#endif
+
+    fprintf(restarter_script, "rm -- \"$0\"\n"); // Delete self
+
+    fclose(restarter_script);
+    chmod("restarter.sh", 0755);
+    system("./restarter.sh &");
+#endif
+
+    log_message(LOG_INFO, "[RESTART] Restart script created. The application will now exit.\n");
+    return true;
+}
