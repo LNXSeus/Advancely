@@ -1337,22 +1337,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     {
         const float search_bar_width = 250.0f;
         const float scope_dropdown_width = 150.0f;
-        const float clear_button_width = ImGui::GetFrameHeight();
+        const float clear_button_size = ImGui::GetFrameHeight(); // Use fixed, consistent size for the button
         const float spacing = ImGui::GetStyle().ItemSpacing.x;
 
-        float total_controls_width = clear_button_width + spacing + search_bar_width + spacing + scope_dropdown_width;
-
+        float total_controls_width = clear_button_size + spacing + search_bar_width + spacing + scope_dropdown_width;
         // Position cursor to the top-right
         ImGui::SetCursorPosX(ImGui::GetWindowWidth() - total_controls_width - ImGui::GetStyle().WindowPadding.x);
 
         // 1. Clear Button ('X')
         if (tc_search_buffer[0] != '\0') {
-            if (ImGui::Button("X##ClearTCSearch")) {
+            if (ImGui::Button("X##ClearTCSearch", ImVec2(clear_button_size, clear_button_size))) {
                 tc_search_buffer[0] = '\0';
             }
         } else {
             // Invisible dummy to maintain layout
-            ImGui::Dummy(ImVec2(clear_button_width, ImGui::GetFrameHeight()));
+            ImGui::Dummy(ImVec2(clear_button_size, ImGui::GetFrameHeight()));
         }
         ImGui::SameLine();
 
