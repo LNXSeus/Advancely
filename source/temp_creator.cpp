@@ -1310,12 +1310,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 strncpy(creator_version_str, VERSION_STRINGS[creator_version_idx], sizeof(creator_version_str) - 1);
                 creator_version_str[sizeof(creator_version_str) - 1] = '\0';
                 editing_template = false; // Always exit editor when switching version
+
+                // Reset search buffer
+                tc_search_buffer[0] = '\0';
+                selected_advancement = nullptr;
+                selected_stat = nullptr;
+                selected_ms_goal = nullptr;
             };
         } else {
-            // No unsaved changes, so the change is final. Just update the string version.
+            // No unsaved changes, so the change is final.
             strncpy(creator_version_str, VERSION_STRINGS[creator_version_idx], sizeof(creator_version_str) - 1);
             creator_version_str[sizeof(creator_version_str) - 1] = '\0';
             editing_template = false; // Always exit editor on version change
+
+            // Reset search and selection state
+            tc_search_buffer[0] = '\0';
+            selected_advancement = nullptr;
+            selected_stat = nullptr;
+            selected_ms_goal = nullptr;
         }
     }
 
@@ -1441,6 +1453,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         // TODO: For now just exit editor. User must re-click Edit
                         editing_template = false;
+
+                        // Reset search buffer
+                        tc_search_buffer[0] = '\0';
+                        selected_advancement = nullptr;
+                        selected_stat = nullptr;
+                        selected_ms_goal = nullptr;
                     }
                 }
             };
@@ -1481,6 +1499,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             status_message[0] = '\0';
             new_template_category[0] = '\0';
             new_template_flag[0] = '\0';
+
+            // Reset search buffer
+            tc_search_buffer[0] = '\0';
+            selected_advancement = nullptr;
+            selected_stat = nullptr;
+            selected_ms_goal = nullptr;
         };
         if (editing_template && editor_has_unsaved_changes) {
             show_unsaved_changes_popup = true;
@@ -2797,7 +2821,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         current_template_data.unlocks.push_back({});
                         save_message_type = MSG_NONE; // Clear message on new edit
                     }
-                    ImGui::Separator();
                     int item_to_remove = -1;
                     int item_to_copy = -1;
                     int unlocks_dnd_source_index = -1;
