@@ -4319,8 +4319,10 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             ImGui::Separator();
 
             // If the "Use Settings Font" option is enabled, push the UI font.
+            bool roboto_font_pushed = false;
             if (settings->notes_use_roboto_font && t->roboto_font) {
                 ImGui::PushFont(t->roboto_font);
+                roboto_font_pushed = true; // 2. Set the flag to true only if we push the font.
             }
 
             // Calculate the editor size to leave just enough space for the checkbox at the bottom.
@@ -4359,7 +4361,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             ImGui::SameLine();
 
             // Font Toggle (aligned to the right)
-            const char *checkbox_label = "Use Settings Font";
+            const char *checkbox_label = "Use Settings/UI Font";
             float checkbox_width = ImGui::CalcTextSize(checkbox_label).x + ImGui::GetFrameHeightWithSpacing();
             ImGui::SetCursorPosX(ImGui::GetWindowWidth() - checkbox_width - ImGui::GetStyle().WindowPadding.x);
             if (ImGui::Checkbox(checkbox_label, &settings->notes_use_roboto_font)) {
@@ -4373,8 +4375,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                     "%s", use_settings_font_tooltip_buffer);
             }
 
-            // Pop the UI font only if we pushed it.
-            if (settings->notes_use_roboto_font && t->roboto_font) {
+            // Pop the UI font only if we pushed it in this frame.
+            if (roboto_font_pushed) { // 3. Base the pop operation on the local flag, not the setting.
                 ImGui::PopFont();
             }
         }

@@ -9,4 +9,6 @@
 
 bool open_icon_file_dialog(char* out_relative_path, size_t max_len);
 
+bool open_font_file_dialog(char* out_filename, size_t max_len);
+
 #endif // DIALOG_UTILS_H

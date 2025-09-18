@@ -211,10 +211,10 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     // SDL_ttf will automatically scale it correctly on any monitor at render time.
     const float base_font_size = DEFAULT_OVERLAY_FONT_SIZE;
     char overlay_font_path[1024];
-    snprintf(overlay_font_path, sizeof(overlay_font_path), "%s/fonts/%s", get_resources_path(), settings->tracker_font_name);
+    snprintf(overlay_font_path, sizeof(overlay_font_path), "%s/fonts/%s", get_resources_path(), settings->overlay_font_name);
 
     if (!path_exists(overlay_font_path)) {
-        log_message(LOG_ERROR, "[OVERLAY] Tracker/Overlay Font '%s' not found. Falling back to default Minecraft font.\n", settings->tracker_font_name);
+        log_message(LOG_ERROR, "[OVERLAY] Tracker/Overlay Font '%s' not found. Falling back to default Minecraft font.\n", settings->overlay_font_name);
         snprintf(overlay_font_path, sizeof(overlay_font_path), "%s/fonts/Minecraft.ttf", get_resources_path());
     }
 

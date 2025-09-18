@@ -72,6 +72,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 
 #define DEFAULT_TRACKER_FONT "Minecraft.ttf" // The overlay also uses this font
 #define DEFAULT_TRACKER_FONT_SIZE 16.0f
+#define DEFAULT_OVERLAY_FONT "Minecraft.ttf"
 #define DEFAULT_UI_FONT "Roboto-Regular.ttf"
 #define DEFAULT_UI_FONT_SIZE 16.0f
 
@@ -161,6 +162,8 @@ struct AppSettings {
     float tracker_font_size;          // Base size for the main trackermap font. Overlay is fixed.
     char ui_font_name[256];           // Filename of the font for ImGui UI (settings, etc.).
     float ui_font_size;               // Base size for the UI font.
+    char overlay_font_name[256];      // Filename of the font for the overlay.
+    float overlay_font_size; // TODO: Implement later with proper relative spacing (vertical as well)
 
     // --- Window Geometry ---
     WindowRect tracker_window; // The saved position and size of the main tracker window.

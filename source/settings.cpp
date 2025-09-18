@@ -13,6 +13,7 @@
 
 #include <vector>
 
+#include "dialog_utils.h"
 #include "settings_utils.h" // ImGui imported through this
 #include "global_event_handler.h" // For global variables
 #include "path_utils.h" // For path_exists()
@@ -57,6 +58,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->tracker_font_size != b->tracker_font_size ||
         strcmp(a->ui_font_name, a->ui_font_name) != 0 ||
         a->ui_font_size != a->ui_font_size ||
+        strcmp(a->overlay_font_name, b->overlay_font_name) != 0 ||
 
         memcmp(&a->tracker_bg_color, &b->tracker_bg_color, sizeof(ColorRGBA)) != 0 ||
         memcmp(&a->overlay_bg_color, &b->overlay_bg_color, sizeof(ColorRGBA)) != 0 ||
@@ -721,40 +723,64 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::SeparatorText("Fonts");
 
     // --- Tracker/Overlay Font ---
-    ImGui::Text("Tracker/Overlay Font: %s", temp_settings.tracker_font_name);
+    ImGui::Text("Tracker Font: %s", temp_settings.tracker_font_name);
     ImGui::SameLine();
     if (ImGui::Button("Browse##TrackerFont")) {
-        const char *filterPatterns[2] = {"*.ttf", "*.otf"};
-        // We assume a helper function open_file_dialog exists, similar to your icon dialog
-        // It should open in the resources/fonts directory
-        const char *result = tinyfd_openFileDialog("Select Tracker/Overlay Font", "", 2, filterPatterns, "Font Files",
-                                                   0);
-        if (result) {
-            // Extract just the filename from the full path
-            const char *filename = strrchr(result, '/');
-            if (!filename) filename = strrchr(result, '\\'); // Fallback for Windows paths
-            filename = filename ? filename + 1 : result; // If no slash, it's already the filename
-
-            strncpy(temp_settings.tracker_font_name, filename, sizeof(temp_settings.tracker_font_name) - 1);
+        char selected_font[256];
+        if (open_font_file_dialog(selected_font, sizeof(selected_font))) {
+            strncpy(temp_settings.tracker_font_name, selected_font, sizeof(temp_settings.tracker_font_name) - 1);
         }
+    }
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buffer[1024];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Select the font for the main tracker view.\n\n"
+                 "This affects the goal display text, the top info bar, and the bottom control buttons.\n"
+                 "Only choose fonts within the resources/fonts directory.\n\n"
+                 "A restart is required to apply changes.");
+        ImGui::SetTooltip("%s", tooltip_buffer);
     }
     // TODO: Implement later with proper relative spacing, just need to enable setting again
     // ImGui::DragFloat("Tracker Font Size", &temp_settings.tracker_font_size, 0.5f, 8.0f, 72.0f, "%.1f");
 
+    // --- Overlay Font ---
+    if (temp_settings.enable_overlay) {
+        ImGui::Text("Overlay Font: %s", temp_settings.overlay_font_name);
+        ImGui::SameLine();
+        if (ImGui::Button("Browse##OverlayFont")) {
+            char selected_font[256];
+            if (open_font_file_dialog(selected_font, sizeof(selected_font))) {
+                strncpy(temp_settings.overlay_font_name, selected_font, sizeof(temp_settings.overlay_font_name) - 1);
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[1024];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Select the font for the text in the separate stream overlay window.\n\n"
+                     "Only choose fonts within the resources/fonts directory.\n\n"
+                     "A restart is required to apply changes.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+
+    }
 
     // --- Settings/UI Font ---
     ImGui::Text("Settings/UI Font: %s", temp_settings.ui_font_name);
     ImGui::SameLine();
     if (ImGui::Button("Browse##UIFont")) {
-        const char *filterPatterns[2] = {"*.ttf", "*.otf"};
-        const char *result = tinyfd_openFileDialog("Select Settings/UI Font", "", 2, filterPatterns, "Font Files", 0);
-        if (result) {
-            const char *filename = strrchr(result, '/');
-            if (!filename) filename = strrchr(result, '\\');
-            filename = filename ? filename + 1 : result;
-
-            strncpy(temp_settings.ui_font_name, filename, sizeof(temp_settings.ui_font_name) - 1);
+        char selected_font[256];
+        if (open_font_file_dialog(selected_font, sizeof(selected_font))) {
+            strncpy(temp_settings.ui_font_name, selected_font, sizeof(temp_settings.ui_font_name) - 1);
         }
+    }
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buffer[1024];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Select the font for UI windows.\n\n"
+                 "This affects the Settings, Template Creator, and Notes windows.\n"
+                 "Only choose fonts within the resources/fonts directory.\n\n"
+                 "A restart is required to apply changes.");
+        ImGui::SetTooltip("%s", tooltip_buffer);
     }
     // TODO: Implement later with proper relative spacing, just need to enable setting again
     // ImGui::DragFloat("Settings Font Size", &temp_settings.ui_font_size, 0.5f, 8.0f, 72.0f, "%.1f");
@@ -763,6 +789,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     bool font_settings_changed =
             strcmp(temp_settings.tracker_font_name, saved_settings.tracker_font_name) != 0 ||
             temp_settings.tracker_font_size != saved_settings.tracker_font_size ||
+            // Overlay restarts automatically when changes are applied
+            // strcmp(temp_settings.overlay_font_name, saved_settings.overlay_font_name) != 0 ||
             strcmp(temp_settings.ui_font_name, saved_settings.ui_font_name) != 0 ||
             temp_settings.ui_font_size != saved_settings.ui_font_size;
 
@@ -1191,6 +1219,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Hide Completed Row 3 Goals: %s\n"
                  "  - Always On Top: %s\n"
                  "  - Tracker Font: %s\n"
+                 "  - Overlay Font: %s\n"
                  "  - UI Font: %s\n"
                  "  - Goal Visibility: Hide All Completed\n"
                  "  - Overlay Width: %dpx\n"
@@ -1212,6 +1241,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
                  DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
                  DEFAULT_TRACKER_FONT,
+                 DEFAULT_OVERLAY_FONT,
                  DEFAULT_UI_FONT,
                  OVERLAY_DEFAULT_WIDTH,
                  DEFAULT_NOTES_USE_ROBOTO ? "Enabled" : "Disabled",

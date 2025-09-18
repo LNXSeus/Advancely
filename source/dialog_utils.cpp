@@ -93,3 +93,58 @@ bool open_icon_file_dialog(char* out_relative_path, size_t max_len) {
     tinyfd_messageBox("Error", "Selected icon must be inside the resources/icons folder.", "ok", "error", 1);
     return false;
 }
+
+// Gets the absolute path to the application's resources/fonts directory
+static bool get_fonts_start_path(std::string& out_path) {
+    char fonts_path[MAX_PATH_LENGTH];
+    snprintf(fonts_path, sizeof(fonts_path), "%s/fonts/", get_resources_path());
+    if (!path_exists(fonts_path)) return false;
+    out_path = fonts_path;
+    normalize_path(out_path);
+    return true;
+}
+
+bool open_font_file_dialog(char* out_filename, size_t max_len) {
+    std::string start_path;
+    if (!get_fonts_start_path(start_path)) {
+        // Fallback if the robust method fails
+        char cwd[MAX_PATH_LENGTH];
+        if (!GETCWD(cwd, sizeof(cwd))) return false;
+        start_path = std::string(cwd) + "/resources/fonts/";
+        normalize_path(start_path);
+    }
+
+    const char* filter_patterns[2] = { "*.ttf", "*.otf" };
+    const char* selected_path = tinyfd_openFileDialog(
+        "Select Font File",
+        start_path.c_str(),
+        2,
+        filter_patterns,
+        "Font Files (.ttf, .otf)",
+        0
+    );
+
+    if (!selected_path) {
+        return false; // User cancelled
+    }
+
+    // --- Validation Logic ---
+    std::string full_path_str = selected_path;
+    normalize_path(full_path_str);
+
+    // Check if the selected path is inside the required fonts directory
+    if (full_path_str.rfind(start_path, 0) == 0) { // rfind with pos=0 checks if string starts with
+        // Path is valid, extract just the filename
+        const char* filename = strrchr(selected_path, '/');
+        if (!filename) filename = strrchr(selected_path, '\\'); // Fallback for Windows paths
+        filename = filename ? filename + 1 : selected_path;
+
+        strncpy(out_filename, filename, max_len - 1);
+        out_filename[max_len - 1] = '\0';
+        return true;
+    }
+
+    // If the path was invalid, show an error
+    tinyfd_messageBox("Invalid Font Location", "You must select a font from within the application's resources/fonts directory.", "ok", "error", 1);
+    return false;
+}

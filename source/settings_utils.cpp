@@ -249,6 +249,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->tracker_font_size = DEFAULT_TRACKER_FONT_SIZE;
     strncpy(settings->ui_font_name, DEFAULT_UI_FONT, sizeof(settings->ui_font_name) - 1);
     settings->ui_font_size = DEFAULT_UI_FONT_SIZE;
+    strncpy(settings->overlay_font_name, DEFAULT_OVERLAY_FONT, sizeof(settings->overlay_font_name) - 1);
 
     // Default Geometry
     WindowRect default_window = {DEFAULT_WINDOW_POS, DEFAULT_WINDOW_POS, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE};
@@ -553,6 +554,14 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
+        const cJSON *overlay_font = cJSON_GetObjectItem(general_settings, "overlay_font_name");
+        if (overlay_font && cJSON_IsString(overlay_font)) strncpy(settings->overlay_font_name, overlay_font->valuestring,
+                                                        sizeof(settings->overlay_font_name) - 1);
+        else {
+            strncpy(settings->overlay_font_name, DEFAULT_OVERLAY_FONT, sizeof(settings->overlay_font_name) - 1);
+            defaults_were_used = true;
+        }
+
         const cJSON *ui_font = cJSON_GetObjectItem(general_settings, "ui_font_name");
         if (ui_font && cJSON_IsString(ui_font)) strncpy(settings->ui_font_name, ui_font->valuestring,
                                                         sizeof(settings->ui_font_name) - 1);
@@ -655,6 +664,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(general_obj, "tracker_font_name", cJSON_CreateString(settings->tracker_font_name));
         cJSON_DeleteItemFromObject(general_obj, "tracker_font_size");
         cJSON_AddItemToObject(general_obj, "tracker_font_size", cJSON_CreateNumber(settings->tracker_font_size));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_font_name");
+        cJSON_AddItemToObject(general_obj, "overlay_font_name", cJSON_CreateString(settings->overlay_font_name));
         cJSON_DeleteItemFromObject(general_obj, "ui_font_name");
         cJSON_AddItemToObject(general_obj, "ui_font_name", cJSON_CreateString(settings->ui_font_name));
         cJSON_DeleteItemFromObject(general_obj, "ui_font_size");
