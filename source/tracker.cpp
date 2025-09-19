@@ -4086,16 +4086,27 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         ImGui::BeginTooltip();
         ImGui::PushTextWrapPos(ImGui::GetFontSize() * 40.0f);
 
-        ImGui::TextUnformatted("Progress Breakdown");
+        ImGui::TextUnformatted("Overlay Text");
+
+        ImGui::BulletText("World: Shows the current world name.");
+        ImGui::BulletText("Run Details: Displays the version, category, and flag.");
+        ImGui::BulletText("Progress: Shows the main adv/ach counter and overall percentage.");
+        ImGui::BulletText("IGT: Displays the in-game time from the stats file (ticks).");
+        ImGui::BulletText("Update Timer: Shows the time since the last game file update.");
+
         ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::TextUnformatted("Progress Breakdown");
 
         ImGui::BulletText(
             "The Adv/Ach counter tracks only the main goals defined in the \"advancements\" section of your template file.");
 
         ImGui::BulletText(
-            "The Progress %% shows your total completion across all individual sub-tasks from all categories.\nEach of the following tasks has an equal weight in the calculation:");
+            "The Progress %% shows your total completion across all individual sub-tasks from all categories.\n"
+            "Each of the following tasks has an equal weight in the calculation:");
         ImGui::Indent();
-        ImGui::BulletText("Advancement Criteria");
+        ImGui::BulletText("Adv/Ach Criteria");
         ImGui::BulletText("Unlocks (exclusive to 25w14craftmine)");
         ImGui::BulletText("Individual Sub-Stats");
         ImGui::BulletText("Custom Goals");

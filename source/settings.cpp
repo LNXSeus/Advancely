@@ -297,8 +297,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char version_tooltip_buffer[1024];
         snprintf(version_tooltip_buffer, sizeof(version_tooltip_buffer), "Select the version of the template.\n"
-                                                                         "This doesn't have to be the exact version of your minecraft instance.\n"
-                                                                         "Click on '(Learn more)' to see the version ranges that functionally equal.");
+                 "This doesn't necessarily have to be the exact version of your minecraft instance.\n"
+                 "Click on '(Learn more)' to see the version ranges that functionally equal.");
         ImGui::SetTooltip("%s", version_tooltip_buffer);
     }
 
@@ -419,6 +419,17 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         }
     }
 
+    if (ImGui::IsItemHovered()) {
+        char category_tooltip_buffer[1024];
+        snprintf(category_tooltip_buffer, sizeof(category_tooltip_buffer),
+                 "Choose between available categories for the selected version.\n"
+                 "If the category you're looking for isn't available you can create it\n"
+                 "by clicking the 'Create Template' button or view the list of officially added\n"
+                 "templates by clicking the '(Learn more)' button next to the 'Template Settings'.");
+        ImGui::SetTooltip("%s", category_tooltip_buffer);
+    }
+
+
     // --- OPTIONAL FLAG DROPDOWN ---
     flag_values.clear();
     flag_display_names.clear();
@@ -452,6 +463,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         }
     }
 
+    if (ImGui::IsItemHovered()) {
+        char flag_tooltip_buffer[1024];
+        snprintf(flag_tooltip_buffer, sizeof(flag_tooltip_buffer),
+                 "Choose between available optional flags for the selected version and category.\n"
+                 "The optional flag is used to differentiate between different versions of the same template.\n");
+        ImGui::SetTooltip("%s", flag_tooltip_buffer);
+    }
+
     // --- LANGUAGE DROPDOWN ---
     if (category_idx != -1) {
         // Find the selected template to get its available languages
@@ -483,6 +502,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     const std::string &selected_flag_str = selected_template->available_lang_flags[lang_idx];
                     strncpy(temp_settings.lang_flag, selected_flag_str.c_str(), sizeof(temp_settings.lang_flag) - 1);
                 }
+            }
+            if (ImGui::IsItemHovered()) {
+                char lang_tooltip_buffer[1024];
+                snprintf(lang_tooltip_buffer, sizeof(lang_tooltip_buffer),
+                         "Choose between available language files for the selected template.\n"
+                         "The Default `_lang.json` is usually english and comes with every template.");
+                ImGui::SetTooltip("%s", lang_tooltip_buffer);
             }
         }
     }
@@ -546,15 +572,20 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char enable_overlay_tooltip_buffer[1024];
         snprintf(enable_overlay_tooltip_buffer, sizeof(enable_overlay_tooltip_buffer),
-                 "Enables a separate window to show your progress in your stream.\n"
-                 "More settings related to the overlay window become available once enabled.\n"
-                 "Use a color key filter in your streaming software on the 'Overlay BG' hex color.\n"
-                 "A negative scroll speed animates from right-to-left.\n"
-                 "To adjust the horizontal spacing between items per row,\n"
-                 "you can shorten the display names in the language (*_lang.json) file.\n"
-                 "To turn off the overlay, disable this checkbox and hit 'Apply Settings'!\n\n"
-                 "IMPORTANT FOR STREAMERS: Applying and settings restarts the overlay window,\n"
-                 "which might lead to OBS capturing the main tracker window instead.");
+                 "Enables a separate, customizable window to show your progress, perfect for streaming.\n\n"
+                 "Overlay Layout:\n"
+                 " • Row 1: Advancement criteria and sub-stats of complex stats.\n"
+                 "   (If two items share an icon, the parent's icon is overlaid.)\n"
+                 " • Row 2: Main advancements and unlocks.\n"
+                 " • Row 3: Stats, custom goals, and multi-stage goals.\n\n"
+                 "Tips:\n"
+                 " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
+                 " • A negative scroll speed animates items from right to left.\n"
+                 " • To adjust horizontal spacing, shorten display names in the template creator.\n\n"
+                 "IMPORTANT FOR STREAMERS:\n"
+                 "Applying settings will restart the overlay window.\n"
+                 "You may need to reselect it in your streaming software (e.g., OBS)."
+        );
         ImGui::SetTooltip("%s", enable_overlay_tooltip_buffer);
     }
 
@@ -605,7 +636,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (ImGui::IsItemHovered()) {
             char speed_up_tooltip_buffer[1024];
             snprintf(speed_up_tooltip_buffer, sizeof(speed_up_tooltip_buffer),
-                     "Toggles speeding up the overlay animation by a factor of %.1f. Don't forget to hit apply!\nOn top of that you can also hold SPACE (also %.1f) when tabbed into the overlay window.",
+                     "Toggles speeding up the overlay animation by a factor of %.1f. Don't forget to hit apply!\n"
+                     "On top of that you can also hold SPACE (also %.1f) when tabbed into the overlay window.",
                      OVERLAY_SPEEDUP_FACTOR, OVERLAY_SPEEDUP_FACTOR);
 
             ImGui::SetTooltip("%s", speed_up_tooltip_buffer);
@@ -617,7 +649,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (ImGui::IsItemHovered()) {
             char hide_completed_row_3_tooltip_buffer[1024];
             snprintf(hide_completed_row_3_tooltip_buffer, sizeof(hide_completed_row_3_tooltip_buffer),
-                     "If checked, all Goals (Stats, Custom Goals and Multi-Stage Goals) will disappear from Row 3 of the overlay.\nThis is independent of the main 'Remove Completed Goals' setting.");
+                     "If checked, all Goals (Stats, Custom Goals and Multi-Stage Goals) will disappear from Row 3 of the overlay.\n"
+                     "This is independent of the main 'Goal Visibility' setting.");
 
 
             ImGui::SetTooltip("%s", hide_completed_row_3_tooltip_buffer);
@@ -657,6 +690,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     if (temp_settings.enable_overlay) {
         ImGui::Text("Overlay Title Alignment:");
+        if (ImGui::IsItemHovered()) {
+            char overlay_title_alignment_tooltip_buffer[1024];
+            snprintf(overlay_title_alignment_tooltip_buffer, sizeof(overlay_title_alignment_tooltip_buffer),
+                     "Adjusts the horizontal positioning of the progress text on the overlay.");
+
+            ImGui::SetTooltip("%s", overlay_title_alignment_tooltip_buffer);
+        }
         ImGui::SameLine();
         ImGui::RadioButton("Left", (int *) &temp_settings.overlay_progress_text_align,
                            OVERLAY_PROGRESS_TEXT_ALIGN_LEFT);
@@ -668,22 +708,91 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                            OVERLAY_PROGRESS_TEXT_ALIGN_RIGHT);
 
         ImGui::Text("Overlay Text Sections:");
+        if (ImGui::IsItemHovered()) {
+            char overlay_text_sections_tooltip_buffer[1024];
+            snprintf(overlay_text_sections_tooltip_buffer, sizeof(overlay_text_sections_tooltip_buffer),
+                     "Configure which sections of the overlay progress text to display.\n"
+                     "Hover over each checkbox for more info.\n"
+                     "The socials can't be removed.");
+            ImGui::SetTooltip("%s", overlay_text_sections_tooltip_buffer);
+        }
         ImGui::SameLine();
         ImGui::Checkbox("World", &temp_settings.overlay_show_world);
+        if (ImGui::IsItemHovered()) {
+            char overlay_text_world_tooltip_buffer[1024];
+            snprintf(overlay_text_world_tooltip_buffer, sizeof(overlay_text_world_tooltip_buffer),
+                     "Shows the current world name.");
+            ImGui::SetTooltip("%s", overlay_text_world_tooltip_buffer);
+        }
         ImGui::SameLine();
         ImGui::Checkbox("Run Details", &temp_settings.overlay_show_run_details);
+        if (ImGui::IsItemHovered()) {
+            char overlay_text_run_tooltip_buffer[1024];
+            snprintf(overlay_text_run_tooltip_buffer, sizeof(overlay_text_run_tooltip_buffer),
+                     "Shows the selected version, template category and optional flag.");
+            ImGui::SetTooltip("%s", overlay_text_run_tooltip_buffer);
+        }
         ImGui::SameLine();
         ImGui::Checkbox("Progress", &temp_settings.overlay_show_progress);
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 40.0f);
+
+            ImGui::TextUnformatted("Progress Breakdown");
+            ImGui::Separator();
+
+            ImGui::BulletText(
+                "The Adv/Ach counter tracks only the main goals defined in the \"advancements\" section of your template file.");
+
+            ImGui::BulletText(
+                "The Progress %% shows your total completion across all individual sub-tasks from all categories.\n"
+                "Each of the following tasks has an equal weight in the calculation:");
+            ImGui::Indent();
+            ImGui::BulletText("Adv/Ach Criteria");
+            ImGui::BulletText("Unlocks (exclusive to 25w14craftmine)");
+            ImGui::BulletText("Individual Sub-Stats");
+            ImGui::BulletText("Custom Goals");
+            ImGui::BulletText("Multi-Stage Goal Stages");
+            ImGui::Unindent();
+
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
         ImGui::SameLine();
         ImGui::Checkbox("IGT", &temp_settings.overlay_show_igt);
+        if (ImGui::IsItemHovered()) {
+            char overlay_text_igt_tooltip_buffer[1024];
+            snprintf(overlay_text_igt_tooltip_buffer, sizeof(overlay_text_igt_tooltip_buffer),
+                     "Shows the in-game time since the start of the run.\n"
+                     "It's read from the statistics file so it's in ticks and only updated when the game saves.");
+            ImGui::SetTooltip("%s", overlay_text_igt_tooltip_buffer);
+        }
         ImGui::SameLine();
         ImGui::Checkbox("Update Timer", &temp_settings.overlay_show_update_timer);
+        if (ImGui::IsItemHovered()) {
+            char overlay_text_timer_tooltip_buffer[1024];
+            snprintf(overlay_text_timer_tooltip_buffer, sizeof(overlay_text_timer_tooltip_buffer),
+                     "Shows the time since the last game file update.");
+            ImGui::SetTooltip("%s", overlay_text_timer_tooltip_buffer);
+        }
 
         ImGui::Separator();
         ImGui::Spacing();
     }
 
     ImGui::Text("Visual Settings");
+    if (ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+
+        ImGui::BulletText("For sliders (like R, G, B), you can drag the label\nleft or right to quickly adjust the value.");
+        ImGui::BulletText("You can also click directly on any number to type in a precise value.");
+
+        ImGui::BulletText("Click any color swatch to open a detailed color picker.");
+        ImGui::BulletText("Inside the picker, you can right-click the large color preview\nto copy its value as a HEX code (e.g., #0D1117).");
+
+        ImGui::EndTooltip();
+    }
+
 
     // Helper arrays to convert Uint8[0-255] to float[0-1] for ImGui color pickers
     static float tracker_bg[4], overlay_bg[4], text_col[4], overlay_text_col[4];
@@ -704,28 +813,50 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     overlay_text_col[2] = (float) temp_settings.overlay_text_color.b / 255.0f;
     overlay_text_col[3] = (float) temp_settings.overlay_text_color.a / 255.0f;
 
-    if (ImGui::ColorEdit3("Tracker BG", tracker_bg)) {
+    if (ImGui::ColorEdit3("Tracker Background Color", tracker_bg)) {
         temp_settings.tracker_bg_color = {
             (Uint8) (tracker_bg[0] * 255), (Uint8) (tracker_bg[1] * 255), (Uint8) (tracker_bg[2] * 255),
             (Uint8) (tracker_bg[3] * 255)
         };
     }
+    if (ImGui::IsItemHovered()) {
+        char tracker_bg_tooltip_buffer[1024];
+        snprintf(tracker_bg_tooltip_buffer, sizeof(tracker_bg_tooltip_buffer),
+                 "Configure the color of the tracker background.");
+        ImGui::SetTooltip("%s", tracker_bg_tooltip_buffer);
+    }
 
     // Conditionally display overlay background color picker
     if (temp_settings.enable_overlay) {
-        if (ImGui::ColorEdit3("Overlay BG", overlay_bg)) {
+        if (ImGui::ColorEdit3("Overlay Background Color", overlay_bg)) {
             temp_settings.overlay_bg_color = {
                 (Uint8) (overlay_bg[0] * 255), (Uint8) (overlay_bg[1] * 255), (Uint8) (overlay_bg[2] * 255),
                 (Uint8) (overlay_bg[3] * 255)
             };
         }
+        if (ImGui::IsItemHovered()) {
+            char overlay_bg_tooltip_buffer[1024];
+            snprintf(overlay_bg_tooltip_buffer, sizeof(overlay_bg_tooltip_buffer),
+                     "Configure the color of the overlay background.\n"
+                     "This is the color you'll need to color key in your streaming software (e.g., OBS).\n"
+                     "Good settings to start within the color key filter: Similarity: 1, Smoothness: 210.");
+            ImGui::SetTooltip("%s", overlay_bg_tooltip_buffer);
+        }
     }
 
-    if (ImGui::ColorEdit3("Text Color", text_col)) {
+    if (ImGui::ColorEdit3("Tracker Text Color", text_col)) {
         temp_settings.text_color = {
             (Uint8) (text_col[0] * 255), (Uint8) (text_col[1] * 255), (Uint8) (text_col[2] * 255),
             (Uint8) (text_col[3] * 255)
         };
+    }
+    if (ImGui::IsItemHovered()) {
+        char tracker_bg_tooltip_buffer[1024];
+        snprintf(tracker_bg_tooltip_buffer, sizeof(tracker_bg_tooltip_buffer),
+                 "Configure the text color of the tracker window.\n"
+                 "This also affects the info window, the checkboxes and\n"
+                 "the controls in the bottom right.");
+        ImGui::SetTooltip("%s", tracker_bg_tooltip_buffer);
     }
 
     if (temp_settings.enable_overlay) {
@@ -734,6 +865,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 (Uint8) (overlay_text_col[0] * 255), (Uint8) (overlay_text_col[1] * 255),
                 (Uint8) (overlay_text_col[2] * 255), (Uint8) (overlay_text_col[3] * 255)
             };
+        }
+        if (ImGui::IsItemHovered()) {
+            char tracker_bg_tooltip_buffer[1024];
+            snprintf(tracker_bg_tooltip_buffer, sizeof(tracker_bg_tooltip_buffer),
+                     "Configure the text color of the overlay window.");
+            ImGui::SetTooltip("%s", tracker_bg_tooltip_buffer);
         }
 
         // Slider for overlay width
@@ -767,10 +904,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[1024];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                 "Select the font for the main tracker view.\n\n"
+                 "Select the font for the main tracker view.\n"
                  "This affects the goal display text, the top info bar, and the bottom control buttons.\n"
                  "Only choose fonts within the resources/fonts directory.\n\n"
-                 "A restart is required to apply changes.");
+                 "A restart is required to properly apply changes.");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
     // TODO: Implement later with proper relative spacing, just need to enable setting again
@@ -789,12 +926,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[1024];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Select the font for the text in the separate stream overlay window.\n\n"
-                     "Only choose fonts within the resources/fonts directory.\n\n"
-                     "A restart is required to apply changes.");
+                     "Select the font for the text in the separate stream overlay window.\n"
+                     "Only choose fonts within the resources/fonts directory.");
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
-
     }
 
     // --- Settings/UI Font ---
@@ -809,10 +944,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[1024];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                 "Select the font for UI windows.\n\n"
+                 "Select the font for UI windows.\n"
                  "This affects the Settings, Template Creator, and Notes windows.\n"
                  "Only choose fonts within the resources/fonts directory.\n\n"
-                 "A restart is required to apply changes.");
+                 "A restart is required to properly apply changes.");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
     // TODO: Implement later with proper relative spacing, just need to enable setting again
@@ -915,9 +1050,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "This toggles printing a detailed progress report to the console after every file update.\n"
                  "Currently it also toggles an FPS counter for the overlay window.\n\n"
                  "IMPORTANT: This can spam the console with a large amount of text if your template files contain many entries.\n\n"
-                 "This setting only affects the detailed report. General status messages and errors\n"
+                 "This setting only affects the detailed report.\n"
                  "Progress on advancements is only printed if the game sends an update.\n"
-                 "are always printed to the console and saved to advancely_log.txt.\n"
+                 "General status messages and errors are always printed to the console and saved to advancely_log.txt.\n"
                  "The log is flushed after every message and reset on startup, making it ideal for diagnosing crashes.\n"
                  "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.");
         ImGui::SetTooltip("%s", debug_print_tooltip_buffer);
@@ -928,7 +1063,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char auto_update_tooltip_buffer[1024];
         snprintf(auto_update_tooltip_buffer, sizeof(auto_update_tooltip_buffer),
-                 "If enabled, Advancely will check for a new version on startup and notify you if one is available.");
+                 "If enabled, Advancely will check for a new version on startup and notify you if one is available.\n"
+                 "Through that notification you'll then be able to automatically install the update\n"
+                 "for your operating system. You can find more instructions on that popup.");
         ImGui::SetTooltip("%s", auto_update_tooltip_buffer);
     }
 
@@ -963,13 +1100,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     if (!custom_counters.empty()) {
-        ImGui::Text("Hotkey Settings");
+        ImGui::Text("Hotkey Settings for Custom Counters");
         if (ImGui::IsItemHovered()) {
             char hotkey_settings_tooltip_buffer[1024];
             snprintf(hotkey_settings_tooltip_buffer, sizeof(hotkey_settings_tooltip_buffer),
                      "IMPORTANT: Hotkeys are remembered between templates.\n"
                      "You might have to restart the settings window for the hotkeys to appear.\n\n"
-                     "Assign keys to increment/decrement custom counters\n(only work when tabbed into the tracker). Maximum of %d hotkeys are supported.",
+                     "Assign keys to increment/decrement custom counters\n"
+                     "(only work when tabbed into the tracker). Maximum of %d hotkeys are supported.",
                      MAX_HOTKEYS);
             ImGui::SetTooltip("%s", hotkey_settings_tooltip_buffer);
         }
@@ -1189,7 +1327,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (ImGui::Button("Revert Changes")) {
             memcpy(&temp_settings, &saved_settings, sizeof(AppSettings));
         }
+        if (ImGui::IsItemHovered()) {
+            char revert_button_tooltip_buffer[1024];
+            snprintf(revert_button_tooltip_buffer, sizeof(revert_button_tooltip_buffer),
+                     "Revert any changes made within the settings window since the last save.");
+            ImGui::SetTooltip("%s", revert_button_tooltip_buffer);
+        }
     }
+
 
     // Show the confirmation message if settings were applied
     if (show_applied_message) {
@@ -1300,14 +1445,15 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             SDL_PushEvent(&quit_event);
         } else {
             // If creating the script failed, notify the user.
-            show_error_message("Restart Failed", "Could not create the restart script. Please restart the application manually.");
+            show_error_message("Restart Failed",
+                               "Could not create the restart script. Please restart the application manually.");
         }
     }
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[1024];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                  "Saves all current settings and restarts the application.\n"
-                 "This is required to apply changes to fonts.");
+                 "This is required to apply changes to fonts within the tracker window.");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
