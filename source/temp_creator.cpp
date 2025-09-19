@@ -2059,7 +2059,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 char button_label[64];
                 snprintf(button_label, sizeof(button_label), "Add New %s", advancement_label);
                 if (ImGui::Button(button_label)) {
-                    current_template_data.advancements.push_back({});
+                    // Create new adv/ach with default values
+                    EditorTrackableCategory new_adv = {};
+                    int counter = 1;
+                    while (true) {
+                        snprintf(new_adv.root_name, sizeof(new_adv.root_name), "minecraft:new/advancement_%d", counter);
+                        bool name_exists = false;
+                        for (const auto& adv : current_template_data.advancements) {
+                            if (strcmp(adv.root_name, new_adv.root_name) == 0) {
+                                name_exists = true;
+                                break;
+                            }
+                        }
+                        if (!name_exists) break;
+                        counter++;
+                    }
+                    snprintf(new_adv.display_name, sizeof(new_adv.display_name), "New %s %d", advancement_label, counter);
+                    strncpy(new_adv.icon_path, "blocks/placeholder.png", sizeof(new_adv.icon_path) - 1);
+                    current_template_data.advancements.push_back(new_adv);
                     save_message_type = MSG_NONE;
                 }
                 ImGui::SameLine();
@@ -2356,7 +2373,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     snprintf(criterion_add_tooltip_buffer, sizeof(criterion_add_tooltip_buffer), "Add New %s Criterion",
                              advancement_label);
                     if (ImGui::Button(criterion_add_tooltip_buffer)) {
-                        advancement.criteria.push_back({});
+                        // Create new adv/ach criterion with default values
+                        EditorTrackableItem new_crit = {};
+                        int counter = 1;
+                        while (true) {
+                            snprintf(new_crit.root_name, sizeof(new_crit.root_name), "new_criterion_%d", counter);
+                            bool name_exists = false;
+                            for (const auto& crit : advancement.criteria) {
+                                if (strcmp(crit.root_name, new_crit.root_name) == 0) {
+                                    name_exists = true;
+                                    break;
+                                }
+                            }
+                            if (!name_exists) break;
+                            counter++;
+                        }
+                        snprintf(new_crit.display_name, sizeof(new_crit.display_name), "New Criterion %d", counter);
+                        strncpy(new_crit.icon_path, "blocks/placeholder.png", sizeof(new_crit.icon_path) - 1);
+                        advancement.criteria.push_back(new_crit);
                         save_message_type = MSG_NONE;
                     }
 
@@ -2542,9 +2576,31 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::BeginChild("StatListPane", ImVec2(pane_width, 0), true);
 
                 if (ImGui::Button("Add New Stat")) {
+                    // Create new stat category with default values
                     EditorTrackableCategory new_stat = {};
-                    new_stat.is_simple_stat = true; // Default new stat to simple
-                    new_stat.criteria.push_back({}); // Add one empty criterion
+                    int counter = 1;
+                    while (true) {
+                        snprintf(new_stat.root_name, sizeof(new_stat.root_name), "new_stat_%d", counter);
+                        bool name_exists = false;
+                        for (const auto& stat : current_template_data.stats) {
+                            if (strcmp(stat.root_name, new_stat.root_name) == 0) {
+                                name_exists = true;
+                                break;
+                            }
+                        }
+                        if (!name_exists) break;
+                        counter++;
+                    }
+                    snprintf(new_stat.display_name, sizeof(new_stat.display_name), "New Stat %d", counter);
+                    strncpy(new_stat.icon_path, "blocks/placeholder.png", sizeof(new_stat.icon_path) - 1);
+                    new_stat.is_simple_stat = true; // Default to simple
+
+                    // Add a default criterion for the simple stat
+                    EditorTrackableItem new_crit = {};
+                    snprintf(new_crit.root_name, sizeof(new_crit.root_name), "minecraft:custom/minecraft:new_stat_%d", counter);
+                    new_crit.goal = 1; // Default to a completable goal
+                    new_stat.criteria.push_back(new_crit);
+
                     current_template_data.stats.push_back(new_stat);
                     save_message_type = MSG_NONE;
                 }
@@ -2834,7 +2890,25 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         // Add Criterion button only for multi-stat categories -> complex stats
                         if (ImGui::Button("Add New Stat Criterion")) {
-                            stat_cat.criteria.push_back({});
+                            // Create new stat criterion with default values
+                            EditorTrackableItem new_crit = {};
+                            int counter = 1;
+                            while (true) {
+                                snprintf(new_crit.root_name, sizeof(new_crit.root_name), "new_criterion_%d", counter);
+                                bool name_exists = false;
+                                for (const auto& crit : stat_cat.criteria) {
+                                    if (strcmp(crit.root_name, new_crit.root_name) == 0) {
+                                        name_exists = true;
+                                        break;
+                                    }
+                                }
+                                if (!name_exists) break;
+                                counter++;
+                            }
+                            snprintf(new_crit.display_name, sizeof(new_crit.display_name), "New Criterion %d", counter);
+                            strncpy(new_crit.icon_path, "blocks/placeholder.png", sizeof(new_crit.icon_path) - 1);
+                            new_crit.goal = 1; // Default to a completable goal
+                            stat_cat.criteria.push_back(new_crit);
                             save_message_type = MSG_NONE;
                         }
 
@@ -3005,8 +3079,25 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (strcmp(creator_version_str, "25w14craftmine") == 0) {
                 if (ImGui::BeginTabItem("Unlocks")) {
                     if (ImGui::Button("Add New Unlock")) {
-                        current_template_data.unlocks.push_back({});
-                        save_message_type = MSG_NONE; // Clear message on new edit
+                        // Create new unlock with default values
+                        EditorTrackableItem new_unlock = {};
+                        int counter = 1;
+                        while (true) {
+                            snprintf(new_unlock.root_name, sizeof(new_unlock.root_name), "minecraft:new_unlock_%d", counter);
+                            bool name_exists = false;
+                            for (const auto& unlock : current_template_data.unlocks) {
+                                if (strcmp(unlock.root_name, new_unlock.root_name) == 0) {
+                                    name_exists = true;
+                                    break;
+                                }
+                            }
+                            if (!name_exists) break;
+                            counter++;
+                        }
+                        snprintf(new_unlock.display_name, sizeof(new_unlock.display_name), "New Unlock %d", counter);
+                        strncpy(new_unlock.icon_path, "blocks/placeholder.png", sizeof(new_unlock.icon_path) - 1);
+                        current_template_data.unlocks.push_back(new_unlock);
+                        save_message_type = MSG_NONE;
                     }
                     int item_to_remove = -1;
                     int item_to_copy = -1;
@@ -3179,8 +3270,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (ImGui::BeginTabItem
                 ("Custom Goals")) {
                 if (ImGui::Button("Add New Custom Goal")) {
-                    current_template_data.custom_goals.push_back({});
-                    save_message_type = MSG_NONE; // Clear message on new edit
+                    // Create a new custom goal with default values
+                    EditorTrackableItem new_goal = {};
+                    int counter = 1;
+                    while (true) {
+                        snprintf(new_goal.root_name, sizeof(new_goal.root_name), "new_custom_goal_%d", counter);
+                        bool name_exists = false;
+                        for (const auto& goal : current_template_data.custom_goals) {
+                            if (strcmp(goal.root_name, new_goal.root_name) == 0) {
+                                name_exists = true;
+                                break;
+                            }
+                        }
+                        if (!name_exists) break;
+                        counter++;
+                    }
+                    snprintf(new_goal.display_name, sizeof(new_goal.display_name), "New Custom Goal %d", counter);
+                    strncpy(new_goal.icon_path, "blocks/placeholder.png", sizeof(new_goal.icon_path) - 1);
+                    new_goal.goal = 1; // Default to a progress-based counter
+                    current_template_data.custom_goals.push_back(new_goal);
+                    save_message_type = MSG_NONE;
                 }
                 ImGui::SameLine();
                 ImGui::TextDisabled("(Hotkeys are configured in the main Settings window)");
@@ -3380,8 +3489,33 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::BeginChild("MSGoalListPane", ImVec2(pane_width, 0), true);
 
                 if (ImGui::Button("Add New Multi-Stage Goal")) {
-                    current_template_data.multi_stage_goals.push_back({});
-                    ms_goal_data_changed = true; // Change was made
+                    // Create a new multi-stage goal with default values and a final stage
+                    EditorMultiStageGoal new_goal = {};
+                    int counter = 1;
+                    while (true) {
+                        snprintf(new_goal.root_name, sizeof(new_goal.root_name), "new_ms_goal_%d", counter);
+                        bool name_exists = false;
+                        for (const auto& goal : current_template_data.multi_stage_goals) {
+                            if (strcmp(goal.root_name, new_goal.root_name) == 0) {
+                                name_exists = true;
+                                break;
+                            }
+                        }
+                        if (!name_exists) break;
+                        counter++;
+                    }
+                    snprintf(new_goal.display_name, sizeof(new_goal.display_name), "New Multi-Stage Goal %d", counter);
+                    strncpy(new_goal.icon_path, "blocks/placeholder.png", sizeof(new_goal.icon_path) - 1);
+
+                    // Add a default "Final" stage, which is required for validation
+                    EditorSubGoal final_stage = {};
+                    strncpy(final_stage.stage_id, "final", sizeof(final_stage.stage_id) - 1);
+                    strncpy(final_stage.display_text, "Final Stage", sizeof(final_stage.display_text) - 1);
+                    final_stage.type = SUBGOAL_MANUAL;
+                    new_goal.stages.push_back(final_stage);
+
+                    current_template_data.multi_stage_goals.push_back(new_goal);
+                    ms_goal_data_changed = true;
                     save_message_type = MSG_NONE;
                 }
                 ImGui::SameLine();
@@ -3618,7 +3752,34 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     ImGui::Text("Stages");
                     if (ImGui::Button("Add New Stage")) {
-                        goal.stages.push_back({});
+                        // Create a new stage with default values and insert it before the final stage
+                        EditorSubGoal new_stage = {};
+                        int counter = 1;
+                        while (true) {
+                            snprintf(new_stage.stage_id, sizeof(new_stage.stage_id), "new_stage_%d", counter);
+                            bool name_exists = false;
+                            for (const auto& stage : goal.stages) {
+                                if (strcmp(stage.stage_id, new_stage.stage_id) == 0) {
+                                    name_exists = true;
+                                    break;
+                                }
+                            }
+                            if (!name_exists) break;
+                            counter++;
+                        }
+                        snprintf(new_stage.display_text, sizeof(new_stage.display_text), "New Stage %d", counter);
+                        new_stage.type = SUBGOAL_STAT; // Default to a common type
+                        strncpy(new_stage.root_name, "minecraft:custom/minecraft:new_stat", sizeof(new_stage.root_name) - 1);
+                        new_stage.required_progress = 1;
+
+                        // Insert the new stage just before the last element (which should be the "final" stage)
+                        if (!goal.stages.empty()) {
+                            goal.stages.insert(goal.stages.end() - 1, new_stage);
+                        } else {
+                            // Should not happen if new goals are created correctly, but as a fallback:
+                            goal.stages.push_back(new_stage);
+                        }
+
                         ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
                     }
@@ -3891,7 +4052,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char template_category_name_tooltip_buffer[1024];
             snprintf(template_category_name_tooltip_buffer, sizeof(template_category_name_tooltip_buffer),
-                     "The main classification for the template (e.g., 'all_advancements', 'all_trims').\nCannot contain spaces or special characters.");
+                     "The main classification for the template (e.g., 'all_advancements', 'all_trims').\n"
+                     "Cannot contain spaces or special characters besides the % sign.");
             ImGui::SetTooltip("%s", template_category_name_tooltip_buffer);
         }
 
@@ -3899,7 +4061,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char optional_flag_tooltip_buffer[1024];
             snprintf(optional_flag_tooltip_buffer, sizeof(optional_flag_tooltip_buffer),
-                     "A variant for the category (e.g., '_optimized', '_modded').\nCannot contain spaces or special characters.");
+                     "A variant for the category (e.g., '_optimized', '_modded').\n"
+                     "Cannot contain spaces or special characters besides the % sign.");
             ImGui::SetTooltip("%s", optional_flag_tooltip_buffer);
         }
 
@@ -3986,7 +4149,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char create_language_tooltip_buffer[1024];
             snprintf(create_language_tooltip_buffer, sizeof(create_language_tooltip_buffer),
-                     "E.g., 'de', 'fr_ca'. Cannot be empty or contain special characters.");
+                     "E.g., 'de', 'fr_ca'. Cannot be empty or contain special characters besides the % sign.");
             ImGui::SetTooltip("%s", create_language_tooltip_buffer);
         }
 

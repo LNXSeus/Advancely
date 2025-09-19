@@ -30,8 +30,8 @@
 static bool is_valid_filename_part(const char *part) {
     if (!part) return true; // An empty flag is valid
     for (const char *p = part; *p; ++p) {
-        // Allow alphanumeric, underscore, and dot
-        if (!isalnum((unsigned char) *p) && *p != '_' && *p != '.') {
+        // Allow alphanumeric, underscore, dot and %
+        if (!isalnum((unsigned char) *p) && *p != '_' && *p != '.' && *p != '%') {
             return false;
         }
     }
