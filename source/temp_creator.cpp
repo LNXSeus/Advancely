@@ -1456,8 +1456,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     tc_search_buffer[0] = '\0'; // Clear search on change
                 }
 
-                ImGui::Separator();
-
                 // Advancement Details
                 if (ImGui::Selectable(adv_details_scope_name, current_search_scope == SCOPE_ADVANCEMENT_DETAILS)) {
                     current_search_scope = SCOPE_ADVANCEMENT_DETAILS;
