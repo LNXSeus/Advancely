@@ -1189,7 +1189,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         SCOPE_STATS,
         SCOPE_UNLOCKS,
         SCOPE_CUSTOM,
-        SCOPE_MULTISTAGE
+        SCOPE_MULTISTAGE,
+        // Details search scopes
+        SCOPE_ADVANCEMENT_DETAILS,
+        SCOPE_STAT_DETAILS,
+        SCOPE_MULTISTAGE_DETAILS
     };
     static TemplateSearchScope current_search_scope = SCOPE_TEMPLATES;
 
@@ -1370,46 +1374,106 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // TODO: Use creator_selected_version to determine scope names
 
         // --- Version-Aware Type Dropdown ---
-        const char *adv_ach_scope_name = "Advancements";
 
-        // Use Achievements for older versions
-        if (creator_selected_version <= MC_VERSION_1_11_2) adv_ach_scope_name = "Achievements";
+        const char *adv_ach_scope_name = (creator_selected_version <= MC_VERSION_1_11_2)
+                                             ? "Achievements"
+                                             : "Advancements";
+        // Add a dynamic name for the details scope as well
+        const char *adv_details_scope_name = (creator_selected_version <= MC_VERSION_1_11_2)
+                                                 ? "Ach. Details"
+                                                 : "Adv. Details";
 
         const char *scope_names[] = {
-            "Templates", "Languages", adv_ach_scope_name, "Stats", "Unlocks", "Custom Goals", "Multi-Stage Goals"
+            "Templates", "Languages", adv_ach_scope_name, "Stats", "Unlocks", "Custom Goals", "Multi-Stage Goals",
+            adv_details_scope_name, "Stat Details", "MS Goal Details"
         };
-        if (ImGui::BeginCombo("##Scope", scope_names[current_search_scope])) {
+
+        // Determine the display name for the currently selected scope
+        const char *current_scope_name = "Unknown";
+        switch (current_search_scope) {
+            case SCOPE_TEMPLATES: current_scope_name = scope_names[SCOPE_TEMPLATES];
+                break;
+            case SCOPE_LANGUAGES: current_scope_name = scope_names[SCOPE_LANGUAGES];
+                break;
+            case SCOPE_ADVANCEMENTS: current_scope_name = adv_ach_scope_name;
+                break;
+            case SCOPE_STATS: current_scope_name = scope_names[SCOPE_STATS];
+                break;
+            case SCOPE_UNLOCKS: current_scope_name = scope_names[SCOPE_UNLOCKS];
+                break;
+            case SCOPE_CUSTOM: current_scope_name = scope_names[SCOPE_CUSTOM];
+                break;
+            case SCOPE_MULTISTAGE: current_scope_name = scope_names[SCOPE_MULTISTAGE];
+                break;
+            case SCOPE_ADVANCEMENT_DETAILS: current_scope_name = adv_details_scope_name;
+                break;
+            case SCOPE_STAT_DETAILS: current_scope_name = scope_names[SCOPE_STAT_DETAILS];
+                break;
+            case SCOPE_MULTISTAGE_DETAILS: current_scope_name = scope_names[SCOPE_MULTISTAGE_DETAILS];
+                break;
+        }
+
+        if (ImGui::BeginCombo("##Scope", current_scope_name)) {
+            // --- Main List Scopes ---
+
             // Always available
             if (ImGui::Selectable(scope_names[SCOPE_TEMPLATES], current_search_scope == SCOPE_TEMPLATES)) {
                 current_search_scope = SCOPE_TEMPLATES;
+                tc_search_buffer[0] = '\0'; // Clear search on change
             }
 
-            // Available only when viewing a template's language list
+            // Available only when viewing a template's language list (not in editor)
             if (selected_template_index != -1 && !editing_template && !show_create_new_view && !show_copy_view) {
                 if (ImGui::Selectable(scope_names[SCOPE_LANGUAGES], current_search_scope == SCOPE_LANGUAGES)) {
                     current_search_scope = SCOPE_LANGUAGES;
+                    tc_search_buffer[0] = '\0'; // Clear search on change
                 }
             }
 
-            // Available only when the editor is active
+            // --- Editor Scopes (only available when editing a template) ---
             if (editing_template) {
-                if (ImGui::Selectable(advancements_label_plural, current_search_scope == SCOPE_ADVANCEMENTS)) {
-                    current_search_scope = SCOPE_ADVANCEMENTS; // Achievements or Advancements
+                // Main Editor Tabs
+                if (ImGui::Selectable(adv_ach_scope_name, current_search_scope == SCOPE_ADVANCEMENTS)) {
+                    current_search_scope = SCOPE_ADVANCEMENTS;
+                    tc_search_buffer[0] = '\0'; // Clear search on change
                 }
                 if (ImGui::Selectable(scope_names[SCOPE_STATS], current_search_scope == SCOPE_STATS)) {
                     current_search_scope = SCOPE_STATS;
+                    tc_search_buffer[0] = '\0'; // Clear search on change
                 }
                 if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
-                    // Only show Unlocks for this version
                     if (ImGui::Selectable(scope_names[SCOPE_UNLOCKS], current_search_scope == SCOPE_UNLOCKS)) {
                         current_search_scope = SCOPE_UNLOCKS;
+                        tc_search_buffer[0] = '\0'; // Clear search on change
                     }
                 }
                 if (ImGui::Selectable(scope_names[SCOPE_CUSTOM], current_search_scope == SCOPE_CUSTOM)) {
                     current_search_scope = SCOPE_CUSTOM;
+                    tc_search_buffer[0] = '\0'; // Clear search on change
                 }
                 if (ImGui::Selectable(scope_names[SCOPE_MULTISTAGE], current_search_scope == SCOPE_MULTISTAGE)) {
                     current_search_scope = SCOPE_MULTISTAGE;
+                    tc_search_buffer[0] = '\0'; // Clear search on change
+                }
+
+                ImGui::Separator();
+
+                // Advancement Details
+                if (ImGui::Selectable(adv_details_scope_name, current_search_scope == SCOPE_ADVANCEMENT_DETAILS)) {
+                    current_search_scope = SCOPE_ADVANCEMENT_DETAILS;
+                    tc_search_buffer[0] = '\0'; // Clear search on change
+                }
+
+                // Stat Details
+                if (ImGui::Selectable(scope_names[SCOPE_STAT_DETAILS], current_search_scope == SCOPE_STAT_DETAILS)) {
+                    current_search_scope = SCOPE_STAT_DETAILS;
+                    tc_search_buffer[0] = '\0'; // Clear search on change
+                }
+
+                // Multi-Stage Goal Details
+                if (ImGui::Selectable(scope_names[SCOPE_MULTISTAGE_DETAILS], current_search_scope == SCOPE_MULTISTAGE_DETAILS)) {
+                    current_search_scope = SCOPE_MULTISTAGE_DETAILS;
+                    tc_search_buffer[0] = '\0'; // Clear search on change
                 }
             }
             ImGui::EndCombo();
@@ -2274,6 +2338,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         save_message_type = MSG_NONE;
                     }
 
+                    // Determine if a details search is active
+                    bool is_details_search_active = (
+                        current_search_scope == SCOPE_ADVANCEMENT_DETAILS && tc_search_buffer[0] != '\0');
+
                     int criterion_to_remove = -1;
                     int criterion_to_copy = -1;
 
@@ -2282,8 +2350,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     int criterion_dnd_target_index = -1;
 
                     for (size_t j = 0; j < advancement.criteria.size(); j++) {
-                        ImGui::PushID(j);
                         auto &criterion = advancement.criteria[j];
+
+                        if (is_details_search_active) {
+                            if (!str_contains_insensitive(criterion.display_name, tc_search_buffer) &&
+                                !str_contains_insensitive(criterion.root_name, tc_search_buffer) &&
+                                !str_contains_insensitive(criterion.icon_path, tc_search_buffer)) {
+                                continue;
+                            }
+                        }
+
+                        ImGui::PushID(j);
+
 
                         // Add vertical spacing creating the gap
                         ImGui::Spacing();
@@ -2474,7 +2552,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 snprintf(goal_str, sizeof(goal_str), "%d", criterion.goal);
 
                                 // For complex stats, we also check the criterion's own display name.
-                                bool name_match = !stat_cat.is_simple_stat && str_contains_insensitive(criterion.display_name, tc_search_buffer);
+                                bool name_match = !stat_cat.is_simple_stat && str_contains_insensitive(
+                                                      criterion.display_name, tc_search_buffer);
 
                                 // The core check for root name, icon path, and target goal, which applies to both simple and complex stats.
                                 if (name_match ||
@@ -2710,10 +2789,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::Text("Criteria");
 
                         // Add Criterion button only for multi-stat categories -> complex stats
-                        if (ImGui::Button("Add Criterion")) {
+                        if (ImGui::Button("Add New Criterion")) {
                             stat_cat.criteria.push_back({});
                             save_message_type = MSG_NONE;
                         }
+
+                        // Determine if a details search is active
+                        bool is_details_search_active = (current_search_scope == SCOPE_STAT_DETAILS && tc_search_buffer[0] != '\0');
 
                         int crit_to_remove = -1;
                         int crit_to_copy = -1;
@@ -2722,6 +2804,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         int stat_crit_dnd_target_index = -1;
                         for (size_t j = 0; j < stat_cat.criteria.size(); j++) {
                             auto &crit = stat_cat.criteria[j];
+
+                            if (is_details_search_active) {
+                                char goal_str[32];
+                                snprintf(goal_str, sizeof(goal_str), "%d", crit.goal);
+                                if (!str_contains_insensitive(crit.display_name, tc_search_buffer) &&
+                                    !str_contains_insensitive(crit.root_name, tc_search_buffer) &&
+                                    !str_contains_insensitive(crit.icon_path, tc_search_buffer) &&
+                                    (crit.goal == 0 || strstr(goal_str, tc_search_buffer) == nullptr)) {
+                                    continue;
+                                    }
+                            }
+
                             ImGui::PushID(j);
 
                             ImGui::Spacing();
@@ -2875,7 +2969,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // If search is active, check both display name and root name.
                         // If neither matches, skip rendering this item.
                         if (is_unlock_search_active) {
-
                             if (!str_contains_insensitive(unlock.display_name, tc_search_buffer) &&
                                 !str_contains_insensitive(unlock.root_name, tc_search_buffer) &&
                                 !str_contains_insensitive(unlock.icon_path, tc_search_buffer)) {
@@ -3257,7 +3350,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 strstr(target_val_str, tc_search_buffer) != nullptr) {
                                 stage_match = true;
                                 break;
-                                }
+                            }
                         }
 
                         if (stage_match) {
@@ -3445,6 +3538,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         save_message_type = MSG_NONE;
                     }
 
+                    // Determine if a details search is active
+                    bool is_details_search_active = (current_search_scope == SCOPE_MULTISTAGE_DETAILS && tc_search_buffer[0] != '\0');
+
                     int stage_to_remove = -1;
                     int stage_to_copy = -1;
 
@@ -3453,6 +3549,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     for (size_t j = 0; j < goal.stages.size(); ++j) {
                         auto &stage = goal.stages[j];
+
+                        if (is_details_search_active) {
+                            char target_val_str[32];
+                            snprintf(target_val_str, sizeof(target_val_str), "%d", stage.required_progress);
+                            if (!str_contains_insensitive(stage.display_text, tc_search_buffer) &&
+                                !str_contains_insensitive(stage.stage_id, tc_search_buffer) &&
+                                !str_contains_insensitive(stage.root_name, tc_search_buffer) &&
+                                !str_contains_insensitive(stage.parent_advancement, tc_search_buffer) &&
+                                (stage.required_progress == 0 || strstr(target_val_str, tc_search_buffer) == nullptr)) {
+                                continue;
+                                }
+                        }
+
                         ImGui::PushID(j);
 
                         // Add some vertical spacing to create a gap
