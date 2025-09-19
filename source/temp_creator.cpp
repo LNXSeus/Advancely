@@ -1355,7 +1355,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
         } else {
             // Invisible dummy to maintain layout
-            ImGui::Dummy(ImVec2(clear_button_size, ImGui::GetFrameHeight()));
+            ImGui::Dummy(ImVec2(clear_button_size, clear_button_size));
         }
         ImGui::SameLine();
 
@@ -1366,6 +1366,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             focus_tc_search_box = false;
         }
         ImGui::InputTextWithHint("##TCSearch", "Search...", tc_search_buffer, sizeof(tc_search_buffer));
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[1024];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Filter the list by name, ID, icon path, or target value.\n\n"
+                     "Press Ctrl+F (Cmd+F on macOS) to focus this field.");
+
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
         ImGui::SameLine();
 
         // 3. Dynamic Scope Dropdown
@@ -1476,6 +1484,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
             }
             ImGui::EndCombo();
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[1024];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Change the search scope.\n\nYou can search the main lists (e.g., Templates, Stats)\nor filter the contents of a selected item's details panel.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
         }
     }
 
@@ -2145,7 +2159,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::IsItemHovered()) {
                         char tooltip_buffer[128];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Duplicate %s. This adds '_copy' to the root name.", label);
+                                 "Duplicate %s.", label);
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
                     ImGui::SameLine();
@@ -2338,7 +2352,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::Separator();
                     ImGui::Text("Criteria");
 
-                    if (ImGui::Button("Add New Criterion")) {
+                    char criterion_add_tooltip_buffer[128];
+                    snprintf(criterion_add_tooltip_buffer, sizeof(criterion_add_tooltip_buffer), "Add New %s Criterion",
+                             advancement_label);
+                    if (ImGui::Button(criterion_add_tooltip_buffer)) {
                         advancement.criteria.push_back({});
                         save_message_type = MSG_NONE;
                     }
@@ -2623,7 +2640,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::IsItemHovered()) {
                         char tooltip_buffer[128];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Duplicate %s. This adds '_copy' to the root name.", label);
+                                 "Duplicate %s.", label);
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
                     ImGui::SameLine();
@@ -2816,7 +2833,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::Text("Criteria");
 
                         // Add Criterion button only for multi-stat categories -> complex stats
-                        if (ImGui::Button("Add New Criterion")) {
+                        if (ImGui::Button("Add New Stat Criterion")) {
                             stat_cat.criteria.push_back({});
                             save_message_type = MSG_NONE;
                         }
@@ -3451,7 +3468,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::Button("Copy")) { goal_to_copy_idx = i; }
                     if (ImGui::IsItemHovered()) {
                         char tooltip_buffer[128];
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate %s. This adds '_copy' to the root name.", label);
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate %s.", label);
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
                     ImGui::SameLine();
