@@ -294,6 +294,38 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             temp_settings.version_str[sizeof(temp_settings.version_str) - 1] = '\0';
         }
     }
+    if (ImGui::IsItemHovered()) {
+        char version_tooltip_buffer[1024];
+        snprintf(version_tooltip_buffer, sizeof(version_tooltip_buffer), "Select the version of the template.\n"
+                                                                         "This doesn't have to be the exact version of your minecraft instance.\n"
+                                                                         "Click on '(Learn more)' to see the version ranges that functionally equal.");
+        ImGui::SetTooltip("%s", version_tooltip_buffer);
+    }
+
+    ImGui::SameLine();
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.6f, 1.0f, 1.0f)); // Use a link-like color
+    ImGui::Text("(Learn more)");
+    ImGui::PopStyleColor();
+
+    if (ImGui::IsItemHovered()) {
+        char open_official_templates_tooltip_buffer[1024];
+        snprintf(open_official_templates_tooltip_buffer, sizeof(open_official_templates_tooltip_buffer),
+                 "Opens the version support page in your browser.");
+        ImGui::SetTooltip("%s", open_official_templates_tooltip_buffer);
+    }
+
+    if (ImGui::IsItemClicked()) {
+        const char *url = "https://github.com/LNXSeus/Advancely#extensive-version-support";
+        char command[1024];
+#ifdef _WIN32
+        snprintf(command, sizeof(command), "start %s", url);
+#elif __APPLE__
+        snprintf(command, sizeof(command), "open %s", url);
+#else
+        snprintf(command, sizeof(command), "xdg-open %s", url);
+#endif
+        system(command);
+    }
 
     // Only show the StatsPerWorld checkbox for legacy versions
     MC_Version selected_version = settings_get_version_from_string(temp_settings.version_str);
@@ -499,7 +531,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char open_template_creator_tooltip_buffer[1024];
         snprintf(open_template_creator_tooltip_buffer, sizeof(open_template_creator_tooltip_buffer),
-                 "Open the Template Creator to build a new custom template.");
+                 "Open the Template Creator to modify or build a new template or language.");
         ImGui::SetTooltip("%s", open_template_creator_tooltip_buffer);
     }
 

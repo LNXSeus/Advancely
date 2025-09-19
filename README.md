@@ -84,9 +84,9 @@ _This animation here is compressed. When you use the overlay the framerate will 
 
 * **Important**: For GIFs to work correctly, they must be unoptimized with all frame data intact. You can prepare any GIF by uploading it to [**ezgif.com/maker**](https://ezgif.com/maker), selecting the **"Don't Stack Frames"** option, and exporting the result.
 
-## Extensive Version Support (1.0 – 1.21+)
+## Extensive Version Support
 
-Advancely supports over 100 Minecraft versions, including every full release from 1.0 upwards and all April Fool's snapshots.
+Advancely supports over 100 Minecraft versions **(1.0 - 1.21.9+)**, including every full release from 1.0 upwards and all April Fool's snapshots.
 
 * **Playtime Tracking**: The tracker reads total playtime directly from the world's stats file, which is measured in in-game ticks (20 ticks per second).
 
