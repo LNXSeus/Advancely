@@ -1335,6 +1335,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
     }
 
+    if (ImGui::IsItemHovered()) {
+        char version_combo_tooltip_buffer[1024];
+        snprintf(version_combo_tooltip_buffer, sizeof(version_combo_tooltip_buffer),
+                 "Select the version of the game you want to create templates for.");
+        ImGui::SetTooltip("%s", version_combo_tooltip_buffer);
+    }
+
     ImGui::SameLine();
 
     // TEMPLATE CREATOR SEARCH BOX
@@ -1599,6 +1606,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
     }
 
+    if (ImGui::IsItemHovered()) {
+        char create_new_template_tooltip_buffer[1024];
+        snprintf(create_new_template_tooltip_buffer, sizeof(create_new_template_tooltip_buffer),
+            "Create a new template for the selected version: %s", creator_version_str);
+        ImGui::SetTooltip("%s", create_new_template_tooltip_buffer);
+    }
+
     ImGui::SameLine();
 
     ImGui::BeginDisabled(selected_template_index == -1);
@@ -1628,6 +1642,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
     }
     ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && selected_template_index == -1) {
+        // When it's disabled
+        char tooltip_buffer[128];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a template from the list to edit.");
+        ImGui::SetTooltip("%s", tooltip_buffer);
+    } else if (ImGui::IsItemHovered(ImGuiHoveredFlags_None)) {
+        char edit_template_tooltip_buffer[1024];
+        snprintf(edit_template_tooltip_buffer, sizeof(edit_template_tooltip_buffer),
+            "Edit the selected template.");
+        ImGui::SetTooltip("%s", edit_template_tooltip_buffer);
+    }
     ImGui::SameLine();
 
     // Allow copying of the currently used template
@@ -1686,7 +1711,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             strncpy(copy_template_flag, new_flag, sizeof(copy_template_flag) - 1);
         }
     }
-    if (ImGui::IsItemHovered()) {
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_None)) {
         char copy_template_tooltip_buffer[1024];
         snprintf(copy_template_tooltip_buffer, sizeof(copy_template_tooltip_buffer),
                  "Creates a copy of the selected template. You can then change its version, category, or flag.\n\n"
@@ -1694,6 +1719,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                  "associated language files (e.g., _lang.json, _lang_eng.json).");
         ImGui::SetTooltip(
             "%s", copy_template_tooltip_buffer);
+    }
+    // Tooltip for the DISABLED state.
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && selected_template_index == -1) {
+        char tooltip_buffer[128];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a template from the list to copy.");
+        ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
     ImGui::EndDisabled();
@@ -1725,10 +1756,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
             ImGui::SetTooltip("%s", tooltip_text);
         } else {
-            char delete_curent_template_tooltip_buffer[1024];
-            snprintf(delete_curent_template_tooltip_buffer, sizeof(delete_curent_template_tooltip_buffer),
-                     "Delete the currently selected template.");
-            ImGui::SetTooltip("%s", delete_curent_template_tooltip_buffer);
+            char delete_current_template_tooltip_buffer[128];
+            snprintf(delete_current_template_tooltip_buffer, sizeof(delete_current_template_tooltip_buffer),
+                     "Select a template from the list to delete.");
+            ImGui::SetTooltip("%s", delete_current_template_tooltip_buffer);
         }
     }
 
