@@ -4053,7 +4053,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             char template_category_name_tooltip_buffer[1024];
             snprintf(template_category_name_tooltip_buffer, sizeof(template_category_name_tooltip_buffer),
                      "The main classification for the template (e.g., 'all_advancements', 'all_trims').\n"
-                     "Cannot contain spaces or special characters besides the % sign.");
+                     "Cannot contain spaces or special characters besides the %% sign.");
             ImGui::SetTooltip("%s", template_category_name_tooltip_buffer);
         }
 
@@ -4062,7 +4062,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             char optional_flag_tooltip_buffer[1024];
             snprintf(optional_flag_tooltip_buffer, sizeof(optional_flag_tooltip_buffer),
                      "A variant for the category (e.g., '_optimized', '_modded').\n"
-                     "Cannot contain spaces or special characters besides the % sign.");
+                     "Cannot contain spaces or special characters besides the %% sign.");
             ImGui::SetTooltip("%s", optional_flag_tooltip_buffer);
         }
 
@@ -4149,7 +4149,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char create_language_tooltip_buffer[1024];
             snprintf(create_language_tooltip_buffer, sizeof(create_language_tooltip_buffer),
-                     "E.g., 'de', 'fr_ca'. Cannot be empty or contain special characters besides the % sign.");
+                     "E.g., 'de', 'fr_ca'. Cannot be empty or contain special characters besides the %% sign.");
             ImGui::SetTooltip("%s", create_language_tooltip_buffer);
         }
 
