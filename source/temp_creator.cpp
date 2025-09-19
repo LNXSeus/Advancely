@@ -1469,7 +1469,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
 
                 // Multi-Stage Goal Details
-                if (ImGui::Selectable(scope_names[SCOPE_MULTISTAGE_DETAILS], current_search_scope == SCOPE_MULTISTAGE_DETAILS)) {
+                if (ImGui::Selectable(scope_names[SCOPE_MULTISTAGE_DETAILS],
+                                      current_search_scope == SCOPE_MULTISTAGE_DETAILS)) {
                     current_search_scope = SCOPE_MULTISTAGE_DETAILS;
                     tc_search_buffer[0] = '\0'; // Clear search on change
                 }
@@ -1735,7 +1736,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::TextUnformatted(template_info);
             ImGui::Separator();
 
-            if (ImGui::Button("OK", ImVec2(120, 0))) {
+            if (ImGui::Button("Delete", ImVec2(120, 0))) {
                 if (delete_template_files(creator_version_str, selected.category, selected.optional_flag)) {
                     snprintf(status_message, sizeof(status_message), "Template '%s' deleted.", selected.category);
                     SDL_SetAtomicInt(&g_templates_changed, 1); // Signal change
@@ -2111,8 +2112,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     auto &advancement = *advancements_to_render[i]; // Dereference the pointer
                     ImGui::PushID(&advancement); // Use pointer for a stable ID
 
-                    // TODO: Remove?
-                    // const auto &advancement = current_template_data.advancements[i];
                     const char *display_name = advancement.display_name;
                     const char *root_name = advancement.root_name;
 
@@ -2131,6 +2130,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         advancement_to_remove_idx = i;
                         save_message_type = MSG_NONE;
                     }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[128];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s", label);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
                     ImGui::SameLine();
 
                     // Draw the "Copy" button
@@ -2138,10 +2142,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         advancement_to_copy_idx = i;
                         save_message_type = MSG_NONE;
                     }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[128];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Duplicate %s. This adds '_copy' to the root name.", label);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
                     ImGui::SameLine();
-
-                    // `advancement_ptr` is the pointer from the `advancements_to_render` vector
-                    // auto& advancement = *advancement_ptr;
 
                     if (ImGui::Selectable(label, &advancement == selected_advancement)) {
                         // Compare pointers
@@ -2417,11 +2424,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             criterion_to_copy = j;
                             save_message_type = MSG_NONE;
                         }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate %s Criterion",
+                                     advancement_label);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
                         ImGui::SameLine();
 
                         if (ImGui::Button("Remove")) {
                             criterion_to_remove = j;
                             save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s Criterion", advancement_label);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
                         ImGui::EndGroup();
@@ -2595,8 +2613,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     if (ImGui::Button("X")) { stat_to_remove_idx = i; }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[128];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s", label);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
                     ImGui::SameLine();
                     if (ImGui::Button("Copy")) { stat_to_copy_idx = i; }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[128];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Duplicate %s. This adds '_copy' to the root name.", label);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
                     ImGui::SameLine();
 
                     if (ImGui::Selectable(label, &stat == selected_stat)) {
@@ -2793,7 +2822,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         // Determine if a details search is active
-                        bool is_details_search_active = (current_search_scope == SCOPE_STAT_DETAILS && tc_search_buffer[0] != '\0');
+                        bool is_details_search_active = (
+                            current_search_scope == SCOPE_STAT_DETAILS && tc_search_buffer[0] != '\0');
 
                         int crit_to_remove = -1;
                         int crit_to_copy = -1;
@@ -2811,7 +2841,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     !str_contains_insensitive(crit.icon_path, tc_search_buffer) &&
                                     (crit.goal == 0 || strstr(goal_str, tc_search_buffer) == nullptr)) {
                                     continue;
-                                    }
+                                }
                             }
 
                             ImGui::PushID(j);
@@ -2865,10 +2895,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 crit_to_copy = j;
                                 save_message_type = MSG_NONE;
                             }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buffer[128];
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Stat Criterion");
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
                             ImGui::SameLine();
                             if (ImGui::Button("Remove")) {
                                 crit_to_remove = j;
                                 save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buffer[128];
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Stat Criterion");
+                                ImGui::SetTooltip("%s", tooltip_buffer);
                             }
                             ImGui::EndGroup();
                             ImGui::SetCursorScreenPos(item_start_cursor_pos);
@@ -3034,10 +3074,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             item_to_copy = i;
                             save_message_type = MSG_NONE;
                         }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Unlock");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
                         ImGui::SameLine();
                         if (ImGui::Button("Remove")) {
                             item_to_remove = i;
                             save_message_type = MSG_NONE; // Clear message on new edit
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Unlock");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
                         ImGui::EndGroup();
@@ -3214,10 +3264,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         item_to_copy = i;
                         save_message_type = MSG_NONE;
                     }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[128];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Custom Goal");
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
                     ImGui::SameLine();
                     if (ImGui::Button("Remove")) {
                         item_to_remove = i;
                         save_message_type = MSG_NONE; // Clear message on new edit
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[128];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Custom Goal");
+                        ImGui::SetTooltip("%s", tooltip_buffer);
                     }
 
                     ImGui::EndGroup();
@@ -3382,8 +3442,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     if (ImGui::Button("X")) { goal_to_remove_idx = i; }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[128];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s", label);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
                     ImGui::SameLine();
                     if (ImGui::Button("Copy")) { goal_to_copy_idx = i; }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[128];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate %s. This adds '_copy' to the root name.", label);
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
                     ImGui::SameLine();
 
                     if (ImGui::Selectable(label, &goal == selected_ms_goal)) {
@@ -3537,7 +3607,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     // Determine if a details search is active
-                    bool is_details_search_active = (current_search_scope == SCOPE_MULTISTAGE_DETAILS && tc_search_buffer[0] != '\0');
+                    bool is_details_search_active = (
+                        current_search_scope == SCOPE_MULTISTAGE_DETAILS && tc_search_buffer[0] != '\0');
 
                     int stage_to_remove = -1;
                     int stage_to_copy = -1;
@@ -3557,7 +3628,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 !str_contains_insensitive(stage.parent_advancement, tc_search_buffer) &&
                                 (stage.required_progress == 0 || strstr(target_val_str, tc_search_buffer) == nullptr)) {
                                 continue;
-                                }
+                            }
                         }
 
                         ImGui::PushID(j);
@@ -3689,12 +3760,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE;
                         }
 
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Stage");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+
                         ImGui::SameLine();
 
                         if (ImGui::Button("Remove")) {
                             stage_to_remove = j;
                             ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
+                        }
+
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Stage");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
                         ImGui::EndGroup();
@@ -3894,7 +3977,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", popup_error_msg);
         }
 
-        if (ImGui::Button("OK", ImVec2(120, 0)) || (!ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
+        if (ImGui::Button("Create", ImVec2(120, 0)) || (
+                !ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
             popup_error_msg[0] = '\0';
             if (validate_and_create_lang_file(creator_version_str, selected.category, selected.optional_flag,
                                               lang_flag_buffer, popup_error_msg, sizeof(popup_error_msg))) {
@@ -3904,7 +3988,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 show_create_lang_popup = false;
             }
         }
-        // Cancel hover text
+        // Confirm Hover text
         if (ImGui::IsItemHovered()) {
             char press_enter_confirm_tooltip_buffer[1024];
             snprintf(press_enter_confirm_tooltip_buffer, sizeof(press_enter_confirm_tooltip_buffer),
@@ -3949,7 +4033,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                "Warning: Source was empty. Copied from Default instead.");
         }
 
-        if (ImGui::Button("OK", ImVec2(120, 0)) || (!ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
+        if (ImGui::Button("Copy", ImVec2(120, 0)) || (!ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
             if (show_fallback_warning) {
                 // This is the second OK click, just close the popup
                 ImGui::CloseCurrentPopup();
@@ -4004,7 +4088,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         const auto &lang_to_delete = selected.available_lang_flags[selected_lang_index];
         ImGui::Text("Are you sure you want to delete the '%s' language file?", lang_to_delete.c_str());
         ImGui::Separator();
-        if (ImGui::Button("OK", ImVec2(120, 0)) || (!ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
+        if (ImGui::Button("Delete", ImVec2(120, 0)) || (
+                !ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Enter))) {
             char error_msg[256];
             if (delete_lang_file(creator_version_str, selected.category, selected.optional_flag, lang_to_delete.c_str(),
                                  error_msg, sizeof(error_msg))) {
