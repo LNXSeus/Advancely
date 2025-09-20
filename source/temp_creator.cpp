@@ -1169,7 +1169,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static EditorTemplate current_template_data;
     static EditorTemplate saved_template_data; // A snapshot of the last saved state
     static DiscoveredTemplate selected_template_info;
-    static std::string selected_lang_flag = ""; // The language currently being edited
+    static std::string selected_lang_flag; // The language currently being edited
     static bool show_advancement_display_names = true;
     static bool show_stat_display_names = true;
     static bool show_ms_goal_display_names = true;
@@ -1271,7 +1271,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // Dynamically create the window title based on unsaved changes
     // On VERY FIRST OPEN it has this size -> nothing in imgui.ini file
     ImGui::SetNextWindowSize(ImVec2(1280, 720), ImGuiCond_FirstUseEver);
-    ImGui::Begin("Template Creator", p_open);
+    ImGui::Begin("Template Editor", p_open);
 
     if (t) {
         // For global event handler to not clash with the other Ctrl + F or Cmd + F
@@ -1338,7 +1338,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     if (ImGui::IsItemHovered()) {
         char version_combo_tooltip_buffer[1024];
         snprintf(version_combo_tooltip_buffer, sizeof(version_combo_tooltip_buffer),
-                 "Select the version of the game you want to create templates for.");
+                 "Select the game version for which you want to manage templates.");
         ImGui::SetTooltip("%s", version_combo_tooltip_buffer);
     }
 
@@ -1359,6 +1359,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (tc_search_buffer[0] != '\0') {
             if (ImGui::Button("X##ClearTCSearch", ImVec2(clear_button_size, clear_button_size))) {
                 tc_search_buffer[0] = '\0';
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Clear Search");
             }
         } else {
             // Invisible dummy to maintain layout
@@ -1609,7 +1612,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     if (ImGui::IsItemHovered()) {
         char create_new_template_tooltip_buffer[1024];
         snprintf(create_new_template_tooltip_buffer, sizeof(create_new_template_tooltip_buffer),
-            "Create a new template for the selected version: %s", creator_version_str);
+                 "Create a new template for the selected version: %s", creator_version_str);
         ImGui::SetTooltip("%s", create_new_template_tooltip_buffer);
     }
 
@@ -1642,16 +1645,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
     }
     ImGui::EndDisabled();
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && selected_template_index == -1) {
-        // When it's disabled
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         char tooltip_buffer[128];
-        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a template from the list to edit.");
+        if (selected_template_index == -1) {
+            // When no template is selected
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a template from the list to edit.");
+        } else {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Open the editor for the selected template.");
+        }
         ImGui::SetTooltip("%s", tooltip_buffer);
-    } else if (ImGui::IsItemHovered(ImGuiHoveredFlags_None)) {
-        char edit_template_tooltip_buffer[1024];
-        snprintf(edit_template_tooltip_buffer, sizeof(edit_template_tooltip_buffer),
-            "Edit the selected template.");
-        ImGui::SetTooltip("%s", edit_template_tooltip_buffer);
     }
     ImGui::SameLine();
 
@@ -1711,20 +1713,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             strncpy(copy_template_flag, new_flag, sizeof(copy_template_flag) - 1);
         }
     }
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_None)) {
-        char copy_template_tooltip_buffer[1024];
-        snprintf(copy_template_tooltip_buffer, sizeof(copy_template_tooltip_buffer),
-                 "Creates a copy of the selected template. You can then change its version, category, or flag.\n\n"
-                 "Note: This action copies the main template file and all of its\n"
-                 "associated language files (e.g., _lang.json, _lang_eng.json).");
-        ImGui::SetTooltip(
-            "%s", copy_template_tooltip_buffer);
-    }
-    // Tooltip for the DISABLED state.
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && selected_template_index == -1) {
-        char tooltip_buffer[128];
-        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a template from the list to copy.");
-        ImGui::SetTooltip("%s", tooltip_buffer);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        if (selected_template_index == -1) {
+            // Tooltip for the DISABLED state.
+            char tooltip_buffer[128];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a template from the list to copy.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        } else {
+            // Enabled state
+            char copy_template_tooltip_buffer[1024];
+            snprintf(copy_template_tooltip_buffer, sizeof(copy_template_tooltip_buffer),
+                     "Creates a copy of the selected template. You can then change its version, category, or flag.\n\n"
+                     "Note: This action copies the main template file and all of its\n"
+                     "associated language files (e.g., _lang.json, _lang_eng.json).");
+            ImGui::SetTooltip(
+                "%s", copy_template_tooltip_buffer);
+        }
     }
 
     ImGui::EndDisabled();
@@ -1842,6 +1846,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 pending_action = create_action;
             } else { create_action(); }
         }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Create a new, empty language file for this template.\n"
+                     "This will result in the root names becoming the display names.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
         ImGui::SameLine();
         ImGui::BeginDisabled(selected_lang_index == -1);
         auto copy_action = [&]() {
@@ -1855,6 +1865,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 show_unsaved_changes_popup = true;
                 pending_action = copy_action;
             } else { copy_action(); }
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Create a new language file by copying the contents of the selected language.\n"
+                     "Copying a completely empty language file will default back to copying the default language file.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
         }
         ImGui::SameLine();
 
@@ -2008,6 +2025,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
         }
 
+        if (ImGui::IsItemHovered()) {
+            char revert_changes_tooltip_buffer[1024];
+            snprintf(revert_changes_tooltip_buffer, sizeof(revert_changes_tooltip_buffer),
+                     "Discard all unsaved changes and reload from the last saved state.");
+            ImGui::SetTooltip("%s", revert_changes_tooltip_buffer);
+        }
+
         // Render the success or error message next to the button
         if (save_message_type != MSG_NONE) {
             ImGui::SameLine();
@@ -2096,7 +2120,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     while (true) {
                         snprintf(new_adv.root_name, sizeof(new_adv.root_name), "minecraft:new/advancement_%d", counter);
                         bool name_exists = false;
-                        for (const auto& adv : current_template_data.advancements) {
+                        for (const auto &adv: current_template_data.advancements) {
                             if (strcmp(adv.root_name, new_adv.root_name) == 0) {
                                 name_exists = true;
                                 break;
@@ -2105,7 +2129,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (!name_exists) break;
                         counter++;
                     }
-                    snprintf(new_adv.display_name, sizeof(new_adv.display_name), "New %s %d", advancement_label, counter);
+                    snprintf(new_adv.display_name, sizeof(new_adv.display_name), "New %s %d", advancement_label,
+                             counter);
                     strncpy(new_adv.icon_path, "blocks/placeholder.png", sizeof(new_adv.icon_path) - 1);
                     current_template_data.advancements.push_back(new_adv);
                     save_message_type = MSG_NONE;
@@ -2115,8 +2140,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (ImGui::IsItemHovered()) {
                     char show_display_names_tooltip_buffer[1024];
                     snprintf(show_display_names_tooltip_buffer, sizeof(show_display_names_tooltip_buffer),
-                             "When checked shows the display names as you see then on the tracker.\n"
-                             "Otherwise it shows the root names.");
+                             "Toggle between showing user-facing display names and internal root names in this list.");
                     ImGui::SetTooltip("%s", show_display_names_tooltip_buffer);
                 }
                 ImGui::Separator();
@@ -2373,11 +2397,30 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::InputText("Root Name", advancement.root_name, sizeof(advancement.root_name))) {
                         save_message_type = MSG_NONE;
                     }
+                    if (ImGui::IsItemHovered()) {
+                        char root_name_tooltip_buffer[128];
+                        snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
+                                 "The unique in-game ID for this %s, e.g., 'minecraft:story/mine_stone'.",
+                                 advancement_label);
+                        ImGui::SetTooltip("%s", root_name_tooltip_buffer);
+                    }
                     if (ImGui::InputText("Display Name", advancement.display_name, sizeof(advancement.display_name))) {
                         save_message_type = MSG_NONE;
                     }
+                    if (ImGui::IsItemHovered()) {
+                        char display_name_tooltip_buffer[128];
+                        snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
+                                 "The user-facing name that appears on the tracker/overlay.");
+                        ImGui::SetTooltip("%s", display_name_tooltip_buffer);
+                    }
                     if (ImGui::InputText("Icon Path", advancement.icon_path, sizeof(advancement.icon_path))) {
                         save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char icon_path_tooltip_buffer[128];
+                        snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                 "Path to the icon file, relative to the 'resources/icons' directory.");
+                        ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                     }
                     ImGui::SameLine();
                     if (ImGui::Button("Browse##AdvIcon")) {
@@ -2397,6 +2440,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::Checkbox("Hidden", &advancement.is_hidden)) {
                         save_message_type = MSG_NONE;
                     }
+                    if (ImGui::IsItemHovered()) {
+                        char hidden_tooltip_buffer[128];
+                        snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
+                                 "If checked, this item will be hidden on the tracker by default.\n"
+                                 "Visibility can be toggled in the main tracker settings.");
+                        ImGui::SetTooltip("%s", hidden_tooltip_buffer);
+                    }
                     ImGui::Separator();
                     ImGui::Text("Criteria");
 
@@ -2410,7 +2460,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         while (true) {
                             snprintf(new_crit.root_name, sizeof(new_crit.root_name), "new_criterion_%d", counter);
                             bool name_exists = false;
-                            for (const auto& crit : advancement.criteria) {
+                            for (const auto &crit: advancement.criteria) {
                                 if (strcmp(crit.root_name, new_crit.root_name) == 0) {
                                     name_exists = true;
                                     break;
@@ -2475,11 +2525,29 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::InputText("Root Name", criterion.root_name, sizeof(criterion.root_name))) {
                             save_message_type = MSG_NONE;
                         }
+                        if (ImGui::IsItemHovered()) {
+                            char root_name_tooltip_buffer[128];
+                            snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
+                                     "The unique in-game ID for this criterion, e.g., 'minecraft:hoglin'.");
+                            ImGui::SetTooltip("%s", root_name_tooltip_buffer);
+                        }
                         if (ImGui::InputText("Display Name", criterion.display_name, sizeof(criterion.display_name))) {
                             save_message_type = MSG_NONE;
                         }
+                        if (ImGui::IsItemHovered()) {
+                            char display_name_tooltip_buffer[128];
+                            snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
+                                     "The user-facing name for this criterion.");
+                            ImGui::SetTooltip("%s", display_name_tooltip_buffer);
+                        }
                         if (ImGui::InputText("Icon Path", criterion.icon_path, sizeof(criterion.icon_path))) {
                             save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char icon_path_tooltip_buffer[1024];
+                            snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                     "Path to the icon file, relative to the 'resources/icons' directory.");
+                            ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                         }
                         ImGui::SameLine();
                         if (ImGui::Button("Browse##CritIcon")) {
@@ -2497,6 +2565,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         if (ImGui::Checkbox("Hidden", &criterion.is_hidden)) {
                             save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char hidden_tooltip_buffer[128];
+                            snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
+                                     "If checked, this criterion will be hidden on the tracker by default.\n"
+                                     "Visibility can be toggled in the main tracker settings");
+                            ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                         }
 
                         ImGui::SameLine();
@@ -2613,7 +2688,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     while (true) {
                         snprintf(new_stat.root_name, sizeof(new_stat.root_name), "new_stat_%d", counter);
                         bool name_exists = false;
-                        for (const auto& stat : current_template_data.stats) {
+                        for (const auto &stat: current_template_data.stats) {
                             if (strcmp(stat.root_name, new_stat.root_name) == 0) {
                                 name_exists = true;
                                 break;
@@ -2628,20 +2703,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // Add a default criterion for the simple stat
                     EditorTrackableItem new_crit = {};
-                    snprintf(new_crit.root_name, sizeof(new_crit.root_name), "minecraft:custom/minecraft:new_stat_%d", counter);
+                    snprintf(new_crit.root_name, sizeof(new_crit.root_name), "minecraft:custom/minecraft:new_stat_%d",
+                             counter);
                     new_crit.goal = 1; // Default to a completable goal
                     new_stat.criteria.push_back(new_crit);
 
                     current_template_data.stats.push_back(new_stat);
                     save_message_type = MSG_NONE;
                 }
+                if (ImGui::IsItemHovered()) {
+                    char add_stat_tooltip_buffer[1024];
+                    snprintf(add_stat_tooltip_buffer, sizeof(add_stat_tooltip_buffer),
+                             "Add a new blank stat to this template.");
+                    ImGui::SetTooltip("%s", add_stat_tooltip_buffer);
+                }
                 ImGui::SameLine();
                 ImGui::Checkbox("Show Display Names", &show_stat_display_names);
                 if (ImGui::IsItemHovered()) {
                     char show_display_names_tooltip_buffer[1024];
                     snprintf(show_display_names_tooltip_buffer, sizeof(show_display_names_tooltip_buffer),
-                             "When checked shows the display names as you see then on the tracker.\n"
-                             "Otherwise it shows the root names.");
+                             "Toggle between showing user-facing display names and internal root names in this list.");
                     ImGui::SetTooltip("%s", show_display_names_tooltip_buffer);
                 }
 
@@ -2844,11 +2925,29 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::InputText("Category Key", stat_cat.root_name, sizeof(stat_cat.root_name))) {
                         save_message_type = MSG_NONE;
                     }
+                    if (ImGui::IsItemHovered()) {
+                        char root_name_tooltip_buffer[128];
+                        snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
+                                 "The unique key for this stat or stat category, e.g., 'stat:my_awesome_stat'.");
+                        ImGui::SetTooltip("%s", root_name_tooltip_buffer);
+                    }
                     if (ImGui::InputText("Display Name", stat_cat.display_name, sizeof(stat_cat.display_name))) {
                         save_message_type = MSG_NONE;
                     }
+                    if (ImGui::IsItemHovered()) {
+                        char display_name_tooltip_buffer[128];
+                        snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
+                                 "The user-facing name for this single stat or stat category.");
+                        ImGui::SetTooltip("%s", display_name_tooltip_buffer);
+                    }
                     if (ImGui::InputText("Icon Path", stat_cat.icon_path, sizeof(stat_cat.icon_path))) {
                         save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char icon_path_tooltip_buffer[1024];
+                        snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                 "Path to the icon file, relative to the 'resources/icons' directory.");
+                        ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                     }
                     ImGui::SameLine();
                     if (ImGui::Button("Browse##StatIcon")) {
@@ -2866,6 +2965,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     if (ImGui::Checkbox("Hidden", &stat_cat.is_hidden)) {
                         save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char hidden_tooltip_buffer[128];
+                        snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
+                                 "If checked, this criterion will be hidden on the tracker by default.\n"
+                                 "Visibility can be toggled in the main tracker settings");
+                        ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                     }
 
                     ImGui::SameLine();
@@ -2902,6 +3008,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         save_message_type = MSG_NONE;
                     }
+                    if (ImGui::IsItemHovered()) {
+                        char multi_stat_tooltip_buffer[256];
+                        snprintf(multi_stat_tooltip_buffer, sizeof(multi_stat_tooltip_buffer),
+                                 "Toggle between a simple, single stat and a complex category containing multiple sub-stats.");
+                        ImGui::SetTooltip("%s", multi_stat_tooltip_buffer);
+                    }
                     ImGui::Separator();
 
                     if (stat_cat.is_simple_stat) {
@@ -2912,8 +3024,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::InputText("Stat Root Name", simple_crit.root_name, sizeof(simple_crit.root_name))) {
                             save_message_type = MSG_NONE;
                         }
+                        if (ImGui::IsItemHovered()) {
+                            char stat_root_name_tooltip_buffer[256];
+                            snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
+                                     "The unique in-game ID for the stat to track, e.g., 'minecraft:mined/minecraft:diamond_ore'.");
+                            ImGui::SetTooltip("%s", stat_root_name_tooltip_buffer);
+                        }
                         if (ImGui::InputInt("Target", &simple_crit.goal)) {
                             save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char target_tooltip_buffer[256];
+                            snprintf(target_tooltip_buffer, sizeof(target_tooltip_buffer),
+                                     "The value required to complete this goal.");
+                            ImGui::SetTooltip("%s", target_tooltip_buffer);
                         }
                     } else {
                         // UI for a complex, multi-stat category (similar to advancements)
@@ -2927,7 +3051,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             while (true) {
                                 snprintf(new_crit.root_name, sizeof(new_crit.root_name), "new_criterion_%d", counter);
                                 bool name_exists = false;
-                                for (const auto& crit : stat_cat.criteria) {
+                                for (const auto &crit: stat_cat.criteria) {
                                     if (strcmp(crit.root_name, new_crit.root_name) == 0) {
                                         name_exists = true;
                                         break;
@@ -2982,14 +3106,32 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::BeginGroup();
 
                             ImGui::Separator();
-                            if (ImGui::InputText("Root Name", crit.root_name, sizeof(crit.root_name))) {
+                            if (ImGui::InputText("Sub-Stat Root Name", crit.root_name, sizeof(crit.root_name))) {
                                 save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char stat_root_name_tooltip_buffer[256];
+                                snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
+                                         "The unique in-game ID for the sub-stat to track, e.g., 'minecraft:mined/minecraft:diamond_ore'.");
+                                ImGui::SetTooltip("%s", stat_root_name_tooltip_buffer);
                             }
                             if (ImGui::InputText("Display Name", crit.display_name, sizeof(crit.display_name))) {
                                 save_message_type = MSG_NONE;
                             }
+                            if (ImGui::IsItemHovered()) {
+                                char display_name_tooltip_buffer[128];
+                                snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
+                                         "The user-facing name for this sub-stat.");
+                                ImGui::SetTooltip("%s", display_name_tooltip_buffer);
+                            }
                             if (ImGui::InputText("Icon Path", crit.icon_path, sizeof(crit.icon_path))) {
                                 save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char icon_path_tooltip_buffer[1024];
+                                snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                         "Path to the icon file, relative to the 'resources/icons' directory.");
+                                ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                             }
                             ImGui::SameLine();
                             if (ImGui::Button("Browse##StatCritIcon")) {
@@ -3008,8 +3150,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ImGui::InputInt("Target", &crit.goal)) {
                                 save_message_type = MSG_NONE;
                             }
+                            if (ImGui::IsItemHovered()) {
+                                char target_tooltip_buffer[256];
+                                snprintf(target_tooltip_buffer, sizeof(target_tooltip_buffer),
+                                         "The value required to complete this goal.");
+                                ImGui::SetTooltip("%s", target_tooltip_buffer);
+                            }
                             if (ImGui::Checkbox("Hidden", &crit.is_hidden)) {
                                 save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char hidden_tooltip_buffer[128];
+                                snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
+                                         "If checked, this criterion will be hidden on the tracker by default.\n"
+                                         "Visibility can be toggled in the main tracker settings");
+                                ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                             }
 
                             ImGui::SameLine();
@@ -3114,9 +3269,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         EditorTrackableItem new_unlock = {};
                         int counter = 1;
                         while (true) {
-                            snprintf(new_unlock.root_name, sizeof(new_unlock.root_name), "minecraft:new_unlock_%d", counter);
+                            snprintf(new_unlock.root_name, sizeof(new_unlock.root_name), "minecraft:new_unlock_%d",
+                                     counter);
                             bool name_exists = false;
-                            for (const auto& unlock : current_template_data.unlocks) {
+                            for (const auto &unlock: current_template_data.unlocks) {
                                 if (strcmp(unlock.root_name, new_unlock.root_name) == 0) {
                                     name_exists = true;
                                     break;
@@ -3183,11 +3339,29 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::InputText("Root Name", unlock.root_name, sizeof(unlock.root_name))) {
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
+                        if (ImGui::IsItemHovered()) {
+                            char root_name_tooltip_buffer[256];
+                            snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
+                                     "The unique in-game ID for this unlock, e.g., 'minecraft:exploration'.");
+                            ImGui::SetTooltip("%s", root_name_tooltip_buffer);
+                        }
                         if (ImGui::InputText("Display Name", unlock.display_name, sizeof(unlock.display_name))) {
                             save_message_type = MSG_NONE;
                         }
+                        if (ImGui::IsItemHovered()) {
+                            char display_name_tooltip_buffer[128];
+                            snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
+                                     "The user-facing name for this unlock.");
+                            ImGui::SetTooltip("%s", display_name_tooltip_buffer);
+                        }
                         if (ImGui::InputText("Icon Path", unlock.icon_path, sizeof(unlock.icon_path))) {
                             save_message_type = MSG_NONE; // Clear message on new edit
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char icon_path_tooltip_buffer[1024];
+                            snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                     "Path to the icon file, relative to the 'resources/icons' directory.");
+                            ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                         }
                         ImGui::SameLine();
                         if (ImGui::Button("Browse##UnlockIcon")) {
@@ -3205,6 +3379,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         if (ImGui::Checkbox("Hidden", &unlock.is_hidden)) {
                             save_message_type = MSG_NONE; // Clear message on new edit
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char hidden_tooltip_buffer[128];
+                            snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
+                                     "If checked, this criterion will be hidden on the tracker by default.\n"
+                                     "Visibility can be toggled in the main tracker settings");
+                            ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                         }
 
                         ImGui::SameLine();
@@ -3307,7 +3488,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     while (true) {
                         snprintf(new_goal.root_name, sizeof(new_goal.root_name), "new_custom_goal_%d", counter);
                         bool name_exists = false;
-                        for (const auto& goal : current_template_data.custom_goals) {
+                        for (const auto &goal: current_template_data.custom_goals) {
                             if (strcmp(goal.root_name, new_goal.root_name) == 0) {
                                 name_exists = true;
                                 break;
@@ -3377,11 +3558,32 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::InputText("Goal Root Name", goal.root_name, sizeof(goal.root_name))) {
                         save_message_type = MSG_NONE; // Clear message on new edit
                     }
+                    if (ImGui::IsItemHovered()) {
+                        char root_name_tooltip_buffer[256];
+                        snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
+                                 "A unique ID for this custom goal (e.g., 'fun_counter').\n"
+                                 "This is used to save progress and assign hotkeys.");
+                        ImGui::SetTooltip("%s", root_name_tooltip_buffer);
+                    }
                     if (ImGui::InputText("Display Name", goal.display_name, sizeof(goal.display_name))) {
                         save_message_type = MSG_NONE;
                     }
+                    if (ImGui::IsItemHovered()) {
+                        char display_name_tooltip_buffer[256];
+                        snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
+                                 "The user-facing name for this custom goal.\n"
+                                 "If target value isn't 0 you'll find this name at the bottom\n"
+                                 "of the settings window to configure hotkeys.");
+                        ImGui::SetTooltip("%s", display_name_tooltip_buffer);
+                    }
                     if (ImGui::InputText("Icon Path", goal.icon_path, sizeof(goal.icon_path))) {
                         save_message_type = MSG_NONE; // Clear message on new edit
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char icon_path_tooltip_buffer[128];
+                        snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                 "Path to the icon file, relative to the 'resources/icons' directory.");
+                        ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                     }
                     ImGui::SameLine();
                     if (ImGui::Button("Browse##CritIcon")) {
@@ -3407,11 +3609,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::IsItemHovered()) {
                         char target_goal_tooltip_buffer[1024];
                         snprintf(target_goal_tooltip_buffer, sizeof(target_goal_tooltip_buffer),
-                                 "0 for a simple toggle, -1 for an infinite counter, >0 for a progress-based counter.");
+                                 "Set the goal's behavior:\n"
+                                 "0 = Simple on/off toggle.\n-1 = Infinite counter.\n"
+                                 ">0 = Progress-based counter that completes at this value.");
                         ImGui::SetTooltip("%s", target_goal_tooltip_buffer);
                     }
                     if (ImGui::Checkbox("Hidden", &goal.is_hidden)) {
                         save_message_type = MSG_NONE; // Clear message on new edit
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char hidden_tooltip_buffer[128];
+                        snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
+                                 "If checked, this criterion will be hidden on the tracker by default.\n"
+                                 "Visibility can be toggled in the main tracker settings");
+                        ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                     }
 
                     ImGui::SameLine();
@@ -3526,7 +3737,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     while (true) {
                         snprintf(new_goal.root_name, sizeof(new_goal.root_name), "new_ms_goal_%d", counter);
                         bool name_exists = false;
-                        for (const auto& goal : current_template_data.multi_stage_goals) {
+                        for (const auto &goal: current_template_data.multi_stage_goals) {
                             if (strcmp(goal.root_name, new_goal.root_name) == 0) {
                                 name_exists = true;
                                 break;
@@ -3554,8 +3765,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (ImGui::IsItemHovered()) {
                     char show_display_names_tooltip_buffer[1024];
                     snprintf(show_display_names_tooltip_buffer, sizeof(show_display_names_tooltip_buffer),
-                             "When checked shows the display names as you see them on the tracker.\n"
-                             "Otherwise it shows the root names.");
+                             "Toggle between showing user-facing display names and internal root names in this list.");
                     ImGui::SetTooltip("%s", show_display_names_tooltip_buffer);
                 }
                 ImGui::Separator();
@@ -3752,13 +3962,31 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
                     }
+                    if (ImGui::IsItemHovered()) {
+                        char root_name_tooltip_buffer[256];
+                        snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
+                                 "A unique ID for this entire multi-stage goal (e.g., 'awesome_ms_goal').");
+                        ImGui::SetTooltip("%s", root_name_tooltip_buffer);
+                    }
                     if (ImGui::InputText("Display Name", goal.display_name, sizeof(goal.display_name))) {
                         ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
                     }
+                    if (ImGui::IsItemHovered()) {
+                        char display_name_tooltip_buffer[128];
+                        snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
+                                 "The user-facing name for this multi-stage goal.");
+                        ImGui::SetTooltip("%s", display_name_tooltip_buffer);
+                    }
                     if (ImGui::InputText("Icon Path", goal.icon_path, sizeof(goal.icon_path))) {
                         ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char icon_path_tooltip_buffer[1024];
+                        snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                 "Path to the icon file, relative to the 'resources/icons' directory.");
+                        ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                     }
                     ImGui::SameLine();
                     if (ImGui::Button("Browse##MSGoalIcon")) {
@@ -3779,6 +4007,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
                     }
+                    if (ImGui::IsItemHovered()) {
+                        char hidden_tooltip_buffer[128];
+                        snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
+                                 "If checked, this criterion will be hidden on the tracker by default.\n"
+                                 "Visibility can be toggled in the main tracker settings");
+                        ImGui::SetTooltip("%s", hidden_tooltip_buffer);
+                    }
                     ImGui::Separator();
 
                     ImGui::Text("Stages");
@@ -3789,7 +4024,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         while (true) {
                             snprintf(new_stage.stage_id, sizeof(new_stage.stage_id), "new_stage_%d", counter);
                             bool name_exists = false;
-                            for (const auto& stage : goal.stages) {
+                            for (const auto &stage: goal.stages) {
                                 if (strcmp(stage.stage_id, new_stage.stage_id) == 0) {
                                     name_exists = true;
                                     break;
@@ -3800,7 +4035,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         snprintf(new_stage.display_text, sizeof(new_stage.display_text), "New Stage %d", counter);
                         new_stage.type = SUBGOAL_STAT; // Default to a common type
-                        strncpy(new_stage.root_name, "minecraft:custom/minecraft:new_stat", sizeof(new_stage.root_name) - 1);
+                        strncpy(new_stage.root_name, "minecraft:custom/minecraft:new_stat",
+                                sizeof(new_stage.root_name) - 1);
                         new_stage.required_progress = 1;
 
                         // Insert the new stage just before the last element (which should be the "final" stage)
@@ -3863,9 +4099,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
                         }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[256];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "A unique ID for this specific stage within the goal.");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
                         if (ImGui::InputText("Display Text", stage.display_text, sizeof(stage.display_text))) {
                             ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[256];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "The text that appears on the tracker/overlay for this stage.\n"
+                                     "For the 'Final' stage, put something like 'Stages Done!'.");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
                         }
                         // --- Version-Aware Type Dropdown ---
                         const char *current_type_name = "Unknown";
@@ -3940,6 +4189,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             ImGui::EndCombo();
                         }
+                        if (ImGui::IsItemHovered()) {
+                            char type_tooltip_buffer[256];
+                            snprintf(type_tooltip_buffer, sizeof(type_tooltip_buffer),
+                                     "The type of event that will complete this stage.\n"
+                                     "For versions below 1.12 achievements count as stats.\n"
+                                     "There must be exactly one 'Final' stage ('Done!' - Stage),\n"
+                                     "and it must be the last stage.\n"
+                                     "Reaching the final stage completes the entire multi-stage goal.");
+                            ImGui::SetTooltip("%s", type_tooltip_buffer);
+                        }
+
 
                         if (stage.type == SUBGOAL_CRITERION) {
                             char parent_label[64];
@@ -3957,10 +4217,23 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ms_goal_data_changed = true;
                                 save_message_type = MSG_NONE;
                             }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buffer[128];
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "The root name of the stat, adv/ach, unlock,\n"
+                                         "or criterion that triggers this stage's completion.");
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
                             if (ImGui::InputInt("Target Value", &stage.required_progress)) {
                                 ms_goal_data_changed = true;
                                 save_message_type = MSG_NONE;
                             }
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "For 'Stat' type stages, this is the value the stat must reach to complete the stage.\n");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
                         if (ImGui::Button("Copy")) {
@@ -4000,7 +4273,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         ImGui::PopID();
                     }
-
 
                     // Final drop target for the end of the list
                     ImGui::InvisibleButton("final_drop_target_stage", ImVec2(-1, 8.0f)); // Added larger drop zone
@@ -4119,6 +4391,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 strncpy(status_message, "Error: A version must be selected.", sizeof(status_message) - 1);
             }
         }
+        if (ImGui::IsItemHovered()) {
+            char create_files_tooltip_buffer[256];
+            snprintf(create_files_tooltip_buffer, sizeof(create_files_tooltip_buffer),
+                "Create the template and language files on disk.\nYou can also press Enter.");
+            ImGui::SetTooltip("%s", create_files_tooltip_buffer);
+        }
         // Display status/error message
         if (status_message[0] != '\0') {
             ImGui::SameLine();
@@ -4163,6 +4441,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     strncpy(status_message, error_msg, sizeof(status_message) - 1);
                 }
             }
+        }
+        if (ImGui::IsItemHovered()) {
+            char confirm_copy_tooltip_buffer[256];
+            snprintf(confirm_copy_tooltip_buffer, sizeof(confirm_copy_tooltip_buffer),
+                "Create a copy of the selected template with the new name.\nYou can also press Enter.");
+            ImGui::SetTooltip("%s", confirm_copy_tooltip_buffer);
         }
         // Display status/error message
         if (status_message[0] != '\0') {

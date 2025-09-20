@@ -249,7 +249,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "resources/templates/Version/Category/Version_CategoryOptionalFlag.json\n\n"
                  "Each template has one or more language files (e.g., ..._lang.json for default, ..._lang_eng.json for English)\n"
                  "that store all the display names shown in the UI.\n\n"
-                 "Use the 'Create Template' button to build new templates, edit existing ones, and manage their language files.");
+                 "Use the 'Edit Templates' button to build new templates, edit existing ones, and manage their language files.");
         ImGui::SetTooltip(
             "%s", template_settings_tooltip_buffer);
     }
@@ -424,7 +424,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         snprintf(category_tooltip_buffer, sizeof(category_tooltip_buffer),
                  "Choose between available categories for the selected version.\n"
                  "If the category you're looking for isn't available you can create it\n"
-                 "by clicking the 'Create Template' button or view the list of officially added\n"
+                 "by clicking the 'Edit Templates' button or view the list of officially added\n"
                  "templates by clicking the '(Learn more)' button next to the 'Template Settings'.");
         ImGui::SetTooltip("%s", category_tooltip_buffer);
     }
@@ -551,13 +551,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Place Template Creator Button in same line
     ImGui::SameLine();
 
-    if (ImGui::Button("Create Template")) {
+    if (ImGui::Button("Edit Templates")) {
         *p_temp_creator_open = true; // Open the template creator window
     }
     if (ImGui::IsItemHovered()) {
         char open_template_creator_tooltip_buffer[1024];
         snprintf(open_template_creator_tooltip_buffer, sizeof(open_template_creator_tooltip_buffer),
-                 "Open the Template Creator to modify or build a new template or language.");
+                 "Open the Template Editor to modify or build a new template or language.");
         ImGui::SetTooltip("%s", open_template_creator_tooltip_buffer);
     }
 
