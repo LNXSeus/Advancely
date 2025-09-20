@@ -342,6 +342,21 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         }
     }
 
+    // --- Version-dependent labels ---
+    // Achievement/Advancement
+    const char *advancement_label_uppercase = (selected_version <= MC_VERSION_1_11_2) ? "Achievement" : "Advancement";
+
+    // Advancements/Achievements
+    const char *advancements_label_plural_uppercase = (selected_version <= MC_VERSION_1_11_2)
+                                                ? "Achievements"
+                                                : "Advancements";
+    // advancements/achievements
+    const char *advancements_label_plural_lowercase = (selected_version <= MC_VERSION_1_11_2)
+                                                ? "achievements"
+                                                : "advancements";
+    // Adv/Ach
+    const char *advancements_label_short_upper = (selected_version <= MC_VERSION_1_11_2) ? "Ach" : "Adv";
+
     // --- SCANNING & UI LOGIC ---
     if (strcmp(last_scanned_version, temp_settings.version_str) != 0) {
         free_discovered_templates(&discovered_templates, &discovered_template_count);
@@ -571,21 +586,24 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::Checkbox("Enable Overlay", &temp_settings.enable_overlay);
     if (ImGui::IsItemHovered()) {
         char enable_overlay_tooltip_buffer[1024];
-        snprintf(enable_overlay_tooltip_buffer, sizeof(enable_overlay_tooltip_buffer),
-                 "Enables a separate, customizable window to show your progress, perfect for streaming.\n\n"
-                 "Overlay Layout:\n"
-                 " • Row 1: Advancement criteria and sub-stats of complex stats.\n"
-                 "   (If two items share an icon, the parent's icon is overlaid.)\n"
-                 " • Row 2: Main advancements and unlocks.\n"
-                 " • Row 3: Stats, custom goals, and multi-stage goals.\n\n"
-                 "Tips:\n"
-                 " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
-                 " • A negative scroll speed animates items from right to left.\n"
-                 " • To adjust horizontal spacing, shorten display names in the template creator.\n\n"
-                 "IMPORTANT FOR STREAMERS:\n"
-                 "Applying settings will restart the overlay window.\n"
-                 "You may need to reselect it in your streaming software (e.g., OBS)."
-        );
+        if (selected_version <= MC_VERSION_1_11_2) {
+            snprintf(enable_overlay_tooltip_buffer, sizeof(enable_overlay_tooltip_buffer),
+                     "Enables a separate, customizable window to show your progress, perfect for streaming.\n\n"
+                     "Overlay Layout:\n"
+                     " • Row 1: %s criteria and sub-stats of complex stats.\n"
+                     "   (If two items share an icon, the parent's icon is overlaid.)\n"
+                     " • Row 2: Main %s and unlocks.\n"
+                     " • Row 3: Stats, custom goals, and multi-stage goals.\n\n"
+                     "Tips:\n"
+                     " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
+                     " • A negative scroll speed animates items from right to left.\n"
+                     " • To adjust horizontal spacing, shorten display names in the template creator.\n\n"
+                     "IMPORTANT FOR STREAMERS:\n"
+                     "Applying settings will restart the overlay window.\n"
+                     "You may need to reselect it in your streaming software (e.g., OBS).",
+                     advancement_label_uppercase, advancement_label_uppercase
+            );
+        }
         ImGui::SetTooltip("%s", enable_overlay_tooltip_buffer);
     }
 
@@ -742,13 +760,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::Separator();
 
             ImGui::BulletText(
-                "The Adv/Ach counter tracks only the main goals defined in the \"advancements\" section of your template file.");
+                "The %s counter tracks only the main goals defined in the \"%s\" section of your template file.", advancement_label_uppercase, advancements_label_plural_lowercase);
 
             ImGui::BulletText(
                 "The Progress %% shows your total completion across all individual sub-tasks from all categories.\n"
                 "Each of the following tasks has an equal weight in the calculation:");
             ImGui::Indent();
-            ImGui::BulletText("Adv/Ach Criteria");
+            ImGui::BulletText("%s Criteria", advancements_label_short_upper);
             ImGui::BulletText("Unlocks (exclusive to 25w14craftmine)");
             ImGui::BulletText("Individual Sub-Stats");
             ImGui::BulletText("Custom Goals");
@@ -1051,10 +1069,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "Currently it also toggles an FPS counter for the overlay window.\n\n"
                  "IMPORTANT: This can spam the console with a large amount of text if your template files contain many entries.\n\n"
                  "This setting only affects the detailed report.\n"
-                 "Progress on advancements is only printed if the game sends an update.\n"
+                 "Progress on %s is only printed if the game sends an update.\n"
                  "General status messages and errors are always printed to the console and saved to advancely_log.txt.\n"
                  "The log is flushed after every message and reset on startup, making it ideal for diagnosing crashes.\n"
-                 "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.");
+                 "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.", advancements_label_plural_lowercase);
         ImGui::SetTooltip("%s", debug_print_tooltip_buffer);
     }
 
@@ -1387,7 +1405,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Optional Flag: %s\n"
                  "  - Language: Default\n"
                  "  - StatsPerWorld Mod (Legacy): %s\n"
-                 "  - Section Order: Advancements -> Unlocks -> Stats -> Custom -> Multi-Stage\n"
+                 "  - Section Order: %s -> Unlocks -> Stats -> Custom -> Multi-Stage\n"
                  "  - Enable Overlay: %s\n"
                  "  - Tracker FPS Limit: %d\n"
                  "  - Overlay FPS Limit: %d\n"
@@ -1410,6 +1428,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_CATEGORY,
                  DEFAULT_OPTIONAL_FLAG,
                  DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
+                 advancements_label_plural_uppercase,
                  DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
                  DEFAULT_FPS,
                  DEFAULT_OVERLAY_FPS,

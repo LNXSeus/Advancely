@@ -1204,11 +1204,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     // --- Version-dependent labels ---
     MC_Version creator_selected_version = settings_get_version_from_string(creator_version_str);
-    const char *advancement_label = (creator_selected_version <= MC_VERSION_1_11_2) ? "Achievement" : "Advancement";
 
-    const char *advancements_label_plural = (creator_selected_version <= MC_VERSION_1_11_2)
-                                                ? "Achievements"
-                                                : "Advancements";
+    // Advancement/Achievement
+    const char *advancements_label_upper = (creator_selected_version <= MC_VERSION_1_11_2)
+                                               ? "Achievement"
+                                               : "Advancement";
+
+    // Advancements/Achievements
+    const char *advancements_label_plural_upper = (creator_selected_version <= MC_VERSION_1_11_2)
+                                                      ? "Achievements"
+                                                      : "Advancements";
 
     // LOGIC
 
@@ -2105,14 +2110,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         if (ImGui::BeginTabBar("EditorTabs")) {
             // "Advancements" or "Achievements" tab depending on version
-            if (ImGui::BeginTabItem(advancements_label_plural)) {
+            if (ImGui::BeginTabItem(advancements_label_plural_upper)) {
                 // TWO-PANE LAYOUT
                 float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                 ImGui::BeginChild("AdvancementListPane", ImVec2(pane_width, 0), true);
 
                 // LEFT PANE: List of Advancements/Achievements
                 char button_label[64];
-                snprintf(button_label, sizeof(button_label), "Add New %s", advancement_label);
+                snprintf(button_label, sizeof(button_label), "Add New %s", advancements_label_upper);
                 if (ImGui::Button(button_label)) {
                     // Create new adv/ach with default values
                     EditorTrackableCategory new_adv = {};
@@ -2129,7 +2134,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (!name_exists) break;
                         counter++;
                     }
-                    snprintf(new_adv.display_name, sizeof(new_adv.display_name), "New %s %d", advancement_label,
+                    snprintf(new_adv.display_name, sizeof(new_adv.display_name), "New %s %d", advancements_label_upper,
                              counter);
                     strncpy(new_adv.icon_path, "blocks/placeholder.png", sizeof(new_adv.icon_path) - 1);
                     current_template_data.advancements.push_back(new_adv);
@@ -2207,7 +2212,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                             : root_name;
                     if (label[0] == '\0') {
                         char placeholder[64];
-                        snprintf(placeholder, sizeof(placeholder), "[New %s]", advancement_label);
+                        snprintf(placeholder, sizeof(placeholder), "[New %s]", advancements_label_upper);
                         label = placeholder;
                     }
 
@@ -2390,7 +2395,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     auto &advancement = *selected_advancement; // Dereference pointer
 
                     char details_title[64];
-                    snprintf(details_title, sizeof(details_title), "Edit %s Details", advancement_label);
+                    snprintf(details_title, sizeof(details_title), "Edit %s Details", advancements_label_upper);
                     ImGui::Text("%s", details_title);
                     ImGui::Separator();
 
@@ -2399,9 +2404,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     if (ImGui::IsItemHovered()) {
                         char root_name_tooltip_buffer[128];
-                        snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
-                                 "The unique in-game ID for this %s, e.g., 'minecraft:story/mine_stone'.",
-                                 advancement_label);
+                        if (creator_selected_version <= MC_VERSION_1_6_4) {
+                            // Legacy
+                            snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
+                                     "The unique in-game ID for this %s, e.g., '5242880'.",
+                                     advancements_label_upper);
+                        } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                            // Mid-era
+                            snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
+                                     "The unique in-game ID for this %s, e.g., 'achievement.exploreAllBiomes'.",
+                                     advancements_label_upper);
+                        } else {
+                            // Modern
+                            snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
+                                     "The unique in-game ID for this %s, e.g., 'minecraft:story/mine_stone'.",
+                                     advancements_label_upper);
+                        }
                         ImGui::SetTooltip("%s", root_name_tooltip_buffer);
                     }
                     if (ImGui::InputText("Display Name", advancement.display_name, sizeof(advancement.display_name))) {
@@ -2447,33 +2465,37 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  "Visibility can be toggled in the main tracker settings.");
                         ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                     }
-                    ImGui::Separator();
-                    ImGui::Text("Criteria");
+                    // Conditionally render the criteria section only for versions that support it.
+                    if (creator_selected_version > MC_VERSION_1_6_4) {
+                        ImGui::Separator();
+                        ImGui::Text("Criteria");
 
-                    char criterion_add_tooltip_buffer[128];
-                    snprintf(criterion_add_tooltip_buffer, sizeof(criterion_add_tooltip_buffer), "Add New %s Criterion",
-                             advancement_label);
-                    if (ImGui::Button(criterion_add_tooltip_buffer)) {
-                        // Create new adv/ach criterion with default values
-                        EditorTrackableItem new_crit = {};
-                        int counter = 1;
-                        while (true) {
-                            snprintf(new_crit.root_name, sizeof(new_crit.root_name), "new_criterion_%d", counter);
-                            bool name_exists = false;
-                            for (const auto &crit: advancement.criteria) {
-                                if (strcmp(crit.root_name, new_crit.root_name) == 0) {
-                                    name_exists = true;
-                                    break;
+                        char criterion_add_tooltip_buffer[128];
+                        snprintf(criterion_add_tooltip_buffer, sizeof(criterion_add_tooltip_buffer),
+                                 "Add New %s Criterion",
+                                 advancements_label_upper);
+                        if (ImGui::Button(criterion_add_tooltip_buffer)) {
+                            // Create new adv/ach criterion with default values
+                            EditorTrackableItem new_crit = {};
+                            int counter = 1;
+                            while (true) {
+                                snprintf(new_crit.root_name, sizeof(new_crit.root_name), "new_criterion_%d", counter);
+                                bool name_exists = false;
+                                for (const auto &crit: advancement.criteria) {
+                                    if (strcmp(crit.root_name, new_crit.root_name) == 0) {
+                                        name_exists = true;
+                                        break;
+                                    }
                                 }
+                                if (!name_exists) break;
+                                counter++;
                             }
-                            if (!name_exists) break;
-                            counter++;
+                            snprintf(new_crit.display_name, sizeof(new_crit.display_name), "New Criterion %d", counter);
+                            strncpy(new_crit.icon_path, "blocks/placeholder.png", sizeof(new_crit.icon_path) - 1);
+                            advancement.criteria.push_back(new_crit);
+                            save_message_type = MSG_NONE;
                         }
-                        snprintf(new_crit.display_name, sizeof(new_crit.display_name), "New Criterion %d", counter);
-                        strncpy(new_crit.icon_path, "blocks/placeholder.png", sizeof(new_crit.icon_path) - 1);
-                        advancement.criteria.push_back(new_crit);
-                        save_message_type = MSG_NONE;
-                    }
+                    } // End of conditional criteria block for above 1.6.4
 
                     // Determine if a details search is active
                     bool is_details_search_active = (
@@ -2522,13 +2544,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
                         ImGui::BeginGroup();
 
-                        if (ImGui::InputText("Root Name", criterion.root_name, sizeof(criterion.root_name))) {
+                        if (ImGui::InputText("Criterion Root Name", criterion.root_name, sizeof(criterion.root_name))) {
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
                             char root_name_tooltip_buffer[128];
-                            snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
-                                     "The unique in-game ID for this criterion, e.g., 'minecraft:hoglin'.");
+                            if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                // Mid-era
+                                snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
+                                         "The unique in-game ID for this criterion, e.g., 'Forest'.");
+                            } else {
+                                // Modern
+                                snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
+                                         "The unique in-game ID for this criterion, e.g., 'minecraft:hoglin'.");
+                            }
                             ImGui::SetTooltip("%s", root_name_tooltip_buffer);
                         }
                         if (ImGui::InputText("Display Name", criterion.display_name, sizeof(criterion.display_name))) {
@@ -2584,7 +2613,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::IsItemHovered()) {
                             char tooltip_buffer[128];
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate %s Criterion",
-                                     advancement_label);
+                                     advancements_label_upper);
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
                         ImGui::SameLine();
@@ -2595,7 +2624,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         if (ImGui::IsItemHovered()) {
                             char tooltip_buffer[128];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s Criterion", advancement_label);
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s Criterion",
+                                     advancements_label_upper);
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
@@ -2669,7 +2699,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 } else {
                     char select_prompt[128];
                     snprintf(select_prompt, sizeof(select_prompt), "Select an %s from the list to edit its details.",
-                             advancement_label);
+                             advancements_label_upper);
                     ImGui::Text("%s", select_prompt);
                 }
                 ImGui::EndChild();
@@ -3026,8 +3056,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         if (ImGui::IsItemHovered()) {
                             char stat_root_name_tooltip_buffer[256];
-                            snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
-                                     "The unique in-game ID for the stat to track, e.g., 'minecraft:mined/minecraft:diamond_ore'.");
+                            if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                // Legacy
+                                snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
+                                         "The unique in-game ID for the stat to track, e.g., '16842813'.");
+                            } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                // Mid-era
+                                snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
+                                         "The unique in-game ID for the stat to track, e.g., 'stat.sprintOneCm'.");
+                            } else {
+                                // Modern
+                                snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
+                                         "The unique in-game ID for the stat to track, e.g., 'minecraft:mined/minecraft:diamond_ore'.");
+                            }
                             ImGui::SetTooltip("%s", stat_root_name_tooltip_buffer);
                         }
                         if (ImGui::InputInt("Target", &simple_crit.goal)) {
@@ -3111,8 +3152,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             if (ImGui::IsItemHovered()) {
                                 char stat_root_name_tooltip_buffer[256];
-                                snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
-                                         "The unique in-game ID for the sub-stat to track, e.g., 'minecraft:mined/minecraft:diamond_ore'.");
+                                if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                    // Legacy
+                                    snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
+                                             "The unique in-game ID for the stat to track, e.g., '1100', '16842813'.");
+                                } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                    // Mid-era
+                                    snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
+                                             "The unique in-game ID for the stat to track, e.g., 'stat.sprintOneCm'.");
+                                } else {
+                                    // Modern
+                                    snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
+                                             "The unique in-game ID for the stat to track, e.g., 'minecraft:mined/minecraft:diamond_ore'.");
+                                }
                                 ImGui::SetTooltip("%s", stat_root_name_tooltip_buffer);
                             }
                             if (ImGui::InputText("Display Name", crit.display_name, sizeof(crit.display_name))) {
@@ -4125,7 +4177,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                         ? "Stat / Achievement"
                                                         : "Stat";
                                 break;
-                            case SUBGOAL_ADVANCEMENT: current_type_name = advancement_label;
+                            case SUBGOAL_ADVANCEMENT: current_type_name = advancements_label_upper;
                                 break;
                             case SUBGOAL_UNLOCK: current_type_name = "Unlock";
                                 break;
@@ -4156,7 +4208,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                             // "Advancement" type is only available for 1.12+
                             if (creator_selected_version >= MC_VERSION_1_12) {
-                                if (ImGui::Selectable(advancement_label, stage.type == SUBGOAL_ADVANCEMENT)) {
+                                if (ImGui::Selectable(advancements_label_upper, stage.type == SUBGOAL_ADVANCEMENT)) {
                                     stage.type = SUBGOAL_ADVANCEMENT;
                                     ms_goal_data_changed = true;
                                     save_message_type = MSG_NONE;
@@ -4191,19 +4243,30 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         if (ImGui::IsItemHovered()) {
                             char type_tooltip_buffer[256];
-                            snprintf(type_tooltip_buffer, sizeof(type_tooltip_buffer),
-                                     "The type of event that will complete this stage.\n"
-                                     "For versions below 1.12 achievements count as stats.\n"
-                                     "There must be exactly one 'Final' stage ('Done!' - Stage),\n"
-                                     "and it must be the last stage.\n"
-                                     "Reaching the final stage completes the entire multi-stage goal.");
+                            if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                // not modern
+                                snprintf(type_tooltip_buffer, sizeof(type_tooltip_buffer),
+                                         "The type of event that will complete this stage.\n"
+                                         "%s count as stats.\n"
+                                         "There must be exactly one 'Final' stage ('Done!' - Stage),\n"
+                                         "and it must be the last stage.\n"
+                                         "Reaching the final stage completes the entire multi-stage goal.",
+                                         advancements_label_plural_upper);
+                            } else {
+                                // modern
+                                snprintf(type_tooltip_buffer, sizeof(type_tooltip_buffer),
+                                         "The type of event that will complete this stage.\n"
+                                         "There must be exactly one 'Final' stage ('Done!' - Stage),\n"
+                                         "and it must be the last stage.\n"
+                                         "Reaching the final stage completes the entire multi-stage goal.");
+                            }
                             ImGui::SetTooltip("%s", type_tooltip_buffer);
                         }
 
 
                         if (stage.type == SUBGOAL_CRITERION) {
                             char parent_label[64];
-                            snprintf(parent_label, sizeof(parent_label), "Parent %s", advancement_label);
+                            snprintf(parent_label, sizeof(parent_label), "Parent %s", advancements_label_upper);
                             if (ImGui::InputText(parent_label, stage.parent_advancement,
                                                  sizeof(stage.parent_advancement))) {
                                 ms_goal_data_changed = true;
@@ -4219,21 +4282,35 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             if (ImGui::IsItemHovered()) {
                                 char tooltip_buffer[128];
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                         "The root name of the stat, adv/ach, unlock,\n"
-                                         "or criterion that triggers this stage's completion.");
+                                if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                    // Legacy stage types
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "The root name of the stat or achievement that triggers this stage's completion.");
+                                } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                    // mid-era stage types
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                                                 "The root name of the stat/achievement or criterion that triggers this stage's completion.");
+                                } else if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
+                                    // craftmine stage types
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                                                 "The root name of the stat, advancement, unlock or criterion that triggers this stage's completion.");
+                                } else {
+                                    // modern stage types without craftmine
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                                                 "The root name of the stat, advancement or criterion that triggers this stage's completion.");
+                                }
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
                             if (ImGui::InputInt("Target Value", &stage.required_progress)) {
                                 ms_goal_data_changed = true;
                                 save_message_type = MSG_NONE;
                             }
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tooltip_buffer[128];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "For 'Stat' type stages, this is the value the stat must reach to complete the stage.\n");
-                            ImGui::SetTooltip("%s", tooltip_buffer);
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buffer[128];
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "For 'Stat' type stages, this is the value the stat must reach to complete the stage.\n");
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
                         }
 
                         if (ImGui::Button("Copy")) {
@@ -4394,7 +4471,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char create_files_tooltip_buffer[256];
             snprintf(create_files_tooltip_buffer, sizeof(create_files_tooltip_buffer),
-                "Create the template and language files on disk.\nYou can also press Enter.");
+                     "Create the template and language files on disk.\nYou can also press Enter.");
             ImGui::SetTooltip("%s", create_files_tooltip_buffer);
         }
         // Display status/error message
@@ -4445,7 +4522,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char confirm_copy_tooltip_buffer[256];
             snprintf(confirm_copy_tooltip_buffer, sizeof(confirm_copy_tooltip_buffer),
-                "Create a copy of the selected template with the new name.\nYou can also press Enter.");
+                     "Create a copy of the selected template with the new name.\nYou can also press Enter.");
             ImGui::SetTooltip("%s", confirm_copy_tooltip_buffer);
         }
         // Display status/error message
