@@ -1812,7 +1812,39 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::EndPopup();
     }
 
+    // --- Help Button (Right-Aligned) ---
+    const char* help_text = "Help";
+    // Calculate button width to align it properly
+    float help_button_width = ImGui::CalcTextSize(help_text).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - help_button_width);
+
+    if (ImGui::Button(help_text)) {
+        char reference_path[MAX_PATH_LENGTH];
+        snprintf(reference_path, sizeof(reference_path), "%s/reference_files", get_resources_path());
+        char command[MAX_PATH_LENGTH + 32];
+#ifdef _WIN32
+        path_to_windows_native(reference_path);
+        snprintf(command, sizeof(command), "explorer \"%s\"", reference_path);
+#elif __APPLE__
+        snprintf(command, sizeof(command), "open \"%s\"", reference_path);
+#else
+        snprintf(command, sizeof(command), "xdg-open \"%s\"", reference_path);
+#endif
+        system(command);
+    }
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buffer[1024];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Opens the reference files folder.\n\n"
+                 "This folder contains guides and examples on how to achieve the\n"
+                 "template functionality you want with version-specific help for root names.\n"
+                 "It also contains example advancements-, stats- and unlocks files of a world\n"
+                 "for every major version range as reference.");
+        ImGui::SetTooltip("%s", tooltip_buffer);
+    }
+
     ImGui::Separator();
+
 
     // --- Language Management UI (appears when a template is selected) ---
     if (selected_template_index != -1 && !editing_template && !show_create_new_view && !show_copy_view) {
@@ -3067,7 +3099,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             } else {
                                 // Modern
                                 snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
-                                         "The unique in-game ID for the stat to track, e.g., 'minecraft:mined/minecraft:diamond_ore'.");
+                                         "The unique in-game ID for the stat to track, e.g., 'minecraft:picked_up/minecraft:deepslate_emerald_ore'.");
                             }
                             ImGui::SetTooltip("%s", stat_root_name_tooltip_buffer);
                         }
