@@ -20,6 +20,7 @@ const ColorRGBA DEFAULT_OVERLAY_TEXT_COLOR = {255, 255, 255, 255};
 // Define the array of section names
 const char *TRACKER_SECTION_NAMES[SECTION_COUNT] = {
     "Advancements",
+    "Recipes",
     "Unlocks",
     "Statistics",
     "Custom Goals",

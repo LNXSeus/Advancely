@@ -184,6 +184,9 @@ struct TrackableCategory {
     SDL_Texture *texture; // Main icon texture for category/advancement
     AnimatedTexture *anim_texture; // To support .gif files
 
+    // Recipe flag for modern version advancements
+    bool is_recipe;
+
     // If stat category has no "criteria": {} it's single stat.
     // If one criteria is defined it's still treated as a multi-stat in terms of rendering.
     bool is_single_stat_category;

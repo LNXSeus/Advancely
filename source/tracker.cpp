@@ -102,7 +102,8 @@ static void tracker_update_notes_path(Tracker *t, const AppSettings *settings) {
                     unsigned long hash_to_delete = (unsigned long) cJSON_GetObjectItem(oldest_entry, "hash")->
                             valuedouble;
                     char path_to_delete[MAX_PATH_LENGTH];
-                    snprintf(path_to_delete, sizeof(path_to_delete), "%s/%lu.txt", get_notes_dir_path(), hash_to_delete);
+                    snprintf(path_to_delete, sizeof(path_to_delete), "%s/%lu.txt", get_notes_dir_path(),
+                             hash_to_delete);
                     if (remove(path_to_delete) == 0) {
                         log_message(LOG_INFO, "[NOTES] Pruned old notes file: %s\n", path_to_delete);
                     }
@@ -858,8 +859,8 @@ static void tracker_update_advancements_modern(Tracker *t, const cJSON *player_a
                 adv->done = game_is_done;
             }
 
-            // Increment completed advancement count
-            if (adv->done) t->template_data->advancements_completed_count++;
+            // Increment completed advancement count when it's NOT a recipe
+            if (adv->done && !adv->is_recipe) t->template_data->advancements_completed_count++;
         } else {
             // If the advancement doesn't exist in the player file, it's not done and neither are its criteria
             adv->done = false;
@@ -1010,6 +1011,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
         new_cat->alpha = 1.0f;
         new_cat->is_visible_on_overlay = true;
         new_cat->is_hidden = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "hidden")); // Hide if hidden in template
+        new_cat->is_recipe = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "is_recipe"));
 
         if (cat_json->string) {
             strncpy(new_cat->root_name, cat_json->string, sizeof(new_cat->root_name) - 1);
@@ -1095,6 +1097,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
 
                         // When hidden is true in template
                         new_crit->is_hidden = cJSON_IsTrue(cJSON_GetObjectItem(crit_item, "hidden"));
+                        new_cat->is_recipe = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "is_recipe"));
 
                         strncpy(new_crit->root_name, crit_item->string, sizeof(new_crit->root_name) - 1);
 
@@ -1127,7 +1130,8 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                         cJSON *crit_icon = cJSON_GetObjectItem(crit_item, "icon");
                         if (cJSON_IsString(crit_icon) && crit_icon->valuestring[0] != '\0') {
                             char full_crit_icon_path[sizeof(new_crit->icon_path)];
-                            snprintf(full_crit_icon_path, sizeof(full_crit_icon_path), "%s/icons/%s", get_resources_path(),
+                            snprintf(full_crit_icon_path, sizeof(full_crit_icon_path), "%s/icons/%s",
+                                     get_resources_path(),
                                      crit_icon->valuestring);
                             strncpy(new_crit->icon_path, full_crit_icon_path, sizeof(new_crit->icon_path) - 1);
 
@@ -1372,7 +1376,8 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
             if (cJSON_IsString(icon)) {
                 // Append "icon" to "resources/icons/"
                 char full_icon_path[sizeof(new_item->icon_path)];
-                snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_resources_path(), icon->valuestring);
+                snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_resources_path(),
+                         icon->valuestring);
                 strncpy(new_item->icon_path, full_icon_path, sizeof(new_item->icon_path) - 1);
 
                 if (strstr(full_icon_path, ".gif")) {
@@ -1842,11 +1847,15 @@ static void tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
 
 /**
  * @brief Calculates the overall progress percentage based on all tracked items. Advancements are separately!!
+ * Advancements with is_recipe set to true count towards the progress here. (modern versions)
  *
- * It first calculates the total number of "steps" (e.g., criteria, sub-stats or stat if no sub-stats, unlocks, custom goals, and multi-stage goals),
+ * It first calculates the total number of "steps" (e.g., Recipes, criteria, sub-stats or stat if no sub-stats, unlocks,
+ * custom goals, and multi-stage goals),
  * then the number of completed "steps", and finally calculates the overall progress percentage.
  *
  * @param t A pointer to the Tracker struct.
+ * @param version The version of the game.
+ * @param settings A pointer to the AppSettings struct.
  *
  */
 static void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const AppSettings *settings) {
@@ -1858,9 +1867,21 @@ static void tracker_calculate_overall_progress(Tracker *t, MC_Version version, c
     int total_steps = 0;
     int completed_steps = 0;
 
-    // Advancements
-    total_steps += t->template_data->total_criteria_count;
-    completed_steps += t->template_data->completed_criteria_count;
+    // Advancements & Recipes
+    // Every recipe is one step
+    for (int i = 0; i < t->template_data->advancement_count; i++) {
+        TrackableCategory *adv = t->template_data->advancements[i];
+        if (adv->is_recipe) {
+            total_steps++; // A recipe is one step.
+            if (adv->done) {
+                completed_steps++;
+            }
+        } else {
+            // A normal advancement's progress is based on its criteria.
+            total_steps += adv->criteria_count;
+            completed_steps += adv->completed_criteria_count;
+        }
+    }
 
     // Stats:
     // - For multi-criteria stats, each criterion is a step.
@@ -2232,7 +2253,7 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
 
     // Initialize SDL_ttf
     char font_path[MAX_PATH_LENGTH];
-    snprintf(font_path, sizeof(font_path),"%s/fonts/Minecraft.ttf", get_resources_path());
+    snprintf(font_path, sizeof(font_path), "%s/fonts/Minecraft.ttf", get_resources_path());
     t->minecraft_font = TTF_OpenFont(font_path, 24);
     if (!t->minecraft_font) {
         log_message(LOG_ERROR, "[TRACKER] Failed to load Minecraft font: %s\n", SDL_GetError());
@@ -2248,7 +2269,7 @@ bool tracker_new(Tracker **tracker, const AppSettings *settings) {
     t->adv_bg = load_texture_with_scale_mode(t->renderer, adv_bg_path, SDL_SCALEMODE_NEAREST);
 
     snprintf(adv_bg_path, sizeof(adv_bg_path), "%s/gui/advancement_background_half_done.png", get_resources_path());
-    t->adv_bg_half_done = load_texture_with_scale_mode(t->renderer, adv_bg_path,SDL_SCALEMODE_NEAREST);
+    t->adv_bg_half_done = load_texture_with_scale_mode(t->renderer, adv_bg_path, SDL_SCALEMODE_NEAREST);
 
     snprintf(adv_bg_path, sizeof(adv_bg_path), "%s/gui/advancement_background_done.png", get_resources_path());
     t->adv_bg_done = load_texture_with_scale_mode(t->renderer, adv_bg_path, SDL_SCALEMODE_NEAREST);
@@ -2340,7 +2361,6 @@ void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
     // Detect if the world has changed since the last update.
     if (t->template_data->last_known_world_name[0] == '\0' || // Handle first-time load
         strcmp(t->world_name, t->template_data->last_known_world_name) != 0) {
-
         // Save notes for the OLD world before doing anything else
         tracker_save_notes(t, settings);
 
@@ -2495,8 +2515,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         // Determine if the category should be hidden by the "Remove Completed Goals" setting.
         // THIS CHECK IGNORES THE SEARCH FILTER INTENTIONALLY.
         bool is_considered_complete = is_stat_section
-                    ? cat->done
-                    : ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (cat->criteria_count == 0 && cat->done));
+                                          ? cat->done
+                                          : ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (
+                                                 cat->criteria_count == 0 && cat->done));
 
         bool should_hide = false;
         switch (settings->goal_hiding_mode) {
@@ -2549,8 +2570,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
         // Parent Hiding Logic
         bool is_considered_complete = is_stat_section
-            ? cat->done
-            : ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (cat->criteria_count == 0 && cat->done));
+                                          ? cat->done
+                                          : ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (
+                                                 cat->criteria_count == 0 && cat->done));
 
         bool parent_should_hide = false;
         switch (settings->goal_hiding_mode) {
@@ -2627,8 +2649,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     float crit_text_width = ImGui::CalcTextSize(crit->display_name).x;
                     float crit_progress_width = ImGui::CalcTextSize(crit_progress_text).x;
                     float total_crit_width = 32 + 4 + 20 + 4 + crit_text_width + (crit_progress_width > 0
-                                                     ? 4 + crit_progress_width
-                                                     : 0);
+                                                 ? 4 + crit_progress_width
+                                                 : 0);
                     required_width = fmaxf(required_width, total_crit_width);
                 }
             }
@@ -2650,7 +2672,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
             if (!cat) continue;
 
-            if (is_stat_section && version <= MC_VERSION_1_6_4 && cat->criteria_count == 1 && cat->criteria[0]->goal == 0) {
+            if (is_stat_section && version <= MC_VERSION_1_6_4 && cat->criteria_count == 1 && cat->criteria[0]->goal ==
+                0) {
                 continue;
             }
 
@@ -2659,11 +2682,12 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
             // --- Parent Hiding Logic ---
             bool is_considered_complete = is_stat_section
-                ? cat->done
-                : ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (cat->criteria_count == 0 && cat->done));
+                                              ? cat->done
+                                              : ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (
+                                                     cat->criteria_count == 0 && cat->done));
 
             bool should_hide_parent = false;
-            switch(settings->goal_hiding_mode) {
+            switch (settings->goal_hiding_mode) {
                 case HIDE_ALL_COMPLETED:
                     should_hide_parent = cat->is_hidden || is_considered_complete;
                     break;
@@ -2685,10 +2709,13 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     if (!crit) continue;
 
                     bool should_hide_crit = false;
-                    switch(settings->goal_hiding_mode) {
-                        case HIDE_ALL_COMPLETED: should_hide_crit = crit->is_hidden || crit->done; break;
-                        case HIDE_ONLY_TEMPLATE_HIDDEN: should_hide_crit = crit->is_hidden; break;
-                        case SHOW_ALL: should_hide_crit = false; break;
+                    switch (settings->goal_hiding_mode) {
+                        case HIDE_ALL_COMPLETED: should_hide_crit = crit->is_hidden || crit->done;
+                            break;
+                        case HIDE_ONLY_TEMPLATE_HIDDEN: should_hide_crit = crit->is_hidden;
+                            break;
+                        case SHOW_ALL: should_hide_crit = false;
+                            break;
                     }
 
                     if (!should_hide_crit && str_contains_insensitive(crit->display_name, t->search_buffer)) {
@@ -2745,9 +2772,12 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                         bool should_hide_crit = false;
                         switch (settings->goal_hiding_mode) {
-                            case HIDE_ALL_COMPLETED: should_hide_crit = crit->is_hidden || crit->done; break;
-                            case HIDE_ONLY_TEMPLATE_HIDDEN: should_hide_crit = crit->is_hidden; break;
-                            case SHOW_ALL: should_hide_crit = false; break;
+                            case HIDE_ALL_COMPLETED: should_hide_crit = crit->is_hidden || crit->done;
+                                break;
+                            case HIDE_ONLY_TEMPLATE_HIDDEN: should_hide_crit = crit->is_hidden;
+                                break;
+                            case SHOW_ALL: should_hide_crit = false;
+                                break;
                         }
                         if (should_hide_crit) continue;
 
@@ -2894,9 +2924,12 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                             bool should_hide_crit = false;
                             switch (settings->goal_hiding_mode) {
-                                case HIDE_ALL_COMPLETED: should_hide_crit = crit->is_hidden || crit->done; break;
-                                case HIDE_ONLY_TEMPLATE_HIDDEN: should_hide_crit = crit->is_hidden; break;
-                                case SHOW_ALL: should_hide_crit = false; break;
+                                case HIDE_ALL_COMPLETED: should_hide_crit = crit->is_hidden || crit->done;
+                                    break;
+                                case HIDE_ONLY_TEMPLATE_HIDDEN: should_hide_crit = crit->is_hidden;
+                                    break;
+                                case SHOW_ALL: should_hide_crit = false;
+                                    break;
                             }
 
                             if (should_hide_crit) continue;
@@ -3209,14 +3242,13 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
  */
 static void render_simple_item_section(Tracker *t, const AppSettings *settings, float &current_y, TrackableItem **items,
                                        int count, const char *section_title) {
-
     // Section separator remains visible with the same spacing even during search
     int visible_count = 0;
     for (int i = 0; i < count; ++i) {
         TrackableItem *item = items[i];
         if (item) {
             bool should_hide = false;
-            switch(settings->goal_hiding_mode) {
+            switch (settings->goal_hiding_mode) {
                 case HIDE_ALL_COMPLETED:
                     should_hide = item->is_hidden || item->done;
                     break;
@@ -3255,7 +3287,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
         // New Refactored Hiding Logic
         bool should_hide = false;
-        switch(settings->goal_hiding_mode) {
+        switch (settings->goal_hiding_mode) {
             case HIDE_ALL_COMPLETED:
                 should_hide = item->is_hidden || item->done;
                 break;
@@ -3287,7 +3319,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
         // New Refactored Hiding Logic
         bool should_hide = false;
-        switch(settings->goal_hiding_mode) {
+        switch (settings->goal_hiding_mode) {
             case HIDE_ALL_COMPLETED:
                 should_hide = item->is_hidden || item->done;
                 break;
@@ -3455,7 +3487,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
         // New Refactored Hiding Logic
         bool should_hide = false;
-        switch(settings->goal_hiding_mode) {
+        switch (settings->goal_hiding_mode) {
             case HIDE_ALL_COMPLETED:
                 should_hide = item->is_hidden || item->done;
                 break;
@@ -3487,7 +3519,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
         // New Refactored Hiding Logic
         bool should_hide = false;
-        switch(settings->goal_hiding_mode) {
+        switch (settings->goal_hiding_mode) {
             case HIDE_ALL_COMPLETED:
                 should_hide = item->is_hidden || item->done;
                 break;
@@ -3670,7 +3702,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         if (goal) {
             bool is_done = (goal->current_stage >= goal->stage_count - 1);
             bool should_hide = false;
-            switch(settings->goal_hiding_mode) {
+            switch (settings->goal_hiding_mode) {
                 case HIDE_ALL_COMPLETED:
                     should_hide = goal->is_hidden || is_done;
                     break;
@@ -3711,7 +3743,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
         // New Refactored Hiding Logic
         bool should_hide = false;
-        switch(settings->goal_hiding_mode) {
+        switch (settings->goal_hiding_mode) {
             case HIDE_ALL_COMPLETED:
                 should_hide = goal->is_hidden || is_done;
                 break;
@@ -3761,7 +3793,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
         // New Refactored Hiding Logic
         bool should_hide = false;
-        switch(settings->goal_hiding_mode) {
+        switch (settings->goal_hiding_mode) {
             case HIDE_ALL_COMPLETED:
                 should_hide = goal->is_hidden || is_done;
                 break;
@@ -3904,7 +3936,7 @@ typedef struct {
 static int NotesEditCallback(ImGuiInputTextCallbackData *data) {
     // The 'UserData' field contains the pointer we passed to InputTextMultiline.
     // We cast it back to our struct type to get access to our tracker and settings.
-    auto *callback_data = (NotesCallbackData*)data->UserData;
+    auto *callback_data = (NotesCallbackData *) data->UserData;
 
     // The buffer has been edited, so we save the notes immediately.
     tracker_save_notes(callback_data->t, callback_data->settings);
@@ -3962,21 +3994,37 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // Get the current game version
     MC_Version version = settings_get_version_from_string(settings->version_str);
 
+    // Create separate vectors for advancements and recipes
+    std::vector<TrackableCategory *> advancements_only;
+    std::vector<TrackableCategory *> recipes_only;
+    if (t->template_data) {
+        for (int i = 0; i < t->template_data->advancement_count; ++i) {
+            TrackableCategory *item = t->template_data->advancements[i];
+            if (item) {
+                if (item->is_recipe) {
+                    recipes_only.push_back(item);
+                } else {
+                    advancements_only.push_back(item);
+                }
+            }
+        }
+    }
+
     //  Render All Sections in User-Defined Order
     for (int i = 0; i < SECTION_COUNT; ++i) {
         auto section_id = (TrackerSection) settings->section_order[i];
         switch (section_id) {
-            case SECTION_ADVANCEMENTS:
-                if (version <= MC_VERSION_1_11_2) {
-                    // Achievements section title
-                    render_trackable_category_section(t, settings, current_y, t->template_data->advancements,
-                                                      t->template_data->advancement_count, "Achievements", false,
-                                                      version);
-                } else {
-                    // Advancements section title
-                    render_trackable_category_section(t, settings, current_y, t->template_data->advancements,
-                                                      t->template_data->advancement_count, "Advancements", false,
-                                                      version);
+            case SECTION_ADVANCEMENTS: {
+                const char *title = (version <= MC_VERSION_1_11_2) ? "Achievements" : "Advancements";
+                render_trackable_category_section(t, settings, current_y, advancements_only.data(),
+                                                  advancements_only.size(), title, false, version);
+                break;
+            }
+            case SECTION_RECIPES:
+                // Only render if the version is modern and there are recipes to show
+                if (version >= MC_VERSION_1_12 && !recipes_only.empty()) {
+                    render_trackable_category_section(t, settings, current_y, recipes_only.data(),
+                                                      recipes_only.size(), "Recipes", false, version);
                 }
                 break;
             case SECTION_UNLOCKS:
@@ -4099,15 +4147,32 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
         ImGui::TextUnformatted("Progress Breakdown");
 
-        ImGui::BulletText(
-            "The Adv/Ach counter tracks only the main goals defined in the \"advancements\" section of your template file.");
+        if (version <= MC_VERSION_1_11_2) {
+            // Achievements
+            ImGui::BulletText(
+                "The Achievements counter tracks only the main goals defined in the \"advancements\" section of your template file.");
+        } else {
+            ImGui::BulletText(
+                "The Advancements counter tracks only the main goals defined in the \"advancements\" section of your template file.");
+        }
 
         ImGui::BulletText(
             "The Progress %% shows your total completion across all individual sub-tasks from all categories.\n"
             "Each of the following tasks has an equal weight in the calculation:");
         ImGui::Indent();
-        ImGui::BulletText("Adv/Ach Criteria");
-        ImGui::BulletText("Unlocks (exclusive to 25w14craftmine)");
+        if (version > MC_VERSION_1_6_4 && version <= MC_VERSION_1_11_2) {
+            // Achievement Criteria
+            ImGui::BulletText("Achievement Criteria");
+        } else {
+            // Advancement Criteria
+            ImGui::BulletText("Advancement Criteria");
+            ImGui::BulletText("Recipes");
+        }
+
+        if (version == MC_VERSION_25W14CRAFTMINE) {
+            ImGui::BulletText("Unlocks");
+        }
+
         ImGui::BulletText("Individual Sub-Stats");
         ImGui::BulletText("Custom Goals");
         ImGui::BulletText("Multi-Stage Goal Stages");
@@ -4233,13 +4298,35 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         ImGui::Separator();
         ImGui::TextUnformatted("It applies the filter to anything currently visible in the following way:");
 
-        ImGui::BulletText(
-            "Advancements & Statistics: Shows a category if its title or any of its sub-criteria match.\nIf only a sub-criterion matches, only that specific one will be shown under its parent.");
+        if (version <= MC_VERSION_1_6_4) {
+            // Achievements, no advancement criteria
+            ImGui::BulletText(
+                "Achievements: Shows a category if its title matches.");
+            ImGui::BulletText(
+                "Statistics: Shows a category if its title or any of its sub-stats match.\n"
+                "If only a sub-stat matches, only that specific one will be shown under its parent.");
+        } else if (version <= MC_VERSION_1_11_2) {
+            // Achievements and critiera
+            ImGui::BulletText(
+                "Achievements & Statistics: Shows a category if its title or any of its sub-criteria match.\n"
+                "If only a sub-criterion matches, only that specific one will be shown under its parent.");
+        } else {
+            // Modern
+            ImGui::BulletText(
+                "Advancements, Recipes & Statistics: Shows a category if its title or any of its sub-criteria match.\n"
+                "If only a sub-criterion matches, only that specific one will be shown under its parent.");
+        }
 
-        ImGui::BulletText("Unlocks & Custom Goals: Shows the goal if its name matches the search term.");
+        if (version == MC_VERSION_25W14CRAFTMINE) {
+            // Unlocks
+            ImGui::BulletText("Unlocks & Custom Goals: Shows the goal if its name matches the search term.");
+        } else {
+            ImGui::BulletText("Custom Goals: Shows the goal if its name matches the search term.");
+        }
 
         ImGui::BulletText(
-            "Multi-Stage Goals: Shows the goal if its main title or the text of its currently\nactive stage matches the search term.");
+            "Multi-Stage Goals: Shows the goal if its main title or the text of its currently\n"
+            "active stage matches the search term.");
 
         ImGui::PopTextWrapPos();
         ImGui::EndTooltip();
@@ -4288,16 +4375,27 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // Add the "Notes" checkbox
     ImGui::Checkbox("Notes", &t->notes_window_open);
     if (ImGui::IsItemHovered()) {
-        char notes_tooltip_buffer[1024];
-        snprintf(notes_tooltip_buffer, sizeof(notes_tooltip_buffer),
-                 "Toggle the notes window.\n\n"
-                 "The notes system has two modes, configurable inside the window:\n"
-                 "  • Per-World (Default): Notes are saved for each world individually. The last 32 worlds are remembered.\n"
-                 "  • Per-Template: Notes are shared for the currently loaded template permanently.\n\n"
-                 "The window's size and position are remembered across sessions.\n"
-                 "Hotkeys are disabled while typing in the notes window.\n"
-                 "The maximum note size is 64KB.");
-        ImGui::SetTooltip("%s", notes_tooltip_buffer);
+        ImGui::BeginTooltip();
+
+        ImGui::TextUnformatted("Notes Window");
+        ImGui::Separator();
+
+        ImGui::TextWrapped(
+            "Toggles a persistent text editor for keeping notes. The system has two modes, configurable inside the window:");
+        ImGui::Spacing();
+
+        ImGui::BulletText(
+            "Per-World (Default): Notes are saved for each world individually. The last 32 worlds are remembered.");
+        ImGui::BulletText("Per-Template: Notes are shared for the currently loaded template permanently.");
+
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::TextUnformatted("The window's size and position are remembered across sessions.");
+        ImGui::TextUnformatted("Anything you type is immediately saved.");
+        ImGui::TextUnformatted("Hotkeys are disabled while typing in the notes window. The maximum note size is 64KB.");
+
+        ImGui::EndTooltip();
     }
 
     ImGui::PopStyleColor(5); // Pop the style colors, there's 5 of them
@@ -4353,7 +4451,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackEdit;
 
             ImGui::InputTextMultiline(widget_id, t->notes_buffer, sizeof(t->notes_buffer),
-                                          editor_size, flags, NotesEditCallback, &callback_data);
+                                      editor_size, flags, NotesEditCallback, &callback_data);
 
 
             // --- Controls at the bottom of the window ---
@@ -4389,7 +4487,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             }
 
             // Pop the UI font only if we pushed it in this frame.
-            if (roboto_font_pushed) { // 3. Base the pop operation on the local flag, not the setting.
+            if (roboto_font_pushed) {
+                // 3. Base the pop operation on the local flag, not the setting.
                 ImGui::PopFont();
             }
         }

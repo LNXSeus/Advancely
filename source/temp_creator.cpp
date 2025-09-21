@@ -35,6 +35,7 @@ struct EditorTrackableCategory {
     char display_name[192];
     char icon_path[256];
     bool is_hidden;
+    bool is_recipe; // UI flag to distinguish recipes from advancements -> count towards progress percentage instead
     bool is_simple_stat; // UI flag to distinguish simple vs complex stats
     std::vector<EditorTrackableItem> criteria; // Criteria then are trackable items
 };
@@ -80,6 +81,7 @@ static bool are_editor_categories_different(const EditorTrackableCategory &a, co
         strcmp(a.display_name, b.display_name) != 0 ||
         strcmp(a.icon_path, b.icon_path) != 0 ||
         a.is_hidden != b.is_hidden ||
+        a.is_recipe != b.is_recipe ||
         a.is_simple_stat != b.is_simple_stat ||
         a.criteria.size() != b.criteria.size()) {
         return true;
@@ -413,9 +415,11 @@ static void parse_editor_trackable_categories(cJSON *json_object,
         strncpy(new_cat.root_name, category_json->string, sizeof(new_cat.root_name) - 1);
         cJSON *icon = cJSON_GetObjectItem(category_json, "icon");
         cJSON *hidden = cJSON_GetObjectItem(category_json, "hidden");
+        cJSON *is_recipe_json = cJSON_GetObjectItem(category_json, "is_recipe");
 
         if (cJSON_IsString(icon)) strncpy(new_cat.icon_path, icon->valuestring, sizeof(new_cat.icon_path) - 1);
         if (cJSON_IsBool(hidden)) new_cat.is_hidden = cJSON_IsTrue(hidden);
+        if (cJSON_IsBool(is_recipe_json)) new_cat.is_recipe = cJSON_IsTrue(is_recipe_json);
 
         char lang_key[256];
         char temp_root_name[291];
@@ -713,6 +717,10 @@ static void serialize_editor_trackable_categories(cJSON *parent, const char *key
         cJSON_AddStringToObject(cat_json, "icon", cat.icon_path);
         if (cat.is_hidden) {
             cJSON_AddBoolToObject(cat_json, "hidden", cat.is_hidden);
+        }
+        // Save the is_recipe flag if it's true
+        if (cat.is_recipe) {
+            cJSON_AddBoolToObject(cat_json, "is_recipe", true);
         }
 
         // Create the nested criteria object
@@ -1813,7 +1821,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     }
 
     // --- Help Button (Right-Aligned) ---
-    const char* help_text = "Help";
+    const char *help_text = "Help";
     // Calculate button width to align it properly
     float help_button_width = ImGui::CalcTextSize(help_text).x + ImGui::GetStyle().FramePadding.x * 2.0f;
     ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - help_button_width);
@@ -2486,6 +2494,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         snprintf(resource_folder_tooltip_buffer, sizeof(resource_folder_tooltip_buffer),
                                  "The icon must be inside the 'resources/icons' folder!");
                         ImGui::SetTooltip("%s", resource_folder_tooltip_buffer);
+                    }
+                    // Add the "Is Recipe" checkbox only for modern versions
+                    if (creator_selected_version >= MC_VERSION_1_12) {
+                        if (ImGui::Checkbox("Is Recipe", &advancement.is_recipe)) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char is_recipe_tooltip_buffer[512];
+                            snprintf(is_recipe_tooltip_buffer, sizeof(is_recipe_tooltip_buffer),
+                                     "Check this if the advancements entry is a recipe.\n"
+                                     "Recipes count towards the percentage progress and\n"
+                                     "not the main advancement counter.");
+                            ImGui::SetTooltip("%s", is_recipe_tooltip_buffer);
+                        }
+                        ImGui::SameLine();
                     }
                     if (ImGui::Checkbox("Hidden", &advancement.is_hidden)) {
                         save_message_type = MSG_NONE;
@@ -4321,15 +4344,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 } else if (creator_selected_version <= MC_VERSION_1_11_2) {
                                     // mid-era stage types
                                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                                                                 "The root name of the stat/achievement or criterion that triggers this stage's completion.");
+                                             "The root name of the stat/achievement or criterion that triggers this stage's completion.");
                                 } else if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
                                     // craftmine stage types
                                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                                                                 "The root name of the stat, advancement, unlock or criterion that triggers this stage's completion.");
+                                             "The root name of the stat, advancement, unlock or criterion that triggers this stage's completion.");
                                 } else {
                                     // modern stage types without craftmine
                                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                                                                 "The root name of the stat, advancement or criterion that triggers this stage's completion.");
+                                             "The root name of the stat, advancement or criterion that triggers this stage's completion.");
                                 }
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }

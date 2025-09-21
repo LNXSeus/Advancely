@@ -32,6 +32,7 @@ enum GoalHidingMode {
 // Enum to identify the tracker sections
 enum TrackerSection {
     SECTION_ADVANCEMENTS,
+    SECTION_RECIPES, // Modern advancements with is_recipe flag set to true in template
     SECTION_UNLOCKS, // Exclusive to 25w14craftmine
     SECTION_STATS,
     SECTION_CUSTOM,

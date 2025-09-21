@@ -298,7 +298,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         char version_tooltip_buffer[1024];
         snprintf(version_tooltip_buffer, sizeof(version_tooltip_buffer), "Select the version of the template.\n"
                  "This doesn't necessarily have to be the exact version of your minecraft instance.\n"
-                 "Click on '(Learn more)' to see the version ranges that functionally equal.");
+                 "Click on '(Learn more)' on the right to see the version ranges that functionally equal.");
         ImGui::SetTooltip("%s", version_tooltip_buffer);
     }
 
@@ -586,7 +586,44 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::Checkbox("Enable Overlay", &temp_settings.enable_overlay);
     if (ImGui::IsItemHovered()) {
         char enable_overlay_tooltip_buffer[1024];
-        if (selected_version <= MC_VERSION_1_11_2) {
+        if (selected_version <= MC_VERSION_1_6_4) {
+            // Legacy
+            snprintf(enable_overlay_tooltip_buffer, sizeof(enable_overlay_tooltip_buffer),
+                     "Enables a separate, customizable window to show your progress, perfect for streaming.\n\n"
+                     "Overlay Layout:\n"
+                     " • Row 1: Sub-stats of complex stats.\n"
+                     "   (If two items share an icon, the parent's icon is overlaid.)\n"
+                     " • Row 2: Main %s.\n" // Main achievements
+                     " • Row 3: Stats, custom goals, and multi-stage goals.\n\n"
+                     "Tips:\n"
+                     " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
+                     " • A negative scroll speed animates items from right to left.\n"
+                     " • To adjust horizontal spacing, shorten display names in the template creator.\n\n"
+                     "IMPORTANT FOR STREAMERS:\n"
+                     "Applying settings will restart the overlay window.\n"
+                     "You may need to reselect it in your streaming software (e.g., OBS).",
+                     advancements_label_plural_lowercase
+            );
+        } else if (selected_version <= MC_VERSION_1_11_2) {
+            // Mid-era
+            snprintf(enable_overlay_tooltip_buffer, sizeof(enable_overlay_tooltip_buffer),
+                     "Enables a separate, customizable window to show your progress, perfect for streaming.\n\n"
+                     "Overlay Layout:\n"
+                     " • Row 1: %s criteria and sub-stats of complex stats.\n"
+                     "   (If two items share an icon, the parent's icon is overlaid.)\n"
+                     " • Row 2: Main %s.\n"
+                     " • Row 3: Stats, custom goals, and multi-stage goals.\n\n"
+                     "Tips:\n"
+                     " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
+                     " • A negative scroll speed animates items from right to left.\n"
+                     " • To adjust horizontal spacing, shorten display names in the template creator.\n\n"
+                     "IMPORTANT FOR STREAMERS:\n"
+                     "Applying settings will restart the overlay window.\n"
+                     "You may need to reselect it in your streaming software (e.g., OBS).",
+                     advancement_label_uppercase, advancements_label_plural_lowercase
+            );
+        } else if (selected_version == MC_VERSION_25W14CRAFTMINE) {
+            // Craftmine
             snprintf(enable_overlay_tooltip_buffer, sizeof(enable_overlay_tooltip_buffer),
                      "Enables a separate, customizable window to show your progress, perfect for streaming.\n\n"
                      "Overlay Layout:\n"
@@ -601,7 +638,25 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                      "IMPORTANT FOR STREAMERS:\n"
                      "Applying settings will restart the overlay window.\n"
                      "You may need to reselect it in your streaming software (e.g., OBS).",
-                     advancement_label_uppercase, advancement_label_uppercase
+                     advancement_label_uppercase, advancements_label_plural_lowercase
+            );
+        } else {
+            // Modern
+            snprintf(enable_overlay_tooltip_buffer, sizeof(enable_overlay_tooltip_buffer),
+                     "Enables a separate, customizable window to show your progress, perfect for streaming.\n\n"
+                     "Overlay Layout:\n"
+                     " • Row 1: %s criteria and sub-stats of complex stats.\n"
+                     "   (If two items share an icon, the parent's icon is overlaid.)\n"
+                     " • Row 2: Main %s.\n"
+                     " • Row 3: Stats, custom goals, and multi-stage goals.\n\n"
+                     "Tips:\n"
+                     " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
+                     " • A negative scroll speed animates items from right to left.\n"
+                     " • To adjust horizontal spacing, shorten display names in the template creator.\n\n"
+                     "IMPORTANT FOR STREAMERS:\n"
+                     "Applying settings will restart the overlay window.\n"
+                     "You may need to reselect it in your streaming software (e.g., OBS).",
+                     advancement_label_uppercase, advancements_label_plural_lowercase
             );
         }
         ImGui::SetTooltip("%s", enable_overlay_tooltip_buffer);
@@ -766,6 +821,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 "The Progress %% shows your total completion across all individual sub-tasks from all categories.\n"
                 "Each of the following tasks has an equal weight in the calculation:");
             ImGui::Indent();
+            ImGui::BulletText("Recipes");
             ImGui::BulletText("%s Criteria", advancements_label_short_upper);
             ImGui::BulletText("Unlocks (exclusive to 25w14craftmine)");
             ImGui::BulletText("Individual Sub-Stats");
@@ -1405,7 +1461,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Optional Flag: %s\n"
                  "  - Language: Default\n"
                  "  - StatsPerWorld Mod (Legacy): %s\n"
-                 "  - Section Order: %s -> Unlocks -> Stats -> Custom -> Multi-Stage\n"
+                 "  - Section Order: %s -> Recipes -> Unlocks -> Stats -> Custom -> Multi-Stage\n"
                  "  - Enable Overlay: %s\n"
                  "  - Tracker FPS Limit: %d\n"
                  "  - Overlay FPS Limit: %d\n"
