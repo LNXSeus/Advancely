@@ -1276,7 +1276,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     if (selected_template_index != -1) {
         const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
         // The version is implicitly the same because the scanner uses app_settings->version_str
-        if (strcmp(selected.category, app_settings->category) == 0 &&
+        if (strcmp(creator_version_str, app_settings->version_str) == 0 &&
+            strcmp(selected.category, app_settings->category) == 0 &&
             strcmp(selected.optional_flag, app_settings->optional_flag) == 0) {
             is_current_template = true;
         }
