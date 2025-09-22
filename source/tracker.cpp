@@ -2187,7 +2187,7 @@ AnimatedTexture *get_animated_texture_from_cache(SDL_Renderer *renderer, Animate
     return new_anim;
 }
 
-bool tracker_new(Tracker **tracker, const AppSettings *settings) {
+bool tracker_new(Tracker **tracker, AppSettings *settings) {
     // Allocate memory for the tracker itself
     // Calloc assures null initialization
     *tracker = (Tracker *) calloc(1, sizeof(Tracker));
@@ -4509,7 +4509,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 // -------------------------------------------- TRACKER RENDERING END --------------------------------------------
 
 
-void tracker_reinit_template(Tracker *t, const AppSettings *settings) {
+void tracker_reinit_template(Tracker *t, AppSettings *settings) {
     if (!t) return;
 
     log_message(LOG_INFO, "[TRACKER] Re-initializing template...\n");
@@ -4573,18 +4573,66 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings) {
     }
 }
 
-bool tracker_load_and_parse_data(Tracker *t, const AppSettings *settings) {
+bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     log_message(LOG_INFO, "[TRACKER] Loading advancement template from: %s\n", t->advancement_template_path);
 
     cJSON *template_json = cJSON_from_file(t->advancement_template_path);
 
-    // When template doesn't exist we stop here
-    // TODO: When template doesn't exist it shouldn't do anything
     if (!template_json) {
+        // --- TEMPLATE NOT FOUND & RECOVERY LOGIC ---
         log_message(LOG_ERROR, "[TRACKER] CRITICAL: Template file not found: %s\n", t->advancement_template_path);
-        show_error_message("Template Not Found",
-                           "The selected template file could not be found. Please check your settings or create the required template file.");
-        return false; // Signal critical failure
+
+        // 1. Temporarily disable 'Always On Top' to ensure the popup is visible
+        bool was_on_top = (SDL_GetWindowFlags(t->window) & SDL_WINDOW_ALWAYS_ON_TOP);
+        if (was_on_top) {
+            SDL_SetWindowAlwaysOnTop(t->window, false);
+        }
+
+        // 2. Show a detailed error message
+        char error_msg[MAX_PATH_LENGTH + 256];
+        snprintf(error_msg, sizeof(error_msg),
+                 "The selected template could not be found:\n%s\n\nAdvancely will now reset to the default template.",
+                 t->advancement_template_path);
+        show_error_message("Template Not Found", error_msg);
+
+        // 3. Restore 'Always On Top' state after the user dismisses the popup
+        if (was_on_top) {
+            SDL_SetWindowAlwaysOnTop(t->window, true);
+        }
+
+        // 4. Reset the settings in memory to the application defaults
+        strncpy(settings->version_str, DEFAULT_VERSION, sizeof(settings->version_str) - 1);
+        strncpy(settings->category, DEFAULT_CATEGORY, sizeof(settings->category) - 1);
+        settings->optional_flag[0] = '\0';
+        settings->lang_flag[0] = '\0';
+
+        // 5. Save these new default settings back to the settings.json file
+        settings_save(settings, nullptr, SAVE_CONTEXT_ALL);
+
+        // 6. Attempt to reload the data with the new default paths immediately
+        construct_template_paths(settings);
+        strncpy(t->advancement_template_path, settings->template_path, MAX_PATH_LENGTH - 1);
+        strncpy(t->lang_path, settings->lang_path, MAX_PATH_LENGTH - 1);
+        strncpy(t->snapshot_path, settings->snapshot_path, MAX_PATH_LENGTH - 1);
+        strncpy(t->notes_path, settings->notes_path, MAX_PATH_LENGTH - 1);
+
+        template_json = cJSON_from_file(t->advancement_template_path);
+        if (!template_json) {
+            // If it fails even with the default, something is critically wrong.
+            // Temporarily disable 'Always On Top' to ensure the popup is visible
+            bool was_on_top = (SDL_GetWindowFlags(t->window) & SDL_WINDOW_ALWAYS_ON_TOP);
+            if (was_on_top) {
+                SDL_SetWindowAlwaysOnTop(t->window, false);
+            }
+            show_error_message("Critical Error", "The default template is missing or corrupted. Please reinstall Advancely.");
+
+            // 3. Restore 'Always On Top' state after the user dismisses the popup
+            if (was_on_top) {
+                SDL_SetWindowAlwaysOnTop(t->window, true);
+            }
+
+            return false; // This is a fatal error
+        }
     }
 
     // Declare lang_json as a local variable, this prevents memory leaks

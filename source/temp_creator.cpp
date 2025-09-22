@@ -1752,6 +1752,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::EndDisabled();
     ImGui::SameLine();
 
+    // Determine if the selected template is the default one
+    // Can't delete it
+    bool is_default_template = false;
+    if (selected_template_index != -1) {
+        const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
+        if (strcmp(creator_version_str, "1.16.1") == 0 &&
+            strcmp(selected.category, "all_advancements") == 0 &&
+            selected.optional_flag[0] == '\0') {
+            is_default_template = true;
+            }
+    }
+
     // Disable if nothing is selected or the selected template is in use
     ImGui::BeginDisabled(selected_template_index == -1 || is_current_template);
     if (ImGui::Button("Delete Template")) {
@@ -1761,7 +1773,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     }
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        if (selected_template_index != -1 && is_current_template) {
+        if (is_default_template) {
+            // Can't delete default template
+            char tooltip_buffer[128];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "The default template cannot be deleted.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        } else if (selected_template_index != -1 && is_current_template) {
             char cannot_delete_template_tooltip_buffer[1024];
             snprintf(cannot_delete_template_tooltip_buffer, sizeof(cannot_delete_template_tooltip_buffer),
                      "Cannot delete the template currently in use.");

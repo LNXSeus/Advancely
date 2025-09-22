@@ -178,7 +178,7 @@ AnimatedTexture *get_animated_texture_from_cache(SDL_Renderer *renderer, Animate
  * @param settings A pointer to the loaded application settings.
  * @return true if initialization was successful, false otherwise.
  */
-bool tracker_new(Tracker **tracker, const AppSettings *settings);
+bool tracker_new(Tracker **tracker, AppSettings *settings);
 
 /**
  * @brief Handles SDL events specifically for the tracker window.
@@ -242,7 +242,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings);
  * @param t A pointer to the Tracker struct.
  * @param settings A pointer to the application settings to use for re-initialization.
  */
-void tracker_reinit_template(Tracker *t, const AppSettings *settings);
+void tracker_reinit_template(Tracker *t, AppSettings *settings);
 
 /**
  * @brief Reloads settings and re-initializes all relevant paths in the tracker struct.
@@ -272,7 +272,7 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings);
  * @param settings A pointer to the application settings.
  * @return true on success, false on a critical failure.
 */
-bool tracker_load_and_parse_data(Tracker *t, const AppSettings *settings);
+bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings);
 
 /**
  * @brief Frees all resources associated with the Tracker instance.
