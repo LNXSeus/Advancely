@@ -20,6 +20,8 @@
 #include <unordered_set> // For checking duplicates
 #include <functional> // For std::function
 
+#include "tinyfiledialogs.h"
+
 // In-memory representation of a template for editing
 struct EditorTrackableItem {
     char root_name[192];
@@ -1210,6 +1212,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static SaveMessageType save_message_type = MSG_NONE;
     static char status_message[256] = "";
 
+    // State for the Import Confirmation view
+    static bool show_import_confirmation_view = false;
+    static char import_zip_path[MAX_PATH_LENGTH] = "";
+    static int import_version_idx = -1;
+    static char import_category[MAX_PATH_LENGTH] = "";
+    static char import_flag[MAX_PATH_LENGTH] = "";
+
     // --- Version-dependent labels ---
     MC_Version creator_selected_version = settings_get_version_from_string(creator_version_str);
 
@@ -1585,7 +1594,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 switch_template_action();
             }
 
-            // On any new template selection, reset the langauge selection
+            // On any new template selection, reset the language selection
             selected_lang_index = -1;
             selected_lang_flag = ""; // default
 
@@ -1603,6 +1612,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     ImGui::BeginChild("ActionsView", ImVec2(0, 0));
 
+    // --- Main Action Buttons ---
+
+    bool has_unsaved_changes_in_editor = editing_template && editor_has_unsaved_changes;
+
+    ImGui::BeginDisabled(has_unsaved_changes_in_editor);
     if (ImGui::Button("Create New Template")) {
         auto create_action = [&]() {
             show_create_new_view = true;
@@ -1626,12 +1640,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             create_action();
         }
     }
+    ImGui::EndDisabled();
 
-    if (ImGui::IsItemHovered()) {
-        char create_new_template_tooltip_buffer[1024];
-        snprintf(create_new_template_tooltip_buffer, sizeof(create_new_template_tooltip_buffer),
-                 "Create a new template for the selected version: %s", creator_version_str);
-        ImGui::SetTooltip("%s", create_new_template_tooltip_buffer);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        char tooltip_buffer[256];
+        if (has_unsaved_changes_in_editor) {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "You have unsaved changes in the editor. Save them first.");
+        } else {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Create a new, empty template for version: %s",
+                     creator_version_str);
+        }
+        ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
     ImGui::SameLine();
@@ -1676,7 +1696,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::SameLine();
 
     // Allow copying of the currently used template
-    ImGui::BeginDisabled(selected_template_index == -1);
+    // Disabled on unsaved changes in editor or no template selected
+    ImGui::BeginDisabled(has_unsaved_changes_in_editor || selected_template_index == -1);
     if (ImGui::Button("Copy Template")) {
         if (selected_template_index != -1) {
             show_copy_view = true;
@@ -1731,25 +1752,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             strncpy(copy_template_flag, new_flag, sizeof(copy_template_flag) - 1);
         }
     }
+    ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        char tooltip_buffer[1024];
         if (selected_template_index == -1) {
             // Tooltip for the DISABLED state.
-            char tooltip_buffer[128];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a template from the list to copy.");
-            ImGui::SetTooltip("%s", tooltip_buffer);
+        } else if (has_unsaved_changes_in_editor) {
+            // Unsaved changes in editor
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "You have unsaved changes in the editor. Save them first.");
         } else {
             // Enabled state
-            char copy_template_tooltip_buffer[1024];
-            snprintf(copy_template_tooltip_buffer, sizeof(copy_template_tooltip_buffer),
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                      "Creates a copy of the selected template. You can then change its version, category, or flag.\n\n"
                      "Note: This action copies the main template file and all of its\n"
                      "associated language files (e.g., _lang.json, _lang_eng.json).");
-            ImGui::SetTooltip(
-                "%s", copy_template_tooltip_buffer);
         }
+        ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
-    ImGui::EndDisabled();
     ImGui::SameLine();
 
     // Determine if the selected template is the default one
@@ -1761,7 +1783,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             strcmp(selected.category, "all_advancements") == 0 &&
             selected.optional_flag[0] == '\0') {
             is_default_template = true;
-            }
+        }
     }
 
     // Disable if nothing is selected or the selected template is in use
@@ -1773,63 +1795,126 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     }
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        if (is_default_template) {
+        char tooltip_buffer[512];
+        if (has_unsaved_changes_in_editor) {
+            // Unsaved changes in editor
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "You have unsaved changes in the editor. Save them first.");
+        } else if (is_default_template) {
             // Can't delete default template
-            char tooltip_buffer[128];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "The default template cannot be deleted.");
-            ImGui::SetTooltip("%s", tooltip_buffer);
         } else if (selected_template_index != -1 && is_current_template) {
-            char cannot_delete_template_tooltip_buffer[1024];
-            snprintf(cannot_delete_template_tooltip_buffer, sizeof(cannot_delete_template_tooltip_buffer),
+            // Selected template is in use
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                      "Cannot delete the template currently in use.");
-            ImGui::SetTooltip("%s", cannot_delete_template_tooltip_buffer);
         } else if (selected_template_index != -1) {
             const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
-            char tooltip_text[512];
             if (selected.optional_flag[0] != '\0') {
-                snprintf(tooltip_text, sizeof(tooltip_text), "Delete template:\nVersion: %s\nCategory: %s\nFlag: %s",
+                // Optional flag is present
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Delete template:\nVersion: %s\nCategory: %s\nFlag: %s",
                          creator_version_str, selected.category, selected.optional_flag);
             } else {
-                snprintf(tooltip_text, sizeof(tooltip_text), "Delete template:\nVersion: %s\nCategory: %s",
+                // No optional flag
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Delete template:\nVersion: %s\nCategory: %s",
                          creator_version_str, selected.category);
             }
-            ImGui::SetTooltip("%s", tooltip_text);
         } else {
-            char delete_current_template_tooltip_buffer[128];
-            snprintf(delete_current_template_tooltip_buffer, sizeof(delete_current_template_tooltip_buffer),
+            // Nothing selected
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                      "Select a template from the list to delete.");
-            ImGui::SetTooltip("%s", delete_current_template_tooltip_buffer);
         }
+        ImGui::SetTooltip("%s", tooltip_buffer);
     }
     ImGui::SameLine();
 
     // Import Template Button
+    ImGui::BeginDisabled(has_unsaved_changes_in_editor);
     if (ImGui::Button("Import Template")) {
-        // TODO: Implement import logic in the next step
+        auto import_action = [&]() {
+            const char *filter_patterns[1] = {"*.zip"};
+            const char *open_path = tinyfd_openFileDialog("Import Template From Zip", "", 1, filter_patterns,
+                                                          "Template ZIP Archive", 0);
+            if (open_path) {
+                char version[64], category[MAX_PATH_LENGTH], flag[MAX_PATH_LENGTH];
+                if (get_info_from_zip(open_path, version, category, flag, status_message, sizeof(status_message))) {
+                    // Success: Pre-fill the confirmation view
+                    strncpy(import_zip_path, open_path, sizeof(import_zip_path) - 1);
+                    strncpy(import_category, category, sizeof(import_category) - 1);
+                    strncpy(import_flag, flag, sizeof(import_flag) - 1);
+
+                    // Find the index for the parsed version string
+                    import_version_idx = -1;
+                    for (int i = 0; i < VERSION_STRINGS_COUNT; i++) {
+                        if (strcmp(VERSION_STRINGS[i], version) == 0) {
+                            import_version_idx = i;
+                            break;
+                        }
+                    }
+                    if (import_version_idx == -1) {
+                        snprintf(status_message, sizeof(status_message), "Error: Zip contains an unknown version: %s",
+                                 version);
+                    } else {
+                        show_import_confirmation_view = true;
+                        show_create_new_view = false;
+                        show_copy_view = false;
+                        editing_template = false;
+                    }
+                }
+                // On failure, get_info_from_zip already set the status_message
+                save_message_type = MSG_ERROR;
+            }
+        };
+
+        if (editing_template && editor_has_unsaved_changes) {
+            show_unsaved_changes_popup = true;
+            pending_action = import_action;
+        } else {
+            import_action();
+        }
     }
+    ImGui::EndDisabled();
+
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[512];
-        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                 "Import a template from a file.\n\n"
-                 "Supports two file types:\n"
-                 " • .zip: A full template package, including the main file and all language files.\n"
-                 " • .json: A single template or language file for the currently selected version.");
+        if (has_unsaved_changes_in_editor) {
+            // Unsaved changes in editor
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "You have unsaved changes in the editor. Save them first.");
+        } else {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Import a template from a file.\n\n"
+                     "Supports two file types:\n"
+                     " • .zip: A full template package, including the main file and all language files.\n"
+                     " • .json: A single template or language file for the currently selected version.");
+        }
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
     ImGui::SameLine();
 
     // Export Template Button
-    ImGui::BeginDisabled(selected_template_index == -1);
+    // Disabled when there are unsaved changes or no template is selected
+    ImGui::BeginDisabled(has_unsaved_changes_in_editor || selected_template_index == -1);
     if (ImGui::Button("Export Template")) {
-        // TODO: Implement export logic in the next step
+        if (selected_template_index != -1) {
+            handle_export_template(discovered_templates[selected_template_index], creator_version_str, status_message,
+                                   sizeof(status_message));
+            save_message_type = MSG_SUCCESS; // Use success color to make the message visible
+        }
     }
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         char tooltip_buffer[256];
         if (selected_template_index == -1) {
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a template from the list to export.");
+        } else if (has_unsaved_changes_in_editor) {
+            // Unsaved changes in editor
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "You have unsaved changes in the editor. Save them first.");
         } else {
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Export the selected template as a .zip file, including its main file and all language files.");
+            // Exporting
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Export the selected template as a .zip file, including its main file and all language files.");
         }
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
@@ -1909,7 +1994,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
 
     // --- Language Management UI (appears when a template is selected) ---
-    if (selected_template_index != -1 && !editing_template && !show_create_new_view && !show_copy_view) {
+    if (selected_template_index != -1 && !editing_template && !show_create_new_view && !show_copy_view && !
+        show_import_confirmation_view) {
         const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
         ImGui::Text("Languages for '%s%s'", selected.category, selected.optional_flag);
 
@@ -4848,7 +4934,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
     }
 
-    // "Copy" Form
+    // "Copy Template" Form
     else if (show_copy_view) {
         ImGui::Text("Copy Template");
 
@@ -4894,6 +4980,51 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         // Display status/error message
         if (status_message[0] != '\0') {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", status_message);
+        }
+    }
+
+    // Import Confirmation View
+    else if (show_import_confirmation_view) {
+        ImGui::Text("Confirm Import");
+        ImGui::Separator();
+        ImGui::TextWrapped("Importing from: %s", import_zip_path);
+        ImGui::Spacing();
+
+        ImGui::Text("Please confirm or edit the details for the new template:");
+
+        if (ImGui::Combo("Version", &import_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT)) {
+            // User changed the version, no extra action needed yet
+        }
+        ImGui::InputText("Category Name", import_category, sizeof(import_category));
+        ImGui::InputText("Optional Flag", import_flag, sizeof(import_flag));
+        ImGui::Spacing();
+
+        if (ImGui::Button("Confirm Import")) {
+            if (import_version_idx != -1) {
+                const char *version_str = VERSION_STRINGS[import_version_idx];
+                if (execute_import_from_zip(import_zip_path, version_str, import_category, import_flag, status_message,
+                                            sizeof(status_message))) {
+                    // SUCCESS!
+                    snprintf(status_message, sizeof(status_message), "Template imported to version %s!", version_str);
+                    show_import_confirmation_view = false;
+                    // Switch UI to the newly imported version
+                    strncpy(creator_version_str, version_str, sizeof(creator_version_str) - 1);
+                    creator_version_idx = import_version_idx;
+                    SDL_SetAtomicInt(&g_templates_changed, 1);
+                    last_scanned_version[0] = '\0'; // Force rescan
+                }
+                save_message_type = MSG_SUCCESS; // Show status message (success or error)
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            show_import_confirmation_view = false;
+            status_message[0] = '\0';
+        }
+
+        if (status_message[0] != '\0' && save_message_type == MSG_ERROR) {
             ImGui::SameLine();
             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", status_message);
         }

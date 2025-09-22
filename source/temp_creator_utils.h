@@ -6,6 +6,8 @@
 #define TEMP_CREATOR_UTILS_H
 
 #include <cstddef> // For size_t
+#include "template_scanner.h" // For the DiscoveredTemplate struct
+#include "settings_utils.h" // For VERSION_STRINGS_COUNT
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,7 +43,8 @@ void fs_create_empty_lang_file(const char *path);
 * @param error_msg_size The size of the error_message buffer.
 * @return true on success, false on failure.
 */
-bool validate_and_create_template(const char* version, const char* category, const char* flag, char* error_message, size_t error_msg_size);
+bool validate_and_create_template(const char *version, const char *category, const char *flag, char *error_message,
+                                  size_t error_msg_size);
 
 /**
 * @brief Copies an existing template and its language file to a new destination.
@@ -55,9 +58,9 @@ bool validate_and_create_template(const char* version, const char* category, con
 * @param error_msg_size The size of the error_message buffer.
 * @return true on success, false on failure.
 */
-bool copy_template_files(const char* src_version, const char* src_category, const char* src_flag,
-                         const char* dest_version, const char* dest_category, const char* dest_flag,
-                         char* error_message, size_t error_msg_size);
+bool copy_template_files(const char *src_version, const char *src_category, const char *src_flag,
+                         const char *dest_version, const char *dest_category, const char *dest_flag,
+                         char *error_message, size_t error_msg_size);
 
 /**
  * @brief Deletes a template and its corresponding language files.
@@ -66,15 +69,15 @@ bool copy_template_files(const char* src_version, const char* src_category, cons
  * @param flag The optional flag of the template to delete.
  * @return true on success, false on failure.
  */
-bool delete_template_files(const char* version, const char* category, const char* flag);
+bool delete_template_files(const char *version, const char *category, const char *flag);
 
 /**
  * @brief Enum to represent the result of a language file copy operation.
 */
 typedef enum {
-    COPY_LANG_FAIL = 0,             // The copy operation failed.
-    COPY_LANG_SUCCESS_DIRECT,       // The copy was successful using the specified source.
-    COPY_LANG_SUCCESS_FALLBACK      // The copy was successful but used the default language as a fallback.
+    COPY_LANG_FAIL = 0, // The copy operation failed.
+    COPY_LANG_SUCCESS_DIRECT, // The copy was successful using the specified source.
+    COPY_LANG_SUCCESS_FALLBACK // The copy was successful but used the default language as a fallback.
 } CopyLangResult;
 
 /**
@@ -87,7 +90,8 @@ typedef enum {
 * @param error_msg_size The size of the error_message buffer.
 * @return true on success, false on failure.
 */
-bool validate_and_create_lang_file(const char* version, const char* category, const char* flag, const char* new_lang_flag, char* error_message, size_t error_msg_size);
+bool validate_and_create_lang_file(const char *version, const char *category, const char *flag,
+                                   const char *new_lang_flag, char *error_message, size_t error_msg_size);
 
 /**
 * @brief Copies an existing language file to a new language file for the same template.
@@ -100,7 +104,8 @@ bool validate_and_create_lang_file(const char* version, const char* category, co
 * @param error_msg_size The size of the error_message buffer.
 * @return CopyLangResult enum value indicating the result of the operation.
 */
-CopyLangResult copy_lang_file(const char* version, const char* category, const char* flag, const char* src_lang_flag, const char* dest_lang_flag, char* error_message, size_t error_msg_size);
+CopyLangResult copy_lang_file(const char *version, const char *category, const char *flag, const char *src_lang_flag,
+                              const char *dest_lang_flag, char *error_message, size_t error_msg_size);
 
 /**
 * @brief Deletes a specific, non-default language file for a template.
@@ -112,7 +117,45 @@ CopyLangResult copy_lang_file(const char* version, const char* category, const c
 * @param error_msg_size The size of the error_message buffer.
 * @return true on success, false on failure.
 */
-bool delete_lang_file(const char* version, const char* category, const char* flag, const char* lang_flag_to_delete, char* error_message, size_t error_msg_size);
+bool delete_lang_file(const char *version, const char *category, const char *flag, const char *lang_flag_to_delete,
+                      char *error_message, size_t error_msg_size);
+
+/**
+ * @brief Reads a .zip file and attempts to parse template info from its contents.
+ * This function does NOT extract any files.
+ * @param zip_path Path to the .zip file.
+ * @param out_version Buffer to store the parsed version string.
+ * @param out_category Buffer to store the parsed category string.
+ * @param out_flag Buffer to store the parsed flag string.
+ * @param error_message Buffer to store an error message on failure.
+ * @param msg_size Size of the error_message buffer.
+ * @return true on success, false on failure.
+ */
+bool get_info_from_zip(const char *zip_path, char *out_version, char *out_category, char *out_flag, char *error_message,
+                       size_t msg_size);
+
+/**
+ * @brief Performs the final import by extracting a zip file to a specified template location.
+ * @param zip_path Path to the source .zip file.
+ * @param version The user-confirmed version for the new template.
+ * @param category The user-confirmed category for the new template.
+ * @param flag The user-confirmed flag for the new template.
+ * @param error_message Buffer to store an error message on failure.
+ * @param msg_size Size of the error_message buffer.
+ * @return true on success, false on failure.
+ */
+bool execute_import_from_zip(const char *zip_path, const char *version, const char *category, const char *flag,
+                             char *error_message, size_t msg_size);
+
+/**
+ * @brief Opens a save dialog and handles the export of a selected template to a .zip file.
+ * @param selected_template The template info to be exported.
+ * @param version The version of the selected template.
+ * @param status_message A buffer to store the success or error message.
+ * @param msg_size The size of the status_message buffer.
+ */
+void handle_export_template(const DiscoveredTemplate &selected_template, const char *version, char *status_message,
+                            size_t msg_size);
 
 #ifdef __cplusplus
 }
