@@ -1933,11 +1933,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 pending_action = copy_action;
             } else { copy_action(); }
         }
-        if (ImGui::IsItemHovered()) {
-            char tooltip_buffer[256];
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Create a new language file by copying the contents of the selected language.\n"
-                     "Copying a completely empty language file will default back to copying the default language file.");
+        ImGui::EndDisabled();
+
+        // Handle both enabled and disabled tooltips
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            char tooltip_buffer[512];
+            if (selected_lang_index == -1) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a language to copy.");
+            } else {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Create a new language file by copying the contents of the selected language.\n"
+                         "Copying a completely empty language file will fall back to copying the default language file.");
+            }
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
         ImGui::SameLine();
@@ -1984,7 +1991,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && !can_delete) {
             ImGui::SetTooltip("%s", disabled_tooltip);
         }
-        ImGui::EndDisabled();
         ImGui::Separator();
     }
 
@@ -4858,6 +4864,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (status_message[0] != '\0') {
             ImGui::SameLine();
             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", status_message);
+        }
+    } else {
+        // If no template is selected
+        if (selected_template_index == -1) {
+            ImGui::TextDisabled("Create a new template or select one from the list to begin.");
         }
     }
 
