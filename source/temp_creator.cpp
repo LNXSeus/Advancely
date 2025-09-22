@@ -1223,6 +1223,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                       ? "Achievements"
                                                       : "Advancements";
 
+    // advancement/achievement
+    const char *advancements_label_singular_lower = (creator_selected_version <= MC_VERSION_1_11_2)
+                                                        ? "achievement"
+                                                        : "advancement";
+
     // LOGIC
 
     // Add state management for window open/close
@@ -2180,10 +2185,41 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     current_template_data.advancements.push_back(new_adv);
                     save_message_type = MSG_NONE;
                 }
+                if (ImGui::IsItemHovered()) {
+                    char add_new_advancement_tooltip_buffer[1024];
+                    if (creator_selected_version <= MC_VERSION_1_6_4) {
+                        // Legacy
+                        snprintf(add_new_advancement_tooltip_buffer, sizeof(add_new_advancement_tooltip_buffer),
+                                 "Add a new blank achievement to this template.\n\n"
+                                 "Achievements act as a guide to completing tasks ingame\n"
+                                 "and additionally serve as challenges.\n"
+                                 "Advancely looks for achievements (e.g., '5242888' - The Lie)\n"
+                                 "within the (global or local) stats file.\n\n"
+                                 "Click the 'Help' button for more info.");
+                    } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                        // Mid-era
+                        snprintf(add_new_advancement_tooltip_buffer, sizeof(add_new_advancement_tooltip_buffer),
+                                 "Add a new blank achievement to this template.\n\n"
+                                 "Achievements act as a guide to completing tasks ingame\n"
+                                 "and additionally serve as challenges.\n"
+                                 "Advancely looks for achievements (e.g., 'achievement.buildWorkBench') within the stats file.\n\n"
+                                 "Click the 'Help' button for more info.");
+                    } else {
+                        // Modern
+                        snprintf(add_new_advancement_tooltip_buffer, sizeof(add_new_advancement_tooltip_buffer),
+                                 "Add a new blank advancement or recipe to this template.\n\n"
+                                 "Advancements act as a guide to completing tasks ingame and additionally serve as challenges.\n"
+                                 "Recipes (e.g., crafting, smelting, ...) are a structured way to perform item and block transformations.\n"
+                                 "Advancely looks for both advancements (e.g., 'minecraft:nether/all_effects') and recipes\n"
+                                 "(e.g., 'minecraft:recipes/misc/mojang_banner_pattern') within the advancements file.\n\n"
+                                 "Click the 'Help' button for more info.");
+                    }
+                    ImGui::SetTooltip("%s", add_new_advancement_tooltip_buffer);
+                }
                 ImGui::SameLine();
                 ImGui::Checkbox("Show Display Names", &show_advancement_display_names);
                 if (ImGui::IsItemHovered()) {
-                    char show_display_names_tooltip_buffer[1024];
+                    char show_display_names_tooltip_buffer[256];
                     snprintf(show_display_names_tooltip_buffer, sizeof(show_display_names_tooltip_buffer),
                              "Toggle between showing user-facing display names and internal root names in this list.");
                     ImGui::SetTooltip("%s", show_display_names_tooltip_buffer);
@@ -2447,7 +2483,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (creator_selected_version <= MC_VERSION_1_6_4) {
                             // Legacy
                             snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
-                                     "The unique in-game ID for this %s, e.g., '5242880'.",
+                                     "The unique in-game ID for this %s, e.g., '5242896' (Sniper Duel).",
                                      advancements_label_upper);
                         } else if (creator_selected_version <= MC_VERSION_1_11_2) {
                             // Mid-era
@@ -2504,8 +2540,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             char is_recipe_tooltip_buffer[512];
                             snprintf(is_recipe_tooltip_buffer, sizeof(is_recipe_tooltip_buffer),
                                      "Check this if the advancements entry is a recipe.\n"
-                                     "Recipes count towards the percentage progress and\n"
-                                     "not the main advancement counter.");
+                                     "Recipes have their own tracker section and count towards the\n"
+                                     "percentage progress and not the main advancement counter.");
                             ImGui::SetTooltip("%s", is_recipe_tooltip_buffer);
                         }
                         ImGui::SameLine();
@@ -2549,6 +2585,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             strncpy(new_crit.icon_path, "blocks/placeholder.png", sizeof(new_crit.icon_path) - 1);
                             advancement.criteria.push_back(new_crit);
                             save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char add_new_criterion_tooltip_buffer[1024];
+                            if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                // Mid-era
+                                snprintf(add_new_criterion_tooltip_buffer, sizeof(add_new_criterion_tooltip_buffer),
+                                         "Add a new blank achievement criterion to this template.\n\n"
+                                         "Achievements can have sub-tasks that must all be completed.\n"
+                                         "Advancely looks for achievement criteria (e.g., 'Swampland' of 'achievement.exploreAllBiomes')\n"
+                                         "within the stats file.\n\n"
+                                         "Click the 'Help' button for more info.");
+                            } else {
+                                // Modern
+                                snprintf(add_new_criterion_tooltip_buffer, sizeof(add_new_criterion_tooltip_buffer),
+                                         "Add a new blank advancement/recipe criterion to this template.\n\n"
+                                         "Advancements can have sub-tasks that must all be completed.\n"
+                                         "Advancely looks for advancement criteria (e.g., 'enchanted_golden_apple'\n"
+                                         "of 'minecraft:husbandry/balanced_diet') and recipe criteria\n"
+                                         "(e.g., 'has_nether_star' of 'minecraft:recipes/misc/beacon') within the advancements file.\n\n"
+                                         "Click the 'Help' button for more info.");
+                            }
+                            ImGui::SetTooltip("%s", add_new_criterion_tooltip_buffer);
                         }
                     } // End of conditional criteria block for above 1.6.4
 
@@ -2798,8 +2856,36 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 if (ImGui::IsItemHovered()) {
                     char add_stat_tooltip_buffer[1024];
-                    snprintf(add_stat_tooltip_buffer, sizeof(add_stat_tooltip_buffer),
-                             "Add a new blank stat to this template.");
+                    if (creator_selected_version <= MC_VERSION_1_6_4) {
+                        // Legacy
+                        snprintf(add_stat_tooltip_buffer, sizeof(add_stat_tooltip_buffer),
+                                 "Add a new blank stat to this template.\n\n"
+                                 "Statistics allow tracking of certain actions in form of numerical data.\n"
+                                 "Advancely looks for statistics (e.g., '16908566'  - Times Used of\n"
+                                 "Diamond Pickaxe) in the (global or local) stats file.\n"
+                                 "Simple achievements (e.g., '5242880' - Taking Inventory) can also act as stats\n"
+                                 "(e.g., How many time you've opened your inventory).\n\n"
+                                 "Click the 'Help' button for more info.");
+                    } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                        // Mid-era
+                        snprintf(add_stat_tooltip_buffer, sizeof(add_stat_tooltip_buffer),
+                                 "Add a new blank stat to this template.\n\n"
+                                 "Statistics allow tracking of certain actions in form of numerical data.\n"
+                                 "Advancely looks for statistics (e.g., 'stat.mineBlock.minecraft.tallgrass') in the stats file.\n"
+                                 "Simple achievements (e.g., 'achievement.mineWood') can also act as stats\n"
+                                 "(e.g., Logs mined (any log type)).\n\n"
+                                 "Click the 'Help' button for more info.");
+                    } else {
+                        // Modern
+                        snprintf(add_stat_tooltip_buffer, sizeof(add_stat_tooltip_buffer),
+                                 "Add a new blank stat to this template.\n\n"
+                                 "Statistics allow tracking of certain actions in form of numerical data.\n"
+                                 "Advancely looks for statistics (e.g., 'minecraft:custom/minecraft:jump') in the stats file.\n"
+                                 "The format for Advancely always is 'namespace:category/namespace:stat',\n"
+                                 "where the category is outside of the curly braces and the stat is inside.\n\n"
+                                 "Click the 'Help' button for more info.");
+                    }
+
                     ImGui::SetTooltip("%s", add_stat_tooltip_buffer);
                 }
                 ImGui::SameLine();
@@ -3096,7 +3182,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::IsItemHovered()) {
                         char multi_stat_tooltip_buffer[256];
                         snprintf(multi_stat_tooltip_buffer, sizeof(multi_stat_tooltip_buffer),
-                                 "Toggle between a simple, single stat and a complex category containing multiple sub-stats.");
+                                 "Toggle between a simple, single stat and a complex category\n"
+                                 "containing multiple sub-stats that individually act as a single stat,\n"
+                                 "but have their own icons similar to %s criteria.", advancements_label_singular_lower);
                         ImGui::SetTooltip("%s", multi_stat_tooltip_buffer);
                     }
                     ImGui::Separator();
@@ -3114,7 +3202,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (creator_selected_version <= MC_VERSION_1_6_4) {
                                 // Legacy
                                 snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
-                                         "The unique in-game ID for the stat to track, e.g., '16842813'.");
+                                         "The unique in-game ID for the stat to track, e.g., '16842813' (Furnace Crafted).");
                             } else if (creator_selected_version <= MC_VERSION_1_11_2) {
                                 // Mid-era
                                 snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
@@ -3122,7 +3210,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             } else {
                                 // Modern
                                 snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
-                                         "The unique in-game ID for the stat to track, e.g., 'minecraft:picked_up/minecraft:deepslate_emerald_ore'.");
+                                         "The unique in-game ID for the stat to track, e.g., 'minecraft:mined/minecraft:diamond_ore'.");
                             }
                             ImGui::SetTooltip("%s", stat_root_name_tooltip_buffer);
                         }
@@ -3140,7 +3228,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::Text("Criteria");
 
                         // Add Criterion button only for multi-stat categories -> complex stats
-                        if (ImGui::Button("Add New Stat Criterion")) {
+                        if (ImGui::Button("Add New Sub-Stat")) {
                             // Create new stat criterion with default values
                             EditorTrackableItem new_crit = {};
                             int counter = 1;
@@ -3162,6 +3250,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             stat_cat.criteria.push_back(new_crit);
                             save_message_type = MSG_NONE;
                         }
+
+                        // Tooltip for Add Criterion button
+                        if (ImGui::IsItemHovered()) {
+                            char add_stat_tooltip_buffer[1024];
+                            snprintf(add_stat_tooltip_buffer, sizeof(add_stat_tooltip_buffer),
+                                     "Add a new blank sub-stat to this template.\n\n"
+                                     "Sub-Stats are functionally identical to stats,\n"
+                                     "but have their own icons that then displays in\n"
+                                     "the topmost row of the overlay.\n\n"
+                                     "Click the 'Help' button for more info.");
+                            ImGui::SetTooltip("%s", add_stat_tooltip_buffer);
+                        }
+
 
                         // Determine if a details search is active
                         bool is_details_search_active = (
@@ -3210,7 +3311,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (creator_selected_version <= MC_VERSION_1_6_4) {
                                     // Legacy
                                     snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
-                                             "The unique in-game ID for the stat to track, e.g., '1100', '16842813'.");
+                                             "The unique in-game ID for the stat to track,\n"
+                                             "e.g., '1100' (Playtime in ticks), '16974109' (Gold Pickaxe Broken).");
                                 } else if (creator_selected_version <= MC_VERSION_1_11_2) {
                                     // Mid-era
                                     snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
@@ -3218,7 +3320,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 } else {
                                     // Modern
                                     snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
-                                             "The unique in-game ID for the stat to track, e.g., 'minecraft:mined/minecraft:diamond_ore'.");
+                                             "The unique in-game ID for the stat to track, e.g., 'minecraft:picked_up/minecraft:deepslate_emerald_ore'.");
                                 }
                                 ImGui::SetTooltip("%s", stat_root_name_tooltip_buffer);
                             }
@@ -3393,6 +3495,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         current_template_data.unlocks.push_back(new_unlock);
                         save_message_type = MSG_NONE;
                     }
+                    if (ImGui::IsItemHovered()) {
+                        char add_unlock_tooltip_buffer[1024];
+                        snprintf(add_unlock_tooltip_buffer, sizeof(add_unlock_tooltip_buffer),
+                                 "Add a new blank unlock to this template.\n"
+                                 "Player Unlocks are abilities to unlock using XP levels.\n"
+                                 "Advancely looks for completed unlocks (e.g., 'minecraft:exploration')\n"
+                                 "within the \"obtained\" object of the unlocks file.\n\n"
+                                 "Click the 'Help' button for more info.");
+                        ImGui::SetTooltip("%s", add_unlock_tooltip_buffer);
+                    }
                     int item_to_remove = -1;
                     int item_to_copy = -1;
                     int unlocks_dnd_source_index = -1;
@@ -3488,7 +3600,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
                         if (ImGui::IsItemHovered()) {
-                            char hidden_tooltip_buffer[128];
+                            char hidden_tooltip_buffer[256];
                             snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
                                      "If checked, this criterion will be hidden on the tracker by default.\n"
                                      "Visibility can be toggled in the main tracker settings");
@@ -3609,6 +3721,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     new_goal.goal = 1; // Default to a progress-based counter
                     current_template_data.custom_goals.push_back(new_goal);
                     save_message_type = MSG_NONE;
+                }
+                if (ImGui::IsItemHovered()) {
+                    char add_custom_goal_tooltip_buffer[1024];
+                    snprintf(add_custom_goal_tooltip_buffer, sizeof(add_custom_goal_tooltip_buffer),
+                             "Add a new blank custom goal to this template.\n"
+                             "Custom Goals are useful for tracking objectives manually\n"
+                             "that cannot be automatically detected by reading the game's world files.\n"
+                             "E.g., the amount of times a structure has been visited.\n"
+                             "Depending on the target value custom goals can have hotkeys.\n"
+                             "These can then be configured in the settings window after selecting the template.\n"
+                             "You need to be tabbed into the main tracker window for hotkeys to work.\n\n"
+                             "Click the 'Help' button for more info.");
+                    ImGui::SetTooltip("%s", add_custom_goal_tooltip_buffer);
                 }
                 ImGui::SameLine();
                 ImGui::TextDisabled("(Hotkeys are configured in the main Settings window)");
@@ -3867,14 +3992,64 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ms_goal_data_changed = true;
                     save_message_type = MSG_NONE;
                 }
+                if (ImGui::IsItemHovered()) {
+                    char add_ms_goal_tooltip_buffer[1024]; // Increased buffer size for detailed text
+
+                    if (creator_selected_version <= MC_VERSION_1_6_4) {
+                        // Legacy Version Tooltip
+                        snprintf(add_ms_goal_tooltip_buffer, sizeof(add_ms_goal_tooltip_buffer),
+                                 "Add a new multi-stage goal to this template.\n\n"
+                                 "Multi-Stage Goals get completed one stage at a time.\n"
+                                 "The 'Type' of each stage determines how it is completed:\n"
+                                 " • Stat / Achievement: The ID number (e.g., '2011' - Items Dropped)\n"
+                                 "   to track in the stats file.\n"
+                                 " • Final: The mandatory last stage that completes the goal.\n\n"
+                                 "Click the 'Help' button for more info.");
+                    } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                        // Mid-Era Version Tooltip
+                        snprintf(add_ms_goal_tooltip_buffer, sizeof(add_ms_goal_tooltip_buffer),
+                                 "Add a new multi-stage goal to this template.\n\n"
+                                 "Multi-Stage Goals get completed one stage at a time.\n"
+                                 "The 'Type' of each stage determines how it is completed:\n"
+                                 " • Stat / Achievement: Root name (e.g., 'stat.craftItem.minecraft.planks')\n"
+                                 "   to track in the stats file.\n"
+                                 " • Criterion: A specific criterion (e.g., 'Sunflower Plains') of a parent achievement\n"
+                                 "   (e.g., 'achievement.exploreAllBiomes').\n"
+                                 " • Final: The mandatory last stage that completes the goal.\n\n"
+                                 "Click the 'Help' button for more info.");
+                    } else if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
+                        // 25w14craftmine Version Tooltip
+                        snprintf(add_ms_goal_tooltip_buffer, sizeof(add_ms_goal_tooltip_buffer),
+                                 "Add a new multi-stage goal to this template.\n\n"
+                                 "Multi-Stage Goals get completed one stage at a time.\n"
+                                 "The 'Type' of each stage determines how it is completed:\n"
+                                 " • Stat: Root name (e.g., 'minecraft:mined/minecraft:spawner') from the stats file.\n"
+                                 " • Advancement: Root name of an advancement (e.g., 'minecraft:end/levitate)\n"
+                                 "   or recipe (e.g., 'minecraft:recipes/redstone/tnt') from the advancements file.\n"
+                                 " • Criterion: A specific criterion (e.g., 'minecraft:wither_boss')\n"
+                                 "   of a parent advancement (e.g., 'minecraft:mines/all_special_mines_completed').\n"
+                                 " • Unlock: Root name (e.g., 'minecraft:exploration') from the unlocks file.\n"
+                                 " • Final: The mandatory last stage that completes the goal.\n\n"
+                                 "Click the 'Help' button for more info.");
+                    } else {
+                        // Modern Versions (1.12+ excluding craftmine) Tooltip
+                        snprintf(add_ms_goal_tooltip_buffer, sizeof(add_ms_goal_tooltip_buffer),
+                                 "Add a new multi-stage goal to this template.\n\n"
+                                 "Multi-Stage Goals get completed one stage at a time.\n"
+                                 "The 'Type' of each stage determines how it is completed:\n"
+                                 " • Stat: Root name (e.g., 'minecraft:killed/minecraft:blaze') from the stats file.\n"
+                                 " • Advancement: Root name of an advancement (e.g., 'minecraft:story/cure_zombie_villager)\n"
+                                 "   or recipe (e.g., 'minecraft:recipes/decorations/anvil') from the advancements file.\n"
+                                 " • Criterion: A specific criterion (e.g., 'minecraft:spotted')\n"
+                                 "   of a parent advancement (e.g., 'minecraft:husbandry/whole_pack').\n"
+                                 " • Final: The mandatory last stage that completes the goal.\n\n"
+                                 "Click the 'Help' button for more info.");
+                    }
+
+                    ImGui::SetTooltip("%s", add_ms_goal_tooltip_buffer);
+                }
                 ImGui::SameLine();
                 ImGui::Checkbox("Show Display Names", &show_ms_goal_display_names);
-                if (ImGui::IsItemHovered()) {
-                    char show_display_names_tooltip_buffer[1024];
-                    snprintf(show_display_names_tooltip_buffer, sizeof(show_display_names_tooltip_buffer),
-                             "Toggle between showing user-facing display names and internal root names in this list.");
-                    ImGui::SetTooltip("%s", show_display_names_tooltip_buffer);
-                }
                 ImGui::Separator();
 
                 // 1. Create a list of pointers to render from.
@@ -4158,6 +4333,61 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         save_message_type = MSG_NONE;
                     }
 
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[1024];
+
+                        if (creator_selected_version <= MC_VERSION_1_6_4) {
+                            // Legacy Version Tooltip
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Adds a new step to this multi-stage goal.\n\n"
+                                     "Stages are completed sequentially. New stages are always added before the 'Final' stage.\n\n"
+                                     "Available Stage Types for this version:\n"
+                                     " • Stat / Achievement: Completes when a stat (e.g., 16777217 - Stone mined)\n"
+                                     "   or achievement (e.g., 5242905 - Overkill) reaches the 'Target Value'.\n\n"
+                                     "Click the 'Help' button for more info.");
+                        } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                            // Mid-Era Version Tooltip
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Adds a new step to this multi-stage goal.\n\n"
+                                     "Stages are completed sequentially. New stages are always added before the 'Final' stage.\n\n"
+                                     "Available Stage Types for this version:\n"
+                                     " • Stat / Achievement: Completes when a stat (e.g., stat.fallOneCm)\n"
+                                     "   or achievement (e.g., 'achievement.buildPickaxe') reaches the 'Target Value'.\n"
+                                     " • Criterion: Completes when a specific criterion (e.g., 'Deep Ocean')\n"
+                                     "   of a parent achievement (e.g., 'achievement.exploreAllBiomes') is met.\n\n"
+                                     "Click the 'Help' button for more info.");
+                        } else if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
+                            // 25w14craftmine Version Tooltip
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Adds a new step to this multi-stage goal.\n\n"
+                                     "Stages are completed sequentially. New stages are always added before the 'Final' stage.\n\n"
+                                     "Available Stage Types for this version:\n"
+                                     " • Stat: Completes when a stat (e.g., 'minecraft:custom/minecraft:aviate_one_cm')\n"
+                                     "   reaches the 'Target Value'.\n"
+                                     " • Advancement: Completes when an advancement (e.g., 'minecraft:feats/kuiper_world')\n"
+                                     "   or recipe (e.g., 'minecraft:recipes/misc/exit_eye') is obtained.\n"
+                                     " • Criterion: Completes when a specific criterion (e.g., 'minecraft:floating_islands_world')\n"
+                                     "   of a parent advancement (e.g., 'minecraft:mines/all_mine_ingredients') is met.\n"
+                                     " • Unlock: Completes when a specific player unlock (e.g., 'minecraft:jump_king_10') is obtained.\n\n"
+                                     "Click the 'Help' button for more info.");
+                        } else {
+                            // Modern Versions (1.12+ excluding craftmine) Tooltip
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Adds a new step to this multi-stage goal.\n\n"
+                                     "Stages are completed sequentially. New stages are always added before the 'Final' stage.\n\n"
+                                     "Available Stage Types for this version:\n"
+                                     " • Stat: Completes when a stat (e.g., 'minecraft:killed/minecraft:endermite'\n"
+                                     "   reaches the 'Target Value'.\n"
+                                     " • Advancement: Completes when an advancement (e.g., 'minecraft:nether/ride_strider')\n"
+                                     "   or recipe (e.g., 'minecraft:recipes/decorations/grindstone') is obtained.\n"
+                                     " • Criterion: Completes when a specific criterion (e.g., 'minecraft:creaking')\n"
+                                     "   of a parent advancement (e.g., 'minecraft:adventure/kill_all_mobs') is met.\n\n"
+                                     "Click the 'Help' button for more info.");
+                        }
+
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+
                     // Determine if a details search is active
                     bool is_details_search_active = (
                         current_search_scope == SCOPE_MULTISTAGE_DETAILS && tc_search_buffer[0] != '\0');
@@ -4270,19 +4500,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
 
-                            // "Unlock" type is only for 25w14craftmine
-                            if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
-                                if (ImGui::Selectable("Unlock", stage.type == SUBGOAL_UNLOCK)) {
-                                    stage.type = SUBGOAL_UNLOCK;
+                            // "Criterion" type is available from mid-era (1.7.2) onwards
+                            if (creator_selected_version >= MC_VERSION_1_7_2) {
+                                if (ImGui::Selectable("Criterion", stage.type == SUBGOAL_CRITERION)) {
+                                    stage.type = SUBGOAL_CRITERION;
                                     ms_goal_data_changed = true;
                                     save_message_type = MSG_NONE;
                                 }
                             }
 
-                            // "Criterion" type is available from mid-era (1.7.2) onwards
-                            if (creator_selected_version >= MC_VERSION_1_7_2) {
-                                if (ImGui::Selectable("Criterion", stage.type == SUBGOAL_CRITERION)) {
-                                    stage.type = SUBGOAL_CRITERION;
+                            // "Unlock" type is only for 25w14craftmine
+                            if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
+                                if (ImGui::Selectable("Unlock", stage.type == SUBGOAL_UNLOCK)) {
+                                    stage.type = SUBGOAL_UNLOCK;
                                     ms_goal_data_changed = true;
                                     save_message_type = MSG_NONE;
                                 }
@@ -4311,9 +4541,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 // modern
                                 snprintf(type_tooltip_buffer, sizeof(type_tooltip_buffer),
                                          "The type of event that will complete this stage.\n"
+                                         "%s can also be recipes.\n"
                                          "There must be exactly one 'Final' stage ('Done!' - Stage),\n"
                                          "and it must be the last stage.\n"
-                                         "Reaching the final stage completes the entire multi-stage goal.");
+                                         "Reaching the final stage completes the entire multi-stage goal.",
+                                         advancements_label_plural_upper);
                             }
                             ImGui::SetTooltip("%s", type_tooltip_buffer);
                         }
@@ -4327,6 +4559,23 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ms_goal_data_changed = true;
                                 save_message_type = MSG_NONE;
                             }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buffer[512];
+                                if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                    // Mid-era tooltip
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "The root name of the parent %s this criterion belongs to.\n"
+                                             "e.g., 'achievement.exploreAllBiomes'",
+                                             advancements_label_singular_lower);
+                                } else {
+                                    // Modern tooltip
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "The root name of the parent %s this criterion belongs to.\n"
+                                             "e.g., 'minecraft:husbandry/bred_all_animals'",
+                                             advancements_label_singular_lower);
+                                }
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
                         }
 
                         // "Final" stages don't need a target or Root Name
@@ -4336,23 +4585,31 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
-                                char tooltip_buffer[128];
+                                char tooltip_buffer[256];
                                 if (creator_selected_version <= MC_VERSION_1_6_4) {
                                     // Legacy stage types
                                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                             "The root name of the stat or achievement that triggers this stage's completion.");
+                                             "The root name of the stat (e.g., '2021' - Damage taken)\n"
+                                             "or achievement (e.g., '5242902' - The End?) that triggers this stage's completion.");
                                 } else if (creator_selected_version <= MC_VERSION_1_11_2) {
                                     // mid-era stage types
                                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                             "The root name of the stat/achievement or criterion that triggers this stage's completion.");
+                                             "The root name of the stat (e.g., 'stat.craftItem.minecraft.stick')\n"
+                                             "or achievement (e.g., 'achievement.ghast') or criterion (e.g., 'Extreme Hills+ M')\n"
+                                             "that triggers this stage's completion.");
                                 } else if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
                                     // craftmine stage types
                                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                             "The root name of the stat, advancement, unlock or criterion that triggers this stage's completion.");
+                                             "The root name of the stat (e.g., 'minecraft:killed_by/minecraft:ravager'),\n"
+                                             "advancement (e.g., 'minecraft:mines/special_mine_completed'),\n"
+                                             "unlock (e.g., 'minecraft:fire_wand') or criterion (e.g., 'minecraft:runemaster')\n"
+                                             "that triggers this stage's completion.");
                                 } else {
                                     // modern stage types without craftmine
                                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                             "The root name of the stat, advancement or criterion that triggers this stage's completion.");
+                                             "The root name of the stat (e.g., 'minecraft:used/minecraft:acacia_boat'),\n"
+                                             "advancement (e.g., 'minecraft:adventure/trim_with_all_exclusive_armor_patterns')\n"
+                                             "or criterion (e.g., 'minecraft:lush_caves') that triggers this stage's completion.");
                                 }
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
@@ -4361,7 +4618,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
-                                char tooltip_buffer[128];
+                                char tooltip_buffer[256];
                                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                          "For 'Stat' type stages, this is the value the stat must reach to complete the stage.\n");
                                 ImGui::SetTooltip("%s", tooltip_buffer);
