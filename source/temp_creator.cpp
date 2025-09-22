@@ -1801,6 +1801,38 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::SetTooltip("%s", delete_current_template_tooltip_buffer);
         }
     }
+    ImGui::SameLine();
+
+    // Import Template Button
+    if (ImGui::Button("Import Template")) {
+        // TODO: Implement import logic in the next step
+    }
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buffer[512];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Import a template from a file.\n\n"
+                 "Supports two file types:\n"
+                 " • .zip: A full template package, including the main file and all language files.\n"
+                 " • .json: A single template or language file for the currently selected version.");
+        ImGui::SetTooltip("%s", tooltip_buffer);
+    }
+    ImGui::SameLine();
+
+    // Export Template Button
+    ImGui::BeginDisabled(selected_template_index == -1);
+    if (ImGui::Button("Export Template")) {
+        // TODO: Implement export logic in the next step
+    }
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        char tooltip_buffer[256];
+        if (selected_template_index == -1) {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a template from the list to export.");
+        } else {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Export the selected template as a .zip file, including its main file and all language files.");
+        }
+        ImGui::SetTooltip("%s", tooltip_buffer);
+    }
 
     // Delete Confirmation Popup
     if (ImGui::BeginPopupModal("Delete Template?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
