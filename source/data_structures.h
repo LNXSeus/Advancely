@@ -262,7 +262,8 @@ struct MultiStageGoal {
 
 // The main container for all data loaded from the template files.
 struct TemplateData {
-    int advancement_count;
+    int advancement_count; // Amount of advancements defined in the template under "advancements"
+    int advancement_goal_count; // Count of actual advancements (non-recipes) for the UI counter
     int advancements_completed_count;
     TrackableCategory **advancements;
 

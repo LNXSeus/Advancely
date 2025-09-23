@@ -4120,7 +4120,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                  formatted_flag,
                  adv_ach_label,
                  t->template_data->advancements_completed_count,
-                 t->template_data->advancement_count,
+                 t->template_data->advancement_goal_count, // Excluding recipes
                  t->template_data->overall_progress_percentage,
                  formatted_time,
                  formatted_update_time);
@@ -4666,6 +4666,18 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
                              &t->template_data->advancement_count, &t->template_data->total_criteria_count,
                              "advancement.", false, version, settings);
 
+    // After parsing, calculate the count of actual advancements (excluding recipes)
+    t->template_data->advancement_goal_count = 0;
+    if (t->template_data->advancements) {
+        for (int i = 0; i < t->template_data->advancement_count; i++) {
+            // When it's NOT a recipe
+            // Recipes count towards percentage progress
+            if (t->template_data->advancements[i] && !t->template_data->advancements[i]->is_recipe) {
+                t->template_data->advancement_goal_count++;
+            }
+        }
+    }
+
     // True as it's for stats
     tracker_parse_categories(t, stats_json, lang_json, &t->template_data->stats,
                              &t->template_data->stat_count, &t->template_data->stat_total_criteria_count, "stat.",
@@ -4913,7 +4925,7 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
              formatted_flag,
              adv_ach_label,
              t->template_data->advancements_completed_count,
-             t->template_data->advancement_count,
+             t->template_data->advancement_goal_count, // Excluding recipes
              t->template_data->overall_progress_percentage,
              formatted_time);
 
@@ -5002,10 +5014,10 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
         // Advancements or Achievements
         if (version >= MC_VERSION_1_12) {
             log_message(LOG_INFO, "[Advancements] %d / %d completed\n", t->template_data->advancements_completed_count,
-                        t->template_data->advancement_count);
+                        t->template_data->advancement_goal_count); // Excluding recipes
         } else {
             log_message(LOG_INFO, "[Achievements] %d / %d completed\n", t->template_data->advancements_completed_count,
-                        t->template_data->advancement_count);
+                        t->template_data->advancement_goal_count);
         }
         for (int i = 0; i < t->template_data->advancement_count; i++) {
             TrackableCategory *adv = t->template_data->advancements[i];
@@ -5210,11 +5222,11 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
         if (version >= MC_VERSION_1_12) {
             log_message(LOG_INFO, "\n[Advancements] %d / %d completed\n",
                         t->template_data->advancements_completed_count,
-                        t->template_data->advancement_count);
+                        t->template_data->advancement_goal_count); // Excluding recipes
         } else {
             log_message(LOG_INFO, "\n[Achievements] %d / %d completed\n",
                         t->template_data->advancements_completed_count,
-                        t->template_data->advancement_count);
+                        t->template_data->advancement_goal_count);
         }
 
 

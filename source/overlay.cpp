@@ -577,7 +577,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
                 snprintf(temp_chunk, sizeof(temp_chunk), "%s: %d/%d - Prog: %.2f%%",
                          adv_ach_label, t->template_data->advancements_completed_count,
-                         t->template_data->advancement_count, t->template_data->overall_progress_percentage);
+                         t->template_data->advancement_goal_count, // Excluding recipes
+                         t->template_data->overall_progress_percentage);
                 add_component(temp_chunk);
             }
 
