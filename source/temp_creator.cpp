@@ -1254,6 +1254,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static bool show_import_advancements_popup = false;
     static std::vector<ImportableAdvancement> importable_advancements;
     static char import_error_message[256] = "";
+    static char import_search_buffer[256] = "";
+    static bool import_select_criteria = false;
+    static int last_clicked_adv_index = -1;
 
     // --- Version-dependent labels ---
     MC_Version creator_selected_version = settings_get_version_from_string(creator_version_str);
@@ -5601,18 +5604,116 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     }
     if (ImGui::BeginPopupModal("Import Advancements from File", &show_import_advancements_popup,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
+        // --- Selection Controls & Search Bar ---
+        if (ImGui::Button("Select All")) {
+            for (auto &adv: importable_advancements) {
+                // Filter based on search
+                bool parent_match = str_contains_insensitive(adv.root_name.c_str(), import_search_buffer);
+                bool child_match = false;
+                if (!parent_match) {
+                    for (const auto &crit: adv.criteria) {
+                        if (str_contains_insensitive(crit.root_name.c_str(), import_search_buffer)) {
+                            child_match = true;
+                            break;
+                        }
+                    }
+                }
+                if (parent_match || child_match) {
+                    adv.is_selected = true;
+                    if (import_select_criteria) {
+                        for (auto &crit: adv.criteria) {
+                            crit.is_selected = true;
+                        }
+                    }
+                }
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Deselect All")) {
+            for (auto& adv : importable_advancements) {
+                // Filter based on search to only affect visible items
+                bool parent_match = str_contains_insensitive(adv.root_name.c_str(), import_search_buffer);
+                bool child_match = false;
+                if (!parent_match) {
+                    for (const auto& crit : adv.criteria) {
+                        if (str_contains_insensitive(crit.root_name.c_str(), import_search_buffer)) {
+                            child_match = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (parent_match || child_match) {
+                    if (import_select_criteria) {
+                        // If checkbox is ticked, deselect ONLY the criteria
+                        for (auto& crit : adv.criteria) {
+                            crit.is_selected = false;
+                        }
+                    } else {
+                        // Otherwise, deselect everything (parents and criteria)
+                        adv.is_selected = false;
+                        for (auto& crit : adv.criteria) {
+                            crit.is_selected = false;
+                        }
+                    }
+                }
+            }
+        }
+        ImGui::SameLine();
+        ImGui::Checkbox("Include Criteria", &import_select_criteria);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "If checked, 'Select All' and range-selection (shift clicking)\n"
+                "will also select all criteria of the affected advancements.");
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(250.0f);
+        ImGui::InputTextWithHint("##ImportSearch", "Search...", import_search_buffer, sizeof(import_search_buffer));
+        ImGui::Separator();
+
+        // --- Render List ---
         if (importable_advancements.empty()) {
             ImGui::Text("No advancements found in the selected file.");
         } else {
             ImGui::BeginChild("ImporterScrollingRegion", ImVec2(600, 400), true);
-            for (auto &adv: importable_advancements) {
-                // Push a unique ID for this advancement and its children.
-                // This resolves the conflicting ID error for criteria with the same name.
-                ImGui::PushID(adv.root_name.c_str());
+            for (size_t i = 0; i < importable_advancements.size(); ++i) {
+                auto &adv = importable_advancements[i];
 
+                // --- Filtering Logic ---
+                bool parent_match = str_contains_insensitive(adv.root_name.c_str(), import_search_buffer);
+                bool child_match = false;
+                if (!parent_match) {
+                    for (const auto &crit: adv.criteria) {
+                        if (str_contains_insensitive(crit.root_name.c_str(), import_search_buffer)) {
+                            child_match = true;
+                            break;
+                        }
+                    }
+                }
+                if (!parent_match && !child_match) {
+                    continue; // Skip rendering this item if it doesn't match the search
+                }
+
+                // --- Rendering Logic ---
+                ImGui::PushID(adv.root_name.c_str());
                 if (ImGui::Checkbox(adv.root_name.c_str(), &adv.is_selected)) {
-                    // If an advancement is unchecked, uncheck all its children
+                    // Handle Shift+Click for range selection
+                    if (ImGui::GetIO().KeyShift && last_clicked_adv_index != -1) {
+                        int start = std::min((int) i, last_clicked_adv_index);
+                        int end = std::max((int) i, last_clicked_adv_index);
+                        for (int j = start; j <= end; ++j) {
+                            importable_advancements[j].is_selected = adv.is_selected;
+                            if (import_select_criteria) {
+                                for (auto &crit: importable_advancements[j].criteria) {
+                                    crit.is_selected = adv.is_selected;
+                                }
+                            }
+                        }
+                    }
+                    last_clicked_adv_index = i;
+
                     if (!adv.is_selected) {
+                        // If parent is unchecked, uncheck all its children
                         for (auto &crit: adv.criteria) {
                             crit.is_selected = false;
                         }
@@ -5622,15 +5723,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::Indent();
                     for (auto &crit: adv.criteria) {
                         if (ImGui::Checkbox(crit.root_name.c_str(), &crit.is_selected)) {
-                            // If a criterion is checked, its parent must also be checked
                             if (crit.is_selected) {
+                                // If a child is checked, ensure its parent is checked
                                 adv.is_selected = true;
                             }
                         }
                     }
                     ImGui::Unindent();
                 }
-                // Pop the ID to keep the ID stack clean for the next item.
                 ImGui::PopID();
             }
             ImGui::EndChild();
@@ -5693,6 +5793,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                 }
                 show_import_advancements_popup = false;
+                import_search_buffer[0] = '\0'; // Clear search after import
             }
         }
         if (ImGui::IsItemHovered()) {
@@ -5706,6 +5807,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             import_error_message[0] = '\0';
             show_import_advancements_popup = false;
+            import_search_buffer[0] = '\0'; // Clear search after cancel
         }
         if (ImGui::IsItemHovered()) {
             char import_advancements_tooltip_buffer[512];
