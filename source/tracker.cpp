@@ -4421,10 +4421,11 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                 format_category_string(settings->category, formatted_category, sizeof(formatted_category));
                 char formatted_flag[128];
                 format_category_string(settings->optional_flag, formatted_flag, sizeof(formatted_flag));
-                ImGui::Text("Template: %s - %s%s",
-                            settings->version_str,
-                            formatted_category,
-                            *settings->optional_flag ? formatted_flag : "");
+                ImGui::Text("Template: %s - %s%s%s",
+                        settings->version_str,
+                        formatted_category,
+                        *settings->optional_flag ? " - " : "",
+                        *settings->optional_flag ? formatted_flag : "");
             }
             ImGui::PopStyleColor();
             ImGui::Separator();
@@ -4463,9 +4464,10 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                 settings_save(settings, nullptr, SAVE_CONTEXT_ALL); // Save the setting change
             }
             if (ImGui::IsItemHovered()) {
-                char per_world_notes_tooltip_buffer[1024];
+                char per_world_notes_tooltip_buffer[512];
                 snprintf(per_world_notes_tooltip_buffer, sizeof(per_world_notes_tooltip_buffer),
-                         "When enabled, notes are saved for each world individually.\nWhen disabled, notes are shared for the current template.");
+                         "When enabled, notes are saved for each world individually.\n"
+                         "When disabled, notes are shared for the current template.");
                 ImGui::SetTooltip("%s", per_world_notes_tooltip_buffer);
             }
 
@@ -4479,7 +4481,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                 settings_save(settings, nullptr, SAVE_CONTEXT_ALL);
             }
             if (ImGui::IsItemHovered()) {
-                char use_settings_font_tooltip_buffer[1024];
+                char use_settings_font_tooltip_buffer[512];
                 snprintf(use_settings_font_tooltip_buffer, sizeof(use_settings_font_tooltip_buffer),
                          "Toggle whether to use the settings window font for the notes editor (better readability).");
                 ImGui::SetTooltip(
