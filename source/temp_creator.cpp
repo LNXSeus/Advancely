@@ -1258,7 +1258,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static bool import_select_criteria = false;
     static int last_clicked_adv_index = -1;
     static int last_clicked_crit_index = -1;
-    static ImportableAdvancement* last_clicked_crit_parent = nullptr;
+    static ImportableAdvancement *last_clicked_crit_parent = nullptr;
+    static bool focus_import_search = false;
 
     // --- Version-dependent labels ---
     MC_Version creator_selected_version = settings_get_version_from_string(creator_version_str);
@@ -1349,6 +1350,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     // Handle Ctrl+F / Cmd+F to focus the search box, but only when this window is active.
     if (t && t->is_temp_creator_focused && !ImGui::IsAnyItemActive() &&
+        !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup) && // No popups open
         (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
         ImGui::IsKeyPressed(ImGuiKey_F)) {
         focus_tc_search_box = true;
@@ -2617,6 +2619,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (parse_player_advancements_for_import(selection, importable_advancements,
                                                                  import_error_message, sizeof(import_error_message))) {
                             show_import_advancements_popup = true;
+                            focus_import_search = true; // Focus search bar as soon as popup opens
                         } else {
                             // If parsing fails, show the error in the main status message
                             save_message_type = MSG_ERROR;
@@ -5606,6 +5609,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     }
     if (ImGui::BeginPopupModal("Import Advancements from File", &show_import_advancements_popup,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
+        // Hotkey logic for search bar
+        if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
+            ImGui::IsKeyPressed(ImGuiKey_F)) {
+            focus_import_search = true;
+        }
         // --- Selection Controls & Search Bar ---
         if (ImGui::Button("Select All")) {
             for (auto &adv: importable_advancements) {
@@ -5673,6 +5681,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         ImGui::SameLine();
         ImGui::SetNextItemWidth(250.0f);
+
+        // Logic to apply focus
+        if (focus_import_search) {
+            ImGui::SetKeyboardFocusHere();
+            focus_import_search = false;
+        }
+
         ImGui::InputTextWithHint("##ImportSearch", "Search...", import_search_buffer, sizeof(import_search_buffer));
         ImGui::Separator();
 
@@ -5704,15 +5719,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (ImGui::Checkbox(adv.root_name.c_str(), &adv.is_selected)) {
                     // Handle Shift+Click for range selection of PARENT advancements
                     if (ImGui::GetIO().KeyShift && last_clicked_adv_index != -1) {
-                        int start = std::min((int)i, last_clicked_adv_index);
-                        int end = std::max((int)i, last_clicked_adv_index);
+                        int start = std::min((int) i, last_clicked_adv_index);
+                        int end = std::max((int) i, last_clicked_adv_index);
                         for (int j = start; j <= end; ++j) {
-                           importable_advancements[j].is_selected = adv.is_selected;
-                           if (import_select_criteria) {
-                               for (auto& crit : importable_advancements[j].criteria) {
-                                   crit.is_selected = adv.is_selected;
-                               }
-                           }
+                            importable_advancements[j].is_selected = adv.is_selected;
+                            if (import_select_criteria) {
+                                for (auto &crit: importable_advancements[j].criteria) {
+                                    crit.is_selected = adv.is_selected;
+                                }
+                            }
                         }
                     }
                     // A click on a parent resets the criterion range selection
@@ -5720,8 +5735,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     last_clicked_crit_parent = nullptr;
                     last_clicked_crit_index = -1;
 
-                    if (!adv.is_selected) { // If parent is unchecked, uncheck all its children
-                        for (auto& crit : adv.criteria) {
+                    if (!adv.is_selected) {
+                        // If parent is unchecked, uncheck all its children
+                        for (auto &crit: adv.criteria) {
                             crit.is_selected = false;
                         }
                     }
@@ -5730,16 +5746,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::Indent();
                     // Use an indexed loop to track the criterion index
                     for (size_t j = 0; j < adv.criteria.size(); ++j) {
-                        auto& crit = adv.criteria[j];
+                        auto &crit = adv.criteria[j];
                         if (ImGui::Checkbox(crit.root_name.c_str(), &crit.is_selected)) {
-                            if (crit.is_selected) { // If a child is checked, ensure its parent is checked
+                            if (crit.is_selected) {
+                                // If a child is checked, ensure its parent is checked
                                 adv.is_selected = true;
                             }
 
                             // Handle Shift+Click for range selection of CRITERIA
-                            if (ImGui::GetIO().KeyShift && import_select_criteria && last_clicked_crit_parent == &adv && last_clicked_crit_index != -1) {
-                                int start = std::min((int)j, last_clicked_crit_index);
-                                int end = std::max((int)j, last_clicked_crit_index);
+                            if (ImGui::GetIO().KeyShift && import_select_criteria && last_clicked_crit_parent == &adv &&
+                                last_clicked_crit_index != -1) {
+                                int start = std::min((int) j, last_clicked_crit_index);
+                                int end = std::max((int) j, last_clicked_crit_index);
                                 for (int k = start; k <= end; ++k) {
                                     adv.criteria[k].is_selected = crit.is_selected;
                                 }
