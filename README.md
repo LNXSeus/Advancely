@@ -214,7 +214,7 @@ Massive thanks to all the beta testers. _Message me on discord @lnxseus with pro
 release and you'll be added here:_
 
 * Windows: ethansplace98, Yumeko, zurtletif, 3emis, MoreTrident, PhoenixAUS_, metal_silver1234, 36_Official, me_nx,
-* macOS: Slackow
+* macOS: Slackow, TheDogmaster28
 * Linux: DesktopFolder, ShadowFlower64
 
 ## License
@@ -229,11 +229,13 @@ the copyright holder.
 
 *This project uses dmon by Sepehr Taghdisian, licensed under the BSD 2-Clause License.*
 *This project's user interface is powered by the excellent [Dear ImGui](https://github.com/ocornut/imgui) library.*
-*This project also uses the SDL3 library suite and cJSON. More information can be found in the LICENSES.txt file.*
+*This project also uses the SDL3 library suite and cJSON.
 *This project uses [curl/libcurl](https://curl.se/libcurl) to download the latest update from github.*
 *This project uses the [miniz](https://github.com/mongoose-os-libs/miniz) compression library to unzip the downloaded
 files.*
 *This project uses [tiny file dialogs](https://sourceforge.net/projects/tinyfiledialogs) to open file dialogs.*
+*More information can be found in the LICENSES.txt file.*
+
 *Lots of assistance was provided by Gemini 2.5 Pro.*
 *Minecraft item .png files downloaded from [Minecraft Asset Cloud](https://mcasset.cloud/1.0/) and block renders from
 the [Minecraft Wiki](https://www.minecraft.wiki) (downloaded by [Dogmaster](https://www.twitch.tv/thedogmaster28))*

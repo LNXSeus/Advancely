@@ -825,6 +825,7 @@ bool template_exists(const char *version, const char *category, const char *flag
 }
 
 // Helper to parse a template filename (e.g., "1.16.1_all_advancements_flag.json") into its components.
+// Helper to parse a template filename (e.g., "1.16.1_all_advancements_flag.json") into its components.
 static bool parse_template_filename(const char *filename, char *out_version, char *out_category, char *out_flag) {
     std::string fname_str(filename);
 
@@ -856,18 +857,49 @@ static bool parse_template_filename(const char *filename, char *out_version, cha
     if (remainder.empty() || remainder[0] != '_') return false; // Must have at least a category
     remainder = remainder.substr(1); // Remove leading underscore
 
-    size_t last_underscore = remainder.rfind('_');
-    // Heuristic: If there's an underscore and the part after it is short, it's likely a flag.
-    // This is not perfect but covers most cases. A more robust system would require stricter naming.
-    if (last_underscore != std::string::npos && (remainder.length() - last_underscore) < 10) {
-        std::string cat_part = remainder.substr(0, last_underscore);
-        std::string flag_part = remainder.substr(last_underscore);
-        strncpy(out_category, cat_part.c_str(), MAX_PATH_LENGTH - 1);
-        strncpy(out_flag, flag_part.c_str(), MAX_PATH_LENGTH - 1);
-    } else {
-        strncpy(out_category, remainder.c_str(), MAX_PATH_LENGTH - 1);
-        out_flag[0] = '\0';
+    std::string category_part = remainder;
+    std::string flag_part = "";
+
+    // --- Step 1: Check for a numeric suffix (e.g., "test1", "category_123") ---
+    size_t last_char_pos = category_part.length() - 1;
+    size_t first_digit_pos = std::string::npos;
+
+    // Scan backwards from the end to find where the number starts
+    for (size_t i = last_char_pos; i != std::string::npos; --i) {
+        if (isdigit(category_part[i])) {
+            first_digit_pos = i;
+        } else {
+            break; // Stop at the first non-digit
+        }
+        if (i == 0) break;
     }
+
+    // A numeric suffix was found, and it's not the entire string
+    if (first_digit_pos != std::string::npos && first_digit_pos > 0) {
+        size_t split_pos = first_digit_pos;
+        // Check if the character before the number is an underscore and include it in the flag
+        if (split_pos > 0 && category_part[split_pos - 1] == '_') {
+            split_pos--;
+        }
+        flag_part = category_part.substr(split_pos);
+        category_part = category_part.substr(0, split_pos);
+    } else {
+        // --- Step 2: Fallback to old heuristic for non-numeric flags (e.g., "_optimized") ---
+        size_t last_underscore = category_part.rfind('_');
+        if (last_underscore != std::string::npos) {
+            // A part is considered a flag if it's short
+            if ((category_part.length() - last_underscore) <= 10) {
+                flag_part = category_part.substr(last_underscore);
+                category_part = category_part.substr(0, last_underscore);
+            }
+        }
+    }
+
+    // Assign the final parsed parts
+    strncpy(out_category, category_part.c_str(), MAX_PATH_LENGTH - 1);
+    out_category[MAX_PATH_LENGTH - 1] = '\0';
+    strncpy(out_flag, flag_part.c_str(), MAX_PATH_LENGTH - 1);
+    out_flag[MAX_PATH_LENGTH - 1] = '\0';
 
     return true;
 }
