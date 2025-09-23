@@ -160,6 +160,29 @@ bool execute_import_from_zip(const char *zip_path, const char *version, const ch
 bool handle_export_template(const DiscoveredTemplate &selected_template, const char *version, char *status_message,
                             size_t msg_size);
 
+/**
+* @brief Opens the file explorer and highlights the selected language file.
+* @param version The version string of the parent template.
+* @param category The category of the parent template.
+* @param flag The optional flag of the parent template.
+* @param lang_flag_to_export The language flag of the file to show.
+*/
+void handle_export_language(const char *version, const char *category, const char *flag, const char *lang_flag_to_export);
+
+
+/**
+* @brief Imports a user-selected language file for a template.
+* @param version The version string of the parent template.
+* @param category The category of the parent template.
+* @param flag The optional flag of the parent template.
+* @param source_path The path to the .json file being imported.
+* @param new_lang_flag The new language flag for the destination file.
+* @param error_message A buffer to store any error message.
+* @param error_msg_size The size of the error_message buffer.
+* @return true on success, false on failure.
+*/
+bool execute_import_language_file(const char *version, const char *category, const char *flag, const char *source_path, const char *new_lang_flag, char *error_message, size_t error_msg_size);
+
 #ifdef __cplusplus
 }
 #endif

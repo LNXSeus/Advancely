@@ -1199,6 +1199,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static char copy_template_category[MAX_PATH_LENGTH] = "";
     static char copy_template_flag[MAX_PATH_LENGTH] = "";
 
+    // State for language import
+    static bool show_import_lang_popup = false;
+    static char import_lang_source_path[MAX_PATH_LENGTH] = "";
+    static char import_lang_flag_buffer[64] = "";
+
     // State for the editor view
     static bool editing_template = false;
     static EditorTemplate current_template_data;
@@ -1880,7 +1885,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::SameLine();
 
     // Import Template Button
-        ImGui::BeginDisabled(has_unsaved_changes_in_editor);
+    ImGui::BeginDisabled(has_unsaved_changes_in_editor);
     if (ImGui::Button("Import Template")) {
         auto import_action = [&]() {
             const char *filter_patterns[1] = {"*.zip"};
@@ -1935,11 +1940,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                      "You have unsaved changes in the editor. Save them first.");
         } else {
+            // Legacy _snapshot naming restriction
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Import a template from a file.\n\n"
-                     "Supports two file types:\n"
-                     " • .zip: A full template package, including the main file and all language files.\n"
-                     " • .json: A single template or language file for the currently selected version.");
+                     "Import a template from a .zip file.\n"
+                     "Import a full template package, including the main file and all language files.\n"
+                     "You can then configure the version, category and flag before performing the import.\n"
+                     "For legacy versions a template file cannot end in _snapshot.");
         }
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
@@ -2053,6 +2059,52 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
         ImGui::SetItemDefaultFocus();
+        ImGui::EndPopup();
+    }
+
+    if (show_import_lang_popup) ImGui::OpenPopup("Import Language");
+    if (ImGui::BeginPopupModal("Import Language", &show_import_lang_popup, ImGuiWindowFlags_AlwaysAutoResize)) {
+        static char popup_error_msg[256] = "";
+        const auto& selected = discovered_templates[selected_template_index];
+
+        ImGui::Text("Importing for: '%s%s' for version %s.", selected.category, selected.optional_flag, creator_version_str);
+        ImGui::TextWrapped("Source: %s", import_lang_source_path);
+        ImGui::Separator();
+        ImGui::InputText("New Language Flag", import_lang_flag_buffer, sizeof(import_lang_flag_buffer));
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Enter a flag for the new language (e.g., 'de', 'fr_ca').\nCannot be empty or contain special characters except for underscores, dots, and the %% sign.");
+        }
+
+        if (popup_error_msg[0] != '\0') {
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", popup_error_msg);
+        }
+
+        if (ImGui::Button("Confirm Import", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+            popup_error_msg[0] = '\0'; // Clear previous error
+            if (execute_import_language_file(creator_version_str, selected.category, selected.optional_flag, import_lang_source_path, import_lang_flag_buffer, popup_error_msg, sizeof(popup_error_msg))) {
+                SDL_SetAtomicInt(&g_templates_changed, 1);
+                last_scanned_version[0] = '\0'; // Force rescan
+                ImGui::CloseCurrentPopup();
+                show_import_lang_popup = false;
+            }
+            // On failure, popup_error_msg is set and the modal remains open
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[128];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Press ENTER to confirm the import.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            popup_error_msg[0] = '\0';
+            ImGui::CloseCurrentPopup();
+            show_import_lang_popup = false;
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[128];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Press ESCAPE to cancel the import.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
         ImGui::EndPopup();
     }
 
@@ -2206,7 +2258,54 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && !can_delete) {
             ImGui::SetTooltip("%s", disabled_tooltip);
         }
-    }
+        ImGui::SameLine();
+
+        ImGui::BeginDisabled(has_unsaved_changes_in_editor);
+        if (ImGui::Button("Import Language")) {
+            const char *filter_patterns[1] = {"*.json"};
+            const char *open_path = tinyfd_openFileDialog("Import Language File", "",
+                1, filter_patterns, "JSON files", 0);
+            if (open_path) {
+                strncpy(import_lang_source_path, open_path, sizeof(import_lang_source_path) - 1);
+                import_lang_flag_buffer[0] = '\0'; // Clear buffer for new import
+                show_import_lang_popup = true;
+            }
+        }
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Import a language file (.json) for the selected template '%s%s'.\n"
+                     "Any matching display name entries within the language file will be kept,\n"
+                     "new ones will default to their respective root names.",
+                     selected.category, selected.optional_flag);
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+
+        ImGui::SameLine();
+
+        ImGui::BeginDisabled(selected_lang_index == -1);
+        if (ImGui::Button("Export Language")) {
+            if (selected_lang_index != -1) {
+                const auto &lang_to_export = selected.available_lang_flags[selected_lang_index];
+                handle_export_language(creator_version_str, selected.category, selected.optional_flag,
+                                       lang_to_export.c_str());
+            }
+        }
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            char tooltip_buffer[256];
+            if (selected_lang_index == -1) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a language to export.");
+            } else {
+                const auto &lang_to_export = selected.available_lang_flags[selected_lang_index];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Open the folder containing the language file for '%s' and select it.",
+                         lang_to_export.empty() ? "Default" : lang_to_export.c_str());
+            }
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+    } // End of Language Selector
 
 
     // "Editing Template" Form
@@ -5047,8 +5146,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[256];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select the destination version for the new template.\n"
-                                                             "This version influences certain functionality of the template\n"
-                                                             "and how the tracker reads the game files.");
+                     "This version influences certain functionality of the template\n"
+                     "and how the tracker reads the game files.");
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
         ImGui::InputText("New Category Name", copy_template_category, sizeof(copy_template_category));
@@ -5116,8 +5215,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[256];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select the destination version for the new template.\n"
-                                                             "This version influences certain functionality of the template\n"
-                                                             "and how the tracker reads the game files.");
+                     "This version influences certain functionality of the template\n"
+                     "and how the tracker reads the game files.");
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
         ImGui::InputText("Category Name", import_category, sizeof(import_category));
@@ -5157,20 +5256,23 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     save_message_type = MSG_ERROR;
                 } else if (version_enum <= MC_VERSION_1_6_4 && ends_with(combined_name, "_snapshot")) {
                     // BLOCKING _snapshot for legacy versions
-                    snprintf(status_message, sizeof(status_message), "Error: Template name cannot end with '_snapshot' for legacy versions.");
+                    snprintf(status_message, sizeof(status_message),
+                             "Error: Template name cannot end with '_snapshot' for legacy versions.");
                     save_message_type = MSG_ERROR;
                 } else {
-                    if (execute_import_from_zip(import_zip_path, version_str, import_category, import_flag, status_message,
+                    if (execute_import_from_zip(import_zip_path, version_str, import_category, import_flag,
+                                                status_message,
                                                 sizeof(status_message))) {
                         // SUCCESS!
-                        snprintf(status_message, sizeof(status_message), "Template imported to version %s!", version_str);
+                        snprintf(status_message, sizeof(status_message), "Template imported to version %s!",
+                                 version_str);
                         show_import_confirmation_view = false;
                         // Switch UI to the newly imported version
                         strncpy(creator_version_str, version_str, sizeof(creator_version_str) - 1);
                         creator_version_idx = import_version_idx;
                         SDL_SetAtomicInt(&g_templates_changed, 1);
                         last_scanned_version[0] = '\0'; // Force rescan
-                                                }
+                    }
                     save_message_type = MSG_ERROR; // Show status message (will be an error on failure)
                 }
             }

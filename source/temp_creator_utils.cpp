@@ -3,7 +3,7 @@
 //
 
 #include <cstdio>
-#include <cstdlib> // For free()
+#include <cstdlib> // For free() and system()
 #include <cstring>
 #include <sys/stat.h> // For stat and mkdir
 #include <cctype> // For isalnum
@@ -11,7 +11,7 @@
 #include "temp_creator_utils.h"
 #include "logger.h"
 #include "file_utils.h"
-#include "path_utils.h" // For path_exists
+#include "path_utils.h" // For path_exists and get_parent_directory
 #include "main.h" // For MAX_PATH_LENGTH
 #include "template_scanner.h"
 #include "file_utils.h" // For cJSON_from_file
@@ -1033,4 +1033,68 @@ bool execute_import_from_zip(const char *zip_path, const char *version, const ch
 
     mz_zip_reader_end(&zip_archive);
     return success;
+}
+
+void handle_export_language(const char *version, const char *category, const char *flag, const char *lang_flag_to_export) {
+    char base_path[MAX_PATH_LENGTH];
+    construct_template_base_path(version, category, flag, base_path, sizeof(base_path));
+
+    char lang_path[MAX_PATH_LENGTH];
+    if (lang_flag_to_export[0] == '\0') {
+        snprintf(lang_path, sizeof(lang_path), "%s_lang.json", base_path);
+    } else {
+        snprintf(lang_path, sizeof(lang_path), "%s_lang_%s.json", base_path, lang_flag_to_export);
+    }
+
+    char command[MAX_PATH_LENGTH + 64];
+#ifdef _WIN32
+    path_to_windows_native(lang_path);
+    snprintf(command, sizeof(command), "explorer /select,\"%s\"", lang_path);
+#elif __APPLE__
+    snprintf(command, sizeof(command), "open -R \"%s\"", lang_path);
+#else // POSIX
+    // Highlighting a file isn't a standard feature, so we open the parent directory.
+    char parent_dir[MAX_PATH_LENGTH];
+    if (get_parent_directory(lang_path, parent_dir, sizeof(parent_dir), 1)) {
+        snprintf(command, sizeof(command), "xdg-open \"%s\"", parent_dir);
+    } else {
+        // Fallback if getting parent fails
+        snprintf(command, sizeof(command), "xdg-open .");
+    }
+#endif
+    system(command);
+}
+
+
+bool execute_import_language_file(const char *version, const char *category, const char *flag, const char *source_path, const char *new_lang_flag, char *error_message, size_t error_msg_size) {
+    // 1. Validate new_lang_flag
+    if (!new_lang_flag || new_lang_flag[0] == '\0') {
+        snprintf(error_message, error_msg_size, "Error: New language flag cannot be empty.");
+        return false;
+    }
+    if (!is_valid_filename_part(new_lang_flag)) {
+        snprintf(error_message, error_msg_size, "Error: New language flag contains invalid characters.");
+        return false;
+    }
+
+    // 2. Construct destination path and check for collision
+    char base_path[MAX_PATH_LENGTH];
+    construct_template_base_path(version, category, flag, base_path, sizeof(base_path));
+
+    char dest_path[MAX_PATH_LENGTH];
+    snprintf(dest_path, sizeof(dest_path), "%s_lang_%s.json", base_path, new_lang_flag);
+
+    if (path_exists(dest_path)) {
+        snprintf(error_message, error_msg_size, "Error: A language file with the flag '%s' already exists for this template.", new_lang_flag);
+        return false;
+    }
+
+    // 3. Copy the file
+    if (!fs_copy_file(source_path, dest_path)) {
+        snprintf(error_message, error_msg_size, "Error: Failed to copy the language file.");
+        return false;
+    }
+
+    log_message(LOG_INFO, "[TEMP CREATE UTILS] Imported language file from '%s' to '%s'\n", source_path, dest_path);
+    return true;
 }
