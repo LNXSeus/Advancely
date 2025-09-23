@@ -5797,6 +5797,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", import_error_message);
         }
 
+        // --- Count selected items to display next to the buttons ---
+        int selected_adv_count = 0;
+        int selected_crit_count = 0;
+        for (const auto& adv : importable_advancements) {
+            if (adv.is_selected) {
+                selected_adv_count++;
+            }
+            for (const auto& crit : adv.criteria) {
+                if (crit.is_selected) {
+                    selected_crit_count++;
+                }
+            }
+        }
+
         if (ImGui::Button("Confirm Import", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
             import_error_message[0] = '\0'; // Clear previous error
             bool has_duplicates = false;
@@ -5874,6 +5888,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             );
             ImGui::SetTooltip("%s", import_advancements_tooltip_buffer);
         }
+
+        // --- Display the counters, aligned to the right ---
+        ImGui::SameLine();
+        char counter_text[128];
+        snprintf(counter_text, sizeof(counter_text), "Selected: %d Advancements, %d Criteria", selected_adv_count, selected_crit_count);
+
+        // Calculate position to right-align the text
+        float text_width = ImGui::CalcTextSize(counter_text).x;
+        ImGui::SetCursorPosX(ImGui::GetWindowWidth() - text_width - ImGui::GetStyle().WindowPadding.x);
+        ImGui::Text("%s", counter_text);
+
         ImGui::EndPopup();
     }
 
