@@ -13,6 +13,29 @@
 extern "C" {
 #endif
 
+// Helper structs for the import feature
+struct ImportableCriterion {
+    std::string root_name;
+    bool is_selected = false;
+};
+
+struct ImportableAdvancement {
+    std::string root_name;
+    bool is_done = false;
+    bool is_selected = false;
+    std::vector<ImportableCriterion> criteria;
+};
+
+/**
+ * @brief Parses a player's advancements.json file into a structure suitable for the import UI.
+ * @param file_path The path to the player's advancements.json file.
+ * @param out_advancements A vector to be populated with the parsed advancements.
+ * @param error_message A buffer to store an error message on failure.
+ * @param error_msg_size The size of the error_message buffer.
+ * @return true on success, false on failure.
+ */
+bool parse_player_advancements_for_import(const char* file_path, std::vector<ImportableAdvancement>& out_advancements, char* error_message, size_t error_msg_size);
+
 /**
  * @brief Ensures that the directory for a given file path exists, creating it if necessary.
  * This function is cross-platform.

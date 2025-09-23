@@ -33,6 +33,47 @@
 #include <unistd.h> // For rmdir()
 #endif
 
+bool parse_player_advancements_for_import(const char *file_path, std::vector<ImportableAdvancement> &out_advancements,
+                                          char *error_message, size_t error_msg_size) {
+    out_advancements.clear();
+
+    cJSON *root = cJSON_from_file(file_path);
+    if (!root) {
+        snprintf(error_message, error_msg_size, "Error: Could not read or parse the selected JSON file.");
+        return false;
+    }
+
+    cJSON *advancement_json = nullptr;
+    cJSON_ArrayForEach(advancement_json, root) {
+        if (!advancement_json->string) continue;
+
+        // Add this check to ignore the DataVersion entry
+        if (strcmp(advancement_json->string, "DataVersion") == 0) {
+            continue;
+        }
+
+        ImportableAdvancement new_adv;
+        new_adv.root_name = advancement_json->string;
+
+        cJSON *done_item = cJSON_GetObjectItem(advancement_json, "done");
+        new_adv.is_done = cJSON_IsTrue(done_item);
+
+        cJSON *criteria_obj = cJSON_GetObjectItem(advancement_json, "criteria");
+        if (criteria_obj) {
+            cJSON *criterion_json = nullptr;
+            cJSON_ArrayForEach(criterion_json, criteria_obj) {
+                if (criterion_json->string) {
+                    new_adv.criteria.push_back({criterion_json->string, false});
+                }
+            }
+        }
+        out_advancements.push_back(new_adv);
+    }
+
+    cJSON_Delete(root);
+    return true;
+}
+
 // Helper to convert version string "1.16.1" to "1_16_1" for filename construction
 static void version_to_filename_format(const char *version_in, char *version_out, size_t max_len) {
     strncpy(version_out, version_in, max_len - 1);
@@ -954,7 +995,7 @@ bool execute_import_from_zip(const char *zip_path, const char *version, const ch
     char new_filename_part[MAX_PATH_LENGTH];
     snprintf(new_filename_part, sizeof(new_filename_part), "%s_%s%s", version_filename, category, flag);
 
-    DiscoveredTemplate* templates = nullptr;
+    DiscoveredTemplate *templates = nullptr;
     int count = 0;
     scan_for_templates(version, &templates, &count);
     bool exists = false;
@@ -1010,12 +1051,12 @@ bool execute_import_from_zip(const char *zip_path, const char *version, const ch
         if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat) || file_stat.m_is_directory) continue;
 
         char new_filename[MAX_PATH_LENGTH];
-        const char* original_filename = file_stat.m_filename;
+        const char *original_filename = file_stat.m_filename;
         size_t old_base_len = strlen(old_base_filename);
 
         // Check if the file matches the old template structure for renaming
         if (strncmp(original_filename, old_base_filename, old_base_len) == 0) {
-            const char* suffix = original_filename + old_base_len;
+            const char *suffix = original_filename + old_base_len;
             snprintf(new_filename, sizeof(new_filename), "%s%s", new_base_filename, suffix);
         } else {
             // Not a core template file, extract with original name to preserve any extra files
@@ -1035,7 +1076,8 @@ bool execute_import_from_zip(const char *zip_path, const char *version, const ch
     return success;
 }
 
-void handle_export_language(const char *version, const char *category, const char *flag, const char *lang_flag_to_export) {
+void handle_export_language(const char *version, const char *category, const char *flag,
+                            const char *lang_flag_to_export) {
     char base_path[MAX_PATH_LENGTH];
     construct_template_base_path(version, category, flag, base_path, sizeof(base_path));
 
@@ -1066,7 +1108,8 @@ void handle_export_language(const char *version, const char *category, const cha
 }
 
 
-bool execute_import_language_file(const char *version, const char *category, const char *flag, const char *source_path, const char *new_lang_flag, char *error_message, size_t error_msg_size) {
+bool execute_import_language_file(const char *version, const char *category, const char *flag, const char *source_path,
+                                  const char *new_lang_flag, char *error_message, size_t error_msg_size) {
     // 1. Validate new_lang_flag
     if (!new_lang_flag || new_lang_flag[0] == '\0') {
         snprintf(error_message, error_msg_size, "Error: New language flag cannot be empty.");
@@ -1085,7 +1128,8 @@ bool execute_import_language_file(const char *version, const char *category, con
     snprintf(dest_path, sizeof(dest_path), "%s_lang_%s.json", base_path, new_lang_flag);
 
     if (path_exists(dest_path)) {
-        snprintf(error_message, error_msg_size, "Error: A language file with the flag '%s' already exists for this template.", new_lang_flag);
+        snprintf(error_message, error_msg_size,
+                 "Error: A language file with the flag '%s' already exists for this template.", new_lang_flag);
         return false;
     }
 

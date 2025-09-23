@@ -1249,6 +1249,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static char import_category[MAX_PATH_LENGTH] = "";
     static char import_flag[MAX_PATH_LENGTH] = "";
 
+    // Imports from world file
+    // advancements
+    static bool show_import_advancements_popup = false;
+    static std::vector<ImportableAdvancement> importable_advancements;
+    static char import_error_message[256] = "";
+
     // --- Version-dependent labels ---
     MC_Version creator_selected_version = settings_get_version_from_string(creator_version_str);
 
@@ -2065,14 +2071,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     if (show_import_lang_popup) ImGui::OpenPopup("Import Language");
     if (ImGui::BeginPopupModal("Import Language", &show_import_lang_popup, ImGuiWindowFlags_AlwaysAutoResize)) {
         static char popup_error_msg[256] = "";
-        const auto& selected = discovered_templates[selected_template_index];
+        const auto &selected = discovered_templates[selected_template_index];
 
-        ImGui::Text("Importing for: '%s%s' for version %s.", selected.category, selected.optional_flag, creator_version_str);
+        ImGui::Text("Importing for: '%s%s' for version %s.", selected.category, selected.optional_flag,
+                    creator_version_str);
         ImGui::TextWrapped("Source: %s", import_lang_source_path);
         ImGui::Separator();
         ImGui::InputText("New Language Flag", import_lang_flag_buffer, sizeof(import_lang_flag_buffer));
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Enter a flag for the new language (e.g., 'de', 'fr_ca').\nCannot be empty or contain special characters except for underscores, dots, and the %% sign.");
+            ImGui::SetTooltip(
+                "Enter a flag for the new language (e.g., 'de', 'fr_ca').\nCannot be empty or contain special characters except for underscores, dots, and the %% sign.");
         }
 
         if (popup_error_msg[0] != '\0') {
@@ -2081,7 +2089,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         if (ImGui::Button("Confirm Import", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
             popup_error_msg[0] = '\0'; // Clear previous error
-            if (execute_import_language_file(creator_version_str, selected.category, selected.optional_flag, import_lang_source_path, import_lang_flag_buffer, popup_error_msg, sizeof(popup_error_msg))) {
+            if (execute_import_language_file(creator_version_str, selected.category, selected.optional_flag,
+                                             import_lang_source_path, import_lang_flag_buffer, popup_error_msg,
+                                             sizeof(popup_error_msg))) {
                 SDL_SetAtomicInt(&g_templates_changed, 1);
                 last_scanned_version[0] = '\0'; // Force rescan
                 ImGui::CloseCurrentPopup();
@@ -2110,7 +2120,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     // --- Open World Folder Button (Right-Aligned) ---
     const char *world_folder_text = "Open World Folder";
-    float world_folder_button_width = ImGui::CalcTextSize(world_folder_text).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    float world_folder_button_width = ImGui::CalcTextSize(world_folder_text).x + ImGui::GetStyle().FramePadding.x *
+                                      2.0f;
 
     // --- Help Button (Right-Aligned) ---
     const char *help_text = "Help";
@@ -2154,7 +2165,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 #endif
             system(command);
         } else {
-            log_message(LOG_ERROR, "[TEMP CREATOR] Could not open world folder, path does not exist: %s\n", path_to_open);
+            log_message(LOG_ERROR, "[TEMP CREATOR] Could not open world folder, path does not exist: %s\n",
+                        path_to_open);
         }
     }
     ImGui::EndDisabled();
@@ -2184,7 +2196,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                          "   with your completed advancements and recipes.\n"
                          " • The 'stats' folder, containing a '.json' file with your statistics.\n"
                          " • The 'unlocks' folder, containing a '.json' file with your obtained unlocks.");
-            } else { // Modern versions
+            } else {
+                // Modern versions
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Opens the folder for the current world.\n\n"
                          "Within this folder you can find:\n"
@@ -2348,7 +2361,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::Button("Import Language")) {
             const char *filter_patterns[1] = {"*.json"};
             const char *open_path = tinyfd_openFileDialog("Import Language File", "",
-                1, filter_patterns, "JSON files", 0);
+                                                          1, filter_patterns, "JSON files", 0);
             if (open_path) {
                 strncpy(import_lang_source_path, open_path, sizeof(import_lang_source_path) - 1);
                 import_lang_flag_buffer[0] = '\0'; // Clear buffer for new import
@@ -2581,6 +2594,35 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::BeginChild("AdvancementListPane", ImVec2(pane_width, 0), true);
 
                 // LEFT PANE: List of Advancements/Achievements
+
+                // Import advancements/achievements on its own line
+                char import_button_label[64];
+                snprintf(import_button_label, sizeof(import_button_label), "Import %s",
+                         advancements_label_plural_upper);
+                if (ImGui::Button(import_button_label)) {
+                    char start_path[MAX_PATH_LENGTH];
+                    snprintf(start_path, sizeof(start_path), "%s/%s/advancements/", t->saves_path, t->world_name);
+
+                    const char *filter_patterns[1] = {"*.json"};
+                    const char *selection = tinyfd_openFileDialog("Select Player Advancements File", start_path, 1,
+                                                                  filter_patterns, "JSON files", 0);
+
+                    if (selection) {
+                        import_error_message[0] = '\0';
+                        if (parse_player_advancements_for_import(selection, importable_advancements,
+                                                                 import_error_message, sizeof(import_error_message))) {
+                            show_import_advancements_popup = true;
+                        } else {
+                            // If parsing fails, show the error in the main status message
+                            save_message_type = MSG_ERROR;
+                            strncpy(status_message, import_error_message, sizeof(status_message) - 1);
+                        }
+                    }
+                }
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("Import advancements and recipes directly from a world's player data file.");
+                }
+
                 char button_label[64];
                 snprintf(button_label, sizeof(button_label), "Add New %s", advancements_label_upper);
                 if (ImGui::Button(button_label)) {
@@ -5552,6 +5594,129 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     }
 
     ImGui::EndChild();
+
+    // Import Advancement Popup Logic
+    if (show_import_advancements_popup) {
+        ImGui::OpenPopup("Import Advancements from File");
+    }
+    if (ImGui::BeginPopupModal("Import Advancements from File", &show_import_advancements_popup,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        if (importable_advancements.empty()) {
+            ImGui::Text("No advancements found in the selected file.");
+        } else {
+            ImGui::BeginChild("ImporterScrollingRegion", ImVec2(600, 400), true);
+            for (auto &adv: importable_advancements) {
+                // Push a unique ID for this advancement and its children.
+                // This resolves the conflicting ID error for criteria with the same name.
+                ImGui::PushID(adv.root_name.c_str());
+
+                if (ImGui::Checkbox(adv.root_name.c_str(), &adv.is_selected)) {
+                    // If an advancement is unchecked, uncheck all its children
+                    if (!adv.is_selected) {
+                        for (auto &crit: adv.criteria) {
+                            crit.is_selected = false;
+                        }
+                    }
+                }
+                if (!adv.criteria.empty()) {
+                    ImGui::Indent();
+                    for (auto &crit: adv.criteria) {
+                        if (ImGui::Checkbox(crit.root_name.c_str(), &crit.is_selected)) {
+                            // If a criterion is checked, its parent must also be checked
+                            if (crit.is_selected) {
+                                adv.is_selected = true;
+                            }
+                        }
+                    }
+                    ImGui::Unindent();
+                }
+                // Pop the ID to keep the ID stack clean for the next item.
+                ImGui::PopID();
+            }
+            ImGui::EndChild();
+        }
+
+        if (import_error_message[0] != '\0') {
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", import_error_message);
+        }
+
+        if (ImGui::Button("Confirm Import", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+            import_error_message[0] = '\0'; // Clear previous error
+            bool has_duplicates = false;
+
+            // 1. Check for duplicate root names before importing
+            std::unordered_set<std::string> existing_names;
+            for (const auto &existing_adv: current_template_data.advancements) {
+                existing_names.insert(existing_adv.root_name);
+            }
+            for (const auto &new_adv: importable_advancements) {
+                if (new_adv.is_selected && existing_names.count(new_adv.root_name)) {
+                    snprintf(import_error_message, sizeof(import_error_message),
+                             "Error: Advancement '%s' already exists in the template.", new_adv.root_name.c_str());
+                    has_duplicates = true;
+                    break;
+                }
+            }
+
+            // 2. If no duplicates, proceed with import
+            if (!has_duplicates) {
+                for (const auto &new_adv: importable_advancements) {
+                    if (new_adv.is_selected) {
+                        EditorTrackableCategory imported_cat = {};
+                        strncpy(imported_cat.root_name, new_adv.root_name.c_str(), sizeof(imported_cat.root_name) - 1);
+                        strncpy(imported_cat.display_name, new_adv.root_name.c_str(),
+                                sizeof(imported_cat.display_name) - 1); // Default display name
+                        strncpy(imported_cat.icon_path, "blocks/placeholder.png", sizeof(imported_cat.icon_path) - 1);
+
+                        // Rule C: Check for recipes
+                        if (new_adv.root_name.find(":recipes/") != std::string::npos) {
+                            imported_cat.is_recipe = true;
+                        }
+
+                        // Rules A & B: Determine if criteria should be added
+                        bool is_simple = new_adv.is_done && new_adv.criteria.size() == 1;
+                        if (!is_simple) {
+                            for (const auto &new_crit: new_adv.criteria) {
+                                if (new_crit.is_selected) {
+                                    EditorTrackableItem imported_crit = {};
+                                    strncpy(imported_crit.root_name, new_crit.root_name.c_str(),
+                                            sizeof(imported_crit.root_name) - 1);
+                                    strncpy(imported_crit.display_name, new_crit.root_name.c_str(),
+                                            sizeof(imported_crit.display_name) - 1);
+                                    strncpy(imported_crit.icon_path, "blocks/placeholder.png",
+                                            sizeof(imported_crit.icon_path) - 1);
+                                    imported_cat.criteria.push_back(imported_crit);
+                                }
+                            }
+                        }
+                        current_template_data.advancements.push_back(imported_cat);
+                    }
+                }
+                show_import_advancements_popup = false;
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            char import_advancements_tooltip_buffer[512];
+            snprintf(import_advancements_tooltip_buffer, sizeof(import_advancements_tooltip_buffer),
+                     "You can also press ENTER.\n"
+                     "Import selected advancements/recipes and their criteria.");
+            ImGui::SetTooltip("%s", import_advancements_tooltip_buffer);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            import_error_message[0] = '\0';
+            show_import_advancements_popup = false;
+        }
+        if (ImGui::IsItemHovered()) {
+            char import_advancements_tooltip_buffer[512];
+            snprintf(import_advancements_tooltip_buffer, sizeof(import_advancements_tooltip_buffer),
+                     "You can also press ESCAPE.\n"
+                     "Cancel the import."
+            );
+            ImGui::SetTooltip("%s", import_advancements_tooltip_buffer);
+        }
+        ImGui::EndPopup();
+    }
 
     if (roboto_font) {
         ImGui::PopFont();
