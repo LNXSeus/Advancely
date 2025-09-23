@@ -458,12 +458,12 @@ bool delete_template_files(const char *version, const char *category, const char
 
     if (h_find != INVALID_HANDLE_VALUE) {
         do {
-            const char* filename = find_data.cFileName;
+            const char *filename = find_data.cFileName;
             size_t base_len = strlen(base_filename);
 
             // Check if the filename starts with the exact base name
             if (strncmp(filename, base_filename, base_len) == 0) {
-                const char* suffix = filename + base_len;
+                const char *suffix = filename + base_len;
                 // Now check if the suffix is one of the valid ones for a template file
                 if (strcmp(suffix, ".json") == 0 ||
                     strcmp(suffix, "_snapshot.json") == 0 ||
@@ -691,8 +691,7 @@ static bool create_zip_from_template(const char *output_zip_path, const Discover
     }
 
     char version_filename[64];
-    strncpy(version_filename, version, sizeof(version_filename) - 1);
-    for (char *p = version_filename; *p; p++) { if (*p == '.') *p = '_'; }
+    version_to_filename_format(version, version_filename, sizeof(version_filename));
 
     char base_filename[MAX_PATH_LENGTH];
     snprintf(base_filename, sizeof(base_filename), "%s_%s%s", version_filename, template_info.category,
@@ -706,23 +705,33 @@ static bool create_zip_from_template(const char *output_zip_path, const Discover
 
 #ifdef _WIN32
     char search_path[MAX_PATH_LENGTH];
-    snprintf(search_path, sizeof(search_path), "%s\\%s*.json", category_path, base_filename);
+    snprintf(search_path, sizeof(search_path), "%s\\*", category_path); // Broad search first
     WIN32_FIND_DATAA find_data;
     HANDLE h_find = FindFirstFileA(search_path, &find_data);
 
     if (h_find != INVALID_HANDLE_VALUE) {
         do {
-            char full_path[MAX_PATH_LENGTH];
-            snprintf(full_path, sizeof(full_path), "%s/%s", category_path, find_data.cFileName);
+            const char *filename = find_data.cFileName;
+            size_t base_len = strlen(base_filename);
 
-            if (mz_zip_writer_add_file(&zip_archive, find_data.cFileName, full_path, nullptr, 0,
-                                       MZ_DEFAULT_COMPRESSION)) {
-                file_added = true;
-            } else {
-                snprintf(status_message, msg_size, "Error: Failed to add '%s' to zip.", find_data.cFileName);
-                mz_zip_writer_end(&zip_archive);
-                FindClose(h_find);
-                return false;
+            // Check if the filename starts with the exact base name
+            if (strncmp(filename, base_filename, base_len) == 0) {
+                const char *suffix = filename + base_len;
+                // Now check if the suffix is one of the valid ones for a template file
+                if (strcmp(suffix, ".json") == 0 ||
+                    strncmp(suffix, "_lang", 5) == 0) // Catches _lang.json and _lang_*.json
+                {
+                    char full_path[MAX_PATH_LENGTH];
+                    snprintf(full_path, sizeof(full_path), "%s/%s", category_path, filename);
+                    if (mz_zip_writer_add_file(&zip_archive, filename, full_path, nullptr, 0, MZ_DEFAULT_COMPRESSION)) {
+                        file_added = true;
+                    } else {
+                        snprintf(status_message, msg_size, "Error: Failed to add '%s' to zip.", filename);
+                        mz_zip_writer_end(&zip_archive);
+                        FindClose(h_find);
+                        return false;
+                    }
+                }
             }
         } while (FindNextFileA(h_find, &find_data) != 0);
         FindClose(h_find);
@@ -732,18 +741,30 @@ static bool create_zip_from_template(const char *output_zip_path, const Discover
     if (dir) {
         struct dirent* entry;
         while ((entry = readdir(dir)) != nullptr) {
-            // Check if it's a file, matches the base name, and is a .json
-            if (entry->d_type == DT_REG && strncmp(entry->d_name, base_filename, strlen(base_filename)) == 0 && strstr(entry->d_name, ".json")) {
-                char full_path[MAX_PATH_LENGTH];
-                snprintf(full_path, sizeof(full_path), "%s/%s", category_path, entry->d_name);
+            // Check if it's a file
+            if (entry->d_type == DT_REG) {
+                const char* filename = entry->d_name;
+                size_t base_len = strlen(base_filename);
 
-                if (mz_zip_writer_add_file(&zip_archive, entry->d_name, full_path, nullptr, 0, MZ_DEFAULT_COMPRESSION)) {
-                    file_added = true;
-                } else {
-                    snprintf(status_message, msg_size, "Error: Failed to add '%s' to zip.", entry->d_name);
-                    mz_zip_writer_end(&zip_archive);
-                    closedir(dir);
-                    return false;
+                // Check if the filename starts with the exact base name
+                if (strncmp(filename, base_filename, base_len) == 0) {
+                    const char* suffix = filename + base_len;
+                    // Now check if the suffix is one of the valid ones for a template file
+                    if (strcmp(suffix, ".json") == 0 ||
+                        strncmp(suffix, "_lang", 5) == 0) // Catches _lang.json and _lang_*.json
+                    {
+                        char full_path[MAX_PATH_LENGTH];
+                        snprintf(full_path, sizeof(full_path), "%s/%s", category_path, filename);
+
+                        if (mz_zip_writer_add_file(&zip_archive, filename, full_path, nullptr, 0, MZ_DEFAULT_COMPRESSION)) {
+                            file_added = true;
+                        } else {
+                            snprintf(status_message, msg_size, "Error: Failed to add '%s' to zip.", filename);
+                            mz_zip_writer_end(&zip_archive);
+                            closedir(dir);
+                            return false;
+                        }
+                    }
                 }
             }
         }
@@ -787,8 +808,8 @@ bool handle_export_template(const DiscoveredTemplate &selected_template, const c
 }
 
 // Helper function to check if a template with a given name already exists.
-bool template_exists(const char* version, const char* category, const char* flag) {
-    DiscoveredTemplate* templates = nullptr;
+bool template_exists(const char *version, const char *category, const char *flag) {
+    DiscoveredTemplate *templates = nullptr;
     int count = 0;
     scan_for_templates(version, &templates, &count);
     bool exists = false;
@@ -850,7 +871,8 @@ static bool parse_template_filename(const char *filename, char *out_version, cha
     return true;
 }
 
-bool get_info_from_zip(const char* zip_path, char* out_version, char* out_category, char* out_flag, char* error_message, size_t msg_size) {
+bool get_info_from_zip(const char *zip_path, char *out_version, char *out_category, char *out_flag, char *error_message,
+                       size_t msg_size) {
     mz_zip_archive zip_archive = {};
     if (!mz_zip_reader_init_file(&zip_archive, zip_path, 0)) {
         snprintf(error_message, msg_size, "Error: Could not read zip file.");
@@ -862,7 +884,8 @@ bool get_info_from_zip(const char* zip_path, char* out_version, char* out_catego
     for (mz_uint i = 0; i < num_files; i++) {
         mz_zip_archive_file_stat file_stat;
         if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) continue;
-        if (!file_stat.m_is_directory && strstr(file_stat.m_filename, ".json") && !strstr(file_stat.m_filename, "_lang")) {
+        if (!file_stat.m_is_directory && strstr(file_stat.m_filename, ".json") && !
+            strstr(file_stat.m_filename, "_lang")) {
             if (main_template_filename[0] != '\0') {
                 snprintf(error_message, msg_size, "Error: Zip file contains multiple main template files.");
                 mz_zip_reader_end(&zip_archive);
@@ -875,19 +898,23 @@ bool get_info_from_zip(const char* zip_path, char* out_version, char* out_catego
     mz_zip_reader_end(&zip_archive);
 
     if (main_template_filename[0] == '\0') {
-        snprintf(error_message, msg_size, "Error: Zip file does not contain a main template file (e.g., ..._all_advancements.json).");
+        snprintf(error_message, msg_size,
+                 "Error: Zip file does not contain a main template file (e.g., ..._all_advancements.json).");
         return false;
     }
 
     if (!parse_template_filename(main_template_filename, out_version, out_category, out_flag)) {
-        snprintf(error_message, msg_size, "Error: Could not parse template name from '%s'. Filename must be in '<VERSION>_<CATEGORY><FLAG>.json' format.", main_template_filename);
+        snprintf(error_message, msg_size,
+                 "Error: Could not parse template name from '%s'. Filename must be in '<VERSION>_<CATEGORY><FLAG>.json' format.",
+                 main_template_filename);
         return false;
     }
 
     return true;
 }
 
-bool execute_import_from_zip(const char* zip_path, const char* version, const char* category, const char* flag, char* error_message, size_t msg_size) {
+bool execute_import_from_zip(const char *zip_path, const char *version, const char *category, const char *flag,
+                             char *error_message, size_t msg_size) {
     // Final validation before extracting
     char version_filename[64];
     version_to_filename_format(version, version_filename, sizeof(version_filename));
@@ -918,6 +945,21 @@ bool execute_import_from_zip(const char* zip_path, const char* version, const ch
         return false;
     }
 
+
+    // --- Get original template info from zip to construct old base filename ---
+    char old_version[64], old_category[MAX_PATH_LENGTH], old_flag[MAX_PATH_LENGTH];
+    if (!get_info_from_zip(zip_path, old_version, old_category, old_flag, error_message, msg_size)) {
+        return false; // Should not happen as it's checked before, but for robustness
+    }
+    char old_version_filename[64];
+    version_to_filename_format(old_version, old_version_filename, sizeof(old_version_filename));
+    char old_base_filename[MAX_PATH_LENGTH];
+    snprintf(old_base_filename, sizeof(old_base_filename), "%s_%s%s", old_version_filename, old_category, old_flag);
+
+    // --- Construct new base filename from user's confirmed details ---
+    char new_base_filename[MAX_PATH_LENGTH];
+    snprintf(new_base_filename, sizeof(new_base_filename), "%s_%s%s", version_filename, category, flag);
+
     char dest_dir[MAX_PATH_LENGTH];
     snprintf(dest_dir, sizeof(dest_dir), "%s/templates/%s/%s/", get_resources_path(), version, category);
     fs_ensure_directory_exists(dest_dir);
@@ -934,10 +976,23 @@ bool execute_import_from_zip(const char* zip_path, const char* version, const ch
         mz_zip_archive_file_stat file_stat;
         if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat) || file_stat.m_is_directory) continue;
 
+        char new_filename[MAX_PATH_LENGTH];
+        const char* original_filename = file_stat.m_filename;
+        size_t old_base_len = strlen(old_base_filename);
+
+        // Check if the file matches the old template structure for renaming
+        if (strncmp(original_filename, old_base_filename, old_base_len) == 0) {
+            const char* suffix = original_filename + old_base_len;
+            snprintf(new_filename, sizeof(new_filename), "%s%s", new_base_filename, suffix);
+        } else {
+            // Not a core template file, extract with original name to preserve any extra files
+            strncpy(new_filename, original_filename, sizeof(new_filename) - 1);
+        }
+
         char dest_path[MAX_PATH_LENGTH];
-        snprintf(dest_path, sizeof(dest_path), "%s%s", dest_dir, file_stat.m_filename);
+        snprintf(dest_path, sizeof(dest_path), "%s%s", dest_dir, new_filename);
         if (!mz_zip_reader_extract_to_file(&zip_archive, i, dest_path, 0)) {
-            snprintf(error_message, msg_size, "Error: Failed to extract '%s'.", file_stat.m_filename);
+            snprintf(error_message, msg_size, "Error: Failed to extract '%s'.", original_filename);
             success = false;
             break;
         }
@@ -946,79 +1001,3 @@ bool execute_import_from_zip(const char* zip_path, const char* version, const ch
     mz_zip_reader_end(&zip_archive);
     return success;
 }
-
-// TODO: Remove
-// // Handles importing a full template from a .zip file
-// static const char* import_template_from_zip(const char* zip_path, char* status_message, size_t msg_size) {
-//     static char imported_version[64];
-//     mz_zip_archive zip_archive = {};
-//     if (!mz_zip_reader_init_file(&zip_archive, zip_path, 0)) {
-//         snprintf(status_message, msg_size, "Error: Could not read zip file.");
-//         return nullptr;
-//     }
-//
-//     // First, find the main template file inside the zip to get its info
-//     char main_template_filename[MAX_PATH_LENGTH] = "";
-//     mz_uint num_files = mz_zip_reader_get_num_files(&zip_archive);
-//     for (mz_uint i = 0; i < num_files; i++) {
-//         mz_zip_archive_file_stat file_stat;
-//         if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) continue;
-//         if (!file_stat.m_is_directory && strstr(file_stat.m_filename, ".json") && !strstr(file_stat.m_filename, "_lang")) {
-//             if (main_template_filename[0] != '\0') {
-//                 snprintf(status_message, msg_size, "Error: Zip file contains multiple main template files.");
-//                 mz_zip_reader_end(&zip_archive);
-//                 return nullptr;
-//             }
-//             strncpy(main_template_filename, file_stat.m_filename, sizeof(main_template_filename) - 1);
-//         }
-//     }
-//
-//     if (main_template_filename[0] == '\0') {
-//         snprintf(status_message, msg_size, "Error: Zip file does not contain a main template .json file.");
-//         mz_zip_reader_end(&zip_archive);
-//         return nullptr;
-//     }
-//
-//     char version[64], category[MAX_PATH_LENGTH], flag[MAX_PATH_LENGTH];
-//     if (!parse_template_filename(main_template_filename, version, category, flag)) {
-//         snprintf(status_message, msg_size, "Error: Could not parse template name from '%s'.", main_template_filename);
-//         mz_zip_reader_end(&zip_archive);
-//         return nullptr;
-//     }
-//
-//     // Check for name collision at destination
-//     if (template_exists(version, category, flag)) {
-//         snprintf(status_message, msg_size, "Error: A template with this name already exists for version %s.", version);
-//         mz_zip_reader_end(&zip_archive);
-//         return nullptr;
-//     }
-//
-//     // All checks passed, proceed with extraction
-//     char dest_dir[MAX_PATH_LENGTH];
-//     snprintf(dest_dir, sizeof(dest_dir), "%s/templates/%s/%s/", get_resources_path(), version, category);
-//     fs_ensure_directory_exists(dest_dir);
-//
-//     bool success = true;
-//     for (mz_uint i = 0; i < num_files; i++) {
-//         mz_zip_archive_file_stat file_stat;
-//         if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat) || file_stat.m_is_directory) continue;
-//
-//         char dest_path[MAX_PATH_LENGTH];
-//         snprintf(dest_path, sizeof(dest_path), "%s%s", dest_dir, file_stat.m_filename);
-//         if (!mz_zip_reader_extract_to_file(&zip_archive, i, dest_path, 0)) {
-//             snprintf(status_message, msg_size, "Error: Failed to extract '%s'.", file_stat.m_filename);
-//             success = false;
-//             break;
-//         }
-//     }
-//
-//     mz_zip_reader_end(&zip_archive);
-//
-//     if (success) {
-//         snprintf(status_message, msg_size, "Template '%s%s' for version %s imported successfully!", category, flag, version);
-//         strncpy(imported_version, version, sizeof(imported_version) - 1);
-//         return imported_version;
-//     }
-//
-//     return nullptr;
-// }

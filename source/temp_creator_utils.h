@@ -136,7 +136,8 @@ bool get_info_from_zip(const char *zip_path, char *out_version, char *out_catego
 
 /**
  * @brief Performs the final import by extracting a zip file to a specified template location.
- * The import is only performed successfully if the that exact template name does not already exist.
+ * The import is only performed successfully if the exact template name does not already exist
+ * for the selected version.
  * @param zip_path Path to the source .zip file.
  * @param version The user-confirmed version for the new template.
  * @param category The user-confirmed category for the new template.

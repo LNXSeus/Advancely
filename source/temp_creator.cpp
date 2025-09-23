@@ -22,6 +22,19 @@
 
 #include "tinyfiledialogs.h"
 
+// Helper to check if a string ends with a specific suffix
+static bool ends_with(const char *str, const char *suffix) {
+    if (!str || !suffix) {
+        return false;
+    }
+    size_t str_len = strlen(str);
+    size_t suffix_len = strlen(suffix);
+    if (suffix_len > str_len) {
+        return false;
+    }
+    return strncmp(str + str_len - suffix_len, suffix, suffix_len) == 0;
+}
+
 // Local helper to check for invalid filename characters (for UI validation)
 static bool is_valid_filename_part_for_ui(const char *part) {
     if (!part) return true; // An empty flag is valid
@@ -1867,7 +1880,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::SameLine();
 
     // Import Template Button
-    ImGui::BeginDisabled(has_unsaved_changes_in_editor);
+        ImGui::BeginDisabled(has_unsaved_changes_in_editor);
     if (ImGui::Button("Import Template")) {
         auto import_action = [&]() {
             const char *filter_patterns[1] = {"*.zip"};
@@ -1892,15 +1905,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (import_version_idx == -1) {
                         snprintf(status_message, sizeof(status_message), "Error: Zip contains an unknown version: %s",
                                  version);
+                        ImGui::OpenPopup("Import Error"); // Trigger popup for unknown version
                     } else {
                         show_import_confirmation_view = true;
                         show_create_new_view = false;
                         show_copy_view = false;
                         editing_template = false;
                     }
+                } else {
+                    // On failure, get_info_from_zip already set the status_message
+                    ImGui::OpenPopup("Import Error"); // Trigger popup for other errors
                 }
-                // On failure, get_info_from_zip already set the status_message
-                save_message_type = MSG_ERROR;
             }
         };
 
@@ -2020,6 +2035,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
         }
+        ImGui::EndPopup();
+    }
+
+    // --- Import Error Popup ---
+    if (ImGui::BeginPopupModal("Import Error", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("An error occurred during import:");
+        ImGui::Separator();
+        ImGui::TextWrapped("%s", status_message); // Display the specific error
+        ImGui::Spacing();
+        if (ImGui::Button("OK", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+            ImGui::CloseCurrentPopup();
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "You can also press ENTER.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+        ImGui::SetItemDefaultFocus();
         ImGui::EndPopup();
     }
 
@@ -5107,6 +5140,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         if (ImGui::Button("Confirm Import") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused())) {
             if (import_version_idx != -1) {
+                const char *version_str = VERSION_STRINGS[import_version_idx];
+                MC_Version version_enum = settings_get_version_from_string(version_str);
+
+                char combined_name[MAX_PATH_LENGTH * 2];
+                snprintf(combined_name, sizeof(combined_name), "%s%s", import_category, import_flag);
                 // Add validation before executing the import
                 if (import_category[0] == '\0') {
                     snprintf(status_message, sizeof(status_message), "Error: Category name cannot be empty.");
@@ -5117,8 +5155,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 } else if (!is_valid_filename_part_for_ui(import_flag)) {
                     snprintf(status_message, sizeof(status_message), "Error: Flag contains invalid characters.");
                     save_message_type = MSG_ERROR;
+                } else if (version_enum <= MC_VERSION_1_6_4 && ends_with(combined_name, "_snapshot")) {
+                    // BLOCKING _snapshot for legacy versions
+                    snprintf(status_message, sizeof(status_message), "Error: Template name cannot end with '_snapshot' for legacy versions.");
+                    save_message_type = MSG_ERROR;
                 } else {
-                    const char *version_str = VERSION_STRINGS[import_version_idx];
                     if (execute_import_from_zip(import_zip_path, version_str, import_category, import_flag, status_message,
                                                 sizeof(status_message))) {
                         // SUCCESS!
