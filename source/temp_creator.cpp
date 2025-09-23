@@ -2108,11 +2108,95 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::EndPopup();
     }
 
+    // --- Open World Folder Button (Right-Aligned) ---
+    const char *world_folder_text = "Open World Folder";
+    float world_folder_button_width = ImGui::CalcTextSize(world_folder_text).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+
     // --- Help Button (Right-Aligned) ---
     const char *help_text = "Help";
     // Calculate button width to align it properly
     float help_button_width = ImGui::CalcTextSize(help_text).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-    ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - help_button_width);
+
+    // Calculate the total width of all buttons on the right to align them correctly
+    float right_buttons_width = world_folder_button_width + ImGui::GetStyle().ItemSpacing.x + help_button_width;
+    ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - right_buttons_width);
+
+    // Get the version that is currently active in the main tracker settings
+    MC_Version tracker_active_version = settings_get_version_from_string(app_settings->version_str);
+
+    // Disable the button if no world is loaded
+    ImGui::BeginDisabled(t->world_name[0] == '\0');
+    if (ImGui::Button(world_folder_text)) {
+        char path_to_open[MAX_PATH_LENGTH] = {0};
+
+        // Determine the correct path based on version and settings
+        if (tracker_active_version <= MC_VERSION_1_6_4 && !app_settings->using_stats_per_world_legacy) {
+            // Legacy global stats: open the parent's "stats" folder
+            char parent_dir[MAX_PATH_LENGTH];
+            if (get_parent_directory(t->saves_path, parent_dir, sizeof(parent_dir), 1)) {
+                snprintf(path_to_open, sizeof(path_to_open), "%s/stats", parent_dir);
+            }
+        } else {
+            // All other cases: open the specific world folder
+            snprintf(path_to_open, sizeof(path_to_open), "%s/%s", t->saves_path, t->world_name);
+        }
+
+        // Execute the system command to open the folder
+        if (path_to_open[0] != '\0' && path_exists(path_to_open)) {
+            char command[MAX_PATH_LENGTH + 32];
+#ifdef _WIN32
+            path_to_windows_native(path_to_open);
+            snprintf(command, sizeof(command), "explorer \"%s\"", path_to_open);
+#elif __APPLE__
+            snprintf(command, sizeof(command), "open \"%s\"", path_to_open);
+#else
+            snprintf(command, sizeof(command), "xdg-open \"%s\"", path_to_open);
+#endif
+            system(command);
+        } else {
+            log_message(LOG_ERROR, "[TEMP CREATOR] Could not open world folder, path does not exist: %s\n", path_to_open);
+        }
+    }
+    ImGui::EndDisabled();
+
+    // Version-aware tooltip logic
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        char tooltip_buffer[1024];
+        if (t->world_name[0] == '\0') {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No world is currently being tracked.");
+        } else {
+            if (tracker_active_version <= MC_VERSION_1_6_4) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Opens the folder containing the stats file for the current world.\n\n"
+                         "It opens the global or local stats depending on your 'StatsPerWorld' setting.\n"
+                         "Inside this folder you can find the '.dat' file which contains all of\n"
+                         "your completed achievements and statistics.");
+            } else if (tracker_active_version <= MC_VERSION_1_11_2) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Opens the folder containing the stats file for the current world.\n\n"
+                         "Inside this folder you can find the '.json' file which contains all of\n"
+                         "your completed achievements and statistics.");
+            } else if (tracker_active_version == MC_VERSION_25W14CRAFTMINE) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Opens the folder for the current world.\n\n"
+                         "Within this folder you can find:\n"
+                         " • The 'advancements' folder, containing a '.json' file\n"
+                         "   with your completed advancements and recipes.\n"
+                         " • The 'stats' folder, containing a '.json' file with your statistics.\n"
+                         " • The 'unlocks' folder, containing a '.json' file with your obtained unlocks.");
+            } else { // Modern versions
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Opens the folder for the current world.\n\n"
+                         "Within this folder you can find:\n"
+                         " • The 'advancements' folder, containing a '.json' file\n"
+                         "   with your completed advancements and recipes.\n"
+                         " • The 'stats' folder, containing a '.json' file with your statistics.");
+            }
+        }
+        ImGui::SetTooltip("%s", tooltip_buffer);
+    }
+
+    ImGui::SameLine();
 
     if (ImGui::Button(help_text)) {
         char reference_path[MAX_PATH_LENGTH];

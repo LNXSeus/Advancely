@@ -6,7 +6,7 @@
   "optional_flag":	"",
   "lang_flag": "",
   "general":	{
-    "section_order":	[0, 1, 2, 3, 4],
+    "section_order":	[0, 1, 2, 3, 4, 5],
     "enable_overlay":	false,
     "using_stats_per_world_legacy":	true,
     "fps":	60,

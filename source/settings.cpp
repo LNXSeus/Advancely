@@ -177,7 +177,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "Automatically finds the default Minecraft saves path for your OS:\n"
                  "Windows: %%APPDATA%%\\.minecraft\\saves\n"
                  "Linux: ~/.minecraft/saves\n"
-                 "macOS: ~/Library/Application Support/minecraft/saves");
+                 "macOS: ~/Library/Application Support/minecraft/saves\n\n"
+                 "Uncheck this to manually set your saves path.");
         ImGui::SetTooltip("%s", default_saves_path_tooltip_buffer);
     }
 
