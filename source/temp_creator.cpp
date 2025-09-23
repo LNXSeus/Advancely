@@ -5614,7 +5614,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::IsKeyPressed(ImGuiKey_F)) {
             focus_import_search = true;
         }
-        // --- Selection Controls & Search Bar ---
+        // --- Left-aligned Controls ---
         if (ImGui::Button("Select All")) {
             for (auto &adv: importable_advancements) {
                 // Filter based on search
@@ -5680,9 +5680,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 "%s", include_criteria_tooltip_buffer);
         }
         ImGui::SameLine();
-        ImGui::SetNextItemWidth(250.0f);
 
-        // Logic to apply focus
+        // --- Right-aligned Controls ---
+        const float search_bar_width = 250.0f;
+        const float clear_button_width = ImGui::GetFrameHeight();
+        const float right_controls_width = search_bar_width + clear_button_width + ImGui::GetStyle().ItemSpacing.x;
+
+        ImGui::SameLine(ImGui::GetWindowWidth() - right_controls_width - ImGui::GetStyle().WindowPadding.x);
+
+        // Render the "X" button or an invisible dummy widget to hold the space for alignment
+        if (import_search_buffer[0] != '\0') {
+            if (ImGui::Button("X##ClearImportSearch", ImVec2(clear_button_width, 0))) {
+                import_search_buffer[0] = '\0';
+            }
+        } else {
+            ImGui::Dummy(ImVec2(clear_button_width, 0));
+        }
+
+        ImGui::SameLine();
+
+        ImGui::SetNextItemWidth(search_bar_width);
         if (focus_import_search) {
             ImGui::SetKeyboardFocusHere();
             focus_import_search = false;
