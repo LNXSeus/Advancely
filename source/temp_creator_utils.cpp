@@ -32,6 +32,55 @@
 #include <dirent.h>
 #endif
 
+// Helper to convert version string "1.16.1" to "1_16_1" for filename construction
+static void version_to_filename_format(const char *version_in, char *version_out, size_t max_len) {
+    strncpy(version_out, version_in, max_len - 1);
+    version_out[max_len - 1] = '\0';
+    for (char *p = version_out; *p; p++) {
+        if (*p == '.') *p = '_'; // Convert dots to underscores
+    }
+}
+
+// Local helper to check if a directory is empty (ignoring '.' and '..')
+static bool is_directory_empty(const char *path) {
+#ifdef _WIN32
+    char search_path[MAX_PATH_LENGTH];
+    snprintf(search_path, sizeof(search_path), "%s\\*", path);
+    WIN32_FIND_DATAA find_data;
+    HANDLE h_find = FindFirstFileA(search_path, &find_data);
+
+    if (h_find == INVALID_HANDLE_VALUE) {
+        return true; // Directory doesn't exist or is inaccessible, treat as empty
+    }
+
+    do {
+        if (strcmp(find_data.cFileName, ".") != 0 && strcmp(find_data.cFileName, "..") != 0) {
+            FindClose(h_find);
+            return false; // Found a file or directory
+        }
+    } while (FindNextFileA(h_find, &find_data) != 0);
+
+    FindClose(h_find);
+    return true;
+#else // POSIX
+    DIR *dir = opendir(path);
+    if (dir == nullptr) {
+        return true; // Cannot open, assume empty or non-existent
+    }
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != nullptr) {
+        if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+            closedir(dir);
+            return false; // Found something
+        }
+    }
+
+    closedir(dir);
+    return true;
+#endif
+}
+
 // Local helper to check for invalid filename characters
 static bool is_valid_filename_part(const char *part) {
     if (!part) return true; // An empty flag is valid
@@ -256,9 +305,11 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
         }
     }
 
-    // 2. Check for Name Collisions at Destination
-    char new_combo[MAX_PATH_LENGTH];
-    snprintf(new_combo, sizeof(new_combo), "%s%s", dest_category, dest_flag);
+    // 2. Check for Name Collisions at Destination based on final filename
+    char dest_version_filename[64];
+    version_to_filename_format(dest_version, dest_version_filename, sizeof(dest_version_filename));
+    char new_filename_part[MAX_PATH_LENGTH];
+    snprintf(new_filename_part, sizeof(new_filename_part), "%s_%s%s", dest_version_filename, dest_category, dest_flag);
 
     DiscoveredTemplate *existing_templates = nullptr;
     int existing_count = 0;
@@ -266,14 +317,15 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
 
     if (existing_templates) {
         for (int i = 0; i < existing_count; ++i) {
-            char existing_combo[MAX_PATH_LENGTH];
-            snprintf(existing_combo, sizeof(existing_combo), "%s%s",
-                     existing_templates[i].category, existing_templates[i].optional_flag);
+            char existing_version_filename[64];
+            version_to_filename_format(dest_version, existing_version_filename, sizeof(existing_version_filename));
+            char existing_filename_part[MAX_PATH_LENGTH];
+            snprintf(existing_filename_part, sizeof(existing_filename_part), "%s_%s%s",
+                     existing_version_filename, existing_templates[i].category, existing_templates[i].optional_flag);
 
-            if (strcmp(new_combo, existing_combo) == 0) {
+            if (strcmp(new_filename_part, existing_filename_part) == 0) {
                 snprintf(error_message, error_msg_size,
-                         "Error: Name collision. A template with category '%s' and flag '%s' already produces the name '%s'.",
-                         existing_templates[i].category, existing_templates[i].optional_flag, existing_combo);
+                         "Error: Name collision. This combination results in an existing filename.");
                 free_discovered_templates(&existing_templates, &existing_count);
                 return false;
             }
@@ -306,10 +358,6 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
 
 
     // 5. Construct Destination Paths
-    char dest_version_filename[64];
-    strncpy(dest_version_filename, dest_version, sizeof(dest_version_filename) - 1);
-    for (char *p = dest_version_filename; *p; p++) { if (*p == '.') *p = '_'; }
-
     char dest_base_path[MAX_PATH_LENGTH];
     snprintf(dest_base_path, sizeof(dest_base_path), "%s/templates/%s/%s/%s_%s%s", get_resources_path(),
              dest_version, dest_category, dest_version_filename, dest_category, dest_flag);
@@ -404,19 +452,33 @@ bool delete_template_files(const char *version, const char *category, const char
 
 #ifdef _WIN32
     char search_path[MAX_PATH_LENGTH];
-    snprintf(search_path, sizeof(search_path), "%s/%s*.json", category_path, base_filename);
+    snprintf(search_path, sizeof(search_path), "%s\\*", category_path); // Search entire directory
     WIN32_FIND_DATAA find_data;
     HANDLE h_find = FindFirstFileA(search_path, &find_data);
 
     if (h_find != INVALID_HANDLE_VALUE) {
         do {
-            char file_to_delete[MAX_PATH_LENGTH];
-            snprintf(file_to_delete, sizeof(file_to_delete), "%s/%s", category_path, find_data.cFileName);
-            if (remove(file_to_delete) != 0) {
-                log_message(LOG_ERROR, "[TEMP CREATE UTILS] Failed to delete file: %s\n", file_to_delete);
-                all_success = false;
-            } else {
-                log_message(LOG_INFO, "[TEMP CREATE UTILS] Deleted file: %s\n", file_to_delete);
+            const char* filename = find_data.cFileName;
+            size_t base_len = strlen(base_filename);
+
+            // Check if the filename starts with the exact base name
+            if (strncmp(filename, base_filename, base_len) == 0) {
+                const char* suffix = filename + base_len;
+                // Now check if the suffix is one of the valid ones for a template file
+                if (strcmp(suffix, ".json") == 0 ||
+                    strcmp(suffix, "_snapshot.json") == 0 ||
+                    strcmp(suffix, "_notes.txt") == 0 ||
+                    strncmp(suffix, "_lang", 5) == 0) // Catches _lang.json and _lang_...json
+                {
+                    char file_to_delete[MAX_PATH_LENGTH];
+                    snprintf(file_to_delete, sizeof(file_to_delete), "%s/%s", category_path, filename);
+                    if (remove(file_to_delete) != 0) {
+                        log_message(LOG_ERROR, "[TEMP CREATE UTILS] Failed to delete file: %s\n", file_to_delete);
+                        all_success = false;
+                    } else {
+                        log_message(LOG_INFO, "[TEMP CREATE UTILS] Deleted file: %s\n", file_to_delete);
+                    }
+                }
             }
         } while (FindNextFileA(h_find, &find_data) != 0);
         FindClose(h_find);
@@ -426,20 +488,56 @@ bool delete_template_files(const char *version, const char *category, const char
     if (dir) {
         struct dirent* entry;
         while ((entry = readdir(dir)) != nullptr) {
-            if (strncmp(entry->d_name, base_filename, strlen(base_filename)) == 0 && strstr(entry->d_name, ".json")) {
-                 char file_to_delete[MAX_PATH_LENGTH];
-                 snprintf(file_to_delete, sizeof(file_to_delete), "%s/%s", category_path, entry->d_name);
-                 if (remove(file_to_delete) != 0) {
-                    log_message(LOG_ERROR, "[TEMP CREATE UTILS] Failed to delete file: %s\n", file_to_delete);
-                    all_success = false;
-                 } else {
-                    log_message(LOG_INFO, "[TEMP CREATE UTILS] Deleted file: %s\n", file_to_delete);
-                 }
+            const char* filename = entry->d_name;
+            size_t base_len = strlen(base_filename);
+
+            // Check if the filename starts with the exact base name
+            if (strncmp(filename, base_filename, base_len) == 0) {
+                const char* suffix = filename + base_len;
+                 // Now check if the suffix is one of the valid ones for a template file
+                if (strcmp(suffix, ".json") == 0 ||
+                    strcmp(suffix, "_snapshot.json") == 0 ||
+                    strcmp(suffix, "_notes.txt") == 0 ||
+                    strncmp(suffix, "_lang", 5) == 0) // Catches _lang.json and _lang_...json
+                {
+                    char file_to_delete[MAX_PATH_LENGTH];
+                    snprintf(file_to_delete, sizeof(file_to_delete), "%s/%s", category_path, filename);
+                    if (remove(file_to_delete) != 0) {
+                       log_message(LOG_ERROR, "[TEMP CREATE UTILS] Failed to delete file: %s\n", file_to_delete);
+                       all_success = false;
+                    } else {
+                       log_message(LOG_INFO, "[TEMP CREATE UTILS] Deleted file: %s\n", file_to_delete);
+                    }
+                }
             }
         }
         closedir(dir);
     }
 #endif
+
+    // After deleting files, check if the category directory is empty and remove it
+    if (all_success && is_directory_empty(category_path)) {
+#ifdef _WIN32
+        if (RemoveDirectoryA(category_path)) {
+#else
+        if (rmdir(category_path) == 0) {
+#endif
+            log_message(LOG_INFO, "[TEMP CREATE UTILS] Removed empty category directory: %s\n", category_path);
+
+            // If category was removed, check if the parent version directory is now empty
+            char version_path[MAX_PATH_LENGTH];
+            snprintf(version_path, sizeof(version_path), "%s/templates/%s", get_resources_path(), version);
+            if (is_directory_empty(version_path)) {
+#ifdef _WIN32
+                if (RemoveDirectoryA(version_path)) {
+#else
+                if (rmdir(version_path) == 0) {
+#endif
+                    log_message(LOG_INFO, "[TEMP CREATE UTILS] Removed empty version directory: %s\n", version_path);
+                }
+            }
+        }
+    }
     return all_success;
 }
 
@@ -665,7 +763,7 @@ static bool create_zip_from_template(const char *output_zip_path, const Discover
 }
 
 // Main function to handle the export process
-void handle_export_template(const DiscoveredTemplate &selected_template, const char *version, char *status_message,
+bool handle_export_template(const DiscoveredTemplate &selected_template, const char *version, char *status_message,
                             size_t msg_size) {
     char suggested_filename[MAX_PATH_LENGTH];
     snprintf(suggested_filename, sizeof(suggested_filename), "%s_%s%s.zip", version, selected_template.category,
@@ -677,13 +775,15 @@ void handle_export_template(const DiscoveredTemplate &selected_template, const c
 
     if (!save_path) {
         snprintf(status_message, msg_size, "Export canceled.");
-        return;
+        return false;
     }
 
     if (create_zip_from_template(save_path, selected_template, version, status_message, msg_size)) {
         snprintf(status_message, msg_size, "Template exported successfully!");
+        return true;
     }
     // If it fails, create_zip_from_template will have already set the error message.
+    return false;
 }
 
 // Helper function to check if a template with a given name already exists.
@@ -789,7 +889,31 @@ bool get_info_from_zip(const char* zip_path, char* out_version, char* out_catego
 
 bool execute_import_from_zip(const char* zip_path, const char* version, const char* category, const char* flag, char* error_message, size_t msg_size) {
     // Final validation before extracting
-    if (template_exists(version, category, flag)) {
+    char version_filename[64];
+    version_to_filename_format(version, version_filename, sizeof(version_filename));
+    char new_filename_part[MAX_PATH_LENGTH];
+    snprintf(new_filename_part, sizeof(new_filename_part), "%s_%s%s", version_filename, category, flag);
+
+    DiscoveredTemplate* templates = nullptr;
+    int count = 0;
+    scan_for_templates(version, &templates, &count);
+    bool exists = false;
+    if (templates) {
+        for (int i = 0; i < count; i++) {
+            char existing_version_filename[64];
+            version_to_filename_format(version, existing_version_filename, sizeof(existing_version_filename));
+            char existing_filename_part[MAX_PATH_LENGTH];
+            snprintf(existing_filename_part, sizeof(existing_filename_part), "%s_%s%s",
+                     existing_version_filename, templates[i].category, templates[i].optional_flag);
+            if (strcmp(new_filename_part, existing_filename_part) == 0) {
+                exists = true;
+                break;
+            }
+        }
+        free_discovered_templates(&templates, &count);
+    }
+
+    if (exists) {
         snprintf(error_message, msg_size, "Error: A template with this name already exists for version %s.", version);
         return false;
     }

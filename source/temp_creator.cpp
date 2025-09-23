@@ -22,6 +22,18 @@
 
 #include "tinyfiledialogs.h"
 
+// Local helper to check for invalid filename characters (for UI validation)
+static bool is_valid_filename_part_for_ui(const char *part) {
+    if (!part) return true; // An empty flag is valid
+    for (const char *p = part; *p; ++p) {
+        // Allow alphanumeric, underscore, dot and %
+        if (!isalnum((unsigned char) *p) && *p != '_' && *p != '.' && *p != '%') {
+            return false;
+        }
+    }
+    return true;
+}
+
 // In-memory representation of a template for editing
 struct EditorTrackableItem {
     char root_name[192];
@@ -1811,14 +1823,39 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         } else if (selected_template_index != -1) {
             const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
             if (selected.optional_flag[0] != '\0') {
-                // Optional flag is present
-                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "Delete template:\nVersion: %s\nCategory: %s\nFlag: %s",
-                         creator_version_str, selected.category, selected.optional_flag);
+                // WITH OPTIONAL FLAG
+                if (creator_selected_version <= MC_VERSION_1_6_4) {
+                    // Legacy snapshot mentioned
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "Delete template:\nVersion: %s\nCategory: %s\nFlag: %s\n\n"
+                             "This deletes the template, associated language files,\n"
+                             "notes and snapshot file for global stats.\n"
+                             "Empty folders within the templates folder will also be deleted.",
+                             creator_version_str, selected.category, selected.optional_flag);
+                } else {
+                    // No snapshot mentioned
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "Delete template:\nVersion: %s\nCategory: %s\nFlag: %s\n\n"
+                             "This deletes the template, associated language files and notes.\n"
+                             "Empty folders within the templates folder will also be deleted.",
+                             creator_version_str, selected.category, selected.optional_flag);
+                }
             } else {
-                // No optional flag
-                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Delete template:\nVersion: %s\nCategory: %s",
-                         creator_version_str, selected.category);
+                // NO OPTIONAL FLAG
+                if (creator_selected_version <= MC_VERSION_1_6_4) {
+                    // Legacy snapshot mentioned
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Delete template:\nVersion: %s\nCategory: %s\n\n"
+                             "This deletes the template, associated language files,\n"
+                             "notes and snapshot file for global stats.\n"
+                             "Empty folders within the templates folder will also be deleted.",
+                             creator_version_str, selected.category);
+                } else {
+                    // No snapshot mentioned
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Delete template:\nVersion: %s\nCategory: %s\n\n"
+                             "This deletes the template, associated language files and notes.\n"
+                             "Empty folders within the templates folder will also be deleted.",
+                             creator_version_str, selected.category);
+                }
             }
         } else {
             // Nothing selected
@@ -1901,6 +1938,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             handle_export_template(discovered_templates[selected_template_index], creator_version_str, status_message,
                                    sizeof(status_message));
             save_message_type = MSG_SUCCESS; // Use success color to make the message visible
+        } else {
+            save_message_type = MSG_ERROR;
         }
     }
     ImGui::EndDisabled();
@@ -1924,7 +1963,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     if (ImGui::BeginPopupModal("Delete Template?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         if (selected_template_index != -1) {
             const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
-            ImGui::Text("Are you sure you want to permanently delete this template?\nThis action cannot be undone.");
+            if (creator_selected_version <= MC_VERSION_1_6_4) {
+                // Snapshot mentioned
+                ImGui::Text("Are you sure you want to permanently delete this template and\n"
+                    "all its associated files (language files, notes and snapshot for global stats)?\n"
+                    "This action cannot be undone.");
+            } else {
+                // Snapshot not mentioned
+                ImGui::Text("Are you sure you want to permanently delete this template and\n"
+                    "all its associated files (language files and notes)?\n"
+                    "This action cannot be undone.");
+            }
 
             // Construct detailed info string
             char template_info[512];
@@ -1938,7 +1987,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::TextUnformatted(template_info);
             ImGui::Separator();
 
-            if (ImGui::Button("Delete", ImVec2(120, 0))) {
+            // Also pressing ENTER
+            if (ImGui::Button("Delete", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
                 if (delete_template_files(creator_version_str, selected.category, selected.optional_flag)) {
                     snprintf(status_message, sizeof(status_message), "Template '%s' deleted.", selected.category);
                     SDL_SetAtomicInt(&g_templates_changed, 1); // Signal change
@@ -1951,10 +2001,23 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 last_scanned_version[0] = '\0'; // Force rescan
                 ImGui::CloseCurrentPopup();
             }
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buffer[256];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "You can also press ENTER.\n"
+                         "Deletes the template.");
+                ImGui::SetTooltip("%s", tooltip_buffer);
+            }
             ImGui::SetItemDefaultFocus();
             ImGui::SameLine();
-            if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+            // Also pressing ESCAPE
+            if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
                 ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buffer[256];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "You can also press ESCAPE.\n"
+                         "Keeps the template.");
+                ImGui::SetTooltip("%s", tooltip_buffer);
             }
         }
         ImGui::EndPopup();
@@ -2110,7 +2173,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && !can_delete) {
             ImGui::SetTooltip("%s", disabled_tooltip);
         }
-        ImGui::Separator();
     }
 
 
@@ -4896,6 +4958,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             char optional_flag_tooltip_buffer[1024];
             snprintf(optional_flag_tooltip_buffer, sizeof(optional_flag_tooltip_buffer),
                      "A variant for the category (e.g., '_optimized', '_modded').\n"
+                     "The optional flag immediately follows the category name\n"
+                     "so it best practice to start with an underscore.\n"
                      "Cannot contain spaces or special characters besides the %% sign.");
             ImGui::SetTooltip("%s", optional_flag_tooltip_buffer);
         }
@@ -4946,10 +5010,30 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::Text("Copying from: %s", selected.category);
         }
 
-        if (ImGui::Combo("New Version", &copy_template_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT)) {
+        ImGui::Combo("New Version", &copy_template_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT);
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select the destination version for the new template.\n"
+                                                             "This version influences certain functionality of the template\n"
+                                                             "and how the tracker reads the game files.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
         }
         ImGui::InputText("New Category Name", copy_template_category, sizeof(copy_template_category));
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "The main classification for the new template.\n"
+                     "Cannot contain spaces or special characters except for underscores, dots, and the %% sign.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
         ImGui::InputText("New Optional Flag", copy_template_flag, sizeof(copy_template_flag));
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "A variant for the new category (e.g., '_optimized').\n"
+                     "The optional flag immediately follows the category name\n"
+                     "so it best practice to start with an underscore.\n"
+                     "Cannot contain spaces or special characters except for underscores, dots, and the %% sign.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
 
         // Allowing enter key to confirm copy WHEN the window is focused
         if (ImGui::Button("Confirm Copy") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(
@@ -4995,34 +5079,76 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         ImGui::Text("Please confirm or edit the details for the new template:");
 
-        if (ImGui::Combo("Version", &import_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT)) {
-            // User changed the version, no extra action needed yet
+        ImGui::Combo("Version", &import_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT);
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select the destination version for the new template.\n"
+                                                             "This version influences certain functionality of the template\n"
+                                                             "and how the tracker reads the game files.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
         }
         ImGui::InputText("Category Name", import_category, sizeof(import_category));
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "The main classification for the new template.\n"
+                     "Cannot contain spaces or special characters except for underscores, dots, and the %% sign.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
         ImGui::InputText("Optional Flag", import_flag, sizeof(import_flag));
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "A variant for the new category (e.g., '_optimized').\n"
+                     "The optional flag immediately follows the category name\n"
+                     "so it best practice to start with an underscore.\n"
+                     "Cannot contain spaces or special characters except for underscores, dots, and the %% sign.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
         ImGui::Spacing();
 
-        if (ImGui::Button("Confirm Import")) {
+        if (ImGui::Button("Confirm Import") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused())) {
             if (import_version_idx != -1) {
-                const char *version_str = VERSION_STRINGS[import_version_idx];
-                if (execute_import_from_zip(import_zip_path, version_str, import_category, import_flag, status_message,
-                                            sizeof(status_message))) {
-                    // SUCCESS!
-                    snprintf(status_message, sizeof(status_message), "Template imported to version %s!", version_str);
-                    show_import_confirmation_view = false;
-                    // Switch UI to the newly imported version
-                    strncpy(creator_version_str, version_str, sizeof(creator_version_str) - 1);
-                    creator_version_idx = import_version_idx;
-                    SDL_SetAtomicInt(&g_templates_changed, 1);
-                    last_scanned_version[0] = '\0'; // Force rescan
+                // Add validation before executing the import
+                if (import_category[0] == '\0') {
+                    snprintf(status_message, sizeof(status_message), "Error: Category name cannot be empty.");
+                    save_message_type = MSG_ERROR;
+                } else if (!is_valid_filename_part_for_ui(import_category)) {
+                    snprintf(status_message, sizeof(status_message), "Error: Category contains invalid characters.");
+                    save_message_type = MSG_ERROR;
+                } else if (!is_valid_filename_part_for_ui(import_flag)) {
+                    snprintf(status_message, sizeof(status_message), "Error: Flag contains invalid characters.");
+                    save_message_type = MSG_ERROR;
+                } else {
+                    const char *version_str = VERSION_STRINGS[import_version_idx];
+                    if (execute_import_from_zip(import_zip_path, version_str, import_category, import_flag, status_message,
+                                                sizeof(status_message))) {
+                        // SUCCESS!
+                        snprintf(status_message, sizeof(status_message), "Template imported to version %s!", version_str);
+                        show_import_confirmation_view = false;
+                        // Switch UI to the newly imported version
+                        strncpy(creator_version_str, version_str, sizeof(creator_version_str) - 1);
+                        creator_version_idx = import_version_idx;
+                        SDL_SetAtomicInt(&g_templates_changed, 1);
+                        last_scanned_version[0] = '\0'; // Force rescan
+                                                }
+                    save_message_type = MSG_ERROR; // Show status message (will be an error on failure)
                 }
-                save_message_type = MSG_SUCCESS; // Show status message (success or error)
             }
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "You can also press ENTER.\n"
+                     "Confirms the import.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel")) {
             show_import_confirmation_view = false;
             status_message[0] = '\0';
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Cancels the import.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
         }
 
         if (status_message[0] != '\0' && save_message_type == MSG_ERROR) {
