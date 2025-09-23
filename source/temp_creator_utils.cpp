@@ -30,6 +30,7 @@
 #else
 #define MKDIR(path) mkdir(path, 0755) // 0755 provides read/write/execute for owner, read/execute for others
 #include <dirent.h>
+#include <unistd.h> // For rmdir()
 #endif
 
 // Helper to convert version string "1.16.1" to "1_16_1" for filename construction
