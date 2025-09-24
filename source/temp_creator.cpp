@@ -2629,7 +2629,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 if (ImGui::IsItemHovered()) {
                     ImGui::SetTooltip("Import 1.12+ advancements/recipes directly from a world's player data file.\n"
-                                      "Cannot import already existing root names.");
+                        "Cannot import already existing root names.");
                 }
 
                 char button_label[64];
@@ -5617,13 +5617,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
 
         // --- Create a filtered list of advancements to display and operate on ---
-        std::vector<ImportableAdvancement*> filtered_advancements;
+        std::vector<ImportableAdvancement *> filtered_advancements;
         if (import_search_buffer[0] != '\0') {
-            for (auto& adv : importable_advancements) {
+            for (auto &adv: importable_advancements) {
                 bool parent_match = str_contains_insensitive(adv.root_name.c_str(), import_search_buffer);
                 bool child_match = false;
                 if (!parent_match) {
-                    for (const auto& crit : adv.criteria) {
+                    for (const auto &crit: adv.criteria) {
                         if (str_contains_insensitive(crit.root_name.c_str(), import_search_buffer)) {
                             child_match = true;
                             break;
@@ -5636,20 +5636,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
         } else {
             // If no search, all advancements are considered "filtered"
-            for (auto& adv : importable_advancements) {
+            for (auto &adv: importable_advancements) {
                 filtered_advancements.push_back(&adv);
             }
         }
 
         // --- Selection Controls & Search Bar (now operating on the filtered list) ---
         if (ImGui::Button("Select All")) {
-            for (auto* adv_ptr : filtered_advancements) {
+            for (auto *adv_ptr: filtered_advancements) {
                 adv_ptr->is_selected = true;
                 if (import_select_criteria) {
                     bool parent_matched = str_contains_insensitive(adv_ptr->root_name.c_str(), import_search_buffer);
-                    for (auto& crit : adv_ptr->criteria) {
+                    for (auto &crit: adv_ptr->criteria) {
                         // Select criteria only if they are visible (parent matched or they matched themselves)
-                        if (import_search_buffer[0] == '\0' || parent_matched || str_contains_insensitive(crit.root_name.c_str(), import_search_buffer)) {
+                        if (import_search_buffer[0] == '\0' || parent_matched || str_contains_insensitive(
+                                crit.root_name.c_str(), import_search_buffer)) {
                             crit.is_selected = true;
                         }
                     }
@@ -5659,25 +5660,23 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char select_all_tooltip_buffer[512];
             snprintf(select_all_tooltip_buffer, sizeof(select_all_tooltip_buffer),
-                "Selects all advancements and all criteria (if 'Include Criteria' is ticked)\n"
-                "within the current search.\n"
-                "Click an advancement checkbox and shift-click another to select all advancements \n"
-                "in between (criteria only if 'Include Criteria' is ticked).\n"
-                "If 'Include Criteria' is checked, you can shift-select criteria of a single advancement.");
+                     "Selects all advancements visible in the current search.\n"
+                     "Also selects their criteria if 'Include Criteria' is checked.\n\n"
+                     "You can also Shift+Click to select a range of items.");
             ImGui::SetTooltip("%s", select_all_tooltip_buffer);
         }
         ImGui::SameLine();
         if (ImGui::Button("Deselect All")) {
-            for (auto* adv_ptr : filtered_advancements) {
+            for (auto *adv_ptr: filtered_advancements) {
                 if (import_select_criteria) {
                     // Deselect ALL criteria of the visible parents, leaving parents selected
-                    for (auto& crit : adv_ptr->criteria) {
+                    for (auto &crit: adv_ptr->criteria) {
                         crit.is_selected = false;
                     }
                 } else {
                     // Deselect everything (parents and their criteria)
                     adv_ptr->is_selected = false;
-                    for (auto& crit : adv_ptr->criteria) {
+                    for (auto &crit: adv_ptr->criteria) {
                         crit.is_selected = false;
                     }
                 }
@@ -5686,9 +5685,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char deselct_all_tooltip_buffer[512];
             snprintf(deselct_all_tooltip_buffer, sizeof(deselct_all_tooltip_buffer),
-                "Deselects all advancements and all criteria (if 'Include Criteria' not ticked)\n"
-                "within the current search.\n"
-                "Deselects only criteria if 'Include Criteria' is ticked.");
+                     "Deselects all advancements and criteria in the current search.\n\n"
+                     "If 'Include Criteria' is checked, only the criteria are deselected,\n"
+                     "leaving the parent advancements selected.");
             ImGui::SetTooltip("%s", deselct_all_tooltip_buffer);
         }
         ImGui::SameLine();
@@ -5696,9 +5695,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char include_criteria_tooltip_buffer[512];
             snprintf(include_criteria_tooltip_buffer, sizeof(include_criteria_tooltip_buffer),
-                     "If checked, 'Select All' and range-selection (shift clicking)\n"
-                     "will also select all criteria of the affected advancements.\n"
-                     "'Deselect All' will only deselect criteria if this is checked.");
+                     "Toggles whether criteria are affected by 'Select All',\n"
+                     "'Deselect All', and range selection (Shift+Click).");
             ImGui::SetTooltip(
                 "%s", include_criteria_tooltip_buffer);
         }
@@ -5733,8 +5731,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char import_search_tooltip_buffer[1024];
             snprintf(import_search_tooltip_buffer, sizeof(import_search_tooltip_buffer),
-                "Case-insensitive search for advancements- and criteria root names.\n"
-                "Searching for criteria still shows the advancement it belongs to.");
+                     "Filter list by advancement or criterion root name (case-insensitive).\n"
+                     "Press Ctrl+F or Cmd+F to focus.");
             ImGui::SetTooltip("%s", import_search_tooltip_buffer);
         }
         ImGui::Separator();
@@ -5745,26 +5743,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         } else {
             ImGui::BeginChild("ImporterScrollingRegion", ImVec2(600, 400), true);
             for (size_t i = 0; i < filtered_advancements.size(); ++i) {
-                auto& adv = *filtered_advancements[i];
+                auto &adv = *filtered_advancements[i];
 
                 // --- Rendering Logic ---
                 ImGui::PushID(adv.root_name.c_str());
                 if (ImGui::Checkbox(adv.root_name.c_str(), &adv.is_selected)) {
                     // Handle Shift+Click for range selection on the filtered list
                     if (ImGui::GetIO().KeyShift && last_clicked_adv_index != -1) {
-                        int start = std::min((int)i, last_clicked_adv_index);
-                        int end = std::max((int)i, last_clicked_adv_index);
+                        int start = std::min((int) i, last_clicked_adv_index);
+                        int end = std::max((int) i, last_clicked_adv_index);
                         for (int j = start; j <= end; ++j) {
-                           auto& ranged_adv = *filtered_advancements[j];
-                           ranged_adv.is_selected = adv.is_selected;
-                           if (import_select_criteria) {
-                               bool parent_matched = str_contains_insensitive(ranged_adv.root_name.c_str(), import_search_buffer);
-                               for (auto& crit : ranged_adv.criteria) {
-                                   if (import_search_buffer[0] == '\0' || parent_matched || str_contains_insensitive(crit.root_name.c_str(), import_search_buffer)) {
-                                       crit.is_selected = adv.is_selected;
-                                   }
-                               }
-                           }
+                            auto &ranged_adv = *filtered_advancements[j];
+                            ranged_adv.is_selected = adv.is_selected;
+                            if (import_select_criteria) {
+                                bool parent_matched = str_contains_insensitive(
+                                    ranged_adv.root_name.c_str(), import_search_buffer);
+                                for (auto &crit: ranged_adv.criteria) {
+                                    if (import_search_buffer[0] == '\0' || parent_matched || str_contains_insensitive(
+                                            crit.root_name.c_str(), import_search_buffer)) {
+                                        crit.is_selected = adv.is_selected;
+                                    }
+                                }
+                            }
                         }
                     }
                     last_clicked_adv_index = i;
@@ -5772,7 +5772,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     last_clicked_crit_index = -1;
 
                     if (!adv.is_selected) {
-                        for (auto& crit : adv.criteria) {
+                        for (auto &crit: adv.criteria) {
                             crit.is_selected = false;
                         }
                     }
@@ -5780,26 +5780,30 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (!adv.criteria.empty()) {
                     ImGui::Indent();
                     for (size_t j = 0; j < adv.criteria.size(); ++j) {
-                        auto& crit = adv.criteria[j];
+                        auto &crit = adv.criteria[j];
 
                         // Only render criteria that are visible based on the search
                         bool parent_matched = str_contains_insensitive(adv.root_name.c_str(), import_search_buffer);
-                        if (import_search_buffer[0] != '\0' && !parent_matched && !str_contains_insensitive(crit.root_name.c_str(), import_search_buffer)) {
+                        if (import_search_buffer[0] != '\0' && !parent_matched && !str_contains_insensitive(
+                                crit.root_name.c_str(), import_search_buffer)) {
                             continue;
                         }
 
                         if (ImGui::Checkbox(crit.root_name.c_str(), &crit.is_selected)) {
-                            if (crit.is_selected) { // If a child is checked, ensure parent is checked
+                            if (crit.is_selected) {
+                                // If a child is checked, ensure parent is checked
                                 adv.is_selected = true;
                             }
                             // Handle Shift+Click for range selection of CRITERIA
-                            if (ImGui::GetIO().KeyShift && import_select_criteria && last_clicked_crit_parent == &adv && last_clicked_crit_index != -1) {
-                                int start = std::min((int)j, last_clicked_crit_index);
-                                int end = std::max((int)j, last_clicked_crit_index);
+                            if (ImGui::GetIO().KeyShift && import_select_criteria && last_clicked_crit_parent == &adv &&
+                                last_clicked_crit_index != -1) {
+                                int start = std::min((int) j, last_clicked_crit_index);
+                                int end = std::max((int) j, last_clicked_crit_index);
                                 for (int k = start; k <= end; ++k) {
                                     // Apply the selection ONLY if the item in the range is visible
-                                    auto& ranged_crit = adv.criteria[k];
-                                    if (import_search_buffer[0] == '\0' || parent_matched || str_contains_insensitive(ranged_crit.root_name.c_str(), import_search_buffer)) {
+                                    auto &ranged_crit = adv.criteria[k];
+                                    if (import_search_buffer[0] == '\0' || parent_matched || str_contains_insensitive(
+                                            ranged_crit.root_name.c_str(), import_search_buffer)) {
                                         ranged_crit.is_selected = crit.is_selected;
                                     }
                                 }
@@ -5825,11 +5829,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // --- Count selected items to display next to the buttons ---
         int selected_adv_count = 0;
         int selected_crit_count = 0;
-        for (const auto& adv : importable_advancements) {
+        for (const auto &adv: importable_advancements) {
             if (adv.is_selected) {
                 selected_adv_count++;
             }
-            for (const auto& crit : adv.criteria) {
+            for (const auto &crit: adv.criteria) {
                 if (crit.is_selected) {
                     selected_crit_count++;
                 }
@@ -5895,8 +5899,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char import_advancements_tooltip_buffer[512];
             snprintf(import_advancements_tooltip_buffer, sizeof(import_advancements_tooltip_buffer),
-                     "You can also press ENTER.\n"
-                     "Import selected advancements/recipes and their criteria.");
+                     "Import selected items into the template.\n(You can also press ENTER)");
             ImGui::SetTooltip("%s", import_advancements_tooltip_buffer);
         }
         ImGui::SameLine();
@@ -5908,16 +5911,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char import_advancements_tooltip_buffer[512];
             snprintf(import_advancements_tooltip_buffer, sizeof(import_advancements_tooltip_buffer),
-                     "You can also press ESCAPE.\n"
-                     "Cancel the import."
-            );
+                     "Cancel the import and close this window.\n(You can also press ESCAPE)");
             ImGui::SetTooltip("%s", import_advancements_tooltip_buffer);
         }
 
         // --- Display the counters, aligned to the right ---
         ImGui::SameLine();
         char counter_text[128];
-        snprintf(counter_text, sizeof(counter_text), "Selected: %d Advancements, %d Criteria", selected_adv_count, selected_crit_count);
+        snprintf(counter_text, sizeof(counter_text), "Selected: %d Advancements, %d Criteria", selected_adv_count,
+                 selected_crit_count);
 
         // Calculate position to right-align the text
         float text_width = ImGui::CalcTextSize(counter_text).x;
