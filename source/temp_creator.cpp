@@ -1338,6 +1338,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static std::vector<ImportableStat> importable_stats;
     static int last_clicked_stat_index = -1;
 
+    // For multi-purpose stats import popup
+    enum StatImportMode { IMPORT_AS_TOP_LEVEL, IMPORT_AS_SUB_STAT };
+    static StatImportMode current_stat_import_mode = IMPORT_AS_TOP_LEVEL;
+
     // --- Version-dependent labels ---
     MC_Version creator_selected_version = settings_get_version_from_string(creator_version_str);
 
@@ -3019,7 +3023,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     save_message_type = MSG_NONE;
                 }
 
-                // Handle copying
+                // Handle Copying
                 if (advancement_to_copy_idx != -1) {
                     // Get a pointer to the source item to copy from the filtered list
                     const EditorTrackableCategory *source_adv_ptr = advancements_to_render[advancement_to_copy_idx];
@@ -3035,11 +3039,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     char new_name[192];
                     int copy_counter = 1;
                     while (true) {
-                        if (copy_counter == 1) {
-                            snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
-                        } else {
-                            snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
-                        }
+                        if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
+                        else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
+
 
                         // Check against the full original list to ensure the name is truly unique
                         bool name_exists = false;
@@ -3445,6 +3447,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::BeginChild("StatListPane", ImVec2(pane_width, 0), true);
 
                 if (ImGui::Button("Import Stats")) {
+                    current_stat_import_mode = IMPORT_AS_TOP_LEVEL; // Set the mode as top level not sub-stat
                     char start_path[MAX_PATH_LENGTH];
                     // Determine the correct starting path based on version and settings
                     if (creator_selected_version <= MC_VERSION_1_6_4) {
@@ -3771,14 +3774,30 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 // Handle Copying
                 if (stat_to_copy_idx != -1) {
                     const EditorTrackableCategory *source_stat_ptr = stats_to_render[stat_to_copy_idx];
-                    EditorTrackableCategory new_stat = *source_stat_ptr;
+
+                    // Perform a manual, safe copy to prevent memory corruption from non-null-terminated strings.
+                    EditorTrackableCategory new_stat;
+                    strncpy(new_stat.root_name, source_stat_ptr->root_name, sizeof(new_stat.root_name));
+                    new_stat.root_name[sizeof(new_stat.root_name) - 1] = '\0';
+                    strncpy(new_stat.display_name, source_stat_ptr->display_name, sizeof(new_stat.display_name));
+                    new_stat.display_name[sizeof(new_stat.display_name) - 1] = '\0';
+                    strncpy(new_stat.icon_path, source_stat_ptr->icon_path, sizeof(new_stat.icon_path));
+                    new_stat.icon_path[sizeof(new_stat.icon_path) - 1] = '\0';
+                    new_stat.is_hidden = source_stat_ptr->is_hidden;
+                    new_stat.is_recipe = source_stat_ptr->is_recipe;
+                    new_stat.is_simple_stat = source_stat_ptr->is_simple_stat;
+                    new_stat.criteria = source_stat_ptr->criteria; // std::vector handles its own deep copy safely.
+
+                    // Now, generate a unique name for the new copy
                     char base_name[192];
-                    strncpy(base_name, source_stat_ptr->root_name, sizeof(base_name) - 1);
-                    base_name[sizeof(base_name) - 1] = '\0';
+                    strncpy(base_name, source_stat_ptr->root_name, sizeof(base_name));
+                    base_name[sizeof(base_name) - 1] = '\0'; // Ensure base_name is safe to use in snprintf
+
                     char new_name[192];
                     int copy_counter = 1;
                     while (true) {
-                        snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter++);
+                        if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
+                        else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
                         bool name_exists = false;
                         for (const auto &s: current_template_data.stats) {
                             if (strcmp(s.root_name, new_name) == 0) {
@@ -3787,8 +3806,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                         }
                         if (!name_exists) break;
+                        copy_counter++;
                     }
-                    strncpy(new_stat.root_name, new_name, sizeof(new_stat.root_name) - 1);
+
+                    // Safely apply the new unique name
+                    strncpy(new_stat.root_name, new_name, sizeof(new_stat.root_name));
                     new_stat.root_name[sizeof(new_stat.root_name) - 1] = '\0';
 
                     auto it = std::find_if(current_template_data.stats.begin(), current_template_data.stats.end(),
@@ -3949,6 +3971,77 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     } else {
                         // UI for a complex, multi-stat category (similar to advancements)
                         ImGui::Text("Criteria");
+
+                        // "Import Sub-Stats" button
+                        if (ImGui::Button("Import Sub-Stats")) {
+                            current_stat_import_mode = IMPORT_AS_SUB_STAT; // Set the mode
+                            char start_path[MAX_PATH_LENGTH];
+                            if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                if (app_settings->using_stats_per_world_legacy) {
+                                    snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
+                                             t->world_name);
+                                } else {
+                                    char parent_dir[MAX_PATH_LENGTH];
+                                    if (get_parent_directory(t->saves_path, parent_dir, sizeof(parent_dir), 1)) {
+                                        snprintf(start_path, sizeof(start_path), "%s/stats/", parent_dir);
+                                    } else {
+                                        strncpy(start_path, t->saves_path, sizeof(start_path));
+                                    }
+                                }
+                            } else {
+                                snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
+                            }
+                            const char *json_filter[1] = {"*.json"};
+                            const char *dat_filter[1] = {"*.dat"};
+                            const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
+                                                               ? dat_filter
+                                                               : json_filter;
+                            const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
+                                                          ? "DAT files"
+                                                          : "JSON files";
+                            const char *selection = tinyfd_openFileDialog(
+                                "Select Player Stats File", start_path, 1, selected_filter, filter_desc, 0);
+                            if (selection) {
+                                import_error_message[0] = '\0';
+                                if (parse_player_stats_for_import(selection, creator_selected_version, importable_stats,
+                                                                  import_error_message, sizeof(import_error_message))) {
+                                    show_import_stats_popup = true;
+                                    last_clicked_stat_index = -1;
+                                } else {
+                                    save_message_type = MSG_ERROR;
+                                    strncpy(status_message, import_error_message, sizeof(status_message) - 1);
+                                }
+                            }
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip[512];
+
+                            if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                if (app_settings->using_stats_per_world_legacy) {
+                                    // Legacy using stats per world
+                                    snprintf(tooltip, sizeof(tooltip),
+                                             "Import sub-stats directly from a local world's player stats/achievements .dat file.\n"
+                                             "Cannot import already existing root names within this stat category.");
+                                } else {
+                                    // Legacy not using stats per world
+                                    snprintf(tooltip, sizeof(tooltip),
+                                             "Import sub-stats directly from a global world's player stats/achievements .dat file.\n"
+                                             "Cannot import already existing root names within this stat category.");
+                                }
+                            } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                // Mid-era
+                                snprintf(tooltip, sizeof(tooltip),
+                                         "Import sub-stats directly from a world's player stats/achievements .json file.\n"
+                                         "Cannot import already existing root names within this stat category.");
+                            } else {
+                                // Modern
+                                snprintf(tooltip, sizeof(tooltip),
+                                         "Import sub-stats directly from a world's player stats .json file.\n"
+                                         "Cannot import already existing root names within this stat category.");
+                            }
+                            ImGui::SetTooltip("%s", tooltip);
+                        }
+                        ImGui::SameLine();
 
                         // Add Criterion button only for multi-stat categories -> complex stats
                         if (ImGui::Button("Add New Sub-Stat")) {
@@ -4936,15 +5029,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 // Handle Copying
                 if (goal_to_copy_idx != -1) {
                     const EditorMultiStageGoal *source_goal_ptr = goals_to_render[goal_to_copy_idx];
-                    EditorMultiStageGoal new_goal = *source_goal_ptr;
-                    // ... (logic to generate unique name for new_goal) ...
+
+                    // Perform a manual, safe copy to prevent memory corruption.
+                    EditorMultiStageGoal new_goal;
+                    strncpy(new_goal.root_name, source_goal_ptr->root_name, sizeof(new_goal.root_name));
+                    new_goal.root_name[sizeof(new_goal.root_name) - 1] = '\0';
+                    strncpy(new_goal.display_name, source_goal_ptr->display_name, sizeof(new_goal.display_name));
+                    new_goal.display_name[sizeof(new_goal.display_name) - 1] = '\0';
+                    strncpy(new_goal.icon_path, source_goal_ptr->icon_path, sizeof(new_goal.icon_path));
+                    new_goal.icon_path[sizeof(new_goal.icon_path) - 1] = '\0';
+                    new_goal.is_hidden = source_goal_ptr->is_hidden;
+                    new_goal.stages = source_goal_ptr->stages; // std::vector handles its own deep copy safely.
+
+                    // Now, generate a unique name for the new copy
                     char base_name[192];
-                    strncpy(base_name, source_goal_ptr->root_name, sizeof(base_name) - 1);
-                    base_name[sizeof(base_name) - 1] = '\0';
+                    strncpy(base_name, new_goal.root_name, sizeof(base_name));
+                    base_name[sizeof(base_name) - 1] = '\0'; // Ensure base_name is safe to use
+
                     char new_name[192];
                     int copy_counter = 1;
                     while (true) {
-                        snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter++);
+                        if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
+                        else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
                         bool name_exists = false;
                         for (const auto &g: current_template_data.multi_stage_goals) {
                             if (strcmp(g.root_name, new_name) == 0) {
@@ -4953,9 +5059,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                         }
                         if (!name_exists) break;
+                        copy_counter++;
                     }
-                    strncpy(new_goal.root_name, new_name, sizeof(new_goal.root_name) - 1);
+
+                    // Safely apply the new unique name
+                    strncpy(new_goal.root_name, new_name, sizeof(new_goal.root_name));
                     new_goal.root_name[sizeof(new_goal.root_name) - 1] = '\0';
+
 
                     auto it = std::find_if(current_template_data.multi_stage_goals.begin(),
                                            current_template_data.multi_stage_goals.end(),
@@ -6274,11 +6384,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::EndPopup();
     } // End of import advancements popup
 
-    // In temp_creator_render_gui, near the other popups
+    // Import Stats OR Sub-Stats from file
+    const char *stats_import_title = (current_stat_import_mode == IMPORT_AS_SUB_STAT)
+                                         ? "Import Sub-Stats from File"
+                                         : "Import Stats from File";
+
     if (show_import_stats_popup) {
-        ImGui::OpenPopup("Import Stats from File");
+        ImGui::OpenPopup(stats_import_title);
     }
-    if (ImGui::BeginPopupModal("Import Stats from File", &show_import_stats_popup, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal(stats_import_title, &show_import_stats_popup, ImGuiWindowFlags_AlwaysAutoResize)) {
         // Hotkey logic for search bar
         if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
             ImGui::IsKeyPressed(ImGuiKey_F)) {
@@ -6308,8 +6422,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[256];
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Selects all stats in the current search.\n\nYou can also Shift+Click to select a range.");
+            if (current_stat_import_mode == IMPORT_AS_SUB_STAT) {
+                // Sub-stats
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Selects all sub-stats in the current search.\n\nYou can also Shift+Click to select a range.");
+            } else {
+                // Regular stats
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Selects all stats in the current search.\n\nYou can also Shift+Click to select a range.");
+            }
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
         ImGui::SameLine();
@@ -6320,8 +6441,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[256];
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Deselects all stats in the current search.\n\n"
-                     "You can also Shift+Click to deselect a range.");
+            if (current_stat_import_mode == IMPORT_AS_SUB_STAT) {
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Deselects all sub-stats in the current search.\n\n"
+                         "You can also Shift+Click to deselect a range.");
+            } else {
+                // Regular stats
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Deselects all stats in the current search.\n\n"
+                         "You can also Shift+Click to deselect a range.");
+            }
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
 
@@ -6348,15 +6475,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  sizeof(import_search_buffer));
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[256];
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Filter list by stat root name (case-insensitive).\nPress Ctrl+F or Cmd+F to focus.");
+            if (current_stat_import_mode == IMPORT_AS_SUB_STAT) {
+                // Sub-stats
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Filter list by sub-stat root name (case-insensitive).\nPress Ctrl+F or Cmd+F to focus.");
+            } else {
+                // Regular stats
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Filter list by stat root name (case-insensitive).\nPress Ctrl+F or Cmd+F to focus.");
+            }
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
         ImGui::Separator();
 
         // --- Render List or empty message ---
         if (importable_stats.empty()) {
-            ImGui::Text("No parsable stats found in the selected file.");
+            if (current_stat_import_mode == IMPORT_AS_SUB_STAT) {
+                // Sub-stats
+                ImGui::Text("No parsable sub-stats found in the selected file.");
+            } else {
+                // Regular stats
+                ImGui::Text("No parsable stats found in the selected file.");
+            }
         } else {
             ImGui::BeginChild("StatsImporterScrollingRegion", ImVec2(600, 400), true);
             for (size_t i = 0; i < filtered_stats.size(); ++i) {
@@ -6393,51 +6533,86 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         if (ImGui::Button("Confirm Import", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
             import_error_message[0] = '\0';
-            std::unordered_set<std::string> existing_names;
-            for (const auto &existing_stat: current_template_data.stats) {
-                // For simple stats, the unique ID is in the criterion's root_name.
-                if (existing_stat.is_simple_stat && !existing_stat.criteria.empty()) {
-                    existing_names.insert(existing_stat.criteria[0].root_name);
-                }
-            }
 
-            for (const auto &new_stat: importable_stats) {
-                if (new_stat.is_selected) {
-                    if (existing_names.count(new_stat.root_name)) {
-                        snprintf(import_error_message, sizeof(import_error_message), "Error: Stat '%s' already exists.",
-                                 new_stat.root_name.c_str());
-                        break;
+            if (current_stat_import_mode == IMPORT_AS_SUB_STAT) {
+                // --- Logic to import as SUB-STATS (CRITERIA) ---
+                if (selected_stat != nullptr) {
+                    std::unordered_set<std::string> existing_names;
+                    for (const auto &crit: selected_stat->criteria) {
+                        existing_names.insert(crit.root_name);
                     }
-                    EditorTrackableCategory imported_stat = {};
-                    strncpy(imported_stat.root_name, new_stat.root_name.c_str(), sizeof(imported_stat.root_name) - 1);
-                    imported_stat.root_name[sizeof(imported_stat.root_name) - 1] = '\0';
-
-                    strncpy(imported_stat.display_name, new_stat.root_name.c_str(),
-                            sizeof(imported_stat.display_name) - 1);
-                    imported_stat.display_name[sizeof(imported_stat.display_name) - 1] = '\0';
-
-                    strncpy(imported_stat.icon_path, "blocks/placeholder.png", sizeof(imported_stat.icon_path) - 1);
-                    imported_stat.icon_path[sizeof(imported_stat.icon_path) - 1] = '\0';
-                    imported_stat.is_simple_stat = true;
-
-                    EditorTrackableItem crit = {};
-                    strncpy(crit.root_name, new_stat.root_name.c_str(), sizeof(crit.root_name) - 1);
-                    crit.root_name[sizeof(crit.root_name) - 1] = '\0';
-                    crit.goal = 1;
-                    imported_stat.criteria.push_back(crit);
-
-                    current_template_data.stats.push_back(imported_stat);
+                    for (const auto &new_stat: importable_stats) {
+                        if (new_stat.is_selected) {
+                            if (existing_names.count(new_stat.root_name)) {
+                                snprintf(import_error_message, sizeof(import_error_message),
+                                         "Error: Sub-stat '%s' already exists.", new_stat.root_name.c_str());
+                                break;
+                            }
+                            EditorTrackableItem new_crit = {};
+                            strncpy(new_crit.root_name, new_stat.root_name.c_str(), sizeof(new_crit.root_name) - 1);
+                            new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
+                            strncpy(new_crit.display_name, new_stat.root_name.c_str(),
+                                    sizeof(new_crit.display_name) - 1);
+                            new_crit.display_name[sizeof(new_crit.display_name) - 1] = '\0';
+                            strncpy(new_crit.icon_path, "blocks/placeholder.png", sizeof(new_crit.icon_path) - 1);
+                            new_crit.icon_path[sizeof(new_crit.icon_path) - 1] = '\0';
+                            new_crit.goal = 1;
+                            selected_stat->criteria.push_back(new_crit);
+                        }
+                    }
+                }
+            } else {
+                // --- Logic to import as TOP-LEVEL STATS ---
+                std::unordered_set<std::string> existing_names;
+                for (const auto &existing_stat: current_template_data.stats) {
+                    if (existing_stat.is_simple_stat && !existing_stat.criteria.empty()) {
+                        existing_names.insert(existing_stat.criteria[0].root_name);
+                    }
+                }
+                for (const auto &new_stat: importable_stats) {
+                    if (new_stat.is_selected) {
+                        if (existing_names.count(new_stat.root_name)) {
+                            snprintf(import_error_message, sizeof(import_error_message),
+                                     "Error: Stat '%s' already exists.", new_stat.root_name.c_str());
+                            break;
+                        }
+                        EditorTrackableCategory imported_stat = {};
+                        strncpy(imported_stat.root_name, new_stat.root_name.c_str(),
+                                sizeof(imported_stat.root_name) - 1);
+                        imported_stat.root_name[sizeof(imported_stat.root_name) - 1] = '\0';
+                        strncpy(imported_stat.display_name, new_stat.root_name.c_str(),
+                                sizeof(imported_stat.display_name) - 1);
+                        imported_stat.display_name[sizeof(imported_stat.display_name) - 1] = '\0';
+                        strncpy(imported_stat.icon_path, "blocks/placeholder.png", sizeof(imported_stat.icon_path) - 1);
+                        imported_stat.icon_path[sizeof(imported_stat.icon_path) - 1] = '\0';
+                        imported_stat.is_simple_stat = true;
+                        EditorTrackableItem crit = {};
+                        strncpy(crit.root_name, new_stat.root_name.c_str(), sizeof(crit.root_name) - 1);
+                        crit.root_name[sizeof(crit.root_name) - 1] = '\0';
+                        crit.goal = 1;
+                        imported_stat.criteria.push_back(crit);
+                        current_template_data.stats.push_back(imported_stat);
+                    }
                 }
             }
+
             if (import_error_message[0] == '\0') {
                 show_import_stats_popup = false;
                 import_search_buffer[0] = '\0';
             }
         }
+
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[256];
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Import selected stats into the template.\n(You can also press ENTER)");
+            if (current_stat_import_mode == IMPORT_AS_SUB_STAT) {
+                // Sub-stats
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Import selected sub-stats into the template.\n(You can also press ENTER)");
+            } else {
+                // Regular stats
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Import selected stats into the template.\n(You can also press ENTER)");
+            }
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
         ImGui::SameLine();
@@ -6455,7 +6630,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // --- Display the counter, aligned to the right ---
         ImGui::SameLine();
         char counter_text[128];
-        snprintf(counter_text, sizeof(counter_text), "Selected: %d Stats", selected_stats_count);
+        snprintf(counter_text, sizeof(counter_text), "Selected: %d %s", selected_stats_count,
+                 (current_stat_import_mode == IMPORT_AS_SUB_STAT) ? "Sub-Stats" : "Stats");
 
         // Calculate position to right-align the text
         float text_width = ImGui::CalcTextSize(counter_text).x;
