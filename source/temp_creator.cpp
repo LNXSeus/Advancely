@@ -1329,8 +1329,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static char import_search_buffer[256] = "";
     static bool import_select_criteria = false;
     static int last_clicked_adv_index = -1;
-    static int last_clicked_crit_index = -1;
-    static ImportableAdvancement *last_clicked_crit_parent = nullptr;
+    [[maybe_unused]] static int last_clicked_crit_index = -1;
+    [[maybe_unused]] static ImportableAdvancement *last_clicked_crit_parent = nullptr;
     static bool focus_import_search = false;
 
     // Stats
@@ -1346,6 +1346,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static bool show_import_unlocks_popup = false;
     static std::vector<ImportableUnlock> importable_unlocks;
     static int last_clicked_unlock_index = -1;
+
+    // For multi-purpose import popups
+    enum ImportMode { BATCH_IMPORT, SINGLE_SELECT_STAGE };
+    static ImportMode current_import_mode = BATCH_IMPORT; // Default to import multiple
+    static EditorSubGoal *stage_to_edit = nullptr;
 
     // --- Version-dependent labels ---
     MC_Version creator_selected_version = settings_get_version_from_string(creator_version_str);
@@ -5507,6 +5512,101 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
+
+                            ImGui::SameLine();
+                            if (ImGui::Button("Import##StageTrigger")) {
+                                current_import_mode = SINGLE_SELECT_STAGE; // One item selectable on import
+                                stage_to_edit = &stage; // Remember which stage we're editing
+
+                                // Prepare to open the correct file dialog and popup
+                                char start_path[MAX_PATH_LENGTH];
+                                const char *selection = nullptr;
+
+                                switch (stage.type) {
+                                    case SUBGOAL_STAT: {
+                                        if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                            if (app_settings->using_stats_per_world_legacy)
+                                                snprintf(
+                                                    start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
+                                                    t->world_name);
+                                            else if (get_parent_directory(
+                                                t->saves_path, start_path, sizeof(start_path), 1))
+                                                snprintf(
+                                                    start_path, sizeof(start_path), "%s/stats/", start_path);
+                                        } else {
+                                            snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
+                                                     t->world_name);
+                                        }
+                                        const char *json_filter[] = {"*.json"};
+                                        const char *dat_filter[] = {"*.dat"};
+                                        selection = tinyfd_openFileDialog(
+                                            "Select Player Stats File", start_path, 1,
+                                            (creator_selected_version <= MC_VERSION_1_6_4) ? dat_filter : json_filter,
+                                            (creator_selected_version <= MC_VERSION_1_6_4) ? "DAT files" : "JSON files",
+                                            0);
+                                        if (selection && parse_player_stats_for_import(
+                                                selection, creator_selected_version, importable_stats,
+                                                import_error_message, sizeof(import_error_message))) {
+                                            show_import_stats_popup = true;
+                                        }
+                                        break;
+                                    }
+                                    case SUBGOAL_ADVANCEMENT:
+                                    case SUBGOAL_CRITERION: {
+                                        if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                            if (app_settings->using_stats_per_world_legacy)
+                                                snprintf(
+                                                    start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
+                                                    t->world_name);
+                                            else if (get_parent_directory(
+                                                t->saves_path, start_path, sizeof(start_path), 1))
+                                                snprintf(
+                                                    start_path, sizeof(start_path), "%s/stats/", start_path);
+                                        } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                            snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
+                                                     t->world_name);
+                                        } else {
+                                            snprintf(start_path, sizeof(start_path), "%s/%s/advancements/",
+                                                     t->saves_path, t->world_name);
+                                        }
+                                        const char *json_filter[] = {"*.json"};
+                                        const char *dat_filter[] = {"*.dat"};
+                                        selection = tinyfd_openFileDialog(
+                                            "Select Player File", start_path, 1,
+                                            (creator_selected_version <= MC_VERSION_1_6_4) ? dat_filter : json_filter,
+                                            (creator_selected_version <= MC_VERSION_1_6_4) ? "DAT files" : "JSON files",
+                                            0);
+                                        if (selection && parse_player_advancements_for_import(
+                                                selection, creator_selected_version, importable_advancements,
+                                                import_error_message, sizeof(import_error_message))) {
+                                            show_import_advancements_popup = true;
+                                        }
+                                        break;
+                                    }
+                                    case SUBGOAL_UNLOCK: {
+                                        snprintf(start_path, sizeof(start_path), "%s/%s/unlocks/", t->saves_path,
+                                                 t->world_name);
+                                        const char *filter_patterns[1] = {"*.json"};
+                                        selection = tinyfd_openFileDialog(
+                                            "Select Player Unlocks File", start_path, 1, filter_patterns, "JSON files",
+                                            0);
+                                        if (selection && parse_player_unlocks_for_import(
+                                                selection, importable_unlocks, import_error_message,
+                                                sizeof(import_error_message))) {
+                                            show_import_unlocks_popup = true;
+                                        }
+                                        break;
+                                    }
+                                    default:
+                                        break;
+                                }
+                                if (selection && !show_import_stats_popup && !show_import_advancements_popup && !
+                                    show_import_unlocks_popup) {
+                                    save_message_type = MSG_ERROR;
+                                    strncpy(status_message, import_error_message, sizeof(status_message) - 1);
+                                }
+                            }
+
                             if (ImGui::InputInt("Target Value", &stage.required_progress)) {
                                 ms_goal_data_changed = true;
                                 save_message_type = MSG_NONE;
@@ -6075,83 +6175,87 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
 
         // --- Selection Controls & Search Bar (now operating on the filtered list) ---
-        if (ImGui::Button("Select All")) {
-            for (auto *adv_ptr: filtered_advancements) {
-                adv_ptr->is_selected = true;
-                if (import_select_criteria) {
-                    bool parent_matched = str_contains_insensitive(adv_ptr->root_name.c_str(), import_search_buffer);
-                    for (auto &crit: adv_ptr->criteria) {
-                        // Select criteria only if they are visible (parent matched or they matched themselves)
-                        if (import_search_buffer[0] == '\0' || parent_matched || str_contains_insensitive(
-                                crit.root_name.c_str(), import_search_buffer)) {
-                            crit.is_selected = true;
+        if (current_import_mode == BATCH_IMPORT) {
+            // Selecting multiple, not multi-stage goal stage
+            if (ImGui::Button("Select All")) {
+                for (auto *adv_ptr: filtered_advancements) {
+                    adv_ptr->is_selected = true;
+                    if (import_select_criteria) {
+                        bool parent_matched =
+                                str_contains_insensitive(adv_ptr->root_name.c_str(), import_search_buffer);
+                        for (auto &crit: adv_ptr->criteria) {
+                            // Select criteria only if they are visible (parent matched or they matched themselves)
+                            if (import_search_buffer[0] == '\0' || parent_matched || str_contains_insensitive(
+                                    crit.root_name.c_str(), import_search_buffer)) {
+                                crit.is_selected = true;
+                            }
                         }
                     }
                 }
             }
-        }
-        if (ImGui::IsItemHovered()) {
-            char select_all_tooltip_buffer[512];
-            if (creator_selected_version <= MC_VERSION_1_6_4) {
-                // Legacy
-                snprintf(select_all_tooltip_buffer, sizeof(select_all_tooltip_buffer),
-                         "Selects all achievements visible in the current search.\n\n"
-                         "You can also Shift+Click to select a range of items.");
-            } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                // Mid-era
-                snprintf(select_all_tooltip_buffer, sizeof(select_all_tooltip_buffer),
-                         "Selects all achievements visible in the current search.\n"
-                         "Also selects their criteria if 'Include Criteria' is checked.\n\n"
-                         "You can also Shift+Click to select a range of items.");
-            } else {
-                // Modern
-                snprintf(select_all_tooltip_buffer, sizeof(select_all_tooltip_buffer),
-                         "Selects all advancements/recipes visible in the current search.\n"
-                         "Also selects their criteria if 'Include Criteria' is checked.\n\n"
-                         "You can also Shift+Click to select a range of items.");
-            }
-            ImGui::SetTooltip("%s", select_all_tooltip_buffer);
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Deselect All")) {
-            for (auto *adv_ptr: filtered_advancements) {
-                if (import_select_criteria) {
-                    // Deselect ALL criteria of the visible parents, leaving parents selected
-                    for (auto &crit: adv_ptr->criteria) {
-                        crit.is_selected = false;
-                    }
+            if (ImGui::IsItemHovered()) {
+                char select_all_tooltip_buffer[512];
+                if (creator_selected_version <= MC_VERSION_1_6_4) {
+                    // Legacy
+                    snprintf(select_all_tooltip_buffer, sizeof(select_all_tooltip_buffer),
+                             "Selects all achievements visible in the current search.\n\n"
+                             "You can also Shift+Click to select a range of items.");
+                } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                    // Mid-era
+                    snprintf(select_all_tooltip_buffer, sizeof(select_all_tooltip_buffer),
+                             "Selects all achievements visible in the current search.\n"
+                             "Also selects their criteria if 'Include Criteria' is checked.\n\n"
+                             "You can also Shift+Click to select a range of items.");
                 } else {
-                    // Deselect everything (parents and their criteria)
-                    adv_ptr->is_selected = false;
-                    for (auto &crit: adv_ptr->criteria) {
-                        crit.is_selected = false;
+                    // Modern
+                    snprintf(select_all_tooltip_buffer, sizeof(select_all_tooltip_buffer),
+                             "Selects all advancements/recipes visible in the current search.\n"
+                             "Also selects their criteria if 'Include Criteria' is checked.\n\n"
+                             "You can also Shift+Click to select a range of items.");
+                }
+                ImGui::SetTooltip("%s", select_all_tooltip_buffer);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Deselect All")) {
+                for (auto *adv_ptr: filtered_advancements) {
+                    if (import_select_criteria) {
+                        // Deselect ALL criteria of the visible parents, leaving parents selected
+                        for (auto &crit: adv_ptr->criteria) {
+                            crit.is_selected = false;
+                        }
+                    } else {
+                        // Deselect everything (parents and their criteria)
+                        adv_ptr->is_selected = false;
+                        for (auto &crit: adv_ptr->criteria) {
+                            crit.is_selected = false;
+                        }
                     }
                 }
             }
-        }
-        if (ImGui::IsItemHovered()) {
-            char deselct_all_tooltip_buffer[512];
-            if (creator_selected_version <= MC_VERSION_1_6_4) {
-                snprintf(deselct_all_tooltip_buffer, sizeof(deselct_all_tooltip_buffer),
-                         "Deselects all achievements in the current search.\n\n"
-                         "You can also Shift+Click to deselect a range of items.");
-            } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                // Mid-era
-                snprintf(deselct_all_tooltip_buffer, sizeof(deselct_all_tooltip_buffer),
-                         "Deselects all achievements and criteria in the current search.\n\n"
-                         "If 'Include Criteria' is checked, only the criteria are deselected,\n"
-                         "leaving the parent achievements selected.\n\n"
-                         "You can also Shift+Click to deselect a range of items.");
-            } else {
-                // Modern
-                snprintf(deselct_all_tooltip_buffer, sizeof(deselct_all_tooltip_buffer),
-                         "Deselects all advancements/recipes and criteria in the current search.\n\n"
-                         "If 'Include Criteria' is checked, only the criteria are deselected,\n"
-                         "leaving the parent advancements selected.\n\n"
-                         "You can also Shift+Click to deselect a range of items.");
+            if (ImGui::IsItemHovered()) {
+                char deselct_all_tooltip_buffer[512];
+                if (creator_selected_version <= MC_VERSION_1_6_4) {
+                    snprintf(deselct_all_tooltip_buffer, sizeof(deselct_all_tooltip_buffer),
+                             "Deselects all achievements in the current search.\n\n"
+                             "You can also Shift+Click to deselect a range of items.");
+                } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                    // Mid-era
+                    snprintf(deselct_all_tooltip_buffer, sizeof(deselct_all_tooltip_buffer),
+                             "Deselects all achievements and criteria in the current search.\n\n"
+                             "If 'Include Criteria' is checked, only the criteria are deselected,\n"
+                             "leaving the parent achievements selected.\n\n"
+                             "You can also Shift+Click to deselect a range of items.");
+                } else {
+                    // Modern
+                    snprintf(deselct_all_tooltip_buffer, sizeof(deselct_all_tooltip_buffer),
+                             "Deselects all advancements/recipes and criteria in the current search.\n\n"
+                             "If 'Include Criteria' is checked, only the criteria are deselected,\n"
+                             "leaving the parent advancements selected.\n\n"
+                             "You can also Shift+Click to deselect a range of items.");
+                }
+                ImGui::SetTooltip("%s", deselct_all_tooltip_buffer);
             }
-            ImGui::SetTooltip("%s", deselct_all_tooltip_buffer);
-        }
+        } // End of batch import
 
         // --- Include Criteria Checkbox ONLY for 1.7+ ---
         if (creator_selected_version > MC_VERSION_1_6_4) {
@@ -6223,75 +6327,72 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::BeginChild("ImporterScrollingRegion", ImVec2(600, 400), true);
             for (size_t i = 0; i < filtered_advancements.size(); ++i) {
                 auto &adv = *filtered_advancements[i];
-
-                // --- Rendering Logic ---
                 ImGui::PushID(adv.root_name.c_str());
+
                 if (ImGui::Checkbox(adv.root_name.c_str(), &adv.is_selected)) {
-                    // Handle Shift+Click for range selection on the filtered list
-                    if (ImGui::GetIO().KeyShift && last_clicked_adv_index != -1) {
-                        int start = std::min((int) i, last_clicked_adv_index);
-                        int end = std::max((int) i, last_clicked_adv_index);
-                        for (int j = start; j <= end; ++j) {
-                            auto &ranged_adv = *filtered_advancements[j];
-                            ranged_adv.is_selected = adv.is_selected;
-                            if (import_select_criteria) {
-                                bool parent_matched = str_contains_insensitive(
-                                    ranged_adv.root_name.c_str(), import_search_buffer);
-                                for (auto &crit: ranged_adv.criteria) {
-                                    if (import_search_buffer[0] == '\0' || parent_matched || str_contains_insensitive(
-                                            crit.root_name.c_str(), import_search_buffer)) {
-                                        crit.is_selected = adv.is_selected;
-                                    }
+                    if (current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit->type != SUBGOAL_CRITERION) {
+                        if (adv.is_selected) {
+                            for (auto &other_adv: importable_advancements) {
+                                if (&other_adv != &adv) other_adv.is_selected = false;
+                                for (auto &crit: other_adv.criteria) crit.is_selected = false;
+                            }
+                        }
+                    } else if (current_import_mode == BATCH_IMPORT) {
+                        if (ImGui::GetIO().KeyShift && last_clicked_adv_index != -1) {
+                            int start = std::min((int) i, last_clicked_adv_index);
+                            int end = std::max((int) i, last_clicked_adv_index);
+                            for (int j = start; j <= end; ++j) {
+                                auto &ranged_adv = *filtered_advancements[j];
+                                ranged_adv.is_selected = adv.is_selected;
+                                if (import_select_criteria) {
+                                    for (auto &crit: ranged_adv.criteria) crit.is_selected = adv.is_selected;
                                 }
                             }
                         }
-                    }
-                    last_clicked_adv_index = i;
-                    last_clicked_crit_parent = nullptr;
-                    last_clicked_crit_index = -1;
-
-                    if (!adv.is_selected) {
-                        for (auto &crit: adv.criteria) {
-                            crit.is_selected = false;
+                        last_clicked_adv_index = i;
+                        last_clicked_crit_parent = nullptr;
+                        last_clicked_crit_index = -1;
+                        if (!adv.is_selected) {
+                            for (auto &crit: adv.criteria) crit.is_selected = false;
                         }
                     }
                 }
                 if (!adv.criteria.empty()) {
                     ImGui::Indent();
+                    bool parent_matched = str_contains_insensitive(adv.root_name.c_str(), import_search_buffer);
                     for (size_t j = 0; j < adv.criteria.size(); ++j) {
                         auto &crit = adv.criteria[j];
-
-                        // Only render criteria that are visible based on the search
-                        bool parent_matched = str_contains_insensitive(adv.root_name.c_str(), import_search_buffer);
-                        if (import_search_buffer[0] != '\0' && !parent_matched && !str_contains_insensitive(
-                                crit.root_name.c_str(), import_search_buffer)) {
+                        if (import_search_buffer[0] != '\0' && !parent_matched && !str_contains_insensitive(crit.root_name.c_str(), import_search_buffer)) {
                             continue;
                         }
 
                         if (ImGui::Checkbox(crit.root_name.c_str(), &crit.is_selected)) {
-                            if (crit.is_selected) {
-                                // If a child is checked, ensure parent is checked
-                                adv.is_selected = true;
-                            }
-                            // Handle Shift+Click for range selection of CRITERIA
-                            if (ImGui::GetIO().KeyShift && import_select_criteria && last_clicked_crit_parent == &adv &&
-                                last_clicked_crit_index != -1) {
-                                int start = std::min((int) j, last_clicked_crit_index);
-                                int end = std::max((int) j, last_clicked_crit_index);
-                                for (int k = start; k <= end; ++k) {
-                                    // Apply the selection ONLY if the item in the range is visible
-                                    auto &ranged_crit = adv.criteria[k];
-                                    if (import_search_buffer[0] == '\0' || parent_matched || str_contains_insensitive(
-                                            ranged_crit.root_name.c_str(), import_search_buffer)) {
-                                        ranged_crit.is_selected = crit.is_selected;
+                            if (current_import_mode == SINGLE_SELECT_STAGE) {
+                                if (crit.is_selected) {
+                                    for (auto &other_adv: importable_advancements) {
+                                        other_adv.is_selected = false;
+                                        for (auto &other_crit : other_adv.criteria) {
+                                            if (&other_crit != &crit) other_crit.is_selected = false;
+                                        }
+                                    }
+                                    adv.is_selected = true;
+                                }
+                            } else if (current_import_mode == BATCH_IMPORT) {
+                                if (crit.is_selected) adv.is_selected = true;
+                                if (ImGui::GetIO().KeyShift && import_select_criteria && last_clicked_crit_parent == &adv && last_clicked_crit_index != -1) {
+                                    int start = std::min((int) j, last_clicked_crit_index);
+                                    int end = std::max((int) j, last_clicked_crit_index);
+                                    for (int k = start; k <= end; ++k) {
+                                        auto &ranged_crit = adv.criteria[k];
+                                        if (import_search_buffer[0] == '\0' || parent_matched || str_contains_insensitive(ranged_crit.root_name.c_str(), import_search_buffer)) {
+                                            ranged_crit.is_selected = crit.is_selected;
+                                        }
                                     }
                                 }
+                                last_clicked_adv_index = -1;
+                                last_clicked_crit_parent = &adv;
+                                last_clicked_crit_index = j;
                             }
-
-                            // Update the last clicked criterion for the next selection
-                            last_clicked_adv_index = -1; // Reset parent range selection
-                            last_clicked_crit_parent = &adv;
-                            last_clicked_crit_index = j;
                         }
                     }
                     ImGui::Unindent();
@@ -6309,75 +6410,104 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         int selected_adv_count = 0;
         int selected_crit_count = 0;
         for (const auto &adv: importable_advancements) {
-            if (adv.is_selected) {
-                selected_adv_count++;
-            }
+            if (adv.is_selected) selected_adv_count++;
             for (const auto &crit: adv.criteria) {
-                if (crit.is_selected) {
-                    selected_crit_count++;
-                }
+                if (crit.is_selected) selected_crit_count++;
             }
         }
 
-        if (ImGui::Button("Confirm Import", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
-            import_error_message[0] = '\0'; // Clear previous error
-            bool has_duplicates = false;
+        // --- Bottom Controls ---
+        const char *confirm_text = (current_import_mode == SINGLE_SELECT_STAGE) ? "Select" : "Confirm Import";
 
-            // 1. Check for duplicate root names before importing
-            std::unordered_set<std::string> existing_names;
-            for (const auto &existing_adv: current_template_data.advancements) {
-                existing_names.insert(existing_adv.root_name);
-            }
-            for (const auto &new_adv: importable_advancements) {
-                if (new_adv.is_selected && existing_names.count(new_adv.root_name)) {
-                    snprintf(import_error_message, sizeof(import_error_message),
-                             "Error: Advancement '%s' already exists in the template.", new_adv.root_name.c_str());
-                    has_duplicates = true;
-                    break;
-                }
-            }
-
-            // 2. If no duplicates, proceed with import
-            if (!has_duplicates) {
-                for (const auto &new_adv: importable_advancements) {
-                    if (new_adv.is_selected) {
-                        EditorTrackableCategory imported_cat = {};
-                        strncpy(imported_cat.root_name, new_adv.root_name.c_str(), sizeof(imported_cat.root_name) - 1);
-                        imported_cat.root_name[sizeof(imported_cat.root_name) - 1] = '\0';
-                        strncpy(imported_cat.display_name, new_adv.root_name.c_str(),
-                                sizeof(imported_cat.display_name) - 1); // Default display name
-                        imported_cat.display_name[sizeof(imported_cat.display_name) - 1] = '\0';
-                        strncpy(imported_cat.icon_path, "blocks/placeholder.png", sizeof(imported_cat.icon_path) - 1);
-                        imported_cat.icon_path[sizeof(imported_cat.icon_path) - 1] = '\0';
-
-                        // Rule C: Check for recipes
-                        if (new_adv.root_name.find(":recipes/") != std::string::npos) {
-                            imported_cat.is_recipe = true;
-                        }
-
-                        // Rules A & B: Determine if criteria should be added
-                        bool is_simple = new_adv.is_done && new_adv.criteria.size() == 1;
-                        if (!is_simple) {
-                            for (const auto &new_crit: new_adv.criteria) {
-                                if (new_crit.is_selected) {
-                                    EditorTrackableItem imported_crit = {};
-                                    strncpy(imported_crit.root_name, new_crit.root_name.c_str(),
-                                            sizeof(imported_crit.root_name) - 1);
-                                    imported_crit.root_name[sizeof(imported_crit.root_name) - 1] = '\0';
-                                    strncpy(imported_crit.display_name, new_crit.root_name.c_str(),
-                                            sizeof(imported_crit.display_name) - 1);
-                                    imported_crit.display_name[sizeof(imported_crit.display_name) - 1] = '\0';
-                                    strncpy(imported_crit.icon_path, "blocks/placeholder.png",
-                                            sizeof(imported_crit.icon_path) - 1);
-                                    imported_crit.icon_path[sizeof(imported_crit.icon_path) - 1] = '\0';
-                                    imported_cat.criteria.push_back(imported_crit);
-                                }
-                            }
-                        }
-                        current_template_data.advancements.push_back(imported_cat);
+        if (ImGui::Button(confirm_text, ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+            if (current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit != nullptr) {
+                // Part of a stage import
+                ImportableAdvancement* selected_adv = nullptr;
+                ImportableCriterion* selected_crit = nullptr;
+                for (auto &adv : importable_advancements) {
+                    if (adv.is_selected) selected_adv = &adv;
+                    for (auto &crit : adv.criteria) {
+                        if (crit.is_selected) selected_crit = &crit;
                     }
                 }
+                if (stage_to_edit->type == SUBGOAL_CRITERION && selected_crit != nullptr && selected_adv != nullptr) {
+                    strncpy(stage_to_edit->parent_advancement, selected_adv->root_name.c_str(), sizeof(stage_to_edit->parent_advancement) - 1);
+                    stage_to_edit->parent_advancement[sizeof(stage_to_edit->parent_advancement) - 1] = '\0';
+                    strncpy(stage_to_edit->root_name, selected_crit->root_name.c_str(), sizeof(stage_to_edit->root_name) - 1);
+                    stage_to_edit->root_name[sizeof(stage_to_edit->root_name) - 1] = '\0';
+                } else if (stage_to_edit->type == SUBGOAL_ADVANCEMENT && selected_adv != nullptr) {
+                    strncpy(stage_to_edit->root_name, selected_adv->root_name.c_str(), sizeof(stage_to_edit->root_name) - 1);
+                    stage_to_edit->root_name[sizeof(stage_to_edit->root_name) - 1] = '\0';
+                }
                 show_import_advancements_popup = false;
+            } else {
+                // Regular batch import
+                import_error_message[0] = '\0'; // Clear previous error
+                bool has_duplicates = false;
+
+                // 1. Check for duplicate root names before importing
+                std::unordered_set<std::string> existing_names;
+                for (const auto &existing_adv: current_template_data.advancements) {
+                    existing_names.insert(existing_adv.root_name);
+                }
+                for (const auto &new_adv: importable_advancements) {
+                    if (new_adv.is_selected && existing_names.count(new_adv.root_name)) {
+                        snprintf(import_error_message, sizeof(import_error_message),
+                                 "Error: Advancement '%s' already exists in the template.", new_adv.root_name.c_str());
+                        has_duplicates = true;
+                        break;
+                    }
+                }
+
+                // 2. If no duplicates, proceed with import
+                if (!has_duplicates) {
+                    for (const auto &new_adv: importable_advancements) {
+                        if (new_adv.is_selected) {
+                            EditorTrackableCategory imported_cat = {};
+                            strncpy(imported_cat.root_name, new_adv.root_name.c_str(),
+                                    sizeof(imported_cat.root_name) - 1);
+                            imported_cat.root_name[sizeof(imported_cat.root_name) - 1] = '\0';
+                            strncpy(imported_cat.display_name, new_adv.root_name.c_str(),
+                                    sizeof(imported_cat.display_name) - 1); // Default display name
+                            imported_cat.display_name[sizeof(imported_cat.display_name) - 1] = '\0';
+                            strncpy(imported_cat.icon_path, "blocks/placeholder.png",
+                                    sizeof(imported_cat.icon_path) - 1);
+                            imported_cat.icon_path[sizeof(imported_cat.icon_path) - 1] = '\0';
+
+                            // Rule C: Check for recipes
+                            if (new_adv.root_name.find(":recipes/") != std::string::npos) {
+                                imported_cat.is_recipe = true;
+                            }
+
+                            // Rules A & B: Determine if criteria should be added
+                            bool is_simple = new_adv.is_done && new_adv.criteria.size() == 1;
+                            if (!is_simple) {
+                                for (const auto &new_crit: new_adv.criteria) {
+                                    if (new_crit.is_selected) {
+                                        EditorTrackableItem imported_crit = {};
+                                        strncpy(imported_crit.root_name, new_crit.root_name.c_str(),
+                                                sizeof(imported_crit.root_name) - 1);
+                                        imported_crit.root_name[sizeof(imported_crit.root_name) - 1] = '\0';
+                                        strncpy(imported_crit.display_name, new_crit.root_name.c_str(),
+                                                sizeof(imported_crit.display_name) - 1);
+                                        imported_crit.display_name[sizeof(imported_crit.display_name) - 1] = '\0';
+                                        strncpy(imported_crit.icon_path, "blocks/placeholder.png",
+                                                sizeof(imported_crit.icon_path) - 1);
+                                        imported_crit.icon_path[sizeof(imported_crit.icon_path) - 1] = '\0';
+                                        imported_cat.criteria.push_back(imported_crit);
+                                    }
+                                }
+                            }
+                            current_template_data.advancements.push_back(imported_cat);
+                        }
+                    }
+                    show_import_advancements_popup = false;
+                }
+            }
+            if (!show_import_advancements_popup) {
+                // If closed
+                current_import_mode = BATCH_IMPORT;
+                stage_to_edit = nullptr;
                 import_search_buffer[0] = '\0'; // Clear search after import
             }
         }
@@ -6389,6 +6519,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            show_import_advancements_popup = false;
+            current_import_mode = BATCH_IMPORT;
+            stage_to_edit = nullptr;
             import_error_message[0] = '\0';
             show_import_advancements_popup = false;
             import_search_buffer[0] = '\0'; // Clear search after cancel
@@ -6425,9 +6558,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     } // End of import advancements popup
 
     // Import Stats OR Sub-Stats from file
-    const char *stats_import_title = (current_stat_import_mode == IMPORT_AS_SUB_STAT)
-                                         ? "Import Sub-Stats from File"
-                                         : "Import Stats from File";
+    const char *stats_import_title = (current_import_mode == SINGLE_SELECT_STAGE) ? "Select Stat from File"
+                                    : (current_stat_import_mode == IMPORT_AS_SUB_STAT) ? "Import Sub-Stats from File"
+                                    : "Import Stats from File";
 
     if (show_import_stats_popup) {
         ImGui::OpenPopup(stats_import_title);
@@ -6683,10 +6816,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
 
     // Import Unlocks from file
+    const char *unlocks_import_title = (current_import_mode == SINGLE_SELECT_STAGE) ? "Select Unlock from File"
+                                        : "Import Unlocks from File";
+
     if (show_import_unlocks_popup) {
-        ImGui::OpenPopup("Import Unlocks from File");
+        ImGui::OpenPopup(unlocks_import_title);
     }
-    if (ImGui::BeginPopupModal("Import Unlocks from File", &show_import_unlocks_popup,
+    if (ImGui::BeginPopupModal(unlocks_import_title, &show_import_unlocks_popup,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         // Hotkey logic for search bar
         if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
