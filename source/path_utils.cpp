@@ -142,6 +142,7 @@ void find_player_data_files(
             if (CompareFileTime(&find_world_data.ftLastWriteTime, &latest_time) > 0) {
                 latest_time = find_world_data.ftLastWriteTime;
                 strncpy(latest_world_name, find_world_data.cFileName, sizeof(latest_world_name) - 1);
+                latest_world_name[sizeof(latest_world_name) - 1] = '\0';
             }
         }
     } while (FindNextFileA(h_find_world, &find_world_data) != 0);
@@ -149,11 +150,13 @@ void find_player_data_files(
 
     if (strlen(latest_world_name) > 0) {
         strncpy(out_world_name, latest_world_name, max_len - 1);
+        out_world_name[max_len - 1] = '\0';
         if (settings) {
             log_message(LOG_INFO, "[PATH UTILS] Found latest world: %s\n", out_world_name);
         }
     } else {
         strncpy(out_world_name, "No Worlds Found", max_len - 1);
+        out_world_name[max_len - 1] = '\0';
     }
 
     // --- Determine paths based on version and mod flag ---
@@ -180,6 +183,7 @@ void find_player_data_files(
             // STANDARD LEGACY: Look for global .dat file
             char mc_root_path[MAX_PATH_LENGTH];
             strncpy(mc_root_path, saves_path, sizeof(mc_root_path) - 1);
+            mc_root_path[sizeof(mc_root_path) - 1] = '\0';
             char *last_slash = strrchr(mc_root_path, '/');
             if (last_slash) *last_slash = '\0';
 
@@ -279,6 +283,7 @@ void find_player_data_files(
                 if (stat_buf.st_mtime > latest_time) {
                     latest_time = stat_buf.st_mtime;
                     strncpy(latest_world_name, entry->d_name, sizeof(latest_world_name) - 1);
+                    latest_world_name[sizeof(latest_world_name) - 1] = '\0';
                 }
             }
         }
@@ -287,11 +292,13 @@ void find_player_data_files(
 
     if (strlen(latest_world_name) > 0) {
         strncpy(out_world_name, latest_world_name, max_len - 1);
+        out_world_name[max_len - 1] = '\0';
         if (settings) {
             log_message(LOG_INFO,"[PATH UTILS] Found latest world: %s\n", out_world_name);
         }
     } else {
         strncpy(out_world_name, "No Worlds Found", max_len - 1);
+        out_world_name[max_len - 1] = '\0';
     }
 
     // --- Determine paths based on version and mod flag ---
@@ -319,6 +326,7 @@ void find_player_data_files(
             // STANDARD LEGACY: Look for global .dat file
             char mc_root_path[MAX_PATH_LENGTH];
             strncpy(mc_root_path, saves_path, sizeof(mc_root_path) - 1);
+            mc_root_path[sizeof(mc_root_path) - 1] = '\0';
             char *last_slash = strrchr(mc_root_path, '/');
             if (last_slash) *last_slash = '\0';
 

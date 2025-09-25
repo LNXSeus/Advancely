@@ -398,6 +398,7 @@ bool validate_and_create_template(const char *version, const char *category, con
     // 3. Construct Paths
     char version_filename[64];
     strncpy(version_filename, version, sizeof(version_filename) - 1);
+    version_filename[sizeof(version_filename) - 1] = '\0';
     for (char *p = version_filename; *p; p++) {
         if (*p == '.') *p = '_';
     }
@@ -488,6 +489,7 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
     // 3. Construct Source Paths
     char src_version_filename[64];
     strncpy(src_version_filename, src_version, sizeof(src_version_filename) - 1);
+    src_version_filename[sizeof(src_version_filename) - 1] = '\0';
     for (char *p = src_version_filename; *p; p++) { if (*p == '.') *p = '_'; }
 
     char src_base_path[MAX_PATH_LENGTH];
@@ -591,6 +593,7 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
 bool delete_template_files(const char *version, const char *category, const char *flag) {
     char version_filename[64];
     strncpy(version_filename, version, sizeof(version_filename) - 1);
+    version_filename[sizeof(version_filename) - 1] = '\0';
     for (char *p = version_filename; *p; p++) { if (*p == '.') *p = '_'; }
 
     char base_filename[MAX_PATH_LENGTH];
@@ -1001,6 +1004,7 @@ static bool parse_template_filename(const char *filename, char *out_version, cha
 
     if (!version_match) return false; // No valid version found at the start of the filename
     strncpy(out_version, version_match, 64 - 1);
+    out_version[64 - 1] = '\0';
 
     // The rest of the string is category + optional flag
     std::string remainder = fname_str.substr(best_match_len);
@@ -1075,6 +1079,7 @@ bool get_info_from_zip(const char *zip_path, char *out_version, char *out_catego
                 return false;
             }
             strncpy(main_template_filename, file_stat.m_filename, sizeof(main_template_filename) - 1);
+            main_template_filename[sizeof(main_template_filename) - 1] = '\0';
         }
     }
 
@@ -1170,6 +1175,7 @@ bool execute_import_from_zip(const char *zip_path, const char *version, const ch
         } else {
             // Not a core template file, extract with original name to preserve any extra files
             strncpy(new_filename, original_filename, sizeof(new_filename) - 1);
+            new_filename[sizeof(new_filename) - 1] = '\0';
         }
 
         char dest_path[MAX_PATH_LENGTH];

@@ -216,10 +216,16 @@ void settings_set_defaults(AppSettings *settings) {
     // TODO: Make sure to add any new default values here and to the tooltip in settings_render_gui() ---------
     // Set safe defaults first -> defined in settings_utils.h
     strncpy(settings->version_str, DEFAULT_VERSION, sizeof(settings->version_str) - 1);
+    settings->version_str[sizeof(settings->version_str) - 1] = '\0';
+
     settings->path_mode = PATH_MODE_AUTO;
     settings->manual_saves_path[0] = '\0';
     strncpy(settings->category, DEFAULT_CATEGORY, sizeof(settings->category) - 1);
+    settings->category[sizeof(settings->category) - 1] = '\0';
+
     strncpy(settings->optional_flag, DEFAULT_OPTIONAL_FLAG, sizeof(settings->optional_flag) - 1);
+    settings->optional_flag[sizeof(settings->optional_flag) - 1] = '\0';
+
     settings->lang_flag[0] = '\0';
 
     // Set the default section order
@@ -247,10 +253,15 @@ void settings_set_defaults(AppSettings *settings) {
     settings->show_welcome_on_startup = DEFAULT_SHOW_WELCOME_ON_STARTUP;
 
     strncpy(settings->tracker_font_name, DEFAULT_TRACKER_FONT, sizeof(settings->tracker_font_name) - 1);
+    settings->tracker_font_name[sizeof(settings->tracker_font_name) - 1] = '\0';
+
     settings->tracker_font_size = DEFAULT_TRACKER_FONT_SIZE;
     strncpy(settings->ui_font_name, DEFAULT_UI_FONT, sizeof(settings->ui_font_name) - 1);
+    settings->ui_font_name[sizeof(settings->ui_font_name) - 1] = '\0';
+
     settings->ui_font_size = DEFAULT_UI_FONT_SIZE;
     strncpy(settings->overlay_font_name, DEFAULT_OVERLAY_FONT, sizeof(settings->overlay_font_name) - 1);
+    settings->overlay_font_name[sizeof(settings->overlay_font_name) - 1] = '\0';
 
     // Default Geometry
     WindowRect default_window = {DEFAULT_WINDOW_POS, DEFAULT_WINDOW_POS, DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE};
@@ -301,45 +312,52 @@ bool settings_load(AppSettings *settings) {
     }
 
     const cJSON *manual_path_json = cJSON_GetObjectItem(json, "manual_saves_path");
-    if (manual_path_json && cJSON_IsString(manual_path_json))
+    if (manual_path_json && cJSON_IsString(manual_path_json)) {
         strncpy(settings->manual_saves_path, manual_path_json->valuestring,
                 sizeof(settings->manual_saves_path) - 1);
-    else {
+        settings->manual_saves_path[sizeof(settings->manual_saves_path) - 1] = '\0';
+    } else {
         settings->manual_saves_path[0] = '\0';
         defaults_were_used = true;
     }
 
     const cJSON *version_json = cJSON_GetObjectItem(json, "version");
-    if (version_json && cJSON_IsString(version_json))
+    if (version_json && cJSON_IsString(version_json)) {
         strncpy(settings->version_str, version_json->valuestring,
                 sizeof(settings->version_str) - 1);
-    else {
+        settings->version_str[sizeof(settings->version_str) - 1] = '\0';
+    } else {
         strncpy(settings->version_str, "1.16.1", sizeof(settings->version_str) - 1);
+        settings->version_str[sizeof(settings->version_str) - 1] = '\0';
         defaults_were_used = true;
     }
 
     const cJSON *category_json = cJSON_GetObjectItem(json, "category");
-    if (category_json && cJSON_IsString(category_json))
+    if (category_json && cJSON_IsString(category_json)) {
         strncpy(settings->category, category_json->valuestring,
                 sizeof(settings->category) - 1);
-    else {
+        settings->category[sizeof(settings->category) - 1] = '\0';
+    } else {
         strncpy(settings->category, "all_advancements", sizeof(settings->category) - 1);
+        settings->category[sizeof(settings->category) - 1] = '\0';
         defaults_were_used = true;
     }
 
     const cJSON *optional_flag_json = cJSON_GetObjectItem(json, "optional_flag");
-    if (optional_flag_json && cJSON_IsString(optional_flag_json))
+    if (optional_flag_json && cJSON_IsString(optional_flag_json)) {
         strncpy(settings->optional_flag, optional_flag_json->valuestring,
                 sizeof(settings->optional_flag) - 1);
-    else {
+        settings->optional_flag[sizeof(settings->optional_flag) - 1] = '\0';
+    } else {
         settings->optional_flag[0] = '\0';
         defaults_were_used = true;
     }
 
     const cJSON *lang_flag_json = cJSON_GetObjectItem(json, "lang_flag");
-    if (lang_flag_json && cJSON_IsString(lang_flag_json))
+    if (lang_flag_json && cJSON_IsString(lang_flag_json)) {
         strncpy(settings->lang_flag, lang_flag_json->valuestring, sizeof(settings->lang_flag) - 1);
-    else {
+        settings->lang_flag[sizeof(settings->lang_flag) - 1] = '\0';
+    } else {
         settings->lang_flag[0] = '\0';
         defaults_were_used = true;
     }
@@ -539,11 +557,12 @@ bool settings_load(AppSettings *settings) {
         }
 
         const cJSON *tracker_font = cJSON_GetObjectItem(general_settings, "tracker_font_name");
-        if (tracker_font && cJSON_IsString(tracker_font)) strncpy(settings->tracker_font_name,
-                                                                  tracker_font->valuestring,
-                                                                  sizeof(settings->tracker_font_name) - 1);
-        else {
+        if (tracker_font && cJSON_IsString(tracker_font)) {
+            strncpy(settings->tracker_font_name, tracker_font->valuestring, sizeof(settings->tracker_font_name) - 1);
+            settings->tracker_font_name[sizeof(settings->tracker_font_name) - 1] = '\0';
+        } else {
             strncpy(settings->tracker_font_name, DEFAULT_TRACKER_FONT, sizeof(settings->tracker_font_name) - 1);
+            settings->tracker_font_name[sizeof(settings->tracker_font_name) - 1] = '\0';
             defaults_were_used = true;
         }
 
@@ -556,18 +575,22 @@ bool settings_load(AppSettings *settings) {
         }
 
         const cJSON *overlay_font = cJSON_GetObjectItem(general_settings, "overlay_font_name");
-        if (overlay_font && cJSON_IsString(overlay_font)) strncpy(settings->overlay_font_name, overlay_font->valuestring,
-                                                        sizeof(settings->overlay_font_name) - 1);
-        else {
+        if (overlay_font && cJSON_IsString(overlay_font)) {
+            strncpy(settings->overlay_font_name, overlay_font->valuestring, sizeof(settings->overlay_font_name) - 1);
+            settings->overlay_font_name[sizeof(settings->overlay_font_name) - 1] = '\0';
+        } else {
             strncpy(settings->overlay_font_name, DEFAULT_OVERLAY_FONT, sizeof(settings->overlay_font_name) - 1);
+            settings->overlay_font_name[sizeof(settings->overlay_font_name) - 1] = '\0';
             defaults_were_used = true;
         }
 
         const cJSON *ui_font = cJSON_GetObjectItem(general_settings, "ui_font_name");
-        if (ui_font && cJSON_IsString(ui_font)) strncpy(settings->ui_font_name, ui_font->valuestring,
-                                                        sizeof(settings->ui_font_name) - 1);
-        else {
+        if (ui_font && cJSON_IsString(ui_font)) {
+            strncpy(settings->ui_font_name, ui_font->valuestring, sizeof(settings->ui_font_name) - 1);
+            settings->ui_font_name[sizeof(settings->ui_font_name) - 1] = '\0';
+        } else {
             strncpy(settings->ui_font_name, DEFAULT_UI_FONT, sizeof(settings->ui_font_name) - 1);
+            settings->ui_font_name[sizeof(settings->ui_font_name) - 1] = '\0';
             defaults_were_used = true;
         }
 
@@ -617,8 +640,11 @@ bool settings_load(AppSettings *settings) {
             if (cJSON_IsString(target) && cJSON_IsString(inc_key) && cJSON_IsString(dec_key)) {
                 HotkeyBinding *hb = &settings->hotkeys[settings->hotkey_count];
                 strncpy(hb->target_goal, target->valuestring, sizeof(hb->target_goal) - 1);
+                hb->target_goal[sizeof(hb->target_goal) - 1] = '\0';
                 strncpy(hb->increment_key, inc_key->valuestring, sizeof(hb->increment_key) - 1);
+                hb->increment_key[sizeof(hb->increment_key) - 1] = '\0';
                 strncpy(hb->decrement_key, dec_key->valuestring, sizeof(hb->decrement_key) - 1);
+                hb->decrement_key[sizeof(hb->decrement_key) - 1] = '\0';
                 settings->hotkey_count++;
             }
         }
@@ -850,6 +876,7 @@ void construct_template_paths(AppSettings *settings) {
     // Create the filename version string by replacing '.' with '_'
     char mc_version_filename[MAX_PATH_LENGTH];
     strncpy(mc_version_filename, settings->version_str, MAX_PATH_LENGTH - 1);
+    mc_version_filename[MAX_PATH_LENGTH - 1] = '\0';
     for (char *p = mc_version_filename; *p; p++) {
         if (*p == '.') *p = '_';
     }

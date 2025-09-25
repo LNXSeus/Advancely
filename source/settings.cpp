@@ -476,6 +476,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (flag_idx >= 0 && (size_t) flag_idx < flag_values.size()) {
             strncpy(temp_settings.optional_flag, flag_values[flag_idx].c_str(),
                     sizeof(temp_settings.optional_flag) - 1);
+            temp_settings.optional_flag[sizeof(temp_settings.optional_flag) - 1] = '\0';
         }
     }
 
@@ -517,6 +518,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (lang_idx >= 0 && (size_t) lang_idx < selected_template->available_lang_flags.size()) {
                     const std::string &selected_flag_str = selected_template->available_lang_flags[lang_idx];
                     strncpy(temp_settings.lang_flag, selected_flag_str.c_str(), sizeof(temp_settings.lang_flag) - 1);
+                    temp_settings.lang_flag[sizeof(temp_settings.lang_flag) - 1] = '\0';
                 }
             }
             if (ImGui::IsItemHovered()) {
@@ -974,6 +976,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         char selected_font[256];
         if (open_font_file_dialog(selected_font, sizeof(selected_font))) {
             strncpy(temp_settings.tracker_font_name, selected_font, sizeof(temp_settings.tracker_font_name) - 1);
+            temp_settings.tracker_font_name[sizeof(temp_settings.tracker_font_name) - 1] = '\0';
         }
     }
     if (ImGui::IsItemHovered()) {
@@ -996,6 +999,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             char selected_font[256];
             if (open_font_file_dialog(selected_font, sizeof(selected_font))) {
                 strncpy(temp_settings.overlay_font_name, selected_font, sizeof(temp_settings.overlay_font_name) - 1);
+                temp_settings.overlay_font_name[sizeof(temp_settings.overlay_font_name) - 1] = '\0';
             }
         }
         if (ImGui::IsItemHovered()) {
@@ -1014,6 +1018,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         char selected_font[256];
         if (open_font_file_dialog(selected_font, sizeof(selected_font))) {
             strncpy(temp_settings.ui_font_name, selected_font, sizeof(temp_settings.ui_font_name) - 1);
+            temp_settings.ui_font_name[sizeof(temp_settings.ui_font_name) - 1] = '\0';
         }
     }
     if (ImGui::IsItemHovered()) {
@@ -1220,11 +1225,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     if (temp_settings.hotkey_count < MAX_HOTKEYS) {
                         binding = &temp_settings.hotkeys[temp_settings.hotkey_count++];
                         strncpy(binding->target_goal, counter->root_name, sizeof(binding->target_goal) - 1);
+                        binding->target_goal[sizeof(binding->target_goal) - 1] = '\0';
                         strcpy(binding->decrement_key, "None"); // Set default for the other key
+                        binding->decrement_key[sizeof(binding->decrement_key) - 1] = '\0';
                     }
                 }
                 if (binding) {
                     strncpy(binding->increment_key, key_names[current_inc_key_idx], sizeof(binding->increment_key) - 1);
+                    binding->increment_key[sizeof(binding->increment_key) - 1] = '\0';
                 }
             }
 
@@ -1249,11 +1257,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     if (temp_settings.hotkey_count < MAX_HOTKEYS) {
                         binding = &temp_settings.hotkeys[temp_settings.hotkey_count++];
                         strncpy(binding->target_goal, counter->root_name, sizeof(binding->target_goal) - 1);
+                        binding->target_goal[sizeof(binding->target_goal) - 1] = '\0';
                         strcpy(binding->increment_key, "None"); // Set default for the other key
+                        binding->increment_key[sizeof(binding->increment_key) - 1] = '\0';
                     }
                 } else {
                     // if binding exists, update it
                     strncpy(binding->decrement_key, key_names[current_dec_key_idx], sizeof(binding->decrement_key) - 1);
+                    binding->decrement_key[sizeof(binding->decrement_key) - 1] = '\0';
                 }
             }
         }

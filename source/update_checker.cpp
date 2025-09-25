@@ -56,6 +56,7 @@ void delete_directory_recursively(const char *path) {
     sf.fFlags = FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI;
     char path_double_null[MAX_PATH_LENGTH + 1] = {0};
     strncpy(path_double_null, path, MAX_PATH_LENGTH);
+    path_double_null[MAX_PATH_LENGTH] = '\0';
     sf.pFrom = path_double_null;
     SHFileOperationA(&sf);
 #else

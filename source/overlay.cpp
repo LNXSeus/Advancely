@@ -86,6 +86,7 @@ static SDL_Texture *get_text_texture_from_cache(Overlay *o, const char *text, SD
 
     TextCacheEntry *new_entry = &o->text_cache[o->text_cache_count++];
     strncpy(new_entry->text, text, sizeof(new_entry->text) - 1);
+    new_entry->text[sizeof(new_entry->text) - 1] = '\0';
     new_entry->color = color;
     new_entry->texture = text_texture;
 
@@ -457,12 +458,14 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
             if (display_item.type == OverlayDisplayItem::ADVANCEMENT) {
                 auto *adv = static_cast<TrackableCategory *>(display_item.item_ptr);
                 strncpy(name_buf, adv->display_name, sizeof(name_buf) - 1);
+                name_buf[sizeof(name_buf) - 1] = '\0';
                 if (adv->criteria_count > 0)
                     snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
                              adv->completed_criteria_count, adv->criteria_count);
             } else if (display_item.type == OverlayDisplayItem::UNLOCK) {
                 auto *unlock = static_cast<TrackableItem *>(display_item.item_ptr);
                 strncpy(name_buf, unlock->display_name, sizeof(name_buf) - 1);
+                name_buf[sizeof(name_buf) - 1] = '\0';
             }
 
             // --- OPTIMIZATION: Use TTF_MeasureString for Row 3 as well ---
@@ -605,6 +608,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         } else {
             // If all sections are turned off, just show the socials
             strncpy(final_buffer, SOCIALS[o->current_social_index], sizeof(final_buffer) - 1);
+            final_buffer[sizeof(final_buffer) - 1] = '\0';
         }
 
 
@@ -792,12 +796,14 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 if (display_item.type == OverlayDisplayItem::ADVANCEMENT) {
                     auto *adv = static_cast<TrackableCategory *>(display_item.item_ptr);
                     strncpy(name_buf, adv->display_name, sizeof(name_buf) - 1);
+                    name_buf[sizeof(name_buf) - 1] = '\0';
                     if (adv->criteria_count > 0)
                         snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
                                  adv->completed_criteria_count, adv->criteria_count);
                 } else if (display_item.type == OverlayDisplayItem::UNLOCK) {
                     auto *unlock = static_cast<TrackableItem *>(display_item.item_ptr);
                     strncpy(name_buf, unlock->display_name, sizeof(name_buf) - 1);
+                    name_buf[sizeof(name_buf) - 1] = '\0';
                 }
 
                 // Use TTF_MeasureString for Row 3 as well
@@ -841,6 +847,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         else if (adv->completed_criteria_count > 0) bg_texture = o->adv_bg_half_done;
                         icon_path = adv->icon_path;
                         strncpy(name_buf, adv->display_name, sizeof(name_buf) - 1);
+                        name_buf[sizeof(name_buf) - 1] = '\0';
                         if (adv->criteria_count > 0) {
                             snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)", adv->completed_criteria_count,
                                      adv->criteria_count);
@@ -852,6 +859,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         if (unlock->done) bg_texture = o->adv_bg_done;
                         icon_path = unlock->icon_path;
                         strncpy(name_buf, unlock->display_name, sizeof(name_buf) - 1);
+                        name_buf[sizeof(name_buf) - 1] = '\0';
                         break;
                     }
                     default: break;
@@ -973,10 +981,13 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 }
                             }
                             strncpy(name_buf, title_line, sizeof(name_buf) - 1);
+                            name_buf[sizeof(name_buf) - 1] = '\0';
                             strncpy(progress_buf, longest_sub_stat_line, sizeof(progress_buf) - 1);
+                            progress_buf[sizeof(progress_buf) - 1] = '\0';
                         } else {
                             // Otherwise, use the original static format for single-criterion stats.
                             strncpy(name_buf, stat->display_name, sizeof(name_buf) - 1);
+                            name_buf[sizeof(name_buf) - 1] = '\0';
                             if (stat->criteria_count == 1) {
                                 TrackableItem *crit = stat->criteria[0];
                                 if (crit->goal > 0) {
@@ -992,6 +1003,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     case OverlayDisplayItem::CUSTOM: {
                         auto *goal = static_cast<TrackableItem *>(display_item.item_ptr);
                         strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
+                        name_buf[sizeof(name_buf) - 1] = '\0';
                         if (goal->goal > 0) {
                             snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)", goal->progress, goal->goal);
                         } else if (goal->goal == -1 && !goal->done) {
@@ -1002,6 +1014,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     case OverlayDisplayItem::MULTISTAGE: {
                         auto *goal = static_cast<MultiStageGoal *>(display_item.item_ptr);
                         strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
+                        name_buf[sizeof(name_buf) - 1] = '\0';
                         if (goal->current_stage < goal->stage_count) {
                             SubGoal *active_stage = goal->stages[goal->current_stage];
                             if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress > 0) {
@@ -1107,6 +1120,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 }
                             } else {
                                 strncpy(name_buf, stat->display_name, sizeof(name_buf) - 1);
+                                name_buf[sizeof(name_buf) - 1] = '\0';
                                 if (stat->criteria_count == 1) {
                                     TrackableItem *crit = stat->criteria[0];
                                     if (crit->goal > 0) {
@@ -1125,6 +1139,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             else if (goal->progress > 0) bg_texture = o->adv_bg_half_done;
                             icon_path = goal->icon_path;
                             strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
+                            name_buf[sizeof(name_buf) - 1] = '\0';
                             if (goal->goal > 0) {
                                 snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)", goal->progress, goal->goal);
                             } else if (goal->goal == -1 && !goal->done) {
@@ -1138,6 +1153,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             else if (goal->current_stage > 0) bg_texture = o->adv_bg_half_done;
                             icon_path = goal->icon_path;
                             strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
+                            name_buf[sizeof(name_buf) - 1] = '\0';
                             if (goal->current_stage < goal->stage_count) {
                                 SubGoal *active_stage = goal->stages[goal->current_stage];
                                 if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress > 0) {

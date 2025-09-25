@@ -125,6 +125,7 @@ static void tracker_update_notes_path(Tracker *t, const AppSettings *settings) {
         // Per template mode
         construct_template_paths((AppSettings *) settings); // This will update the template paths
         strncpy(t->notes_path, settings->notes_path, MAX_PATH_LENGTH - 1);
+        t->notes_path[MAX_PATH_LENGTH - 1] = '\0';
     }
 }
 
@@ -354,6 +355,7 @@ static void tracker_load_snapshot_from_file(Tracker *t, const AppSettings *setti
     cJSON *world_name_json = cJSON_GetObjectItem(snapshot_json, "snapshot_world_name");
     if (cJSON_IsString(world_name_json)) {
         strncpy(t->template_data->snapshot_world_name, world_name_json->valuestring, MAX_PATH_LENGTH - 1);
+        t->template_data->snapshot_world_name[MAX_PATH_LENGTH - 1] = '\0';
     }
     cJSON *playtime_json = cJSON_GetObjectItem(snapshot_json, "playtime_snapshot");
     if (cJSON_IsNumber(playtime_json)) {
@@ -1015,6 +1017,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
 
         if (cat_json->string) {
             strncpy(new_cat->root_name, cat_json->string, sizeof(new_cat->root_name) - 1);
+            new_cat->root_name[sizeof(new_cat->root_name) - 1] = '\0';
         } else {
             log_message(LOG_ERROR, "[TRACKER] PARSE ERROR: Found a JSON item with a nullptr key. Skipping.\n");
             free(new_cat);
@@ -1029,6 +1032,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
             // Transform for advancements
             char temp_root_name[192];
             strncpy(temp_root_name, new_cat->root_name, sizeof(temp_root_name) - 1);
+            temp_root_name[sizeof(temp_root_name) - 1] = '\0';
             char *path_part = strchr(temp_root_name, ':');
             if (path_part) *path_part = '.';
             snprintf(cat_lang_key, sizeof(cat_lang_key), "%s%s", lang_key_prefix, temp_root_name);
@@ -1039,10 +1043,13 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
         }
 
         cJSON *lang_entry = cJSON_GetObjectItem(lang_json, cat_lang_key);
-        if (cJSON_IsString(lang_entry))
-            strncpy(new_cat->display_name, lang_entry->valuestring,
-                    sizeof(new_cat->display_name) - 1);
-        else strncpy(new_cat->display_name, new_cat->root_name, sizeof(new_cat->display_name) - 1);
+        if (cJSON_IsString(lang_entry)) {
+            strncpy(new_cat->display_name, lang_entry->valuestring, sizeof(new_cat->display_name) - 1);
+            new_cat->display_name[sizeof(new_cat->display_name) - 1] = '\0';
+        } else {
+            strncpy(new_cat->display_name, new_cat->root_name, sizeof(new_cat->display_name) - 1);
+            new_cat->display_name[sizeof(new_cat->display_name) - 1] = '\0';
+        }
 
 
         // Determine if this is a "hidden" legacy stat used only for multi-stage goal tracking
@@ -1066,6 +1073,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
             // Put whatever is in "icon" into "resources/icons/"
             snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_resources_path(), icon->valuestring);
             strncpy(new_cat->icon_path, full_icon_path, sizeof(new_cat->icon_path) - 1);
+            new_cat->icon_path[sizeof(new_cat->icon_path) - 1] = '\0';
 
             if (strstr(full_icon_path, ".gif")) {
                 new_cat->anim_texture = get_animated_texture_from_cache(t->renderer, &t->anim_cache,
@@ -1100,6 +1108,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                         new_cat->is_recipe = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "is_recipe"));
 
                         strncpy(new_crit->root_name, crit_item->string, sizeof(new_crit->root_name) - 1);
+                        new_crit->root_name[sizeof(new_crit->root_name) - 1] = '\0';
 
                         // Add pre-parsing for multi-criteria stats
                         if (is_stat_category) {
@@ -1109,6 +1118,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                                 strncpy(new_crit->stat_category_key, new_crit->root_name, len);
                                 new_crit->stat_category_key[len] = '\0';
                                 strncpy(new_crit->stat_item_key, slash + 1, sizeof(new_crit->stat_item_key) - 1);
+                                new_crit->stat_item_key[sizeof(new_crit->stat_item_key) - 1] = '\0';
                             }
                         }
 
@@ -1121,11 +1131,14 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                         snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", cat_lang_key,
                                  new_crit->root_name);
                         cJSON *crit_lang_entry = cJSON_GetObjectItem(lang_json, crit_lang_key);
-                        if (cJSON_IsString(crit_lang_entry))
-                            strncpy(new_crit->display_name,
-                                    crit_lang_entry->valuestring,
+                        if (cJSON_IsString(crit_lang_entry)) {
+                            strncpy(new_crit->display_name, crit_lang_entry->valuestring,
                                     sizeof(new_crit->display_name) - 1);
-                        else strncpy(new_crit->display_name, new_crit->root_name, sizeof(new_crit->display_name) - 1);
+                            new_crit->display_name[sizeof(new_crit->display_name) - 1] = '\0';
+                        } else {
+                            strncpy(new_crit->display_name, new_crit->root_name, sizeof(new_crit->display_name) - 1);
+                            new_crit->display_name[sizeof(new_crit->display_name) - 1] = '\0';
+                        }
 
                         cJSON *crit_icon = cJSON_GetObjectItem(crit_item, "icon");
                         if (cJSON_IsString(crit_icon) && crit_icon->valuestring[0] != '\0') {
@@ -1134,6 +1147,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                                      get_resources_path(),
                                      crit_icon->valuestring);
                             strncpy(new_crit->icon_path, full_crit_icon_path, sizeof(new_crit->icon_path) - 1);
+                            new_crit->icon_path[sizeof(new_crit->icon_path) - 1] = '\0';
 
                             if (strstr(full_crit_icon_path, ".gif")) {
                                 new_crit->anim_texture = get_animated_texture_from_cache(
@@ -1164,6 +1178,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                     if (cJSON_IsString(crit_root_name_json)) {
                         strncpy(the_criterion->root_name, crit_root_name_json->valuestring,
                                 sizeof(the_criterion->root_name) - 1);
+                        the_criterion->root_name[sizeof(the_criterion->root_name) - 1] = '\0';
 
                         // Pre-parse stat keys
                         const char *slash = strchr(the_criterion->root_name, '/');
@@ -1172,12 +1187,15 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                             strncpy(the_criterion->stat_category_key, the_criterion->root_name, len);
                             the_criterion->stat_category_key[len] = '\0';
                             strncpy(the_criterion->stat_item_key, slash + 1, sizeof(the_criterion->stat_item_key) - 1);
+                            the_criterion->stat_item_key[sizeof(the_criterion->stat_item_key) - 1] = '\0';
                         }
                     }
 
                     strncpy(the_criterion->display_name, new_cat->display_name,
                             sizeof(the_criterion->display_name) - 1);
+                    the_criterion->display_name[sizeof(the_criterion->display_name) - 1] = '\0';
                     strncpy(the_criterion->icon_path, new_cat->icon_path, sizeof(the_criterion->icon_path) - 1);
+                    the_criterion->icon_path[sizeof(the_criterion->icon_path) - 1] = '\0';
                     the_criterion->is_shared = true; // Mark for overlay indicator
 
                     cJSON *target = cJSON_GetObjectItem(cat_json, "target");
@@ -1351,6 +1369,7 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
             cJSON *root_name_json = cJSON_GetObjectItem(item_json, "root_name");
             if (cJSON_IsString(root_name_json)) {
                 strncpy(new_item->root_name, root_name_json->valuestring, sizeof(new_item->root_name) - 1);
+                new_item->root_name[sizeof(new_item->root_name) - 1] = '\0';
             } else {
                 // Skip this item if it has no root_name
                 free(new_item);
@@ -1367,8 +1386,10 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
             if (cJSON_IsString(lang_entry)) {
                 // If string copy value as display name otherwise root name
                 strncpy(new_item->display_name, lang_entry->valuestring, sizeof(new_item->display_name) - 1);
+                new_item->display_name[sizeof(new_item->display_name) - 1] = '\0';
             } else {
                 strncpy(new_item->display_name, new_item->root_name, sizeof(new_item->display_name) - 1);
+                new_item->display_name[sizeof(new_item->display_name) - 1] = '\0';
             }
 
             // Get other properties from the template
@@ -1379,6 +1400,7 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
                 snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_resources_path(),
                          icon->valuestring);
                 strncpy(new_item->icon_path, full_icon_path, sizeof(new_item->icon_path) - 1);
+                new_item->icon_path[sizeof(new_item->icon_path) - 1] = '\0';
 
                 if (strstr(full_icon_path, ".gif")) {
                     new_item->anim_texture = get_animated_texture_from_cache(
@@ -1462,13 +1484,15 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
         cJSON *root_name = cJSON_GetObjectItem(goal_item_json, "root_name");
         cJSON *icon = cJSON_GetObjectItem(goal_item_json, "icon");
 
-        if (cJSON_IsString(root_name))
-            strncpy(new_goal->root_name, root_name->valuestring,
-                    sizeof(new_goal->root_name) - 1);
+        if (cJSON_IsString(root_name)) {
+            strncpy(new_goal->root_name, root_name->valuestring, sizeof(new_goal->root_name) - 1);
+            new_goal->root_name[sizeof(new_goal->root_name) - 1] = '\0';
+        }
         if (cJSON_IsString(icon)) {
             char full_icon_path[sizeof(new_goal->icon_path)];
             snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_resources_path(), icon->valuestring);
             strncpy(new_goal->icon_path, full_icon_path, sizeof(new_goal->icon_path) - 1);
+            new_goal->icon_path[sizeof(new_goal->icon_path) - 1] = '\0';
 
             if (strstr(full_icon_path, ".gif")) {
                 new_goal->anim_texture = get_animated_texture_from_cache(
@@ -1491,8 +1515,10 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
         // If the display name is not found in the lang file, use the root name
         if (cJSON_IsString(goal_lang_entry)) {
             strncpy(new_goal->display_name, goal_lang_entry->valuestring, sizeof(new_goal->display_name) - 1);
+            new_goal->display_name[sizeof(new_goal->display_name) - 1] = '\0';
         } else {
             strncpy(new_goal->display_name, new_goal->root_name, sizeof(new_goal->display_name) - 1);
+            new_goal->display_name[sizeof(new_goal->display_name) - 1] = '\0';
         }
 
         // Parse stages
@@ -1521,18 +1547,22 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
                 cJSON *root = cJSON_GetObjectItem(stage_item_json, "root_name");
                 cJSON *target_val = cJSON_GetObjectItem(stage_item_json, "target");
 
-                if (cJSON_IsString(text))
-                    strncpy(new_stage->display_text, text->valuestring,
-                            sizeof(new_stage->display_text) - 1);
-                if (cJSON_IsString(stage_id))
-                    strncpy(new_stage->stage_id, stage_id->valuestring,
-                            sizeof(new_stage->stage_id) - 1);
-                if (cJSON_IsString(parent_adv))
-                    strncpy(new_stage->parent_advancement, parent_adv->valuestring,
-                            sizeof(new_stage->parent_advancement) - 1);
-                if (cJSON_IsString(root))
-                    strncpy(new_stage->root_name, root->valuestring,
-                            sizeof(new_stage->root_name) - 1);
+                if (cJSON_IsString(text)) {
+                    strncpy(new_stage->display_text, text->valuestring, sizeof(new_stage->display_text) - 1);
+                    new_stage->display_text[sizeof(new_stage->display_text) - 1] = '\0';
+                }
+                if (cJSON_IsString(stage_id)) {
+                    strncpy(new_stage->stage_id, stage_id->valuestring, sizeof(new_stage->stage_id) - 1);
+                    new_stage->stage_id[sizeof(new_stage->stage_id) - 1] = '\0';
+                }
+                if (cJSON_IsString(parent_adv)) {
+                    strncpy(new_stage->parent_advancement, parent_adv->valuestring, sizeof(new_stage->parent_advancement) - 1);
+                    new_stage->parent_advancement[sizeof(new_stage->parent_advancement) - 1] = '\0';
+                }
+                if (cJSON_IsString(root)) {
+                    strncpy(new_stage->root_name, root->valuestring, sizeof(new_stage->root_name) - 1);
+                    new_stage->root_name[sizeof(new_stage->root_name) - 1] = '\0';
+                }
                 if (cJSON_IsNumber(target_val)) new_stage->required_progress = target_val->valueint; // This is a number
 
 
@@ -1547,9 +1577,11 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
                 if (cJSON_IsString(stage_lang_entry)) {
                     strncpy(new_stage->display_text, stage_lang_entry->valuestring,
                             sizeof(new_stage->display_text) - 1);
+                    new_stage->display_text[sizeof(new_stage->display_text) - 1] = '\0';
                 } else {
                     strncpy(new_stage->display_text, new_stage->stage_id,
                             sizeof(new_stage->display_text) - 1); // Fallback
+                    new_stage->display_text[sizeof(new_stage->display_text) - 1] = '\0';
                 }
 
                 // Parse type
@@ -1757,6 +1789,7 @@ static void tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
                         if (stats_obj) {
                             char root_name_copy[192];
                             strncpy(root_name_copy, stage_to_check->root_name, sizeof(root_name_copy) - 1);
+                            root_name_copy[sizeof(root_name_copy) - 1] = '\0';
                             char *item_key = strchr(root_name_copy, '/');
                             if (item_key) {
                                 *item_key = '\0';
@@ -2127,6 +2160,8 @@ SDL_Texture *get_texture_from_cache(SDL_Renderer *renderer, TextureCacheEntry **
 
     // Add to cache
     strncpy((*cache)[*cache_count].path, path, MAX_PATH_LENGTH - 1);
+    (*cache)[*cache_count].path[MAX_PATH_LENGTH - 1] = '\0'; // Ensure null-termination
+
     (*cache)[*cache_count].texture = new_texture;
     (*cache_count)++;
 
@@ -2181,6 +2216,8 @@ AnimatedTexture *get_animated_texture_from_cache(SDL_Renderer *renderer, Animate
 
     // Add to cache
     strncpy((*cache)[*cache_count].path, path, MAX_PATH_LENGTH - 1);
+    (*cache)[*cache_count].path[MAX_PATH_LENGTH - 1] = '\0'; // Ensure null-termination
+
     (*cache)[*cache_count].anim = new_anim;
     (*cache_count)++;
 
@@ -2379,6 +2416,7 @@ void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
     // After the check, update the last known world name to the current one for the next cycle.
     strncpy(t->template_data->last_known_world_name, t->world_name,
             sizeof(t->template_data->last_known_world_name) - 1);
+    t->template_data->last_known_world_name[sizeof(t->template_data->last_known_world_name) - 1] = '\0';
 
 
     MC_Version version = settings_get_version_from_string(settings->version_str);
@@ -4422,10 +4460,10 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                 char formatted_flag[128];
                 format_category_string(settings->optional_flag, formatted_flag, sizeof(formatted_flag));
                 ImGui::Text("Template: %s - %s%s%s",
-                        settings->version_str,
-                        formatted_category,
-                        *settings->optional_flag ? " - " : "",
-                        *settings->optional_flag ? formatted_flag : "");
+                            settings->version_str,
+                            formatted_category,
+                            *settings->optional_flag ? " - " : "",
+                            *settings->optional_flag ? formatted_flag : "");
             }
             ImGui::PopStyleColor();
             ImGui::Separator();
@@ -4604,7 +4642,11 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
 
         // 4. Reset the settings in memory to the application defaults
         strncpy(settings->version_str, DEFAULT_VERSION, sizeof(settings->version_str) - 1);
+        settings->version_str[sizeof(settings->version_str) - 1] = '\0';
+
         strncpy(settings->category, DEFAULT_CATEGORY, sizeof(settings->category) - 1);
+        settings->category[sizeof(settings->category) - 1] = '\0';
+
         settings->optional_flag[0] = '\0';
         settings->lang_flag[0] = '\0';
 
@@ -4614,9 +4656,16 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
         // 6. Attempt to reload the data with the new default paths immediately
         construct_template_paths(settings);
         strncpy(t->advancement_template_path, settings->template_path, MAX_PATH_LENGTH - 1);
+        t->advancement_template_path[MAX_PATH_LENGTH - 1] = '\0';
+
         strncpy(t->lang_path, settings->lang_path, MAX_PATH_LENGTH - 1);
+        t->lang_path[MAX_PATH_LENGTH - 1] = '\0';
+
         strncpy(t->snapshot_path, settings->snapshot_path, MAX_PATH_LENGTH - 1);
+        t->snapshot_path[MAX_PATH_LENGTH - 1] = '\0';
+
         strncpy(t->notes_path, settings->notes_path, MAX_PATH_LENGTH - 1);
+        t->notes_path[MAX_PATH_LENGTH - 1] = '\0';
 
         template_json = cJSON_from_file(t->advancement_template_path);
         if (!template_json) {
@@ -4626,7 +4675,8 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
             if (was_on_top) {
                 SDL_SetWindowAlwaysOnTop(t->window, false);
             }
-            show_error_message("Critical Error", "The default template is missing or corrupted. Please reinstall Advancely.");
+            show_error_message("Critical Error",
+                               "The default template is missing or corrupted. Please reinstall Advancely.");
 
             // 3. Restore 'Always On Top' state after the user dismisses the popup
             if (was_on_top) {
@@ -4819,6 +4869,7 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     // Prime the 'last_known_world_name' with the initial world on first load.
     strncpy(t->template_data->last_known_world_name, t->world_name,
             sizeof(t->template_data->last_known_world_name) - 1);
+    t->template_data->last_known_world_name[sizeof(t->template_data->last_known_world_name) - 1] = '\0';
 
     log_message(LOG_INFO, "[TRACKER] Initial template parsing complete.\n");
 

@@ -109,7 +109,9 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
 
                 DiscoveredTemplate dt = {};
                 strncpy(dt.category, category, sizeof(dt.category) - 1);
+                dt.category[sizeof(dt.category) - 1] = '\0';
                 strncpy(dt.optional_flag, flag_start, sizeof(dt.optional_flag) - 1);
+                dt.optional_flag[sizeof(dt.optional_flag) - 1] = '\0';
 
                 // --- Phase 2: Find all associated language files for this template ---
                 #ifdef _WIN32

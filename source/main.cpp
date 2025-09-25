@@ -99,6 +99,7 @@ static void find_and_set_resource_path(char* path_buffer, size_t buffer_size) {
     char exe_path[MAX_PATH_LENGTH];
     if (!get_executable_path(exe_path, sizeof(exe_path))) {
         strncpy(path_buffer, "resources", buffer_size - 1); // Fallback
+        path_buffer[buffer_size - 1] = '\0';
         return;
     }
 
@@ -122,6 +123,7 @@ static void find_and_set_resource_path(char* path_buffer, size_t buffer_size) {
     // For Windows, Linux, and non-bundle macOS builds (don't exist), 'resources' is next to the executable.
     if (!get_parent_directory(exe_path, exe_dir, sizeof(exe_dir), 1)) {
         strncpy(path_buffer, "resources", buffer_size - 1);
+        path_buffer[buffer_size - 1] = '\0';
         return;
     }
 
@@ -132,6 +134,7 @@ static void find_and_set_resource_path(char* path_buffer, size_t buffer_size) {
 
     // Ultimate fallback to a relative path if all else fails.
     strncpy(path_buffer, "resources", buffer_size - 1);
+    path_buffer[buffer_size - 1] = '\0';
 }
 
 

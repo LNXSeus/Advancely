@@ -405,10 +405,14 @@ static void parse_editor_trackable_items(cJSON *json_array, std::vector<EditorTr
         cJSON *target = cJSON_GetObjectItem(item_json, "target");
         cJSON *hidden = cJSON_GetObjectItem(item_json, "hidden");
 
-        if (cJSON_IsString(root_name))
-            strncpy(new_item.root_name, root_name->valuestring,
-                    sizeof(new_item.root_name) - 1);
-        if (cJSON_IsString(icon)) strncpy(new_item.icon_path, icon->valuestring, sizeof(new_item.icon_path) - 1);
+        if (cJSON_IsString(root_name)) {
+            strncpy(new_item.root_name, root_name->valuestring, sizeof(new_item.root_name) - 1);
+            new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
+        }
+        if (cJSON_IsString(icon)) {
+            strncpy(new_item.icon_path, icon->valuestring, sizeof(new_item.icon_path) - 1);
+            new_item.icon_path[sizeof(new_item.icon_path) - 1] = '\0';
+        }
         if (cJSON_IsNumber(target)) new_item.goal = target->valueint;
         if (cJSON_IsBool(hidden)) new_item.is_hidden = cJSON_IsTrue(hidden);
 
@@ -418,9 +422,11 @@ static void parse_editor_trackable_items(cJSON *json_array, std::vector<EditorTr
         cJSON *lang_entry = cJSON_GetObjectItem(lang_json, lang_key);
         if (cJSON_IsString(lang_entry)) {
             strncpy(new_item.display_name, lang_entry->valuestring, sizeof(new_item.display_name) - 1);
+            new_item.display_name[sizeof(new_item.display_name) - 1] = '\0';
         } else {
             // Take root name if there's no lang entry, shouldn't be the case in editor itself
             strncpy(new_item.display_name, new_item.root_name, sizeof(new_item.display_name) - 1);
+            new_item.display_name[sizeof(new_item.display_name) - 1] = '\0';
         }
 
 
@@ -440,17 +446,22 @@ static void parse_editor_trackable_categories(cJSON *json_object,
 
         // Parse parent item properties
         strncpy(new_cat.root_name, category_json->string, sizeof(new_cat.root_name) - 1);
+        new_cat.root_name[sizeof(new_cat.root_name) - 1] = '\0';
         cJSON *icon = cJSON_GetObjectItem(category_json, "icon");
         cJSON *hidden = cJSON_GetObjectItem(category_json, "hidden");
         cJSON *is_recipe_json = cJSON_GetObjectItem(category_json, "is_recipe");
 
-        if (cJSON_IsString(icon)) strncpy(new_cat.icon_path, icon->valuestring, sizeof(new_cat.icon_path) - 1);
+        if (cJSON_IsString(icon)) {
+            strncpy(new_cat.icon_path, icon->valuestring, sizeof(new_cat.icon_path) - 1);
+            new_cat.icon_path[sizeof(new_cat.icon_path) - 1] = '\0';
+        }
         if (cJSON_IsBool(hidden)) new_cat.is_hidden = cJSON_IsTrue(hidden);
         if (cJSON_IsBool(is_recipe_json)) new_cat.is_recipe = cJSON_IsTrue(is_recipe_json);
 
         char lang_key[256];
         char temp_root_name[291];
         strncpy(temp_root_name, new_cat.root_name, sizeof(temp_root_name) - 1);
+        temp_root_name[sizeof(temp_root_name) - 1] = '\0';
         char *p = temp_root_name;
 
         // Replacing ":" and "/" with "." for lang key, ONLY for advancements
@@ -460,8 +471,10 @@ static void parse_editor_trackable_categories(cJSON *json_object,
         cJSON *lang_entry = cJSON_GetObjectItem(lang_json, lang_key);
         if (cJSON_IsString(lang_entry)) {
             strncpy(new_cat.display_name, lang_entry->valuestring, sizeof(new_cat.display_name) - 1);
+            new_cat.display_name[sizeof(new_cat.display_name) - 1] = '\0';
         } else {
             strncpy(new_cat.display_name, new_cat.root_name, sizeof(new_cat.display_name) - 1);
+            new_cat.display_name[sizeof(new_cat.display_name) - 1] = '\0';
         }
 
 
@@ -474,23 +487,28 @@ static void parse_editor_trackable_categories(cJSON *json_object,
             cJSON_ArrayForEach(criterion_json, criteria_object) {
                 EditorTrackableItem new_crit = {};
                 strncpy(new_crit.root_name, criterion_json->string, sizeof(new_crit.root_name) - 1);
+                new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
 
                 cJSON *crit_icon = cJSON_GetObjectItem(criterion_json, "icon");
                 cJSON *crit_hidden = cJSON_GetObjectItem(criterion_json, "hidden");
 
-                if (cJSON_IsString(crit_icon))
-                    strncpy(new_crit.icon_path, crit_icon->valuestring,
-                            sizeof(new_crit.icon_path) - 1);
+                if (cJSON_IsString(crit_icon)) {
+                    strncpy(new_crit.icon_path, crit_icon->valuestring, sizeof(new_crit.icon_path) - 1);
+                    new_crit.icon_path[sizeof(new_crit.icon_path) - 1] = '\0';
+                }
                 if (cJSON_IsBool(crit_hidden)) new_crit.is_hidden = cJSON_IsTrue(crit_hidden);
 
                 // Load display name for the criterion
                 char crit_lang_key[512];
                 snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", lang_key, new_crit.root_name);
                 cJSON *crit_lang_entry = cJSON_GetObjectItem(lang_json, crit_lang_key);
-                if (cJSON_IsString(crit_lang_entry))
+                if (cJSON_IsString(crit_lang_entry)) {
                     strncpy(new_crit.display_name, crit_lang_entry->valuestring, sizeof(new_crit.display_name) - 1);
-                else
+                    new_crit.display_name[sizeof(new_crit.display_name) - 1] = '\0';
+                } else {
                     strncpy(new_crit.display_name, new_crit.root_name, sizeof(new_crit.display_name) - 1);
+                    new_crit.display_name[sizeof(new_crit.display_name) - 1] = '\0';
+                }
 
                 criteria_items.push_back(new_crit);
             }
@@ -513,11 +531,13 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
 
         // Parse parent item properties
         strncpy(new_cat.root_name, category_json->string, sizeof(new_cat.root_name) - 1);
+        new_cat.root_name[sizeof(new_cat.root_name) - 1] = '\0';
         cJSON *icon = cJSON_GetObjectItem(category_json, "icon");
         cJSON *hidden = cJSON_GetObjectItem(category_json, "hidden");
 
         if (cJSON_IsString(icon)) {
             strncpy(new_cat.icon_path, icon->valuestring, sizeof(new_cat.icon_path) - 1);
+            new_cat.icon_path[sizeof(new_cat.icon_path) - 1] = '\0';
         }
         if (cJSON_IsBool(hidden)) new_cat.is_hidden = cJSON_IsTrue(hidden);
 
@@ -525,10 +545,13 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
         char cat_lang_key[256];
         snprintf(cat_lang_key, sizeof(cat_lang_key), "stat.%s", new_cat.root_name);
         cJSON *cat_lang_entry = cJSON_GetObjectItem(lang_json, cat_lang_key);
-        if (cJSON_IsString(cat_lang_entry))
+        if (cJSON_IsString(cat_lang_entry)) {
             strncpy(new_cat.display_name, cat_lang_entry->valuestring, sizeof(new_cat.display_name) - 1);
-        else
+            new_cat.display_name[sizeof(new_cat.display_name) - 1] = '\0';
+        } else {
             strncpy(new_cat.display_name, new_cat.root_name, sizeof(new_cat.display_name) - 1);
+            new_cat.display_name[sizeof(new_cat.display_name) - 1] = '\0';
+        }
 
 
         cJSON *criteria_object = cJSON_GetObjectItem(category_json, "criteria");
@@ -539,6 +562,7 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
             cJSON_ArrayForEach(criterion_json, criteria_object) {
                 EditorTrackableItem new_crit = {};
                 strncpy(new_crit.root_name, criterion_json->string, sizeof(new_crit.root_name) - 1);
+                new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
 
                 cJSON *crit_icon = cJSON_GetObjectItem(criterion_json, "icon");
                 cJSON *crit_hidden = cJSON_GetObjectItem(criterion_json, "hidden");
@@ -546,6 +570,7 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
 
                 if (cJSON_IsString(crit_icon)) {
                     strncpy(new_crit.icon_path, crit_icon->valuestring, sizeof(new_crit.icon_path) - 1);
+                    new_crit.icon_path[sizeof(new_crit.icon_path) - 1] = '\0';
                 }
                 if (cJSON_IsBool(crit_hidden)) new_crit.is_hidden = cJSON_IsTrue(crit_hidden);
                 if (cJSON_IsNumber(crit_target)) new_crit.goal = crit_target->valueint;
@@ -554,10 +579,13 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
                 char crit_lang_key[512];
                 snprintf(crit_lang_key, sizeof(crit_lang_key), "%s.criteria.%s", cat_lang_key, new_crit.root_name);
                 cJSON *crit_lang_entry = cJSON_GetObjectItem(lang_json, crit_lang_key);
-                if (cJSON_IsString(crit_lang_entry))
+                if (cJSON_IsString(crit_lang_entry)) {
                     strncpy(new_crit.display_name, crit_lang_entry->valuestring, sizeof(new_crit.display_name) - 1);
-                else
+                    new_crit.display_name[sizeof(new_crit.display_name) - 1] = '\0';
+                } else {
                     strncpy(new_crit.display_name, new_crit.root_name, sizeof(new_crit.display_name) - 1);
+                    new_crit.display_name[sizeof(new_crit.display_name) - 1] = '\0';
+                }
 
                 new_cat.criteria.push_back(new_crit);
             }
@@ -570,9 +598,11 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
 
             if (cJSON_IsString(stat_root_name)) {
                 strncpy(new_crit.root_name, stat_root_name->valuestring, sizeof(new_crit.root_name) - 1);
+                new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
             } else {
                 // Fallback for hidden MS goal stats (version <= 1.6.4)
                 strncpy(new_crit.root_name, new_cat.root_name, sizeof(new_crit.root_name) - 1);
+                new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
             }
 
             if (cJSON_IsNumber(target)) new_crit.goal = target->valueint;
@@ -600,18 +630,25 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
 
         if (cJSON_IsString(root_name)) {
             strncpy(new_goal.root_name, root_name->valuestring, sizeof(new_goal.root_name) - 1);
+            new_goal.root_name[sizeof(new_goal.root_name) - 1] = '\0';
         }
-        if (cJSON_IsString(icon)) strncpy(new_goal.icon_path, icon->valuestring, sizeof(new_goal.icon_path) - 1);
+        if (cJSON_IsString(icon)) {
+            strncpy(new_goal.icon_path, icon->valuestring, sizeof(new_goal.icon_path) - 1);
+            new_goal.icon_path[sizeof(new_goal.icon_path) - 1] = '\0';
+        }
         if (cJSON_IsBool(hidden)) new_goal.is_hidden = cJSON_IsTrue(hidden);
 
         // Language file
         char goal_lang_key[256];
         snprintf(goal_lang_key, sizeof(goal_lang_key), "multi_stage_goal.%s.display_name", new_goal.root_name);
         cJSON *goal_lang_entry = cJSON_GetObjectItem(lang_json, goal_lang_key);
-        if (cJSON_IsString(goal_lang_entry))
+        if (cJSON_IsString(goal_lang_entry)) {
             strncpy(new_goal.display_name, goal_lang_entry->valuestring, sizeof(new_goal.display_name) - 1);
-        else
+            new_goal.display_name[sizeof(new_goal.display_name) - 1] = '\0';
+        } else {
             strncpy(new_goal.display_name, new_goal.root_name, sizeof(new_goal.display_name) - 1);
+            new_goal.display_name[sizeof(new_goal.display_name) - 1] = '\0';
+        }
 
         cJSON *stages_array = cJSON_GetObjectItem(goal_json, "stages");
         if (stages_array) {
@@ -627,13 +664,16 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
 
                 if (cJSON_IsString(stage_id)) {
                     strncpy(new_stage.stage_id, stage_id->valuestring, sizeof(new_stage.stage_id) - 1);
+                    new_stage.stage_id[sizeof(new_stage.stage_id) - 1] = '\0';
                 }
                 if (cJSON_IsString(parent_adv)) {
                     strncpy(new_stage.parent_advancement, parent_adv->valuestring,
                             sizeof(new_stage.parent_advancement) - 1);
+                    new_stage.parent_advancement[sizeof(new_stage.parent_advancement) - 1] = '\0';
                 }
                 if (cJSON_IsString(stage_root)) {
                     strncpy(new_stage.root_name, stage_root->valuestring, sizeof(new_stage.root_name) - 1);
+                    new_stage.root_name[sizeof(new_stage.root_name) - 1] = '\0';
                 }
                 if (cJSON_IsNumber(target)) new_stage.required_progress = target->valueint;
 
@@ -642,10 +682,13 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
                 snprintf(stage_lang_key, sizeof(stage_lang_key), "multi_stage_goal.%s.stage.%s", new_goal.root_name,
                          new_stage.stage_id);
                 cJSON *stage_lang_entry = cJSON_GetObjectItem(lang_json, stage_lang_key);
-                if (cJSON_IsString(stage_lang_entry))
+                if (cJSON_IsString(stage_lang_entry)) {
                     strncpy(new_stage.display_text, stage_lang_entry->valuestring, sizeof(new_stage.display_text) - 1);
-                else
+                    new_stage.display_text[sizeof(new_stage.display_text) - 1] = '\0';
+                } else {
                     strncpy(new_stage.display_text, new_stage.stage_id, sizeof(new_stage.display_text) - 1);
+                    new_stage.display_text[sizeof(new_stage.display_text) - 1] = '\0';
+                }
 
                 if (cJSON_IsString(type)) {
                     if (strcmp(type->valuestring, "stat") == 0) new_stage.type = SUBGOAL_STAT;
@@ -921,6 +964,7 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
         char cat_lang_key[256];
         char temp_root_name[192];
         strncpy(temp_root_name, cat.root_name, sizeof(temp_root_name) - 1);
+        temp_root_name[sizeof(temp_root_name) - 1] = '\0';
         char *p = temp_root_name;
         while ((p = strpbrk(p, ":/")) != nullptr) *p = '.';
         snprintf(cat_lang_key, sizeof(cat_lang_key), "advancement.%s", temp_root_name);
@@ -1038,8 +1082,8 @@ static bool validate_and_save_template(const char *creator_version_str,
     if (validation_passed && version <= MC_VERSION_1_6_4) {
         // 1. Get all stat IDs required by multi-stage goals.
         std::unordered_set<std::string> required_ms_goal_stats;
-        for (const auto &goal : current_template_data.multi_stage_goals) {
-            for (const auto &stage : goal.stages) {
+        for (const auto &goal: current_template_data.multi_stage_goals) {
+            for (const auto &stage: goal.stages) {
                 if (stage.type == SUBGOAL_STAT && stage.root_name[0] != '\0') {
                     required_ms_goal_stats.insert(stage.root_name);
                 }
@@ -1047,13 +1091,14 @@ static bool validate_and_save_template(const char *creator_version_str,
         }
 
         // 2. Check all stats with the reserved prefix.
-        for (const auto &stat_cat : current_template_data.stats) {
+        for (const auto &stat_cat: current_template_data.stats) {
             if (strncmp(stat_cat.root_name, "hidden_ms_stat_", 15) == 0) {
                 // This stat has the reserved prefix. It's only valid if it's actually required.
-                if (stat_cat.criteria.empty() || required_ms_goal_stats.find(stat_cat.criteria[0].root_name) == required_ms_goal_stats.end()) {
+                if (stat_cat.criteria.empty() || required_ms_goal_stats.find(stat_cat.criteria[0].root_name) ==
+                    required_ms_goal_stats.end()) {
                     // This is an orphaned or malformed hidden stat. Flag it as an error.
-                    snprintf(status_message, 512, "Error: The prefix 'hidden_ms_stat_' is reserved and was used\n"
-                                                  "on a stat ('%s') that is not part of a multi-stage goal.", stat_cat.root_name);
+                    snprintf(status_message, 256, "Error: The prefix 'hidden_ms_stat_' is reserved and was used\n"
+                             "on a stat ('%s') that is not part of a multi-stage goal.", stat_cat.root_name);
                     validation_passed = false;
                     break;
                 }
@@ -1179,6 +1224,7 @@ static void synchronize_legacy_ms_goal_stats(EditorTemplate &editor_data) {
 
             EditorTrackableItem new_crit = {};
             strncpy(new_crit.root_name, required_root_name.c_str(), sizeof(new_crit.root_name) - 1);
+            new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
             new_hidden_stat.criteria.push_back(new_crit);
 
             editor_data.stats.push_back(new_hidden_stat);
@@ -1362,6 +1408,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         free_discovered_templates(&discovered_templates, &discovered_template_count);
         scan_for_templates(creator_version_str, &discovered_templates, &discovered_template_count);
         strncpy(last_scanned_version, creator_version_str, sizeof(last_scanned_version) - 1);
+        last_scanned_version[sizeof(last_scanned_version) - 1] = '\0';
         selected_template_index = -1; // Reset selection
         selected_lang_index = -1;
         status_message[0] = '\0'; // Clear status message
@@ -1786,6 +1833,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
             // Pre-fill the category and version for the new copy
             strncpy(copy_template_category, selected.category, sizeof(copy_template_category) - 1);
+            copy_template_category[sizeof(copy_template_category) - 1] = '\0';
             copy_template_version_idx = creator_version_idx;
 
             // --- Logic to find a unique name for the new flag ---
@@ -1825,6 +1873,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
             // Apply the new unique flag to the copy view's buffer
             strncpy(copy_template_flag, new_flag, sizeof(copy_template_flag) - 1);
+            copy_template_flag[sizeof(copy_template_flag) - 1] = '\0';
         }
     }
     ImGui::EndDisabled();
@@ -1940,8 +1989,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (get_info_from_zip(open_path, version, category, flag, status_message, sizeof(status_message))) {
                     // Success: Pre-fill the confirmation view
                     strncpy(import_zip_path, open_path, sizeof(import_zip_path) - 1);
+                    import_zip_path[sizeof(import_zip_path) - 1] = '\0';
+
                     strncpy(import_category, category, sizeof(import_category) - 1);
+                    import_category[sizeof(import_category) - 1] = '\0';
+
                     strncpy(import_flag, flag, sizeof(import_flag) - 1);
+                    import_flag[sizeof(import_flag) - 1] = '\0';
 
                     // Find the index for the parsed version string
                     import_version_idx = -1;
@@ -2402,6 +2456,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           1, filter_patterns, "JSON files", 0);
             if (open_path) {
                 strncpy(import_lang_source_path, open_path, sizeof(import_lang_source_path) - 1);
+                import_lang_source_path[sizeof(import_lang_source_path) - 1] = '\0';
                 import_lang_flag_buffer[0] = '\0'; // Clear buffer for new import
                 show_import_lang_popup = true;
             }
@@ -2650,6 +2705,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 snprintf(start_path, sizeof(start_path), "%s/stats/", parent_dir);
                             } else {
                                 strncpy(start_path, t->saves_path, sizeof(start_path)); // Fallback
+                                start_path[sizeof(start_path) - 1] = '\0';
                             }
                         }
                     } else if (creator_selected_version <= MC_VERSION_1_11_2) {
@@ -2685,6 +2741,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             // If parsing fails, show the error in the main status message
                             save_message_type = MSG_ERROR;
                             strncpy(status_message, import_error_message, sizeof(status_message) - 1);
+                            status_message[sizeof(status_message) - 1] = '\0';
                         }
                     }
                 }
@@ -2736,6 +2793,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     snprintf(new_adv.display_name, sizeof(new_adv.display_name), "New %s %d", advancements_label_upper,
                              counter);
                     strncpy(new_adv.icon_path, "blocks/placeholder.png", sizeof(new_adv.icon_path) - 1);
+                    new_adv.icon_path[sizeof(new_adv.icon_path) - 1] = '\0';
                     current_template_data.advancements.push_back(new_adv);
                     save_message_type = MSG_NONE;
                 }
@@ -2997,6 +3055,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         copy_counter++;
                     }
                     strncpy(new_advancement.root_name, new_name, sizeof(new_advancement.root_name) - 1);
+                    new_advancement.root_name[sizeof(new_advancement.root_name) - 1] = '\0';
                     // --- End of unique name generation ---
 
                     // Find the position of the source item in the original vector
@@ -3075,6 +3134,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         char new_path[MAX_PATH_LENGTH];
                         if (open_icon_file_dialog(new_path, sizeof(new_path))) {
                             strncpy(advancement.icon_path, new_path, sizeof(advancement.icon_path) - 1);
+                            advancement.icon_path[sizeof(advancement.icon_path) - 1] = '\0';
                             save_message_type = MSG_NONE;
                         }
                     }
@@ -3117,7 +3177,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::Separator();
                         ImGui::Text("Criteria");
 
-                        char criterion_add_tooltip_buffer[128];
+                        char criterion_add_tooltip_buffer[256];
                         snprintf(criterion_add_tooltip_buffer, sizeof(criterion_add_tooltip_buffer),
                                  "Add New %s Criterion",
                                  advancements_label_upper);
@@ -3139,6 +3199,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             snprintf(new_crit.display_name, sizeof(new_crit.display_name), "New Criterion %d", counter);
                             strncpy(new_crit.icon_path, "blocks/placeholder.png", sizeof(new_crit.icon_path) - 1);
+                            new_crit.icon_path[sizeof(new_crit.icon_path) - 1] = '\0';
                             advancement.criteria.push_back(new_crit);
                             save_message_type = MSG_NONE;
                         }
@@ -3252,6 +3313,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             char new_path[MAX_PATH_LENGTH];
                             if (open_icon_file_dialog(new_path, sizeof(new_path))) {
                                 strncpy(criterion.icon_path, new_path, sizeof(criterion.icon_path) - 1);
+                                criterion.icon_path[sizeof(criterion.icon_path) - 1] = '\0';
                                 save_message_type = MSG_NONE;
                             }
                         }
@@ -3363,6 +3425,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             copy_counter++;
                         }
                         strncpy(new_criterion.root_name, new_name, sizeof(new_criterion.root_name) - 1);
+                        new_criterion.root_name[sizeof(new_criterion.root_name) - 1] = '\0';
                         advancement.criteria.insert(advancement.criteria.begin() + criterion_to_copy + 1,
                                                     new_criterion);
                     }
@@ -3395,6 +3458,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 snprintf(start_path, sizeof(start_path), "%s/stats/", parent_dir);
                             } else {
                                 strncpy(start_path, t->saves_path, sizeof(start_path)); // Fallback
+                                start_path[sizeof(start_path) - 1] = '\0';
                             }
                         }
                     } else {
@@ -3424,6 +3488,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         } else {
                             save_message_type = MSG_ERROR;
                             strncpy(status_message, import_error_message, sizeof(status_message) - 1);
+                            status_message[sizeof(status_message) - 1] = '\0';
                         }
                     }
                 }
@@ -3482,11 +3547,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     EditorTrackableItem new_crit = {};
                     // Version-aware root name for the new criterion
                     if (creator_selected_version <= MC_VERSION_1_6_4) {
-                        strncpy(new_crit.root_name, "0", sizeof(new_crit.root_name) - 1); // Legacy stats are numeric IDs
+                        strncpy(new_crit.root_name, "0", sizeof(new_crit.root_name) - 1);
+                        new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
+                        // Legacy stats are numeric IDs
                     } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                        snprintf(new_crit.root_name, sizeof(new_crit.root_name), "stat.new_stat_%d", counter); // Mid-era stats are prefixed
+                        snprintf(new_crit.root_name, sizeof(new_crit.root_name), "stat.new_stat_%d", counter);
+                        // Mid-era stats are prefixed
                     } else {
-                        snprintf(new_crit.root_name, sizeof(new_crit.root_name), "minecraft:custom/minecraft:new_stat_%d", counter); // Modern
+                        snprintf(new_crit.root_name, sizeof(new_crit.root_name),
+                                 "minecraft:custom/minecraft:new_stat_%d", counter); // Modern
                     }
                     new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
                     new_crit.goal = 1; // Default to a completable goal
@@ -3548,7 +3617,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 if (search_active) {
                     for (auto &stat_cat: current_template_data.stats) {
-
                         // Skip internal helper stats from appearing in the list.
                         if (strncmp(stat_cat.root_name, "hidden_ms_stat_", 15) == 0) {
                             continue;
@@ -3721,6 +3789,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (!name_exists) break;
                     }
                     strncpy(new_stat.root_name, new_name, sizeof(new_stat.root_name) - 1);
+                    new_stat.root_name[sizeof(new_stat.root_name) - 1] = '\0';
 
                     auto it = std::find_if(current_template_data.stats.begin(), current_template_data.stats.end(),
                                            [&](const EditorTrackableCategory &s) { return &s == source_stat_ptr; });
@@ -3775,6 +3844,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         char new_path[MAX_PATH_LENGTH];
                         if (open_icon_file_dialog(new_path, sizeof(new_path))) {
                             strncpy(stat_cat.icon_path, new_path, sizeof(stat_cat.icon_path) - 1);
+                            stat_cat.icon_path[sizeof(stat_cat.icon_path) - 1] = '\0';
                             save_message_type = MSG_NONE;
                         }
                     }
@@ -3814,12 +3884,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             // Copy the parent's display name to the first criterion.
                             strncpy(stat_cat.criteria[0].display_name, stat_cat.display_name,
                                     sizeof(stat_cat.criteria[0].display_name) - 1);
+                            stat_cat.criteria[0].display_name[sizeof(stat_cat.criteria[0].display_name) - 1] = '\0';
                         }
                         // If switching FROM Multi-Stat TO Simple Stat
                         else if (!was_simple_stat && stat_cat.is_simple_stat) {
                             // Copy the first criterion's display name up to the parent.
                             strncpy(stat_cat.display_name, stat_cat.criteria[0].display_name,
                                     sizeof(stat_cat.display_name) - 1);
+                            stat_cat.display_name[sizeof(stat_cat.display_name) - 1] = '\0';
 
                             // If there were multiple criteria, keep only the first one.
                             if (stat_cat.criteria.size() > 1) {
@@ -3897,6 +3969,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             snprintf(new_crit.display_name, sizeof(new_crit.display_name), "New Criterion %d", counter);
                             strncpy(new_crit.icon_path, "blocks/placeholder.png", sizeof(new_crit.icon_path) - 1);
+                            new_crit.icon_path[sizeof(new_crit.icon_path) - 1] = '\0';
                             new_crit.goal = 1; // Default to a completable goal
                             stat_cat.criteria.push_back(new_crit);
                             save_message_type = MSG_NONE;
@@ -3998,6 +4071,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 char new_path[MAX_PATH_LENGTH];
                                 if (open_icon_file_dialog(new_path, sizeof(new_path))) {
                                     strncpy(crit.icon_path, new_path, sizeof(crit.icon_path) - 1);
+                                    crit.icon_path[sizeof(crit.icon_path) - 1] = '\0';
                                     save_message_type = MSG_NONE;
                                 }
                             }
@@ -4109,6 +4183,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 copy_counter++;
                             }
                             strncpy(new_criterion.root_name, new_name, sizeof(new_criterion.root_name) - 1);
+                            new_criterion.root_name[sizeof(new_criterion.root_name) - 1] = '\0';
                             stat_cat.criteria.insert(stat_cat.criteria.begin() + crit_to_copy + 1, new_criterion);
                             save_message_type = MSG_NONE;
                         }
@@ -4144,6 +4219,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         snprintf(new_unlock.display_name, sizeof(new_unlock.display_name), "New Unlock %d", counter);
                         strncpy(new_unlock.icon_path, "blocks/placeholder.png", sizeof(new_unlock.icon_path) - 1);
+                        new_unlock.icon_path[sizeof(new_unlock.icon_path) - 1] = '\0';
                         current_template_data.unlocks.push_back(new_unlock);
                         save_message_type = MSG_NONE;
                     }
@@ -4239,6 +4315,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             char new_path[MAX_PATH_LENGTH];
                             if (open_icon_file_dialog(new_path, sizeof(new_path))) {
                                 strncpy(unlock.icon_path, new_path, sizeof(unlock.icon_path));
+                                unlock.icon_path[sizeof(unlock.icon_path) - 1] = '\0';
                                 save_message_type = MSG_NONE;
                             }
                         }
@@ -4345,6 +4422,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             copy_counter++;
                         }
                         strncpy(new_item.root_name, new_name, sizeof(new_item.root_name) - 1);
+                        new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
                         current_template_data.unlocks.insert(current_template_data.unlocks.begin() + item_to_copy + 1,
                                                              new_item);
                     }
@@ -4371,6 +4449,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     snprintf(new_goal.display_name, sizeof(new_goal.display_name), "New Custom Goal %d", counter);
                     strncpy(new_goal.icon_path, "blocks/placeholder.png", sizeof(new_goal.icon_path) - 1);
+                    new_goal.icon_path[sizeof(new_goal.icon_path) - 1] = '\0';
                     new_goal.goal = 1; // Default to a progress-based counter
                     current_template_data.custom_goals.push_back(new_goal);
                     save_message_type = MSG_NONE;
@@ -4475,6 +4554,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         char new_path[MAX_PATH_LENGTH];
                         if (open_icon_file_dialog(new_path, sizeof(new_path))) {
                             strncpy(goal.icon_path, new_path, sizeof(goal.icon_path) - 1);
+                            goal.icon_path[sizeof(goal.icon_path) - 1] = '\0';
                             save_message_type = MSG_NONE;
                         }
                     }
@@ -4601,6 +4681,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         copy_counter++;
                     }
                     strncpy(new_item.root_name, new_name, sizeof(new_item.root_name) - 1);
+                    new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
                     current_template_data.custom_goals.insert(
                         current_template_data.custom_goals.begin() + item_to_copy + 1, new_item);
                 }
@@ -4634,11 +4715,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     snprintf(new_goal.display_name, sizeof(new_goal.display_name), "New Multi-Stage Goal %d", counter);
                     strncpy(new_goal.icon_path, "blocks/placeholder.png", sizeof(new_goal.icon_path) - 1);
+                    new_goal.icon_path[sizeof(new_goal.icon_path) - 1] = '\0';
 
                     // Add a default "Final" stage, which is required for validation
                     EditorSubGoal final_stage = {};
                     strncpy(final_stage.stage_id, "final", sizeof(final_stage.stage_id) - 1);
+                    final_stage.stage_id[sizeof(final_stage.stage_id) - 1] = '\0';
                     strncpy(final_stage.display_text, "Final Stage", sizeof(final_stage.display_text) - 1);
+                    final_stage.display_text[sizeof(final_stage.display_text) - 1] = '\0';
                     final_stage.type = SUBGOAL_MANUAL;
                     new_goal.stages.push_back(final_stage);
 
@@ -4856,6 +4940,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // ... (logic to generate unique name for new_goal) ...
                     char base_name[192];
                     strncpy(base_name, source_goal_ptr->root_name, sizeof(base_name) - 1);
+                    base_name[sizeof(base_name) - 1] = '\0';
                     char new_name[192];
                     int copy_counter = 1;
                     while (true) {
@@ -4870,6 +4955,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (!name_exists) break;
                     }
                     strncpy(new_goal.root_name, new_name, sizeof(new_goal.root_name) - 1);
+                    new_goal.root_name[sizeof(new_goal.root_name) - 1] = '\0';
 
                     auto it = std::find_if(current_template_data.multi_stage_goals.begin(),
                                            current_template_data.multi_stage_goals.end(),
@@ -4929,6 +5015,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         char new_path[MAX_PATH_LENGTH];
                         if (open_icon_file_dialog(new_path, sizeof(new_path))) {
                             strncpy(goal.icon_path, new_path, sizeof(goal.icon_path) - 1);
+                            goal.icon_path[sizeof(goal.icon_path) - 1] = '\0';
+
                             ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
                         }
@@ -4974,6 +5062,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_stage.type = SUBGOAL_STAT; // Default to a common type
                         strncpy(new_stage.root_name, "minecraft:custom/minecraft:new_stat",
                                 sizeof(new_stage.root_name) - 1);
+                        new_stage.root_name[sizeof(new_stage.root_name) - 1] = '\0';
                         new_stage.required_progress = 1;
 
                         // Insert the new stage just before the last element (which should be the "final" stage)
@@ -5368,6 +5457,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             copy_counter++;
                         }
                         strncpy(new_stage.stage_id, new_id, sizeof(new_stage.stage_id) - 1);
+                        new_stage.stage_id[sizeof(new_stage.stage_id) - 1] = '\0';
                         goal.stages.insert(goal.stages.begin() + stage_to_copy + 1, new_stage);
                         ms_goal_data_changed = true;
                         save_message_type = MSG_NONE;
@@ -5432,9 +5522,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     last_scanned_version[0] = '\0';
                 } else {
                     strncpy(status_message, error_msg, sizeof(status_message) - 1);
+                    status_message[sizeof(status_message) - 1] = '\0';
                 }
             } else {
                 strncpy(status_message, "Error: A version must be selected.", sizeof(status_message) - 1);
+                status_message[sizeof(status_message) - 1] = '\0';
             }
         }
         if (ImGui::IsItemHovered()) {
@@ -5505,6 +5597,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     last_scanned_version[0] = '\0'; // Force rescan
                 } else {
                     strncpy(status_message, error_msg, sizeof(status_message) - 1);
+                    status_message[sizeof(status_message) - 1] = '\0';
                 }
             }
         }
@@ -5588,6 +5681,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         show_import_confirmation_view = false;
                         // Switch UI to the newly imported version
                         strncpy(creator_version_str, version_str, sizeof(creator_version_str) - 1);
+                        creator_version_str[sizeof(creator_version_str) - 1] = '\0';
                         creator_version_idx = import_version_idx;
                         SDL_SetAtomicInt(&g_templates_changed, 1);
                         last_scanned_version[0] = '\0'; // Force rescan
@@ -5762,6 +5856,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 selected_lang_index = -1;
             } else {
                 strncpy(status_message, error_msg, sizeof(status_message) - 1);
+                status_message[sizeof(status_message) - 1] = '\0';
             }
             ImGui::CloseCurrentPopup();
         }
