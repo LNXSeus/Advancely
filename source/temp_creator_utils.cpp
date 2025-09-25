@@ -33,6 +33,63 @@
 #include <unistd.h> // For rmdir()
 #endif
 
+bool parse_player_stats_for_import(const char* file_path, MC_Version version, std::vector<ImportableStat>& out_stats, char* error_message, size_t error_msg_size) {
+    out_stats.clear();
+
+    cJSON* root = cJSON_from_file(file_path);
+    if (!root) {
+        snprintf(error_message, error_msg_size, "Error: Could not read or parse the selected JSON file.");
+        return false;
+    }
+
+    if (version <= MC_VERSION_1_6_4) {
+        // Legacy .dat file (parsed as json)
+        cJSON* stats_change = cJSON_GetObjectItem(root, "stats-change");
+        if (cJSON_IsArray(stats_change)) {
+            cJSON* stat_entry;
+            cJSON_ArrayForEach(stat_entry, stats_change) {
+                cJSON* item = stat_entry->child;
+                if (item && item->string) {
+                    out_stats.push_back({item->string, false});
+                }
+            }
+        }
+    } else if (version <= MC_VERSION_1_11_2) {
+        // Mid-era flat json file
+        cJSON* stat_entry = nullptr;
+        cJSON_ArrayForEach(stat_entry, root) {
+            if (stat_entry->string) {
+                out_stats.push_back({stat_entry->string, false});
+            }
+        }
+    } else {
+        // Modern nested json file
+        cJSON* stats_obj = cJSON_GetObjectItem(root, "stats");
+        if (stats_obj) {
+            cJSON* category_obj = nullptr;
+            cJSON_ArrayForEach(category_obj, stats_obj) {
+                if (category_obj->string) {
+                    cJSON* stat_entry = nullptr;
+                    cJSON_ArrayForEach(stat_entry, category_obj) {
+                        if (stat_entry->string) {
+                            char full_root_name[256];
+                            snprintf(full_root_name, sizeof(full_root_name), "%s/%s", category_obj->string, stat_entry->string);
+                            out_stats.push_back({full_root_name, false});
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    cJSON_Delete(root);
+    if (out_stats.empty()) {
+        snprintf(error_message, error_msg_size, "No parsable stats found in the selected file.");
+        return false;
+    }
+    return true;
+}
+
 bool parse_player_advancements_for_import(const char *file_path, std::vector<ImportableAdvancement> &out_advancements,
                                           char *error_message, size_t error_msg_size) {
     out_advancements.clear();

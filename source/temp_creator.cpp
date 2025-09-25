@@ -1250,7 +1250,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static char import_flag[MAX_PATH_LENGTH] = "";
 
     // Imports from world file
-    // advancements
+    // Advancements
     static bool show_import_advancements_popup = false;
     static std::vector<ImportableAdvancement> importable_advancements;
     static char import_error_message[256] = "";
@@ -1260,6 +1260,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static int last_clicked_crit_index = -1;
     static ImportableAdvancement *last_clicked_crit_parent = nullptr;
     static bool focus_import_search = false;
+
+    // Stats
+    static bool show_import_stats_popup = false;
+    static std::vector<ImportableStat> importable_stats;
+    static int last_clicked_stat_index = -1;
 
     // --- Version-dependent labels ---
     MC_Version creator_selected_version = settings_get_version_from_string(creator_version_str);
@@ -3295,6 +3300,33 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                 ImGui::BeginChild("StatListPane", ImVec2(pane_width, 0), true);
 
+                if (ImGui::Button("Import Stats")) {
+                    char start_path[MAX_PATH_LENGTH];
+                    snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
+
+                    const char *filter_patterns[2] = {"*.json", "*.dat"};
+                    const char *selection = tinyfd_openFileDialog("Select Player Stats File", start_path, 2,
+                                                                  filter_patterns, "Stats files", 0);
+
+                    if (selection) {
+                        import_error_message[0] = '\0';
+                        if (parse_player_stats_for_import(selection, creator_selected_version, importable_stats,
+                                                          import_error_message, sizeof(import_error_message))) {
+                            show_import_stats_popup = true;
+                            last_clicked_stat_index = -1; // Reset range selection index
+                        } else {
+                            save_message_type = MSG_ERROR;
+                            strncpy(status_message, import_error_message, sizeof(status_message) - 1);
+                        }
+                    }
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tooltip[256];
+                    snprintf(tooltip, sizeof(tooltip), "Import stats directly from a world's player data file.");
+                    ImGui::SetTooltip("%s", tooltip);
+                }
+
+                // New Line
                 if (ImGui::Button("Add New Stat")) {
                     // Create new stat category with default values
                     EditorTrackableCategory new_stat = {};
@@ -5687,7 +5719,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             snprintf(deselct_all_tooltip_buffer, sizeof(deselct_all_tooltip_buffer),
                      "Deselects all advancements and criteria in the current search.\n\n"
                      "If 'Include Criteria' is checked, only the criteria are deselected,\n"
-                     "leaving the parent advancements selected.");
+                     "leaving the parent advancements selected.\n\n"
+                     "You can also Shift+Click to deselect a range of items.");
             ImGui::SetTooltip("%s", deselct_all_tooltip_buffer);
         }
         ImGui::SameLine();
@@ -5927,7 +5960,186 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::Text("%s", counter_text);
 
         ImGui::EndPopup();
+    } // End of import advancements popup
+
+    // In temp_creator_render_gui, near the other popups
+    if (show_import_stats_popup) {
+        ImGui::OpenPopup("Import Stats from File");
     }
+    if (ImGui::BeginPopupModal("Import Stats from File", &show_import_stats_popup, ImGuiWindowFlags_AlwaysAutoResize)) {
+
+        // Hotkey logic for search bar
+        if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
+            ImGui::IsKeyPressed(ImGuiKey_F)) {
+            focus_import_search = true;
+        }
+
+        // --- Create a filtered list of stats to display and operate on ---
+        std::vector<ImportableStat *> filtered_stats;
+        if (import_search_buffer[0] != '\0') {
+            for (auto &stat: importable_stats) {
+                if (str_contains_insensitive(stat.root_name.c_str(), import_search_buffer)) {
+                    filtered_stats.push_back(&stat);
+                }
+            }
+        } else {
+            // If no search, all stats are "filtered"
+            for (auto &stat: importable_stats) {
+                filtered_stats.push_back(&stat);
+            }
+        }
+
+        // --- Left-aligned Controls ---
+        if (ImGui::Button("Select All")) {
+            for (auto *stat_ptr: filtered_stats) {
+                stat_ptr->is_selected = true;
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Selects all stats in the current search.\n\nYou can also Shift+Click to select a range.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Deselect All")) {
+            for (auto *stat_ptr: filtered_stats) {
+                stat_ptr->is_selected = false;
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Deselects all stats in the current search.\n\n"
+                                                             "You can also Shift+Click to deselect a range.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+
+
+        // --- Right-aligned Controls ---
+        const float search_bar_width = 250.0f;
+        const float clear_button_width = ImGui::GetFrameHeight();
+        const float right_controls_width = search_bar_width + clear_button_width + ImGui::GetStyle().ItemSpacing.x;
+        ImGui::SameLine(ImGui::GetWindowWidth() - right_controls_width - ImGui::GetStyle().WindowPadding.x);
+        if (import_search_buffer[0] != '\0') {
+            if (ImGui::Button("X##ClearImportStatsSearch", ImVec2(clear_button_width, 0))) {
+                import_search_buffer[0] = '\0';
+            }
+        } else {
+            ImGui::Dummy(ImVec2(clear_button_width, 0));
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(search_bar_width);
+        if (focus_import_search) {
+            ImGui::SetKeyboardFocusHere();
+            focus_import_search = false;
+        }
+        ImGui::InputTextWithHint("##ImportStatsSearch", "Search...", import_search_buffer,
+                                 sizeof(import_search_buffer));
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Filter list by stat root name (case-insensitive).\nPress Ctrl+F or Cmd+F to focus.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+        ImGui::Separator();
+
+        // --- Render List (using filtered list) ---
+        ImGui::BeginChild("StatsImporterScrollingRegion", ImVec2(600, 400), true);
+        for (size_t i = 0; i < filtered_stats.size(); ++i) {
+            auto &stat = *filtered_stats[i];
+            ImGui::PushID(&stat);
+
+            if (ImGui::Checkbox(stat.root_name.c_str(), &stat.is_selected)) {
+                if (ImGui::GetIO().KeyShift && last_clicked_stat_index != -1) {
+                    int start = std::min((int) i, last_clicked_stat_index);
+                    int end = std::max((int) i, last_clicked_stat_index);
+                    for (int j = start; j <= end; ++j) {
+                        filtered_stats[j]->is_selected = stat.is_selected;
+                    }
+                }
+                last_clicked_stat_index = i;
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndChild();
+
+        // --- Bottom Controls ---
+        if (import_error_message[0] != '\0') {
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", import_error_message);
+        }
+
+        // --- Count selected items ---
+        int selected_stats_count = 0;
+        for (const auto &stat: importable_stats) {
+            if (stat.is_selected) {
+                selected_stats_count++;
+            }
+        }
+
+        if (ImGui::Button("Confirm Import", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+            import_error_message[0] = '\0';
+            std::unordered_set<std::string> existing_names;
+            for (const auto &existing_stat: current_template_data.stats) {
+                existing_names.insert(existing_stat.root_name);
+            }
+
+            for (const auto &new_stat: importable_stats) {
+                if (new_stat.is_selected) {
+                    if (existing_names.count(new_stat.root_name)) {
+                        snprintf(import_error_message, sizeof(import_error_message), "Error: Stat '%s' already exists.",
+                                 new_stat.root_name.c_str());
+                        break;
+                    }
+                    EditorTrackableCategory imported_stat = {};
+                    strncpy(imported_stat.root_name, new_stat.root_name.c_str(), sizeof(imported_stat.root_name) - 1);
+                    strncpy(imported_stat.display_name, new_stat.root_name.c_str(),
+                            sizeof(imported_stat.display_name) - 1);
+                    strncpy(imported_stat.icon_path, "blocks/placeholder.png", sizeof(imported_stat.icon_path) - 1);
+                    imported_stat.is_simple_stat = true;
+
+                    EditorTrackableItem crit = {};
+                    strncpy(crit.root_name, new_stat.root_name.c_str(), sizeof(crit.root_name) - 1);
+                    crit.goal = 1;
+                    imported_stat.criteria.push_back(crit);
+
+                    current_template_data.stats.push_back(imported_stat);
+                }
+            }
+            if (import_error_message[0] == '\0') {
+                show_import_stats_popup = false;
+                import_search_buffer[0] = '\0';
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Import selected stats into the template.\n(You can also press ENTER)");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            show_import_stats_popup = false;
+            import_search_buffer[0] = '\0';
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Cancel the import and close this window.\n(You can also press ESCAPE)");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+
+        // --- Display the counter, aligned to the right ---
+        ImGui::SameLine();
+        char counter_text[128];
+        snprintf(counter_text, sizeof(counter_text), "Selected: %d Stats", selected_stats_count);
+
+        // Calculate position to right-align the text
+        float text_width = ImGui::CalcTextSize(counter_text).x;
+        ImGui::SetCursorPosX(ImGui::GetWindowWidth() - text_width - ImGui::GetStyle().WindowPadding.x);
+        ImGui::Text("%s", counter_text);
+
+        ImGui::EndPopup();
+    } // End of import stats popup
 
     if (roboto_font) {
         ImGui::PopFont();

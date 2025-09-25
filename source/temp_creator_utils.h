@@ -13,6 +13,12 @@
 extern "C" {
 #endif
 
+// Struct for the stats import feature
+struct ImportableStat {
+    std::string root_name;
+    bool is_selected = false;
+};
+
 // Helper structs for the import feature
 struct ImportableCriterion {
     std::string root_name;
@@ -25,6 +31,17 @@ struct ImportableAdvancement {
     bool is_selected = false;
     std::vector<ImportableCriterion> criteria;
 };
+
+/**
+ * @brief Parses a player's stats file (.json or .dat) into a simple list of stat root names.
+ * @param file_path The path to the player's stats file.
+ * @param version The MC_Version to determine which parsing format to use.
+ * @param out_stats A vector to be populated with the parsed stat names.
+ * @param error_message A buffer to store an error message on failure.
+ * @param error_msg_size The size of the error_message buffer.
+ * @return true on success, false on failure.
+ */
+bool parse_player_stats_for_import(const char* file_path, MC_Version version, std::vector<ImportableStat>& out_stats, char* error_message, size_t error_msg_size);
 
 /**
  * @brief Parses a player's advancements.json file into a structure suitable for the import UI.
