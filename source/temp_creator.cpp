@@ -3080,8 +3080,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::IsItemHovered()) {
                         char hidden_tooltip_buffer[128];
                         snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
-                                 "If checked, this item will be hidden on the tracker by default.\n"
-                                 "Visibility can be toggled in the main tracker settings.");
+                                 "If checked, this %s will be fully hidden on the overlay\n"
+                                 "and hidden settings-based on the tracker.\n"
+                                 "Visibility can be toggled in the main tracker settings.\n",
+                                 advancements_label_singular_lower);
                         ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                     }
                     // Conditionally render the criteria section only for versions that support it.
@@ -3239,7 +3241,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::IsItemHovered()) {
                             char hidden_tooltip_buffer[128];
                             snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
-                                     "If checked, this criterion will be hidden on the tracker by default.\n"
+                                     "If checked, this criterion will be fully hidden on the overlay\n"
+                                     "and hidden settings-based on the tracker.\n"
                                      "Visibility can be toggled in the main tracker settings");
                             ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                         }
@@ -3744,7 +3747,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::IsItemHovered()) {
                         char hidden_tooltip_buffer[128];
                         snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
-                                 "If checked, this criterion will be hidden on the tracker by default.\n"
+                                 "If checked, this stat will be fully hidden on the overlay\n"
+                                 "and hidden settings-based on the tracker.\n"
                                  "Visibility can be toggled in the main tracker settings");
                         ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                     }
@@ -3975,7 +3979,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ImGui::IsItemHovered()) {
                                 char hidden_tooltip_buffer[128];
                                 snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
-                                         "If checked, this criterion will be hidden on the tracker by default.\n"
+                                         "If checked, this sub-stat will be fully hidden on the overlay\n"
+                                         "and hidden settings-based on the tracker.\n"
                                          "Visibility can be toggled in the main tracker settings");
                                 ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                             }
@@ -4206,7 +4211,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::IsItemHovered()) {
                             char hidden_tooltip_buffer[256];
                             snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
-                                     "If checked, this criterion will be hidden on the tracker by default.\n"
+                                     "If checked, this unlock will be fully hidden on the overlay\n"
+                                     "and hidden settings-based on the tracker.\n"
                                      "Visibility can be toggled in the main tracker settings");
                             ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                         }
@@ -4456,7 +4462,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::IsItemHovered()) {
                         char hidden_tooltip_buffer[128];
                         snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
-                                 "If checked, this criterion will be hidden on the tracker by default.\n"
+                                 "If checked, this custom goal will be fully hidden on the overlay\n"
+                                 "and hidden settings-based on the tracker.\n"
                                  "Visibility can be toggled in the main tracker settings");
                         ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                     }
@@ -4896,7 +4903,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::IsItemHovered()) {
                         char hidden_tooltip_buffer[128];
                         snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
-                                 "If checked, this criterion will be hidden on the tracker by default.\n"
+                                 "If checked, this multi-stage goal will be fully hidden on the overlay\n"
+                                 "and hidden settings-based on the tracker.\n"
                                  "Visibility can be toggled in the main tracker settings");
                         ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                     }
@@ -6107,7 +6115,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         } else if (creator_selected_version <= MC_VERSION_1_11_2) {
             // Achievements and criteria
             snprintf(counter_text, sizeof(counter_text), "Selected: %d Achievements, %d Criteria", selected_adv_count,
-                                 selected_crit_count);
+                     selected_crit_count);
         } else {
             // Advancements and criteria
             snprintf(counter_text, sizeof(counter_text), "Selected: %d Advancements, %d Criteria", selected_adv_count,
