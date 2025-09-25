@@ -2621,7 +2621,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     if (selection) {
                         import_error_message[0] = '\0';
-                        if (parse_player_advancements_for_import(selection, importable_advancements,
+                        if (parse_player_advancements_for_import(selection, creator_selected_version, importable_advancements,
                                                                  import_error_message, sizeof(import_error_message))) {
                             show_import_advancements_popup = true;
                             focus_import_search = true; // Focus search bar as soon as popup opens

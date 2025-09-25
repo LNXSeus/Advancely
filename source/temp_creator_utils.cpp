@@ -58,7 +58,8 @@ bool parse_player_stats_for_import(const char* file_path, MC_Version version, st
         // Mid-era flat json file
         cJSON* stat_entry = nullptr;
         cJSON_ArrayForEach(stat_entry, root) {
-            if (stat_entry->string) {
+            // Only import entries that are simple numbers, excluding complex objects (achievements with criteria).
+            if (stat_entry->string && cJSON_IsNumber(stat_entry)) {
                 out_stats.push_back({stat_entry->string, false});
             }
         }
@@ -90,7 +91,7 @@ bool parse_player_stats_for_import(const char* file_path, MC_Version version, st
     return true;
 }
 
-bool parse_player_advancements_for_import(const char *file_path, std::vector<ImportableAdvancement> &out_advancements,
+bool parse_player_advancements_for_import(const char *file_path, MC_Version version, std::vector<ImportableAdvancement> &out_advancements,
                                           char *error_message, size_t error_msg_size) {
     out_advancements.clear();
 
@@ -100,31 +101,64 @@ bool parse_player_advancements_for_import(const char *file_path, std::vector<Imp
         return false;
     }
 
-    cJSON *advancement_json = nullptr;
-    cJSON_ArrayForEach(advancement_json, root) {
-        if (!advancement_json->string) continue;
+    if (version <= MC_VERSION_1_11_2) {
+        // --- Mid-era stats file parsing for ALL achievements ---
+        cJSON* achievement_json = nullptr;
+        cJSON_ArrayForEach(achievement_json, root) {
+            // We only care about entries that are actual achievements.
+            if (!achievement_json->string || strncmp(achievement_json->string, "achievement.", 12) != 0) {
+                continue;
+            }
 
-        // Add this check to ignore the DataVersion entry
-        if (strcmp(advancement_json->string, "DataVersion") == 0) {
-            continue;
-        }
+            ImportableAdvancement new_adv;
+            new_adv.root_name = achievement_json->string;
+            new_adv.is_done = false; // Default state
 
-        ImportableAdvancement new_adv;
-        new_adv.root_name = advancement_json->string;
-
-        cJSON *done_item = cJSON_GetObjectItem(advancement_json, "done");
-        new_adv.is_done = cJSON_IsTrue(done_item);
-
-        cJSON *criteria_obj = cJSON_GetObjectItem(advancement_json, "criteria");
-        if (criteria_obj) {
-            cJSON *criterion_json = nullptr;
-            cJSON_ArrayForEach(criterion_json, criteria_obj) {
-                if (criterion_json->string) {
-                    new_adv.criteria.push_back({criterion_json->string, false});
+            // Check if the achievement is simple (a number) or complex (an object).
+            if (cJSON_IsNumber(achievement_json)) {
+                // Simple achievement, e.g., "achievement.buildHoe": 1. It has no criteria.
+                new_adv.is_done = true; // A number value indicates it's completed.
+            } else if (cJSON_IsObject(achievement_json)) {
+                // Complex achievement with criteria, e.g., "achievement.exploreAllBiomes".
+                cJSON *progress_array = cJSON_GetObjectItem(achievement_json, "progress");
+                if (cJSON_IsArray(progress_array)) {
+                    cJSON *criterion_json = nullptr;
+                    cJSON_ArrayForEach(criterion_json, progress_array) {
+                        if (cJSON_IsString(criterion_json)) {
+                            new_adv.criteria.push_back({criterion_json->valuestring, false});
+                        }
+                    }
                 }
             }
+            out_advancements.push_back(new_adv);
         }
-        out_advancements.push_back(new_adv);
+    } else {
+        // --- Modern advancements file parsing (existing logic) ---
+        cJSON *advancement_json = nullptr;
+        cJSON_ArrayForEach(advancement_json, root) {
+            if (!advancement_json->string) continue;
+
+            if (strcmp(advancement_json->string, "DataVersion") == 0) {
+                continue;
+            }
+
+            ImportableAdvancement new_adv;
+            new_adv.root_name = advancement_json->string;
+
+            cJSON *done_item = cJSON_GetObjectItem(advancement_json, "done");
+            new_adv.is_done = cJSON_IsTrue(done_item);
+
+            cJSON *criteria_obj = cJSON_GetObjectItem(advancement_json, "criteria");
+            if (criteria_obj) {
+                cJSON *criterion_json = nullptr;
+                cJSON_ArrayForEach(criterion_json, criteria_obj) {
+                    if (criterion_json->string) {
+                        new_adv.criteria.push_back({criterion_json->string, false});
+                    }
+                }
+            }
+            out_advancements.push_back(new_adv);
+        }
     }
 
     cJSON_Delete(root);

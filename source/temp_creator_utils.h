@@ -45,13 +45,14 @@ bool parse_player_stats_for_import(const char* file_path, MC_Version version, st
 
 /**
  * @brief Parses a player's advancements.json file into a structure suitable for the import UI.
- * @param file_path The path to the player's advancements.json file.
+ * @param file_path The path to the player's advancements.json or legacy stats.json file.
+ * @param version The MC_Version to determine which parsing format to use.
  * @param out_advancements A vector to be populated with the parsed advancements.
  * @param error_message A buffer to store an error message on failure.
  * @param error_msg_size The size of the error_message buffer.
  * @return true on success, false on failure.
  */
-bool parse_player_advancements_for_import(const char* file_path, std::vector<ImportableAdvancement>& out_advancements, char* error_message, size_t error_msg_size);
+bool parse_player_advancements_for_import(const char* file_path, MC_Version version, std::vector<ImportableAdvancement>& out_advancements, char* error_message, size_t error_msg_size);
 
 /**
  * @brief Ensures that the directory for a given file path exists, creating it if necessary.
