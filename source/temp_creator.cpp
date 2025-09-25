@@ -2613,18 +2613,36 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                          advancements_label_plural_upper);
                 if (ImGui::Button(import_button_label)) {
                     char start_path[MAX_PATH_LENGTH];
-                    // For legacy, stats are not in a subfolder
+                    // Determine the correct starting path based on version and settings
                     if (creator_selected_version <= MC_VERSION_1_6_4) {
-                        snprintf(start_path, sizeof(start_path), "%s/%s/", t->saves_path, t->world_name);
+                        // Legacy achievements are in the stats file (global or local)
+                        if (app_settings->using_stats_per_world_legacy) {
+                            snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
+                        } else {
+                            char parent_dir[MAX_PATH_LENGTH];
+                            if (get_parent_directory(t->saves_path, parent_dir, sizeof(parent_dir), 1)) {
+                                snprintf(start_path, sizeof(start_path), "%s/stats/", parent_dir);
+                            } else {
+                                strncpy(start_path, t->saves_path, sizeof(start_path)); // Fallback
+                            }
+                        }
+                    } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                        // Mid-era achievements are in the per-world stats file
+                        snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
                     } else {
+                        // Modern advancements are in their own per-world folder
                         snprintf(start_path, sizeof(start_path), "%s/%s/advancements/", t->saves_path, t->world_name);
                     }
 
                     // --- Version-aware file filters ---
                     const char *json_filter[1] = {"*.json"};
                     const char *dat_filter[1] = {"*.dat"};
-                    const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4) ? dat_filter : json_filter;
-                    const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4) ? "DAT files" : "JSON files";
+                    const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
+                                                       ? dat_filter
+                                                       : json_filter;
+                    const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
+                                                  ? "DAT files"
+                                                  : "JSON files";
 
 
                     const char *selection = tinyfd_openFileDialog("Select Player Advancements File", start_path, 1,
@@ -2632,7 +2650,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     if (selection) {
                         import_error_message[0] = '\0';
-                        if (parse_player_advancements_for_import(selection, creator_selected_version, importable_advancements,
+                        if (parse_player_advancements_for_import(selection, creator_selected_version,
+                                                                 importable_advancements,
                                                                  import_error_message, sizeof(import_error_message))) {
                             show_import_advancements_popup = true;
                             focus_import_search = true; // Focus search bar as soon as popup opens
@@ -2644,10 +2663,32 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                 }
                 if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("Import 1.12+ advancements/recipes directly from a world's player data file.\n"
-                        "Cannot import already existing root names.");
+                    char import_stats_tooltip[512];
+                    if (creator_selected_version <= MC_VERSION_1_6_4) {
+                        if (app_settings->using_stats_per_world_legacy) {
+                            // Legacy using stats per world
+                            snprintf(import_stats_tooltip, sizeof(import_stats_tooltip),
+                                     "Import legacy achievements directly from a local world's player achievements .dat file.\n"
+                                     "Cannot import already existing root names.");
+                        } else {
+                            // Legacy not using stats per world
+                            snprintf(import_stats_tooltip, sizeof(import_stats_tooltip),
+                                     "Import legacy achievements directly from a global world's player achievements .dat file.\n"
+                                     "Cannot import already existing root names.");
+                        }
+                    } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                        // Mid-era
+                        snprintf(import_stats_tooltip, sizeof(import_stats_tooltip),
+                                 "Import mid-era achievements directly from a world's player achievements .json file.\n"
+                                 "Cannot import already existing root names.");
+                    } else {
+                        // Modern
+                        snprintf(import_stats_tooltip, sizeof(import_stats_tooltip),
+                                 "Import modern advancements/recipes directly from a world's player advancements .json file.\n"
+                                 "Cannot import already existing root names.");
+                    }
+                    ImGui::SetTooltip("%s", import_stats_tooltip);
                 }
-
                 char button_label[64];
                 snprintf(button_label, sizeof(button_label), "Add New %s", advancements_label_upper);
                 if (ImGui::Button(button_label)) {
@@ -3313,13 +3354,34 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 if (ImGui::Button("Import Stats")) {
                     char start_path[MAX_PATH_LENGTH];
-                    snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
+                    // Determine the correct starting path based on version and settings
+                    if (creator_selected_version <= MC_VERSION_1_6_4) {
+                        if (app_settings->using_stats_per_world_legacy) {
+                            // Legacy, Per-World: .../saves/WORLD_NAME/stats/
+                            snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
+                        } else {
+                            // Legacy, Global: .../stats/
+                            char parent_dir[MAX_PATH_LENGTH];
+                            if (get_parent_directory(t->saves_path, parent_dir, sizeof(parent_dir), 1)) {
+                                snprintf(start_path, sizeof(start_path), "%s/stats/", parent_dir);
+                            } else {
+                                strncpy(start_path, t->saves_path, sizeof(start_path)); // Fallback
+                            }
+                        }
+                    } else {
+                        // Mid-era and Modern stats are always in a per-world stats folder
+                        snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
+                    }
 
                     // --- Version-aware file filters ---
                     const char *json_filter[1] = {"*.json"};
                     const char *dat_filter[1] = {"*.dat"};
-                    const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4) ? dat_filter : json_filter;
-                    const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4) ? "DAT files" : "JSON files";
+                    const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
+                                                       ? dat_filter
+                                                       : json_filter;
+                    const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
+                                                  ? "DAT files"
+                                                  : "JSON files";
 
                     const char *selection = tinyfd_openFileDialog("Select Player Stats File", start_path, 1,
                                                                   selected_filter, filter_desc, 0);
@@ -3330,15 +3392,38 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           import_error_message, sizeof(import_error_message))) {
                             show_import_stats_popup = true;
                             last_clicked_stat_index = -1; // Reset range selection
-                                                          } else {
-                                                              save_message_type = MSG_ERROR;
-                                                              strncpy(status_message, import_error_message, sizeof(status_message) - 1);
-                                                          }
+                        } else {
+                            save_message_type = MSG_ERROR;
+                            strncpy(status_message, import_error_message, sizeof(status_message) - 1);
+                        }
                     }
                 }
                 if (ImGui::IsItemHovered()) {
-                    char tooltip[256];
-                    snprintf(tooltip, sizeof(tooltip), "Import stats directly from a world's player data file.");
+                    char tooltip[512];
+
+                    if (creator_selected_version <= MC_VERSION_1_6_4) {
+                        if (app_settings->using_stats_per_world_legacy) {
+                            // Legacy using stats per world
+                            snprintf(tooltip, sizeof(tooltip),
+                                     "Import stats directly from a local world's player stats/achievements .dat file.\n"
+                                     "Cannot import already existing root names.");
+                        } else {
+                            // Legacy not using stats per world
+                            snprintf(tooltip, sizeof(tooltip),
+                                     "Import stats directly from a global world's player stats/achievements .dat file.\n"
+                                     "Cannot import already existing root names.");
+                        }
+                    } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                        // Mid-era
+                        snprintf(tooltip, sizeof(tooltip),
+                                 "Import stats directly from a world's player stats/achievements .json file.\n"
+                                 "Cannot import already existing root names.");
+                    } else {
+                        // Modern
+                        snprintf(tooltip, sizeof(tooltip),
+                                 "Import stats directly from a world's player stats .json file.\n"
+                                 "Cannot import already existing root names.");
+                    }
                     ImGui::SetTooltip("%s", tooltip);
                 }
 
@@ -5653,10 +5738,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::EndChild();
 
     // Import Advancement Popup Logic
+    const char *import_popup_title = (creator_selected_version <= MC_VERSION_1_11_2)
+                                         ? "Import Achievements from File"
+                                         : "Import Advancements from File";
+
     if (show_import_advancements_popup) {
-        ImGui::OpenPopup("Import Advancements from File");
+        ImGui::OpenPopup(import_popup_title);
     }
-    if (ImGui::BeginPopupModal("Import Advancements from File", &show_import_advancements_popup,
+    if (ImGui::BeginPopupModal(import_popup_title, &show_import_advancements_popup,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         // Hotkey logic for search bar
         if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
@@ -5707,10 +5796,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         if (ImGui::IsItemHovered()) {
             char select_all_tooltip_buffer[512];
-            snprintf(select_all_tooltip_buffer, sizeof(select_all_tooltip_buffer),
-                     "Selects all advancements visible in the current search.\n"
-                     "Also selects their criteria if 'Include Criteria' is checked.\n\n"
-                     "You can also Shift+Click to select a range of items.");
+            if (creator_selected_version <= MC_VERSION_1_6_4) {
+                // Legacy
+                snprintf(select_all_tooltip_buffer, sizeof(select_all_tooltip_buffer),
+                         "Selects all achievements visible in the current search.\n\n"
+                         "You can also Shift+Click to select a range of items.");
+            } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                // Mid-era
+                snprintf(select_all_tooltip_buffer, sizeof(select_all_tooltip_buffer),
+                         "Selects all achievements visible in the current search.\n"
+                         "Also selects their criteria if 'Include Criteria' is checked.\n\n"
+                         "You can also Shift+Click to select a range of items.");
+            } else {
+                // Modern
+                snprintf(select_all_tooltip_buffer, sizeof(select_all_tooltip_buffer),
+                         "Selects all advancements/recipes visible in the current search.\n"
+                         "Also selects their criteria if 'Include Criteria' is checked.\n\n"
+                         "You can also Shift+Click to select a range of items.");
+            }
             ImGui::SetTooltip("%s", select_all_tooltip_buffer);
         }
         ImGui::SameLine();
@@ -5732,22 +5835,40 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         if (ImGui::IsItemHovered()) {
             char deselct_all_tooltip_buffer[512];
-            snprintf(deselct_all_tooltip_buffer, sizeof(deselct_all_tooltip_buffer),
-                     "Deselects all advancements and criteria in the current search.\n\n"
-                     "If 'Include Criteria' is checked, only the criteria are deselected,\n"
-                     "leaving the parent advancements selected.\n\n"
-                     "You can also Shift+Click to deselect a range of items.");
+            if (creator_selected_version <= MC_VERSION_1_6_4) {
+                snprintf(deselct_all_tooltip_buffer, sizeof(deselct_all_tooltip_buffer),
+                         "Deselects all achievements in the current search.\n\n"
+                         "You can also Shift+Click to deselect a range of items.");
+            } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                // Mid-era
+                snprintf(deselct_all_tooltip_buffer, sizeof(deselct_all_tooltip_buffer),
+                         "Deselects all achievements and criteria in the current search.\n\n"
+                         "If 'Include Criteria' is checked, only the criteria are deselected,\n"
+                         "leaving the parent achievements selected.\n\n"
+                         "You can also Shift+Click to deselect a range of items.");
+            } else {
+                // Modern
+                snprintf(deselct_all_tooltip_buffer, sizeof(deselct_all_tooltip_buffer),
+                         "Deselects all advancements/recipes and criteria in the current search.\n\n"
+                         "If 'Include Criteria' is checked, only the criteria are deselected,\n"
+                         "leaving the parent advancements selected.\n\n"
+                         "You can also Shift+Click to deselect a range of items.");
+            }
             ImGui::SetTooltip("%s", deselct_all_tooltip_buffer);
         }
-        ImGui::SameLine();
-        ImGui::Checkbox("Include Criteria", &import_select_criteria);
-        if (ImGui::IsItemHovered()) {
-            char include_criteria_tooltip_buffer[512];
-            snprintf(include_criteria_tooltip_buffer, sizeof(include_criteria_tooltip_buffer),
-                     "Toggles whether criteria are affected by 'Select All',\n"
-                     "'Deselect All', and range selection (Shift+Click).");
-            ImGui::SetTooltip(
-                "%s", include_criteria_tooltip_buffer);
+
+        // --- Include Criteria Checkbox ONLY for 1.7+ ---
+        if (creator_selected_version > MC_VERSION_1_6_4) {
+            ImGui::SameLine();
+            ImGui::Checkbox("Include Criteria", &import_select_criteria);
+            if (ImGui::IsItemHovered()) {
+                char include_criteria_tooltip_buffer[512];
+                snprintf(include_criteria_tooltip_buffer, sizeof(include_criteria_tooltip_buffer),
+                         "Toggles whether criteria are affected by 'Select All',\n"
+                         "'Deselect All', and range selection (Shift+Click).");
+                ImGui::SetTooltip(
+                    "%s", include_criteria_tooltip_buffer);
+            }
         }
         ImGui::SameLine();
 
@@ -5779,9 +5900,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::InputTextWithHint("##ImportSearch", "Search...", import_search_buffer, sizeof(import_search_buffer));
         if (ImGui::IsItemHovered()) {
             char import_search_tooltip_buffer[1024];
-            snprintf(import_search_tooltip_buffer, sizeof(import_search_tooltip_buffer),
-                     "Filter list by advancement or criterion root name (case-insensitive).\n"
-                     "Press Ctrl+F or Cmd+F to focus.");
+            if (creator_selected_version <= MC_VERSION_1_6_4) {
+                // No criteria
+                snprintf(import_search_tooltip_buffer, sizeof(import_search_tooltip_buffer),
+                         "Filter list by achievement root name (case-insensitive).\n"
+                         "Press Ctrl+F or Cmd+F to focus.");
+            } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                // Achievements with criteria
+                snprintf(import_search_tooltip_buffer, sizeof(import_search_tooltip_buffer),
+                         "Filter list by achievement or criterion root name (case-insensitive).\n"
+                         "Press Ctrl+F or Cmd+F to focus.");
+            } else {
+                // Advancements
+                snprintf(import_search_tooltip_buffer, sizeof(import_search_tooltip_buffer),
+                         "Filter list by advancement/recipe or criterion root name (case-insensitive).\n"
+                         "Press Ctrl+F or Cmd+F to focus.");
+            }
             ImGui::SetTooltip("%s", import_search_tooltip_buffer);
         }
         ImGui::Separator();
@@ -5983,7 +6117,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::OpenPopup("Import Stats from File");
     }
     if (ImGui::BeginPopupModal("Import Stats from File", &show_import_stats_popup, ImGuiWindowFlags_AlwaysAutoResize)) {
-
         // Hotkey logic for search bar
         if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
             ImGui::IsKeyPressed(ImGuiKey_F)) {
@@ -6026,7 +6159,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[256];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Deselects all stats in the current search.\n\n"
-                                                             "You can also Shift+Click to deselect a range.");
+                     "You can also Shift+Click to deselect a range.");
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
 
