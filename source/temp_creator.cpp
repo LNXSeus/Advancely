@@ -1342,6 +1342,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     enum StatImportMode { IMPORT_AS_TOP_LEVEL, IMPORT_AS_SUB_STAT };
     static StatImportMode current_stat_import_mode = IMPORT_AS_TOP_LEVEL;
 
+    // Unlocks
+    static bool show_import_unlocks_popup = false;
+    static std::vector<ImportableUnlock> importable_unlocks;
+    static int last_clicked_unlock_index = -1;
+
     // --- Version-dependent labels ---
     MC_Version creator_selected_version = settings_get_version_from_string(creator_version_str);
 
@@ -4213,7 +4218,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             if (ImGui::IsItemHovered()) {
                                 char tooltip_buffer[128];
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Sub-Stat:\n%s", crit.root_name);
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Sub-Stat:\n%s",
+                                         crit.root_name);
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
                             ImGui::EndGroup();
@@ -4294,6 +4300,39 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             // Only show the Unlocks tab for the specific version
             if (strcmp(creator_version_str, "25w14craftmine") == 0) {
                 if (ImGui::BeginTabItem("Unlocks")) {
+                    // Import unlocks button
+                    if (ImGui::Button("Import Unlocks")) {
+                        char start_path[MAX_PATH_LENGTH];
+                        snprintf(start_path, sizeof(start_path), "%s/%s/unlocks/", t->saves_path, t->world_name);
+
+                        const char *filter_patterns[1] = {"*.json"};
+                        const char *selection = tinyfd_openFileDialog("Select Player Unlocks File", start_path, 1,
+                                                                      filter_patterns, "JSON files", 0);
+
+                        if (selection) {
+                            import_error_message[0] = '\0';
+                            if (parse_player_unlocks_for_import(selection, importable_unlocks, import_error_message,
+                                                                sizeof(import_error_message))) {
+                                show_import_unlocks_popup = true;
+                                last_clicked_unlock_index = -1; // Reset range selection
+                                focus_import_search = true;
+                            } else {
+                                save_message_type = MSG_ERROR;
+                                strncpy(status_message, import_error_message, sizeof(status_message) - 1);
+                                status_message[sizeof(status_message) - 1] = '\0';
+                            }
+                        }
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[256];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Import unlocks directly from a world's player unlocks .json file.\n"
+                                 "Cannot import already existing root names.");
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+
+                    // Add new unlock button
+                    ImGui::SameLine();
                     if (ImGui::Button("Add New Unlock")) {
                         // Create new unlock with default values
                         EditorTrackableItem new_unlock = {};
@@ -6641,6 +6680,180 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         ImGui::EndPopup();
     } // End of import stats popup
+
+
+    // Import Unlocks from file
+    if (show_import_unlocks_popup) {
+        ImGui::OpenPopup("Import Unlocks from File");
+    }
+    if (ImGui::BeginPopupModal("Import Unlocks from File", &show_import_unlocks_popup,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        // Hotkey logic for search bar
+        if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
+            ImGui::IsKeyPressed(ImGuiKey_F)) {
+            focus_import_search = true;
+        }
+
+        // --- Create a filtered list of unlocks to display and operate on ---
+        std::vector<ImportableUnlock *> filtered_unlocks;
+        if (import_search_buffer[0] != '\0') {
+            for (auto &unlock: importable_unlocks) {
+                if (str_contains_insensitive(unlock.root_name.c_str(), import_search_buffer)) {
+                    filtered_unlocks.push_back(&unlock);
+                }
+            }
+        } else {
+            for (auto &unlock: importable_unlocks) {
+                filtered_unlocks.push_back(&unlock);
+            }
+        }
+
+        // --- Left-aligned Controls ---
+        if (ImGui::Button("Select All")) {
+            for (auto *unlock_ptr: filtered_unlocks) {
+                unlock_ptr->is_selected = true;
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Selects all unlocks in the current search.\n\nYou can also Shift+Click to select a range.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Deselect All")) {
+            for (auto *unlock_ptr: filtered_unlocks) {
+                unlock_ptr->is_selected = false;
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Deselects all unlocks in the current search.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+
+        // --- Right-aligned Controls ---
+        const float search_bar_width = 250.0f;
+        const float clear_button_width = ImGui::GetFrameHeight();
+        const float right_controls_width = search_bar_width + clear_button_width + ImGui::GetStyle().ItemSpacing.x;
+        ImGui::SameLine(ImGui::GetWindowWidth() - right_controls_width - ImGui::GetStyle().WindowPadding.x);
+        if (import_search_buffer[0] != '\0') {
+            if (ImGui::Button("X##ClearImportUnlocksSearch", ImVec2(clear_button_width, 0))) {
+                import_search_buffer[0] = '\0';
+            }
+        } else {
+            ImGui::Dummy(ImVec2(clear_button_width, 0));
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(search_bar_width);
+        if (focus_import_search) {
+            ImGui::SetKeyboardFocusHere();
+            focus_import_search = false;
+        }
+        ImGui::InputTextWithHint("##ImportUnlocksSearch", "Search...", import_search_buffer,
+                                 sizeof(import_search_buffer));
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Filter list by unlock root name (case-insensitive).\nPress Ctrl+F or Cmd+F to focus.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+        ImGui::Separator();
+
+        // --- Render List or empty message ---
+        if (importable_unlocks.empty()) {
+            ImGui::Text("No parsable unlocks found in the selected file.");
+        } else {
+            ImGui::BeginChild("UnlocksImporterScrollingRegion", ImVec2(600, 400), true);
+            for (size_t i = 0; i < filtered_unlocks.size(); ++i) {
+                auto &unlock = *filtered_unlocks[i];
+                ImGui::PushID(&unlock);
+
+                if (ImGui::Checkbox(unlock.root_name.c_str(), &unlock.is_selected)) {
+                    if (ImGui::GetIO().KeyShift && last_clicked_unlock_index != -1) {
+                        int start = std::min((int) i, last_clicked_unlock_index);
+                        int end = std::max((int) i, last_clicked_unlock_index);
+                        for (int j = start; j <= end; ++j) {
+                            filtered_unlocks[j]->is_selected = unlock.is_selected;
+                        }
+                    }
+                    last_clicked_unlock_index = i;
+                }
+                ImGui::PopID();
+            }
+            ImGui::EndChild();
+        }
+
+        // --- Bottom Controls ---
+        if (import_error_message[0] != '\0') {
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", import_error_message);
+        }
+
+        int selected_unlocks_count = 0;
+        for (const auto &unlock: importable_unlocks) {
+            if (unlock.is_selected) {
+                selected_unlocks_count++;
+            }
+        }
+
+        if (ImGui::Button("Confirm Import", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+            import_error_message[0] = '\0';
+            std::unordered_set<std::string> existing_names;
+            for (const auto &existing_unlock: current_template_data.unlocks) {
+                existing_names.insert(existing_unlock.root_name);
+            }
+
+            for (const auto &new_unlock: importable_unlocks) {
+                if (new_unlock.is_selected) {
+                    if (existing_names.count(new_unlock.root_name)) {
+                        snprintf(import_error_message, sizeof(import_error_message),
+                                 "Error: Unlock '%s' already exists.", new_unlock.root_name.c_str());
+                        break;
+                    }
+                    EditorTrackableItem imported_unlock = {};
+                    strncpy(imported_unlock.root_name, new_unlock.root_name.c_str(),
+                            sizeof(imported_unlock.root_name) - 1);
+                    imported_unlock.root_name[sizeof(imported_unlock.root_name) - 1] = '\0';
+                    strncpy(imported_unlock.display_name, new_unlock.root_name.c_str(),
+                            sizeof(imported_unlock.display_name) - 1);
+                    imported_unlock.display_name[sizeof(imported_unlock.display_name) - 1] = '\0';
+                    strncpy(imported_unlock.icon_path, "blocks/placeholder.png", sizeof(imported_unlock.icon_path) - 1);
+                    imported_unlock.icon_path[sizeof(imported_unlock.icon_path) - 1] = '\0';
+                    current_template_data.unlocks.push_back(imported_unlock);
+                }
+            }
+            if (import_error_message[0] == '\0') {
+                show_import_unlocks_popup = false;
+                import_search_buffer[0] = '\0';
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Import selected unlocks into the template.\n(You can also press ENTER)");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            show_import_unlocks_popup = false;
+            import_search_buffer[0] = '\0';
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Cancel the import and close this window.\n(You can also press ESCAPE)");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+
+        ImGui::SameLine();
+        char counter_text[128];
+        snprintf(counter_text, sizeof(counter_text), "Selected: %d Unlocks", selected_unlocks_count);
+        float text_width = ImGui::CalcTextSize(counter_text).x;
+        ImGui::SetCursorPosX(ImGui::GetWindowWidth() - text_width - ImGui::GetStyle().WindowPadding.x);
+        ImGui::Text("%s", counter_text);
+
+        ImGui::EndPopup();
+    } // End of import unlocks popup
 
     if (roboto_font) {
         ImGui::PopFont();

@@ -32,6 +32,12 @@ struct ImportableAdvancement {
     std::vector<ImportableCriterion> criteria;
 };
 
+// Struct for the unlocks import feature
+struct ImportableUnlock {
+    std::string root_name;
+    bool is_selected = false;
+};
+
 /**
  * @brief Parses a player's stats file (.json or .dat) into a simple list of stat root names.
  * @param file_path The path to the player's stats file.
@@ -53,6 +59,16 @@ bool parse_player_stats_for_import(const char* file_path, MC_Version version, st
  * @return true on success, false on failure.
  */
 bool parse_player_advancements_for_import(const char* file_path, MC_Version version, std::vector<ImportableAdvancement>& out_advancements, char* error_message, size_t error_msg_size);
+
+/**
+ * @brief Parses a player's unlocks.json file into a simple list of unlock root names from 'obtained' array.
+ * @param file_path The path to the player's unlocks.json file.
+ * @param out_unlocks A vector to be populated with the parsed unlock names.
+ * @param error_message A buffer to store an error message on failure.
+ * @param error_msg_size The size of the error_message buffer.
+ * @return true on success, false on failure.
+ */
+bool parse_player_unlocks_for_import(const char* file_path, std::vector<ImportableUnlock>& out_unlocks, char* error_message, size_t error_msg_size);
 
 /**
  * @brief Ensures that the directory for a given file path exists, creating it if necessary.

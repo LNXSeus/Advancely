@@ -183,6 +183,34 @@ bool parse_player_advancements_for_import(const char *file_path, MC_Version vers
     return true;
 }
 
+bool parse_player_unlocks_for_import(const char *file_path, std::vector<ImportableUnlock> &out_unlocks,
+                                     char *error_message, size_t error_msg_size) {
+    out_unlocks.clear();
+
+    cJSON *root = cJSON_from_file(file_path);
+    if (!root) {
+        snprintf(error_message, error_msg_size, "Error: Could not read or parse the selected JSON file.");
+        return false;
+    }
+
+    cJSON *obtained_obj = cJSON_GetObjectItem(root, "obtained");
+    if (cJSON_IsObject(obtained_obj)) {
+        cJSON* unlock_entry = nullptr;
+        cJSON_ArrayForEach(unlock_entry, obtained_obj) {
+            if (unlock_entry->string) {
+                out_unlocks.push_back({unlock_entry->string, false});
+            }
+        }
+    }
+
+    cJSON_Delete(root);
+    if (out_unlocks.empty()) {
+        snprintf(error_message, error_msg_size, "No parsable unlocks found in the selected file.");
+        return false;
+    }
+    return true;
+}
+
 // Helper to convert version string "1.16.1" to "1_16_1" for filename construction
 static void version_to_filename_format(const char *version_in, char *version_out, size_t max_len) {
     strncpy(version_out, version_in, max_len - 1);
