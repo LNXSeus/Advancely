@@ -49,6 +49,7 @@ bool parse_player_stats_for_import(const char* file_path, MC_Version version, st
             cJSON* stat_entry;
             cJSON_ArrayForEach(stat_entry, stats_change) {
                 cJSON* item = stat_entry->child;
+                // Legacy stats can also be achievements
                 if (item && item->string) {
                     out_stats.push_back({item->string, false});
                 }
@@ -101,7 +102,24 @@ bool parse_player_advancements_for_import(const char *file_path, MC_Version vers
         return false;
     }
 
-    if (version <= MC_VERSION_1_11_2) {
+    if (version <= MC_VERSION_1_6_4) {
+        // --- Legacy .dat file parsing for achievements ---
+        cJSON* stats_change = cJSON_GetObjectItem(root, "stats-change");
+        if (cJSON_IsArray(stats_change)) {
+            cJSON* stat_entry;
+            cJSON_ArrayForEach(stat_entry, stats_change) {
+                cJSON* item = stat_entry->child;
+                // Legacy achievements start with ID 5242880. We check if the first character is '5'.
+                if (item && item->string && item->string[0] == '5') {
+                    ImportableAdvancement new_adv;
+                    new_adv.root_name = item->string;
+                    new_adv.is_done = true; // Any entry in the file means it's completed.
+                    out_advancements.push_back(new_adv);
+                }
+            }
+        }
+    }
+    else if (version <= MC_VERSION_1_11_2) {
         // --- Mid-era stats file parsing for ALL achievements ---
         cJSON* achievement_json = nullptr;
         cJSON_ArrayForEach(achievement_json, root) {

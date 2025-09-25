@@ -2613,11 +2613,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                          advancements_label_plural_upper);
                 if (ImGui::Button(import_button_label)) {
                     char start_path[MAX_PATH_LENGTH];
-                    snprintf(start_path, sizeof(start_path), "%s/%s/advancements/", t->saves_path, t->world_name);
+                    // For legacy, stats are not in a subfolder
+                    if (creator_selected_version <= MC_VERSION_1_6_4) {
+                        snprintf(start_path, sizeof(start_path), "%s/%s/", t->saves_path, t->world_name);
+                    } else {
+                        snprintf(start_path, sizeof(start_path), "%s/%s/advancements/", t->saves_path, t->world_name);
+                    }
 
-                    const char *filter_patterns[1] = {"*.json"};
+                    // --- Version-aware file filters ---
+                    const char *json_filter[1] = {"*.json"};
+                    const char *dat_filter[1] = {"*.dat"};
+                    const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4) ? dat_filter : json_filter;
+                    const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4) ? "DAT files" : "JSON files";
+
+
                     const char *selection = tinyfd_openFileDialog("Select Player Advancements File", start_path, 1,
-                                                                  filter_patterns, "JSON files", 0);
+                                                                  selected_filter, filter_desc, 0);
 
                     if (selection) {
                         import_error_message[0] = '\0';
@@ -3304,20 +3315,25 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     char start_path[MAX_PATH_LENGTH];
                     snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
 
-                    const char *filter_patterns[2] = {"*.json", "*.dat"};
-                    const char *selection = tinyfd_openFileDialog("Select Player Stats File", start_path, 2,
-                                                                  filter_patterns, "Stats files", 0);
+                    // --- Version-aware file filters ---
+                    const char *json_filter[1] = {"*.json"};
+                    const char *dat_filter[1] = {"*.dat"};
+                    const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4) ? dat_filter : json_filter;
+                    const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4) ? "DAT files" : "JSON files";
+
+                    const char *selection = tinyfd_openFileDialog("Select Player Stats File", start_path, 1,
+                                                                  selected_filter, filter_desc, 0);
 
                     if (selection) {
                         import_error_message[0] = '\0';
                         if (parse_player_stats_for_import(selection, creator_selected_version, importable_stats,
                                                           import_error_message, sizeof(import_error_message))) {
                             show_import_stats_popup = true;
-                            last_clicked_stat_index = -1; // Reset range selection index
-                        } else {
-                            save_message_type = MSG_ERROR;
-                            strncpy(status_message, import_error_message, sizeof(status_message) - 1);
-                        }
+                            last_clicked_stat_index = -1; // Reset range selection
+                                                          } else {
+                                                              save_message_type = MSG_ERROR;
+                                                              strncpy(status_message, import_error_message, sizeof(status_message) - 1);
+                                                          }
                     }
                 }
                 if (ImGui::IsItemHovered()) {
@@ -6043,25 +6059,29 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         ImGui::Separator();
 
-        // --- Render List (using filtered list) ---
-        ImGui::BeginChild("StatsImporterScrollingRegion", ImVec2(600, 400), true);
-        for (size_t i = 0; i < filtered_stats.size(); ++i) {
-            auto &stat = *filtered_stats[i];
-            ImGui::PushID(&stat);
+        // --- Render List or empty message ---
+        if (importable_stats.empty()) {
+            ImGui::Text("No parsable stats found in the selected file.");
+        } else {
+            ImGui::BeginChild("StatsImporterScrollingRegion", ImVec2(600, 400), true);
+            for (size_t i = 0; i < filtered_stats.size(); ++i) {
+                auto &stat = *filtered_stats[i];
+                ImGui::PushID(&stat); // Add unique ID scope for each widget
 
-            if (ImGui::Checkbox(stat.root_name.c_str(), &stat.is_selected)) {
-                if (ImGui::GetIO().KeyShift && last_clicked_stat_index != -1) {
-                    int start = std::min((int) i, last_clicked_stat_index);
-                    int end = std::max((int) i, last_clicked_stat_index);
-                    for (int j = start; j <= end; ++j) {
-                        filtered_stats[j]->is_selected = stat.is_selected;
+                if (ImGui::Checkbox(stat.root_name.c_str(), &stat.is_selected)) {
+                    if (ImGui::GetIO().KeyShift && last_clicked_stat_index != -1) {
+                        int start = std::min((int) i, last_clicked_stat_index);
+                        int end = std::max((int) i, last_clicked_stat_index);
+                        for (int j = start; j <= end; ++j) {
+                            filtered_stats[j]->is_selected = stat.is_selected;
+                        }
                     }
+                    last_clicked_stat_index = i;
                 }
-                last_clicked_stat_index = i;
+                ImGui::PopID();
             }
-            ImGui::PopID();
+            ImGui::EndChild();
         }
-        ImGui::EndChild();
 
         // --- Bottom Controls ---
         if (import_error_message[0] != '\0') {
