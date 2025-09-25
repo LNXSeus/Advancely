@@ -6101,8 +6101,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // --- Display the counters, aligned to the right ---
         ImGui::SameLine();
         char counter_text[128];
-        snprintf(counter_text, sizeof(counter_text), "Selected: %d Advancements, %d Criteria", selected_adv_count,
-                 selected_crit_count);
+        if (creator_selected_version <= MC_VERSION_1_6_4) {
+            // Only achievements
+            snprintf(counter_text, sizeof(counter_text), "Selected: %d Achievements", selected_adv_count);
+        } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+            // Achievements and criteria
+            snprintf(counter_text, sizeof(counter_text), "Selected: %d Achievements, %d Criteria", selected_adv_count,
+                                 selected_crit_count);
+        } else {
+            // Advancements and criteria
+            snprintf(counter_text, sizeof(counter_text), "Selected: %d Advancements, %d Criteria", selected_adv_count,
+                     selected_crit_count);
+        }
 
         // Calculate position to right-align the text
         float text_width = ImGui::CalcTextSize(counter_text).x;
