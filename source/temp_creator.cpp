@@ -3346,8 +3346,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         if (ImGui::IsItemHovered()) {
                             char tooltip_buffer[128];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate %s Criterion",
-                                     advancements_label_upper);
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate %s Criterion:\n%s",
+                                     advancements_label_upper, criterion.root_name);
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
                         ImGui::SameLine();
@@ -3358,8 +3358,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         if (ImGui::IsItemHovered()) {
                             char tooltip_buffer[128];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s Criterion",
-                                     advancements_label_upper);
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s Criterion:\n%s",
+                                     advancements_label_upper, criterion.root_name);
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
@@ -4202,7 +4202,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             if (ImGui::IsItemHovered()) {
                                 char tooltip_buffer[128];
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Stat Criterion");
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Sub-Stat:\n%s",
+                                         crit.root_name);
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
                             ImGui::SameLine();
@@ -4212,7 +4213,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             if (ImGui::IsItemHovered()) {
                                 char tooltip_buffer[128];
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Stat Criterion");
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Sub-Stat:\n%s", crit.root_name);
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
                             ImGui::EndGroup();
@@ -4438,7 +4439,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         if (ImGui::IsItemHovered()) {
                             char tooltip_buffer[128];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Unlock");
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Unlock:\n%s", unlock.root_name);
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
                         ImGui::SameLine();
@@ -4448,7 +4449,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         if (ImGui::IsItemHovered()) {
                             char tooltip_buffer[128];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Unlock");
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Unlock:\n%s", unlock.root_name);
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
@@ -4693,7 +4694,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     if (ImGui::IsItemHovered()) {
                         char tooltip_buffer[128];
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Custom Goal");
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Custom Goal:\n%s", goal.root_name);
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
                     ImGui::SameLine();
@@ -4703,7 +4704,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     if (ImGui::IsItemHovered()) {
                         char tooltip_buffer[128];
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Custom Goal");
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Custom Goal:\n%s", goal.root_name);
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
 
@@ -5487,7 +5488,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ImGui::IsItemHovered()) {
                             char tooltip_buffer[128];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Stage");
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Stage:\n%s", stage.stage_id);
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
@@ -5501,7 +5502,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ImGui::IsItemHovered()) {
                             char tooltip_buffer[128];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Stage");
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Stage:\n%s", stage.stage_id);
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
