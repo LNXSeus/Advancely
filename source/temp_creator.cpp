@@ -1034,6 +1034,32 @@ static bool validate_and_save_template(const char *creator_version_str,
             validation_passed = false;
         }
     }
+    // Prevent orphaned/manual 'hidden_ms_stat_' entries for legacy versions.
+    if (validation_passed && version <= MC_VERSION_1_6_4) {
+        // 1. Get all stat IDs required by multi-stage goals.
+        std::unordered_set<std::string> required_ms_goal_stats;
+        for (const auto &goal : current_template_data.multi_stage_goals) {
+            for (const auto &stage : goal.stages) {
+                if (stage.type == SUBGOAL_STAT && stage.root_name[0] != '\0') {
+                    required_ms_goal_stats.insert(stage.root_name);
+                }
+            }
+        }
+
+        // 2. Check all stats with the reserved prefix.
+        for (const auto &stat_cat : current_template_data.stats) {
+            if (strncmp(stat_cat.root_name, "hidden_ms_stat_", 15) == 0) {
+                // This stat has the reserved prefix. It's only valid if it's actually required.
+                if (stat_cat.criteria.empty() || required_ms_goal_stats.find(stat_cat.criteria[0].root_name) == required_ms_goal_stats.end()) {
+                    // This is an orphaned or malformed hidden stat. Flag it as an error.
+                    snprintf(status_message, 512, "Error: The prefix 'hidden_ms_stat_' is reserved and was used\n"
+                                                  "on a stat ('%s') that is not part of a multi-stage goal.", stat_cat.root_name);
+                    validation_passed = false;
+                    break;
+                }
+            }
+        }
+    }
     if (validation_passed) {
         for (const auto &stat_cat: current_template_data.stats) {
             if (has_duplicate_root_names(stat_cat.criteria, status_message)) {
@@ -3078,7 +3104,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         save_message_type = MSG_NONE;
                     }
                     if (ImGui::IsItemHovered()) {
-                        char hidden_tooltip_buffer[128];
+                        char hidden_tooltip_buffer[256];
                         snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
                                  "If checked, this %s will be fully hidden on the overlay\n"
                                  "and hidden settings-based on the tracker.\n"
@@ -3239,7 +3265,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
-                            char hidden_tooltip_buffer[128];
+                            char hidden_tooltip_buffer[256];
                             snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
                                      "If checked, this criterion will be fully hidden on the overlay\n"
                                      "and hidden settings-based on the tracker.\n"
@@ -3449,12 +3475,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     snprintf(new_stat.display_name, sizeof(new_stat.display_name), "New Stat %d", counter);
                     strncpy(new_stat.icon_path, "blocks/placeholder.png", sizeof(new_stat.icon_path) - 1);
+                    new_stat.icon_path[sizeof(new_stat.icon_path) - 1] = '\0';
                     new_stat.is_simple_stat = true; // Default to simple
 
                     // Add a default criterion for the simple stat
                     EditorTrackableItem new_crit = {};
-                    snprintf(new_crit.root_name, sizeof(new_crit.root_name), "minecraft:custom/minecraft:new_stat_%d",
-                             counter);
+                    // Version-aware root name for the new criterion
+                    if (creator_selected_version <= MC_VERSION_1_6_4) {
+                        strncpy(new_crit.root_name, "0", sizeof(new_crit.root_name) - 1); // Legacy stats are numeric IDs
+                    } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                        snprintf(new_crit.root_name, sizeof(new_crit.root_name), "stat.new_stat_%d", counter); // Mid-era stats are prefixed
+                    } else {
+                        snprintf(new_crit.root_name, sizeof(new_crit.root_name), "minecraft:custom/minecraft:new_stat_%d", counter); // Modern
+                    }
+                    new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
                     new_crit.goal = 1; // Default to a completable goal
                     new_stat.criteria.push_back(new_crit);
 
@@ -3514,6 +3548,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 if (search_active) {
                     for (auto &stat_cat: current_template_data.stats) {
+
+                        // Skip internal helper stats from appearing in the list.
+                        if (strncmp(stat_cat.root_name, "hidden_ms_stat_", 15) == 0) {
+                            continue;
+                        }
                         bool should_render = false;
 
                         // Always check parent-level fields first
@@ -3550,8 +3589,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
                 } else {
-                    // Search is inactive, so show all stats.
+                    // Search is inactive, so show all non-hidden stats.
                     for (auto &stat_cat: current_template_data.stats) {
+                        // Skip internal helper stats from appearing in the list.
+                        if (strncmp(stat_cat.root_name, "hidden_ms_stat_", 15) == 0) {
+                            continue;
+                        }
                         stats_to_render.push_back(&stat_cat);
                     }
                 }
@@ -3745,7 +3788,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         save_message_type = MSG_NONE;
                     }
                     if (ImGui::IsItemHovered()) {
-                        char hidden_tooltip_buffer[128];
+                        char hidden_tooltip_buffer[256];
                         snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
                                  "If checked, this stat will be fully hidden on the overlay\n"
                                  "and hidden settings-based on the tracker.\n"
@@ -3977,7 +4020,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
-                                char hidden_tooltip_buffer[128];
+                                char hidden_tooltip_buffer[256];
                                 snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
                                          "If checked, this sub-stat will be fully hidden on the overlay\n"
                                          "and hidden settings-based on the tracker.\n"
@@ -4460,7 +4503,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         save_message_type = MSG_NONE; // Clear message on new edit
                     }
                     if (ImGui::IsItemHovered()) {
-                        char hidden_tooltip_buffer[128];
+                        char hidden_tooltip_buffer[256];
                         snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
                                  "If checked, this custom goal will be fully hidden on the overlay\n"
                                  "and hidden settings-based on the tracker.\n"
@@ -4901,7 +4944,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         save_message_type = MSG_NONE;
                     }
                     if (ImGui::IsItemHovered()) {
-                        char hidden_tooltip_buffer[128];
+                        char hidden_tooltip_buffer[256];
                         snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
                                  "If checked, this multi-stage goal will be fully hidden on the overlay\n"
                                  "and hidden settings-based on the tracker.\n"
@@ -6055,9 +6098,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (new_adv.is_selected) {
                         EditorTrackableCategory imported_cat = {};
                         strncpy(imported_cat.root_name, new_adv.root_name.c_str(), sizeof(imported_cat.root_name) - 1);
+                        imported_cat.root_name[sizeof(imported_cat.root_name) - 1] = '\0';
                         strncpy(imported_cat.display_name, new_adv.root_name.c_str(),
                                 sizeof(imported_cat.display_name) - 1); // Default display name
+                        imported_cat.display_name[sizeof(imported_cat.display_name) - 1] = '\0';
                         strncpy(imported_cat.icon_path, "blocks/placeholder.png", sizeof(imported_cat.icon_path) - 1);
+                        imported_cat.icon_path[sizeof(imported_cat.icon_path) - 1] = '\0';
 
                         // Rule C: Check for recipes
                         if (new_adv.root_name.find(":recipes/") != std::string::npos) {
@@ -6072,10 +6118,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     EditorTrackableItem imported_crit = {};
                                     strncpy(imported_crit.root_name, new_crit.root_name.c_str(),
                                             sizeof(imported_crit.root_name) - 1);
+                                    imported_crit.root_name[sizeof(imported_crit.root_name) - 1] = '\0';
                                     strncpy(imported_crit.display_name, new_crit.root_name.c_str(),
                                             sizeof(imported_crit.display_name) - 1);
+                                    imported_crit.display_name[sizeof(imported_crit.display_name) - 1] = '\0';
                                     strncpy(imported_crit.icon_path, "blocks/placeholder.png",
                                             sizeof(imported_crit.icon_path) - 1);
+                                    imported_crit.icon_path[sizeof(imported_crit.icon_path) - 1] = '\0';
                                     imported_cat.criteria.push_back(imported_crit);
                                 }
                             }
@@ -6251,7 +6300,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             import_error_message[0] = '\0';
             std::unordered_set<std::string> existing_names;
             for (const auto &existing_stat: current_template_data.stats) {
-                existing_names.insert(existing_stat.root_name);
+                // For simple stats, the unique ID is in the criterion's root_name.
+                if (existing_stat.is_simple_stat && !existing_stat.criteria.empty()) {
+                    existing_names.insert(existing_stat.criteria[0].root_name);
+                }
             }
 
             for (const auto &new_stat: importable_stats) {
@@ -6263,13 +6315,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     EditorTrackableCategory imported_stat = {};
                     strncpy(imported_stat.root_name, new_stat.root_name.c_str(), sizeof(imported_stat.root_name) - 1);
+                    imported_stat.root_name[sizeof(imported_stat.root_name) - 1] = '\0';
+
                     strncpy(imported_stat.display_name, new_stat.root_name.c_str(),
                             sizeof(imported_stat.display_name) - 1);
+                    imported_stat.display_name[sizeof(imported_stat.display_name) - 1] = '\0';
+
                     strncpy(imported_stat.icon_path, "blocks/placeholder.png", sizeof(imported_stat.icon_path) - 1);
+                    imported_stat.icon_path[sizeof(imported_stat.icon_path) - 1] = '\0';
                     imported_stat.is_simple_stat = true;
 
                     EditorTrackableItem crit = {};
                     strncpy(crit.root_name, new_stat.root_name.c_str(), sizeof(crit.root_name) - 1);
+                    crit.root_name[sizeof(crit.root_name) - 1] = '\0';
                     crit.goal = 1;
                     imported_stat.criteria.push_back(crit);
 
