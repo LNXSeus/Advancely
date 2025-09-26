@@ -2920,12 +2920,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
 
                 // --- Counter for the list ---
-                ImGui::Spacing();
                 char counter_text[128];
-                snprintf(counter_text, sizeof(counter_text), "%zu %s", advancements_to_render.size(), advancements_label_plural_upper);
+                snprintf(counter_text, sizeof(counter_text), "%zu %s", advancements_to_render.size(),
+                         advancements_to_render.size() == 1
+                             ? advancements_label_upper
+                             : advancements_label_plural_upper);
                 float text_width = ImGui::CalcTextSize(counter_text).x;
-                // Center Count
-                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - text_width) * 0.5f);
+                ImGui::SetCursorPosX(
+                    ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - text_width) *
+                    0.5f);
                 ImGui::TextDisabled("%s", counter_text);
 
                 int advancement_to_remove_idx = -1;
@@ -3111,7 +3114,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     // Re-find and update the selected_advancement pointer
                     if (selected_root_name_before_op[0] != '\0') {
-                        for (auto& adv : current_template_data.advancements) {
+                        for (auto &adv: current_template_data.advancements) {
                             if (strcmp(adv.root_name, selected_root_name_before_op) == 0) {
                                 selected_advancement = &adv;
                                 break;
@@ -3125,7 +3128,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (advancement_to_remove_idx != -1) {
                     char selected_root_name_before_op[192] = {};
                     if (selected_advancement) {
-                        strncpy(selected_root_name_before_op, selected_advancement->root_name, sizeof(selected_root_name_before_op) - 1);
+                        strncpy(selected_root_name_before_op, selected_advancement->root_name,
+                                sizeof(selected_root_name_before_op) - 1);
                     }
 
                     EditorTrackableCategory *adv_to_remove = advancements_to_render[advancement_to_remove_idx];
@@ -3142,7 +3146,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // Re-find pointer if it wasn't the one being deleted
                     if (selected_advancement && selected_root_name_before_op[0] != '\0') {
-                        for (auto& adv : current_template_data.advancements) {
+                        for (auto &adv: current_template_data.advancements) {
                             if (strcmp(adv.root_name, selected_root_name_before_op) == 0) {
                                 selected_advancement = &adv;
                                 break;
@@ -3255,11 +3259,25 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::Text("Criteria");
 
                         // --- Counter for the criteria list ---
-                        ImGui::SameLine();
                         char crit_counter_text[128];
-                        snprintf(crit_counter_text, sizeof(crit_counter_text), "%zu Criteria", advancement.criteria.size());
-                        float text_width = ImGui::CalcTextSize(counter_text).x;
-                        ImGui::SameLine(ImGui::GetContentRegionAvail().x - text_width);
+                        bool is_details_search_active = (
+                            current_search_scope == SCOPE_ADVANCEMENT_DETAILS && tc_search_buffer[0] != '\0');
+                        int visible_criteria_count = 0;
+                        if (!is_details_search_active) {
+                            visible_criteria_count = advancement.criteria.size();
+                        } else {
+                            for (const auto &criterion: advancement.criteria) {
+                                if (str_contains_insensitive(criterion.display_name, tc_search_buffer) ||
+                                    str_contains_insensitive(criterion.root_name, tc_search_buffer) ||
+                                    str_contains_insensitive(criterion.icon_path, tc_search_buffer)) {
+                                    visible_criteria_count++;
+                                }
+                            }
+                        }
+                        snprintf(crit_counter_text, sizeof(crit_counter_text), "%d %s", visible_criteria_count,
+                                 visible_criteria_count == 1 ? "Criterion" : "Criteria");
+                        float crit_text_width = ImGui::CalcTextSize(crit_counter_text).x;
+                        ImGui::SameLine(ImGui::GetContentRegionAvail().x - crit_text_width);
                         ImGui::TextDisabled("%s", crit_counter_text);
 
                         char criterion_add_tooltip_buffer[256];
@@ -3771,10 +3789,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 ImGui::Spacing();
                 char counter_text[128];
-                snprintf(counter_text, sizeof(counter_text), "%zu Stats", stats_to_render.size());
+                snprintf(counter_text, sizeof(counter_text), "%zu %s", stats_to_render.size(),
+                         stats_to_render.size() == 1 ? "Stat" : "Stats");
                 float text_width = ImGui::CalcTextSize(counter_text).x;
                 // Center Count
-                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - text_width) * 0.5f);
+                ImGui::SetCursorPosX(
+                    ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - text_width) *
+                    0.5f);
                 ImGui::TextDisabled("%s", counter_text);
 
                 // 3. Render the list using pointers.
@@ -3866,10 +3887,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 // Handle Copying
                 if (stat_to_copy_idx != -1) {
-
                     char selected_root_name_before_op[192] = {};
                     if (selected_stat) {
-                        strncpy(selected_root_name_before_op, selected_stat->root_name, sizeof(selected_root_name_before_op) - 1);
+                        strncpy(selected_root_name_before_op, selected_stat->root_name,
+                                sizeof(selected_root_name_before_op) - 1);
                     }
                     const EditorTrackableCategory *source_stat_ptr = stats_to_render[stat_to_copy_idx];
 
@@ -3885,7 +3906,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     new_stat.is_recipe = source_stat_ptr->is_recipe;
                     new_stat.is_simple_stat = source_stat_ptr->is_simple_stat;
                     new_stat.criteria = source_stat_ptr->criteria; // std::vector handles its own deep copy safely.
-
 
 
                     // Now, generate a unique name for the new copy
@@ -3924,7 +3944,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // Re-find and update the selected_stat pointer
                     if (selected_root_name_before_op[0] != '\0') {
-                        for (auto& stat : current_template_data.stats) {
+                        for (auto &stat: current_template_data.stats) {
                             if (strcmp(stat.root_name, selected_root_name_before_op) == 0) {
                                 selected_stat = &stat;
                                 break;
@@ -3938,7 +3958,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (stat_to_remove_idx != -1) {
                     char selected_root_name_before_op[192] = {};
                     if (selected_stat) {
-                        strncpy(selected_root_name_before_op, selected_stat->root_name, sizeof(selected_root_name_before_op) - 1);
+                        strncpy(selected_root_name_before_op, selected_stat->root_name,
+                                sizeof(selected_root_name_before_op) - 1);
                     }
 
                     EditorTrackableCategory *stat_to_remove = stats_to_render[stat_to_remove_idx];
@@ -3954,7 +3975,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // Re-find pointer if it wasn't the one being deleted
                     if (selected_stat && selected_root_name_before_op[0] != '\0') {
-                        for (auto& stat : current_template_data.stats) {
+                        for (auto &stat: current_template_data.stats) {
                             if (strcmp(stat.root_name, selected_root_name_before_op) == 0) {
                                 selected_stat = &stat;
                                 break;
@@ -4118,7 +4139,25 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         // --- Counter for the sub-stat list ---
                         char crit_counter_text[128];
-                        snprintf(crit_counter_text, sizeof(crit_counter_text), "%zu Sub-Stats", stat_cat.criteria.size());
+                        bool is_details_search_active = (
+                            current_search_scope == SCOPE_STAT_DETAILS && tc_search_buffer[0] != '\0');
+                        int visible_criteria_count = 0;
+                        if (!is_details_search_active) {
+                            visible_criteria_count = stat_cat.criteria.size();
+                        } else {
+                            for (const auto &crit : stat_cat.criteria) {
+                                char goal_str[32];
+                                snprintf(goal_str, sizeof(goal_str), "%d", crit.goal);
+                                if (str_contains_insensitive(crit.display_name, tc_search_buffer) ||
+                                    str_contains_insensitive(crit.root_name, tc_search_buffer) ||
+                                    str_contains_insensitive(crit.icon_path, tc_search_buffer) ||
+                                    (crit.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr)) {
+                                    visible_criteria_count++;
+                                    }
+                            }
+                        }
+                        snprintf(crit_counter_text, sizeof(crit_counter_text), "%d %s", visible_criteria_count,
+                                 visible_criteria_count == 1 ? "Sub-Stat" : "Sub-Stats");
                         float text_width = ImGui::CalcTextSize(crit_counter_text).x;
                         ImGui::SameLine(ImGui::GetContentRegionAvail().x - text_width);
                         ImGui::TextDisabled("%s", crit_counter_text);
@@ -4230,11 +4269,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "Click the 'Help' button for more info.");
                             ImGui::SetTooltip("%s", add_stat_tooltip_buffer);
                         }
-
-
-                        // Determine if a details search is active
-                        bool is_details_search_active = (
-                            current_search_scope == SCOPE_STAT_DETAILS && tc_search_buffer[0] != '\0');
 
                         int crit_to_remove = -1;
                         int crit_to_copy = -1;
@@ -4525,9 +4559,25 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SetTooltip("%s", add_unlock_tooltip_buffer);
                     }
 
+                    // Determine if search is active for this scope
+                    bool is_unlock_search_active = (
+                        current_search_scope == SCOPE_UNLOCKS && tc_search_buffer[0] != '\0');
+
                     // --- Counter for the list ---
                     char counter_text[128];
-                    snprintf(counter_text, sizeof(counter_text), "%zu Unlocks", current_template_data.unlocks.size());
+                    size_t count = 0;
+                    if (!is_unlock_search_active) {
+                        count = current_template_data.unlocks.size();
+                    } else {
+                        for (const auto &unlock : current_template_data.unlocks) {
+                            if (str_contains_insensitive(unlock.display_name, tc_search_buffer) ||
+                                str_contains_insensitive(unlock.root_name, tc_search_buffer) ||
+                                str_contains_insensitive(unlock.icon_path, tc_search_buffer)) {
+                                count++;
+                                }
+                        }
+                    }
+                    snprintf(counter_text, sizeof(counter_text), "%zu %s", count, count == 1 ? "Unlock" : "Unlocks");
                     float text_width = ImGui::CalcTextSize(counter_text).x;
                     ImGui::SameLine(ImGui::GetContentRegionAvail().x - text_width);
                     ImGui::TextDisabled("%s", counter_text);
@@ -4537,22 +4587,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     int unlocks_dnd_source_index = -1;
                     int unlocks_dnd_target_index = -1;
 
-                    // Determine if search is active for this scope
-                    bool is_unlock_search_active = (
-                        current_search_scope == SCOPE_UNLOCKS && tc_search_buffer[0] != '\0');
-
                     for (size_t i = 0; i < current_template_data.unlocks.size(); i++) {
                         auto &unlock = current_template_data.unlocks[i];
 
                         // SEARCH FILTER
-                        // If search is active, check both display name and root name.
-                        // If neither matches, skip rendering this item.
                         if (is_unlock_search_active) {
                             if (!str_contains_insensitive(unlock.display_name, tc_search_buffer) &&
                                 !str_contains_insensitive(unlock.root_name, tc_search_buffer) &&
                                 !str_contains_insensitive(unlock.icon_path, tc_search_buffer)) {
                                 continue;
-                            }
+                                }
                         }
 
                         ImGui::PushID(i);
@@ -4691,7 +4735,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         current_template_data.unlocks.insert(
                             current_template_data.unlocks.begin() + unlocks_dnd_target_index, item_to_move);
                         save_message_type = MSG_NONE;
-                    }
+                        }
 
                     if (item_to_remove != -1) {
                         current_template_data.unlocks.erase(current_template_data.unlocks.begin() + item_to_remove);
@@ -4781,9 +4825,34 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::SameLine();
                 ImGui::TextDisabled("(Hotkeys are configured in the main Settings window)");
 
+                // Determine if search is active for this scope
+                bool is_custom_search_active = (current_search_scope == SCOPE_CUSTOM && tc_search_buffer[0] != '\0');
+
+                // Create a filtered list to render
+                std::vector<EditorTrackableItem *> goals_to_render;
+                if (is_custom_search_active) {
+                    for (auto &goal: current_template_data.custom_goals) {
+                        char goal_str[32];
+                        snprintf(goal_str, sizeof(goal_str), "%d", goal.goal);
+
+                        if (str_contains_insensitive(goal.display_name, tc_search_buffer) ||
+                            str_contains_insensitive(goal.root_name, tc_search_buffer) ||
+                            str_contains_insensitive(goal.icon_path, tc_search_buffer) ||
+                            (goal.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr)) {
+                            goals_to_render.push_back(&goal);
+                            }
+                    }
+                } else {
+                    for (auto &goal: current_template_data.custom_goals) {
+                        goals_to_render.push_back(&goal);
+                    }
+                }
+
                 // --- Counter for the list ---
                 char counter_text[128];
-                snprintf(counter_text, sizeof(counter_text), "%zu Custom Goals", current_template_data.custom_goals.size());
+                size_t count = goals_to_render.size();
+                snprintf(counter_text, sizeof(counter_text), "%zu %s", count,
+                         count == 1 ? "Custom Goal" : "Custom Goals");
                 float text_width = ImGui::CalcTextSize(counter_text).x;
                 ImGui::SameLine(ImGui::GetContentRegionAvail().x - text_width);
                 ImGui::TextDisabled("%s", counter_text);
@@ -4793,27 +4862,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 int custom_dnd_source_index = -1;
                 int custom_dnd_target_index = -1;
 
-                // Determine if search is active for this scope
-                bool is_custom_search_active = (current_search_scope == SCOPE_CUSTOM && tc_search_buffer[0] != '\0');
-
-                for (size_t i = 0; i < current_template_data.custom_goals.size(); ++i) {
-                    auto &goal = current_template_data.custom_goals[i];
-
-                    // SEARCH FILTER
-                    // If search is active, check both display name and root name.
-                    // If neither matches, skip rendering this item.
-                    if (is_custom_search_active) {
-                        // Convert goal value into a string
-                        char goal_str[32];
-                        snprintf(goal_str, sizeof(goal_str), "%d", goal.goal);
-
-                        if (!str_contains_insensitive(goal.display_name, tc_search_buffer) &&
-                            !str_contains_insensitive(goal.root_name, tc_search_buffer) &&
-                            !str_contains_insensitive(goal.icon_path, tc_search_buffer) &&
-                            strstr(goal_str, tc_search_buffer) == nullptr) {
-                            continue;
-                        }
-                    }
+                for (size_t i = 0; i < goals_to_render.size(); ++i) {
+                    auto &goal = *goals_to_render[i];
 
                     ImGui::PushID(i);
 
@@ -5168,10 +5218,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 // --- Counter for the list ---
                 ImGui::Spacing();
                 char counter_text[128];
-                snprintf(counter_text, sizeof(counter_text), "%zu Multi-Stage Goals", goals_to_render.size());
+                snprintf(counter_text, sizeof(counter_text), "%zu %s", goals_to_render.size(),
+                         goals_to_render.size() == 1 ? "Multi-Stage Goal" : "Multi-Stage Goals");
                 float text_width = ImGui::CalcTextSize(counter_text).x;
                 // Center Count
-                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - text_width) * 0.5f);
+                ImGui::SetCursorPosX(
+                    ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - text_width) *
+                    0.5f);
                 ImGui::TextDisabled("%s", counter_text);
 
                 // 3. Render the list using pointers.
@@ -5259,10 +5312,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 // Handle Copying
                 if (goal_to_copy_idx != -1) {
-
                     char selected_root_name_before_op[192] = {};
                     if (selected_ms_goal) {
-                        strncpy(selected_root_name_before_op, selected_ms_goal->root_name, sizeof(selected_root_name_before_op) - 1);
+                        strncpy(selected_root_name_before_op, selected_ms_goal->root_name,
+                                sizeof(selected_root_name_before_op) - 1);
                     }
 
                     const EditorMultiStageGoal *source_goal_ptr = goals_to_render[goal_to_copy_idx];
@@ -5316,7 +5369,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // Re-find and update the selected_ms_goal pointer
                     if (selected_root_name_before_op[0] != '\0') {
-                        for (auto& goal : current_template_data.multi_stage_goals) {
+                        for (auto &goal: current_template_data.multi_stage_goals) {
                             if (strcmp(goal.root_name, selected_root_name_before_op) == 0) {
                                 selected_ms_goal = &goal;
                                 break;
@@ -5331,7 +5384,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (goal_to_remove_idx != -1) {
                     char selected_root_name_before_op[192] = {};
                     if (selected_ms_goal) {
-                        strncpy(selected_root_name_before_op, selected_ms_goal->root_name, sizeof(selected_root_name_before_op) - 1);
+                        strncpy(selected_root_name_before_op, selected_ms_goal->root_name,
+                                sizeof(selected_root_name_before_op) - 1);
                     }
 
                     EditorMultiStageGoal *goal_to_remove = goals_to_render[goal_to_remove_idx];
@@ -5348,7 +5402,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // Re-find pointer if it wasn't the one being deleted
                     if (selected_ms_goal && selected_root_name_before_op[0] != '\0') {
-                        for (auto& goal : current_template_data.multi_stage_goals) {
+                        for (auto &goal: current_template_data.multi_stage_goals) {
                             if (strcmp(goal.root_name, selected_root_name_before_op) == 0) {
                                 selected_ms_goal = &goal;
                                 break;
@@ -5434,7 +5488,26 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // --- Counter for the stages list ---
                     char stage_counter_text[128];
-                    snprintf(stage_counter_text, sizeof(stage_counter_text), "%zu Stages", goal.stages.size());
+                    bool is_details_search_active = (
+                        current_search_scope == SCOPE_MULTISTAGE_DETAILS && tc_search_buffer[0] != '\0');
+                    int visible_stages_count = 0;
+                    if (!is_details_search_active) {
+                        visible_stages_count = goal.stages.size();
+                    } else {
+                        for (const auto &stage : goal.stages) {
+                            char target_val_str[32];
+                            snprintf(target_val_str, sizeof(target_val_str), "%d", stage.required_progress);
+                            if (str_contains_insensitive(stage.display_text, tc_search_buffer) ||
+                                str_contains_insensitive(stage.stage_id, tc_search_buffer) ||
+                                str_contains_insensitive(stage.root_name, tc_search_buffer) ||
+                                str_contains_insensitive(stage.parent_advancement, tc_search_buffer) ||
+                                (stage.required_progress != 0 && strstr(target_val_str, tc_search_buffer) != nullptr)) {
+                                visible_stages_count++;
+                                }
+                        }
+                    }
+                    snprintf(stage_counter_text, sizeof(stage_counter_text), "%d %s", visible_stages_count,
+                             visible_stages_count == 1 ? "Stage" : "Stages");
                     float stage_text_width = ImGui::CalcTextSize(stage_counter_text).x;
                     ImGui::SameLine(ImGui::GetContentRegionAvail().x - stage_text_width);
                     ImGui::TextDisabled("%s", stage_counter_text);
@@ -5536,10 +5609,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
-
-                    // Determine if a details search is active
-                    bool is_details_search_active = (
-                        current_search_scope == SCOPE_MULTISTAGE_DETAILS && tc_search_buffer[0] != '\0');
 
                     int stage_to_remove = -1;
                     int stage_to_copy = -1;
