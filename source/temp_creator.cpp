@@ -2793,15 +2793,30 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     EditorTrackableCategory new_adv = {};
                     int counter = 1;
                     while (true) {
-                        snprintf(new_adv.root_name, sizeof(new_adv.root_name), "minecraft:new/advancement_%d", counter);
+                        char temp_name[256];
+                        if (creator_selected_version <= MC_VERSION_1_6_4) {
+                            // Legacy
+                            snprintf(temp_name, sizeof(new_adv.root_name), "5242880_%d", counter);
+                        } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                            // Mid-era
+                            snprintf(temp_name, sizeof(new_adv.root_name), "achievement.new_%d", counter);
+                        } else {
+                            // Modern
+                            snprintf(temp_name, sizeof(new_adv.root_name), "awesome:new/advancement_%d", counter);
+                        }
+
                         bool name_exists = false;
                         for (const auto &adv: current_template_data.advancements) {
-                            if (strcmp(adv.root_name, new_adv.root_name) == 0) {
+                            if (strcmp(adv.root_name, temp_name) == 0) {
                                 name_exists = true;
                                 break;
                             }
                         }
-                        if (!name_exists) break;
+                        if (!name_exists) {
+                            strncpy(new_adv.root_name, temp_name, sizeof(new_adv.root_name) - 1);
+                            new_adv.root_name[sizeof(new_adv.root_name) - 1] = '\0';
+                            break;
+                        }
                         counter++;
                     }
                     snprintf(new_adv.display_name, sizeof(new_adv.display_name), "New %s %d", advancements_label_upper,
@@ -5215,8 +5230,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         snprintf(new_stage.display_text, sizeof(new_stage.display_text), "New Stage %d", counter);
                         new_stage.type = SUBGOAL_STAT; // Default to a common type
-                        strncpy(new_stage.root_name, "minecraft:custom/minecraft:new_stat",
-                                sizeof(new_stage.root_name) - 1);
+                        // Version-aware root name for the new stage's trigger
+                        if (creator_selected_version <= MC_VERSION_1_6_4) {
+                            strncpy(new_stage.root_name, "0", sizeof(new_stage.root_name) - 1);
+                        } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                            strncpy(new_stage.root_name, "stat.cool", sizeof(new_stage.root_name) - 1);
+                        } else {
+                            strncpy(new_stage.root_name, "minecraft:custom/minecraft:new_stat", sizeof(new_stage.root_name) - 1);
+                        }
                         new_stage.root_name[sizeof(new_stage.root_name) - 1] = '\0';
                         new_stage.required_progress = 1;
 
