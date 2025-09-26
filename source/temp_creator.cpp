@@ -6362,7 +6362,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     bool parent_matched = str_contains_insensitive(adv.root_name.c_str(), import_search_buffer);
                     for (size_t j = 0; j < adv.criteria.size(); ++j) {
                         auto &crit = adv.criteria[j];
-                        if (import_search_buffer[0] != '\0' && !parent_matched && !str_contains_insensitive(crit.root_name.c_str(), import_search_buffer)) {
+                        if (import_search_buffer[0] != '\0' && !parent_matched && !str_contains_insensitive(
+                                crit.root_name.c_str(), import_search_buffer)) {
                             continue;
                         }
 
@@ -6371,7 +6372,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (crit.is_selected) {
                                     for (auto &other_adv: importable_advancements) {
                                         other_adv.is_selected = false;
-                                        for (auto &other_crit : other_adv.criteria) {
+                                        for (auto &other_crit: other_adv.criteria) {
                                             if (&other_crit != &crit) other_crit.is_selected = false;
                                         }
                                     }
@@ -6379,12 +6380,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             } else if (current_import_mode == BATCH_IMPORT) {
                                 if (crit.is_selected) adv.is_selected = true;
-                                if (ImGui::GetIO().KeyShift && import_select_criteria && last_clicked_crit_parent == &adv && last_clicked_crit_index != -1) {
+                                if (ImGui::GetIO().KeyShift && import_select_criteria && last_clicked_crit_parent == &
+                                    adv && last_clicked_crit_index != -1) {
                                     int start = std::min((int) j, last_clicked_crit_index);
                                     int end = std::max((int) j, last_clicked_crit_index);
                                     for (int k = start; k <= end; ++k) {
                                         auto &ranged_crit = adv.criteria[k];
-                                        if (import_search_buffer[0] == '\0' || parent_matched || str_contains_insensitive(ranged_crit.root_name.c_str(), import_search_buffer)) {
+                                        if (import_search_buffer[0] == '\0' || parent_matched ||
+                                            str_contains_insensitive(ranged_crit.root_name.c_str(),
+                                                                     import_search_buffer)) {
                                             ranged_crit.is_selected = crit.is_selected;
                                         }
                                     }
@@ -6422,22 +6426,33 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::Button(confirm_text, ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
             if (current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit != nullptr) {
                 // Part of a stage import
-                ImportableAdvancement* selected_adv = nullptr;
-                ImportableCriterion* selected_crit = nullptr;
-                for (auto &adv : importable_advancements) {
+                ImportableAdvancement *selected_adv = nullptr;
+                ImportableCriterion *selected_crit = nullptr;
+                for (auto &adv: importable_advancements) {
                     if (adv.is_selected) selected_adv = &adv;
-                    for (auto &crit : adv.criteria) {
+                    for (auto &crit: adv.criteria) {
                         if (crit.is_selected) selected_crit = &crit;
                     }
                 }
                 if (stage_to_edit->type == SUBGOAL_CRITERION && selected_crit != nullptr && selected_adv != nullptr) {
-                    strncpy(stage_to_edit->parent_advancement, selected_adv->root_name.c_str(), sizeof(stage_to_edit->parent_advancement) - 1);
+                    strncpy(stage_to_edit->parent_advancement, selected_adv->root_name.c_str(),
+                            sizeof(stage_to_edit->parent_advancement) - 1);
                     stage_to_edit->parent_advancement[sizeof(stage_to_edit->parent_advancement) - 1] = '\0';
-                    strncpy(stage_to_edit->root_name, selected_crit->root_name.c_str(), sizeof(stage_to_edit->root_name) - 1);
+                    strncpy(stage_to_edit->root_name, selected_crit->root_name.c_str(),
+                            sizeof(stage_to_edit->root_name) - 1);
                     stage_to_edit->root_name[sizeof(stage_to_edit->root_name) - 1] = '\0';
+                    // Manually trigger sync if it's a legacy version
+                    if (creator_selected_version <= MC_VERSION_1_6_4) {
+                        synchronize_legacy_ms_goal_stats(current_template_data);
+                    }
                 } else if (stage_to_edit->type == SUBGOAL_ADVANCEMENT && selected_adv != nullptr) {
-                    strncpy(stage_to_edit->root_name, selected_adv->root_name.c_str(), sizeof(stage_to_edit->root_name) - 1);
+                    strncpy(stage_to_edit->root_name, selected_adv->root_name.c_str(),
+                            sizeof(stage_to_edit->root_name) - 1);
                     stage_to_edit->root_name[sizeof(stage_to_edit->root_name) - 1] = '\0';
+                    // Manually trigger sync if it's a legacy version
+                    if (creator_selected_version <= MC_VERSION_1_6_4) {
+                        synchronize_legacy_ms_goal_stats(current_template_data);
+                    }
                 }
                 show_import_advancements_popup = false;
             } else {
@@ -6558,9 +6573,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     } // End of import advancements popup
 
     // Import Stats OR Sub-Stats from file
-    const char *stats_import_title = (current_import_mode == SINGLE_SELECT_STAGE) ? "Select Stat from File"
-                                    : (current_stat_import_mode == IMPORT_AS_SUB_STAT) ? "Import Sub-Stats from File"
-                                    : "Import Stats from File";
+    const char *stats_import_title = (current_import_mode == SINGLE_SELECT_STAGE)
+                                         ? "Select Stat from File"
+                                         : (current_stat_import_mode == IMPORT_AS_SUB_STAT)
+                                               ? "Import Sub-Stats from File"
+                                               : "Import Stats from File";
 
     if (show_import_stats_popup) {
         ImGui::OpenPopup(stats_import_title);
@@ -6587,42 +6604,45 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
         }
 
-        // --- Left-aligned Controls ---
-        if (ImGui::Button("Select All")) {
-            for (auto *stat_ptr: filtered_stats) {
-                stat_ptr->is_selected = true;
+        // --- Left-aligned Controls (only for batch import) ---
+        if (current_import_mode == BATCH_IMPORT) {
+            if (ImGui::Button("Select All")) {
+                for (auto *stat_ptr: filtered_stats) {
+                    stat_ptr->is_selected = true;
+                }
             }
-        }
-        if (ImGui::IsItemHovered()) {
-            char tooltip_buffer[256];
-            if (current_stat_import_mode == IMPORT_AS_SUB_STAT) {
-                // Sub-stats
-                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "Selects all sub-stats in the current search.\n\nYou can also Shift+Click to select a range.");
-            } else {
-                // Regular stats
-                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "Selects all stats in the current search.\n\nYou can also Shift+Click to select a range.");
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buffer[256];
+                if (current_stat_import_mode == IMPORT_AS_SUB_STAT) {
+                    // Sub-stats
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "Selects all sub-stats in the current search.\n\nYou can also Shift+Click to select a range.");
+                } else {
+                    // Regular stats
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "Selects all stats in the current search.\n\nYou can also Shift+Click to select a range.");
+                }
+                ImGui::SetTooltip("%s", tooltip_buffer);
             }
-            ImGui::SetTooltip("%s", tooltip_buffer);
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Deselect All")) {
-            for (auto *stat_ptr: filtered_stats) {
-                stat_ptr->is_selected = false;
+            ImGui::SameLine();
+            if (ImGui::Button("Deselect All")) {
+                for (auto *stat_ptr: filtered_stats) {
+                    stat_ptr->is_selected = false;
+                }
             }
-        }
-        if (ImGui::IsItemHovered()) {
-            char tooltip_buffer[256];
-            if (current_stat_import_mode == IMPORT_AS_SUB_STAT) {
-                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Deselects all sub-stats in the current search.\n\n"
-                         "You can also Shift+Click to deselect a range.");
-            } else {
-                // Regular stats
-                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Deselects all stats in the current search.\n\n"
-                         "You can also Shift+Click to deselect a range.");
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buffer[256];
+                if (current_stat_import_mode == IMPORT_AS_SUB_STAT) {
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "Deselects all sub-stats in the current search.\n\n"
+                             "You can also Shift+Click to deselect a range.");
+                } else {
+                    // Regular stats
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Deselects all stats in the current search.\n\n"
+                             "You can also Shift+Click to deselect a range.");
+                }
+                ImGui::SetTooltip("%s", tooltip_buffer);
             }
-            ImGui::SetTooltip("%s", tooltip_buffer);
         }
 
 
@@ -6677,7 +6697,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::PushID(&stat); // Add unique ID scope for each widget
 
                 if (ImGui::Checkbox(stat.root_name.c_str(), &stat.is_selected)) {
-                    if (ImGui::GetIO().KeyShift && last_clicked_stat_index != -1) {
+                    if (current_import_mode == SINGLE_SELECT_STAGE) {
+                        if (stat.is_selected) {
+                            // If it was just checked
+                            // Deselect all others
+                            for (auto &other_stat: importable_stats) {
+                                if (&other_stat != &stat) {
+                                    other_stat.is_selected = false;
+                                }
+                            }
+                        }
+                    } else if (ImGui::GetIO().KeyShift && last_clicked_stat_index != -1) {
                         int start = std::min((int) i, last_clicked_stat_index);
                         int end = std::max((int) i, last_clicked_stat_index);
                         for (int j = start; j <= end; ++j) {
@@ -6704,74 +6734,94 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
         }
 
-        if (ImGui::Button("Confirm Import", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+        const char *confirm_text = (current_import_mode == SINGLE_SELECT_STAGE) ? "Select" : "Confirm Import";
+        if (ImGui::Button(confirm_text, ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
             import_error_message[0] = '\0';
 
-            if (current_stat_import_mode == IMPORT_AS_SUB_STAT) {
-                // --- Logic to import as SUB-STATS (CRITERIA) ---
-                if (selected_stat != nullptr) {
+            if (current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit != nullptr) {
+                // --- Logic for SINGLE_SELECT_STAGE ---
+                for (const auto &new_stat: importable_stats) {
+                    if (new_stat.is_selected) {
+                        strncpy(stage_to_edit->root_name, new_stat.root_name.c_str(),
+                                sizeof(stage_to_edit->root_name) - 1);
+                        stage_to_edit->root_name[sizeof(stage_to_edit->root_name) - 1] = '\0';
+                        // Manually trigger sync if it's a legacy version
+                        if (creator_selected_version <= MC_VERSION_1_6_4) {
+                            synchronize_legacy_ms_goal_stats(current_template_data);
+                        }
+                        break; // Only import the first one found
+                    }
+                }
+                show_import_stats_popup = false;
+            } else {
+                // BATCH_IMPORT
+                if (current_stat_import_mode == IMPORT_AS_SUB_STAT) {
+                    // --- Logic to import as SUB-STATS (CRITERIA) ---
+                    if (selected_stat != nullptr) {
+                        std::unordered_set<std::string> existing_names;
+                        for (const auto &crit: selected_stat->criteria) {
+                            existing_names.insert(crit.root_name);
+                        }
+                        for (const auto &new_stat: importable_stats) {
+                            if (new_stat.is_selected) {
+                                if (existing_names.count(new_stat.root_name)) {
+                                    snprintf(import_error_message, sizeof(import_error_message),
+                                             "Error: Sub-stat '%s' already exists.", new_stat.root_name.c_str());
+                                    break;
+                                }
+                                EditorTrackableItem new_crit = {};
+                                strncpy(new_crit.root_name, new_stat.root_name.c_str(), sizeof(new_crit.root_name) - 1);
+                                new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
+                                strncpy(new_crit.display_name, new_stat.root_name.c_str(),
+                                        sizeof(new_crit.display_name) - 1);
+                                new_crit.display_name[sizeof(new_crit.display_name) - 1] = '\0';
+                                strncpy(new_crit.icon_path, "blocks/placeholder.png", sizeof(new_crit.icon_path) - 1);
+                                new_crit.icon_path[sizeof(new_crit.icon_path) - 1] = '\0';
+                                new_crit.goal = 1;
+                                selected_stat->criteria.push_back(new_crit);
+                            }
+                        }
+                    }
+                } else {
+                    // IMPORT_AS_TOP_LEVEL
+                    // --- Logic to import as TOP-LEVEL STATS ---
                     std::unordered_set<std::string> existing_names;
-                    for (const auto &crit: selected_stat->criteria) {
-                        existing_names.insert(crit.root_name);
+                    for (const auto &existing_stat: current_template_data.stats) {
+                        if (existing_stat.is_simple_stat && !existing_stat.criteria.empty()) {
+                            existing_names.insert(existing_stat.criteria[0].root_name);
+                        }
                     }
                     for (const auto &new_stat: importable_stats) {
                         if (new_stat.is_selected) {
                             if (existing_names.count(new_stat.root_name)) {
                                 snprintf(import_error_message, sizeof(import_error_message),
-                                         "Error: Sub-stat '%s' already exists.", new_stat.root_name.c_str());
+                                         "Error: Stat '%s' already exists.", new_stat.root_name.c_str());
                                 break;
                             }
-                            EditorTrackableItem new_crit = {};
-                            strncpy(new_crit.root_name, new_stat.root_name.c_str(), sizeof(new_crit.root_name) - 1);
-                            new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
-                            strncpy(new_crit.display_name, new_stat.root_name.c_str(),
-                                    sizeof(new_crit.display_name) - 1);
-                            new_crit.display_name[sizeof(new_crit.display_name) - 1] = '\0';
-                            strncpy(new_crit.icon_path, "blocks/placeholder.png", sizeof(new_crit.icon_path) - 1);
-                            new_crit.icon_path[sizeof(new_crit.icon_path) - 1] = '\0';
-                            new_crit.goal = 1;
-                            selected_stat->criteria.push_back(new_crit);
+                            EditorTrackableCategory imported_stat = {};
+                            strncpy(imported_stat.root_name, new_stat.root_name.c_str(),
+                                    sizeof(imported_stat.root_name) - 1);
+                            imported_stat.root_name[sizeof(imported_stat.root_name) - 1] = '\0';
+                            strncpy(imported_stat.display_name, new_stat.root_name.c_str(),
+                                    sizeof(imported_stat.display_name) - 1);
+                            imported_stat.display_name[sizeof(imported_stat.display_name) - 1] = '\0';
+                            strncpy(imported_stat.icon_path, "blocks/placeholder.png",
+                                    sizeof(imported_stat.icon_path) - 1);
+                            imported_stat.icon_path[sizeof(imported_stat.icon_path) - 1] = '\0';
+                            imported_stat.is_simple_stat = true;
+                            EditorTrackableItem crit = {};
+                            strncpy(crit.root_name, new_stat.root_name.c_str(), sizeof(crit.root_name) - 1);
+                            crit.root_name[sizeof(crit.root_name) - 1] = '\0';
+                            crit.goal = 1;
+                            imported_stat.criteria.push_back(crit);
+                            current_template_data.stats.push_back(imported_stat);
                         }
-                    }
-                }
-            } else {
-                // --- Logic to import as TOP-LEVEL STATS ---
-                std::unordered_set<std::string> existing_names;
-                for (const auto &existing_stat: current_template_data.stats) {
-                    if (existing_stat.is_simple_stat && !existing_stat.criteria.empty()) {
-                        existing_names.insert(existing_stat.criteria[0].root_name);
-                    }
-                }
-                for (const auto &new_stat: importable_stats) {
-                    if (new_stat.is_selected) {
-                        if (existing_names.count(new_stat.root_name)) {
-                            snprintf(import_error_message, sizeof(import_error_message),
-                                     "Error: Stat '%s' already exists.", new_stat.root_name.c_str());
-                            break;
-                        }
-                        EditorTrackableCategory imported_stat = {};
-                        strncpy(imported_stat.root_name, new_stat.root_name.c_str(),
-                                sizeof(imported_stat.root_name) - 1);
-                        imported_stat.root_name[sizeof(imported_stat.root_name) - 1] = '\0';
-                        strncpy(imported_stat.display_name, new_stat.root_name.c_str(),
-                                sizeof(imported_stat.display_name) - 1);
-                        imported_stat.display_name[sizeof(imported_stat.display_name) - 1] = '\0';
-                        strncpy(imported_stat.icon_path, "blocks/placeholder.png", sizeof(imported_stat.icon_path) - 1);
-                        imported_stat.icon_path[sizeof(imported_stat.icon_path) - 1] = '\0';
-                        imported_stat.is_simple_stat = true;
-                        EditorTrackableItem crit = {};
-                        strncpy(crit.root_name, new_stat.root_name.c_str(), sizeof(crit.root_name) - 1);
-                        crit.root_name[sizeof(crit.root_name) - 1] = '\0';
-                        crit.goal = 1;
-                        imported_stat.criteria.push_back(crit);
-                        current_template_data.stats.push_back(imported_stat);
                     }
                 }
             }
 
             if (import_error_message[0] == '\0') {
                 show_import_stats_popup = false;
-                import_search_buffer[0] = '\0';
             }
         }
 
@@ -6791,6 +6841,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             show_import_stats_popup = false;
+            current_import_mode = BATCH_IMPORT; // Reset to batch import on cancel
+            stage_to_edit = nullptr;
             import_search_buffer[0] = '\0';
         }
         if (ImGui::IsItemHovered()) {
@@ -6816,8 +6868,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
 
     // Import Unlocks from file
-    const char *unlocks_import_title = (current_import_mode == SINGLE_SELECT_STAGE) ? "Select Unlock from File"
-                                        : "Import Unlocks from File";
+    const char *unlocks_import_title = (current_import_mode == SINGLE_SELECT_STAGE)
+                                           ? "Select Unlock from File"
+                                           : "Import Unlocks from File";
 
     if (show_import_unlocks_popup) {
         ImGui::OpenPopup(unlocks_import_title);
@@ -6844,28 +6897,30 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
         }
 
-        // --- Left-aligned Controls ---
-        if (ImGui::Button("Select All")) {
-            for (auto *unlock_ptr: filtered_unlocks) {
-                unlock_ptr->is_selected = true;
+        // --- Left-aligned Controls (for batch import only) ---
+        if (current_import_mode == BATCH_IMPORT) {
+            if (ImGui::Button("Select All")) {
+                for (auto *unlock_ptr: filtered_unlocks) {
+                    unlock_ptr->is_selected = true;
+                }
             }
-        }
-        if (ImGui::IsItemHovered()) {
-            char tooltip_buffer[256];
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Selects all unlocks in the current search.\n\nYou can also Shift+Click to select a range.");
-            ImGui::SetTooltip("%s", tooltip_buffer);
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Deselect All")) {
-            for (auto *unlock_ptr: filtered_unlocks) {
-                unlock_ptr->is_selected = false;
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buffer[256];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Selects all unlocks in the current search.\n\nYou can also Shift+Click to select a range.");
+                ImGui::SetTooltip("%s", tooltip_buffer);
             }
-        }
-        if (ImGui::IsItemHovered()) {
-            char tooltip_buffer[256];
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Deselects all unlocks in the current search.");
-            ImGui::SetTooltip("%s", tooltip_buffer);
+            ImGui::SameLine();
+            if (ImGui::Button("Deselect All")) {
+                for (auto *unlock_ptr: filtered_unlocks) {
+                    unlock_ptr->is_selected = false;
+                }
+            }
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buffer[256];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Deselects all unlocks in the current search.");
+                ImGui::SetTooltip("%s", tooltip_buffer);
+            }
         }
 
         // --- Right-aligned Controls ---
@@ -6906,7 +6961,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::PushID(&unlock);
 
                 if (ImGui::Checkbox(unlock.root_name.c_str(), &unlock.is_selected)) {
-                    if (ImGui::GetIO().KeyShift && last_clicked_unlock_index != -1) {
+                    if (current_import_mode == SINGLE_SELECT_STAGE) {
+                        // Only one can be checked
+                        if (unlock.is_selected) {
+                            // If it was just checked
+                            for (auto &other_unlock: importable_unlocks) {
+                                if (&other_unlock != &unlock) {
+                                    other_unlock.is_selected = false;
+                                }
+                            }
+                        }
+                    } else if (ImGui::GetIO().KeyShift && last_clicked_unlock_index != -1) {
                         int start = std::min((int) i, last_clicked_unlock_index);
                         int end = std::max((int) i, last_clicked_unlock_index);
                         for (int j = start; j <= end; ++j) {
@@ -6932,34 +6997,58 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
         }
 
-        if (ImGui::Button("Confirm Import", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
-            import_error_message[0] = '\0';
-            std::unordered_set<std::string> existing_names;
-            for (const auto &existing_unlock: current_template_data.unlocks) {
-                existing_names.insert(existing_unlock.root_name);
-            }
+        const char *confirm_unlock_text = (current_import_mode == SINGLE_SELECT_STAGE) ? "Select" : "Confirm Import";
 
-            for (const auto &new_unlock: importable_unlocks) {
-                if (new_unlock.is_selected) {
-                    if (existing_names.count(new_unlock.root_name)) {
-                        snprintf(import_error_message, sizeof(import_error_message),
-                                 "Error: Unlock '%s' already exists.", new_unlock.root_name.c_str());
+        if (ImGui::Button(confirm_unlock_text, ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+            import_error_message[0] = '\0';
+            if (current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit != nullptr) {
+                for (const auto &new_unlock: importable_unlocks) {
+                    if (new_unlock.is_selected) {
+                        strncpy(stage_to_edit->root_name, new_unlock.root_name.c_str(),
+                                sizeof(stage_to_edit->root_name) - 1);
+                        stage_to_edit->root_name[sizeof(stage_to_edit->root_name) - 1] = '\0';
+                        // Manually trigger sync (will only run if version is also legacy)
+                        if (creator_selected_version <= MC_VERSION_1_6_4) {
+                            synchronize_legacy_ms_goal_stats(current_template_data);
+                        }
                         break;
                     }
-                    EditorTrackableItem imported_unlock = {};
-                    strncpy(imported_unlock.root_name, new_unlock.root_name.c_str(),
-                            sizeof(imported_unlock.root_name) - 1);
-                    imported_unlock.root_name[sizeof(imported_unlock.root_name) - 1] = '\0';
-                    strncpy(imported_unlock.display_name, new_unlock.root_name.c_str(),
-                            sizeof(imported_unlock.display_name) - 1);
-                    imported_unlock.display_name[sizeof(imported_unlock.display_name) - 1] = '\0';
-                    strncpy(imported_unlock.icon_path, "blocks/placeholder.png", sizeof(imported_unlock.icon_path) - 1);
-                    imported_unlock.icon_path[sizeof(imported_unlock.icon_path) - 1] = '\0';
-                    current_template_data.unlocks.push_back(imported_unlock);
+                }
+                show_import_unlocks_popup = false;
+            } else {
+                std::unordered_set<std::string> existing_names;
+                for (const auto &existing_unlock: current_template_data.unlocks) {
+                    existing_names.insert(existing_unlock.root_name);
+                }
+
+                for (const auto &new_unlock: importable_unlocks) {
+                    if (new_unlock.is_selected) {
+                        if (existing_names.count(new_unlock.root_name)) {
+                            snprintf(import_error_message, sizeof(import_error_message),
+                                     "Error: Unlock '%s' already exists.", new_unlock.root_name.c_str());
+                            break;
+                        }
+                        EditorTrackableItem imported_unlock = {};
+                        strncpy(imported_unlock.root_name, new_unlock.root_name.c_str(),
+                                sizeof(imported_unlock.root_name) - 1);
+                        imported_unlock.root_name[sizeof(imported_unlock.root_name) - 1] = '\0';
+                        strncpy(imported_unlock.display_name, new_unlock.root_name.c_str(),
+                                sizeof(imported_unlock.display_name) - 1);
+                        imported_unlock.display_name[sizeof(imported_unlock.display_name) - 1] = '\0';
+                        strncpy(imported_unlock.icon_path, "blocks/placeholder.png",
+                                sizeof(imported_unlock.icon_path) - 1);
+                        imported_unlock.icon_path[sizeof(imported_unlock.icon_path) - 1] = '\0';
+                        current_template_data.unlocks.push_back(imported_unlock);
+                    }
+                }
+                if (import_error_message[0] == '\0') {
+                    show_import_unlocks_popup = false;
+                    import_search_buffer[0] = '\0';
                 }
             }
-            if (import_error_message[0] == '\0') {
-                show_import_unlocks_popup = false;
+            if (!show_import_unlocks_popup) {
+                current_import_mode = BATCH_IMPORT;
+                stage_to_edit = nullptr;
                 import_search_buffer[0] = '\0';
             }
         }
@@ -6972,6 +7061,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             show_import_unlocks_popup = false;
+            current_import_mode = BATCH_IMPORT;
+            stage_to_edit = nullptr;
             import_search_buffer[0] = '\0';
         }
         if (ImGui::IsItemHovered()) {
