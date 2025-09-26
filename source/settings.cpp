@@ -141,11 +141,18 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         show_template_not_found_error = false;
     }
 
-    // use function to properly compare the settings
-    bool has_unsaved_changes = are_settings_different(&temp_settings, &saved_settings);
-
     // Window title
     ImGui::Begin("Advancely Settings", p_open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
+
+    // Unsaved changes
+    bool has_unsaved_changes = are_settings_different(&temp_settings, &saved_settings);
+
+    // Revert Changes -> Ctrl+Z / Cmd+Z hotkey logic
+    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && has_unsaved_changes && !ImGui::IsAnyItemActive() &&
+        (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
+        ImGui::IsKeyPressed(ImGuiKey_Z)) {
+        memcpy(&temp_settings, &saved_settings, sizeof(AppSettings));
+        }
 
     // If settings were forced open, display a prominent warning message
     if (force_open_flag && *force_open_flag) {
@@ -1416,7 +1423,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (ImGui::IsItemHovered()) {
             char revert_button_tooltip_buffer[1024];
             snprintf(revert_button_tooltip_buffer, sizeof(revert_button_tooltip_buffer),
-                     "Revert any changes made within the settings window since the last save.");
+                     "Revert any changes made within the settings window since the last save.\n"
+                     "(Ctrl+Z / Cmd+Z)");
             ImGui::SetTooltip("%s", revert_button_tooltip_buffer);
         }
     }

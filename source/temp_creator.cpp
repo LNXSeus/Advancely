@@ -1448,6 +1448,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         focus_tc_search_box = true;
     }
 
+    // Handle Ctrl+Z / Cmd+Z to revert changes
+    if (t && t->is_temp_creator_focused && editor_has_unsaved_changes && !ImGui::IsAnyItemActive() &&
+        (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
+        ImGui::IsKeyPressed(ImGuiKey_Z)) {
+        current_template_data = saved_template_data;
+        save_message_type = MSG_NONE;
+        status_message[0] = '\0';
+        }
+
     if (roboto_font) {
         ImGui::PushFont(roboto_font);
     }
@@ -2618,7 +2627,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char revert_changes_tooltip_buffer[1024];
             snprintf(revert_changes_tooltip_buffer, sizeof(revert_changes_tooltip_buffer),
-                     "Discard all unsaved changes and reload from the last saved state.");
+                     "Discard all unsaved changes and reload from the last saved state.\n"
+                     "(Ctrl+Z / Cmd+Z)");
             ImGui::SetTooltip("%s", revert_changes_tooltip_buffer);
         }
 
