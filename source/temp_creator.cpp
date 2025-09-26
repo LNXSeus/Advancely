@@ -3942,6 +3942,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             strncpy(stat_cat.criteria[0].display_name, stat_cat.display_name,
                                     sizeof(stat_cat.criteria[0].display_name) - 1);
                             stat_cat.criteria[0].display_name[sizeof(stat_cat.criteria[0].display_name) - 1] = '\0';
+
+                            // Set a default placeholder icon for the newly visible sub-stat.
+                            strncpy(stat_cat.criteria[0].icon_path, "blocks/placeholder.png", sizeof(stat_cat.criteria[0].icon_path) - 1);
+                            stat_cat.criteria[0].icon_path[sizeof(stat_cat.criteria[0].icon_path) - 1] = '\0';
                         }
                         // If switching FROM Multi-Stat TO Simple Stat
                         else if (!was_simple_stat && stat_cat.is_simple_stat) {
