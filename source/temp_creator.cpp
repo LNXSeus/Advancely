@@ -5530,14 +5530,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 switch (stage.type) {
                                     case SUBGOAL_STAT: {
                                         if (creator_selected_version <= MC_VERSION_1_6_4) {
-                                            if (app_settings->using_stats_per_world_legacy)
-                                                snprintf(
-                                                    start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
-                                                    t->world_name);
-                                            else if (get_parent_directory(
-                                                t->saves_path, start_path, sizeof(start_path), 1))
-                                                snprintf(
-                                                    start_path, sizeof(start_path), "%s/stats/", start_path);
+                                            if (app_settings->using_stats_per_world_legacy) {
+                                                snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
+                                            } else if (get_parent_directory(t->saves_path, start_path, sizeof(start_path), 1)) {
+                                                // Use a temporary buffer to prevent source/destination overlap
+                                                char temp_parent_dir[MAX_PATH_LENGTH];
+                                                strncpy(temp_parent_dir, start_path, sizeof(temp_parent_dir));
+                                                temp_parent_dir[sizeof(temp_parent_dir) - 1] = '\0';
+                                                snprintf(start_path, sizeof(start_path), "%s/stats/", temp_parent_dir);
+                                            }
                                         } else {
                                             snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
                                                      t->world_name);
@@ -5559,14 +5560,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     case SUBGOAL_ADVANCEMENT:
                                     case SUBGOAL_CRITERION: {
                                         if (creator_selected_version <= MC_VERSION_1_6_4) {
-                                            if (app_settings->using_stats_per_world_legacy)
-                                                snprintf(
-                                                    start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
-                                                    t->world_name);
-                                            else if (get_parent_directory(
-                                                t->saves_path, start_path, sizeof(start_path), 1))
-                                                snprintf(
-                                                    start_path, sizeof(start_path), "%s/stats/", start_path);
+                                            if (app_settings->using_stats_per_world_legacy) {
+                                                snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
+                                            } else if (get_parent_directory(t->saves_path, start_path, sizeof(start_path), 1)) {
+                                                // Use a temporary buffer to prevent source/destination overlap
+                                                char temp_parent_dir[MAX_PATH_LENGTH];
+                                                strncpy(temp_parent_dir, start_path, sizeof(temp_parent_dir));
+                                                temp_parent_dir[sizeof(temp_parent_dir) - 1] = '\0';
+                                                snprintf(start_path, sizeof(start_path), "%s/stats/", temp_parent_dir);
+                                            }
                                         } else if (creator_selected_version <= MC_VERSION_1_11_2) {
                                             snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
                                                      t->world_name);
@@ -5610,6 +5612,50 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     save_message_type = MSG_ERROR;
                                     strncpy(status_message, import_error_message, sizeof(status_message) - 1);
                                 }
+                            }
+
+                            // Import Stage Tooltip
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buffer[512];
+                                switch (stage.type) {
+                                    case SUBGOAL_STAT:
+                                        if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                     "Select a single stat or achievement from a\n"
+                                                     "player's .dat file to use as a trigger.");
+                                        } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                     "Select a single stat or achievement from a\n"
+                                                     "player's .json file to use as a trigger.");
+                                        } else {
+                                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                     "Select a single stat from a\n"
+                                                     "player's .json file to use as a trigger.");
+                                        }
+                                        break;
+                                    case SUBGOAL_ADVANCEMENT:
+                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                 "Select a single advancement or recipe from a\n"
+                                                 "player's .json file to use as a trigger.");
+                                        break;
+                                    case SUBGOAL_CRITERION:
+                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                 "Select a single criterion from a player's file.\n"
+                                                 "The parent and criterion fields will be filled in automatically.");
+                                        break;
+                                    case SUBGOAL_UNLOCK:
+                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                 "Select a single unlock from a\n"
+                                                 "player's .json file to use as a trigger.");
+                                        break;
+                                    default:
+                                        // This case should not be reachable as the button is not rendered for SUBGOAL_MANUAL.
+                                        strncpy(tooltip_buffer, "Import a value from a player file.",
+                                                sizeof(tooltip_buffer) - 1);
+                                        tooltip_buffer[sizeof(tooltip_buffer) - 1] = '\0';
+                                        break;
+                                }
+                                ImGui::SetTooltip("%s", tooltip_buffer);
                             }
 
                             if (ImGui::InputInt("Target Value", &stage.required_progress)) {
