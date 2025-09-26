@@ -1933,8 +1933,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
     }
 
-    // Disable if nothing is selected or the selected template is in use
-    ImGui::BeginDisabled(selected_template_index == -1 || is_current_template);
+    // Disable if nothing is selected or the selected template is in use or unsaved changes in editor
+    ImGui::BeginDisabled(selected_template_index == -1 || is_current_template || has_unsaved_changes_in_editor);
     if (ImGui::Button("Delete Template")) {
         if (selected_template_index != -1) {
             ImGui::OpenPopup("Delete Template?");
@@ -2054,7 +2054,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     }
     ImGui::EndDisabled();
 
-    if (ImGui::IsItemHovered()) {
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         char tooltip_buffer[512];
         if (has_unsaved_changes_in_editor) {
             // Unsaved changes in editor
