@@ -1455,7 +1455,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         current_template_data = saved_template_data;
         save_message_type = MSG_NONE;
         status_message[0] = '\0';
-        }
+    }
 
     if (roboto_font) {
         ImGui::PushFont(roboto_font);
@@ -3035,36 +3035,59 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     save_message_type = MSG_NONE;
                 }
 
-                // Handle removal
-                if (advancement_to_remove_idx != -1) {
-                    // Get a pointer to the item that was marked for removal
-                    EditorTrackableCategory *adv_to_remove = advancements_to_render[advancement_to_remove_idx];
-
-                    // If the removed item was the currently selected one, deselect it (set pointer to null)
-                    if (selected_advancement == adv_to_remove) {
-                        selected_advancement = nullptr;
-                    }
-
-                    // Use the C++ erase-remove idiom to find and remove the correct object
-                    // from the original data source by comparing its memory address.
-                    current_template_data.advancements.erase(
-                        std::remove_if(current_template_data.advancements.begin(),
-                                       current_template_data.advancements.end(),
-                                       [&](const EditorTrackableCategory &adv) {
-                                           return &adv == adv_to_remove;
-                                       }),
-                        current_template_data.advancements.end()
-                    );
-                    save_message_type = MSG_NONE;
-                }
+                // TODO: Remove
+                // // Handle Removal
+                // if (advancement_to_remove_idx != -1) {
+                //     // Get a pointer to the item that was marked for removal
+                //     EditorTrackableCategory *adv_to_remove = advancements_to_render[advancement_to_remove_idx];
+                //
+                //     // If the removed item was the currently selected one, deselect it (set pointer to null)
+                //     if (selected_advancement == adv_to_remove) {
+                //         selected_advancement = nullptr;
+                //     }
+                //
+                //     // Use the C++ erase-remove idiom to find and remove the correct object
+                //     // from the original data source by comparing its memory address.
+                //     current_template_data.advancements.erase(
+                //         std::remove_if(current_template_data.advancements.begin(),
+                //                        current_template_data.advancements.end(),
+                //                        [&](const EditorTrackableCategory &adv) {
+                //                            return &adv == adv_to_remove;
+                //                        }),
+                //         current_template_data.advancements.end()
+                //     );
+                //     save_message_type = MSG_NONE;
+                // }
 
                 // Handle Copying
                 if (advancement_to_copy_idx != -1) {
+                    char selected_root_name_before_op[192] = {};
+                    if (selected_advancement) {
+                        strncpy(selected_root_name_before_op, selected_advancement->root_name,
+                                sizeof(selected_root_name_before_op) - 1);
+                    }
                     // Get a pointer to the source item to copy from the filtered list
                     const EditorTrackableCategory *source_adv_ptr = advancements_to_render[advancement_to_copy_idx];
 
-                    // Create a deep copy of the object
-                    EditorTrackableCategory new_advancement = *source_adv_ptr;
+                    // Perform a manual, safe copy to prevent memory corruption.
+                    EditorTrackableCategory new_advancement;
+                    strncpy(new_advancement.root_name, source_adv_ptr->root_name, sizeof(new_advancement.root_name));
+                    new_advancement.root_name[sizeof(new_advancement.root_name) - 1] = '\0';
+                    strncpy(new_advancement.display_name, source_adv_ptr->display_name,
+                            sizeof(new_advancement.display_name));
+                    new_advancement.display_name[sizeof(new_advancement.display_name) - 1] = '\0';
+                    strncpy(new_advancement.icon_path, source_adv_ptr->icon_path, sizeof(new_advancement.icon_path));
+                    new_advancement.icon_path[sizeof(new_advancement.icon_path) - 1] = '\0';
+                    new_advancement.is_hidden = source_adv_ptr->is_hidden;
+                    new_advancement.is_recipe = source_adv_ptr->is_recipe;
+                    new_advancement.is_simple_stat = source_adv_ptr->is_simple_stat;
+                    new_advancement.criteria = source_adv_ptr->criteria; // std::vector handles its own deep copy.
+
+                    // TODO: Remove DEBUG
+                    // log_message(LOG_ERROR, "DEBUG: Copied advancement '%s'. Is simple: %s. Criteria count: %zu\n",
+                    //        new_advancement.root_name,
+                    //        new_advancement.is_simple_stat ? "yes" : "no",
+                    //        new_advancement.criteria.size());
 
                     // --- Generate a unique root_name for the copy ---
                     char base_name[192];
@@ -3086,9 +3109,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 break;
                             }
                         }
-                        if (!name_exists) {
-                            break; // Found a unique name
-                        }
+                        if (!name_exists) break; // Found a unique name
                         copy_counter++;
                     }
                     strncpy(new_advancement.root_name, new_name, sizeof(new_advancement.root_name) - 1);
@@ -3108,6 +3129,46 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     } else {
                         // Fallback: if source not found (shouldn't happen), add to the end
                         current_template_data.advancements.push_back(new_advancement);
+                    }
+                    // Re-find and update the selected_advancement pointer
+                    if (selected_root_name_before_op[0] != '\0') {
+                        for (auto& adv : current_template_data.advancements) {
+                            if (strcmp(adv.root_name, selected_root_name_before_op) == 0) {
+                                selected_advancement = &adv;
+                                break;
+                            }
+                        }
+                    }
+                    save_message_type = MSG_NONE;
+                }
+
+                // Handle Removal
+                if (advancement_to_remove_idx != -1) {
+                    char selected_root_name_before_op[192] = {};
+                    if (selected_advancement) {
+                        strncpy(selected_root_name_before_op, selected_advancement->root_name, sizeof(selected_root_name_before_op) - 1);
+                    }
+
+                    EditorTrackableCategory *adv_to_remove = advancements_to_render[advancement_to_remove_idx];
+                    if (selected_advancement == adv_to_remove) {
+                        selected_advancement = nullptr;
+                    }
+
+                    current_template_data.advancements.erase(
+                        std::remove_if(current_template_data.advancements.begin(),
+                                       current_template_data.advancements.end(),
+                                       [&](const EditorTrackableCategory &adv) { return &adv == adv_to_remove; }),
+                        current_template_data.advancements.end()
+                    );
+
+                    // Re-find pointer if it wasn't the one being deleted
+                    if (selected_advancement && selected_root_name_before_op[0] != '\0') {
+                        for (auto& adv : current_template_data.advancements) {
+                            if (strcmp(adv.root_name, selected_root_name_before_op) == 0) {
+                                selected_advancement = &adv;
+                                break;
+                            }
+                        }
                     }
                     save_message_type = MSG_NONE;
                 }
@@ -3442,7 +3503,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // Logic to handle the copy action after the loop
                     if (criterion_to_copy != -1) {
                         const auto &source_criterion = advancement.criteria[criterion_to_copy];
-                        EditorTrackableItem new_criterion = source_criterion; // Create Deepcopy
+
+
+                        // Perform a manual, safe copy.
+                        EditorTrackableItem new_criterion;
+                        strncpy(new_criterion.root_name, source_criterion.root_name, sizeof(new_criterion.root_name));
+                        new_criterion.root_name[sizeof(new_criterion.root_name) - 1] = '\0';
+                        strncpy(new_criterion.display_name, source_criterion.display_name,
+                                sizeof(new_criterion.display_name));
+                        new_criterion.display_name[sizeof(new_criterion.display_name) - 1] = '\0';
+                        strncpy(new_criterion.icon_path, source_criterion.icon_path, sizeof(new_criterion.icon_path));
+                        new_criterion.icon_path[sizeof(new_criterion.icon_path) - 1] = '\0';
+                        new_criterion.goal = source_criterion.goal;
+                        new_criterion.is_hidden = source_criterion.is_hidden;
+
                         char base_name[192];
                         strncpy(base_name, source_criterion.root_name, sizeof(base_name) - 1);
                         base_name[sizeof(base_name) - 1] = '\0';
@@ -3465,6 +3539,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_criterion.root_name[sizeof(new_criterion.root_name) - 1] = '\0';
                         advancement.criteria.insert(advancement.criteria.begin() + criterion_to_copy + 1,
                                                     new_criterion);
+                        save_message_type = MSG_NONE;
                     }
                 } else {
                     char select_prompt[128];
@@ -3792,22 +3867,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     save_message_type = MSG_NONE;
                 }
 
-                // Handle Removal
-                if (stat_to_remove_idx != -1) {
-                    EditorTrackableCategory *stat_to_remove = stats_to_render[stat_to_remove_idx];
-                    if (selected_stat == stat_to_remove) {
-                        selected_stat = nullptr;
-                    }
-                    current_template_data.stats.erase(
-                        std::remove_if(current_template_data.stats.begin(), current_template_data.stats.end(),
-                                       [&](const EditorTrackableCategory &s) { return &s == stat_to_remove; }),
-                        current_template_data.stats.end()
-                    );
-                    save_message_type = MSG_NONE;
-                }
+                // TODO: Remove
+                // // Handle Removal
+                // if (stat_to_remove_idx != -1) {
+                //     EditorTrackableCategory *stat_to_remove = stats_to_render[stat_to_remove_idx];
+                //     if (selected_stat == stat_to_remove) {
+                //         selected_stat = nullptr;
+                //     }
+                //     current_template_data.stats.erase(
+                //         std::remove_if(current_template_data.stats.begin(), current_template_data.stats.end(),
+                //                        [&](const EditorTrackableCategory &s) { return &s == stat_to_remove; }),
+                //         current_template_data.stats.end()
+                //     );
+                //     save_message_type = MSG_NONE;
+                // }
 
                 // Handle Copying
                 if (stat_to_copy_idx != -1) {
+
+                    char selected_root_name_before_op[192] = {};
+                    if (selected_stat) {
+                        strncpy(selected_root_name_before_op, selected_stat->root_name, sizeof(selected_root_name_before_op) - 1);
+                    }
                     const EditorTrackableCategory *source_stat_ptr = stats_to_render[stat_to_copy_idx];
 
                     // Perform a manual, safe copy to prevent memory corruption from non-null-terminated strings.
@@ -3822,6 +3903,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     new_stat.is_recipe = source_stat_ptr->is_recipe;
                     new_stat.is_simple_stat = source_stat_ptr->is_simple_stat;
                     new_stat.criteria = source_stat_ptr->criteria; // std::vector handles its own deep copy safely.
+
+
 
                     // Now, generate a unique name for the new copy
                     char base_name[192];
@@ -3856,15 +3939,61 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     } else {
                         current_template_data.stats.push_back(new_stat);
                     }
+
+                    // Re-find and update the selected_stat pointer
+                    if (selected_root_name_before_op[0] != '\0') {
+                        for (auto& stat : current_template_data.stats) {
+                            if (strcmp(stat.root_name, selected_root_name_before_op) == 0) {
+                                selected_stat = &stat;
+                                break;
+                            }
+                        }
+                    }
                     save_message_type = MSG_NONE;
                 }
 
+                // Handle Removal
+                if (stat_to_remove_idx != -1) {
+                    char selected_root_name_before_op[192] = {};
+                    if (selected_stat) {
+                        strncpy(selected_root_name_before_op, selected_stat->root_name, sizeof(selected_root_name_before_op) - 1);
+                    }
+
+                    EditorTrackableCategory *stat_to_remove = stats_to_render[stat_to_remove_idx];
+                    if (selected_stat == stat_to_remove) {
+                        selected_stat = nullptr;
+                    }
+
+                    current_template_data.stats.erase(
+                        std::remove_if(current_template_data.stats.begin(), current_template_data.stats.end(),
+                                       [&](const EditorTrackableCategory &s) { return &s == stat_to_remove; }),
+                        current_template_data.stats.end()
+                    );
+
+                    // Re-find pointer if it wasn't the one being deleted
+                    if (selected_stat && selected_root_name_before_op[0] != '\0') {
+                        for (auto& stat : current_template_data.stats) {
+                            if (strcmp(stat.root_name, selected_root_name_before_op) == 0) {
+                                selected_stat = &stat;
+                                break;
+                            }
+                        }
+                    }
+                    save_message_type = MSG_NONE;
+                }
                 ImGui::EndChild();
                 ImGui::SameLine();
 
                 ImGui::BeginChild("StatDetailsPane", ImVec2(0, 0), true);
                 if (selected_stat != nullptr) {
                     auto &stat_cat = *selected_stat;
+
+                    // TODO: Remove DEBUG
+                    // // HIGHLIGHT: Add this debug print
+                    // log_message(LOG_ERROR, "DEBUG: Rendering stat details for '%s'. Is simple: %s. Criteria pointer is %p\n",
+                    //        stat_cat.root_name,
+                    //        stat_cat.is_simple_stat ? "yes" : "no",
+                    //        (void*)&stat_cat.criteria);
 
                     ImGui::Text("Edit Stat Details");
                     ImGui::Separator();
@@ -3944,7 +4073,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             stat_cat.criteria[0].display_name[sizeof(stat_cat.criteria[0].display_name) - 1] = '\0';
 
                             // Set a default placeholder icon for the newly visible sub-stat.
-                            strncpy(stat_cat.criteria[0].icon_path, "blocks/placeholder.png", sizeof(stat_cat.criteria[0].icon_path) - 1);
+                            strncpy(stat_cat.criteria[0].icon_path, "blocks/placeholder.png",
+                                    sizeof(stat_cat.criteria[0].icon_path) - 1);
                             stat_cat.criteria[0].icon_path[sizeof(stat_cat.criteria[0].icon_path) - 1] = '\0';
                         }
                         // If switching FROM Multi-Stat TO Simple Stat
@@ -4297,7 +4427,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // Logic to handle the copy action after the loop
                         if (crit_to_copy != -1) {
                             const auto &source_criterion = stat_cat.criteria[crit_to_copy];
-                            EditorTrackableItem new_criterion = source_criterion;
+
+                            // Perform a manual, safe copy.
+                            EditorTrackableItem new_crit;
+                            strncpy(new_crit.root_name, source_criterion.root_name, sizeof(new_crit.root_name));
+                            new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
+                            strncpy(new_crit.display_name, source_criterion.display_name,
+                                    sizeof(new_crit.display_name));
+                            new_crit.display_name[sizeof(new_crit.display_name) - 1] = '\0';
+                            strncpy(new_crit.icon_path, source_criterion.icon_path, sizeof(new_crit.icon_path));
+                            new_crit.icon_path[sizeof(new_crit.icon_path) - 1] = '\0';
+                            new_crit.goal = source_criterion.goal;
+                            new_crit.is_hidden = source_criterion.is_hidden;
+
                             char base_name[192];
                             strncpy(base_name, source_criterion.root_name, sizeof(base_name) - 1);
                             base_name[sizeof(base_name) - 1] = '\0';
@@ -4316,9 +4458,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (!name_exists) break;
                                 copy_counter++;
                             }
-                            strncpy(new_criterion.root_name, new_name, sizeof(new_criterion.root_name) - 1);
-                            new_criterion.root_name[sizeof(new_criterion.root_name) - 1] = '\0';
-                            stat_cat.criteria.insert(stat_cat.criteria.begin() + crit_to_copy + 1, new_criterion);
+                            strncpy(new_crit.root_name, new_name, sizeof(new_crit.root_name) - 1);
+                            new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
+                            stat_cat.criteria.insert(stat_cat.criteria.begin() + crit_to_copy + 1, new_crit);
                             save_message_type = MSG_NONE;
                         }
                     }
@@ -4569,7 +4711,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // Logic to handle the copy action after the loop
                     if (item_to_copy != -1) {
                         const auto &source_item = current_template_data.unlocks[item_to_copy];
-                        EditorTrackableItem new_item = source_item;
+
+                        // Perform a manual, safe copy.
+                        EditorTrackableItem new_item;
+                        strncpy(new_item.root_name, source_item.root_name, sizeof(new_item.root_name));
+                        new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
+                        strncpy(new_item.display_name, source_item.display_name, sizeof(new_item.display_name));
+                        new_item.display_name[sizeof(new_item.display_name) - 1] = '\0';
+                        strncpy(new_item.icon_path, source_item.icon_path, sizeof(new_item.icon_path));
+                        new_item.icon_path[sizeof(new_item.icon_path) - 1] = '\0';
+                        new_item.goal = source_item.goal;
+                        new_item.is_hidden = source_item.is_hidden;
+
                         char base_name[192];
                         strncpy(base_name, source_item.root_name, sizeof(base_name) - 1);
                         base_name[sizeof(base_name) - 1] = '\0';
@@ -4592,6 +4745,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
                         current_template_data.unlocks.insert(current_template_data.unlocks.begin() + item_to_copy + 1,
                                                              new_item);
+                        save_message_type = MSG_NONE;
                     }
                     ImGui::EndTabItem();
                 }
@@ -4828,7 +4982,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 // Logic to handle the copy action after the loop
                 if (item_to_copy != -1) {
                     const auto &source_item = current_template_data.custom_goals[item_to_copy];
-                    EditorTrackableItem new_item = source_item;
+
+                    // Perform a manual, safe copy.
+                    EditorTrackableItem new_item;
+                    strncpy(new_item.root_name, source_item.root_name, sizeof(new_item.root_name));
+                    new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
+                    strncpy(new_item.display_name, source_item.display_name, sizeof(new_item.display_name));
+                    new_item.display_name[sizeof(new_item.display_name) - 1] = '\0';
+                    strncpy(new_item.icon_path, source_item.icon_path, sizeof(new_item.icon_path));
+                    new_item.icon_path[sizeof(new_item.icon_path) - 1] = '\0';
+                    new_item.goal = source_item.goal;
+                    new_item.is_hidden = source_item.is_hidden;
+
                     char base_name[192];
                     strncpy(base_name, source_item.root_name, sizeof(base_name) - 1);
                     base_name[sizeof(base_name) - 1] = '\0';
@@ -4851,6 +5016,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
                     current_template_data.custom_goals.insert(
                         current_template_data.custom_goals.begin() + item_to_copy + 1, new_item);
+                    save_message_type = MSG_NONE;
                 }
                 ImGui::EndTabItem();
             }
@@ -5084,24 +5250,31 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     save_message_type = MSG_NONE;
                 }
 
-                // Handle Removal
-                if (goal_to_remove_idx != -1) {
-                    EditorMultiStageGoal *goal_to_remove = goals_to_render[goal_to_remove_idx];
-                    if (selected_ms_goal == goal_to_remove) {
-                        selected_ms_goal = nullptr;
-                    }
-                    current_template_data.multi_stage_goals.erase(
-                        std::remove_if(current_template_data.multi_stage_goals.begin(),
-                                       current_template_data.multi_stage_goals.end(),
-                                       [&](const EditorMultiStageGoal &g) { return &g == goal_to_remove; }),
-                        current_template_data.multi_stage_goals.end()
-                    );
-                    ms_goal_data_changed = true;
-                    save_message_type = MSG_NONE;
-                }
+                // TODO: Remove
+                // // Handle Removal
+                // if (goal_to_remove_idx != -1) {
+                //     EditorMultiStageGoal *goal_to_remove = goals_to_render[goal_to_remove_idx];
+                //     if (selected_ms_goal == goal_to_remove) {
+                //         selected_ms_goal = nullptr;
+                //     }
+                //     current_template_data.multi_stage_goals.erase(
+                //         std::remove_if(current_template_data.multi_stage_goals.begin(),
+                //                        current_template_data.multi_stage_goals.end(),
+                //                        [&](const EditorMultiStageGoal &g) { return &g == goal_to_remove; }),
+                //         current_template_data.multi_stage_goals.end()
+                //     );
+                //     ms_goal_data_changed = true;
+                //     save_message_type = MSG_NONE;
+                // }
 
                 // Handle Copying
                 if (goal_to_copy_idx != -1) {
+
+                    char selected_root_name_before_op[192] = {};
+                    if (selected_ms_goal) {
+                        strncpy(selected_root_name_before_op, selected_ms_goal->root_name, sizeof(selected_root_name_before_op) - 1);
+                    }
+
                     const EditorMultiStageGoal *source_goal_ptr = goals_to_render[goal_to_copy_idx];
 
                     // Perform a manual, safe copy to prevent memory corruption.
@@ -5149,6 +5322,48 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         current_template_data.multi_stage_goals.insert(it + 1, new_goal);
                     } else {
                         current_template_data.multi_stage_goals.push_back(new_goal);
+                    }
+
+                    // Re-find and update the selected_ms_goal pointer
+                    if (selected_root_name_before_op[0] != '\0') {
+                        for (auto& goal : current_template_data.multi_stage_goals) {
+                            if (strcmp(goal.root_name, selected_root_name_before_op) == 0) {
+                                selected_ms_goal = &goal;
+                                break;
+                            }
+                        }
+                    }
+                    ms_goal_data_changed = true;
+                    save_message_type = MSG_NONE;
+                }
+
+                // Handle Removal
+                if (goal_to_remove_idx != -1) {
+                    char selected_root_name_before_op[192] = {};
+                    if (selected_ms_goal) {
+                        strncpy(selected_root_name_before_op, selected_ms_goal->root_name, sizeof(selected_root_name_before_op) - 1);
+                    }
+
+                    EditorMultiStageGoal *goal_to_remove = goals_to_render[goal_to_remove_idx];
+                    if (selected_ms_goal == goal_to_remove) {
+                        selected_ms_goal = nullptr;
+                    }
+
+                    current_template_data.multi_stage_goals.erase(
+                        std::remove_if(current_template_data.multi_stage_goals.begin(),
+                                       current_template_data.multi_stage_goals.end(),
+                                       [&](const EditorMultiStageGoal &g) { return &g == goal_to_remove; }),
+                        current_template_data.multi_stage_goals.end()
+                    );
+
+                    // Re-find pointer if it wasn't the one being deleted
+                    if (selected_ms_goal && selected_root_name_before_op[0] != '\0') {
+                        for (auto& goal : current_template_data.multi_stage_goals) {
+                            if (strcmp(goal.root_name, selected_root_name_before_op) == 0) {
+                                selected_ms_goal = &goal;
+                                break;
+                            }
+                        }
                     }
                     ms_goal_data_changed = true;
                     save_message_type = MSG_NONE;
@@ -5250,7 +5465,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         } else if (creator_selected_version <= MC_VERSION_1_11_2) {
                             strncpy(new_stage.root_name, "stat.cool", sizeof(new_stage.root_name) - 1);
                         } else {
-                            strncpy(new_stage.root_name, "minecraft:custom/minecraft:new_stat", sizeof(new_stage.root_name) - 1);
+                            strncpy(new_stage.root_name, "minecraft:custom/minecraft:new_stat",
+                                    sizeof(new_stage.root_name) - 1);
                         }
                         new_stage.root_name[sizeof(new_stage.root_name) - 1] = '\0';
                         new_stage.required_progress = 1;
@@ -5566,8 +5782,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     case SUBGOAL_STAT: {
                                         if (creator_selected_version <= MC_VERSION_1_6_4) {
                                             if (app_settings->using_stats_per_world_legacy) {
-                                                snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
-                                            } else if (get_parent_directory(t->saves_path, start_path, sizeof(start_path), 1)) {
+                                                snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
+                                                         t->world_name);
+                                            } else if (get_parent_directory(
+                                                t->saves_path, start_path, sizeof(start_path), 1)) {
                                                 // Use a temporary buffer to prevent source/destination overlap
                                                 char temp_parent_dir[MAX_PATH_LENGTH];
                                                 strncpy(temp_parent_dir, start_path, sizeof(temp_parent_dir));
@@ -5596,8 +5814,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     case SUBGOAL_CRITERION: {
                                         if (creator_selected_version <= MC_VERSION_1_6_4) {
                                             if (app_settings->using_stats_per_world_legacy) {
-                                                snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
-                                            } else if (get_parent_directory(t->saves_path, start_path, sizeof(start_path), 1)) {
+                                                snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
+                                                         t->world_name);
+                                            } else if (get_parent_directory(
+                                                t->saves_path, start_path, sizeof(start_path), 1)) {
                                                 // Use a temporary buffer to prevent source/destination overlap
                                                 char temp_parent_dir[MAX_PATH_LENGTH];
                                                 strncpy(temp_parent_dir, start_path, sizeof(temp_parent_dir));
@@ -5773,7 +5993,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // Logic to handle stage copy action after the loop
                     if (stage_to_copy != -1) {
                         const auto &source_stage = goal.stages[stage_to_copy];
-                        EditorSubGoal new_stage = source_stage;
+
+                        // Perform a manual, safe copy.
+                        EditorSubGoal new_stage;
+                        strncpy(new_stage.stage_id, source_stage.stage_id, sizeof(new_stage.stage_id));
+                        new_stage.stage_id[sizeof(new_stage.stage_id) - 1] = '\0';
+                        strncpy(new_stage.display_text, source_stage.display_text, sizeof(new_stage.display_text));
+                        new_stage.display_text[sizeof(new_stage.display_text) - 1] = '\0';
+                        strncpy(new_stage.parent_advancement, source_stage.parent_advancement,
+                                sizeof(new_stage.parent_advancement));
+                        new_stage.parent_advancement[sizeof(new_stage.parent_advancement) - 1] = '\0';
+                        strncpy(new_stage.root_name, source_stage.root_name, sizeof(new_stage.root_name));
+                        new_stage.root_name[sizeof(new_stage.root_name) - 1] = '\0';
+                        new_stage.type = source_stage.type;
+                        new_stage.required_progress = source_stage.required_progress;
+
                         char base_name[64];
                         strncpy(base_name, source_stage.stage_id, sizeof(base_name) - 1);
                         base_name[sizeof(base_name) - 1] = '\0';
@@ -6416,7 +6650,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::PushID(adv.root_name.c_str());
 
                 // Determine if we are in the special criterion-select mode
-                bool is_criterion_select_mode = (current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit->type == SUBGOAL_CRITERION);
+                bool is_criterion_select_mode = (
+                    current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit->type == SUBGOAL_CRITERION);
 
                 if (is_criterion_select_mode) {
                     // advancements/achievements checkbox is not interactive
@@ -6426,10 +6661,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                         char tooltip_buffer[256];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a specific criterion below.\n"
-                                                                         "The parent will be selected automatically.");
+                                 "The parent will be selected automatically.");
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
-
                 } else {
                     // All other modes the achievements/advancements checkbox is interactive
                     if (ImGui::Checkbox(adv.root_name.c_str(), &adv.is_selected)) {
