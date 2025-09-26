@@ -2338,7 +2338,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                  "This folder contains guides and examples on how to achieve the\n"
                  "template functionality you want with version-specific help for root names.\n"
                  "It also contains example advancements-, stats- and unlocks files of a world\n"
-                 "for every major version range as reference.");
+                 "for every major version range as reference or to import.");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
@@ -6380,31 +6380,49 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 auto &adv = *filtered_advancements[i];
                 ImGui::PushID(adv.root_name.c_str());
 
-                if (ImGui::Checkbox(adv.root_name.c_str(), &adv.is_selected)) {
-                    if (current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit->type != SUBGOAL_CRITERION) {
-                        if (adv.is_selected) {
-                            for (auto &other_adv: importable_advancements) {
-                                if (&other_adv != &adv) other_adv.is_selected = false;
-                                for (auto &crit: other_adv.criteria) crit.is_selected = false;
-                            }
-                        }
-                    } else if (current_import_mode == BATCH_IMPORT) {
-                        if (ImGui::GetIO().KeyShift && last_clicked_adv_index != -1) {
-                            int start = std::min((int) i, last_clicked_adv_index);
-                            int end = std::max((int) i, last_clicked_adv_index);
-                            for (int j = start; j <= end; ++j) {
-                                auto &ranged_adv = *filtered_advancements[j];
-                                ranged_adv.is_selected = adv.is_selected;
-                                if (import_select_criteria) {
-                                    for (auto &crit: ranged_adv.criteria) crit.is_selected = adv.is_selected;
+                // Determine if we are in the special criterion-select mode
+                bool is_criterion_select_mode = (current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit->type == SUBGOAL_CRITERION);
+
+                if (is_criterion_select_mode) {
+                    // advancements/achievements checkbox is not interactive
+                    ImGui::BeginDisabled();
+                    ImGui::Checkbox(adv.root_name.c_str(), &adv.is_selected);
+                    ImGui::EndDisabled();
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tooltip_buffer[256];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a specific criterion below.\n"
+                                                                         "The parent will be selected automatically.");
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+
+                } else {
+                    // All other modes the achievements/advancements checkbox is interactive
+                    if (ImGui::Checkbox(adv.root_name.c_str(), &adv.is_selected)) {
+                        if (current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit->type != SUBGOAL_CRITERION) {
+                            if (adv.is_selected) {
+                                for (auto &other_adv: importable_advancements) {
+                                    if (&other_adv != &adv) other_adv.is_selected = false;
+                                    for (auto &crit: other_adv.criteria) crit.is_selected = false;
                                 }
                             }
-                        }
-                        last_clicked_adv_index = i;
-                        last_clicked_crit_parent = nullptr;
-                        last_clicked_crit_index = -1;
-                        if (!adv.is_selected) {
-                            for (auto &crit: adv.criteria) crit.is_selected = false;
+                        } else if (current_import_mode == BATCH_IMPORT) {
+                            if (ImGui::GetIO().KeyShift && last_clicked_adv_index != -1) {
+                                int start = std::min((int) i, last_clicked_adv_index);
+                                int end = std::max((int) i, last_clicked_adv_index);
+                                for (int j = start; j <= end; ++j) {
+                                    auto &ranged_adv = *filtered_advancements[j];
+                                    ranged_adv.is_selected = adv.is_selected;
+                                    if (import_select_criteria) {
+                                        for (auto &crit: ranged_adv.criteria) crit.is_selected = adv.is_selected;
+                                    }
+                                }
+                            }
+                            last_clicked_adv_index = i;
+                            last_clicked_crit_parent = nullptr;
+                            last_clicked_crit_index = -1;
+                            if (!adv.is_selected) {
+                                for (auto &crit: adv.criteria) crit.is_selected = false;
+                            }
                         }
                     }
                 }

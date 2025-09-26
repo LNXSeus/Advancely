@@ -187,15 +187,19 @@
       "target": 1
     },
     "hidden_ms_stat_5242881": {
+      "hidden":	true,
       "root_name": "5242881"
     },
     "hidden_ms_stat_5242883": {
+      "hidden":	true,
       "root_name": "5242883"
     },
     "hidden_ms_stat_16777217": {
+      "hidden":	true,
       "root_name": "16777217"
     },
     "hidden_ms_stat_16843026": {
+      "hidden":	true,
       "root_name": "16843026"
     }
   },
