@@ -2919,6 +2919,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                 }
 
+                // --- Counter for the list ---
+                ImGui::Spacing();
+                char counter_text[128];
+                snprintf(counter_text, sizeof(counter_text), "%zu %s", advancements_to_render.size(), advancements_label_plural_upper);
+                float text_width = ImGui::CalcTextSize(counter_text).x;
+                // Center Count
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - text_width) * 0.5f);
+                ImGui::TextDisabled("%s", counter_text);
+
                 int advancement_to_remove_idx = -1;
                 int advancement_to_copy_idx = -1; // To queue a copy action
 
@@ -3035,30 +3044,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     save_message_type = MSG_NONE;
                 }
 
-                // TODO: Remove
-                // // Handle Removal
-                // if (advancement_to_remove_idx != -1) {
-                //     // Get a pointer to the item that was marked for removal
-                //     EditorTrackableCategory *adv_to_remove = advancements_to_render[advancement_to_remove_idx];
-                //
-                //     // If the removed item was the currently selected one, deselect it (set pointer to null)
-                //     if (selected_advancement == adv_to_remove) {
-                //         selected_advancement = nullptr;
-                //     }
-                //
-                //     // Use the C++ erase-remove idiom to find and remove the correct object
-                //     // from the original data source by comparing its memory address.
-                //     current_template_data.advancements.erase(
-                //         std::remove_if(current_template_data.advancements.begin(),
-                //                        current_template_data.advancements.end(),
-                //                        [&](const EditorTrackableCategory &adv) {
-                //                            return &adv == adv_to_remove;
-                //                        }),
-                //         current_template_data.advancements.end()
-                //     );
-                //     save_message_type = MSG_NONE;
-                // }
-
                 // Handle Copying
                 if (advancement_to_copy_idx != -1) {
                     char selected_root_name_before_op[192] = {};
@@ -3082,12 +3067,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     new_advancement.is_recipe = source_adv_ptr->is_recipe;
                     new_advancement.is_simple_stat = source_adv_ptr->is_simple_stat;
                     new_advancement.criteria = source_adv_ptr->criteria; // std::vector handles its own deep copy.
-
-                    // TODO: Remove DEBUG
-                    // log_message(LOG_ERROR, "DEBUG: Copied advancement '%s'. Is simple: %s. Criteria count: %zu\n",
-                    //        new_advancement.root_name,
-                    //        new_advancement.is_simple_stat ? "yes" : "no",
-                    //        new_advancement.criteria.size());
 
                     // --- Generate a unique root_name for the copy ---
                     char base_name[192];
@@ -3274,6 +3253,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (creator_selected_version > MC_VERSION_1_6_4) {
                         ImGui::Separator();
                         ImGui::Text("Criteria");
+
+                        // --- Counter for the criteria list ---
+                        ImGui::SameLine();
+                        char crit_counter_text[128];
+                        snprintf(crit_counter_text, sizeof(crit_counter_text), "%zu Criteria", advancement.criteria.size());
+                        float text_width = ImGui::CalcTextSize(counter_text).x;
+                        ImGui::SameLine(ImGui::GetContentRegionAvail().x - text_width);
+                        ImGui::TextDisabled("%s", crit_counter_text);
 
                         char criterion_add_tooltip_buffer[256];
                         snprintf(criterion_add_tooltip_buffer, sizeof(criterion_add_tooltip_buffer),
@@ -3780,6 +3767,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                 }
 
+                // --- Counter for the list ---
+
+                ImGui::Spacing();
+                char counter_text[128];
+                snprintf(counter_text, sizeof(counter_text), "%zu Stats", stats_to_render.size());
+                float text_width = ImGui::CalcTextSize(counter_text).x;
+                // Center Count
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - text_width) * 0.5f);
+                ImGui::TextDisabled("%s", counter_text);
+
                 // 3. Render the list using pointers.
                 int stat_to_remove_idx = -1;
                 int stat_to_copy_idx = -1;
@@ -3866,21 +3863,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     current_template_data.stats.insert(target_it, item_to_move);
                     save_message_type = MSG_NONE;
                 }
-
-                // TODO: Remove
-                // // Handle Removal
-                // if (stat_to_remove_idx != -1) {
-                //     EditorTrackableCategory *stat_to_remove = stats_to_render[stat_to_remove_idx];
-                //     if (selected_stat == stat_to_remove) {
-                //         selected_stat = nullptr;
-                //     }
-                //     current_template_data.stats.erase(
-                //         std::remove_if(current_template_data.stats.begin(), current_template_data.stats.end(),
-                //                        [&](const EditorTrackableCategory &s) { return &s == stat_to_remove; }),
-                //         current_template_data.stats.end()
-                //     );
-                //     save_message_type = MSG_NONE;
-                // }
 
                 // Handle Copying
                 if (stat_to_copy_idx != -1) {
@@ -3987,13 +3969,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::BeginChild("StatDetailsPane", ImVec2(0, 0), true);
                 if (selected_stat != nullptr) {
                     auto &stat_cat = *selected_stat;
-
-                    // TODO: Remove DEBUG
-                    // // HIGHLIGHT: Add this debug print
-                    // log_message(LOG_ERROR, "DEBUG: Rendering stat details for '%s'. Is simple: %s. Criteria pointer is %p\n",
-                    //        stat_cat.root_name,
-                    //        stat_cat.is_simple_stat ? "yes" : "no",
-                    //        (void*)&stat_cat.criteria);
 
                     ImGui::Text("Edit Stat Details");
                     ImGui::Separator();
@@ -4139,7 +4114,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     } else {
                         // UI for a complex, multi-stat category (similar to advancements)
-                        ImGui::Text("Criteria");
+                        ImGui::Text("Sub-Stats");
+
+                        // --- Counter for the sub-stat list ---
+                        char crit_counter_text[128];
+                        snprintf(crit_counter_text, sizeof(crit_counter_text), "%zu Sub-Stats", stat_cat.criteria.size());
+                        float text_width = ImGui::CalcTextSize(crit_counter_text).x;
+                        ImGui::SameLine(ImGui::GetContentRegionAvail().x - text_width);
+                        ImGui::TextDisabled("%s", crit_counter_text);
 
                         // "Import Sub-Stats" button
                         if (ImGui::Button("Import Sub-Stats")) {
@@ -4542,6 +4524,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  "Click the 'Help' button for more info.");
                         ImGui::SetTooltip("%s", add_unlock_tooltip_buffer);
                     }
+
+                    // --- Counter for the list ---
+                    char counter_text[128];
+                    snprintf(counter_text, sizeof(counter_text), "%zu Unlocks", current_template_data.unlocks.size());
+                    float text_width = ImGui::CalcTextSize(counter_text).x;
+                    ImGui::SameLine(ImGui::GetContentRegionAvail().x - text_width);
+                    ImGui::TextDisabled("%s", counter_text);
+
                     int item_to_remove = -1;
                     int item_to_copy = -1;
                     int unlocks_dnd_source_index = -1;
@@ -4790,6 +4780,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 ImGui::SameLine();
                 ImGui::TextDisabled("(Hotkeys are configured in the main Settings window)");
+
+                // --- Counter for the list ---
+                char counter_text[128];
+                snprintf(counter_text, sizeof(counter_text), "%zu Custom Goals", current_template_data.custom_goals.size());
+                float text_width = ImGui::CalcTextSize(counter_text).x;
+                ImGui::SameLine(ImGui::GetContentRegionAvail().x - text_width);
+                ImGui::TextDisabled("%s", counter_text);
+
                 int item_to_remove = -1;
                 int item_to_copy = -1;
                 int custom_dnd_source_index = -1;
@@ -5167,6 +5165,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                 }
 
+                // --- Counter for the list ---
+                ImGui::Spacing();
+                char counter_text[128];
+                snprintf(counter_text, sizeof(counter_text), "%zu Multi-Stage Goals", goals_to_render.size());
+                float text_width = ImGui::CalcTextSize(counter_text).x;
+                // Center Count
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - text_width) * 0.5f);
+                ImGui::TextDisabled("%s", counter_text);
+
                 // 3. Render the list using pointers.
                 int goal_to_remove_idx = -1;
                 int goal_to_copy_idx = -1;
@@ -5249,23 +5256,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ms_goal_data_changed = true;
                     save_message_type = MSG_NONE;
                 }
-
-                // TODO: Remove
-                // // Handle Removal
-                // if (goal_to_remove_idx != -1) {
-                //     EditorMultiStageGoal *goal_to_remove = goals_to_render[goal_to_remove_idx];
-                //     if (selected_ms_goal == goal_to_remove) {
-                //         selected_ms_goal = nullptr;
-                //     }
-                //     current_template_data.multi_stage_goals.erase(
-                //         std::remove_if(current_template_data.multi_stage_goals.begin(),
-                //                        current_template_data.multi_stage_goals.end(),
-                //                        [&](const EditorMultiStageGoal &g) { return &g == goal_to_remove; }),
-                //         current_template_data.multi_stage_goals.end()
-                //     );
-                //     ms_goal_data_changed = true;
-                //     save_message_type = MSG_NONE;
-                // }
 
                 // Handle Copying
                 if (goal_to_copy_idx != -1) {
@@ -5441,6 +5431,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::Separator();
 
                     ImGui::Text("Stages");
+
+                    // --- Counter for the stages list ---
+                    char stage_counter_text[128];
+                    snprintf(stage_counter_text, sizeof(stage_counter_text), "%zu Stages", goal.stages.size());
+                    float stage_text_width = ImGui::CalcTextSize(stage_counter_text).x;
+                    ImGui::SameLine(ImGui::GetContentRegionAvail().x - stage_text_width);
+                    ImGui::TextDisabled("%s", stage_counter_text);
+
+
                     if (ImGui::Button("Add New Stage")) {
                         // Create a new stage with default values and insert it before the final stage
                         EditorSubGoal new_stage = {};
