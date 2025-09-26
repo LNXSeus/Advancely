@@ -5515,8 +5515,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                             ImGui::SameLine();
                             if (ImGui::Button("Import##StageTrigger")) {
+                                // Reset state for a new single-select import
                                 current_import_mode = SINGLE_SELECT_STAGE; // One item selectable on import
                                 stage_to_edit = &stage; // Remember which stage we're editing
+                                import_search_buffer[0] = '\0';
+                                importable_advancements.clear();
+                                importable_stats.clear();
+                                importable_unlocks.clear();
 
                                 // Prepare to open the correct file dialog and popup
                                 char start_path[MAX_PATH_LENGTH];
@@ -6255,21 +6260,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 ImGui::SetTooltip("%s", deselct_all_tooltip_buffer);
             }
+            // --- Include Criteria Checkbox ONLY for 1.7+ ---
+            if (creator_selected_version > MC_VERSION_1_6_4) {
+                ImGui::SameLine();
+                ImGui::Checkbox("Include Criteria", &import_select_criteria);
+                if (ImGui::IsItemHovered()) {
+                    char include_criteria_tooltip_buffer[512];
+                    snprintf(include_criteria_tooltip_buffer, sizeof(include_criteria_tooltip_buffer),
+                             "Toggles whether criteria are affected by 'Select All',\n"
+                             "'Deselect All', and range selection (Shift+Click).");
+                    ImGui::SetTooltip(
+                        "%s", include_criteria_tooltip_buffer);
+                }
+            }
         } // End of batch import
 
-        // --- Include Criteria Checkbox ONLY for 1.7+ ---
-        if (creator_selected_version > MC_VERSION_1_6_4) {
-            ImGui::SameLine();
-            ImGui::Checkbox("Include Criteria", &import_select_criteria);
-            if (ImGui::IsItemHovered()) {
-                char include_criteria_tooltip_buffer[512];
-                snprintf(include_criteria_tooltip_buffer, sizeof(include_criteria_tooltip_buffer),
-                         "Toggles whether criteria are affected by 'Select All',\n"
-                         "'Deselect All', and range selection (Shift+Click).");
-                ImGui::SetTooltip(
-                    "%s", include_criteria_tooltip_buffer);
-            }
-        }
         ImGui::SameLine();
 
         // --- Right-aligned Controls ---
@@ -6553,15 +6558,33 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         char counter_text[128];
         if (creator_selected_version <= MC_VERSION_1_6_4) {
             // Only achievements
-            snprintf(counter_text, sizeof(counter_text), "Selected: %d Achievements", selected_adv_count);
+            if (current_import_mode == BATCH_IMPORT) {
+                snprintf(counter_text, sizeof(counter_text), "Selected: %d Achievements", selected_adv_count);
+            } else {
+                snprintf(counter_text, sizeof(counter_text), "Selected: %d / 1 Achievements", selected_adv_count);
+            }
         } else if (creator_selected_version <= MC_VERSION_1_11_2) {
             // Achievements and criteria
-            snprintf(counter_text, sizeof(counter_text), "Selected: %d Achievements, %d Criteria", selected_adv_count,
-                     selected_crit_count);
+            if (current_import_mode == BATCH_IMPORT) {
+                snprintf(counter_text, sizeof(counter_text), "Selected: %d Achievements, %d Criteria",
+                         selected_adv_count,
+                         selected_crit_count);
+            } else {
+                snprintf(counter_text, sizeof(counter_text),
+                         "Selected: %d / 1 Achievements, %d / 1 Criteria", selected_adv_count,
+                         selected_crit_count);
+            }
         } else {
             // Advancements and criteria
-            snprintf(counter_text, sizeof(counter_text), "Selected: %d Advancements, %d Criteria", selected_adv_count,
-                     selected_crit_count);
+            if (current_import_mode == BATCH_IMPORT) {
+                snprintf(counter_text, sizeof(counter_text), "Selected: %d Advancements, %d Criteria",
+                         selected_adv_count,
+                         selected_crit_count);
+            } else {
+                snprintf(counter_text, sizeof(counter_text),
+                         "Selected: %d / 1 Advancements, %d / 1 Criteria", selected_adv_count,
+                         selected_crit_count);
+            }
         }
 
         // Calculate position to right-align the text
@@ -6818,10 +6841,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
                 }
+                // Close popup only if no error occurred during batch import
+                if (import_error_message[0] == '\0') {
+                    show_import_stats_popup = false;
+                }
             }
 
-            if (import_error_message[0] == '\0') {
-                show_import_stats_popup = false;
+            if (!show_import_stats_popup) {
+                // If closed by any path
+                current_import_mode = BATCH_IMPORT;
+                stage_to_edit = nullptr;
+                import_search_buffer[0] = '\0';
             }
         }
 
@@ -6855,9 +6885,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // --- Display the counter, aligned to the right ---
         ImGui::SameLine();
         char counter_text[128];
-        snprintf(counter_text, sizeof(counter_text), "Selected: %d %s", selected_stats_count,
-                 (current_stat_import_mode == IMPORT_AS_SUB_STAT) ? "Sub-Stats" : "Stats");
-
+        if (current_import_mode == BATCH_IMPORT) {
+            // Arbitrary amount
+            snprintf(counter_text, sizeof(counter_text), "Selected: %d %s", selected_stats_count,
+                     (current_stat_import_mode == IMPORT_AS_SUB_STAT) ? "Sub-Stats" : "Stats");
+        } else {
+            // Maximum of 1
+            snprintf(counter_text, sizeof(counter_text), "Selected: %d / 1 %s", selected_stats_count,
+                     (current_stat_import_mode == IMPORT_AS_SUB_STAT) ? "Sub-Stats" : "Stats");
+        }
         // Calculate position to right-align the text
         float text_width = ImGui::CalcTextSize(counter_text).x;
         ImGui::SetCursorPosX(ImGui::GetWindowWidth() - text_width - ImGui::GetStyle().WindowPadding.x);
@@ -7074,7 +7110,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         ImGui::SameLine();
         char counter_text[128];
-        snprintf(counter_text, sizeof(counter_text), "Selected: %d Unlocks", selected_unlocks_count);
+        if (current_import_mode == BATCH_IMPORT) {
+            snprintf(counter_text, sizeof(counter_text), "Selected: %d Unlocks", selected_unlocks_count);
+        } else {
+            snprintf(counter_text, sizeof(counter_text), "Selected: %d / 1 Unlocks", selected_unlocks_count);
+        }
         float text_width = ImGui::CalcTextSize(counter_text).x;
         ImGui::SetCursorPosX(ImGui::GetWindowWidth() - text_width - ImGui::GetStyle().WindowPadding.x);
         ImGui::Text("%s", counter_text);
