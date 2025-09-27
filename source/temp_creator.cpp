@@ -2075,24 +2075,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     strncpy(import_flag, flag, sizeof(import_flag) - 1);
                     import_flag[sizeof(import_flag) - 1] = '\0';
 
-                    // Find the index for the parsed version string
-                    import_version_idx = -1;
-                    for (int i = 0; i < VERSION_STRINGS_COUNT; i++) {
-                        if (strcmp(VERSION_STRINGS[i], version) == 0) {
-                            import_version_idx = i;
-                            break;
-                        }
-                    }
-                    if (import_version_idx == -1) {
-                        snprintf(status_message, sizeof(status_message), "Error: Zip contains an unknown version: %s",
-                                 version);
-                        ImGui::OpenPopup("Import Error"); // Trigger popup for unknown version
-                    } else {
-                        show_import_confirmation_view = true;
-                        show_create_new_view = false;
-                        show_copy_view = false;
-                        editing_template = false;
-                    }
+                    // Pre-select the version dropdown to match the creator's current version.
+                    import_version_idx = creator_version_idx;
+
+                    show_import_confirmation_view = true;
+                    show_create_new_view = false;
+                    show_copy_view = false;
+                    editing_template = false;
                 } else {
                     // On failure, get_info_from_zip already set the status_message
                     ImGui::OpenPopup("Import Error"); // Trigger popup for other errors
