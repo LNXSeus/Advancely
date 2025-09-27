@@ -1686,7 +1686,35 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // Determine if search is active for the template list
     bool is_template_search_active = (current_search_scope == SCOPE_TEMPLATES && tc_search_buffer[0] != '\0');
 
-    for (int i = 0; i < discovered_template_count; i++) {
+    // Create a filtered list of indices to count and render from
+    std::vector<int> templates_to_render_indices;
+    if (is_template_search_active) {
+        for (int i = 0; i < discovered_template_count; i++) {
+            char item_label[MAX_PATH_LENGTH * 2];
+            if (discovered_templates[i].optional_flag[0] != '\0') {
+                snprintf(item_label, sizeof(item_label), "%s%s", discovered_templates[i].category, discovered_templates[i].optional_flag);
+            } else {
+                snprintf(item_label, sizeof(item_label), "%s", discovered_templates[i].category);
+            }
+            if (str_contains_insensitive(item_label, tc_search_buffer)) {
+                templates_to_render_indices.push_back(i);
+            }
+        }
+    } else {
+        for (int i = 0; i < discovered_template_count; i++) {
+            templates_to_render_indices.push_back(i);
+        }
+    }
+
+    // --- Centered Counter for the list ---
+    char counter_text[128];
+    snprintf(counter_text, sizeof(counter_text), "%zu %s", templates_to_render_indices.size(), templates_to_render_indices.size() == 1 ? "Template" : "Templates");
+    float text_width = ImGui::CalcTextSize(counter_text).x;
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x - text_width) * 0.5f);
+    ImGui::TextDisabled("%s", counter_text);
+
+    // Render the filtered list using the stored indices
+    for (int i : templates_to_render_indices) {
         char item_label[MAX_PATH_LENGTH * 2];
         if (discovered_templates[i].optional_flag[0] != '\0') {
             // With optional flag, display right after category
@@ -1697,14 +1725,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             snprintf(item_label, sizeof(item_label), "%s", discovered_templates[i].category);
         }
 
-        // Search Filter
-        // If search is active and the label doesn't match, skip rendering this item.
-        if (is_template_search_active && !str_contains_insensitive(item_label, tc_search_buffer)) {
-            continue;
-        }
-
         if (ImGui::Selectable(item_label, selected_template_index == i)) {
-            // Define the action of switching to a new template
+            // Define the action of switching to a new template, capturing the correct original index 'i'
             auto switch_template_action = [&, i]() {
                 selected_template_index = i;
                 selected_lang_index = -1; // Reset language selection
@@ -1718,10 +1740,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // Also update the 'saved' snapshot to reflect the newly loaded state
                         saved_template_data = current_template_data;
 
-                        // TODO: For now just exit editor. User must re-click Edit
+                        // Exit editor to prevent confusion
                         editing_template = false;
 
-                        // Reset search buffer
+                        // Reset search buffer and selections
                         tc_search_buffer[0] = '\0';
                         selected_advancement = nullptr;
                         selected_stat = nullptr;
@@ -2363,17 +2385,36 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // Replace ListBox with a filterable list
         bool is_lang_search_active = (current_search_scope == SCOPE_LANGUAGES && tc_search_buffer[0] != '\0');
 
+        // Create a filtered list to count and render from
+        std::vector<int> langs_to_render_indices;
+        if (is_lang_search_active) {
+            for (size_t i = 0; i < selected.available_lang_flags.size(); ++i) {
+                const auto &flag = selected.available_lang_flags[i];
+                const char *display_name = flag.empty() ? "Default (_lang.json)" : flag.c_str();
+                if (str_contains_insensitive(display_name, tc_search_buffer)) {
+                    langs_to_render_indices.push_back(i);
+                }
+            }
+        } else {
+            for (size_t i = 0; i < selected.available_lang_flags.size(); ++i) {
+                langs_to_render_indices.push_back(i);
+            }
+        }
+
+        // --- Right-aligned Counter for the list ---
+        char lang_counter_text[128];
+        snprintf(lang_counter_text, sizeof(lang_counter_text), "%zu %s", langs_to_render_indices.size(), langs_to_render_indices.size() == 1 ? "Language" : "Languages");
+        float lang_text_width = ImGui::CalcTextSize(lang_counter_text).x;
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - lang_text_width);
+        ImGui::TextDisabled("%s", lang_counter_text);
+
+
         // Use a child window to create a scrollable area for the list
         ImGui::BeginChild("LanguageListChild", ImVec2(-1, 125), true); // 125px height
 
-        for (size_t i = 0; i < selected.available_lang_flags.size(); ++i) {
+        for (int i : langs_to_render_indices) {
             const auto &flag = selected.available_lang_flags[i];
             const char *display_name = flag.empty() ? "Default (_lang.json)" : flag.c_str();
-
-            // --- SEARCH FILTER ---
-            if (is_lang_search_active && !str_contains_insensitive(display_name, tc_search_buffer)) {
-                continue;
-            }
 
             if (ImGui::Selectable(display_name, selected_lang_index == (int) i)) {
                 selected_lang_index = i;
