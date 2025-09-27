@@ -6773,6 +6773,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             continue;
                         }
 
+                        // Determine if the criterion checkbox should be disabled
+                        bool disable_crit_checkbox = (current_import_mode == SINGLE_SELECT_STAGE &&
+                                                      stage_to_edit->type == SUBGOAL_ADVANCEMENT);
+
+                        // Don't allow clicking criteria if the stage is a subgoal advancement
+                        if (disable_crit_checkbox) {
+                            ImGui::BeginDisabled();
+                        }
+
                         if (ImGui::Checkbox(crit.root_name.c_str(), &crit.is_selected)) {
                             if (current_import_mode == SINGLE_SELECT_STAGE) {
                                 if (crit.is_selected) {
@@ -6802,6 +6811,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 last_clicked_adv_index = -1;
                                 last_clicked_crit_parent = &adv;
                                 last_clicked_crit_index = j;
+                            }
+                        }
+
+                        // If only advancements is being import
+                        if (disable_crit_checkbox) {
+                            ImGui::EndDisabled();
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                char tooltip[256];
+                                snprintf(tooltip, sizeof(tooltip), "Switch the stage's 'Type' to 'Criterion'\n"
+                                                                   "to import a specific criterion.");
+                                ImGui::SetTooltip("%s", tooltip);
                             }
                         }
                     }
