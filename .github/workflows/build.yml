@@ -152,7 +152,7 @@ jobs:
           elif [ "$RUNNER_OS" == "Linux" ]; then
             SUFFIX="Linux"
           fi
-          FILENAME="Advancely-v${{ env.PROJECT_VERSION }}-${SUFFIX}.zip"
+          FILENAME="Advancely-v${{ env.PROJECT_VERSION }}-${SUFFIX}"
           echo "FILENAME=$FILENAME" >> $GITHUB_ENV
 
       - name: Upload Build Artifact
