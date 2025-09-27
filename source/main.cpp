@@ -875,7 +875,7 @@ int main(int argc, char *argv[]) {
             char release_page_url[256];
             if (check_for_updates(ADVANCELY_VERSION, latest_version_str, sizeof(latest_version_str), download_url,
                                   sizeof(download_url), release_page_url, sizeof(release_page_url))) {
-                char message_buffer[1024];
+                char message_buffer[2048];
                 snprintf(message_buffer, sizeof(message_buffer),
                          "A new version of Advancely is available!\n\n"
                          "  Your Version: %s\n"
