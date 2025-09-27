@@ -117,6 +117,39 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     static std::vector<std::string> flag_values;
     static std::vector<const char *> flag_display_names;
 
+    // State for version dropdown with counts
+    static std::vector<std::string> version_display_names;
+    static std::vector<const char *> version_display_c_strs;
+    static bool version_counts_generated = false;
+
+    if (!version_counts_generated) {
+        version_display_names.reserve(VERSION_STRINGS_COUNT);
+        for (int i = 0; i < VERSION_STRINGS_COUNT; ++i) {
+            DiscoveredTemplate *templates = nullptr;
+            int count = 0;
+            scan_for_templates(VERSION_STRINGS[i], &templates, &count);
+
+            char buffer[128];
+            if (count > 0) {
+                snprintf(buffer, sizeof(buffer), "%s (%d)", VERSION_STRINGS[i], count);
+            } else {
+                // strncpy is safer if VERSION_STRINGS[i] could be too long
+                strncpy(buffer, VERSION_STRINGS[i], sizeof(buffer) - 1);
+                buffer[sizeof(buffer) - 1] = '\0';
+            }
+            version_display_names.push_back(buffer);
+
+            free_discovered_templates(&templates, &count);
+        }
+
+        version_display_c_strs.reserve(VERSION_STRINGS_COUNT);
+        for (const auto &name: version_display_names) {
+            version_display_c_strs.push_back(name.c_str());
+        }
+
+        version_counts_generated = true;
+    }
+
     // Force a rescan if the template files have been changed by the creator
     if (SDL_SetAtomicInt(&g_templates_changed, 0) == 1) {
         last_scanned_version[0] = '\0';
@@ -148,11 +181,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     bool has_unsaved_changes = are_settings_different(&temp_settings, &saved_settings);
 
     // Revert Changes -> Ctrl+Z / Cmd+Z hotkey logic
-    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && has_unsaved_changes && !ImGui::IsAnyItemActive() &&
+    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && has_unsaved_changes && !
+        ImGui::IsAnyItemActive() &&
         (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
         ImGui::IsKeyPressed(ImGuiKey_Z)) {
         memcpy(&temp_settings, &saved_settings, sizeof(AppSettings));
-        }
+    }
 
     // If settings were forced open, display a prominent warning message
     if (force_open_flag && *force_open_flag) {
@@ -295,7 +329,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             break;
         }
     }
-    if (ImGui::Combo("Version", &current_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT)) {
+    if (ImGui::Combo("Version", &current_version_idx, version_display_c_strs.data(), version_display_c_strs.size())) {
         if (current_version_idx >= 0) {
             strncpy(temp_settings.version_str, VERSION_STRINGS[current_version_idx],
                     sizeof(temp_settings.version_str) - 1);
@@ -305,6 +339,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char version_tooltip_buffer[1024];
         snprintf(version_tooltip_buffer, sizeof(version_tooltip_buffer), "Select the version of the template.\n"
+                 "The number in brackets shows how many templates are available for that version.\n"
                  "This doesn't necessarily have to be the exact version of your minecraft instance.\n"
                  "Click on '(Learn more)' on the right to see the version ranges that functionally equal.");
         ImGui::SetTooltip("%s", version_tooltip_buffer);
@@ -356,12 +391,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // Advancements/Achievements
     const char *advancements_label_plural_uppercase = (selected_version <= MC_VERSION_1_11_2)
-                                                ? "Achievements"
-                                                : "Advancements";
+                                                          ? "Achievements"
+                                                          : "Advancements";
     // advancements/achievements
     const char *advancements_label_plural_lowercase = (selected_version <= MC_VERSION_1_11_2)
-                                                ? "achievements"
-                                                : "advancements";
+                                                          ? "achievements"
+                                                          : "advancements";
     // Adv/Ach
     const char *advancements_label_short_upper = (selected_version <= MC_VERSION_1_11_2) ? "Ach" : "Adv";
 
@@ -825,7 +860,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::Separator();
 
             ImGui::BulletText(
-                "The %s counter tracks only the main goals defined in the \"%s\" section of your template file.", advancement_label_uppercase, advancements_label_plural_lowercase);
+                "The %s counter tracks only the main goals defined in the \"%s\" section of your template file.",
+                advancement_label_uppercase, advancements_label_plural_lowercase);
 
             ImGui::BulletText(
                 "The Progress %% shows your total completion across all individual sub-tasks from all categories.\n"
@@ -868,11 +904,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         ImGui::BeginTooltip();
 
-        ImGui::BulletText("For sliders (like R, G, B), you can drag the label\nleft or right to quickly adjust the value.");
+        ImGui::BulletText(
+            "For sliders (like R, G, B), you can drag the label\nleft or right to quickly adjust the value.");
         ImGui::BulletText("You can also click directly on any number to type in a precise value.");
 
         ImGui::BulletText("Click any color swatch to open a detailed color picker.");
-        ImGui::BulletText("Inside the picker, you can right-click the large color preview\nto copy its value as a HEX code (e.g., #0D1117).");
+        ImGui::BulletText(
+            "Inside the picker, you can right-click the large color preview\nto copy its value as a HEX code (e.g., #0D1117).");
 
         ImGui::EndTooltip();
     }
@@ -1141,7 +1179,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "Progress on %s is only printed if the game sends an update.\n"
                  "General status messages and errors are always printed to the console and saved to advancely_log.txt.\n"
                  "The log is flushed after every message and reset on startup, making it ideal for diagnosing crashes.\n"
-                 "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.", advancements_label_plural_lowercase);
+                 "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.",
+                 advancements_label_plural_lowercase);
         ImGui::SetTooltip("%s", debug_print_tooltip_buffer);
     }
 

@@ -1352,6 +1352,38 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static ImportMode current_import_mode = BATCH_IMPORT; // Default to import multiple
     static EditorSubGoal *stage_to_edit = nullptr;
 
+    // State for version dropdown with counts
+    static std::vector<std::string> version_display_names;
+    static std::vector<const char *> version_display_c_strs;
+    static bool version_counts_generated = false;
+
+    if (!version_counts_generated) {
+        version_display_names.reserve(VERSION_STRINGS_COUNT);
+        for (int i = 0; i < VERSION_STRINGS_COUNT; ++i) {
+            DiscoveredTemplate *templates = nullptr;
+            int count = 0;
+            scan_for_templates(VERSION_STRINGS[i], &templates, &count);
+
+            char buffer[128];
+            if (count > 0) {
+                snprintf(buffer, sizeof(buffer), "%s (%d)", VERSION_STRINGS[i], count);
+            } else {
+                strncpy(buffer, VERSION_STRINGS[i], sizeof(buffer) - 1);
+                buffer[sizeof(buffer) - 1] = '\0';
+            }
+            version_display_names.push_back(buffer);
+
+            free_discovered_templates(&templates, &count);
+        }
+
+        version_display_c_strs.reserve(VERSION_STRINGS_COUNT);
+        for (const auto &name: version_display_names) {
+            version_display_c_strs.push_back(name.c_str());
+        }
+
+        version_counts_generated = true;
+    }
+
     // --- Version-dependent labels ---
     MC_Version creator_selected_version = settings_get_version_from_string(creator_version_str);
 
@@ -1464,7 +1496,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // Version Selector
     ImGui::SetNextItemWidth(250); // Set a reasonable width for the combo box
     int original_version_idx = creator_version_idx; // UUse a temporary variable for the combo
-    if (ImGui::Combo("Version", &creator_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT)) {
+    if (ImGui::Combo("Version", &creator_version_idx, version_display_c_strs.data(), version_display_c_strs.size())) {
         // This block runs when the user makes a new selection.
         // creator_version_idx now holds the NEW index the user clicked.
 
@@ -1510,7 +1542,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     if (ImGui::IsItemHovered()) {
         char version_combo_tooltip_buffer[1024];
         snprintf(version_combo_tooltip_buffer, sizeof(version_combo_tooltip_buffer),
-                 "Select the game version for which you want to manage templates.");
+                 "Select the game version for which you want to manage templates.\n"
+                 "The number in brackets shows how many templates are available for that version.");
         ImGui::SetTooltip("%s", version_combo_tooltip_buffer);
     }
 
@@ -3828,7 +3861,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 // --- Counter for the list ---
 
-                ImGui::Spacing();
                 char counter_text[128];
                 snprintf(counter_text, sizeof(counter_text), "%zu %s", stats_to_render.size(),
                          stats_to_render.size() == 1 ? "Stat" : "Stats");
@@ -5257,7 +5289,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
 
                 // --- Counter for the list ---
-                ImGui::Spacing();
                 char counter_text[128];
                 snprintf(counter_text, sizeof(counter_text), "%zu %s", goals_to_render.size(),
                          goals_to_render.size() == 1 ? "Multi-Stage Goal" : "Multi-Stage Goals");
