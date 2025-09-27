@@ -1210,11 +1210,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "Currently it also toggles an FPS counter for the overlay window.\n\n"
                  "IMPORTANT: This can spam the console with a large amount of text if your template files contain many entries.\n\n"
                  "This setting only affects the detailed report.\n"
-                 "Progress on %s is only printed if the game sends an update.\n"
+                 "Progress on goals is only printed if the game sends an update.\n"
                  "General status messages and errors are always printed to the console and saved to advancely_log.txt.\n"
                  "The log is flushed after every message and reset on startup, making it ideal for diagnosing crashes.\n"
-                 "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.",
-                 advancements_label_plural_lowercase);
+                 "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.");
         ImGui::SetTooltip("%s", debug_print_tooltip_buffer);
     }
 
@@ -1224,6 +1223,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         char auto_update_tooltip_buffer[1024];
         snprintf(auto_update_tooltip_buffer, sizeof(auto_update_tooltip_buffer),
                  "If enabled, Advancely will check for a new version on startup and notify you if one is available.\n"
+                 "You can see your current version (vX.X.X) in the title of the main Advancely window.\n"
                  "Through that notification you'll then be able to automatically install the update\n"
                  "for your operating system. You can find more instructions on that popup.");
         ImGui::SetTooltip("%s", auto_update_tooltip_buffer);

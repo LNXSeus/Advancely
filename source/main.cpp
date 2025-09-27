@@ -93,8 +93,7 @@ static char release_url_buffer[256] = {0};
 static SDL_Texture *g_logo_texture = nullptr; // Loading the advancely logo
 
 // All builds now have the resources folder on the same level as the executable or .app bundle
-static void find_and_set_resource_path(char* path_buffer, size_t buffer_size) {
-
+static void find_and_set_resource_path(char *path_buffer, size_t buffer_size) {
     // For all builds (Windows, macOS, Linux and windows), find the executable's path.
     char exe_path[MAX_PATH_LENGTH];
     if (!get_executable_path(exe_path, sizeof(exe_path))) {
@@ -513,7 +512,7 @@ void macos_set_cwd() {
 // ACCESSOR FUNCTIONS
 
 // This is the single source of truth for the resources path.
-const char* get_resources_path() {
+const char *get_resources_path() {
     static char path[MAX_PATH_LENGTH] = "";
     if (path[0] == '\0') {
         // This runs only ONCE, the very first time this function is called.
@@ -522,7 +521,7 @@ const char* get_resources_path() {
     return path;
 }
 
-const char* get_settings_file_path() {
+const char *get_settings_file_path() {
     static char path[MAX_PATH_LENGTH] = "";
     if (path[0] == '\0') {
         // It calls the function above to get the base path and builds its own path.
@@ -531,7 +530,7 @@ const char* get_settings_file_path() {
     return path;
 }
 
-const char* get_notes_dir_path() {
+const char *get_notes_dir_path() {
     static char path[MAX_PATH_LENGTH] = "";
     if (path[0] == '\0') {
         snprintf(path, sizeof(path), "%s/notes", get_resources_path());
@@ -539,7 +538,7 @@ const char* get_notes_dir_path() {
     return path;
 }
 
-const char* get_notes_manifest_path() {
+const char *get_notes_manifest_path() {
     static char path[MAX_PATH_LENGTH] = "";
     if (path[0] == '\0') {
         // This one cleverly builds on another accessor function.
@@ -549,7 +548,6 @@ const char* get_notes_manifest_path() {
 }
 
 int main(int argc, char *argv[]) {
-
     // TODO: DEBUG FOR AUTO-UPDATE TESTING -> SET FLAG AT THE TOP OF THE FILE
 #ifdef MANUAL_UPDATE_TEST
     log_init(); // Init logger to see update messages
@@ -598,7 +596,7 @@ int main(int argc, char *argv[]) {
             // DEBUG PRINT 3: Confirm the file was opened successfully.
             log_message(LOG_ERROR, "[DEBUG] 'update_url.txt' opened successfully.\n");
             // Read the URL from the file
-            (void)fgets(release_url_buffer, sizeof(release_url_buffer), f);
+            (void) fgets(release_url_buffer, sizeof(release_url_buffer), f);
             fclose(f);
 
             // Trim trailing newline characters
@@ -882,17 +880,20 @@ int main(int argc, char *argv[]) {
                          "A new version of Advancely is available!\n\n"
                          "  Your Version: %s\n"
                          "  Latest Version: %s\n\n"
-                         "VERY IMPORTANT: THIS WILL OVERWRITE EXISTING FILES!\n"
-                         "If you HAVE MODIFIED any OFFICIAL templates, PLEASE RENAME them BEFORE UPDATING to avoid losing your changes.\n"
-                         "It's easiest to just adjust the optional flag by putting \"_custom\" right after the category for both files.\n"
-                         "It will KEEP all your SETTINGS (settings.json & imgui.ini) and template specific NOTES (_notes.txt).\n"
-                         "It will REPLACE the following file types in the root directory: .exe, .dll, .txt, .md\n"
-                         "It will REPLACE the following folders inside resources: fonts, gui, icons, templates.\n\n"
+                         "--- IMPORTANT: How to Protect Your Modified Templates ---\n"
+                         "The updater replaces official template files. To protect your changes, please use the Template Editor BEFORE updating:\n\n"
+                         " • If you only changed DISPLAY NAMES:\n"
+                         "   Use the 'Copy Language' feature to create a new language file. This keeps your names safe while allowing the template's structure to receive updates.\n\n"
+                         " • If you changed GOALS, ICONS, or functionality:\n"
+                         "   Use the 'Copy Template' feature to create a separate version with a unique name or optional flag (e.g., '_custom'). Your copy will not be overwritten.\n\n"
+                         "----------------------------------------------------------------\n"
+                         "The update will KEEP your settings.json and _notes.txt files.\n"
+                         "It will REPLACE the main executable, libraries (.dll), and official files in the 'resources' folder (fonts, icons, templates, etc.).\n\n"
                          "Options:\n"
-                         " - Later: Skip updating until next restart (Disable in settings).\n"
+                         " - Update: Install the new version now.\n"
+                         " - Templates: Open your local templates folder to make backups.\n"
                          " - Official: View official templates online.\n"
-                         " - Templates: Open your local templates folder.\n"
-                         " - Update: Install the new version now.\n\n"
+                         " - Later: Skip updating until the next restart.\n\n"
                          "Would you like to install it now?\n"
                          "Expect 3 more windows after clicking \"Update\" that you need to confirm with \"OK\".",
                          ADVANCELY_VERSION, latest_version_str);
@@ -941,7 +942,7 @@ int main(int argc, char *argv[]) {
 #else
                             snprintf(command, sizeof(command), "xdg-open \"%s\"", templates_path);
 #endif
-                            (void)system(command);
+                            (void) system(command);
                             break; // Re-shows the message box
                         }
 
@@ -956,7 +957,7 @@ int main(int argc, char *argv[]) {
 #else
                                     snprintf(command, sizeof(command), "xdg-open %s", url);
 #endif
-                            (void)system(command);
+                            (void) system(command);
                         }
                         break; // Re-shows the message box
                     }
@@ -1161,21 +1162,27 @@ int main(int argc, char *argv[]) {
         snprintf(ui_font_path, sizeof(ui_font_path), "%s/fonts/%s", get_resources_path(), app_settings.ui_font_name);
         if (path_exists(ui_font_path)) {
             tracker->roboto_font = io.Fonts->AddFontFromFileTTF(ui_font_path, app_settings.ui_font_size);
-        } else { // Fallback to default if user-selected font is not found
+        } else {
+            // Fallback to default if user-selected font is not found
             snprintf(ui_font_path, sizeof(ui_font_path), "%s/fonts/%s", get_resources_path(), DEFAULT_UI_FONT);
             tracker->roboto_font = io.Fonts->AddFontFromFileTTF(ui_font_path, DEFAULT_UI_FONT_SIZE);
-            log_message(LOG_ERROR, "[MAIN] UI Font '%s' not found. Falling back to default.\n", app_settings.ui_font_name);
+            log_message(LOG_ERROR, "[MAIN] UI Font '%s' not found. Falling back to default.\n",
+                        app_settings.ui_font_name);
         }
 
         // 2. Load the Tracker Font (replaces Minecraft) as a secondary font.
         char tracker_font_path[MAX_PATH_LENGTH];
-        snprintf(tracker_font_path, sizeof(tracker_font_path), "%s/fonts/%s", get_resources_path(), app_settings.tracker_font_name);
+        snprintf(tracker_font_path, sizeof(tracker_font_path), "%s/fonts/%s", get_resources_path(),
+                 app_settings.tracker_font_name);
         if (path_exists(tracker_font_path)) {
             tracker->tracker_font = io.Fonts->AddFontFromFileTTF(tracker_font_path, app_settings.tracker_font_size);
-        } else { // Fallback to default if user-selected font is not found
-            snprintf(tracker_font_path, sizeof(tracker_font_path), "%s/fonts/%s", get_resources_path(), DEFAULT_TRACKER_FONT);
+        } else {
+            // Fallback to default if user-selected font is not found
+            snprintf(tracker_font_path, sizeof(tracker_font_path), "%s/fonts/%s", get_resources_path(),
+                     DEFAULT_TRACKER_FONT);
             tracker->tracker_font = io.Fonts->AddFontFromFileTTF(tracker_font_path, DEFAULT_TRACKER_FONT_SIZE);
-            log_message(LOG_ERROR, "[MAIN] Tracker Font '%s' not found. Falling back to default.\n", app_settings.tracker_font_name);
+            log_message(LOG_ERROR, "[MAIN] Tracker Font '%s' not found. Falling back to default.\n",
+                        app_settings.tracker_font_name);
         }
 
         // Check if the currently configured saves path is valid, regardless of mode.
