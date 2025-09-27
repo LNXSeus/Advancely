@@ -636,8 +636,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             snprintf(enable_overlay_tooltip_buffer, sizeof(enable_overlay_tooltip_buffer),
                      "Enables a separate, customizable window to show your progress, perfect for streaming.\n\n"
                      "Overlay Layout:\n"
-                     " • Row 1: Sub-stats of complex stats.\n"
-                     "   (If two items share an icon, the parent's icon is overlaid.)\n"
+                     " • Row 1: Sub-stats of complex stats (if not template hidden).\n"
+                     "   (If two visible items share an icon, the parent's icon is overlaid.)\n"
                      " • Row 2: Main %s.\n" // Main achievements
                      " • Row 3: Stats, custom goals, and multi-stage goals.\n\n"
                      "Tips:\n"
@@ -654,8 +654,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             snprintf(enable_overlay_tooltip_buffer, sizeof(enable_overlay_tooltip_buffer),
                      "Enables a separate, customizable window to show your progress, perfect for streaming.\n\n"
                      "Overlay Layout:\n"
-                     " • Row 1: %s criteria and sub-stats of complex stats.\n"
-                     "   (If two items share an icon, the parent's icon is overlaid.)\n"
+                     " • Row 1: %s criteria and sub-stats of complex stats (if not template hidden).\n"
+                     "   (If two visible items share an icon, the parent's icon is overlaid.)\n"
                      " • Row 2: Main %s.\n"
                      " • Row 3: Stats, custom goals, and multi-stage goals.\n\n"
                      "Tips:\n"
@@ -672,8 +672,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             snprintf(enable_overlay_tooltip_buffer, sizeof(enable_overlay_tooltip_buffer),
                      "Enables a separate, customizable window to show your progress, perfect for streaming.\n\n"
                      "Overlay Layout:\n"
-                     " • Row 1: %s criteria and sub-stats of complex stats.\n"
-                     "   (If two items share an icon, the parent's icon is overlaid.)\n"
+                     " • Row 1: %s criteria and sub-stats of complex stats (if not template hidden).\n"
+                     "   (If two visible items share an icon, the parent's icon is overlaid.)\n"
                      " • Row 2: Main %s, recipes and unlocks.\n"
                      " • Row 3: Stats, custom goals, and multi-stage goals.\n\n"
                      "Tips:\n"

@@ -1231,8 +1231,8 @@ static int count_all_icon_paths(IconPathCounter **counts, int capacity, int curr
         }
         for (int j = 0; j < categories[i]->criteria_count; j++) {
             TrackableItem *crit = categories[i]->criteria[j];
-            // Only count items that have a valid icon path
-            if (crit->icon_path[0] == '\0') {
+            // Only count items that have a valid icon path AND ARE NOT HIDDEN
+            if (crit->is_hidden || crit->icon_path[0] == '\0') {
                 continue;
             }
 
@@ -1271,8 +1271,8 @@ static void flag_shared_icons(IconPathCounter *counts, int unique_count, Trackab
             TrackableItem *crit = categories[i]->criteria[j];
             crit->is_shared = false; // Reset first
 
-            // Cannot be shared if it doesn't have an icon path
-            if (crit->icon_path[0] == '\0') {
+            // A hidden criterion cannot be part of a shared group
+            if (crit->is_hidden || crit->icon_path[0] == '\0') {
                 continue;
             }
 
