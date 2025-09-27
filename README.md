@@ -6,7 +6,7 @@
 
 ## This tracker supports an arbitrary number of advancements, recipes, custom statistics, unlocks, multi-stage goals, manual goals, and custom counters for over 100 Minecraft versions.
 
-### Built for flexibility, Advancely supports everything from vanilla speedruns to modded adventures and custom datapacks. It automatically detects changes in your latest singleplayer world, providing real-time progress updates.
+### Built for flexibility, Advancely supports everything from vanilla speedruns to modded adventures and datapacks through the creation of custom templates with a built-in template editor. It automatically detects changes in your latest singleplayer world, providing real-time progress updates.
 
 ## Socials
 

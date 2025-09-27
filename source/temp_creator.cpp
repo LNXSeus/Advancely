@@ -1328,6 +1328,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static char import_error_message[256] = "";
     static char import_search_buffer[256] = "";
     static bool import_select_criteria = false;
+    static bool import_search_criteria_only = false;
     static int last_clicked_adv_index = -1;
     [[maybe_unused]] static int last_clicked_crit_index = -1;
     [[maybe_unused]] static ImportableAdvancement *last_clicked_crit_parent = nullptr;
@@ -1725,7 +1726,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         for (int i = 0; i < discovered_template_count; i++) {
             char item_label[MAX_PATH_LENGTH * 2];
             if (discovered_templates[i].optional_flag[0] != '\0') {
-                snprintf(item_label, sizeof(item_label), "%s%s", discovered_templates[i].category, discovered_templates[i].optional_flag);
+                snprintf(item_label, sizeof(item_label), "%s%s", discovered_templates[i].category,
+                         discovered_templates[i].optional_flag);
             } else {
                 snprintf(item_label, sizeof(item_label), "%s", discovered_templates[i].category);
             }
@@ -1741,13 +1743,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     // --- Centered Counter for the list ---
     char counter_text[128];
-    snprintf(counter_text, sizeof(counter_text), "%zu %s", templates_to_render_indices.size(), templates_to_render_indices.size() == 1 ? "Template" : "Templates");
+    snprintf(counter_text, sizeof(counter_text), "%zu %s", templates_to_render_indices.size(),
+             templates_to_render_indices.size() == 1 ? "Template" : "Templates");
     float text_width = ImGui::CalcTextSize(counter_text).x;
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x - text_width) * 0.5f);
     ImGui::TextDisabled("%s", counter_text);
 
     // Render the filtered list using the stored indices
-    for (int i : templates_to_render_indices) {
+    for (int i: templates_to_render_indices) {
         char item_label[MAX_PATH_LENGTH * 2];
         if (discovered_templates[i].optional_flag[0] != '\0') {
             // With optional flag, display right after category
@@ -2425,7 +2428,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         // --- Right-aligned Counter for the list ---
         char lang_counter_text[128];
-        snprintf(lang_counter_text, sizeof(lang_counter_text), "%zu %s", langs_to_render_indices.size(), langs_to_render_indices.size() == 1 ? "Language" : "Languages");
+        snprintf(lang_counter_text, sizeof(lang_counter_text), "%zu %s", langs_to_render_indices.size(),
+                 langs_to_render_indices.size() == 1 ? "Language" : "Languages");
         float lang_text_width = ImGui::CalcTextSize(lang_counter_text).x;
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - lang_text_width);
         ImGui::TextDisabled("%s", lang_counter_text);
@@ -2434,7 +2438,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // Use a child window to create a scrollable area for the list
         ImGui::BeginChild("LanguageListChild", ImVec2(-1, 125), true); // 125px height
 
-        for (int i : langs_to_render_indices) {
+        for (int i: langs_to_render_indices) {
             const auto &flag = selected.available_lang_flags[i];
             const char *display_name = flag.empty() ? "Default (_lang.json)" : flag.c_str();
 
@@ -4207,7 +4211,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (!is_details_search_active) {
                             visible_criteria_count = stat_cat.criteria.size();
                         } else {
-                            for (const auto &crit : stat_cat.criteria) {
+                            for (const auto &crit: stat_cat.criteria) {
                                 char goal_str[32];
                                 snprintf(goal_str, sizeof(goal_str), "%d", crit.goal);
                                 if (str_contains_insensitive(crit.display_name, tc_search_buffer) ||
@@ -4215,7 +4219,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     str_contains_insensitive(crit.icon_path, tc_search_buffer) ||
                                     (crit.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr)) {
                                     visible_criteria_count++;
-                                    }
+                                }
                             }
                         }
                         snprintf(crit_counter_text, sizeof(crit_counter_text), "%d %s", visible_criteria_count,
@@ -4631,12 +4635,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (!is_unlock_search_active) {
                         count = current_template_data.unlocks.size();
                     } else {
-                        for (const auto &unlock : current_template_data.unlocks) {
+                        for (const auto &unlock: current_template_data.unlocks) {
                             if (str_contains_insensitive(unlock.display_name, tc_search_buffer) ||
                                 str_contains_insensitive(unlock.root_name, tc_search_buffer) ||
                                 str_contains_insensitive(unlock.icon_path, tc_search_buffer)) {
                                 count++;
-                                }
+                            }
                         }
                     }
                     snprintf(counter_text, sizeof(counter_text), "%zu %s", count, count == 1 ? "Unlock" : "Unlocks");
@@ -4658,7 +4662,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 !str_contains_insensitive(unlock.root_name, tc_search_buffer) &&
                                 !str_contains_insensitive(unlock.icon_path, tc_search_buffer)) {
                                 continue;
-                                }
+                            }
                         }
 
                         ImGui::PushID(i);
@@ -4797,7 +4801,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         current_template_data.unlocks.insert(
                             current_template_data.unlocks.begin() + unlocks_dnd_target_index, item_to_move);
                         save_message_type = MSG_NONE;
-                        }
+                    }
 
                     if (item_to_remove != -1) {
                         current_template_data.unlocks.erase(current_template_data.unlocks.begin() + item_to_remove);
@@ -4902,7 +4906,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             str_contains_insensitive(goal.icon_path, tc_search_buffer) ||
                             (goal.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr)) {
                             goals_to_render.push_back(&goal);
-                            }
+                        }
                     }
                 } else {
                     for (auto &goal: current_template_data.custom_goals) {
@@ -5555,7 +5559,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (!is_details_search_active) {
                         visible_stages_count = goal.stages.size();
                     } else {
-                        for (const auto &stage : goal.stages) {
+                        for (const auto &stage: goal.stages) {
                             char target_val_str[32];
                             snprintf(target_val_str, sizeof(target_val_str), "%d", stage.required_progress);
                             if (str_contains_insensitive(stage.display_text, tc_search_buffer) ||
@@ -5564,7 +5568,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 str_contains_insensitive(stage.parent_advancement, tc_search_buffer) ||
                                 (stage.required_progress != 0 && strstr(target_val_str, tc_search_buffer) != nullptr)) {
                                 visible_stages_count++;
-                                }
+                            }
                         }
                     }
                     snprintf(stage_counter_text, sizeof(stage_counter_text), "%d %s", visible_stages_count,
@@ -6601,19 +6605,27 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // --- Create a filtered list of advancements to display and operate on ---
         std::vector<ImportableAdvancement *> filtered_advancements;
         if (import_search_buffer[0] != '\0') {
-            for (auto &adv: importable_advancements) {
-                bool parent_match = str_contains_insensitive(adv.root_name.c_str(), import_search_buffer);
-                bool child_match = false;
-                if (!parent_match) {
+            // Search logic now uses the new 'import_search_criteria_only' flag
+            if (import_search_criteria_only) {
+                // Search ONLY within criteria, but show their parents
+                for (auto &adv: importable_advancements) {
+                    bool child_match = false;
                     for (const auto &crit: adv.criteria) {
                         if (str_contains_insensitive(crit.root_name.c_str(), import_search_buffer)) {
                             child_match = true;
                             break;
                         }
                     }
+                    if (child_match) {
+                        filtered_advancements.push_back(&adv);
+                    }
                 }
-                if (parent_match || child_match) {
-                    filtered_advancements.push_back(&adv);
+            } else {
+                // Search ONLY within parent advancements/achievements
+                for (auto &adv: importable_advancements) {
+                    if (str_contains_insensitive(adv.root_name.c_str(), import_search_buffer)) {
+                        filtered_advancements.push_back(&adv);
+                    }
                 }
             }
         } else {
@@ -6707,28 +6719,61 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             // --- Include Criteria Checkbox ONLY for 1.7+ ---
             if (creator_selected_version > MC_VERSION_1_6_4) {
                 ImGui::SameLine();
-                ImGui::Checkbox("Include Criteria", &import_select_criteria);
+                ImGui::Checkbox("Include Crit.", &import_select_criteria);
                 if (ImGui::IsItemHovered()) {
                     char include_criteria_tooltip_buffer[512];
                     snprintf(include_criteria_tooltip_buffer, sizeof(include_criteria_tooltip_buffer),
-                             "Toggles whether criteria are affected by 'Select All',\n"
-                             "'Deselect All', and range selection (Shift+Click).");
+                             "Changes the behavior of the SELECTION tools.\n\n"
+                             "CHECKED: 'Select/Deselect All' and Shift+Click affect criteria.\n\n"
+                             "UNCHECKED: 'Select/Deselect All' and Shift+Click affect parent advancements only.");
                     ImGui::SetTooltip(
                         "%s", include_criteria_tooltip_buffer);
                 }
             }
         } // End of batch import
 
-        ImGui::SameLine();
+        // Store the cursor position after drawing the left-aligned controls
+        float left_controls_end_x = ImGui::GetCursorPosX();
 
         // --- Right-aligned Controls ---
-        const float search_bar_width = 250.0f;
+        const float search_bar_width = 200.0f;
         const float clear_button_width = ImGui::GetFrameHeight();
-        const float right_controls_width = search_bar_width + clear_button_width + ImGui::GetStyle().ItemSpacing.x;
+        const char *search_scope_label = "Crit. Search";
+        const float search_scope_checkbox_width = (creator_selected_version > MC_VERSION_1_6_4)
+                                                      ? (ImGui::CalcTextSize(search_scope_label).x +
+                                                         ImGui::GetFrameHeightWithSpacing())
+                                                      : 0.0f;
 
-        ImGui::SameLine(ImGui::GetWindowWidth() - right_controls_width - ImGui::GetStyle().WindowPadding.x);
+        const float right_controls_width = search_bar_width + clear_button_width + search_scope_checkbox_width + (
+                                               ImGui::GetStyle().ItemSpacing.x * 2);
 
-        // Render the "X" button or an invisible dummy widget to hold the space for alignment
+        // --- Position and render right-aligned controls ---
+        float right_controls_start_x = ImGui::GetWindowWidth() - right_controls_width -
+                                       ImGui::GetStyle().WindowPadding.x;
+
+        // Only move to the same line if there is enough space to avoid overlap
+        if (right_controls_start_x > left_controls_end_x) {
+            ImGui::SameLine(right_controls_start_x);
+        }
+
+        // Add the new checkbox for search scope
+        if (creator_selected_version > MC_VERSION_1_6_4) {
+            ImGui::Checkbox(search_scope_label, &import_search_criteria_only);
+            if (ImGui::IsItemHovered()) {
+                char tooltip[1024];
+                snprintf(tooltip, sizeof(tooltip), "Changes the scope of the search bar.\n\n"
+                         "CHECKED: Search only criterion names.\n"
+                         "UNCHECKED: Search only parent names.");
+                ImGui::SetTooltip("%s", tooltip);
+            }
+        } else {
+            ImGui::Dummy(ImVec2(search_scope_checkbox_width, ImGui::GetFrameHeight()));
+        }
+
+
+        ImGui::SameLine();
+
+        // Render the "X" button or a dummy widget
         if (import_search_buffer[0] != '\0') {
             if (ImGui::Button("X##ClearImportSearch", ImVec2(clear_button_width, 0))) {
                 import_search_buffer[0] = '\0';
@@ -6739,6 +6784,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         ImGui::SameLine();
 
+        // Set focus and render the search bar
         ImGui::SetNextItemWidth(search_bar_width);
         if (focus_import_search) {
             ImGui::SetKeyboardFocusHere();
@@ -6753,16 +6799,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 // No criteria
                 snprintf(import_search_tooltip_buffer, sizeof(import_search_tooltip_buffer),
                          "Filter list by achievement root name (case-insensitive).\n"
+                         "Use the checkbox to the left to toggle search scope.\n\n"
                          "Press Ctrl+F or Cmd+F to focus.");
             } else if (creator_selected_version <= MC_VERSION_1_11_2) {
                 // Achievements with criteria
                 snprintf(import_search_tooltip_buffer, sizeof(import_search_tooltip_buffer),
                          "Filter list by achievement or criterion root name (case-insensitive).\n"
+                         "Use the checkbox to the left to toggle search scope.\n\n"
                          "Press Ctrl+F or Cmd+F to focus.");
             } else {
                 // Advancements
                 snprintf(import_search_tooltip_buffer, sizeof(import_search_tooltip_buffer),
                          "Filter list by advancement/recipe or criterion root name (case-insensitive).\n"
+                         "Use the checkbox to the left to toggle search scope.\n\n"
                          "Press Ctrl+F or Cmd+F to focus.");
             }
             ImGui::SetTooltip("%s", import_search_tooltip_buffer);
@@ -6881,7 +6930,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                 char tooltip[256];
                                 snprintf(tooltip, sizeof(tooltip), "Switch the stage's 'Type' to 'Criterion'\n"
-                                                                   "to import a specific criterion.");
+                                         "to import a specific criterion.");
                                 ImGui::SetTooltip("%s", tooltip);
                             }
                         }
