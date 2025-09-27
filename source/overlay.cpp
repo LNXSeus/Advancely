@@ -212,10 +212,13 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     // SDL_ttf will automatically scale it correctly on any monitor at render time.
     const float base_font_size = DEFAULT_OVERLAY_FONT_SIZE;
     char overlay_font_path[1024];
-    snprintf(overlay_font_path, sizeof(overlay_font_path), "%s/fonts/%s", get_resources_path(), settings->overlay_font_name);
+    snprintf(overlay_font_path, sizeof(overlay_font_path), "%s/fonts/%s", get_resources_path(),
+             settings->overlay_font_name);
 
     if (!path_exists(overlay_font_path)) {
-        log_message(LOG_ERROR, "[OVERLAY] Tracker/Overlay Font '%s' not found. Falling back to default Minecraft font.\n", settings->overlay_font_name);
+        log_message(
+            LOG_ERROR, "[OVERLAY] Tracker/Overlay Font '%s' not found. Falling back to default Minecraft font.\n",
+            settings->overlay_font_name);
         snprintf(overlay_font_path, sizeof(overlay_font_path), "%s/fonts/Minecraft.ttf", get_resources_path());
     }
 
@@ -418,7 +421,8 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
                             o->start_index_row1 = (o->start_index_row1 + 1) % row1_items.size();
                             loop_guard++;
                         } while ((row1_items[o->start_index_row1].first->done || row1_items[o->start_index_row1].second
-                                  ->is_hidden) && loop_guard < row1_items.size() * 2);
+                                  ->is_hidden || row1_items[o->start_index_row1].first->is_hidden) && loop_guard <
+                                 row1_items.size() * 2);
                     }
                 } else {
                     for (int i = 0; i < items_scrolled; ++i) {
@@ -427,7 +431,8 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
                             o->start_index_row1 = (o->start_index_row1 - 1 + row1_items.size()) % row1_items.size();
                             loop_guard++;
                         } while ((row1_items[o->start_index_row1].first->done || row1_items[o->start_index_row1].second
-                                  ->is_hidden) && loop_guard < row1_items.size() * 2);
+                                  ->is_hidden || row1_items[o->start_index_row1].first->is_hidden) && loop_guard <
+                                 row1_items.size() * 2);
                     }
                 }
             }
@@ -697,7 +702,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
                 // Find the next visible item, skipping it if it's done OR its parent is hidden.
                 size_t loop_guard = 0;
-                while (row1_items[current_item_idx].first->done || row1_items[current_item_idx].second->is_hidden) {
+                while (row1_items[current_item_idx].first->done || row1_items[current_item_idx].second->is_hidden ||
+                       row1_items[current_item_idx].first->is_hidden) {
                     current_item_idx = (current_item_idx + 1) % row1_items.size();
                     loop_guard++;
                     if (loop_guard > row1_items.size()) {
