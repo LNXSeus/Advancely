@@ -4271,12 +4271,6 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
     ImGui::SetWindowFontScale(0.9f); // Slightly smaller text for controls
 
-    // Ctrl + F or Cmd + F to focus the search box
-    if (t->focus_search_box_requested) {
-        ImGui::SetKeyboardFocusHere();
-        t->focus_search_box_requested = false; // Reset the flag immediately after use
-    }
-
     // We use the tracker's main text color but with the faded alpha value.
     ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4((float) settings->text_color.r / 255.f,
                                                         (float) settings->text_color.g / 255.f,
@@ -4301,7 +4295,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
     ImGui::SameLine();
 
-    // Render the search bix
+    // Render the search box
     // Apply styles for placeholder and border
     bool search_is_active = (t->search_buffer[0] != '\0');
     if (search_is_active) {
@@ -4309,14 +4303,11 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                                                       (float) settings->text_color.g / 255.f,
                                                       (float) settings->text_color.b / 255.f, 0.8f));
     }
-    ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4((float) settings->text_color.r / 255.f,
-                                                        (float) settings->text_color.g / 255.f,
-                                                        (float) settings->text_color.b / 255.f,
-                                                        (float) ADVANCELY_FADED_ALPHA / 255.0f));
 
+    // Ctrl + F or Cmd + F to focus the search box
     if (t->focus_search_box_requested) {
         ImGui::SetKeyboardFocusHere();
-        t->focus_search_box_requested = false;
+        t->focus_search_box_requested = false; // Reset the flag immediately after use
     }
 
     // Search box
@@ -4324,7 +4315,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     ImGui::InputTextWithHint("##SearchBox", "Search...", t->search_buffer, sizeof(t->search_buffer));
 
     // Pop color
-    ImGui::PopStyleColor(2);
+    ImGui::PopStyleColor(1);
     if (search_is_active) ImGui::PopStyleColor(); // Pop border color
 
     if (ImGui::IsItemHovered()) {
