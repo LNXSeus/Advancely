@@ -418,7 +418,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                          unique_category_values.end());
         }
 
-        // After scan, validate and reset current selection if it's no longer valid for the new version
+        // --- After scan, validate and reset current selection if it's no longer valid for the new version ---
+
+        // Step 1: Validate the category.
         bool category_is_valid = false;
         for (const auto &cat: unique_category_values) {
             if (cat == temp_settings.category) {
@@ -427,21 +429,53 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             }
         }
         if (!category_is_valid) {
+            // If the old category doesn't exist for this version, pick the first one.
             if (!unique_category_values.empty()) {
                 strncpy(temp_settings.category, unique_category_values[0].c_str(), sizeof(temp_settings.category) - 1);
                 temp_settings.category[sizeof(temp_settings.category) - 1] = '\0';
             } else {
                 temp_settings.category[0] = '\0';
             }
-            // Since category is invalid, the flag must also be reset
+            // Since the category is being reset, the flags must also be reset.
             temp_settings.optional_flag[0] = '\0';
             temp_settings.lang_flag[0] = '\0';
         }
 
-        // This change may have altered the hotkey structure. To prevent a false "Unsaved Changes"
-        // flag, we re-sync the snapshot to this new, clean state.
-        // memcpy(&saved_settings, &temp_settings, sizeof(AppSettings)); // TODO: Critical
+        // Step 2: Validate the optional flag for the (now guaranteed to be valid) category.
+        // This runs whether the category was reset or was already valid.
+        bool flag_is_valid = false;
+        if (temp_settings.category[0] != '\0') {
+            for (int i = 0; i < discovered_template_count; ++i) {
+                if (strcmp(discovered_templates[i].category, temp_settings.category) == 0 &&
+                    strcmp(discovered_templates[i].optional_flag, temp_settings.optional_flag) == 0) {
+                    flag_is_valid = true;
+                    break;
+                }
+            }
+        }
+
+        if (!flag_is_valid) {
+            // The current flag is invalid for this version/category pair.
+            // Find and set the first available flag for the current category.
+            bool flag_set = false;
+            for (int i = 0; i < discovered_template_count; ++i) {
+                if (strcmp(discovered_templates[i].category, temp_settings.category) == 0) {
+                    strncpy(temp_settings.optional_flag, discovered_templates[i].optional_flag,
+                            sizeof(temp_settings.optional_flag) - 1);
+                    temp_settings.optional_flag[sizeof(temp_settings.optional_flag) - 1] = '\0';
+                    flag_set = true;
+                    break; // Found the first one, we're done.
+                }
+            }
+            if (!flag_set) {
+                // This case should not happen if the category is valid, but as a fallback:
+                temp_settings.optional_flag[0] = '\0';
+            }
+            // Since the flag was reset, the language must also be reset.
+            temp_settings.lang_flag[0] = '\0';
+        }
     }
+
 
     // --- CATEGORY DROPDOWN ---
     category_display_names.clear();
