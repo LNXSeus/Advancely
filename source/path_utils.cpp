@@ -27,6 +27,8 @@
 
 #if defined(__APPLE__)
 #include <mach-o/dyld.h>
+#include <libproc.h>
+#include <sys/sysctl.h>
 #endif
 
 // LOCAL HELPER FUNCTIONS
