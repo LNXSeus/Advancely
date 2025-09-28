@@ -29,7 +29,12 @@
 extern "C" {
 #endif
 
-
+// Enum to track the specific reason for forcing the settings window open on startup.
+typedef enum {
+    FORCE_OPEN_NONE,
+    FORCE_OPEN_AUTO_FAIL,
+    FORCE_OPEN_MANUAL_FAIL
+} ForceOpenReason;
 
 // Global error message function, accessible for other files
 void show_error_message(const char *title, const char *message);
@@ -45,7 +50,7 @@ const char* get_notes_manifest_path();
 #define TRACKER_TITLE "Advancely"
 
 // This is the version that gets compared with the latest release tag on GitHub
-#define ADVANCELY_VERSION "v0.9.294" // vMAJOR.MINOR.PATCH // TODO: Update this always, SAME FORMAT ON RELEASE TAG!
+#define ADVANCELY_VERSION "v0.9.295" // vMAJOR.MINOR.PATCH // TODO: Update this always, SAME FORMAT ON RELEASE TAG!
 // Starting from /gui folder
 #define ADVANCELY_ICON_PATH "/gui/Advancely_Logo_NoText.png" // TODO: Use this in tracker_init_sdl()
 // Starting from /gui folder

@@ -82,7 +82,9 @@ SDL_AtomicInt g_game_data_changed; // When game data is modified, custom counter
 SDL_AtomicInt g_notes_changed;
 SDL_AtomicInt g_apply_button_clicked;
 SDL_AtomicInt g_templates_changed;
-bool g_force_open_settings = false;
+
+// Change the global flag from a bool to our new enum.
+ForceOpenReason g_force_open_reason = FORCE_OPEN_NONE;
 
 
 static bool g_show_release_notes_on_startup = false;
@@ -1186,14 +1188,16 @@ int main(int argc, char *argv[]) {
         }
 
         // After the tracker is initialized, its saves_path is populated based on the loaded settings.
-        // Check if this resolved path is actually valid. If it's invalid, and the selected mode is NOT
-        // instance tracking, force the settings window open so the user can correct it.
-        // We exclude instance tracking because it's expected to fail if no game is running,
-        // which is not an error state that requires a persistent warning.
-        if (app_settings.path_mode != PATH_MODE_INSTANCE) {
-            if (!path_exists(tracker->saves_path)) {
-                log_message(LOG_ERROR, "[MAIN] Configured saves path ('%s') is invalid for the selected mode. Forcing settings open.\n", tracker->saves_path);
-                g_force_open_settings = true;
+        // Check if this resolved path is actually valid. If not, set the reason for forcing
+        // the settings window to open. We exclude instance tracking because it's expected
+        // to fail if no game is running.
+        if (!path_exists(tracker->saves_path)) {
+            if (app_settings.path_mode == PATH_MODE_AUTO) {
+                log_message(LOG_ERROR, "[MAIN] Auto-detected saves path is invalid. Forcing settings open.\n");
+                g_force_open_reason = FORCE_OPEN_AUTO_FAIL;
+            } else if (app_settings.path_mode == PATH_MODE_MANUAL) {
+                log_message(LOG_ERROR, "[MAIN] Manual saves path is invalid. Forcing settings open.\n");
+                g_force_open_reason = FORCE_OPEN_MANUAL_FAIL;
             }
         }
 
@@ -1274,7 +1278,7 @@ int main(int argc, char *argv[]) {
         // Unified MAIN TRACKER LOOP -------------------------------------------------
         while (is_running) {
             // Force settings window open if the path was invalid on startup
-            if (g_force_open_settings) {
+            if (g_force_open_reason != FORCE_OPEN_NONE) {
                 settings_opened = true;
             }
 
@@ -1588,7 +1592,7 @@ int main(int argc, char *argv[]) {
 
             // Render settings window in tracker window
             // settings_opened flag is triggered by Esc key -> tracker_events() and global event handler
-            settings_render_gui(&settings_opened, &app_settings, tracker->roboto_font, tracker, &g_force_open_settings,
+            settings_render_gui(&settings_opened, &app_settings, tracker->roboto_font, tracker, &g_force_open_reason,
                                 &tracker->temp_creator_window_open);
 
             // Render the template creator window

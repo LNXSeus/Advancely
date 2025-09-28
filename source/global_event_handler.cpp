@@ -138,7 +138,7 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
 
             if (settings_changed) {
                 // Only save window geometry changes if the settings are not being forcibly configured
-                if (!g_force_open_settings) {
+                if (g_force_open_reason == FORCE_OPEN_NONE) {
                     // Save settings, passing nullptr for TemplateData as we only changed window geometry
                     settings_save(app_settings, nullptr, SAVE_CONTEXT_TRACKER_GEOM);
                 }

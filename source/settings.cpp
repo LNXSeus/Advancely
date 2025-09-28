@@ -80,7 +80,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
 }
 
 void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t,
-                         bool *force_open_flag, bool *p_temp_creator_open) {
+                         ForceOpenReason *force_open_reason, bool *p_temp_creator_open) {
     // This static variable tracks the open state from the previous frame
     static bool was_open_last_frame = false;
 
@@ -185,12 +185,17 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         memcpy(&temp_settings, &saved_settings, sizeof(AppSettings));
     }
 
-    // If settings were forced open, display a prominent warning message
-    if (force_open_flag && *force_open_flag) {
+    // If settings were forced open, display a prominent and context-aware warning message
+    if (force_open_reason && *force_open_reason != FORCE_OPEN_NONE) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.8f, 0.0f, 1.0f)); // Yellow text
-        ImGui::TextWrapped("IMPORTANT: Could not find Minecraft saves folder automatically.");
-        ImGui::TextWrapped(
-            "Please enter a custom saves path to your '.minecraft/saves' folder below or automatically track the active instance and click 'Apply Settings'.");
+        if (*force_open_reason == FORCE_OPEN_AUTO_FAIL) {
+            ImGui::TextWrapped("IMPORTANT: Could not find Minecraft saves folder automatically.");
+            ImGui::TextWrapped(
+                "Please select a different mode or ensure the default Minecraft path exists, then click 'Apply Settings'.");
+        } else if (*force_open_reason == FORCE_OPEN_MANUAL_FAIL) {
+            ImGui::TextWrapped("IMPORTANT: The manually configured saves path is invalid or does not exist.");
+            ImGui::TextWrapped("Please check the path you have entered and click 'Apply Settings'.");
+        }
         ImGui::PopStyleColor();
         ImGui::Separator();
         ImGui::Spacing();
@@ -204,7 +209,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::Text("Path Settings");
 
     // The (int*) cast is necessary because ImGui::RadioButton works with integers.
-    if (ImGui::RadioButton("Auto-Detect Default Saves Path", (int*)&temp_settings.path_mode, PATH_MODE_AUTO)) {
+    if (ImGui::RadioButton("Auto-Detect Default Saves Path", (int *) &temp_settings.path_mode, PATH_MODE_AUTO)) {
         // Action to take when this specific button is clicked (optional)
     }
     if (ImGui::IsItemHovered()) {
@@ -217,13 +222,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SetTooltip("%s", default_saves_path_tooltip_buffer);
     }
 
-    if (ImGui::RadioButton("Track Custom Saves Folder", (int*)&temp_settings.path_mode, PATH_MODE_MANUAL)) {
+    if (ImGui::RadioButton("Track Custom Saves Folder", (int *) &temp_settings.path_mode, PATH_MODE_MANUAL)) {
         // Action to take when this specific button is clicked (optional)
     }
     if (ImGui::IsItemHovered()) {
         char tooltip[512];
         snprintf(tooltip, sizeof(tooltip), "Manually specify the path to your '.minecraft/saves' folder.\n"
-                          "Useful for custom launchers or non-standard installations.");
+                 "Useful for custom launchers or non-standard installations.");
         ImGui::SetTooltip("%s", tooltip);
     }
 
@@ -247,13 +252,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::Unindent();
     }
 
-    if (ImGui::RadioButton("Auto-Track Active Instance", (int*)&temp_settings.path_mode, PATH_MODE_INSTANCE)) {
+    if (ImGui::RadioButton("Auto-Track Active Instance", (int *) &temp_settings.path_mode, PATH_MODE_INSTANCE)) {
         // Action to take when this specific button is clicked (optional)
     }
     if (ImGui::IsItemHovered()) {
         char tooltip[512];
         snprintf(tooltip, sizeof(tooltip), "Automatically detect and track the active Minecraft instance\n"
-                                           "launched from MultiMC or Prism Launcher.");
+                 "launched from MultiMC or Prism Launcher.");
         ImGui::SetTooltip("%s", tooltip);
     }
 
@@ -1389,98 +1394,63 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             // The constructed path does not point to a real file.
             show_template_not_found_error = true;
         } else {
-            // Step 1: Validate the manual Path if it's being used
+            // This entire block is new/updated
+            bool settings_applied = false;
+
+            // Validate the selected path mode
             if (temp_settings.path_mode == PATH_MODE_MANUAL) {
-                // Check if the path is empty or does not exist
                 if (strlen(temp_settings.manual_saves_path) == 0 || !path_exists(temp_settings.manual_saves_path)) {
-                    // CASE 1: Manual mode is selected, but the path is invalid.
                     show_invalid_manual_path_error = true;
-                    // Do not apply settings; force user to correct the path
+                    if (force_open_reason) *force_open_reason = FORCE_OPEN_MANUAL_FAIL;
                 } else {
-                    // CASE 2: Manual mode is selected, and the path is valid. Apply settings.
-                    show_invalid_manual_path_error = false; // Hide error message
+                    show_invalid_manual_path_error = false;
+                    settings_applied = true;
+                }
+            } else if (temp_settings.path_mode == PATH_MODE_AUTO) {
+                char auto_path_buffer[MAX_PATH_LENGTH];
+                if (!get_saves_path(auto_path_buffer, MAX_PATH_LENGTH, PATH_MODE_AUTO, nullptr)) {
+                    temp_settings.path_mode = PATH_MODE_MANUAL; // Revert UI to manual
+                    if (force_open_reason) *force_open_reason = FORCE_OPEN_AUTO_FAIL;
+                } else {
+                    settings_applied = true;
+                }
+            } else if (temp_settings.path_mode == PATH_MODE_INSTANCE) {
+                // Instance tracking is considered a valid selection even if no game is running.
+                // The tracker will simply report "No Worlds Found".
+                settings_applied = true;
+            }
 
-                    // If the path is now valid, we can clear the force_open_flag
-                    if (force_open_flag) {
-                        *force_open_flag = false;
-                    }
+            // If any of the modes resulted in a valid configuration, apply the settings.
+            if (settings_applied) {
+                if (force_open_reason) {
+                    *force_open_reason = FORCE_OPEN_NONE; // Clear any startup warnings
+                }
 
-                    // Hotkey warning logic
-                    // Check if this is a template change AND if there were any active hotkeys
-                    bool is_template_change = (strcmp(temp_settings.version_str, saved_settings.version_str) != 0 ||
-                                               strcmp(temp_settings.category, saved_settings.category) != 0 ||
-                                               strcmp(temp_settings.optional_flag, saved_settings.optional_flag) != 0);
-                    bool had_active_hotkeys = false;
-                    for (int i = 0; i < saved_settings.hotkey_count; ++i) {
-                        if (strcmp(saved_settings.hotkeys[i].increment_key, "None") != 0 ||
-                            strcmp(saved_settings.hotkeys[i].decrement_key, "None") != 0) {
-                            had_active_hotkeys = true;
-                            break;
-                        }
-                    }
-
-                    // Copy temp settings to the real settings, save, and trigger a reload
-                    memcpy(app_settings, &temp_settings, sizeof(AppSettings));
-                    // Also update our clean snapshot
-                    memcpy(&saved_settings, &temp_settings, sizeof(AppSettings));
-                    SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
-                    settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
-                    SDL_SetAtomicInt(&g_settings_changed, 1); // Trigger a reload
-                    SDL_SetAtomicInt(&g_apply_button_clicked, 1);
-                    show_applied_message = true;
-
-                    // Display hotkey warning
-                    if (is_template_change && had_active_hotkeys) {
-                        show_hotkey_warning_message = true;
-                    } else {
-                        show_applied_message = true;
+                // Hotkey Warning Logic
+                bool is_template_change = (strcmp(temp_settings.version_str, saved_settings.version_str) != 0 ||
+                                           strcmp(temp_settings.category, saved_settings.category) != 0 ||
+                                           strcmp(temp_settings.optional_flag, saved_settings.optional_flag) != 0);
+                bool had_active_hotkeys = false;
+                for (int i = 0; i < saved_settings.hotkey_count; ++i) {
+                    if (strcmp(saved_settings.hotkeys[i].increment_key, "None") != 0 ||
+                        strcmp(saved_settings.hotkeys[i].decrement_key, "None") != 0) {
+                        had_active_hotkeys = true;
+                        break;
                     }
                 }
-            } else {
-                // temp_settings.path_mode == PATH_MODE_AUTO
-                char auto_path_buffer[MAX_PATH_LENGTH];
-                get_saves_path(auto_path_buffer, MAX_PATH_LENGTH, PATH_MODE_AUTO, nullptr);
 
-                if (!path_exists(auto_path_buffer)) {
-                    // CASE 3: Auto mode is selected, but the auto-detected path is invalid.
-                    temp_settings.path_mode = PATH_MODE_MANUAL; // Revert the choice in the UI
-                    if (force_open_flag) {
-                        *force_open_flag = true; // Re-trigger the warning message
-                    }
+                // Copy temp settings to the real settings, save, and trigger a reload
+                memcpy(app_settings, &temp_settings, sizeof(AppSettings));
+                memcpy(&saved_settings, &temp_settings, sizeof(AppSettings)); // Update clean snapshot
+                SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
+                settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
+                SDL_SetAtomicInt(&g_settings_changed, 1); // Trigger a reload
+                SDL_SetAtomicInt(&g_apply_button_clicked, 1);
+
+                if (is_template_change && had_active_hotkeys) {
+                    show_hotkey_warning_message = true;
                 } else {
-                    // CASE 4: Auto mode is selected, and the path is valid. Apply settings.
-                    if (force_open_flag) {
-                        *force_open_flag = false;
-                    }
-
-                    // Hotkey Warning Logic
-                    bool is_template_change = (strcmp(temp_settings.version_str, saved_settings.version_str) != 0 ||
-                                               strcmp(temp_settings.category, saved_settings.category) != 0 ||
-                                               strcmp(temp_settings.optional_flag, saved_settings.optional_flag) != 0);
-                    bool had_active_hotkeys = false;
-                    for (int i = 0; i < saved_settings.hotkey_count; ++i) {
-                        if (strcmp(saved_settings.hotkeys[i].increment_key, "None") != 0 ||
-                            strcmp(saved_settings.hotkeys[i].decrement_key, "None") != 0) {
-                            had_active_hotkeys = true;
-                            break;
-                        }
-                    }
-
-                    memcpy(app_settings, &temp_settings, sizeof(AppSettings));
-                    // Also update our clean snapshot
-                    memcpy(&saved_settings, &temp_settings, sizeof(AppSettings));
-                    SDL_SetWindowAlwaysOnTop(t->window, app_settings->tracker_always_on_top);
-                    settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
-                    SDL_SetAtomicInt(&g_settings_changed, 1);
-                    SDL_SetAtomicInt(&g_apply_button_clicked, 1);
                     show_applied_message = true;
-
-                    // Display hotkey warning message
-                    if (is_template_change && had_active_hotkeys) {
-                        show_hotkey_warning_message = true;
-                    } else {
-                        show_applied_message = true;
-                    }
                 }
             }
         }
