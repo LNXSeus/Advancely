@@ -450,9 +450,9 @@ or [create a new issue](https://github.com/LNXSeus/Advancely/issues/new) on GitH
 Massive thanks to all the beta testers. _Message me on discord @lnxseus with proof of using Advancely before its full
 release and you'll be added here:_
 
-* Windows: ethansplace98, Yumeko, zurtletif, 3emis, MoreTrident, PhoenixAUS_, metal_silver1234, 36_Official, me_nx,
+* Windows: ethansplace98, Yumeko, zurtletif, 3emis, MoreTrident, PhoenixAUS_, metal_silver1234, 36_Official
 * macOS: Slackow, TheDogmaster28
-* Linux: DesktopFolder, ShadowFlower64
+* Linux: DesktopFolder, ShadowFlower64, me_nx
 
 ***
 

@@ -204,8 +204,10 @@ MC_Version settings_get_version_from_string(const char *version_str) {
 
 PathMode settings_get_path_mode_from_string(const char *mode_str) {
     if (mode_str && strcmp(mode_str, "manual") == 0) {
-        // returns 0 if strings are equal
         return PATH_MODE_MANUAL;
+    }
+    if (mode_str && strcmp(mode_str, "instance") == 0) {
+        return PATH_MODE_INSTANCE;
     }
     return PATH_MODE_AUTO; // Default to auto
 }
@@ -670,8 +672,18 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
     if (context == SAVE_CONTEXT_ALL) {
         // Update top-level settings using a safe "delete then add" pattern
         cJSON_DeleteItemFromObject(root, "path_mode");
-        cJSON_AddItemToObject(root, "path_mode",
-                              cJSON_CreateString(settings->path_mode == PATH_MODE_MANUAL ? "manual" : "auto"));
+        const char *mode_str;
+        switch (settings->path_mode) {
+            case PATH_MODE_MANUAL: mode_str = "manual";
+                break;
+            case PATH_MODE_INSTANCE: mode_str = "instance";
+                break;
+            case PATH_MODE_AUTO:
+            default: mode_str = "auto";
+                break;
+        }
+        // Insert that mode string into the settings.json file
+        cJSON_AddItemToObject(root, "path_mode", cJSON_CreateString(mode_str));
         cJSON_DeleteItemFromObject(root, "manual_saves_path");
         cJSON_AddItemToObject(root, "manual_saves_path", cJSON_CreateString(settings->manual_saves_path));
         cJSON_DeleteItemFromObject(root, "version");

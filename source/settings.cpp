@@ -206,44 +206,58 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Path Settings
     ImGui::Text("Path Settings");
 
-
-    bool path_mode_is_auto = (temp_settings.path_mode == PATH_MODE_AUTO);
-    if (ImGui::Checkbox("Auto-Detect Saves Path", &path_mode_is_auto)) {
-        temp_settings.path_mode = path_mode_is_auto ? PATH_MODE_AUTO : PATH_MODE_MANUAL;
+    // The (int*) cast is necessary because ImGui::RadioButton works with integers.
+    if (ImGui::RadioButton("Auto-Detect Default Saves Path", (int*)&temp_settings.path_mode, PATH_MODE_AUTO)) {
+        // Action to take when this specific button is clicked (optional)
     }
-
     if (ImGui::IsItemHovered()) {
         char default_saves_path_tooltip_buffer[1024];
         snprintf(default_saves_path_tooltip_buffer, sizeof(default_saves_path_tooltip_buffer),
-                 "Automatically finds the default Minecraft saves path for your OS:\n"
+                 "Automatically finds the default Minecraft saves path for your OS.\n"
                  "Windows: %%APPDATA%%\\.minecraft\\saves\n"
                  "Linux: ~/.minecraft/saves\n"
-                 "macOS: ~/Library/Application Support/minecraft/saves\n\n"
-                 "Uncheck this to manually set your saves path.");
+                 "macOS: ~/Library/Application Support/minecraft/saves");
         ImGui::SetTooltip("%s", default_saves_path_tooltip_buffer);
     }
 
+    if (ImGui::RadioButton("Track Custom Saves Folder", (int*)&temp_settings.path_mode, PATH_MODE_MANUAL)) {
+        // Action to take when this specific button is clicked (optional)
+    }
+    if (ImGui::IsItemHovered()) {
+        char tooltip[512];
+        snprintf(tooltip, sizeof(tooltip), "Manually specify the path to your '.minecraft/saves' folder.\n"
+                          "Useful for custom launchers or non-standard installations.");
+        ImGui::SetTooltip("%s", tooltip);
+    }
+
+    // Conditionally show the manual path input only when its radio button is selected
     if (temp_settings.path_mode == PATH_MODE_MANUAL) {
         ImGui::Indent();
         ImGui::InputText("Manual Saves Path", temp_settings.manual_saves_path, MAX_PATH_LENGTH);
-
         if (ImGui::IsItemHovered()) {
             char manual_saves_path_tooltip_buffer[1024];
             snprintf(manual_saves_path_tooltip_buffer, sizeof(manual_saves_path_tooltip_buffer),
-                     "Enter the path to your '.minecraft/saves' folder.\n"
-                     "You can just paste it in.\n"
-                     "Doesn't matter if the path uses forward- or backward slashes.");
+                     "Enter the full path to your saves folder.\n"
+                     "You can paste it in directly. Forward or backward slashes are fine.");
             ImGui::SetTooltip("%s", manual_saves_path_tooltip_buffer);
         }
-
         if (show_invalid_manual_path_error) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f)); // Red text
             ImGui::TextWrapped(
                 "The specified path is invalid or does not exist. Please provide a valid path to your '.minecraft/saves' folder.");
             ImGui::PopStyleColor();
         }
-
         ImGui::Unindent();
+    }
+
+    if (ImGui::RadioButton("Auto-Track Active Instance", (int*)&temp_settings.path_mode, PATH_MODE_INSTANCE)) {
+        // Action to take when this specific button is clicked (optional)
+    }
+    if (ImGui::IsItemHovered()) {
+        char tooltip[512];
+        snprintf(tooltip, sizeof(tooltip), "Automatically detect and track the active Minecraft instance\n"
+                                           "launched from MultiMC or Prism Launcher.");
+        ImGui::SetTooltip("%s", tooltip);
     }
 
     // Open Instances Folder Button

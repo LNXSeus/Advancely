@@ -18,7 +18,7 @@ extern "C" {
 typedef enum {
     SAVE_CONTEXT_ALL, // Saving everything from "Settings Apply" butotn
     SAVE_CONTEXT_TRACKER_GEOM, // Save only tracker window's position/size
-    SAVE_CONTEXT_OVERLAY_GEOM // Save only overlay window's positin/size
+    SAVE_CONTEXT_OVERLAY_GEOM // Save only overlay window's position/size
 } SettingsSaveContext;
 
 enum GoalHidingMode {

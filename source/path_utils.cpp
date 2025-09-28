@@ -95,6 +95,10 @@ bool get_saves_path(char *out_path, size_t max_len, PathMode mode, const char *m
         } else {
             log_message(LOG_ERROR, "[PATH UTILS] Manual path is empty or invalid.\n");
         }
+    } else if (mode == PATH_MODE_INSTANCE) {
+        // Placeholder for future instance detection logic
+        log_message(LOG_ERROR, "[PATH UTILS] Instance tracking selected, but not yet implemented. Falling back to auto-detection for now.\n");
+        success = get_auto_saves_path(out_path, max_len);
     }
 
     // normalize path
