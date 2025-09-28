@@ -1185,17 +1185,16 @@ int main(int argc, char *argv[]) {
                         app_settings.tracker_font_name);
         }
 
-        // Check if the currently configured saves path is valid, regardless of mode.
-        // This ensures that on every launch, if the path is bad, we force the user to fix it.
-        if (!path_exists(tracker->saves_path)) {
-            log_message(LOG_ERROR, "[MAIN] Current saves path is invalid. Forcing manual configuration.\n");
-
-            // If the current path is invalid, we must be in manual mode for the user to fix it.
-            app_settings.path_mode = PATH_MODE_MANUAL;
-            g_force_open_settings = true;
-
-            // Save this state so if the app is closed and reopened, it remembers to force the settings open again.
-            settings_save(&app_settings, nullptr, SAVE_CONTEXT_ALL);
+        // Check if the auto-detected saves path is valid, and only force the
+        // settings open if the user is currently in auto-mode and it fails.
+        // This prevents the warning from showing up incorrectly for users with a valid manual path.
+        if (app_settings.path_mode == PATH_MODE_AUTO) {
+            char auto_path_buffer[MAX_PATH_LENGTH];
+            // We only need to check the result of auto-detection here.
+            if (!get_saves_path(auto_path_buffer, sizeof(auto_path_buffer), PATH_MODE_AUTO, nullptr)) {
+                log_message(LOG_ERROR, "[MAIN] Auto-detected saves path is invalid. Forcing settings open.\n");
+                g_force_open_settings = true;
+            }
         }
 
         dmon_init();
