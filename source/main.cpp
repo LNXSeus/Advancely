@@ -1185,14 +1185,14 @@ int main(int argc, char *argv[]) {
                         app_settings.tracker_font_name);
         }
 
-        // Check if the auto-detected saves path is valid, and only force the
-        // settings open if the user is currently in auto-mode and it fails.
-        // This prevents the warning from showing up incorrectly for users with a valid manual path.
-        if (app_settings.path_mode == PATH_MODE_AUTO) {
-            char auto_path_buffer[MAX_PATH_LENGTH];
-            // We only need to check the result of auto-detection here.
-            if (!get_saves_path(auto_path_buffer, sizeof(auto_path_buffer), PATH_MODE_AUTO, nullptr)) {
-                log_message(LOG_ERROR, "[MAIN] Auto-detected saves path is invalid. Forcing settings open.\n");
+        // After the tracker is initialized, its saves_path is populated based on the loaded settings.
+        // Check if this resolved path is actually valid. If it's invalid, and the selected mode is NOT
+        // instance tracking, force the settings window open so the user can correct it.
+        // We exclude instance tracking because it's expected to fail if no game is running,
+        // which is not an error state that requires a persistent warning.
+        if (app_settings.path_mode != PATH_MODE_INSTANCE) {
+            if (!path_exists(tracker->saves_path)) {
+                log_message(LOG_ERROR, "[MAIN] Configured saves path ('%s') is invalid for the selected mode. Forcing settings open.\n", tracker->saves_path);
                 g_force_open_settings = true;
             }
         }
