@@ -51,13 +51,10 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_show_progress != b->overlay_show_progress ||
         a->overlay_show_igt != b->overlay_show_igt ||
         a->overlay_show_update_timer != b->overlay_show_update_timer ||
-        // Changes to window geometry of overlay and tracker window DO NOT cause the "Unsaved Changes" text to appear.
-        // memcmp(&a->tracker_window, &b->tracker_window, sizeof(WindowRect)) != 0 ||
-        // memcmp(&a->overlay_window, &b->overlay_window, sizeof(WindowRect)) != 0 ||
 
         strcmp(a->tracker_font_name, b->tracker_font_name) != 0 ||
         a->tracker_font_size != b->tracker_font_size ||
-        strcmp(a->ui_font_name, a->ui_font_name) != 0 ||
+        strcmp(a->ui_font_name, b->ui_font_name) != 0 ||
         a->ui_font_size != a->ui_font_size ||
         strcmp(a->overlay_font_name, b->overlay_font_name) != 0 ||
 
@@ -193,7 +190,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.8f, 0.0f, 1.0f)); // Yellow text
         ImGui::TextWrapped("IMPORTANT: Could not find Minecraft saves folder automatically.");
         ImGui::TextWrapped(
-            "Please enter the correct path to your '.minecraft/saves' folder below and click 'Apply Settings'.");
+            "Please enter a custom saves path to your '.minecraft/saves' folder below or automatically track the active instance and click 'Apply Settings'.");
         ImGui::PopStyleColor();
         ImGui::Separator();
         ImGui::Spacing();
