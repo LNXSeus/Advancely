@@ -5,6 +5,12 @@
 
 #include "settings.h"
 
+// Includes for fork() and execvp() on Linux/macOS
+#ifndef _WIN32
+#include <unistd.h>
+#include <sys/wait.h>
+#endif
+
 #include <algorithm>
 #include <string>
 #include <cstring> // For memcmp on simple sub-structs
@@ -273,18 +279,31 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::Button("Open Instances Folder")) {
         char instances_path[MAX_PATH_LENGTH];
         if (get_parent_directory(t->saves_path, instances_path, sizeof(instances_path), 3)) {
-            char command[MAX_PATH_LENGTH + 32];
 #ifdef _WIN32
-            // Convert slashes to backslashes for the windows expolorer command
+            char command[MAX_PATH_LENGTH + 32];
             path_to_windows_native(instances_path);
             snprintf(command, sizeof(command), "explorer \"%s\"", instances_path);
-#elif __APPLE__
-            snprintf(command, sizeof(command), "open \"%s\"", instances_path);
-#else
-            snprintf(command, sizeof(command), "xdg-open \"%s\"", instances_path);
-#endif
-            log_message(LOG_INFO, "[DEBUG settings] Executing system command: %s\n", command);
             system(command);
+#else
+            // On POSIX systems (macOS, Linux), use fork() + execvp() for a more robust launch.
+            // This avoids shell environment issues that can affect system().
+            pid_t pid = fork();
+            if (pid == 0) { // This is the child process
+                // execvp requires a null-terminated array of arguments.
+                // The path does not need to be quoted here.
+#if __APPLE__
+                char* args[] = {(char*)"open", instances_path, nullptr};
+#else
+                char* args[] = {(char*)"xdg-open", instances_path, nullptr};
+#endif
+                execvp(args[0], args);
+                // If execvp returns, it means an error occurred.
+                _exit(127);
+            } else if (pid < 0) {
+                log_message(LOG_ERROR, "[SETTINGS] Failed to fork process to open folder.\n");
+            }
+            // The parent process (Advancely) continues running here without waiting.
+#endif
         }
     }
 
@@ -344,15 +363,24 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     if (ImGui::IsItemClicked()) {
         const char *url = "https://github.com/LNXSeus/Advancely#Officially-Added-Templates";
-        char command[1024];
 #ifdef _WIN32
+        char command[1024];
         snprintf(command, sizeof(command), "start %s", url);
-#elif __APPLE__
-        snprintf(command, sizeof(command), "open %s", url);
-#else
-        snprintf(command, sizeof(command), "xdg-open %s", url);
-#endif
         system(command);
+#else // macOS and Linux
+        pid_t pid = fork();
+        if (pid == 0) { // Child process
+#if __APPLE__
+            char* args[] = {(char*)"open", (char*)url, nullptr};
+#else
+            char* args[] = {(char*)"xdg-open", (char*)url, nullptr};
+#endif
+            execvp(args[0], args);
+            _exit(127); // Exit if exec fails
+        } else if (pid < 0) {
+            log_message(LOG_ERROR, "[SETTINGS] Failed to fork process to open URL.\n");
+        }
+#endif
     }
 
     // Version dropdown
@@ -393,15 +421,24 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     if (ImGui::IsItemClicked()) {
         const char *url = "https://github.com/LNXSeus/Advancely#extensive-version-support";
-        char command[1024];
 #ifdef _WIN32
+        char command[1024];
         snprintf(command, sizeof(command), "start %s", url);
-#elif __APPLE__
-        snprintf(command, sizeof(command), "open %s", url);
-#else
-        snprintf(command, sizeof(command), "xdg-open %s", url);
-#endif
         system(command);
+#else // macOS and Linux
+        pid_t pid = fork();
+        if (pid == 0) { // Child process
+#if __APPLE__
+            char* args[] = {(char*)"open", (char*)url, nullptr};
+#else
+            char* args[] = {(char*)"xdg-open", (char*)url, nullptr};
+#endif
+            execvp(args[0], args);
+            _exit(127); // Exit if exec fails
+        } else if (pid < 0) {
+            log_message(LOG_ERROR, "[SETTINGS] Failed to fork process to open URL.\n");
+        }
+#endif
     }
 
     // Only show the StatsPerWorld checkbox for legacy versions
@@ -658,16 +695,25 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::Button("Open Template Folder")) {
         char templates_path[MAX_PATH_LENGTH];
         snprintf(templates_path, sizeof(templates_path), "%s/templates", get_resources_path());
-        char command[MAX_PATH_LENGTH + 32];
 #ifdef _WIN32
+        char command[MAX_PATH_LENGTH + 32];
         path_to_windows_native(templates_path); // Convert to backslashes for explorer
         snprintf(command, sizeof(command), "explorer \"%s\"", templates_path);
-#elif __APPLE__
-        snprintf(command, sizeof(command), "open \"%s\"", templates_path);
-#else
-        snprintf(command, sizeof(command), "xdg-open \"%s\"", templates_path);
-#endif
         system(command);
+#else // macOS and Linux
+        pid_t pid = fork();
+        if (pid == 0) { // Child process
+#if __APPLE__
+            char* args[] = {(char*)"open", templates_path, nullptr};
+#else
+            char* args[] = {(char*)"xdg-open", templates_path, nullptr};
+#endif
+            execvp(args[0], args);
+            _exit(127); // Exit if exec fails
+        } else if (pid < 0) {
+            log_message(LOG_ERROR, "[SETTINGS] Failed to fork process to open folder.\n");
+        }
+#endif
     }
     if (ImGui::IsItemHovered()) {
         char open_templates_folder_tooltip_buffer[1024];

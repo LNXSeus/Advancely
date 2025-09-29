@@ -921,7 +921,7 @@ int main(int argc, char *argv[]) {
                 int buttonid = -1;
                 bool decision_made = false;
 
-                while (!decision_made) {
+while (!decision_made) {
                     SDL_ShowMessageBox(&messageboxdata, &buttonid);
 
                     switch (buttonid) {
@@ -935,33 +935,51 @@ int main(int argc, char *argv[]) {
                         {
                             char templates_path[MAX_PATH_LENGTH];
                             snprintf(templates_path, sizeof(templates_path), "%s/templates", get_resources_path());
-                            char command[MAX_PATH_LENGTH + 32];
 #ifdef _WIN32
+                            char command[MAX_PATH_LENGTH + 32];
                             path_to_windows_native(templates_path); // Convert to backslashes for explorer
                             snprintf(command, sizeof(command), "explorer \"%s\"", templates_path);
-#elif __APPLE__
-                            snprintf(command, sizeof(command), "open \"%s\"", templates_path);
-#else
-                            snprintf(command, sizeof(command), "xdg-open \"%s\"", templates_path);
-#endif
                             (void) system(command);
+#else // macOS and Linux
+                            pid_t pid = fork();
+                            if (pid == 0) { // Child process
+                                #if __APPLE__
+                                    char* args[] = {(char*)"open", templates_path, nullptr};
+                                #else
+                                    char* args[] = {(char*)"xdg-open", templates_path, nullptr};
+                                #endif
+                                execvp(args[0], args);
+                                _exit(127); // Exit if exec fails
+                            } else if (pid < 0) {
+                                log_message(LOG_ERROR, "[MAIN] Failed to fork process to open folder.\n");
+                            }
+#endif
                             break; // Re-shows the message box
                         }
 
                         case 3: // View Templates Online
                         {
                             const char *url = "https://github.com/LNXSeus/Advancely#Officially-Added-Templates";
-                            char command[1024];
 #ifdef _WIN32
+                            char command[1024];
                             snprintf(command, sizeof(command), "start %s", url);
-#elif __APPLE__
-                                    snprintf(command, sizeof(command), "open %s", url);
-#else
-                                    snprintf(command, sizeof(command), "xdg-open %s", url);
-#endif
                             (void) system(command);
+#else // macOS and Linux
+                            pid_t pid = fork();
+                            if (pid == 0) { // Child process
+                                #if __APPLE__
+                                    char* args[] = {(char*)"open", (char*)url, nullptr};
+                                #else
+                                    char* args[] = {(char*)"xdg-open", (char*)url, nullptr};
+                                #endif
+                                execvp(args[0], args);
+                                _exit(127); // Exit if exec fails
+                            } else if (pid < 0) {
+                                log_message(LOG_ERROR, "[MAIN] Failed to fork process to open URL.\n");
+                            }
+#endif
+                            break; // Re-shows the message box
                         }
-                        break; // Re-shows the message box
                     }
                 }
 

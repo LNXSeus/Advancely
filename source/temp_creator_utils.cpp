@@ -31,6 +31,7 @@
 #define MKDIR(path) mkdir(path, 0755) // 0755 provides read/write/execute for owner, read/execute for others
 #include <dirent.h>
 #include <unistd.h> // For rmdir()
+#include <sys/wait.h>
 #endif
 
 bool parse_player_stats_for_import(const char* file_path, MC_Version version, std::vector<ImportableStat>& out_stats, char* error_message, size_t error_msg_size) {
@@ -1231,23 +1232,30 @@ void handle_export_language(const char *version, const char *category, const cha
         snprintf(lang_path, sizeof(lang_path), "%s_lang_%s.json", base_path, lang_flag_to_export);
     }
 
-    char command[MAX_PATH_LENGTH + 64];
 #ifdef _WIN32
+    char command[MAX_PATH_LENGTH + 64];
     path_to_windows_native(lang_path);
     snprintf(command, sizeof(command), "explorer /select,\"%s\"", lang_path);
-#elif __APPLE__
-    snprintf(command, sizeof(command), "open -R \"%s\"", lang_path);
-#else // POSIX
-    // Highlighting a file isn't a standard feature, so we open the parent directory.
-    char parent_dir[MAX_PATH_LENGTH];
-    if (get_parent_directory(lang_path, parent_dir, sizeof(parent_dir), 1)) {
-        snprintf(command, sizeof(command), "xdg-open \"%s\"", parent_dir);
-    } else {
-        // Fallback if getting parent fails
-        snprintf(command, sizeof(command), "xdg-open .");
+    system(command);
+#else // macOS and Linux
+    pid_t pid = fork();
+    if (pid == 0) { // Child process
+#if __APPLE__
+        // Use "open -R" to reveal the file in Finder
+        char* args[] = {(char*)"open", (char*)"-R", lang_path, nullptr};
+#else // Linux
+        // Highlighting a file isn't a standard feature, so we open the parent directory.
+        char parent_dir[MAX_PATH_LENGTH];
+        if (get_parent_directory(lang_path, parent_dir, sizeof(parent_dir), 1)) {
+            char* args[] = {(char*)"xdg-open", parent_dir, nullptr};
+            execvp(args[0], args);
+        }
+#endif
+        _exit(127); // Exit if exec fails
+    } else if (pid < 0) {
+        log_message(LOG_ERROR, "[TEMP CREATE UTILS] Failed to fork process to open folder.\n");
     }
 #endif
-    system(command);
 }
 
 
