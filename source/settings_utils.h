@@ -1,3 +1,8 @@
+// Copyright (c) 2025 LNXSeus. All Rights Reserved.
+//
+// This project is proprietary software. You are granted a license to use the software as-is.
+// You may not copy, distribute, modify, reverse-engineer, or use this software
+// or its source code in any way without the express written permission of the copyright holder.
 //
 // Created by Linus on 27.06.2025.
 //
@@ -162,9 +167,9 @@ struct AppSettings {
     char tracker_font_name[256];      // Filename of the font for the trackermap/overlay.
     float tracker_font_size;          // Base size for the main trackermap font. Overlay is fixed.
     char ui_font_name[256];           // Filename of the font for ImGui UI (settings, etc.).
-    float ui_font_size;               // Base size for the UI font.
+    float ui_font_size;               // // EXPERIMENTAL: Only changeable in settings.json directly
     char overlay_font_name[256];      // Filename of the font for the overlay.
-    float overlay_font_size; // TODO: Implement later with proper relative spacing (vertical as well)
+    float overlay_font_size; // EXPERIMENTAL: Only changeable in settings.json directly
 
     // --- Window Geometry ---
     WindowRect tracker_window; // The saved position and size of the main tracker window.

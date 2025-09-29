@@ -1,3 +1,8 @@
+// Copyright (c) 2025 LNXSeus. All Rights Reserved.
+//
+// This project is proprietary software. You are granted a license to use the software as-is.
+// You may not copy, distribute, modify, reverse-engineer, or use this software
+// or its source code in any way without the express written permission of the copyright holder.
 //
 // Created by Linus on 26.06.2025.
 //
@@ -88,12 +93,6 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                         }
                     }
                 }
-            }
-            // TODO: Spacebar probably only used in overlay_events in overlay.cpp
-            // Global hotkey for animation speedup
-            if (event.key.scancode == SDL_SCANCODE_SPACE) {
-                // Spacebar acts as a toggle
-                // app_settings->overlay_animation_speedup = !app_settings->overlay_animation_speedup;
             }
         }
 

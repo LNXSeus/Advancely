@@ -1,3 +1,8 @@
+// Copyright (c) 2025 LNXSeus. All Rights Reserved.
+//
+// This project is proprietary software. You are granted a license to use the software as-is.
+// You may not copy, distribute, modify, reverse-engineer, or use this software
+// or its source code in any way without the express written permission of the copyright holder.
 //
 // Created by Linus on 27.06.2025.
 //
@@ -215,7 +220,7 @@ PathMode settings_get_path_mode_from_string(const char *mode_str) {
 // ------------------- SETTINGS UTILS -------------------
 
 void settings_set_defaults(AppSettings *settings) {
-    // TODO: Make sure to add any new default values here and to the tooltip in settings_render_gui() ---------
+    // Make sure to add any new default values here and to the tooltip in settings_render_gui()
     // Set safe defaults first -> defined in settings_utils.h
     strncpy(settings->version_str, DEFAULT_VERSION, sizeof(settings->version_str) - 1);
     settings->version_str[sizeof(settings->version_str) - 1] = '\0';

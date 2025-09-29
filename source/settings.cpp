@@ -1,3 +1,8 @@
+// Copyright (c) 2025 LNXSeus. All Rights Reserved.
+//
+// This project is proprietary software. You are granted a license to use the software as-is.
+// You may not copy, distribute, modify, reverse-engineer, or use this software
+// or its source code in any way without the express written permission of the copyright holder.
 //
 // Created by Linus on 26.06.2025.
 //
@@ -1147,7 +1152,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "A restart is required to properly apply changes.");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
-    // TODO: Implement later with proper relative spacing, just need to enable setting again
+    // Font size change only possible through settings.json directly -> EXPERIMENTAL
     // ImGui::DragFloat("Tracker Font Size", &temp_settings.tracker_font_size, 0.5f, 8.0f, 72.0f, "%.1f");
 
     // --- Overlay Font ---
@@ -1189,7 +1194,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "A restart is required to properly apply changes.");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
-    // TODO: Implement later with proper relative spacing, just need to enable setting again
+    // Font size change only possible through settings.json directly -> EXPERIMENTAL
     // ImGui::DragFloat("Settings Font Size", &temp_settings.ui_font_size, 0.5f, 8.0f, 72.0f, "%.1f");
 
     // --- Restart Warning ---
@@ -1593,7 +1598,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "Resets all settings (besides window size/position & hotkeys) in this window to their default values.\n"
                  "This does not modify your template files.\n\n"
                  "Defaults:\n"
-                 "  - Path Mode: Auto-Detect\n"
+                 "  - Path Mode: Auto-Detect Default Saves Path\n"
                  "  - Version: %s\n"
                  "  - Category: %s\n"
                  "  - Optional Flag: %s\n"

@@ -1,3 +1,10 @@
+# Copyright (c) 2025 LNXSeus. All Rights Reserved.
+#
+# This project is proprietary software. You are granted a license to use the software as-is.
+# You may not copy, distribute, modify, reverse-engineer, or use this software
+# or its source code in any way without the express written permission of the copyright holder.
+
+
 # Minimum CMake version required
 cmake_minimum_required(VERSION 3.20)
 
@@ -258,8 +265,8 @@ if (MSVC)
             /wd4458 # Disable "hides class member" warning
             /wd4101 # Disable "unreferenced local variable" warning
             /wd4505 # Disable "unreferenced function" warning
-            /wd4132
-            /wd4127
+            /wd4132 # Disable "'object': const object should be initialized" warning
+            /wd4127 # Disable "conditional expression is constant" warning
     )
 else ()
     # Apply GCC/Clang-specific warning flags
@@ -321,17 +328,3 @@ if (UNIX AND NOT APPLE)
     install(FILES "resources/gui/Advancely_Logo_NoText_512_Linux.png" DESTINATION share/icons/hicolor/512x512/apps RENAME advancely.png)
     install(FILES "packaging/linux/dev.LNXSeus.Advancely.metainfo.xml" DESTINATION share/metainfo)
 endif ()
-
-## --- CPack Configuration for creating a .deb package ---
-#set(CPACK_GENERATOR "DEB")
-#set(CPACK_PACKAGE_NAME "advancely")
-#set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}") # version directly from main.h
-#set(CPACK_PACKAGE_VENDOR "LNXSeus")
-#set(CPACK_DEBIAN_PACKAGE_MAINTAINER "LNXSeus <https://youtube.com/@lnxs>")
-#set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A highly customizable and interactive tool to track your Minecraft progress beyond just Advancements.")
-#set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/LNXSeus/Advancely")
-#
-## This is important: it lists the runtime libraries the .deb package depends on
-#set(CPACK_DEBIAN_PACKAGE_DEPENDS "libsdl3-0 (>= 3.0.0), libcurl4 (>= 7.68)")
-#
-#include(CPack)

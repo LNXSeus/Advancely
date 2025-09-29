@@ -1,3 +1,8 @@
+// Copyright (c) 2025 LNXSeus. All Rights Reserved.
+//
+// This project is proprietary software. You are granted a license to use the software as-is.
+// You may not copy, distribute, modify, reverse-engineer, or use this software
+// or its source code in any way without the express written permission of the copyright holder.
 //
 // Created by Linus on 24.06.2025.
 //
@@ -19,7 +24,7 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
     }
 
     // First create without he ALWAYS_ON_TOP flag
-    Uint32 window_flags = SDL_WINDOW_RESIZABLE; // TODO: SDL_WINDOW_HIGH_PIXEL_DENSITY was there
+    Uint32 window_flags = SDL_WINDOW_RESIZABLE;
 
     // Use loaded settings for window creation, with SDL_WINDOWPOS_CENTERED as a fallback
     int x = (settings->tracker_window.x == DEFAULT_WINDOW_POS)
@@ -53,7 +58,7 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
     // Set position after creation to handle multi-monitor setups better
     SDL_SetWindowPosition(t->window, x, y);
 
-    // DEBUG: Print the value being set at initialization
+    // Print the value being set at initialization
     log_message(LOG_INFO, "[INIT SDL] Settings initial AlwaysOnTop state to: %s\n",
                 settings->tracker_always_on_top ? "true" : "false");
 

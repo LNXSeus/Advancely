@@ -1,3 +1,8 @@
+// Copyright (c) 2025 LNXSeus. All Rights Reserved.
+//
+// This project is proprietary software. You are granted a license to use the software as-is.
+// You may not copy, distribute, modify, reverse-engineer, or use this software
+// or its source code in any way without the express written permission of the copyright holder.
 //
 // Created by Linus on 24.08.2025.
 //
@@ -21,7 +26,7 @@ void log_set_settings(const AppSettings *settings) {
     g_app_settings = settings;
 }
 
-void log_init(void) {
+void log_init() {
     // Open the log file in write mode to clear it on each startup
     log_file = fopen("advancely_log.txt", "w");
     if (log_file == nullptr) {
@@ -30,7 +35,7 @@ void log_init(void) {
     }
 
     // Add a timestamp to the log file
-    time_t now = time(0);
+    const time_t now = time(nullptr);
     char time_buf[64];
     strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", localtime(&now));
     fprintf(log_file, "Advancely Log - %s\n", time_buf);

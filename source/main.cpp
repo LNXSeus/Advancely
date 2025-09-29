@@ -1,3 +1,8 @@
+// Copyright (c) 2025 LNXSeus. All Rights Reserved.
+//
+// This project is proprietary software. You are granted a license to use the software as-is.
+// You may not copy, distribute, modify, reverse-engineer, or use this software
+// or its source code in any way without the express written permission of the copyright holder.
 //
 // Created by Linus on 24.06.2025.
 //
@@ -676,7 +681,6 @@ int main(int argc, char *argv[]) {
             return 1;
         }
 
-        // TODO: Could also do FILE_MAP_READ
         overlay->h_map_file = OpenFileMappingA(FILE_MAP_ALL_ACCESS, FALSE, SHARED_MEM_NAME);
         overlay->p_shared_data = (SharedData *) MapViewOfFile(overlay->h_map_file, FILE_MAP_ALL_ACCESS, 0, 0,
                                                               sizeof(SharedData));

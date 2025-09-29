@@ -1,3 +1,8 @@
+// Copyright (c) 2025 LNXSeus. All Rights Reserved.
+//
+// This project is proprietary software. You are granted a license to use the software as-is.
+// You may not copy, distribute, modify, reverse-engineer, or use this software
+// or its source code in any way without the express written permission of the copyright holder.
 //
 // Created by Linus on 24.06.2025.
 //
@@ -50,7 +55,7 @@ const char* get_notes_manifest_path();
 #define TRACKER_TITLE "Advancely"
 
 // This is the version that gets compared with the latest release tag on GitHub
-#define ADVANCELY_VERSION "v0.9.306" // vMAJOR.MINOR.PATCH // TODO: Update this always, SAME FORMAT ON RELEASE TAG!
+#define ADVANCELY_VERSION "v0.9.307" // vMAJOR.MINOR.PATCH // TODO: Update this always, SAME FORMAT ON RELEASE TAG!
 // Starting from /gui folder
 #define ADVANCELY_ICON_PATH "/gui/Advancely_Logo_NoText.png"
 // Starting from /gui folder

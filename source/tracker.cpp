@@ -1,3 +1,8 @@
+// Copyright (c) 2025 LNXSeus. All Rights Reserved.
+//
+// This project is proprietary software. You are granted a license to use the software as-is.
+// You may not copy, distribute, modify, reverse-engineer, or use this software
+// or its source code in any way without the express written permission of the copyright holder.
 //
 // Created by Linus on 24.06.2025.
 //
@@ -460,8 +465,7 @@ static void tracker_snapshot_legacy_stats(Tracker *t, const AppSettings *setting
     // SAVE TO SNAPSHOT FILE
     tracker_save_snapshot_to_file(t);
 
-    // TODO: DEBUGGING CODE TO PRINT WHAT THE SNAPSHOT LOOKS LIKE
-    // --- ADD THIS EXPANDED DEBUGGING CODE ---
+    // ---- DEBUGGING CODE TO PRINT WHAT THE SNAPSHOT LOOKS LIKE ----
     log_message(LOG_INFO, "\n--- STARTING SNAPSHOT FOR WORLD: %s ---\n", t->template_data->snapshot_world_name);
 
     // Re-load the JSON file just for this debug print (this is inefficient but simple for debugging)
@@ -2470,6 +2474,7 @@ void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
     cJSON_Delete(settings_json);
 }
 
+// UNUSED
 void tracker_render(Tracker *t, const AppSettings *settings) {
     (void) t;
     (void) settings;
