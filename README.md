@@ -64,8 +64,9 @@ sharp._
 
 ## Core Features
 
-* **Automatic Instance Tracking**: For users of **Prism Launcher** or **MultiMC**, Advancely can automatically detect
-  which instance you are actively playing and track it even if multiple instances are open at once. It intelligently
+* **Automatic Instance Tracking**: For users of a custom launcher like **Prism Launcher**, **MultiMC** etc., Advancely
+  can automatically detect which instance you are actively playing and track it even if multiple instances are open at
+  once. It intelligently
   selects the instance you last interacted with. Find out
   more [here](https://github.com/LNXSeus/Advancely#the-settings-window-esc)
 * **Interactive Map View**: The main tracker window is an interactive map where you can pan by holding `Right-Click` or
@@ -160,7 +161,8 @@ files on Linux), and the `resources` folder. The executable must always stay in 
 
 Launch Advancely by running the executable (or the shortcut you created). On its first run, it will default to finding
 your most recently played world from the standard Minecraft installation. To begin customizing, press the `ESC` key to
-open the settings window, where you can switch to `Auto-Track Active Instance` if you use Prism Launcher or MultiMC.
+open the settings window, where you can switch to `Auto-Track Active Instance` if you use Prism Launcher, MultiMC or
+some other custom launcher.
 
 ***
 
@@ -425,11 +427,11 @@ lists of game data to assist you in building the perfect template.
 The true power of Advancely lies in its deep customization. Every feature can be configured in real-time from the
 settings window, which can be opened at any time by pressing the `ESC` key.
 
-![Settings_Window](readme_assets/v0.9.286_Settings_Window.png)
+![Settings_Window](readme_assets/v0.9.299_Settings_Window.png)
 
 | Setting Group         | Options & Features                                                                                                                                                                                                                                                                                                                                                                                                                         |
 |:----------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Path Settings**     | Choose how Advancely finds your saves. `Auto-Detect` finds the default Minecraft path. `Track Custom Saves Folder` lets you specify a manual path. `Auto-Track Active Instance` automatically finds and follows the instance you are playing from **Prism Launcher** or **MultiMC**. The `Open Instances Folder` button helps you quickly navigate to your launcher's instance directory.                                                                  |
+| **Path Settings**     | Choose how Advancely finds your saves. `Auto-Detect` finds the default Minecraft path. `Track Custom Saves Folder` lets you specify a manual path. `Auto-Track Active Instance` automatically finds and follows the instance you are playing from **Prism Launcher**, **MultiMC** etc.. The `Open Instances Folder` button helps you quickly navigate to your launcher's instance directory.                                               |
 | **Template Settings** | Select the `Version`, `Category`, `Optional Flag`, and `Language` to load a specific ruleset. You can also use the `Open Template Folder` button for quick access to the files on your disk.                                                                                                                                                                                                                                               |
 | **General Settings**  | Toggle the stream `Overlay`, set the `Tracker FPS Limit`, keep the tracker `Always On Top`, and enable `Using StatsPerWorld Mod` compatibility for legacy Minecraft versions (1.0 - 1.6.4).                                                                                                                                                                                                                                                |
 | **Goal Visibility**   | Fine-tune which completed goals are displayed on the tracker with three modes: `Hide All Completed` (strictest), `Hide Template-Hidden Only`, or `Show All`.                                                                                                                                                                                                                                                                               |
