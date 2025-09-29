@@ -47,7 +47,7 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
         log_message(LOG_INFO, "[INIT SDL] Tracker window icon set to %s\n", icon_path);
         log_message(LOG_INFO, "[INIT SDL] Tracker window icon size: %dx%d\n", icon_surface->w, icon_surface->h);
     } else {
-        log_message(LOG_ERROR, "[INIT SDL] Failed to load tracker window icon: %s\n", SDL_GetError());
+        log_message(LOG_ERROR, "[INIT SDL] Failed to load tracker window icon (asure path contains only standard English (ASCII) characters): %s\n", SDL_GetError());
     }
 
     // Set position after creation to handle multi-monitor setups better

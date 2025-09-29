@@ -121,8 +121,16 @@ your operating system. The `vX.X.X` is the Advancely version, that is also displ
 
 To ensure the application works correctly, please follow the instructions for your operating system.
 
-Your download contains the Advancely application (`.exe` on Windows, `.app` on macOS, or a binary file on Linux) and a
-`resources` folder. **Both must be kept in the same directory for Advancely to work**.
+> **✔️ Important: Use English-Only (ASCII) File Paths**
+>
+> To prevent errors, please make sure the **entire folder path** to your Advancely application contains **only standard English (ASCII) characters**.
+>
+> Special characters, accents (like `é`, `ü`, `ñ`), or symbols in the file path can cause the tracker to fail when loading templates or watching your save files.
+>
+> * **❌ Bad Path:** `C:\Users\Jörg\Desktop\Spiele\Advancely\`
+> * **✅ Good Path:** `C:\Users\Joerg\Desktop\Games\Advancely\`
+
+Your download contains the Advancely application (`.exe` on Windows, `.app` on macOS, or a binary file on Linux) and a `resources` folder. **Both must be kept in the same directory for Advancely to work**.
 
 **macOS Instructions**
 
@@ -506,9 +514,8 @@ or [create a new issue](https://github.com/LNXSeus/Advancely/issues/new) on GitH
 
 ## Running into Issues?
 
-* **Is Windows Defender blocking the application?**: I've contacted Microsoft so windows defender does not falsely
-  detect Advancely.exe as a virus. So make sure your Windows Defender version is up to date. Get the latest
-  version [here](https://docs.microsoft.com/microsoft-365/security/defender-endpoint/manage-updates-baselines-microsoft-defender-antivirus).
+* **Is Windows Defender blocking the application?**: I've contacted Microsoft so windows defender does not falsely detect Advancely.exe as a virus. So make sure your Windows Defender version is up to date. Get the latest version [here](https://docs.microsoft.com/microsoft-365/security/defender-endpoint/manage-updates-baselines-microsoft-defender-antivirus).
+* **Is the tracker in a path with special characters?**: Ensure the full folder path to `Advancely.exe` (e.g., `C:\Users\Jörg\...`) contains only standard English letters and numbers. Special characters can cause errors when loading files.
 * **Check log file**: First, look into the `advancely_log.txt` file to see if there are any errors that were caused by
   wrong usage of the application. With the `Print Debug To Console` setting enabled, the log file will also contain
   detailed progress updates, not just errors.

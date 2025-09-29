@@ -2293,7 +2293,7 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     snprintf(font_path, sizeof(font_path), "%s/fonts/Minecraft.ttf", get_resources_path());
     t->minecraft_font = TTF_OpenFont(font_path, 24);
     if (!t->minecraft_font) {
-        log_message(LOG_ERROR, "[TRACKER] Failed to load Minecraft font: %s\n", SDL_GetError());
+        log_message(LOG_ERROR, "[TRACKER] Failed to load Minecraft font (asure path contains only standard English (ASCII) characters): %s\n", SDL_GetError());
         tracker_free(tracker, settings);
         return false;
     }

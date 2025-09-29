@@ -6,22 +6,35 @@ Thank you for using Advancely!
 To ensure the application works correctly, please follow the instructions for your operating system.
 
 --------------------------------------------------
+--- For ALL Users: Use English-Only (ASCII) File Paths ---
+--------------------------------------------------
+
+To prevent errors, please make sure the **entire folder path** to your Advancely application contains **only standard English (ASCII) characters**.
+
+Special characters, accents (like `é`, `ü`, `ñ`), or symbols in the file path can cause the tracker to fail when loading templates or watching your save files.
+
+- **BAD Path:** `C:\Users\Jörg\Desktop\Spiele\Advancely\`
+- **GOOD Path:** `C:\Users\Joerg\Desktop\Games\Advancely\`
+
+--------------------------------------------------
 --- For macOS Users ---
 --------------------------------------------------
 
-Your download contains the `Advancely.app` application and a `resources` folder. **Both must be kept in the same directory for the app to work.**
+Your download contains the `Advancely.app` application and a `resources` folder.
+**Both must be kept in the same directory for the app to work.**
 
-Due to macOS security (Gatekeeper), you must run a one-time command before opening the app for the first time. You may see an error saying the application is "damaged" if you skip this step. The app is not damaged.
+Due to macOS security (Gatekeeper), you must run a one-time command before opening the app for the first time.
+You may see an error saying the application is "damaged" if you skip this step. The app is not damaged.
 
 ✔️ **CORRECT WAY TO RUN (First Time):**
 
-1.  Open the **Terminal** app (you can find it in Applications -> Utilities, or search for it with Spotlight).
-2.  Type `xattr -cr ` (note the space at the end) but DO NOT press Enter yet.
-3.  Drag the `Advancely.app` file from Finder and drop it onto the Terminal window.
-4.  The command should now look like this: `xattr -cr /path/to/your/Advancely.app`
-5.  Press **Enter**.
-6.  You can now double-click `Advancely.app` to run it.
-7.  This command only needs to be run once for this copy of the application.
+1. Open the **Terminal** app (you can find it in Applications -> Utilities, or search for it with Spotlight).
+2. Type `xattr -cr ` (note the space at the end) but DO NOT press Enter yet.
+3. Drag the `Advancely.app` file from Finder and drop it onto the Terminal window.
+4. The command should now look like this: `xattr -cr /path/to/your/Advancely.app`
+5. Press **Enter**.
+6. You can now double-click `Advancely.app` to run it.
+7. This command only needs to be run once for this copy of the application.
 
 ✔️ **CORRECT WAY TO INSTALL:**
 
@@ -29,7 +42,8 @@ Due to macOS security (Gatekeeper), you must run a one-time command before openi
 * You can then drag `Advancely.app` from the Applications folder to your Dock to add a shortcut.
 
 ❌ **INCORRECT WAY:**
-DO NOT separate the `Advancely.app` file from its `resources` folder. The application needs the `resources` folder to load settings, templates, icons, and fonts.
+DO NOT separate the `Advancely.app` file from its `resources` folder.
+The application needs the `resources` folder to load settings, templates, icons, and fonts.
 
 --------------------------------------------------
 --- For Windows & Linux Users ---
@@ -41,16 +55,17 @@ Your application folder contains the main executable (`Advancely.exe` or `Advanc
 To run Advancely from another location (like your Desktop), please create a shortcut.
 - **Windows:** Right-click `Advancely.exe` -> "Create shortcut".
 - **Linux:** Right-click `Advancely` -> "Create Link".
-
 You can move this new shortcut or link anywhere you like.
 
 ❌ **INCORRECT WAY:**
 DO NOT move or copy the original executable file by itself.
-It will not be able to find its resources or libraries and will fail to start, run, or save correctly. The executable must always stay in the same folder as its supporting files.
+It will not be able to find its resources or libraries and will fail to start, run, or save correctly.
+The executable must always stay in the same folder as its supporting files.
 
 ==================================================
 TL;DR (Summary)
 ==================================================
 
+- **For ALL Users:** Place the Advancely folder in a path with only English characters (no accents like é, ü, etc.).
 - **On macOS:** Run the one-time Terminal command on `Advancely.app`. Keep the `.app` and `resources` folder together.
 - **On Windows/Linux:** Don't move the executable out of its folder. Create a shortcut/link to it instead.
