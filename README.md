@@ -1,8 +1,6 @@
 ![readme_assets/Advancely_Logo.png](readme_assets/Advancely_Logo.png)
 
-# [**DOWNLOAD ADVANCELY NOW\! (Windows, Linux & macOS (X64 & ARM64), any MC Java Version)
-
-**](https://github.com/LNXSeus/Advancely/releases)
+# [**DOWNLOAD ADVANCELY NOW\! (Windows, Linux & macOS (X64 & ARM64), any MC Java Version)**](https://github.com/LNXSeus/Advancely/releases)
 
 ***
 
@@ -22,7 +20,7 @@
 * [My YouTube](https://www.youtube.com/@lnxs?sub_confirmation=1)
 * [My Twitch](https://www.twitch.tv/lnxseus)
 * [My Twitch Archive + Advancely Devlogs](https://www.youtube.com/@lnxsarchive/playlists?view=1&sort=lad&flow=grid&sub_confirmation=1)
-* [My Discord](https://discord.gg/TyNgXDz)
+* [Official Advancely Discord](https://discord.gg/TyNgXDz)
 * [My GitHub](https://github.com/LNXSeus)
 
 ***
@@ -363,7 +361,7 @@ From the main editor view, you can manage entire template packages:
 * **Import Template**: Imports a full template package from a `.zip` file. You can confirm or change the version,
   category, and flag before the files are added.
 * **Export Template**: Packages the selected template and all its language files into a single `.zip` file, perfect for
-  sharing with others.
+  sharing with others on the [Official Advancely Discord](https://discord.gg/TyNgXDz).
 
 ### Language File Management
 
@@ -507,8 +505,8 @@ non-default languages are appended after `lang_`._
 
 ## You have a feature idea?
 
-Contact me on [Discord @lnxseus](https://discord.gg/TyNgXDz)
-or [create a new issue](https://github.com/LNXSeus/Advancely/issues/new) on GitHub\!
+Suggest it in the [Official Advancely Discord](https://discord.gg/TyNgXDz) within the `📊│advancely-tracker` channel or
+[create a new issue](https://github.com/LNXSeus/Advancely/issues/new) on GitHub\!
 
 ***
 

@@ -2148,7 +2148,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         } else {
             // Exporting
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Export the selected template as a .zip file, including its main file and all language files.");
+                     "Export the selected template as a .zip file, including its main file and all language files.\n\n"
+                     "Feel free to share them on the Official Advancely Discord (discord.gg/TyNgXDz)!");
         }
         ImGui::SetTooltip("%s", tooltip_buffer);
     }

@@ -45,14 +45,14 @@ const char* get_notes_dir_path();
 const char* get_notes_manifest_path();
 
 // Set my own SDL_FLAGS
-#define SDL_FLAGS SDL_INIT_VIDEO // TODO: OR'd together with SDL_INIT_AUDIO
+#define SDL_FLAGS SDL_INIT_VIDEO
 
 #define TRACKER_TITLE "Advancely"
 
 // This is the version that gets compared with the latest release tag on GitHub
-#define ADVANCELY_VERSION "v0.9.305" // vMAJOR.MINOR.PATCH // TODO: Update this always, SAME FORMAT ON RELEASE TAG!
+#define ADVANCELY_VERSION "v0.9.306" // vMAJOR.MINOR.PATCH // TODO: Update this always, SAME FORMAT ON RELEASE TAG!
 // Starting from /gui folder
-#define ADVANCELY_ICON_PATH "/gui/Advancely_Logo_NoText.png" // TODO: Use this in tracker_init_sdl()
+#define ADVANCELY_ICON_PATH "/gui/Advancely_Logo_NoText.png"
 // Starting from /gui folder
 #define ADVANCELY_LOGO_PATH "/gui/Advancely_Logo.png"
 #define ADVANCELY_LOGO_SIZE 512.0f // Logo size on startup message window or update successful window
