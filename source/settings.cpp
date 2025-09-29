@@ -293,8 +293,11 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::EndDisabled();
         // Add a tooltip that only appears when hovering over the disabled button.
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            char open_instance_folder_tooltip_buffer[1024];
+            snprintf(open_instance_folder_tooltip_buffer, sizeof(open_instance_folder_tooltip_buffer),
+                     "A valid saves path must be active to use this feature.\nPlease apply a correct path first.");
             ImGui::SetTooltip(
-                "A valid saves path must be active to use this feature.\nPlease apply a correct path first.");
+                "%s", open_instance_folder_tooltip_buffer);
         }
     } else {
         // This is the original tooltip for when the button is enabled.
