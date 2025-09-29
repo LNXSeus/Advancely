@@ -1,6 +1,8 @@
 ![readme_assets/Advancely_Logo.png](readme_assets/Advancely_Logo.png)
 
-# [**DOWNLOAD ADVANCELY NOW\! (Windows, Linux & macOS (X64 & ARM64), any MC Java Version)**](https://github.com/LNXSeus/Advancely/releases)
+# [**DOWNLOAD ADVANCELY NOW\! (Windows, Linux & macOS (X64 & ARM64), any MC Java Version)
+
+**](https://github.com/LNXSeus/Advancely/releases)
 
 ***
 
@@ -62,6 +64,10 @@ sharp._
 
 ## Core Features
 
+* **Automatic Instance Tracking**: For users of **Prism Launcher** or **MultiMC**, Advancely can automatically detect
+  which instance you are actively playing and track it even if multiple instances are open at once. It intelligently
+  selects the instance you last interacted with. Find out
+  more [here](https://github.com/LNXSeus/Advancely#the-settings-window-esc)
 * **Interactive Map View**: The main tracker window is an interactive map where you can pan by holding `Right-Click` or
   `Middle-Click`, zoom with the `Mouse Wheel`, and lock the layout in place by pressing `SPACE`.
 * **Comprehensive Real-Time Tracking**: Advancely operates in real-time by watching your singleplayer save files for
@@ -152,23 +158,28 @@ files on Linux), and the `resources` folder. The executable must always stay in 
 
 ### 3. Your First Launch
 
-Launch Advancely by running the executable (or the shortcut you created). It will automatically find your most recently
-played singleplayer world and begin displaying your progress in real-time. To begin customizing, press the `ESC` key to
-open the settings window.
+Launch Advancely by running the executable (or the shortcut you created). On its first run, it will default to finding
+your most recently played world from the standard Minecraft installation. To begin customizing, press the `ESC` key to
+open the settings window, where you can switch to `Auto-Track Active Instance` if you use Prism Launcher or MultiMC.
 
 ***
 
-That's a very detailed and important section. The best place to put it is right after the **"Getting Started"** section in your `README.md`.
+That's a very detailed and important section. The best place to put it is right after the **"Getting Started"** section
+in your `README.md`.
 
-New users will read "Getting Started" to get the application running, and the very next thing they should know is how to maintain it and keep it updated. Placing it here ensures they see this crucial information early on.
+New users will read "Getting Started" to get the application running, and the very next thing they should know is how to
+maintain it and keep it updated. Placing it here ensures they see this crucial information early on.
 
-Here is an updated version of the text you provided. I've restructured it for clarity and updated the technical details to accurately reflect the process for all three operating systems, based on the `update_checker.cpp` file.
+Here is an updated version of the text you provided. I've restructured it for clarity and updated the technical details
+to accurately reflect the process for all three operating systems, based on the `update_checker.cpp` file.
 
 ***
 
 ## Download Once, Update Forever
 
-Advancely is designed to be easy to maintain. By default, **the tracker will automatically check for new versions on startup**. When an update is available, you will be notified with a prompt offering to download and install it for you. This process is designed to be as safe as possible for your custom files.
+Advancely is designed to be easy to maintain. By default, **the tracker will automatically check for new versions on
+startup**. When an update is available, you will be notified with a prompt offering to download and install it for you.
+This process is designed to be as safe as possible for your custom files.
 
 ### How the Automatic Update Works
 
@@ -186,25 +197,29 @@ The updater is smart about which files it replaces to ensure your personal confi
 
 ### Protecting Your Modified Official Templates
 
-To prevent losing your work during an automatic update, it's highly recommended to **avoid editing official template files directly**. Instead, use the **Template Editor** to create your own safe-to-edit versions. The correct method depends on the types of changes you want to make.
+To prevent losing your work during an automatic update, it's highly recommended to **avoid editing official template
+files directly**. Instead, use the **Template Editor** to create your own safe-to-edit versions. The correct method
+depends on the types of changes you want to make.
 
 **If you only want to change display names:**
 
-The best approach is to create a new **language file** for the official template. This keeps your custom names separate while still allowing the underlying template structure (the goals, criteria, icons, etc.) to receive official updates.
+The best approach is to create a new **language file** for the official template. This keeps your custom names separate
+while still allowing the underlying template structure (the goals, criteria, icons, etc.) to receive official updates.
 
-1.  Open the **Template Editor** and select the official template you wish to customize.
-2.  In the "Languages" section, select the "Default" language and click **Copy Language**.
-3.  Give your new language a unique flag (e.g., `custom` or `mypack`).
-4.  You can now select your custom language in the main settings, and your display names will be safe from updates.
+1. Open the **Template Editor** and select the official template you wish to customize.
+2. In the "Languages" section, select the "Default" language and click **Copy Language**.
+3. Give your new language a unique flag (e.g., `custom` or `mypack`).
+4. You can now select your custom language in the main settings, and your display names will be safe from updates.
 
 **If you have changed goals, criteria, or icons (core functionality):**
 
-The best approach is to create a complete **copy of the template**. This makes your version fully independent and protects it from being overwritten.
+The best approach is to create a complete **copy of the template**. This makes your version fully independent and
+protects it from being overwritten.
 
-1.  Open the **Template Editor** and select the official template you want to use as a base.
-2.  Click the **Copy Template** button.
-3.  Give your new version a unique name, typically by adding an **Optional Flag** (e.g., `_custom`).
-4.  You can now safely edit your new, independent template in any way you wish.
+1. Open the **Template Editor** and select the official template you want to use as a base.
+2. Click the **Copy Template** button.
+3. Give your new version a unique name, typically by adding an **Optional Flag** (e.g., `_custom`).
+4. You can now safely edit your new, independent template in any way you wish.
 
 Your custom template will appear separately in the template list and will not be touched by the auto-updater.
 
@@ -214,41 +229,57 @@ Your custom template will appear separately in the template list and will not be
 
 ![Tracker_Window](readme_assets/v0.9.286_Tracker_Window.png)
 
-The main window is an interactive canvas where all your tracked goals are displayed. You can freely zoom in and out to rearrange the items in view to suit your needs, making it easy to focus on what matters most for your current run. The order of the sections (advancements, recipes, multi-stage goals, ...) can be configured in the [settings window](https://github.com/LNXSeus/Advancely#The-Settings-Window).
+The main window is an interactive canvas where all your tracked goals are displayed. You can freely zoom in and out to
+rearrange the items in view to suit your needs, making it easy to focus on what matters most for your current run. The
+order of the sections (advancements, recipes, multi-stage goals, ...) can be configured in
+the [settings window](https://github.com/LNXSeus/Advancely#The-Settings-Window).
 
 ### Navigating the Map
 
 You can manipulate the view using several intuitive controls:
+
 * **Pan**: Hold `Right-Click` or `Middle-Click` and drag to move the entire map of goals.
 * **Zoom**: Use the `Mouse Wheel` to zoom in and out, allowing you to see an overview or focus on specific details.
-* **Lock Layout**: Press the `SPACE` key to lock the grid layout. This prevents goals from rearranging when you resize the window, giving you precise control over how many items appear in each row.
-* **Reset Layout**: Click the "Reset Layout" button in the bottom-right corner to instantly reset the pan and zoom to their default positions.
+* **Lock Layout**: Press the `SPACE` key to lock the grid layout. This prevents goals from rearranging when you resize
+  the window, giving you precise control over how many items appear in each row.
+* **Reset Layout**: Click the "Reset Layout" button in the bottom-right corner to instantly reset the pan and zoom to
+  their default positions.
 
 ### Searching & Filtering
 
-To quickly find a specific goal, press `Ctrl+F` (or `Cmd+F` on macOS) to focus the search box in the bottom-right corner. The filter is case-insensitive and intelligently searches across different goal types:
+To quickly find a specific goal, press `Ctrl+F` (or `Cmd+F` on macOS) to focus the search box in the bottom-right
+corner. The filter is case-insensitive and intelligently searches across different goal types:
 
-* **Advancements, Recipes & Statistics**: Shows a category if its main title or any of its sub-criteria/sub-stats match the search term. If only a sub-item matches, it will be the only one shown under its parent.
+* **Advancements, Recipes & Statistics**: Shows a category if its main title or any of its sub-criteria/sub-stats match
+  the search term. If only a sub-item matches, it will be the only one shown under its parent.
 * **Unlocks & Custom Goals**: Shows the goal if its name matches the search term.
-* **Multi-Stage Goals**: Shows the goal if its main title or the text of its *currently active stage* matches the search term.
+* **Multi-Stage Goals**: Shows the goal if its main title or the text of its *currently active stage* matches the search
+  term.
 
 ### The Info Bar
 
 A transparent info bar at the top of the window provides a live summary of your run. It includes:
+
 * **World**: The name of the world currently being tracked.
 * **Run Details**: The Minecraft version, template category, and optional flag you have selected.
-* **Progress**: The main advancement/achievement counter and the overall completion percentage, which includes every single sub-task from all categories (recipes, criteria, stats, etc.).
+* **Progress**: The main advancement/achievement counter and the overall completion percentage, which includes every
+  single sub-task from all categories (recipes, criteria, stats, etc.).
 * **IGT**: The total in-game time for the current world, read directly from the stats file.
 * **Update Timer**: A timer showing how long it has been since the game last saved its files.
 
 ### The Notes Window
 
-A powerful notes editor can be toggled via the "Notes" button in the bottom-right corner. All text is saved instantly as you type. The notes system has two distinct modes, which can be changed from within the notes window:
+A powerful notes editor can be toggled via the "Notes" button in the bottom-right corner. All text is saved instantly as
+you type. The notes system has two distinct modes, which can be changed from within the notes window:
 
-* **Per-World Mode (Default)**: Notes are saved for each world individually. This is perfect for keeping track of world-specific information like coordinates or To-Do lists. The tracker automatically remembers the notes for your last 32 played worlds.
-* **Per-Template Mode**: Notes are tied directly to the loaded template. This is useful for storing general strategies or information that applies to every run using that specific template.
+* **Per-World Mode (Default)**: Notes are saved for each world individually. This is perfect for keeping track of
+  world-specific information like coordinates or To-Do lists. The tracker automatically remembers the notes for your
+  last 32 played worlds.
+* **Per-Template Mode**: Notes are tied directly to the loaded template. This is useful for storing general strategies
+  or information that applies to every run using that specific template.
 
-The notes window also supports live-reloading (if you edit the `.txt` file externally, the window updates instantly) and allows you to switch to the UI font for improved readability.
+The notes window also supports live-reloading (if you edit the `.txt` file externally, the window updates instantly) and
+allows you to switch to the UI font for improved readability.
 
 ***
 
@@ -258,116 +289,156 @@ The notes window also supports live-reloading (if you edit the `.txt` file exter
 _This animation here is compressed. When you use the overlay the framerate will be higher and the resolution perfectly
 sharp._
 
-Advancely includes a dedicated, customizable window perfect for showing your progress to viewers. It's an animated, real-time display that you can easily add to your stream layout.
+Advancely includes a dedicated, customizable window perfect for showing your progress to viewers. It's an animated,
+real-time display that you can easily add to your stream layout.
 
 ### Setup in OBS (or other streaming software)
 
-1.  **Enable the Overlay**: In Advancely's settings (`ESC`), check the `Enable Overlay` box and click `Apply Settings` or hit `ENTER`. A new `Advancely Overlay` window will appear.
-2.  **Add a Source**: In your streaming software (like OBS), add a new `Game Capture` source on Windows or Linux and a `Window Capture` source on macOS.
-3.  **Select the Window**: Choose the `[Advancely.exe]: Advancely Overlay` window from the list.
-4.  **Add a Color Key Filter**: Right-click the new source, go to "Filters", and add a "Color Key" filter.
-5.  **Set the Color**: Use the color picker to select the overlay's background color. You can copy the exact HEX code from the Advancely's `Overlay Background Color` setting to ensure a perfect match.
-6.  **Adjust Settings**: For a clean, transparent background, it's recommended to set the **Similarity** to `1` and **Smoothness** to around `210`.
+1. **Enable the Overlay**: In Advancely's settings (`ESC`), check the `Enable Overlay` box and click `Apply Settings` or
+   hit `ENTER`. A new `Advancely Overlay` window will appear.
+2. **Add a Source**: In your streaming software (like OBS), add a new `Game Capture` source on Windows or Linux and a
+   `Window Capture` source on macOS.
+3. **Select the Window**: Choose the `[Advancely.exe]: Advancely Overlay` window from the list.
+4. **Add a Color Key Filter**: Right-click the new source, go to "Filters", and add a "Color Key" filter.
+5. **Set the Color**: Use the color picker to select the overlay's background color. You can copy the exact HEX code
+   from the Advancely's `Overlay Background Color` setting to ensure a perfect match.
+6. **Adjust Settings**: For a clean, transparent background, it's recommended to set the **Similarity** to `1` and *
+   *Smoothness** to around `210`.
 
-> **Important for Streamers:** Applying any changes in Advancely's settings will restart the overlay window. You may need to re-select the window in your capture source properties afterward.
+> **Important for Streamers:** Applying any changes in Advancely's settings will restart the overlay window. You may
+> need to re-select the window in your capture source properties afterward.
 
 ### Overlay Layout Explained
 
 The overlay is organized into three horizontally scrolling rows, each dedicated to different types of goals:
 
-* **Row 1 (Top)**: This row displays the icons of the smallest sub-tasks. It shows the individual criteria for advancements/recipes and the sub-stats for complex stat goals.
+* **Row 1 (Top)**: This row displays the icons of the smallest sub-tasks. It shows the individual criteria for
+  advancements/recipes and the sub-stats for complex stat goals.
 * **Row 2 (Middle)**: This row shows the main parent goals, such as primary advancements, recipes, and unlocks.
 * **Row 3 (Bottom)**: This row is for all other goal types, including statistics, custom goals, and multi-stage goals.
 
 ### Customization
 
 Nearly every aspect of the overlay can be tailored to your liking from the settings window:
-* **Speed & Direction**: Adjust the `Overlay Scroll Speed`. A positive value scrolls left-to-right, while a negative value scrolls right-to-left. A value of 0 makes the items static.
-* **Animation**: Set the `Overlay FPS Limit` and toggle the `Speed Up Animation` option. You can also temporarily speed up the animation by holding `SPACE` while the overlay window is focused.
-* **Stat Cycling**: For multi-stat goals, you can set the `Sub-Stat Cycle Interval` to control how frequently the overlay cycles through displaying each sub-stat.
-* **Visibility**: Choose whether to hide completed goals from Row 3, and toggle the visibility of each section of the top info bar (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`).
+
+* **Speed & Direction**: Adjust the `Overlay Scroll Speed`. A positive value scrolls left-to-right, while a negative
+  value scrolls right-to-left. A value of 0 makes the items static.
+* **Animation**: Set the `Overlay FPS Limit` and toggle the `Speed Up Animation` option. You can also temporarily speed
+  up the animation by holding `SPACE` while the overlay window is focused.
+* **Stat Cycling**: For multi-stat goals, you can set the `Sub-Stat Cycle Interval` to control how frequently the
+  overlay cycles through displaying each sub-stat.
+* **Visibility**: Choose whether to hide completed goals from Row 3, and toggle the visibility of each section of the
+  top info bar (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`).
 * **Alignment**: The main progress text at the top of the overlay can be aligned to the `Left`, `Center`, or `Right`.
 
 ***
 
 ## The Template Editor (`ESC` ▶ Edit Templates)
 
-This is the heart of Advancely's customization. The in-app editor gives you complete control to define, modify, and share the rulesets or `templates` that the tracker uses. You can access it by opening the settings (`ESC`) and clicking the `Edit Templates` button.
+This is the heart of Advancely's customization. The in-app editor gives you complete control to define, modify, and
+share the rulesets or `templates` that the tracker uses. You can access it by opening the settings (`ESC`) and clicking
+the `Edit Templates` button.
 
 ![Template_Editor](readme_assets/v0.9.286_Template_Editor.png)
 
 ### Template Management
 
 From the main editor view, you can manage entire template packages:
-* **Create New Template**: Builds a new, empty template from scratch for the selected version. You provide a unique `Category Name` and an `Optional Flag`.
-* **Copy Template**: Duplicates an existing template, including all its language files. This is the perfect starting point for creating a variation of a complex template.
+
+* **Create New Template**: Builds a new, empty template from scratch for the selected version. You provide a unique
+  `Category Name` and an `Optional Flag`.
+* **Copy Template**: Duplicates an existing template, including all its language files. This is the perfect starting
+  point for creating a variation of a complex template.
 * **Delete Template**: Permanently removes a template and all of its associated language **and notes files**.
-* **Import Template**: Imports a full template package from a `.zip` file. You can confirm or change the version, category, and flag before the files are added.
-* **Export Template**: Packages the selected template and all its language files into a single `.zip` file, perfect for sharing with others.
+* **Import Template**: Imports a full template package from a `.zip` file. You can confirm or change the version,
+  category, and flag before the files are added.
+* **Export Template**: Packages the selected template and all its language files into a single `.zip` file, perfect for
+  sharing with others.
 
 ### Language File Management
 
-Each template can have multiple language files for localization. The editor allows you to manage these for any selected template:
-* **Create Language**: Creates a new, blank language file. Display names will initially default to their internal root names.
+Each template can have multiple language files for localization. The editor allows you to manage these for any selected
+template:
+
+* **Create Language**: Creates a new, blank language file. Display names will initially default to their internal root
+  names.
 * **Copy Language**: Duplicates an existing language file to a new one, preserving all translations.
 * **Delete Language**: Removes a specific language file (you cannot delete the default `_lang.json`).
-* **Import/Export Language**: Import a single `.json` language file from an external source or open the folder containing the selected language file to export it.
+* **Import/Export Language**: Import a single `.json` language file from an external source or open the folder
+  containing the selected language file to export it.
 
 ### Editing a Template
 
 Opening a template reveals a tabbed interface where you can define every goal.
 
-> **Important**: For GIFs to work correctly, they must be unoptimized with all frame data intact. You can prepare any GIF by uploading it to [**ezgif.com/maker**](https://ezgif.com/maker), selecting the **"Don't Stack Frames"** option, and exporting the result.
+> **Important**: For GIFs to work correctly, they must be unoptimized with all frame data intact. You can prepare any
+> GIF by uploading it to [**ezgif.com/maker**](https://ezgif.com/maker), selecting the **"Don't Stack Frames"** option,
+> and exporting the result.
 
-* **Advancements & Recipes**: List all achievements or advancements you want to track. Each entry has a `Root Name` (the in-game ID, e.g., `minecraft:story/mine_stone`), a `Display Name`, and an `Icon Path`. You can also add `Criteria` to track sub-tasks, and a checkbox designates an entry as a `Recipe` to sort it into its own section and move it to the percentage progress calculation instead.
+* **Advancements & Recipes**: List all achievements or advancements you want to track. Each entry has a `Root Name` (the
+  in-game ID, e.g., `minecraft:story/mine_stone`), a `Display Name`, and an `Icon Path`. You can also add `Criteria` to
+  track sub-tasks, and a checkbox designates an entry as a `Recipe` to sort it into its own section and move it to the
+  percentage progress calculation instead.
 * **Statistics**: Track any in-game statistic.
-    * **Simple Stats**: A single goal with a `Target` value (e.g., track "Blocks Mined" until a goal of 10,000 is reached).
-    * **Multi-Stat Categories**: Group related stats under one parent icon. Each `Sub-Stat` has its own name, icon, and target, and will cycle on the stream overlay.
-* **Unlocks**: For the `25w14craftmine` snapshot, this tab allows you to track the completion of player unlocks like `minecraft:exploration`.
-* **Custom Goals & Counters**: Create goals for things that can't be automatically tracked. The "Target Goal" value defines its behavior:
+    * **Simple Stats**: A single goal with a `Target` value (e.g., track "Blocks Mined" until a goal of 10,000 is
+      reached).
+    * **Multi-Stat Categories**: Group related stats under one parent icon. Each `Sub-Stat` has its own name, icon, and
+      target, and will cycle on the stream overlay.
+* **Unlocks**: For the `25w14craftmine` snapshot, this tab allows you to track the completion of player unlocks like
+  `minecraft:exploration`.
+* **Custom Goals & Counters**: Create goals for things that can't be automatically tracked. The "Target Goal" value
+  defines its behavior:
     * `0`: A simple on/off toggle (manual checklist item).
     * `>0`: A progress-based counter that completes when the target is reached.
     * `-1`: An infinite counter with no completion state.
-* **Multi-Stage Goals**: Design complex, sequential objectives. Each goal has a parent name and icon, and a list of `Stages`. Each stage is a smaller goal that must be completed in order. A stage's `Type` determines its trigger:
-    * **Stat/Achievement**: Triggers when a specific stat reaches its target or an achievement is earned (read from the `stats` folder).
+* **Multi-Stage Goals**: Design complex, sequential objectives. Each goal has a parent name and icon, and a list of
+  `Stages`. Each stage is a smaller goal that must be completed in order. A stage's `Type` determines its trigger:
+    * **Stat/Achievement**: Triggers when a specific stat reaches its target or an achievement is earned (read from the
+      `stats` folder).
     * **Advancement**: Triggers when a specific advancement or recipe is earned (read from the `advancements` folder).
-    * **Criterion**: Triggers when a specific *sub-criterion* of a parent advancement is met (e.g., visiting a single biome for "Adventuring Time").
+    * **Criterion**: Triggers when a specific *sub-criterion* of a parent advancement is met (e.g., visiting a single
+      biome for "Adventuring Time").
     * **Unlock**: Triggers when a specific player unlock is obtained (read from the `unlocks` folder).
     * **Final**: The mandatory last stage that completes the entire multi-stage goal.
 
 ### Importing from Game Files
 
-To save you from manually typing hundreds of root names, nearly every editor tab has an **"Import..."** button. This powerful feature allows you to:
+To save you from manually typing hundreds of root names, nearly every editor tab has an **"Import..."** button. This
+powerful feature allows you to:
 
-1.  Click the button (e.g., "Import Advancements").
-2.  Select a player data file (`.json` or `.dat`) from one of your world saves.
-3.  A popup will appear with a searchable list of every single advancement, stat, or unlock present in that file.
-4.  Simply check the boxes for the items you want to add to your template and confirm. They will be instantly added, ready for you to assign icons and display names.
+1. Click the button (e.g., "Import Advancements").
+2. Select a player data file (`.json` or `.dat`) from one of your world saves.
+3. A popup will appear with a searchable list of every single advancement, stat, or unlock present in that file.
+4. Simply check the boxes for the items you want to add to your template and confirm. They will be instantly added,
+   ready for you to assign icons and display names.
 
 ### The Help Button
 
-If you need help finding the correct root name for an item or want to see examples, click the "Help" button in the editor. This will open the `resources/reference_files` folder, which contains guides, examples, and version-specific lists of game data to assist you in building the perfect template.
+If you need help finding the correct root name for an item or want to see examples, click the "Help" button in the
+editor. This will open the `resources/reference_files` folder, which contains guides, examples, and version-specific
+lists of game data to assist you in building the perfect template.
 
 ***
 
 ## The Settings Window (`ESC`)
 
-The true power of Advancely lies in its deep customization. Every feature can be configured in real-time from the settings window, which can be opened at any time by pressing the `ESC` key.
+The true power of Advancely lies in its deep customization. Every feature can be configured in real-time from the
+settings window, which can be opened at any time by pressing the `ESC` key.
 
 ![Settings_Window](readme_assets/v0.9.286_Settings_Window.png)
 
-| Setting Group | Options & Features                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| :--- |:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Path Settings** | `Auto-Detect` the default Minecraft saves path (default launcher) for your OS or specify a `Manual` path if you use a custom launcher. The `Open Instances Folder` button navigates up three directories from your saves path, making it easy to switch between launcher instances.                                                                                                                                                        |
+| Setting Group         | Options & Features                                                                                                                                                                                                                                                                                                                                                                                                                         |
+|:----------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Path Settings**     | Choose how Advancely finds your saves. `Auto-Detect` finds the default Minecraft path. `Track Custom Saves Folder` lets you specify a manual path. `Auto-Track Active Instance` automatically finds and follows the instance you are playing from **Prism Launcher** or **MultiMC**. The `Open Instances Folder` button helps you quickly navigate to your launcher's instance directory.                                                                  |
 | **Template Settings** | Select the `Version`, `Category`, `Optional Flag`, and `Language` to load a specific ruleset. You can also use the `Open Template Folder` button for quick access to the files on your disk.                                                                                                                                                                                                                                               |
-| **General Settings** | Toggle the stream `Overlay`, set the `Tracker FPS Limit`, keep the tracker `Always On Top`, and enable `Using StatsPerWorld Mod` compatibility for legacy Minecraft versions (1.0 - 1.6.4).                                                                                                                                                                                                                                                |
-| **Goal Visibility** | Fine-tune which completed goals are displayed on the tracker with three modes: `Hide All Completed` (strictest), `Hide Template-Hidden Only`, or `Show All`.                                                                                                                                                                                                                                                                               |
-| **Visual Settings** | Full RGBA color customization for the tracker `background` and `text`, as well as the overlay `background` and `text`. You can also adjust the `Overlay Width` with a pixel-perfect slider.                                                                                                                                                                                                                                                |
-| **Font Settings** | Independently set the font for the **Tracker**, **Overlay**, and **UI (Settings/Notes)**. Both `.ttf` and `.otf` font files are supported. *Note: Changes to the Tracker and UI fonts require an application restart to take effect.*                                                                                                                                                                                                      |
-| **Overlay Settings** | Set the `Overlay FPS Limit` independently from the tracker. Configure the `Overlay Scroll Speed` (negative values reverse the direction), the `Sub-Stat Cycle Interval` for multi-stat animations, and toggle a constant `Speed Up Animation`. You can also align the top progress text (`Left`, `Center`, or `Right`) and toggle visibility for each section of the info bar (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`). |
-| **Hotkey Settings** | This section appears if your template contains custom counters. Assign keyboard hotkeys to increment or decrement any counter (hotkeys only work when the tracker window is focused).                                                                                                                                                                                                                                                      |
-| **Section Order** | Drag and drop the section names (`Advancements`, `Stats`, `Unlocks`, etc.) to reorder how they appear in the main tracker window.                                                                                                                                                                                                                                                                                                          |
-| **Debug Settings** | Toggle `Print Debug To Console` for detailed status updates in your terminal or `advancely_log.txt`, `Auto-Check for Updates` on startup or `Restart Advancely` to perform a full automatic restart of Advancely, which is needed for some font settings to take effect.                                                                                                                                                                   |
+| **General Settings**  | Toggle the stream `Overlay`, set the `Tracker FPS Limit`, keep the tracker `Always On Top`, and enable `Using StatsPerWorld Mod` compatibility for legacy Minecraft versions (1.0 - 1.6.4).                                                                                                                                                                                                                                                |
+| **Goal Visibility**   | Fine-tune which completed goals are displayed on the tracker with three modes: `Hide All Completed` (strictest), `Hide Template-Hidden Only`, or `Show All`.                                                                                                                                                                                                                                                                               |
+| **Visual Settings**   | Full RGBA color customization for the tracker `background` and `text`, as well as the overlay `background` and `text`. You can also adjust the `Overlay Width` with a pixel-perfect slider.                                                                                                                                                                                                                                                |
+| **Font Settings**     | Independently set the font for the **Tracker**, **Overlay**, and **UI (Settings/Notes)**. Both `.ttf` and `.otf` font files are supported. *Note: Changes to the Tracker and UI fonts require an application restart to take effect.*                                                                                                                                                                                                      |
+| **Overlay Settings**  | Set the `Overlay FPS Limit` independently from the tracker. Configure the `Overlay Scroll Speed` (negative values reverse the direction), the `Sub-Stat Cycle Interval` for multi-stat animations, and toggle a constant `Speed Up Animation`. You can also align the top progress text (`Left`, `Center`, or `Right`) and toggle visibility for each section of the info bar (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`). |
+| **Hotkey Settings**   | This section appears if your template contains custom counters. Assign keyboard hotkeys to increment or decrement any counter (hotkeys only work when the tracker window is focused).                                                                                                                                                                                                                                                      |
+| **Section Order**     | Drag and drop the section names (`Advancements`, `Stats`, `Unlocks`, etc.) to reorder how they appear in the main tracker window.                                                                                                                                                                                                                                                                                                          |
+| **Debug Settings**    | Toggle `Print Debug To Console` for detailed status updates in your terminal or `advancely_log.txt`, `Auto-Check for Updates` on startup or `Restart Advancely` to perform a full automatic restart of Advancely, which is needed for some font settings to take effect.                                                                                                                                                                   |
 
 ***
 

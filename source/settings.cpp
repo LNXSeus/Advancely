@@ -288,7 +288,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             snprintf(open_instance_folder_tooltip_buffer, sizeof(open_instance_folder_tooltip_buffer),
                      "IMPORTANT: If you just changed your saves path you'll need to hit 'Apply Settings' first.\n"
                      "Attempts to open the parent 'instances' folder (goes up 3 directories from your saves path).\n"
-                     "Useful for quickly switching between instances in custom launchers.");
+                     "Useful for quickly switching between instances in custom launchers or navigating the game files.");
             ImGui::SetTooltip(
                 "%s", open_instance_folder_tooltip_buffer);
         }

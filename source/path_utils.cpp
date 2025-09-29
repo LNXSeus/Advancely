@@ -153,7 +153,6 @@ static uint64_t get_latest_modification_time(const char *dir_path) {
 static bool get_active_instance_saves_path(char *out_path, size_t max_len) {
     std::vector<std::string> candidate_saves_paths;
 #ifdef _WIN32
-    log_message(LOG_ERROR, "[DEBUG] Starting active instance scan for Windows...\n");
     HANDLE h_process_snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (h_process_snap == INVALID_HANDLE_VALUE) return false;
 
@@ -163,7 +162,6 @@ static bool get_active_instance_saves_path(char *out_path, size_t max_len) {
     if (Process32First(h_process_snap, &pe32)) {
         do {
             if (stricmp(pe32.szExeFile, "javaw.exe") == 0 || stricmp(pe32.szExeFile, "java.exe") == 0) {
-                log_message(LOG_ERROR, "[DEBUG] Found javaw.exe/java.exe process with PID: %lu\n", pe32.th32ProcessID);
                 HANDLE h_process = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
                 if (h_process == nullptr) continue;
 
@@ -251,7 +249,6 @@ static bool get_active_instance_saves_path(char *out_path, size_t max_len) {
     CloseHandle(h_process_snap);
 
 #elif __APPLE__
-    log_message(LOG_ERROR, "[DEBUG] Starting active instance scan for macOS...\n");
     pid_t pids[2048];
     int count = proc_listpids(PROC_ALL_PIDS, 0, pids, sizeof(pids));
     if (count > 0) {
@@ -276,7 +273,6 @@ static bool get_active_instance_saves_path(char *out_path, size_t max_len) {
                 free(arg_buf);
                 continue;
             }
-            log_message(LOG_ERROR, "[DEBUG] Found java process with PID: %d\n", pid);
 
             while (p < arg_buf + arg_max && *p) p++;
             while (p < arg_buf + arg_max && !*p) p++;
@@ -297,12 +293,14 @@ static bool get_active_instance_saves_path(char *out_path, size_t max_len) {
 
             if (lib_path_str) {
                 strncpy(instance_path, lib_path_str, sizeof(instance_path) - 1);
+                instance_path[sizeof(instance_path) - 1] = '\0';
                 char *natives_suffix = strstr(instance_path, "/natives");
                 if (natives_suffix && *(natives_suffix + strlen("/natives")) == '\0') {
                     *natives_suffix = '\0';
                 }
             } else if (game_dir_str) {
                 strncpy(instance_path, game_dir_str, sizeof(instance_path) - 1);
+                instance_path[sizeof(instance_path) - 1] = '\0';
             }
 
             if (instance_path[0] != '\0') {
@@ -321,7 +319,6 @@ static bool get_active_instance_saves_path(char *out_path, size_t max_len) {
         }
     }
 #else // Linux
-    log_message(LOG_ERROR, "[DEBUG] Starting active instance scan for Linux...\n");
     DIR *proc_dir = opendir("/proc");
     if (proc_dir) {
         struct dirent *entry;
@@ -340,7 +337,6 @@ static bool get_active_instance_saves_path(char *out_path, size_t max_len) {
             fclose(f);
 
             if (bytes_read == 0 || !strstr(args, "java")) continue;
-            log_message(LOG_ERROR, "[DEBUG] Found java process with PID: %d\n", pid);
 
             char instance_path[MAX_PATH_LENGTH] = {0};
             const char *p = args;
@@ -348,6 +344,7 @@ static bool get_active_instance_saves_path(char *out_path, size_t max_len) {
             while (p < args + bytes_read) {
                 if (strncmp(p, "-Djava.library.path=", 20) == 0) {
                     strncpy(instance_path, p + 20, sizeof(instance_path) - 1);
+                    instance_path[sizeof(instance_path) - 1] = '\0';
                     char *natives_suffix = strstr(instance_path, "/natives");
                     if (natives_suffix && *(natives_suffix + strlen("/natives")) == '\0') {
                         *natives_suffix = '\0';
@@ -364,6 +361,7 @@ static bool get_active_instance_saves_path(char *out_path, size_t max_len) {
                         const char *game_dir = p + strlen(p) + 1;
                         if (game_dir < args + bytes_read) {
                             strncpy(instance_path, game_dir, sizeof(instance_path) - 1);
+                            instance_path[sizeof(instance_path) - 1] = '\0';
                         }
                         break;
                     }
@@ -410,6 +408,7 @@ static bool get_active_instance_saves_path(char *out_path, size_t max_len) {
         return true;
     }
 
+    log_message(LOG_ERROR, "[PATH UTILS] No active instance found.\n");
     return false;
 }
 
