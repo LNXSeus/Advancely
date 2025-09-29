@@ -8,6 +8,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <vector>
+#include <string>
+#include <algorithm>
 
 
 // Platform-specific includes
@@ -85,9 +88,62 @@ static bool get_auto_saves_path(char *out_path, size_t max_len) {
 }
 
 
-// TODO: DEBUGGING
 /**
- * @brief Attempts to find a running Minecraft instance from MultiMC/Prism and get its saves path.
+ * @brief Scans a directory and returns the most recent modification time of any file or subdirectory within it.
+ * @param dir_path The path to the directory to scan.
+ * @return The timestamp of the most recently modified item, or 0 on failure.
+ */
+static uint64_t get_latest_modification_time(const char *dir_path) {
+#ifdef _WIN32
+    char search_path[MAX_PATH_LENGTH];
+    snprintf(search_path, sizeof(search_path), "%s/*", dir_path);
+
+    WIN32_FIND_DATAA find_data;
+    HANDLE h_find = FindFirstFileA(search_path, &find_data);
+    if (h_find == INVALID_HANDLE_VALUE) {
+        return 0;
+    }
+
+    FILETIME latest_time = {0, 0};
+    do {
+        if (strcmp(find_data.cFileName, ".") != 0 && strcmp(find_data.cFileName, "..") != 0) {
+            if (CompareFileTime(&find_data.ftLastWriteTime, &latest_time) > 0) {
+                latest_time = find_data.ftLastWriteTime;
+            }
+        }
+    } while (FindNextFileA(h_find, &find_data) != 0);
+    FindClose(h_find);
+
+    // Convert FILETIME to a single 64-bit integer for easy comparison
+    return ((uint64_t) latest_time.dwHighDateTime << 32) | latest_time.dwLowDateTime;
+#else
+    DIR *dir = opendir(dir_path);
+    if (!dir) {
+        return 0;
+    }
+
+    time_t latest_time = 0;
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != nullptr) {
+        if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+            char full_path[MAX_PATH_LENGTH];
+            snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, entry->d_name);
+            struct stat stat_buf;
+            if (stat(full_path, &stat_buf) == 0) {
+                if (stat_buf.st_mtime > latest_time) {
+                    latest_time = stat_buf.st_mtime;
+                }
+            }
+        }
+    }
+    closedir(dir);
+    return (uint64_t)latest_time;
+#endif
+}
+
+
+/**
+ * @brief Attempts to find the most recently updated running Minecraft instance from MultiMC/Prism and get its saves path.
  * This is a cross-platform function that inspects running processes for launch arguments.
  * It now prioritizes -Djava.library.path and falls back to --gameDir.
  * @param out_path A buffer to store the resulting path.
@@ -95,6 +151,7 @@ static bool get_auto_saves_path(char *out_path, size_t max_len) {
  * @return true if a path was found, false otherwise.
  */
 static bool get_active_instance_saves_path(char *out_path, size_t max_len) {
+    std::vector<std::string> candidate_saves_paths;
 #ifdef _WIN32
     log_message(LOG_ERROR, "[DEBUG] Starting active instance scan for Windows...\n");
     HANDLE h_process_snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -103,529 +160,259 @@ static bool get_active_instance_saves_path(char *out_path, size_t max_len) {
     PROCESSENTRY32 pe32;
     pe32.dwSize = sizeof(PROCESSENTRY32);
 
-    if (!Process32First(h_process_snap, &pe32)) {
-        CloseHandle(h_process_snap);
-        return false;
-    }
+    if (Process32First(h_process_snap, &pe32)) {
+        do {
+            if (stricmp(pe32.szExeFile, "javaw.exe") == 0 || stricmp(pe32.szExeFile, "java.exe") == 0) {
+                log_message(LOG_ERROR, "[DEBUG] Found javaw.exe/java.exe process with PID: %lu\n", pe32.th32ProcessID);
+                HANDLE h_process = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
+                if (h_process == nullptr) continue;
 
-    bool found = false;
-    do {
-        if (stricmp(pe32.szExeFile, "javaw.exe") == 0 || stricmp(pe32.szExeFile, "java.exe") == 0) {
-            log_message(LOG_ERROR, "[DEBUG] Found javaw.exe/java.exe process with PID: %lu\n", pe32.th32ProcessID);
-            HANDLE h_process = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
-            if (h_process == nullptr) continue;
+                PROCESS_BASIC_INFORMATION pbi;
+                if (NtQueryInformationProcess(h_process, ProcessBasicInformation, &pbi, sizeof(pbi), nullptr) >= 0) {
+                    PEB peb;
+                    RTL_USER_PROCESS_PARAMETERS params;
+                    if (ReadProcessMemory(h_process, pbi.PebBaseAddress, &peb, sizeof(peb), nullptr) &&
+                        ReadProcessMemory(h_process, peb.ProcessParameters, &params, sizeof(params), nullptr)) {
+                        wchar_t *cmd_line = (wchar_t *) malloc(params.CommandLine.Length + 2);
+                        if (cmd_line && ReadProcessMemory(h_process, params.CommandLine.Buffer, cmd_line,
+                                                          params.CommandLine.Length, nullptr)) {
+                            cmd_line[params.CommandLine.Length / sizeof(wchar_t)] = L'\0';
 
-            PROCESS_BASIC_INFORMATION pbi;
-            if (NtQueryInformationProcess(h_process, ProcessBasicInformation, &pbi, sizeof(pbi), nullptr) >= 0) {
-                PEB peb;
-                RTL_USER_PROCESS_PARAMETERS params;
-                if (ReadProcessMemory(h_process, pbi.PebBaseAddress, &peb, sizeof(peb), nullptr) &&
-                    ReadProcessMemory(h_process, peb.ProcessParameters, &params, sizeof(params), nullptr)) {
-
-                    wchar_t *cmd_line = (wchar_t *)malloc(params.CommandLine.Length + 2);
-                    if (cmd_line && ReadProcessMemory(h_process, params.CommandLine.Buffer, cmd_line, params.CommandLine.Length, nullptr)) {
-                        cmd_line[params.CommandLine.Length / sizeof(wchar_t)] = L'\0';
-
-                        char instance_path_mbs[MAX_PATH_LENGTH] = {0};
+                            char instance_path_mbs[MAX_PATH_LENGTH] = {0};
+                            // --- NEW, FINAL PARSING LOGIC FOR WINDOWS ---
+                        const wchar_t* keys[] = {L"-Djava.library.path=", L"--gameDir"};
                         wchar_t extracted_path_w[MAX_PATH_LENGTH] = {0};
 
-                        // --- MORE ROBUST PARSING LOGIC ---
-                        const wchar_t* lib_path_key = L"-Djava.library.path=";
-                        const wchar_t* game_dir_key = L"--gameDir";
+                        for (int i = 0; i < 2 && extracted_path_w[0] == L'\0'; ++i) {
+                            const wchar_t* current_key = keys[i];
+                            wchar_t* key_start = wcsstr(cmd_line, current_key);
+                            if (!key_start) continue;
 
-                        wchar_t* arg_ptr = wcsstr(cmd_line, lib_path_key);
-                        const wchar_t* found_key = lib_path_key;
-
-                        if (arg_ptr) {
-                            arg_ptr += wcslen(lib_path_key);
-                        } else {
-                            arg_ptr = wcsstr(cmd_line, game_dir_key);
-                            if (arg_ptr) {
-                                found_key = game_dir_key;
-                                arg_ptr += wcslen(game_dir_key);
-                                while (*arg_ptr == L' ' || *arg_ptr == L'\t') arg_ptr++;
+                            wchar_t* value_start = key_start + wcslen(current_key);
+                            // For --gameDir, skip the space after the key
+                            if (i == 1) {
+                                while (*value_start == L' ') value_start++;
                             }
-                        }
 
-                        if (arg_ptr) {
-                            char found_key_mbs[64] = {0};
-                            wcstombs(found_key_mbs, found_key, sizeof(found_key_mbs) -1);
-                            log_message(LOG_INFO, "[DEBUG] Found '%s' argument.\n", found_key_mbs);
+                            wchar_t* value_end = nullptr;
+                            // Check if the value is quoted
+                            if (*value_start == L'"') {
+                                value_start++; // Move past opening quote
+                                value_end = wcschr(value_start, L'"');
+                            }
+                            // Check if the whole argument is quoted (e.g., "-Dkey=value")
+                            else if (key_start > cmd_line && *(key_start - 1) == L'"') {
+                                value_end = wcschr(value_start, L'"');
+                            }
+                            // Else, it's an unquoted value ending at the next space or end of string
+                            else {
+                                value_end = wcschr(value_start, L' ');
+                            }
 
-                            if (*arg_ptr == L'"') {
-                                arg_ptr++;
-                                wchar_t* end_quote = wcschr(arg_ptr, L'"');
-                                if (end_quote) {
-                                   wcsncpy(extracted_path_w, arg_ptr, end_quote - arg_ptr);
-                                   extracted_path_w[end_quote - arg_ptr] = L'\0';
-                                }
+                            if (value_end) {
+                                wcsncpy(extracted_path_w, value_start, value_end - value_start);
+                                extracted_path_w[value_end - value_start] = L'\0';
                             } else {
-                                // Find the end of the argument, which is the start of the *next* argument (preceded by a space)
-                                wchar_t* next_arg_start = wcsstr(arg_ptr, L" -");
-                                if (next_arg_start) {
-                                    // Trim trailing space
-                                    wchar_t* end_ptr = next_arg_start - 1;
-                                    while (end_ptr > arg_ptr && *end_ptr == L' ') end_ptr--;
-                                    wcsncpy(extracted_path_w, arg_ptr, (end_ptr - arg_ptr) + 1);
-                                    extracted_path_w[(end_ptr - arg_ptr) + 1] = L'\0';
-                                } else {
-                                    wcscpy(extracted_path_w, arg_ptr);
-                                }
+                                wcscpy(extracted_path_w, value_start);
                             }
                         }
 
                         if (extracted_path_w[0] != L'\0') {
                             wcstombs(instance_path_mbs, extracted_path_w, sizeof(instance_path_mbs));
-                            log_message(LOG_INFO, "[DEBUG] Parsed instance path raw: %s\n", instance_path_mbs);
 
-                            if (wcsstr(cmd_line, lib_path_key)) {
+                            // Trim /natives if the path came from Djava.library.path
+                            if (wcsstr(cmd_line, keys[0])) {
                                 char *last_sep = strrchr(instance_path_mbs, '/');
                                 if (!last_sep) last_sep = strrchr(instance_path_mbs, '\\');
                                 if (last_sep && (stricmp(last_sep, "/natives") == 0 || stricmp(last_sep, "\\natives") == 0)) {
                                     *last_sep = '\0';
-                                    log_message(LOG_INFO, "[DEBUG] Trimmed '/natives', final instance path: %s\n", instance_path_mbs);
                                 }
                             }
 
                             char path_candidate[MAX_PATH_LENGTH];
                             snprintf(path_candidate, sizeof(path_candidate), "%s/.minecraft/saves", instance_path_mbs);
-                            log_message(LOG_INFO, "[DEBUG] Checking candidate 1: '%s'\n", path_candidate);
                             if (path_exists(path_candidate)) {
-                                strncpy(out_path, path_candidate, max_len - 1);
-                                found = true;
+                                candidate_saves_paths.emplace_back(path_candidate);
                             } else {
                                 snprintf(path_candidate, sizeof(path_candidate), "%s/minecraft/saves", instance_path_mbs);
-                                log_message(LOG_INFO, "[DEBUG] Checking candidate 2: '%s'\n", path_candidate);
                                 if (path_exists(path_candidate)) {
-                                    strncpy(out_path, path_candidate, max_len - 1);
-                                    found = true;
+                                    candidate_saves_paths.emplace_back(path_candidate);
                                 }
                             }
-                            if(found) log_message(LOG_INFO, "[DEBUG] Success! Found valid saves folder: %s\n", out_path);
                         }
                         free(cmd_line);
+                        }
                     }
                 }
+                CloseHandle(h_process);
             }
-            CloseHandle(h_process);
-        }
-    } while (Process32Next(h_process_snap, &pe32) && !found);
-
+        } while (Process32Next(h_process_snap, &pe32));
+    }
     CloseHandle(h_process_snap);
-    log_message(LOG_ERROR, "[DEBUG] Windows instance scan finished. Found: %s\n", found ? "Yes" : "No");
-    return found;
 
 #elif __APPLE__
-    log_message(LOG_INFO, "[DEBUG] Starting active instance scan for macOS...\n");
+    log_message(LOG_ERROR, "[DEBUG] Starting active instance scan for macOS...\n");
     pid_t pids[2048];
     int count = proc_listpids(PROC_ALL_PIDS, 0, pids, sizeof(pids));
-    if (count <= 0) return false;
+    if (count > 0) {
+        for (int i = 0; i < count; i++) {
+            pid_t pid = pids[i];
+            if (pid == 0) continue;
 
-    for (int i = 0; i < count; i++) {
-        pid_t pid = pids[i];
-        if (pid == 0) continue;
+            int mib[3] = { CTL_KERN, KERN_PROCARGS2, pid };
+            size_t arg_max;
+            if (sysctl(mib, 3, nullptr, &arg_max, nullptr, 0) == -1) continue;
 
-        int mib[3] = { CTL_KERN, KERN_PROCARGS2, pid };
-        size_t arg_max;
-        if (sysctl(mib, 3, nullptr, &arg_max, nullptr, 0) == -1) continue;
+            char *arg_buf = (char *)malloc(arg_max);
+            if (!arg_buf) continue;
 
-        char *arg_buf = (char *)malloc(arg_max);
-        if (!arg_buf) continue;
-
-        if (sysctl(mib, 3, arg_buf, &arg_max, nullptr, 0) == -1) {
-            free(arg_buf);
-            continue;
-        }
-
-        char *p = arg_buf + sizeof(int);
-        if (!strstr(p, "java")) {
-            free(arg_buf);
-            continue;
-        }
-        log_message(LOG_INFO, "[DEBUG] Found java process with PID: %d\n", pid);
-
-        while (p < arg_buf + arg_max && *p) p++;
-        while (p < arg_buf + arg_max && !*p) p++;
-
-        bool found = false;
-        char instance_path[MAX_PATH_LENGTH] = {0};
-        char *lib_path_str = nullptr;
-        char *game_dir_str = nullptr;
-
-        char *current_arg = p;
-        while (current_arg < arg_buf + arg_max && *current_arg) {
-            if (strncmp(current_arg, "-Djava.library.path=", 20) == 0) {
-                lib_path_str = current_arg + 20;
-            } else if (strcmp(current_arg, "--gameDir") == 0) {
-                game_dir_str = current_arg + strlen(current_arg) + 1;
+            if (sysctl(mib, 3, arg_buf, &arg_max, nullptr, 0) == -1) {
+                free(arg_buf);
+                continue;
             }
-            current_arg += strlen(current_arg) + 1;
-        }
 
-        if (lib_path_str) {
-            log_message(LOG_INFO, "[DEBUG] Found '-Djava.library.path=' argument.\n");
-            strncpy(instance_path, lib_path_str, sizeof(instance_path) - 1);
-            char *natives_suffix = strstr(instance_path, "/natives");
-            if (natives_suffix && *(natives_suffix + strlen("/natives")) == '\0') {
-                *natives_suffix = '\0';
+            char *p = arg_buf + sizeof(int);
+            if (!strstr(p, "java")) {
+                free(arg_buf);
+                continue;
             }
-            log_message(LOG_INFO, "[DEBUG] Parsed instance path: %s\n", instance_path);
-        } else if (game_dir_str) {
-            log_message(LOG_INFO, "[DEBUG] Found '--gameDir' argument.\n");
-            strncpy(instance_path, game_dir_str, sizeof(instance_path) - 1);
-            log_message(LOG_INFO, "[DEBUG] Parsed instance path: %s\n", instance_path);
-        }
+            log_message(LOG_ERROR, "[DEBUG] Found java process with PID: %d\n", pid);
 
-        if (instance_path[0] != '\0') {
-            char path_candidate[MAX_PATH_LENGTH];
-            snprintf(path_candidate, sizeof(path_candidate), "%s/.minecraft/saves", instance_path);
-            log_message(LOG_INFO, "[DEBUG] Checking candidate 1: '%s'\n", path_candidate);
-            if (path_exists(path_candidate)) {
-                strncpy(out_path, path_candidate, max_len - 1);
-                found = true;
-            } else {
-                snprintf(path_candidate, sizeof(path_candidate), "%s/minecraft/saves", instance_path);
-                log_message(LOG_INFO, "[DEBUG] Checking candidate 2: '%s'\n", path_candidate);
-                if (path_exists(path_candidate)) {
-                    strncpy(out_path, path_candidate, max_len - 1);
-                    found = true;
+            while (p < arg_buf + arg_max && *p) p++;
+            while (p < arg_buf + arg_max && !*p) p++;
+
+            char instance_path[MAX_PATH_LENGTH] = {0};
+            char *lib_path_str = nullptr;
+            char *game_dir_str = nullptr;
+
+            char *current_arg = p;
+            while (current_arg < arg_buf + arg_max && *current_arg) {
+                if (strncmp(current_arg, "-Djava.library.path=", 20) == 0) {
+                    lib_path_str = current_arg + 20;
+                } else if (strcmp(current_arg, "--gameDir") == 0) {
+                    game_dir_str = current_arg + strlen(current_arg) + 1;
                 }
+                current_arg += strlen(current_arg) + 1;
             }
-             if(found) log_message(LOG_INFO, "[DEBUG] Success! Found valid saves folder: %s\n", out_path);
-        }
 
-        free(arg_buf);
-        if (found) {
-             log_message(LOG_INFO, "[DEBUG] macOS instance scan finished. Found: Yes\n");
-             return true;
-        }
-    }
-    log_message(LOG_INFO, "[DEBUG] macOS instance scan finished. Found: No\n");
-    return false;
-
-#else // Linux
-    log_message(LOG_INFO, "[DEBUG] Starting active instance scan for Linux...\n");
-    DIR *proc_dir = opendir("/proc");
-    if (!proc_dir) return false;
-
-    struct dirent *entry;
-    while ((entry = readdir(proc_dir)) != nullptr) {
-        pid_t pid = atoi(entry->d_name);
-        if (pid == 0) continue;
-
-        char cmdline_path[256];
-        snprintf(cmdline_path, sizeof(cmdline_path), "/proc/%d/cmdline", pid);
-
-        FILE *f = fopen(cmdline_path, "r");
-        if (!f) continue;
-
-        char args[4096] = {0};
-        size_t bytes_read = fread(args, 1, sizeof(args) - 1, f);
-        fclose(f);
-
-        if (bytes_read == 0 || !strstr(args, "java")) continue;
-        log_message(LOG_INFO, "[DEBUG] Found java process with PID: %d\n", pid);
-
-        char instance_path[MAX_PATH_LENGTH] = {0};
-        const char *p = args;
-
-        while (p < args + bytes_read) {
-            if (strncmp(p, "-Djava.library.path=", 20) == 0) {
-                log_message(LOG_INFO, "[DEBUG] Found '-Djava.library.path=' argument.\n");
-                strncpy(instance_path, p + 20, sizeof(instance_path) - 1);
+            if (lib_path_str) {
+                strncpy(instance_path, lib_path_str, sizeof(instance_path) - 1);
                 char *natives_suffix = strstr(instance_path, "/natives");
                 if (natives_suffix && *(natives_suffix + strlen("/natives")) == '\0') {
                     *natives_suffix = '\0';
                 }
-                log_message(LOG_INFO, "[DEBUG] Parsed instance path: %s\n", instance_path);
-                break;
+            } else if (game_dir_str) {
+                strncpy(instance_path, game_dir_str, sizeof(instance_path) - 1);
             }
-            p += strlen(p) + 1;
-        }
 
-        if (instance_path[0] == '\0') {
-            p = args;
+            if (instance_path[0] != '\0') {
+                char path_candidate[MAX_PATH_LENGTH];
+                snprintf(path_candidate, sizeof(path_candidate), "%s/.minecraft/saves", instance_path);
+                if (path_exists(path_candidate)) {
+                    candidate_saves_paths.emplace_back(path_candidate);
+                } else {
+                    snprintf(path_candidate, sizeof(path_candidate), "%s/minecraft/saves", instance_path);
+                    if (path_exists(path_candidate)) {
+                        candidate_saves_paths.emplace_back(path_candidate);
+                    }
+                }
+            }
+            free(arg_buf);
+        }
+    }
+#else // Linux
+    log_message(LOG_ERROR, "[DEBUG] Starting active instance scan for Linux...\n");
+    DIR *proc_dir = opendir("/proc");
+    if (proc_dir) {
+        struct dirent *entry;
+        while ((entry = readdir(proc_dir)) != nullptr) {
+            pid_t pid = atoi(entry->d_name);
+            if (pid == 0) continue;
+
+            char cmdline_path[256];
+            snprintf(cmdline_path, sizeof(cmdline_path), "/proc/%d/cmdline", pid);
+
+            FILE *f = fopen(cmdline_path, "r");
+            if (!f) continue;
+
+            char args[4096] = {0};
+            size_t bytes_read = fread(args, 1, sizeof(args) - 1, f);
+            fclose(f);
+
+            if (bytes_read == 0 || !strstr(args, "java")) continue;
+            log_message(LOG_ERROR, "[DEBUG] Found java process with PID: %d\n", pid);
+
+            char instance_path[MAX_PATH_LENGTH] = {0};
+            const char *p = args;
+
             while (p < args + bytes_read) {
-                if (strcmp(p, "--gameDir") == 0) {
-                    log_message(LOG_INFO, "[DEBUG] Found '--gameDir' argument.\n");
-                    const char *game_dir = p + strlen(p) + 1;
-                    if (game_dir < args + bytes_read) {
-                        strncpy(instance_path, game_dir, sizeof(instance_path) - 1);
-                        log_message(LOG_INFO, "[DEBUG] Parsed instance path: %s\n", instance_path);
+                if (strncmp(p, "-Djava.library.path=", 20) == 0) {
+                    strncpy(instance_path, p + 20, sizeof(instance_path) - 1);
+                    char *natives_suffix = strstr(instance_path, "/natives");
+                    if (natives_suffix && *(natives_suffix + strlen("/natives")) == '\0') {
+                        *natives_suffix = '\0';
                     }
                     break;
                 }
                 p += strlen(p) + 1;
             }
-        }
 
-        if (instance_path[0] != '\0') {
-            char path_candidate[MAX_PATH_LENGTH];
-            snprintf(path_candidate, sizeof(path_candidate), "%s/.minecraft/saves", instance_path);
-            log_message(LOG_INFO, "[DEBUG] Checking candidate 1: '%s'\n", path_candidate);
-            if (path_exists(path_candidate)) {
-                strncpy(out_path, path_candidate, max_len - 1);
-                log_message(LOG_INFO, "[DEBUG] Success! Found valid saves folder: %s\n", out_path);
-                closedir(proc_dir);
-                return true;
+            if (instance_path[0] == '\0') {
+                p = args;
+                while (p < args + bytes_read) {
+                    if (strcmp(p, "--gameDir") == 0) {
+                        const char *game_dir = p + strlen(p) + 1;
+                        if (game_dir < args + bytes_read) {
+                            strncpy(instance_path, game_dir, sizeof(instance_path) - 1);
+                        }
+                        break;
+                    }
+                    p += strlen(p) + 1;
+                }
             }
-            snprintf(path_candidate, sizeof(path_candidate), "%s/minecraft/saves", instance_path);
-            log_message(LOG_INFO, "[DEBUG] Checking candidate 2: '%s'\n", path_candidate);
-            if (path_exists(path_candidate)) {
-                strncpy(out_path, path_candidate, max_len - 1);
-                log_message(LOG_INFO, "[DEBUG] Success! Found valid saves folder: %s\n", out_path);
-                closedir(proc_dir);
-                return true;
+
+            if (instance_path[0] != '\0') {
+                char path_candidate[MAX_PATH_LENGTH];
+                snprintf(path_candidate, sizeof(path_candidate), "%s/.minecraft/saves", instance_path);
+                if (path_exists(path_candidate)) {
+                    candidate_saves_paths.emplace_back(path_candidate);
+                } else {
+                    snprintf(path_candidate, sizeof(path_candidate), "%s/minecraft/saves", instance_path);
+                    if (path_exists(path_candidate)) {
+                        candidate_saves_paths.emplace_back(path_candidate);
+                    }
+                }
             }
+        }
+        closedir(proc_dir);
+    }
+#endif
+    // --- After scanning all processes, find the most recently modified path ---
+    if (candidate_saves_paths.empty()) {
+        return false;
+    }
+
+    uint64_t latest_time = 0;
+    std::string best_path = "";
+
+    for (const auto& path : candidate_saves_paths) {
+        uint64_t current_time = get_latest_modification_time(path.c_str());
+        if (current_time > latest_time) {
+            latest_time = current_time;
+            best_path = path;
         }
     }
-    closedir(proc_dir);
-    log_message(LOG_INFO, "[DEBUG] Linux instance scan finished. Found: No\n");
+
+    if (!best_path.empty()) {
+        log_message(LOG_INFO, "[PATH UTILS] Selected most recently modified instance: %s\n", best_path.c_str());
+        strncpy(out_path, best_path.c_str(), max_len - 1);
+        out_path[max_len - 1] = '\0';
+        return true;
+    }
+
     return false;
-#endif
 }
 
-// TODO: WITHOUT DEBUGGING
-// /**
-//  * @brief Attempts to find a running Minecraft instance from MultiMC/Prism and get its saves path.
-//  * This is a cross-platform function that inspects running processes for launch arguments.
-//  * It now prioritizes -Djava.library.path and falls back to --gameDir.
-//  * @param out_path A buffer to store the resulting path.
-//  * @param max_len The size of the out_path buffer.
-//  * @return true if a path was found, false otherwise.
-//  */
-// static bool get_active_instance_saves_path(char *out_path, size_t max_len) {
-// #ifdef _WIN32
-//     // On Windows, we iterate through processes to find the instance path argument.
-//     HANDLE h_process_snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-//     if (h_process_snap == INVALID_HANDLE_VALUE) return false;
-//
-//     PROCESSENTRY32 pe32;
-//     pe32.dwSize = sizeof(PROCESSENTRY32);
-//
-//     if (!Process32First(h_process_snap, &pe32)) {
-//         CloseHandle(h_process_snap);
-//         return false;
-//     }
-//
-//     bool found = false;
-//     do {
-//         if (stricmp(pe32.szExeFile, "javaw.exe") == 0 || stricmp(pe32.szExeFile, "java.exe") == 0) {
-//             HANDLE h_process = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pe32.th32ProcessID);
-//             if (h_process == nullptr) continue;
-//
-//             PROCESS_BASIC_INFORMATION pbi;
-//             if (NtQueryInformationProcess(h_process, ProcessBasicInformation, &pbi, sizeof(pbi), nullptr) >= 0) {
-//                 PEB peb;
-//                 RTL_USER_PROCESS_PARAMETERS params;
-//                 if (ReadProcessMemory(h_process, pbi.PebBaseAddress, &peb, sizeof(peb), nullptr) &&
-//                     ReadProcessMemory(h_process, peb.ProcessParameters, &params, sizeof(params), nullptr)) {
-//
-//                     wchar_t *cmd_line = (wchar_t *)malloc(params.CommandLine.Length + 2);
-//                     if (cmd_line && ReadProcessMemory(h_process, params.CommandLine.Buffer, cmd_line, params.CommandLine.Length, nullptr)) {
-//                         cmd_line[params.CommandLine.Length / sizeof(wchar_t)] = L'\0';
-//
-//                         char instance_path_mbs[MAX_PATH_LENGTH] = {0};
-//
-//                         // 1. Prioritize -Djava.library.path
-//                         wchar_t *lib_path_arg = wcsstr(cmd_line, L"-Djava.library.path=");
-//                         if (lib_path_arg) {
-//                             wchar_t natives_path_w[MAX_PATH_LENGTH] = {0};
-//                             if (swscanf(lib_path_arg, L"-Djava.library.path=\"%[^\"]\"", natives_path_w) == 1 ||
-//                                 swscanf(lib_path_arg, L"-Djava.library.path=%s", natives_path_w) == 1) {
-//                                 wcstombs(instance_path_mbs, natives_path_w, sizeof(instance_path_mbs));
-//                                 char *last_sep = strrchr(instance_path_mbs, '/');
-//                                 if (!last_sep) last_sep = strrchr(instance_path_mbs, '\\');
-//                                 if (last_sep) *last_sep = '\0'; // Remove /natives
-//                             }
-//                         }
-//
-//                         // 2. Fallback to --gameDir
-//                         if (instance_path_mbs[0] == '\0') {
-//                             wchar_t *game_dir_arg = wcsstr(cmd_line, L"--gameDir");
-//                             if (game_dir_arg) {
-//                                 wchar_t game_dir_path_w[MAX_PATH_LENGTH] = {0};
-//                                 if (swscanf(game_dir_arg, L"--gameDir \"%[^\"]\"", game_dir_path_w) == 1 ||
-//                                     swscanf(game_dir_arg, L"--gameDir %s", game_dir_path_w) == 1) {
-//                                     wcstombs(instance_path_mbs, game_dir_path_w, sizeof(instance_path_mbs));
-//                                 }
-//                             }
-//                         }
-//
-//                         // 3. Check for saves folder if an instance path was found
-//                         if (instance_path_mbs[0] != '\0') {
-//                             char path_candidate[MAX_PATH_LENGTH];
-//                             snprintf(path_candidate, sizeof(path_candidate), "%s/.minecraft/saves", instance_path_mbs);
-//                             if (path_exists(path_candidate)) {
-//                                 strncpy(out_path, path_candidate, max_len - 1);
-//                                 found = true;
-//                             } else {
-//                                 snprintf(path_candidate, sizeof(path_candidate), "%s/minecraft/saves", instance_path_mbs);
-//                                 if (path_exists(path_candidate)) {
-//                                     strncpy(out_path, path_candidate, max_len - 1);
-//                                     found = true;
-//                                 }
-//                             }
-//                         }
-//                         free(cmd_line);
-//                     }
-//                 }
-//             }
-//             CloseHandle(h_process);
-//         }
-//     } while (Process32Next(h_process_snap, &pe32) && !found);
-//
-//     CloseHandle(h_process_snap);
-//     return found;
-//
-// #elif __APPLE__
-//     pid_t pids[2048];
-//     int count = proc_listpids(PROC_ALL_PIDS, 0, pids, sizeof(pids));
-//     if (count <= 0) return false;
-//
-//     for (int i = 0; i < count; i++) {
-//         pid_t pid = pids[i];
-//         if (pid == 0) continue;
-//
-//         int mib[3] = { CTL_KERN, KERN_PROCARGS2, pid };
-//         size_t arg_max;
-//         if (sysctl(mib, 3, nullptr, &arg_max, nullptr, 0) == -1) continue;
-//
-//         char *arg_buf = (char *)malloc(arg_max);
-//         if (!arg_buf) continue;
-//
-//         if (sysctl(mib, 3, arg_buf, &arg_max, nullptr, 0) == -1) {
-//             free(arg_buf);
-//             continue;
-//         }
-//
-//         char *p = arg_buf + sizeof(int);
-//         while (p < arg_buf + arg_max && *p) p++;
-//         while (p < arg_buf + arg_max && !*p) p++;
-//
-//         bool found = false;
-//         char instance_path[MAX_PATH_LENGTH] = {0};
-//         char *lib_path_str = nullptr;
-//         char *game_dir_str = nullptr;
-//
-//         // Find both arguments first
-//         char *current_arg = p;
-//         while (current_arg < arg_buf + arg_max && *current_arg) {
-//             if (strncmp(current_arg, "-Djava.library.path=", 20) == 0) {
-//                 lib_path_str = current_arg + 20;
-//             } else if (strcmp(current_arg, "--gameDir") == 0) {
-//                 game_dir_str = current_arg + strlen(current_arg) + 1;
-//             }
-//             current_arg += strlen(current_arg) + 1;
-//         }
-//
-//         // 1. Prioritize -Djava.library.path
-//         if (lib_path_str) {
-//             strncpy(instance_path, lib_path_str, sizeof(instance_path) - 1);
-//             char *natives_suffix = strstr(instance_path, "/natives");
-//             if (natives_suffix && *(natives_suffix + strlen("/natives")) == '\0') {
-//                 *natives_suffix = '\0';
-//             }
-//         }
-//         // 2. Fallback to --gameDir
-//         else if (game_dir_str) {
-//             strncpy(instance_path, game_dir_str, sizeof(instance_path) - 1);
-//         }
-//
-//         // 3. Check for saves folder if an instance path was found
-//         if (instance_path[0] != '\0') {
-//             char path_candidate[MAX_PATH_LENGTH];
-//             snprintf(path_candidate, sizeof(path_candidate), "%s/.minecraft/saves", instance_path);
-//             if (path_exists(path_candidate)) {
-//                 strncpy(out_path, path_candidate, max_len - 1);
-//                 found = true;
-//             } else {
-//                 snprintf(path_candidate, sizeof(path_candidate), "%s/minecraft/saves", instance_path);
-//                 if (path_exists(path_candidate)) {
-//                     strncpy(out_path, path_candidate, max_len - 1);
-//                     found = true;
-//                 }
-//             }
-//         }
-//
-//         free(arg_buf);
-//         if (found) return true;
-//     }
-//     return false;
-//
-// #else // Linux
-//     DIR *proc_dir = opendir("/proc");
-//     if (!proc_dir) return false;
-//
-//     struct dirent *entry;
-//     while ((entry = readdir(proc_dir)) != nullptr) {
-//         pid_t pid = atoi(entry->d_name);
-//         if (pid == 0) continue;
-//
-//         char cmdline_path[256];
-//         snprintf(cmdline_path, sizeof(cmdline_path), "/proc/%d/cmdline", pid);
-//
-//         FILE *f = fopen(cmdline_path, "r");
-//         if (!f) continue;
-//
-//         char args[4096] = {0};
-//         size_t bytes_read = fread(args, 1, sizeof(args) - 1, f);
-//         fclose(f);
-//
-//         if (bytes_read == 0 || !strstr(args, "java")) continue;
-//
-//         char instance_path[MAX_PATH_LENGTH] = {0};
-//
-//         const char *p = args;
-//         // 1. Prioritize -Djava.library.path
-//         while (p < args + bytes_read) {
-//             if (strncmp(p, "-Djava.library.path=", 20) == 0) {
-//                 strncpy(instance_path, p + 20, sizeof(instance_path) - 1);
-//                 char *natives_suffix = strstr(instance_path, "/natives");
-//                 if (natives_suffix && *(natives_suffix + strlen("/natives")) == '\0') {
-//                     *natives_suffix = '\0';
-//                 }
-//                 break;
-//             }
-//             p += strlen(p) + 1;
-//         }
-//
-//         // 2. Fallback to --gameDir
-//         if (instance_path[0] == '\0') {
-//             p = args;
-//             while (p < args + bytes_read) {
-//                 if (strcmp(p, "--gameDir") == 0) {
-//                     const char *game_dir = p + strlen(p) + 1;
-//                     if (game_dir < args + bytes_read) {
-//                         strncpy(instance_path, game_dir, sizeof(instance_path) - 1);
-//                     }
-//                     break;
-//                 }
-//                 p += strlen(p) + 1;
-//             }
-//         }
-//
-//         // 3. Check for saves folder if an instance path was found
-//         if (instance_path[0] != '\0') {
-//             char path_candidate[MAX_PATH_LENGTH];
-//             snprintf(path_candidate, sizeof(path_candidate), "%s/.minecraft/saves", instance_path);
-//             if (path_exists(path_candidate)) {
-//                 strncpy(out_path, path_candidate, max_len - 1);
-//                 closedir(proc_dir);
-//                 return true;
-//             }
-//             snprintf(path_candidate, sizeof(path_candidate), "%s/minecraft/saves", instance_path);
-//             if (path_exists(path_candidate)) {
-//                 strncpy(out_path, path_candidate, max_len - 1);
-//                 closedir(proc_dir);
-//                 return true;
-//             }
-//         }
-//     }
-//     closedir(proc_dir);
-//     return false;
-// #endif
-// }
 
 // PUBLIC FUNCTIONS
 
