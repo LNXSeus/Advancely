@@ -263,33 +263,47 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     // Open Instances Folder Button
-    // Only show the button if the current saves path is valid and not empty.
-    if (t->saves_path[0] != '\0' && path_exists(t->saves_path)) {
-        if (ImGui::Button("Open Instances Folder")) {
-            char instances_path[MAX_PATH_LENGTH];
-            if (get_parent_directory(t->saves_path, instances_path, sizeof(instances_path), 3)) {
-                char command[MAX_PATH_LENGTH + 32];
+    bool is_saves_path_valid = t->saves_path[0] != '\0' && path_exists(t->saves_path);
+
+    // If the path is not valid, begin a disabled state for the button.
+    if (!is_saves_path_valid) {
+        ImGui::BeginDisabled();
+    }
+
+    if (ImGui::Button("Open Instances Folder")) {
+        char instances_path[MAX_PATH_LENGTH];
+        if (get_parent_directory(t->saves_path, instances_path, sizeof(instances_path), 3)) {
+            char command[MAX_PATH_LENGTH + 32];
 #ifdef _WIN32
-                // Convert slashes to backslashes for the windows expolorer command
-                path_to_windows_native(instances_path);
-                snprintf(command, sizeof(command), "explorer \"%s\"", instances_path);
+            // Convert slashes to backslashes for the windows expolorer command
+            path_to_windows_native(instances_path);
+            snprintf(command, sizeof(command), "explorer \"%s\"", instances_path);
 #elif __APPLE__
-                snprintf(command, sizeof(command), "open \"%s\"", instances_path);
+            snprintf(command, sizeof(command), "open \"%s\"", instances_path);
 #else
-                snprintf(command, sizeof(command), "xdg-open \"%s\"", instances_path);
+            snprintf(command, sizeof(command), "xdg-open \"%s\"", instances_path);
 #endif
-                // DEBUG: Log the exact command being passed to the system.
-                log_message(LOG_INFO, "[DEBUG settings] Executing system command: %s\n", command);
-                system(command);
-            }
+            log_message(LOG_INFO, "[DEBUG settings] Executing system command: %s\n", command);
+            system(command);
         }
+    }
+
+    // If the button was disabled, end the disabled state.
+    if (!is_saves_path_valid) {
+        ImGui::EndDisabled();
+        // Add a tooltip that only appears when hovering over the disabled button.
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            ImGui::SetTooltip(
+                "A valid saves path must be active to use this feature.\nPlease apply a correct path first.");
+        }
+    } else {
+        // This is the original tooltip for when the button is enabled.
         if (ImGui::IsItemHovered()) {
             char open_instance_folder_tooltip_buffer[1024];
             snprintf(open_instance_folder_tooltip_buffer, sizeof(open_instance_folder_tooltip_buffer),
                      "IMPORTANT: If you just changed your saves path you'll need to hit 'Apply Settings' first.\n"
                      "Attempts to open the parent 'instances' folder (goes up 3 directories from your saves path).\n"
-                     "Useful for quickly switching between instances in custom launchers (e.g., Prism Launcher)\n"
-                     "or navigating the game files.");
+                     "Useful for quickly switching between instances in custom launchers.");
             ImGui::SetTooltip(
                 "%s", open_instance_folder_tooltip_buffer);
         }

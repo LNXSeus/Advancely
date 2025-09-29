@@ -68,7 +68,7 @@ sharp._
   can automatically detect which instance you are actively playing and track it even if multiple instances are open at
   once. It intelligently
   selects the instance you last interacted with. Find out
-  more [here](https://github.com/LNXSeus/Advancely#the-settings-window-esc)
+  more [here](https://github.com/LNXSeus/Advancely#the-settings-window-esc).
 * **Interactive Map View**: The main tracker window is an interactive map where you can pan by holding `Right-Click` or
   `Middle-Click`, zoom with the `Mouse Wheel`, and lock the layout in place by pressing `SPACE`.
 * **Comprehensive Real-Time Tracking**: Advancely operates in real-time by watching your singleplayer save files for
@@ -523,8 +523,8 @@ or [create a new issue](https://github.com/LNXSeus/Advancely/issues/new) on GitH
 Massive thanks to all the beta testers. _Message me on discord @lnxseus with proof of using Advancely before its full
 release and you'll be added here:_
 
-* Windows: ethansplace98, Yumeko, zurtletif, 3emis, MoreTrident, PhoenixAUS_, metal_silver1234, 36_Official
-* macOS: Slackow, TheDogmaster28
+* Windows: ethansplace98, Yumeko, zurtletif, 3emis, MoreTrident, PhoenixAUS_, metal_silver1234, 36_Official, TheDogmaster28
+* macOS: Slackow, TheDogmaster28, ethansplace98
 * Linux: DesktopFolder, ShadowFlower64, me_nx
 
 ***

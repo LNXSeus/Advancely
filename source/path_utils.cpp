@@ -66,7 +66,7 @@ static bool get_auto_saves_path(char *out_path, size_t max_len) {
         char appdata_path[MAX_PATH];
         wcstombs(appdata_path, appdata_path_wide, MAX_PATH);
         CoTaskMemFree(appdata_path_wide);
-        snprintf(out_path, max_len, "%s/.minecraft/saves", appdata_path);
+        snprintf(out_path, max_len, "%s/.minecraft/save", appdata_path);
         return true;
     }
 #else
