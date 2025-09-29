@@ -1243,6 +1243,7 @@ void handle_export_language(const char *version, const char *category, const cha
 #if __APPLE__
         // Use "open -R" to reveal the file in Finder
         char* args[] = {(char*)"open", (char*)"-R", lang_path, nullptr};
+        execvp(args[0], args);
 #else // Linux
         // Highlighting a file isn't a standard feature, so we open the parent directory.
         char parent_dir[MAX_PATH_LENGTH];
