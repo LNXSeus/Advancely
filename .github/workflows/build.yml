@@ -31,7 +31,7 @@ jobs:
 
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
-        run: brew install sdl3 sdl3_image sdl3_ttf curl
+        run: brew install sdl3 sdl3_image sdl3_ttf curl libsharpyuv
 
       # --- CMAKE CONFIGURATION (FIXED) ---
       - name: Configure CMake (Linux)

@@ -481,6 +481,8 @@ all April Fool's snapshots.
 
 ## Officially Added Templates
 
+> **These will get replaced through auto updates!**
+
 | Category           | Version(s)                                  | Optional Flag(s) | Languages           |
 |--------------------|---------------------------------------------|------------------|---------------------|
 | `all_advancements` | 1.16.1                                      |                  | Default, ger, zh_cn |
