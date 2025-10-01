@@ -99,6 +99,19 @@ static bool show_welcome_window = false; // For rendering the welcome window on 
 static char release_url_buffer[256] = {0};
 static SDL_Texture *g_logo_texture = nullptr; // Loading the advancely logo
 
+
+// Warning the user with a popup window if file path contains non-ascii characters
+// Especially a problem on windows
+static bool path_contains_non_ascii(const char *path) {
+    for (const char *p = path; *p; ++p) {
+        // Check if the character has a value outside the standard ASCII range
+        if ((unsigned char) *p > 127) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // All builds now have the resources folder on the same level as the executable or .app bundle
 static void find_and_set_resource_path(char *path_buffer, size_t buffer_size) {
     // For all builds (Windows, macOS, Linux and windows), find the executable's path.
@@ -554,6 +567,29 @@ int main(int argc, char *argv[]) {
     // As we're not only using SDL_main() as our entry point
     SDL_SetMainReady();
 
+    // --- Non-ASCII Path Check (Windows-specific) ---
+#ifdef _WIN32
+    char exe_path_check[MAX_PATH_LENGTH];
+    if (get_executable_path(exe_path_check, sizeof(exe_path_check))) {
+        if (path_contains_non_ascii(exe_path_check)) {
+            // Initialize SDL video subsystem just to be able to show a message box
+            if (!SDL_Init(SDL_INIT_VIDEO)) {
+                // Fallback if SDL can't even initialize
+                fprintf(stderr, "Critical Path Error: Advancely cannot run from a path with special characters.\n");
+                return EXIT_FAILURE;
+            }
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,
+                                     "Invalid Path Error",
+                                     "Advancely cannot run from a folder path that contains special or non-English characters (e.g., ü, ö, ß).\n\n"
+                                     "Please move the application to a simple path (e.g., C:\\Users\\YourName\\Desktop\\Advancely) and run it again.",
+                                     nullptr);
+            SDL_Quit();
+            return EXIT_FAILURE;
+        }
+    }
+#endif
+
+
     // Check for --updated flag on startup
     if (argc > 1 && strcmp(argv[1], "--updated") == 0) {
         // The --update flag gets passed from the apply_update() function
@@ -897,7 +933,7 @@ int main(int argc, char *argv[]) {
                 int buttonid = -1;
                 bool decision_made = false;
 
-while (!decision_made) {
+                while (!decision_made) {
                     SDL_ShowMessageBox(&messageboxdata, &buttonid);
 
                     switch (buttonid) {
@@ -919,11 +955,11 @@ while (!decision_made) {
 #else // macOS and Linux
                             pid_t pid = fork();
                             if (pid == 0) { // Child process
-                                #if __APPLE__
+#if __APPLE__
                                     char* args[] = {(char*)"open", templates_path, nullptr};
-                                #else
+#else
                                     char* args[] = {(char*)"xdg-open", templates_path, nullptr};
-                                #endif
+#endif
                                 execvp(args[0], args);
                                 _exit(127); // Exit if exec fails
                             } else if (pid < 0) {
@@ -943,11 +979,11 @@ while (!decision_made) {
 #else // macOS and Linux
                             pid_t pid = fork();
                             if (pid == 0) { // Child process
-                                #if __APPLE__
+#if __APPLE__
                                     char* args[] = {(char*)"open", (char*)url, nullptr};
-                                #else
+#else
                                     char* args[] = {(char*)"xdg-open", (char*)url, nullptr};
-                                #endif
+#endif
                                 execvp(args[0], args);
                                 _exit(127); // Exit if exec fails
                             } else if (pid < 0) {
