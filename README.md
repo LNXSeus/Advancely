@@ -54,7 +54,7 @@ import, create, copy, and modify any template directly within Advancely.
 This powerful and flexible system makes Advancely the ultimate tool for any Minecraft challenge, from a vanilla "All
 Advancements" run to a heavily modded playthrough with hundreds of custom milestones.
 
-![Advancely_Tracker_Preview.gif](readme_assets/Advancely_Tracker_Preview.gif)
+![Advancely_Tracker_Preview](readme_assets/Advancely-v0.9.313-Preview.gif)
 _This animation here is compressed. When you use the tracker the framerate will be higher and the resolution perfectly
 sharp._
 

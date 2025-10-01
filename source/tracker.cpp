@@ -4409,27 +4409,18 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // Add the "Notes" checkbox
     ImGui::Checkbox("Notes", &t->notes_window_open);
     if (ImGui::IsItemHovered()) {
-        ImGui::BeginTooltip();
-
-        ImGui::TextUnformatted("Notes Window");
-        ImGui::Separator();
-
-        ImGui::TextWrapped(
-            "Toggles a persistent text editor for keeping notes. The system has two modes, configurable inside the window:");
-        ImGui::Spacing();
-
-        ImGui::BulletText(
-            "Per-World (Default): Notes are saved for each world individually. The last 32 worlds are remembered.");
-        ImGui::BulletText("Per-Template: Notes are shared for the currently loaded template permanently.");
-
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        ImGui::TextUnformatted("The window's size and position are remembered across sessions.");
-        ImGui::TextUnformatted("Anything you type is immediately saved.");
-        ImGui::TextUnformatted("Hotkeys are disabled while typing in the notes window. The maximum note size is 64KB.");
-
-        ImGui::EndTooltip();
+        char notes_tooltip_buffer[1024];
+        snprintf(notes_tooltip_buffer, sizeof(notes_tooltip_buffer),
+                 "Notes Window\n"
+                 "--------------------------------\n"
+                 "Toggles a persistent text editor for keeping notes. The system has two modes, configurable inside the window:\n\n"
+                 " - Per-World (Default): Notes are saved for each world individually. The last 32 worlds are remembered.\n"
+                 " - Per-Template: Notes are shared for the currently loaded template permanently.\n\n"
+                 "--------------------------------\n"
+                 "The window's size and position are remembered across sessions.\n"
+                 "Anything you type is immediately saved.\n"
+                 "Hotkeys are disabled while typing in the notes window. The maximum note size is 64KB.");
+        ImGui::SetTooltip("%s", notes_tooltip_buffer);
     }
 
     ImGui::PopStyleColor(5); // Pop the style colors, there's 5 of them
