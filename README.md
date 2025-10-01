@@ -1,6 +1,6 @@
 ![readme_assets/Advancely_Logo.png](readme_assets/Advancely_Logo.png)
 
-# [**DOWNLOAD ADVANCELY NOW\! (Windows, Linux & macOS (X64 & ARM64), any MC Java Version)**](https://github.com/LNXSeus/Advancely/releases)
+# [**DOWNLOAD ADVANCELY NOW\! (Windows, Linux & macOS)**](https://github.com/LNXSeus/Advancely/releases)
 
 ***
 
@@ -20,7 +20,7 @@
 * [My YouTube](https://www.youtube.com/@lnxs?sub_confirmation=1)
 * [My Twitch](https://www.twitch.tv/lnxseus)
 * [My Twitch Archive + Advancely Devlogs](https://www.youtube.com/@lnxsarchive/playlists?view=1&sort=lad&flow=grid&sub_confirmation=1)
-* [Official Advancely Discord](https://discord.gg/TyNgXDz)
+* [Official Advancely Discord w/ **Unofficial Releases**!](https://discord.gg/TyNgXDz)
 * [My GitHub](https://github.com/LNXSeus)
 
 ***
@@ -121,14 +121,17 @@ To ensure the application works correctly, please follow the instructions for yo
 
 > **✔️ Important: Use English-Only (ASCII) File Paths**
 >
-> To prevent errors, please make sure the **entire folder path** to your Advancely application contains **only standard English (ASCII) characters**.
+> To prevent errors, please make sure the **entire folder path** to your Advancely application contains **only standard
+English (ASCII) characters**.
 >
-> Special characters, accents (like `é`, `ü`, `ñ`), or symbols in the file path can cause the tracker to fail when loading templates or watching your save files.
+> Special characters, accents (like `é`, `ü`, `ñ`), or symbols in the file path can cause the tracker to fail when
+> loading templates or watching your save files.
 >
 > * **❌ Bad Path:** `C:\Users\Jörg\Desktop\Spiele\Advancely\`
 > * **✅ Good Path:** `C:\Users\Joerg\Desktop\Games\Advancely\`
 
-Your download contains the Advancely application (`.exe` on Windows, `.app` on macOS, or a binary file on Linux) and a `resources` folder. **Both must be kept in the same directory for Advancely to work**.
+Your download contains the Advancely application (`.exe` on Windows, `.app` on macOS, or a binary file on Linux) and a
+`resources` folder. **Both must be kept in the same directory for Advancely to work**.
 
 **macOS Instructions**
 
@@ -478,18 +481,22 @@ all April Fool's snapshots.
 
 ## Officially Added Templates
 
-| Category           | Version(s)                                         | Optional Flag(s) | Languages |
-|--------------------|----------------------------------------------------|------------------|-----------|
-| `all_advancements` | 1.16.1, 1.21.8                                     |                  | Default   |
-| `all_advancements` | 1.21.8                                             | `_optimized`     | Default   |
-| `all_advancements` | 1.16.1                                             |                  | ger (WIP) |
-| `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4        |                  | Default   |
-| `miku%`            | 1.21.8                                             |                  | Default   |
-| `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 1.21.8, 25w14craftmine | `1`              | Default   |
+| Category           | Version(s)                                  | Optional Flag(s) | Languages           |
+|--------------------|---------------------------------------------|------------------|---------------------|
+| `all_advancements` | 1.16.1                                      |                  | Default, ger, zh_cn |
+| `all_advancements` | 1.21.8, 1.21.9                              |                  | Default, ger, zh_cn |
+| `all_advancements` | 1.21.8, 1.21.9                              | `_optimized`     | Default, ger, zh_cn |
+| `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4 |                  | Default, ger        |
+| `miku%`            | 1.21.8, 1.21.9                              |                  | Default             |
+| `all_trims`        | 1.21.8, 1.21.9                              |                  | Default             |
+| `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 25w14craftmine  | `1`              | Default             |
 
 _The `test1` templates are for you to learn and understand how templates work. These test templates include all the core
 functionalities of all goal types. The `Default` language is the standard english template (`_lang.json`). Any
 non-default languages are appended after `lang_`._
+
+Credits for chinese translation of the 1.16.1 `all_advancements` template go to @towardstars and @yumekotism on dc.
+Make sure you use the `SourceHanSansCN-Normal.otf` font in all places (tracker, overlay and UI).
 
 ***
 
@@ -512,8 +519,12 @@ Suggest it in the [Official Advancely Discord](https://discord.gg/TyNgXDz) withi
 
 ## Running into Issues?
 
-* **Is Windows Defender blocking the application?**: I've contacted Microsoft so windows defender does not falsely detect Advancely.exe as a virus. So make sure your Windows Defender version is up to date. Get the latest version [here](https://docs.microsoft.com/microsoft-365/security/defender-endpoint/manage-updates-baselines-microsoft-defender-antivirus).
-* **Is the tracker in a path with special characters?**: Ensure the full folder path to `Advancely.exe` (e.g., `C:\Users\Jörg\...`) contains only standard English letters and numbers. Special characters can cause errors when loading files.
+* **Is Windows Defender blocking the application?**: I've contacted Microsoft so windows defender does not falsely
+  detect Advancely.exe as a virus. So make sure your Windows Defender version is up to date. Get the latest
+  version [here](https://docs.microsoft.com/microsoft-365/security/defender-endpoint/manage-updates-baselines-microsoft-defender-antivirus).
+* **Is the tracker in a path with special characters?**: Ensure the full folder path to `Advancely.exe` (e.g.,
+  `C:\Users\Jörg\...`) contains only standard English letters and numbers. Special characters can cause errors when
+  loading files.
 * **Check log file**: First, look into the `advancely_log.txt` file to see if there are any errors that were caused by
   wrong usage of the application. With the `Print Debug To Console` setting enabled, the log file will also contain
   detailed progress updates, not just errors.
@@ -528,7 +539,8 @@ Suggest it in the [Official Advancely Discord](https://discord.gg/TyNgXDz) withi
 Massive thanks to all the beta testers. _Message me on discord @lnxseus with proof of using Advancely before its full
 release and you'll be added here:_
 
-* Windows: ethansplace98, Yumeko, zurtletif, 3emis, MoreTrident, PhoenixAUS_, metal_silver1234, 36_Official, TheDogmaster28
+* Windows: ethansplace98, Yumeko, zurtletif, 3emis, MoreTrident, PhoenixAUS_, metal_silver1234, 36_Official,
+  TheDogmaster28
 * macOS: Slackow, TheDogmaster28, ethansplace98
 * Linux: DesktopFolder, ShadowFlower64, me_nx
 
