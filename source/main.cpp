@@ -99,7 +99,7 @@ static bool show_welcome_window = false; // For rendering the welcome window on 
 static char release_url_buffer[256] = {0};
 static SDL_Texture *g_logo_texture = nullptr; // Loading the advancely logo
 
-
+#ifdef _WIN32
 // Warning the user with a popup window if file path contains non-ascii characters
 // Especially a problem on windows
 static bool path_contains_non_ascii(const char *path) {
@@ -111,6 +111,7 @@ static bool path_contains_non_ascii(const char *path) {
     }
     return false;
 }
+#endif
 
 // All builds now have the resources folder on the same level as the executable or .app bundle
 static void find_and_set_resource_path(char *path_buffer, size_t buffer_size) {
