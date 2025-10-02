@@ -51,6 +51,7 @@ jobs:
         shell: bash
         run: |
           mkdir release
+          # --- OS-Specific File Copying ---
           if [ "$RUNNER_OS" == "macOS" ]; then
             # --- ROBUST SCRIPT WITH RECURSIVE DEPENDENCY BUNDLING ---
             BUNDLE_DEST_PATH="release/Advancely.app"
@@ -63,22 +64,15 @@ jobs:
             cp -r resources "release/"
             cp _PLEASE_READ_ME.txt LICENSES.txt README.md "release/"
 
-            # --- Step 1: Discover all unique dependencies recursively ---
-            declare -A LIBS_TO_COPY # Use an associative array for unique paths
-          
-            # Start with the main executable
+            # Step 1: Discover all unique dependencies recursively
+            declare -A LIBS_TO_COPY
             FILES_TO_INSPECT=("$EXE_PATH")
-          
             idx=0
             while [ $idx -lt ${#FILES_TO_INSPECT[@]} ]; do
               file_to_inspect="${FILES_TO_INSPECT[$idx]}"
               idx=$((idx + 1))
-
-              # Find dependencies linked from Homebrew
               DEPS=$(otool -L "$file_to_inspect" | grep "$BREW_PREFIX" | awk '{print $1}')
-          
               for dep_path in $DEPS; do
-                # If we haven't seen this exact path before, process it
                 if [[ -z "${LIBS_TO_COPY[$dep_path]}" ]]; then
                   echo "Discovered dependency: $dep_path"
                   LIBS_TO_COPY[$dep_path]=1
@@ -87,34 +81,32 @@ jobs:
               done
             done
 
-            # --- Step 2: Copy all unique libraries to the bundle ---
+            # Step 2: Copy all unique libraries to the bundle
             for lib_path in "${!LIBS_TO_COPY[@]}"; do
               echo "Copying $lib_path"
               cp "$lib_path" "$LIBS_DEST_DIR/"
             done
           
-            # --- Step 3: Update all references in the executable and copied libraries ---
+            # Step 3: Update all references
             ALL_BINARIES=("$EXE_PATH")
             for lib_path in "${!LIBS_TO_COPY[@]}"; do
               lib_name=$(basename "$lib_path")
               ALL_BINARIES+=("$LIBS_DEST_DIR/$lib_name")
             done
-
             for binary in "${ALL_BINARIES[@]}"; do
               for lib_path in "${!LIBS_TO_COPY[@]}"; do
                 lib_name=$(basename "$lib_path")
-                echo "Fixing reference to $lib_name in $binary"
                 install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$binary"
               done
             done
           
-            # --- Step 4: Ad-hoc sign everything ---
+            # Step 4: Ad-hoc sign everything
             echo "Signing bundled libraries and application..."
             codesign --force --sign - --timestamp=none --all-architectures "$LIBS_DEST_DIR"/lib*.dylib
             codesign --force --deep --sign - --timestamp=none --all-architectures "$BUNDLE_DEST_PATH"
           
           elif [ "$RUNNER_OS" == "Linux" ]; then
-            # Your existing Linux packaging script
+            # Linux packaging script
             cp build/Advancely release/
             cp -r resources release/
             cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
@@ -123,35 +115,19 @@ jobs:
             cp /usr/local/lib/libSDL3_ttf.so.0 release/
           fi
           
-            TEMPLATE_DIR="release/resources/templates/1.16.1"
-            if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
-              mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/advancements_temp" && mv "$TEMPLATE_DIR/advancements_temp" "$TEMPLATE_DIR/all_advancements"
-            fi
-            LOWERCASE_DIR="$TEMPLATE_DIR/all_advancements"
-            if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements.json" ]; then
-              mv "$LOWERCASE_DIR/1_16_1_All_Advancements.json" "$LOWERCASE_DIR/temp.json" && mv "$LOWERCASE_DIR/temp.json" "$LOWERCASE_DIR/1_16_1_all_advancements.json"
-            fi
-            if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" ]; then
-              mv "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" "$LOWERCASE_DIR/temp_lang.json" && mv "$LOWERCASE_DIR/temp_lang.json" "$LOWERCASE_DIR/1_16_1_all_advancements_lang.json"
-            fi
-          elif [ "$RUNNER_OS" == "Linux" ]; then
-            cp build/Advancely release/
-            cp -r resources release/
-            cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
-            cp /usr/local/lib/libSDL3.so.0 release/
-            cp /usr/local/lib/libSDL3_image.so.0 release/
-            cp /usr/local/lib/libSDL3_ttf.so.0 release/
-            TEMPLATE_DIR="release/resources/templates/1.16.1"
-            if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
-              mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/all_advancements"
-            fi
-            LOWERCASE_DIR="$TEMPLATE_DIR/all_advancements"
-            if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements.json" ]; then
-              mv "$LOWERCASE_DIR/1_16_1_All_Advancements.json" "$LOWERCASE_DIR/1_16_1_all_advancements.json"
-            fi
-            if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" ]; then
-              mv "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" "$LOWERCASE_DIR/1_16_1_all_advancements_lang.json"
-            fi
+          # --- Common Post-Packaging Steps for all OS ---
+          echo "Correcting template filenames..."
+          TEMPLATE_DIR="release/resources/templates/1.16.1"
+          if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
+            mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/all_advancements"
+          fi
+          
+          LOWERCASE_DIR="$TEMPLATE_DIR/all_advancements"
+          if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements.json" ]; then
+            mv "$LOWERCASE_DIR/1_16_1_All_Advancements.json" "$LOWERCASE_DIR/1_16_1_all_advancements.json"
+          fi
+          if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" ]; then
+            mv "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" "$LOWERCASE_DIR/1_16_1_all_advancements_lang.json"
           fi
 
       # --- ZIPPING AND UPLOADING STEP (FIXED) ---
