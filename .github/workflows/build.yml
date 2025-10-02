@@ -52,71 +52,69 @@ jobs:
         run: |
           mkdir release
           if [ "$RUNNER_OS" == "macOS" ]; then
-            # --- SCRIPT WITH RECURSIVE DEPENDENCY BUNDLING FOR .APP ---
-            BUNDLE_SRC_PATH="build/Advancely.app"
+            # --- ROBUST SCRIPT WITH RECURSIVE DEPENDENCY BUNDLING ---
             BUNDLE_DEST_PATH="release/Advancely.app"
-            EXE_DEST_PATH="$BUNDLE_DEST_PATH/Contents/MacOS/Advancely"
+            EXE_PATH="$BUNDLE_DEST_PATH/Contents/MacOS/Advancely"
             LIBS_DEST_DIR="$BUNDLE_DEST_PATH/Contents/MacOS"
             BREW_PREFIX=$(brew --prefix)
-            echo "Using Homebrew prefix: $BREW_PREFIX"
           
-            cp -R "$BUNDLE_SRC_PATH" "release/"
+            echo "Copying app bundle and resources..."
+            cp -R "build/Advancely.app" "release/"
             cp -r resources "release/"
             cp _PLEASE_READ_ME.txt LICENSES.txt README.md "release/"
 
-            # --- RECURSIVE BUNDLING LOGIC ---
-            LIBS_TO_PROCESS=()
-            PROCESSED_LIBS=() # Tracks full original paths to already processed libs
+            # --- Step 1: Discover all unique dependencies recursively ---
+            declare -A LIBS_TO_COPY # Use an associative array for unique paths
           
-            # 1. Get initial list of direct dependencies for the main executable
-            DIRECT_DEPS=$(otool -L "$EXE_DEST_PATH" | grep "$BREW_PREFIX" | awk '{print $1}')
-            for dep in $DIRECT_DEPS; do
-              LIBS_TO_PROCESS+=("$dep")
+            # Start with the main executable
+            FILES_TO_INSPECT=("$EXE_PATH")
+          
+            idx=0
+            while [ $idx -lt ${#FILES_TO_INSPECT[@]} ]; do
+              file_to_inspect="${FILES_TO_INSPECT[$idx]}"
+              idx=$((idx + 1))
+
+              # Find dependencies linked from Homebrew
+              DEPS=$(otool -L "$file_to_inspect" | grep "$BREW_PREFIX" | awk '{print $1}')
+          
+              for dep_path in $DEPS; do
+                # If we haven't seen this exact path before, process it
+                if [[ -z "${LIBS_TO_COPY[$dep_path]}" ]]; then
+                  echo "Discovered dependency: $dep_path"
+                  LIBS_TO_COPY[$dep_path]=1
+                  FILES_TO_INSPECT+=("$dep_path")
+                fi
+              done
             done
 
-            # 2. Loop until there are no more dependencies to process
-            while [ ${#LIBS_TO_PROCESS[@]} -gt 0 ]; do
-              lib_path=${LIBS_TO_PROCESS[0]}
-              lib_name=$(basename "$lib_path")
-              LIBS_TO_PROCESS=("${LIBS_TO_PROCESS[@]:1}")
-
-              # Skip if we have already processed this exact library path
-              if [[ " ${PROCESSED_LIBS[*]} " =~ " ${lib_path} " ]]; then
-                continue
-              fi
-          
-              echo "Processing dependency: $lib_path"
-          
-              # Copy the library into the bundle
+            # --- Step 2: Copy all unique libraries to the bundle ---
+            for lib_path in "${!LIBS_TO_COPY[@]}"; do
+              echo "Copying $lib_path"
               cp "$lib_path" "$LIBS_DEST_DIR/"
+            done
           
-              # Update the main executable to look for this library in the app bundle
-              install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$EXE_DEST_PATH"
+            # --- Step 3: Update all references in the executable and copied libraries ---
+            ALL_BINARIES=("$EXE_PATH")
+            for lib_path in "${!LIBS_TO_COPY[@]}"; do
+              lib_name=$(basename "$lib_path")
+              ALL_BINARIES+=("$LIBS_DEST_DIR/$lib_name")
+            done
 
-              PROCESSED_LIBS+=("$lib_path")
-          
-              # 3. Find the transitive dependencies of the library we just copied
-              TRANSITIVE_DEPS=$(otool -L "$LIBS_DEST_DIR/$lib_name" | grep "$BREW_PREFIX" | awk '{print $1}')
-              for transitive_dep in $TRANSITIVE_DEPS; do
-                LIBS_TO_PROCESS+=("$transitive_dep")
+            for binary in "${ALL_BINARIES[@]}"; do
+              for lib_path in "${!LIBS_TO_COPY[@]}"; do
+                lib_name=$(basename "$lib_path")
+                echo "Fixing reference to $lib_name in $binary"
+                install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$binary"
               done
             done
           
-            # 4. Final pass: update all copied libraries to reference each other correctly
-            for copied_lib_path in "$LIBS_DEST_DIR"/lib*.dylib; do
-              for original_lib_path in "${PROCESSED_LIBS[@]}"; do
-                original_lib_name=$(basename "$original_lib_path")
-                # Update the reference inside the currently looped library
-                install_name_tool -change "$original_lib_path" "@executable_path/$original_lib_name" "$copied_lib_path"
-              done
-            done
+            # --- Step 4: Ad-hoc sign everything ---
+            echo "Signing bundled libraries and application..."
+            codesign --force --sign - --timestamp=none --all-architectures "$LIBS_DEST_DIR"/lib*.dylib
+            codesign --force --deep --sign - --timestamp=none --all-architectures "$BUNDLE_DEST_PATH"
           
-            # Ad-hoc sign all the bundled libraries and the main app
-            codesign --force --sign - "$LIBS_DEST_DIR"/lib*.dylib
-            codesign --force --deep --sign - "$BUNDLE_DEST_PATH"
-          
-          # --- END OF RECURSIVE BUNDLING LOGIC ---
           elif [ "$RUNNER_OS" == "Linux" ]; then
+            # Your existing Linux packaging script
             cp build/Advancely release/
             cp -r resources release/
             cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
