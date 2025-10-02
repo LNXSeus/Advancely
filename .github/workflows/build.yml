@@ -74,11 +74,11 @@ jobs:
               file_to_inspect="${FILES_TO_INSPECT[$idx]}"
               idx=$((idx + 1))
 
-              DEPS=$(otool -L "$file_to_inspect" | grep "$BREW_PREFIX" | awk '{print $1}')
+              # The awk command now ignores lines ending in a colon.
+              DEPS=$(otool -L "$file_to_inspect" | grep "$BREW_PREFIX" | awk '!/:$/ {print $1}')
           
               for dep_path in $DEPS; do
                 dep_name=$(basename "$dep_path")
-                # Check if a library with this filename has already been queued for copy
                 if [[ ! " ${COPIED_LIBS_BASENAMES[*]} " =~ " ${dep_name} " ]]; then
                   echo "Discovered dependency: $dep_path"
                   ALL_DEPENDENCIES+=("$dep_path")
