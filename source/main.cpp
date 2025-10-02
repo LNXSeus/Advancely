@@ -576,7 +576,7 @@ int main(int argc, char *argv[]) {
             // Initialize SDL video subsystem just to be able to show a message box
             if (!SDL_Init(SDL_INIT_VIDEO)) {
                 // Fallback if SDL can't even initialize
-                fprintf(stderr, "Critical Path Error: Advancely cannot run from a path with special characters.\n");
+                log_message(LOG_ERROR, "Critical Path Error: Advancely cannot run from a path with special characters.\n");
                 return EXIT_FAILURE;
             }
             SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,
