@@ -76,7 +76,7 @@
       "criteria": {}
     },
     "minecraft:story/enchant_item": {
-      "icon": "items/enchanted_book_3d_shareware_v1.34.png",
+      "icon": "items/Enchanted_Book_unoptimized.gif",
       "hidden": false,
       "criteria": {}
     },
@@ -661,12 +661,12 @@
       "criteria": {}
     },
     "minecraft:adventure/voluntary_exile": {
-      "icon": "blocks/Ominous_Banner.gif",
+      "icon": "blocks/Ominous_Banner_unoptimized.gif",
       "hidden": false,
       "criteria": {}
     },
     "minecraft:adventure/hero_of_the_village": {
-      "icon": "blocks/Ominous_Banner.gif",
+      "icon": "blocks/Ominous_Banner_unoptimized.gif",
       "hidden": false,
       "criteria": {}
     },
@@ -1219,7 +1219,7 @@
     },
     {
       "root_name": "ms_goal:bees",
-      "icon": "animals/bee_animated.gif",
+      "icon": "animals/Bee_unoptimized.gif",
       "hidden": false,
       "stages": [
         {
