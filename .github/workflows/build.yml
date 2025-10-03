@@ -88,7 +88,7 @@ jobs:
                 exit 1
               fi
 
-              TRANSITIVE_DEPS=($(otool -L "$actual_lib_path" | grep "$BREW_PREFIX" | awk '{gsub(/:$/, ""); print $1}'))
+              TRANSITIVE_DEPS=($(otool -L "$actual_lib_path" | grep -E "$BREW_PREFIX|@rpath" | awk '{gsub(/:$/, ""); print $1}'))
               for dep in "${TRANSITIVE_DEPS[@]}"; do
                 LIBS_TO_PROCESS+=("$dep")
               done
