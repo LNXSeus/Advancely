@@ -7,7 +7,7 @@ on:
     branches: [ main, master ]
 
 jobs:
-  # Job 1: Build the Linux version
+  # Job 1: Build and Test the Linux version
   build_linux:
     runs-on: ubuntu-latest
     steps:
@@ -24,7 +24,6 @@ jobs:
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
       - name: Build Project
         run: cmake --build build --config Release
-      # --- ADDED TEST STEPS FOR LINUX ---
       - name: Run Executable Test (Linux)
         run: |
           echo "Running executable for 5 seconds..."
@@ -46,7 +45,6 @@ jobs:
           cp /usr/local/lib/libSDL3.so.0 release/
           cp /usr/local/lib/libSDL3_image.so.0 release/
           cp /usr/local/lib/libSDL3_ttf.so.0 release/
-          
           TEMPLATE_DIR="release/resources/templates/1.16.1"
           if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
             mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/all_advancements"
@@ -64,7 +62,7 @@ jobs:
           name: Advancely-v${{ env.PROJECT_VERSION }}-Linux
           path: release/
 
-  # Job 2: Build the macOS Intel (X64) version
+  # Job 2: Build, Test, and Bundle the macOS Intel (X64) version
   build_macos_intel:
     runs-on: macos-13
     steps:
@@ -76,8 +74,6 @@ jobs:
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$(brew --prefix) -DCMAKE_OSX_DEPLOYMENT_TARGET="11.0"
       - name: Build Project
         run: cmake --build build --config Release
-
-      # --- ADDED TEST STEPS FOR MACOS INTEL ---
       - name: Install gtimeout (GNU Coreutils)
         run: brew install coreutils
       - name: Run Executable Test (macOS Intel)
@@ -91,14 +87,53 @@ jobs:
         with:
           name: test-output-v${{ env.PROJECT_VERSION }}-macOS-X64
           path: output.txt
-
+      - name: Bundle macOS Dependencies
+        shell: bash
+        run: |
+          BUNDLE_PATH="build/Advancely.app"
+          EXE_PATH="$BUNDLE_PATH/Contents/MacOS/Advancely"
+          LIBS_DEST_DIR="$BUNDLE_PATH/Contents/MacOS"
+          BREW_PREFIX=$(brew --prefix)
+          LIBS_TO_PROCESS=($(otool -L "$EXE_PATH" | grep "$BREW_PREFIX" | awk '{gsub(/:$/, ""); print $1}'))
+          TEMP_DEPS_LIST=()
+          i=0
+          while [ $i -lt ${#LIBS_TO_PROCESS[@]} ]; do
+            original_lib_path=${LIBS_TO_PROCESS[$i]}
+            i=$((i+1))
+            if [[ " ${TEMP_DEPS_LIST[*]} " =~ " ${original_lib_path} " ]]; then continue; fi
+            TEMP_DEPS_LIST+=("$original_lib_path")
+            lib_name=$(basename "$original_lib_path")
+            actual_lib_path="$BREW_PREFIX/lib/$lib_name"
+            if [ ! -f "$actual_lib_path" ]; then echo "::error::Cannot find '$lib_name'"; exit 1; fi
+            TRANSITIVE_DEPS=($(otool -L "$actual_lib_path" | grep -E "$BREW_PREFIX|@rpath" | awk '{gsub(/:$/, ""); print $1}'))
+            for dep in "${TRANSITIVE_DEPS[@]}"; do LIBS_TO_PROCESS+=("$dep"); done
+          done
+          UNIQUE_ORIGINAL_PATHS=($(echo "${LIBS_TO_PROCESS[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' '))
+          UNIQUE_BASENAMES=($(for path in "${UNIQUE_ORIGINAL_PATHS[@]}"; do basename "$path"; done | sort -u))
+          for lib_name in "${UNIQUE_BASENAMES[@]}"; do
+            cp "$BREW_PREFIX/lib/$lib_name" "$LIBS_DEST_DIR/"
+          done
+          for original_lib_path in "${UNIQUE_ORIGINAL_PATHS[@]}"; do
+            lib_name=$(basename "$original_lib_path")
+            install_name_tool -change "$original_lib_path" "@executable_path/$lib_name" "$EXE_PATH"
+          done
+          for copied_lib_path in "$LIBS_DEST_DIR"/lib*.dylib; do
+            copied_lib_name=$(basename "$copied_lib_path")
+            install_name_tool -id "@executable_path/$copied_lib_name" "$copied_lib_path"
+            for original_lib_path in "${UNIQUE_ORIGINAL_PATHS[@]}"; do
+              original_lib_name=$(basename "$original_lib_path")
+              install_name_tool -change "$original_lib_path" "@executable_path/$original_lib_name" "$copied_lib_path"
+            done
+          done
+          codesign --force --sign - "$LIBS_DEST_DIR"/lib*.dylib
+          codesign --force --deep --sign - "$BUNDLE_PATH"
       - name: Upload Intel App Bundle
         uses: actions/upload-artifact@v4
         with:
           name: Advancely-macOS-X64-app
           path: build/Advancely.app
 
-  # Job 3: Build the macOS Apple Silicon (ARM64) version
+  # Job 3: Build, Test, and Bundle the macOS Apple Silicon (ARM64) version
   build_macos_arm:
     runs-on: macos-latest
     steps:
@@ -110,8 +145,6 @@ jobs:
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$(brew --prefix) -DCMAKE_OSX_DEPLOYMENT_TARGET="11.0"
       - name: Build Project
         run: cmake --build build --config Release
-
-      # --- ADDED TEST STEPS FOR MACOS ARM ---
       - name: Install gtimeout (GNU Coreutils)
         run: brew install coreutils
       - name: Run Executable Test (macOS ARM)
@@ -125,7 +158,46 @@ jobs:
         with:
           name: test-output-v${{ env.PROJECT_VERSION }}-macOS-ARM64
           path: output.txt
-
+      - name: Bundle macOS Dependencies
+        shell: bash
+        run: |
+          BUNDLE_PATH="build/Advancely.app"
+          EXE_PATH="$BUNDLE_PATH/Contents/MacOS/Advancely"
+          LIBS_DEST_DIR="$BUNDLE_PATH/Contents/MacOS"
+          BREW_PREFIX=$(brew --prefix)
+          LIBS_TO_PROCESS=($(otool -L "$EXE_PATH" | grep "$BREW_PREFIX" | awk '{gsub(/:$/, ""); print $1}'))
+          TEMP_DEPS_LIST=()
+          i=0
+          while [ $i -lt ${#LIBS_TO_PROCESS[@]} ]; do
+            original_lib_path=${LIBS_TO_PROCESS[$i]}
+            i=$((i+1))
+            if [[ " ${TEMP_DEPS_LIST[*]} " =~ " ${original_lib_path} " ]]; then continue; fi
+            TEMP_DEPS_LIST+=("$original_lib_path")
+            lib_name=$(basename "$original_lib_path")
+            actual_lib_path="$BREW_PREFIX/lib/$lib_name"
+            if [ ! -f "$actual_lib_path" ]; then echo "::error::Cannot find '$lib_name'"; exit 1; fi
+            TRANSITIVE_DEPS=($(otool -L "$actual_lib_path" | grep -E "$BREW_PREFIX|@rpath" | awk '{gsub(/:$/, ""); print $1}'))
+            for dep in "${TRANSITIVE_DEPS[@]}"; do LIBS_TO_PROCESS+=("$dep"); done
+          done
+          UNIQUE_ORIGINAL_PATHS=($(echo "${LIBS_TO_PROCESS[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' '))
+          UNIQUE_BASENAMES=($(for path in "${UNIQUE_ORIGINAL_PATHS[@]}"; do basename "$path"; done | sort -u))
+          for lib_name in "${UNIQUE_BASENAMES[@]}"; do
+            cp "$BREW_PREFIX/lib/$lib_name" "$LIBS_DEST_DIR/"
+          done
+          for original_lib_path in "${UNIQUE_ORIGINAL_PATHS[@]}"; do
+            lib_name=$(basename "$original_lib_path")
+            install_name_tool -change "$original_lib_path" "@executable_path/$lib_name" "$EXE_PATH"
+          done
+          for copied_lib_path in "$LIBS_DEST_DIR"/lib*.dylib; do
+            copied_lib_name=$(basename "$copied_lib_path")
+            install_name_tool -id "@executable_path/$copied_lib_name" "$copied_lib_path"
+            for original_lib_path in "${UNIQUE_ORIGINAL_PATHS[@]}"; do
+              original_lib_name=$(basename "$original_lib_path")
+              install_name_tool -change "$original_lib_path" "@executable_path/$original_lib_name" "$copied_lib_path"
+            done
+          done
+          codesign --force --sign - "$LIBS_DEST_DIR"/lib*.dylib
+          codesign --force --deep --sign - "$BUNDLE_PATH"
       - name: Upload ARM App Bundle
         uses: actions/upload-artifact@v4
         with:
@@ -149,7 +221,7 @@ jobs:
         with:
           name: Advancely-macOS-ARM64-app
           path: build-arm64/Advancely.app
-      - name: Create Universal App and Bundle Dependencies
+      - name: Create Universal App from Bundled Artifacts
         shell: bash
         run: |
           INTEL_APP_PATH="build-x64/Advancely.app"
@@ -164,46 +236,25 @@ jobs:
           lipo -create -output "$UNIVERSAL_APP_PATH/Contents/MacOS/Advancely" \
             "$INTEL_APP_PATH/Contents/MacOS/Advancely" \
             "$ARM_APP_PATH/Contents/MacOS/Advancely"
-
-          echo "Finding all unique dependencies from both architectures..."
-          BREW_PREFIX_INTEL="/usr/local"
-          BREW_PREFIX_ARM="/opt/homebrew"
-          
-          # Gather dependencies from both builds
-          INTEL_DEPS=$(otool -L "$INTEL_APP_PATH/Contents/MacOS/Advancely" | grep "$BREW_PREFIX_INTEL" | awk '{gsub(/:$/, ""); print $1}')
-          ARM_DEPS=$(otool -L "$ARM_APP_PATH/Contents/MacOS/Advancely" | grep "$BREW_PREFIX_ARM" | awk '{gsub(/:$/, ""); print $1}')
-          
-          # Combine and find unique basenames
-          ALL_DEPS_BASENAMES=$( (echo "$INTEL_DEPS"; echo "$ARM_DEPS") | xargs -n1 basename | sort -u)
           
           echo "Creating universal libraries..."
-          for lib_name in $ALL_DEPS_BASENAMES; do
-            echo "Processing $lib_name..."
-            lipo -create -output "$UNIVERSAL_APP_PATH/Contents/MacOS/$lib_name" \
-              "$BREW_PREFIX_INTEL/lib/$lib_name" \
-              "$BREW_PREFIX_ARM/lib/$lib_name"
-          done
+          ARM_LIBS_DIR="$UNIVERSAL_APP_PATH/Contents/MacOS"
+          INTEL_LIBS_DIR="$INTEL_APP_PATH/Contents/MacOS"
           
-          echo "Fixing library paths..."
-          ALL_DEPS_PATHS=$( (echo "$INTEL_DEPS"; echo "$ARM_DEPS") | sort -u)
-          ALL_ITEMS_IN_BUNDLE=$(find "$UNIVERSAL_APP_PATH/Contents/MacOS" -type f \( -name "*.dylib" -o -name "Advancely" \))
-
-          for original_path in $ALL_DEPS_PATHS; do
-            lib_name=$(basename "$original_path")
-            for item in $ALL_ITEMS_IN_BUNDLE; do
-              install_name_tool -change "$original_path" "@executable_path/$lib_name" "$item"
-            done
-          done
-          
-          for dylib in $(find "$UNIVERSAL_APP_PATH/Contents/MacOS" -name "*.dylib"); do
-            lib_name=$(basename "$dylib")
-            install_name_tool -id "@executable_path/$lib_name" "$dylib"
+          for arm_lib_path in $(find "$ARM_LIBS_DIR" -name "*.dylib"); do
+            lib_name=$(basename "$arm_lib_path")
+            intel_lib_path="$INTEL_LIBS_DIR/$lib_name"
+            if [ -f "$intel_lib_path" ]; then
+              echo "Merging $lib_name..."
+              lipo -create -output "$arm_lib_path" "$arm_lib_path" "$intel_lib_path"
+            else
+              echo "Warning: Could not find matching Intel library for $lib_name."
+            fi
           done
           
           echo "Codesigning final application..."
           codesign --force --sign - "$UNIVERSAL_APP_PATH/Contents/MacOS/"*.dylib
           codesign --force --deep --sign - "$UNIVERSAL_APP_PATH"
-
       - name: Assemble Final Release Package
         shell: bash
         run: |
@@ -226,3 +277,4 @@ jobs:
         with:
           name: Advancely-v${{ env.PROJECT_VERSION }}-macOS-Universal
           path: release/
+
