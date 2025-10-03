@@ -53,7 +53,7 @@ jobs:
           mkdir release
           
           if [ "$RUNNER_OS" == "macOS" ]; then
-            # --- FINAL ROBUST RECURSIVE DEPENDENCY BUNDLING SCRIPT ---
+            # --- FINAL, ROBUST SCRIPT FOR DEPENDENCY BUNDLING ---
             BUNDLE_DEST_PATH="release/Advancely.app"
             EXE_PATH="$BUNDLE_DEST_PATH/Contents/MacOS/Advancely"
             LIBS_DEST_DIR="$BUNDLE_DEST_PATH/Contents/MacOS"
@@ -81,12 +81,12 @@ jobs:
               for dep_path in $DEPS; do
                 resolved_dep_path=""
                 if [[ $dep_path == @rpath* ]]; then
-                  resolved_dep_path="${dep_path/@rpath/$dir_of_file}"
+                  resolved_dep_path="${dep_path/@rpath/$(realpath "$dir_of_file")}"
                 elif [[ $dep_path == $BREW_PREFIX* ]]; then
                   resolved_dep_path="$dep_path"
                 fi
           
-                if [[ -n "$resolved_dep_path" ]]; then
+                if [[ -n "$resolved_dep_path" && -f "$resolved_dep_path" ]]; then
                   dep_name=$(basename "$resolved_dep_path")
                   if [[ ! " ${COPIED_LIBS_BASENAMES[*]} " =~ " ${dep_name} " ]]; then
                     ALL_DEPENDENCIES+=("$resolved_dep_path")
@@ -104,29 +104,29 @@ jobs:
               fi
             done
           
-            # Step 3: Update library IDs and references
+            # Step 3: Patch all binaries (the executable and all copied libs)
             ALL_BINARIES=("$EXE_PATH")
-            for lib_path in "${ALL_DEPENDENCIES[@]}"; do
-              lib_name=$(basename "$lib_path")
-              ALL_BINARIES+=("$LIBS_DEST_DIR/$lib_name")
+            for lib_name in "${COPIED_LIBS_BASENAMES[@]}"; do
+                ALL_BINARIES+=("$LIBS_DEST_DIR/$lib_name")
             done
 
             for binary in "${ALL_BINARIES[@]}"; do
               if [ ! -f "$binary" ]; then continue; fi
-          
-              # Add rpath to ensure @rpath dependencies are found
-              install_name_tool -add_rpath "@executable_path/" "$binary" 2>/dev/null || true
 
-              # Update the internal ID of the library itself
+              # Update the binary's own ID if it's a library
               if [[ "$binary" == *".dylib" ]]; then
                 lib_name=$(basename "$binary")
                 install_name_tool -id "@executable_path/$lib_name" "$binary"
               fi
 
-              # Update references to other libraries
-              for lib_path in "${ALL_DEPENDENCIES[@]}"; do
-                lib_name=$(basename "$lib_path")
-                install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$binary" 2>/dev/null || true
+              # Update its references to the other bundled libraries
+              for dep_path in "${ALL_DEPENDENCIES[@]}"; do
+                dep_name=$(basename "$dep_path")
+                # Get the original reference path from otool for an exact match
+                original_ref=$(otool -L "$binary" | grep "$dep_name" | awk '{print $1}')
+                if [ -n "$original_ref" ]; then
+                    install_name_tool -change "$original_ref" "@executable_path/$dep_name" "$binary"
+                fi
               done
             done
           
