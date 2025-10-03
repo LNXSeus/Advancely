@@ -129,6 +129,9 @@ jobs:
           
             # Step 4: Ad-hoc sign everything
             echo "Signing bundled libraries and application..."
+          
+            ls -lR "$LIBS_DEST_DIR"
+          
             codesign --force --sign - --timestamp=none --all-architectures "$LIBS_DEST_DIR"/lib*.dylib
             codesign --force --deep --sign - --timestamp=none --all-architectures "$BUNDLE_DEST_PATH"
           
