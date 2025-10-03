@@ -242,7 +242,15 @@ static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *pa
             SDL_DestroyTexture(temp_texture);
         } else {
             // If the frame was already square, just create the texture directly.
-            final_frame_texture = SDL_CreateTextureFromSurface(renderer, frame_surface);
+            // Convert to a standard format first for robustness.
+            SDL_Surface *formatted_surface = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_RGBA32);
+            if (formatted_surface) {
+                SDL_BlitSurface(frame_surface, nullptr, formatted_surface, nullptr);
+                final_frame_texture = SDL_CreateTextureFromSurface(renderer, formatted_surface);
+                SDL_DestroySurface(formatted_surface);
+            } else {
+                final_frame_texture = SDL_CreateTextureFromSurface(renderer, frame_surface);
+            }
         }
 
         anim_texture->frames[i] = final_frame_texture;
@@ -1560,7 +1568,8 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
                     new_stage->stage_id[sizeof(new_stage->stage_id) - 1] = '\0';
                 }
                 if (cJSON_IsString(parent_adv)) {
-                    strncpy(new_stage->parent_advancement, parent_adv->valuestring, sizeof(new_stage->parent_advancement) - 1);
+                    strncpy(new_stage->parent_advancement, parent_adv->valuestring,
+                            sizeof(new_stage->parent_advancement) - 1);
                     new_stage->parent_advancement[sizeof(new_stage->parent_advancement) - 1] = '\0';
                 }
                 if (cJSON_IsString(root)) {
@@ -2297,7 +2306,10 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     snprintf(font_path, sizeof(font_path), "%s/fonts/Minecraft.ttf", get_resources_path());
     t->minecraft_font = TTF_OpenFont(font_path, 24);
     if (!t->minecraft_font) {
-        log_message(LOG_ERROR, "[TRACKER] Failed to load Minecraft font (asure path contains only standard English (ASCII) characters): %s\n", SDL_GetError());
+        log_message(
+            LOG_ERROR,
+            "[TRACKER] Failed to load Minecraft font (asure path contains only standard English (ASCII) characters): %s\n",
+            SDL_GetError());
         tracker_free(tracker, settings);
         return false;
     }
@@ -2692,8 +2704,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     float crit_text_width = ImGui::CalcTextSize(crit->display_name).x;
                     float crit_progress_width = ImGui::CalcTextSize(crit_progress_text).x;
                     float total_crit_width = 32 + 4 + 20 + 4 + crit_text_width + (crit_progress_width > 0
-                                                 ? 4 + crit_progress_width
-                                                 : 0);
+                                                     ? 4 + crit_progress_width
+                                                     : 0);
                     required_width = fmaxf(required_width, total_crit_width);
                 }
             }
