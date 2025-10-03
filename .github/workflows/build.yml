@@ -1,6 +1,5 @@
 name: Build and Package
 
-# This workflow runs on pushes and pull requests to the main branches.
 on:
   push:
     branches: [ main, master ]
@@ -8,202 +7,222 @@ on:
     branches: [ main, master ]
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ ubuntu-latest, macos-13, macos-latest ]
-
+  # Job 1: Build the Linux version
+  build_linux:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      # --- DEPENDENCY INSTALLATION ---
       - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake git libcurl4-openssl-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libwayland-dev libdecor-0-dev libxkbcommon-dev libfreetype6-dev libharfbuzz-dev libasound2-dev
           git clone https://github.com/libsdl-org/SDL.git -b main && cd SDL && cmake -B build && cmake --build build && sudo cmake --install build && cd ..
           git clone https://github.com/libsdl-org/SDL_image.git -b main && cd SDL_image && cmake -B build && cmake --build build && sudo cmake --install build && cd ..
           git clone https://github.com/libsdl-org/SDL_ttf.git -b main && cd SDL_ttf && cmake -B build && cmake --build build && sudo cmake --install build && cd ..
-
-      - name: Install dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
-
-      # --- CMAKE CONFIGURATION ---
       - name: Configure CMake (Linux)
-        if: runner.os == 'Linux'
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
-
-      - name: Configure CMake (macOS)
-        if: runner.os == 'macOS'
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$(brew --prefix) -DCMAKE_OSX_DEPLOYMENT_TARGET="11.0"
-
-      # --- BUILD STEP ---
       - name: Build Project
         run: cmake --build build --config Release
-          
-      # --- INSTALL TIMEOUT COMMAND (macOS only) ---
-      - name: Install gtimeout (GNU Coreutils)
-        if: runner.os == 'macOS'
-        run: brew install coreutils
-
-      # --- RUN EXECUTABLE (All OSes) ---
-      - name: Run Executable Test
+      # --- ADDED TEST STEPS FOR LINUX ---
+      - name: Run Executable Test (Linux)
         run: |
-          # Set the path to the executable based on the OS
-          if [[ "${{ runner.os }}" == "macOS" ]]; then
-            EXE_PATH="./build/Advancely.app/Contents/MacOS/Advancely"
-          else
-            EXE_PATH="./build/Advancely"
-          fi
-          
-          echo "Running executable at $EXE_PATH for 5 seconds..."
-          # Run the command with a 5-second timeout and capture its output.
-          # The '|| true' part is important: it ensures the workflow step succeeds
-          # even when the timeout stops the program, which would otherwise cause an error.
-          timeout 5s "$EXE_PATH" --test-mode > output.txt 2>&1 || true
-          
+          echo "Running executable for 5 seconds..."
+          timeout 5s ./build/Advancely --test-mode > output.txt 2>&1 || true
           echo "Executable run finished. Contents of output.txt:"
           cat output.txt
-
-      # --- UPLOAD TEST OUTPUT (All OSes) ---
-      - name: Upload Test Output
+      - name: Upload Test Output (Linux)
         uses: actions/upload-artifact@v4
         with:
-          name: test-output-v${{ env.PROJECT_VERSION }}-${{ matrix.os }}-${{ runner.arch }}
+          name: test-output-v${{ env.PROJECT_VERSION }}-Linux
           path: output.txt
-
-      # --- PACKAGING STEP (REVISED FOR MACOS) ---
-      - name: Package Artifacts
+      - name: Package Linux Artifact
         shell: bash
         run: |
           mkdir release
-          if [ "$RUNNER_OS" == "macOS" ]; then
-            # --- SCRIPT WITH RECURSIVE DEPENDENCY BUNDLING FOR .APP ---
-            BUNDLE_SRC_PATH="build/Advancely.app"
-            BUNDLE_DEST_PATH="release/Advancely.app"
-            EXE_DEST_PATH="$BUNDLE_DEST_PATH/Contents/MacOS/Advancely"
-            LIBS_DEST_DIR="$BUNDLE_DEST_PATH/Contents/MacOS"
-            BREW_PREFIX=$(brew --prefix)
-            echo "Using Homebrew prefix: $BREW_PREFIX"
+          cp build/Advancely release/
+          cp -r resources release/
+          cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
+          cp /usr/local/lib/libSDL3.so.0 release/
+          cp /usr/local/lib/libSDL3_image.so.0 release/
+          cp /usr/local/lib/libSDL3_ttf.so.0 release/
           
-            cp -R "$BUNDLE_SRC_PATH" "release/"
-            cp -r resources "release/"
-            cp _PLEASE_READ_ME.txt LICENSES.txt README.md "release/"
-
-            # 1. GATHER A COMPLETE, THEN UNIQUE, LIST OF ALL DEPENDENCIES
-            ALL_DEPS_PATHS=()
-            LIBS_TO_PROCESS=($(otool -L "$EXE_DEST_PATH" | grep "$BREW_PREFIX" | awk '{gsub(/:$/, ""); print $1}'))
-          
-            # First, gather all paths recursively, allowing duplicates for now
-            TEMP_DEPS_LIST=()
-            i=0
-            while [ $i -lt ${#LIBS_TO_PROCESS[@]} ]; do
-              original_lib_path=${LIBS_TO_PROCESS[$i]}
-              i=$((i+1))
-
-              # Avoid circular dependencies
-              if [[ " ${TEMP_DEPS_LIST[*]} " =~ " ${original_lib_path} " ]]; then
-                continue
-              fi
-              TEMP_DEPS_LIST+=("$original_lib_path")
-
-              lib_name=$(basename "$original_lib_path")
-              actual_lib_path="$BREW_PREFIX/lib/$lib_name"
-              if [ ! -f "$actual_lib_path" ]; then
-                echo "::error::Cannot find '$lib_name' at '$actual_lib_path'. Aborting."
-                exit 1
-              fi
-
-              TRANSITIVE_DEPS=($(otool -L "$actual_lib_path" | grep -E "$BREW_PREFIX|@rpath" | awk '{gsub(/:$/, ""); print $1}'))
-              for dep in "${TRANSITIVE_DEPS[@]}"; do
-                LIBS_TO_PROCESS+=("$dep")
-              done
-            done
-          
-            # Now, create a truly unique list of paths using sort
-            UNIQUE_ORIGINAL_PATHS=($(echo "${LIBS_TO_PROCESS[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' '))
-
-            # From the unique paths, create a unique list of basenames for the copy step
-            UNIQUE_BASENAMES=($(for path in "${UNIQUE_ORIGINAL_PATHS[@]}"; do basename "$path"; done | sort -u))
-
-            # 2. COPY ALL UNIQUE DEPENDENCIES INTO THE BUNDLE
-            for lib_name in "${UNIQUE_BASENAMES[@]}"; do
-              actual_lib_path="$BREW_PREFIX/lib/$lib_name"
-              echo "Copying dependency: $lib_name"
-              cp "$actual_lib_path" "$LIBS_DEST_DIR/"
-            done
-          
-            # 3. FIX REFERENCES IN THE MAIN EXECUTABLE
-            for original_lib_path in "${UNIQUE_ORIGINAL_PATHS[@]}"; do
-              lib_name=$(basename "$original_lib_path")
-              install_name_tool -change "$original_lib_path" "@executable_path/$lib_name" "$EXE_DEST_PATH"
-            done
-          
-            # 4. FIX INTER-LIBRARY REFERENCES AND IDS FOR ALL COPIED LIBS
-            for copied_lib_path in "$LIBS_DEST_DIR"/lib*.dylib; do
-              copied_lib_name=$(basename "$copied_lib_path")
-              install_name_tool -id "@executable_path/$copied_lib_name" "$copied_lib_path"
-          
-              for original_lib_path in "${UNIQUE_ORIGINAL_PATHS[@]}"; do
-                original_lib_name=$(basename "$original_lib_path")
-                install_name_tool -change "$original_lib_path" "@executable_path/$original_lib_name" "$copied_lib_path"
-              done
-            done
-          
-            codesign --force --sign - "$LIBS_DEST_DIR"/lib*.dylib
-            codesign --force --deep --sign - "$BUNDLE_DEST_PATH"
-          
-            TEMPLATE_DIR="release/resources/templates/1.16.1"
-            if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
-              mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/advancements_temp" && mv "$TEMPLATE_DIR/advancements_temp" "$TEMPLATE_DIR/all_advancements"
-            fi
-            LOWERCASE_DIR="$TEMPLATE_DIR/all_advancements"
-            if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements.json" ]; then
-              mv "$LOWERCASE_DIR/1_16_1_All_Advancements.json" "$LOWERCASE_DIR/temp.json" && mv "$LOWERCASE_DIR/temp.json" "$LOWERCASE_DIR/1_16_1_all_advancements.json"
-            fi
-            if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" ]; then
-              mv "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" "$LOWERCASE_DIR/temp_lang.json" && mv "$LOWERCASE_DIR/temp_lang.json" "$LOWERCASE_DIR/1_16_1_all_advancements_lang.json"
-            fi
-          elif [ "$RUNNER_OS" == "Linux" ]; then
-            cp build/Advancely release/
-            cp -r resources release/
-            cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
-            cp /usr/local/lib/libSDL3.so.0 release/
-            cp /usr/local/lib/libSDL3_image.so.0 release/
-            cp /usr/local/lib/libSDL3_ttf.so.0 release/
-            TEMPLATE_DIR="release/resources/templates/1.16.1"
-            if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
-              mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/all_advancements"
-            fi
-            LOWERCASE_DIR="$TEMPLATE_DIR/all_advancements"
-            if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements.json" ]; then
-              mv "$LOWERCASE_DIR/1_16_1_All_Advancements.json" "$LOWERCASE_DIR/1_16_1_all_advancements.json"
-            fi
-            if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" ]; then
-              mv "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" "$LOWERCASE_DIR/1_16_1_all_advancements_lang.json"
-            fi
+          TEMPLATE_DIR="release/resources/templates/1.16.1"
+          if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
+            mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/all_advancements"
           fi
-
-      # --- ZIPPING AND UPLOADING STEP ---
-      - name: Set Final Archive Name
-        id: set_filename
-        shell: bash
-        run: |
-          if [ "$RUNNER_OS" == "macOS" ]; then
-            SUFFIX="${{ matrix.os }}-${{ runner.arch }}" # e.g., macos-13-X64
-          elif [ "$RUNNER_OS" == "Linux" ]; then
-            SUFFIX="Linux"
+          LOWERCASE_DIR="$TEMPLATE_DIR/all_advancements"
+          if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements.json" ]; then
+            mv "$LOWERCASE_DIR/1_16_1_All_Advancements.json" "$LOWERCASE_DIR/1_16_1_all_advancements.json"
           fi
-          FILENAME="Advancely-v${{ env.PROJECT_VERSION }}-${SUFFIX}"
-          echo "FILENAME=$FILENAME" >> $GITHUB_ENV
-
-      - name: Upload Build Artifact
+          if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" ]; then
+            mv "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" "$LOWERCASE_DIR/1_16_1_all_advancements_lang.json"
+          fi
+      - name: Upload Linux Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.FILENAME }}
+          name: Advancely-v${{ env.PROJECT_VERSION }}-Linux
+          path: release/
+
+  # Job 2: Build the macOS Intel (X64) version
+  build_macos_intel:
+    runs-on: macos-13
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install dependencies (macOS)
+        run: brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
+      - name: Configure CMake (macOS)
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$(brew --prefix) -DCMAKE_OSX_DEPLOYMENT_TARGET="11.0"
+      - name: Build Project
+        run: cmake --build build --config Release
+
+      # --- ADDED TEST STEPS FOR MACOS INTEL ---
+      - name: Install gtimeout (GNU Coreutils)
+        run: brew install coreutils
+      - name: Run Executable Test (macOS Intel)
+        run: |
+          echo "Running executable for 5 seconds..."
+          gtimeout 5s ./build/Advancely.app/Contents/MacOS/Advancely --test-mode > output.txt 2>&1 || true
+          echo "Executable run finished. Contents of output.txt:"
+          cat output.txt
+      - name: Upload Test Output (macOS Intel)
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output-v${{ env.PROJECT_VERSION }}-macOS-X64
+          path: output.txt
+
+      - name: Upload Intel App Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Advancely-macOS-X64-app
+          path: build/Advancely.app
+
+  # Job 3: Build the macOS Apple Silicon (ARM64) version
+  build_macos_arm:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install dependencies (macOS)
+        run: brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
+      - name: Configure CMake (macOS)
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$(brew --prefix) -DCMAKE_OSX_DEPLOYMENT_TARGET="11.0"
+      - name: Build Project
+        run: cmake --build build --config Release
+
+      # --- ADDED TEST STEPS FOR MACOS ARM ---
+      - name: Install gtimeout (GNU Coreutils)
+        run: brew install coreutils
+      - name: Run Executable Test (macOS ARM)
+        run: |
+          echo "Running executable for 5 seconds..."
+          gtimeout 5s ./build/Advancely.app/Contents/MacOS/Advancely --test-mode > output.txt 2>&1 || true
+          echo "Executable run finished. Contents of output.txt:"
+          cat output.txt
+      - name: Upload Test Output (macOS ARM)
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output-v${{ env.PROJECT_VERSION }}-macOS-ARM64
+          path: output.txt
+
+      - name: Upload ARM App Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Advancely-macOS-ARM64-app
+          path: build/Advancely.app
+
+  # Job 4: Combine macOS builds into a universal package
+  package_universal_macos:
+    runs-on: macos-latest
+    needs: [build_macos_intel, build_macos_arm]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Download Intel build
+        uses: actions/download-artifact@v4
+        with:
+          name: Advancely-macOS-X64-app
+          path: build-x64/Advancely.app
+      - name: Download ARM build
+        uses: actions/download-artifact@v4
+        with:
+          name: Advancely-macOS-ARM64-app
+          path: build-arm64/Advancely.app
+      - name: Create Universal App and Bundle Dependencies
+        shell: bash
+        run: |
+          INTEL_APP_PATH="build-x64/Advancely.app"
+          ARM_APP_PATH="build-arm64/Advancely.app"
+          UNIVERSAL_APP_PATH="release/Advancely.app"
+          
+          echo "Setting up universal app structure..."
+          mkdir -p release/
+          cp -R "$ARM_APP_PATH" "$UNIVERSAL_APP_PATH"
+          
+          echo "Creating universal executable..."
+          lipo -create -output "$UNIVERSAL_APP_PATH/Contents/MacOS/Advancely" \
+            "$INTEL_APP_PATH/Contents/MacOS/Advancely" \
+            "$ARM_APP_PATH/Contents/MacOS/Advancely"
+
+          echo "Finding all unique dependencies from both architectures..."
+          BREW_PREFIX_INTEL="/usr/local"
+          BREW_PREFIX_ARM="/opt/homebrew"
+          
+          # Gather dependencies from both builds
+          INTEL_DEPS=$(otool -L "$INTEL_APP_PATH/Contents/MacOS/Advancely" | grep "$BREW_PREFIX_INTEL" | awk '{gsub(/:$/, ""); print $1}')
+          ARM_DEPS=$(otool -L "$ARM_APP_PATH/Contents/MacOS/Advancely" | grep "$BREW_PREFIX_ARM" | awk '{gsub(/:$/, ""); print $1}')
+          
+          # Combine and find unique basenames
+          ALL_DEPS_BASENAMES=$( (echo "$INTEL_DEPS"; echo "$ARM_DEPS") | xargs -n1 basename | sort -u)
+          
+          echo "Creating universal libraries..."
+          for lib_name in $ALL_DEPS_BASENAMES; do
+            echo "Processing $lib_name..."
+            lipo -create -output "$UNIVERSAL_APP_PATH/Contents/MacOS/$lib_name" \
+              "$BREW_PREFIX_INTEL/lib/$lib_name" \
+              "$BREW_PREFIX_ARM/lib/$lib_name"
+          done
+          
+          echo "Fixing library paths..."
+          ALL_DEPS_PATHS=$( (echo "$INTEL_DEPS"; echo "$ARM_DEPS") | sort -u)
+          ALL_ITEMS_IN_BUNDLE=$(find "$UNIVERSAL_APP_PATH/Contents/MacOS" -type f \( -name "*.dylib" -o -name "Advancely" \))
+
+          for original_path in $ALL_DEPS_PATHS; do
+            lib_name=$(basename "$original_path")
+            for item in $ALL_ITEMS_IN_BUNDLE; do
+              install_name_tool -change "$original_path" "@executable_path/$lib_name" "$item"
+            done
+          done
+          
+          for dylib in $(find "$UNIVERSAL_APP_PATH/Contents/MacOS" -name "*.dylib"); do
+            lib_name=$(basename "$dylib")
+            install_name_tool -id "@executable_path/$lib_name" "$dylib"
+          done
+          
+          echo "Codesigning final application..."
+          codesign --force --sign - "$UNIVERSAL_APP_PATH/Contents/MacOS/"*.dylib
+          codesign --force --deep --sign - "$UNIVERSAL_APP_PATH"
+
+      - name: Assemble Final Release Package
+        shell: bash
+        run: |
+          cp -r resources release/
+          cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
+          
+          TEMPLATE_DIR="release/resources/templates/1.16.1"
+          if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
+            mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/all_advancements"
+          fi
+          LOWERCASE_DIR="$TEMPLATE_DIR/all_advancements"
+          if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements.json" ]; then
+            mv "$LOWERCASE_DIR/1_16_1_All_Advancements.json" "$LOWERCASE_DIR/1_16_1_all_advancements.json"
+          fi
+          if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" ]; then
+            mv "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" "$LOWERCASE_DIR/1_16_1_all_advancements_lang.json"
+          fi
+      - name: Upload Universal macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Advancely-v${{ env.PROJECT_VERSION }}-macOS-Universal
           path: release/
