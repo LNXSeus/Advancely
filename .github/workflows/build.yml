@@ -66,7 +66,7 @@ jobs:
 
             # 1. GATHER A UNIQUE LIST OF ALL DEPENDENCIES
             ALL_ORIGINAL_DEPS_PATHS=()
-            LIBS_TO_PROCESS=($(otool -L "$EXE_DEST_PATH" | grep "$BREW_PREFIX" | awk '{print $1}'))
+            LIBS_TO_PROCESS=($(otool -L "$EXE_DEST_PATH" | grep "$BREW_PREFIX" | awk '{gsub(/:$/, ""); print $1}'))
           
             while [ ${#LIBS_TO_PROCESS[@]} -gt 0 ]; do
               original_lib_path=${LIBS_TO_PROCESS[0]}
@@ -86,7 +86,7 @@ jobs:
                 fi
           
                 # Use the *actual* path to find transitive dependencies
-                TRANSITIVE_DEPS=$(otool -L "$actual_lib_path" | grep "$BREW_PREFIX" | awk '{print $1}')
+                TRANSITIVE_DEPS=$(otool -L "$actual_lib_path" | grep "$BREW_PREFIX" | awk '{gsub(/:$/, ""); print $1}')
                 for transitive_dep in $TRANSITIVE_DEPS; do
                   LIBS_TO_PROCESS+=("$transitive_dep")
                 done
