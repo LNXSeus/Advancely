@@ -1,5 +1,6 @@
 name: Build and Package
 
+# This workflow runs on pushes and pull requests to the main branches.
 on:
   push:
     branches: [ main, master ]
@@ -7,7 +8,7 @@ on:
     branches: [ main, master ]
 
 jobs:
-  # Job 1: Build and Test the Linux version
+  # Job 1: Build, Test, and Package the Linux version
   build_linux:
     runs-on: ubuntu-latest
     steps:
@@ -56,7 +57,7 @@ jobs:
           if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" ]; then
             mv "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" "$LOWERCASE_DIR/1_16_1_all_advancements_lang.json"
           fi
-      - name: Upload Linux Artifact
+      - name: Upload Linux Release Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Advancely-v${{ env.PROJECT_VERSION }}-Linux
@@ -130,7 +131,7 @@ jobs:
       - name: Upload Intel App Bundle
         uses: actions/upload-artifact@v4
         with:
-          name: Advancely-macOS-X64-app
+          name: Advancely-v${{ env.PROJECT_VERSION }}-macOS-X64-app
           path: build/Advancely.app
 
   # Job 3: Build, Test, and Bundle the macOS Apple Silicon (ARM64) version
@@ -201,7 +202,7 @@ jobs:
       - name: Upload ARM App Bundle
         uses: actions/upload-artifact@v4
         with:
-          name: Advancely-macOS-ARM64-app
+          name: Advancely-v${{ env.PROJECT_VERSION }}-macOS-ARM64-app
           path: build/Advancely.app
 
   # Job 4: Combine macOS builds into a universal package
@@ -211,15 +212,17 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Configure CMake to get version
+        run: cmake -B build
       - name: Download Intel build
         uses: actions/download-artifact@v4
         with:
-          name: Advancely-macOS-X64-app
+          name: Advancely-v${{ env.PROJECT_VERSION }}-macOS-X64-app
           path: build-x64/Advancely.app
       - name: Download ARM build
         uses: actions/download-artifact@v4
         with:
-          name: Advancely-macOS-ARM64-app
+          name: Advancely-v${{ env.PROJECT_VERSION }}-macOS-ARM64-app
           path: build-arm64/Advancely.app
       - name: Create Universal App from Bundled Artifacts
         shell: bash
@@ -277,4 +280,3 @@ jobs:
         with:
           name: Advancely-v${{ env.PROJECT_VERSION }}-macOS-Universal
           path: release/
-

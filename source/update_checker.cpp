@@ -142,18 +142,12 @@ bool check_for_updates(const char *current_version, char *out_latest_version, si
                     if (compare_versions(current_version, out_latest_version) < 0) {
                         is_new_version_available = true;
 
-                        // Determine which OS-specific and ARCH-specific asset to look for
+                        // Determine which OS-specific asset to look for
 #if defined(_WIN32)
                         const char* os_identifier = "-Windows";
 #elif defined(__APPLE__)
-                        // Choose between macOS-ARM64 (Apple Silicon) and macOS-X64 (Intel)
-#if defined(__aarch64__) || defined(__arm64__)
-                        // Apple Silicon (M1/M2/etc.)
-                        const char* os_identifier = "-macOS-ARM64";
-#else
-                        // Intel-based Mac
-                        const char* os_identifier = "-macOS-X64";
-#endif
+                        // On macOS, ALWAYS look for the Universal build now.
+                        const char* os_identifier = "-macOS-Universal";
 #else
                         // Linux
                         const char* os_identifier = "-Linux";
