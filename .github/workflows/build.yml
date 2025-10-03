@@ -64,47 +64,47 @@ jobs:
             cp -r resources "release/"
             cp _PLEASE_READ_ME.txt LICENSES.txt README.md "release/"
 
-            LIBS_TO_PROCESS=()
-            PROCESSED_LIBS=() # Tracks full original paths
-            COPIED_LIBS_BASENAMES=() # Tracks filenames to prevent duplicates
+            # 1. GATHER A UNIQUE LIST OF ALL DEPENDENCIES
+            ALL_DEPS=()
+            LIBS_TO_PROCESS=($(otool -L "$EXE_DEST_PATH" | grep "$BREW_PREFIX" | awk '{print $1}'))
           
-            DIRECT_DEPS=$(otool -L "$EXE_DEST_PATH" | grep "$BREW_PREFIX" | awk '{gsub(/:$/, ""); print $1}')
-            for dep in $DIRECT_DEPS; do
-              LIBS_TO_PROCESS+=("$dep")
-            done
-
             while [ ${#LIBS_TO_PROCESS[@]} -gt 0 ]; do
               lib_path=${LIBS_TO_PROCESS[0]}
-              lib_name=$(basename "$lib_path")
               LIBS_TO_PROCESS=("${LIBS_TO_PROCESS[@]:1}")
 
-              # FIX: Check if we have already copied a library with this FILENAME.
-              if [[ " ${COPIED_LIBS_BASENAMES[*]} " =~ " ${lib_name} " ]]; then
-                # If we have, we don't need to copy it again. But we still must ensure
-                # the executable knows to look for the version we already copied.
-                install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$EXE_DEST_PATH"
-                continue
+              # If we haven't seen this library path before, process it
+              if [[ ! " ${ALL_DEPS[*]} " =~ " ${lib_path} " ]]; then
+                ALL_DEPS+=("$lib_path")
+                # Add its own dependencies to the queue to be checked
+                TRANSITIVE_DEPS=$(otool -L "$lib_path" | grep "$BREW_PREFIX" | awk '{print $1}')
+                for transitive_dep in $TRANSITIVE_DEPS; do
+                  LIBS_TO_PROCESS+=("$transitive_dep")
+                done
               fi
-
-              echo "Processing dependency: $lib_path"
-              cp "$lib_path" "$LIBS_DEST_DIR/"
-              install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$EXE_DEST_PATH"
-          
-              PROCESSED_LIBS+=("$lib_path")
-              COPIED_LIBS_BASENAMES+=("$lib_name")
-          
-              TRANSITIVE_DEPS=$(otool -L "$lib_path" | grep "$BREW_PREFIX" | awk '{gsub(/:$/, ""); print $1}')
-              for transitive_dep in $TRANSITIVE_DEPS; do
-                LIBS_TO_PROCESS+=("$transitive_dep")
-              done
             done
           
+            # 2. COPY ALL UNIQUE DEPENDENCIES INTO THE BUNDLE
+            for lib_path in "${ALL_DEPS[@]}"; do
+              echo "Copying dependency: $(basename "$lib_path")"
+              cp "$lib_path" "$LIBS_DEST_DIR/"
+            done
+          
+            # 3. FIX REFERENCES IN THE MAIN EXECUTABLE
+            for lib_path in "${ALL_DEPS[@]}"; do
+              lib_name=$(basename "$lib_path")
+              install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$EXE_DEST_PATH"
+            done
+          
+            # 4. FIX INTER-LIBRARY REFERENCES AND IDS FOR ALL COPIED LIBS
             for copied_lib_path in "$LIBS_DEST_DIR"/lib*.dylib; do
-              for original_lib_path in "${PROCESSED_LIBS[@]}"; do
+              # Fix the library's own install name ID (good practice)
+              copied_lib_name=$(basename "$copied_lib_path")
+              install_name_tool -id "@executable_path/$copied_lib_name" "$copied_lib_path"
+          
+              # Fix its references to other bundled libraries
+              for original_lib_path in "${ALL_DEPS[@]}"; do
                 original_lib_name=$(basename "$original_lib_path")
-                if [ -f "$LIBS_DEST_DIR/$original_lib_name" ]; then
-                  install_name_tool -change "$original_lib_path" "@executable_path/$original_lib_name" "$copied_lib_path"
-                fi
+                install_name_tool -change "$original_lib_path" "@executable_path/$original_lib_name" "$copied_lib_path"
               done
             done
           
