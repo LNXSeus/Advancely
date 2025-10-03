@@ -51,7 +51,7 @@ jobs:
         shell: bash
         run: |
           mkdir release
-          if [ "$RUNNER_OS" == "macOS" ]; then
+          if [ "$RUN_OS" == "macOS" ]; then
             # --- SCRIPT WITH RECURSIVE DEPENDENCY BUNDLING FOR .APP ---
             BUNDLE_SRC_PATH="build/Advancely.app"
             BUNDLE_DEST_PATH="release/Advancely.app"
@@ -64,46 +64,50 @@ jobs:
             cp -r resources "release/"
             cp _PLEASE_READ_ME.txt LICENSES.txt README.md "release/"
 
-            # 1. GATHER A UNIQUE LIST OF ALL DEPENDENCIES
-            declare -A UNIQUE_DEPS # Use an associative array for true uniqueness by basename
+            # 1. GATHER A COMPLETE, THEN UNIQUE, LIST OF ALL DEPENDENCIES
+            ALL_DEPS_PATHS=()
             LIBS_TO_PROCESS=($(otool -L "$EXE_DEST_PATH" | grep "$BREW_PREFIX" | awk '{gsub(/:$/, ""); print $1}'))
           
-            while [ ${#LIBS_TO_PROCESS[@]} -gt 0 ]; do
-              original_lib_path=${LIBS_TO_PROCESS[0]}
-              LIBS_TO_PROCESS=("${LIBS_TO_PROCESS[@]:1}")
-              lib_name=$(basename "$original_lib_path")
+            # First, gather all paths recursively, allowing duplicates for now
+            TEMP_DEPS_LIST=()
+            i=0
+            while [ $i -lt ${#LIBS_TO_PROCESS[@]} ]; do
+              original_lib_path=${LIBS_TO_PROCESS[$i]}
+              i=$((i+1))
 
-              # If we haven't already processed this library *basename*, process it
-              if [[ -z "${UNIQUE_DEPS[$lib_name]}" ]]; then
-                # Mark as processed by adding to the array, storing the original path for later.
-                UNIQUE_DEPS["$lib_name"]="$original_lib_path"
-          
-                # Find the actual path to the library on disk to inspect it
-                actual_lib_path="$BREW_PREFIX/lib/$lib_name"
-
-                if [ ! -f "$actual_lib_path" ]; then
-                  echo "::error::Cannot find '$lib_name' at '$actual_lib_path'. Aborting."
-                  exit 1
-                fi
-          
-                # Use the *actual* path to find transitive dependencies and add them to the queue
-                TRANSITIVE_DEPS=$(otool -L "$actual_lib_path" | grep "$BREW_PREFIX" | awk '{gsub(/:$/, ""); print $1}')
-                for transitive_dep in $TRANSITIVE_DEPS; do
-                  LIBS_TO_PROCESS+=("$transitive_dep")
-                done
+              # Avoid circular dependencies
+              if [[ " ${TEMP_DEPS_LIST[*]} " =~ " ${original_lib_path} " ]]; then
+                continue
               fi
+              TEMP_DEPS_LIST+=("$original_lib_path")
+
+              lib_name=$(basename "$original_lib_path")
+              actual_lib_path="$BREW_PREFIX/lib/$lib_name"
+              if [ ! -f "$actual_lib_path" ]; then
+                echo "::error::Cannot find '$lib_name' at '$actual_lib_path'. Aborting."
+                exit 1
+              fi
+
+              TRANSITIVE_DEPS=($(otool -L "$actual_lib_path" | grep "$BREW_PREFIX" | awk '{gsub(/:$/, ""); print $1}'))
+              for dep in "${TRANSITIVE_DEPS[@]}"; do
+                LIBS_TO_PROCESS+=("$dep")
+              done
             done
           
+            # Now, create a truly unique list of paths using sort
+            UNIQUE_ORIGINAL_PATHS=($(echo "${LIBS_TO_PROCESS[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' '))
+
             # 2. COPY ALL UNIQUE DEPENDENCIES INTO THE BUNDLE
-            for lib_name in "${!UNIQUE_DEPS[@]}"; do
+            for original_lib_path in "${UNIQUE_ORIGINAL_PATHS[@]}"; do
+              lib_name=$(basename "$original_lib_path")
               actual_lib_path="$BREW_PREFIX/lib/$lib_name"
               echo "Copying dependency: $lib_name"
               cp "$actual_lib_path" "$LIBS_DEST_DIR/"
             done
           
             # 3. FIX REFERENCES IN THE MAIN EXECUTABLE
-            for lib_name in "${!UNIQUE_DEPS[@]}"; do
-              original_lib_path=${UNIQUE_DEPS[$lib_name]}
+            for original_lib_path in "${UNIQUE_ORIGINAL_PATHS[@]}"; do
+              lib_name=$(basename "$original_lib_path")
               install_name_tool -change "$original_lib_path" "@executable_path/$lib_name" "$EXE_DEST_PATH"
             done
           
@@ -112,9 +116,9 @@ jobs:
               copied_lib_name=$(basename "$copied_lib_path")
               install_name_tool -id "@executable_path/$copied_lib_name" "$copied_lib_path"
           
-              for lib_name in "${!UNIQUE_DEPS[@]}"; do
-                original_lib_path=${UNIQUE_DEPS[$lib_name]}
-                install_name_tool -change "$original_lib_path" "@executable_path/$lib_name" "$copied_lib_path"
+              for original_lib_path in "${UNIQUE_ORIGINAL_PATHS[@]}"; do
+                original_lib_name=$(basename "$original_lib_path")
+                install_name_tool -change "$original_lib_path" "@executable_path/$original_lib_name" "$copied_lib_path"
               done
             done
           
