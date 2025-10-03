@@ -546,6 +546,16 @@ const char *get_notes_manifest_path() {
 }
 
 int main(int argc, char *argv[]) {
+
+    // TODO: Handle proper quitting for github action runners 5s test
+    // Add a simple test/version flag that can run without a GUI
+    // This communicates with the build.yml file, where the gtimeout or timeout are
+    if (argc > 1 && (strcmp(argv[1], "--test-mode") == 0 || strcmp(argv[1], "--version") == 0)) {
+        printf("Advancely version: %s\n", ADVANCELY_VERSION);
+        printf("Test mode execution successful.\n");
+        return 0; // Exit successfully before any GUI is initialized
+    }
+
     // TODO: DEBUG FOR AUTO-UPDATE TESTING -> SET FLAG AT THE TOP OF THE FILE
 #ifdef MANUAL_UPDATE_TEST
     log_init(); // Init logger to see update messages
