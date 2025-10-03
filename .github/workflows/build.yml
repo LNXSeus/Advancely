@@ -212,8 +212,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Install dependencies (macOS)
+        run: brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
       - name: Configure CMake to get version
-        run: cmake -B build
+        run: cmake -B build -DCMAKE_PREFIX_PATH=$(brew --prefix)
       - name: Download Intel build
         uses: actions/download-artifact@v4
         with:

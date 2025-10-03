@@ -10,8 +10,8 @@
 #include "update_checker.h"
 #include "logger.h"
 #include <cJSON.h>
-#include <curl/curl.h>
 #include <string>
+#include <curl/curl.h>
 
 #include "main.h" // For MAX_PATH_LENGTH
 #include "path_utils.h"
@@ -19,6 +19,7 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <shellapi.h> // For ShellExecuteA
+#include <urlmon.h>   // For URLDownloadToFileA
 #else
 #include <dirent.h>
 #include <unistd.h> // For execv
@@ -108,6 +109,8 @@ static size_t write_file_callback(void *ptr, size_t size, size_t nmemb, FILE *st
 
 bool check_for_updates(const char *current_version, char *out_latest_version, size_t max_len, char *out_download_url,
                        size_t url_max_len, char *out_html_url, size_t html_url_max_len) {
+    // This function will now use libcurl for all platforms, as it's only for checking the API, not downloading files.
+    // The false positive is triggered by the download action itself.
     CURL *curl;
     CURLcode res;
     std::string read_buffer;
@@ -125,7 +128,14 @@ bool check_for_updates(const char *current_version, char *out_latest_version, si
         curl_easy_setopt(curl, CURLOPT_USERAGENT, "AdvancelyUpdateChecker/1.0");
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &read_buffer);
+
+        #ifdef _WIN32
+        // On Windows, use the system's certificate store
+        curl_easy_setopt(curl, CURLOPT_SSL_OPTIONS, CURLSSLOPT_NATIVE_CA);
+        #else
+        // On macOS/Linux, use our bundled certificate
         curl_easy_setopt(curl, CURLOPT_CAINFO, CERT_BUNDLE_PATH);
+        #endif
 
 
         res = curl_easy_perform(curl);
@@ -138,22 +148,17 @@ bool check_for_updates(const char *current_version, char *out_latest_version, si
                     strncpy(out_latest_version, tag_name_json->valuestring, max_len - 1);
                     out_latest_version[max_len - 1] = '\0';
 
-                    // Compare versions numerically instead of lexicographically
                     if (compare_versions(current_version, out_latest_version) < 0) {
                         is_new_version_available = true;
 
-                        // Determine which OS-specific asset to look for
 #if defined(_WIN32)
                         const char* os_identifier = "-Windows";
 #elif defined(__APPLE__)
-                        // On macOS, ALWAYS look for the Universal build now.
                         const char* os_identifier = "-macOS-Universal";
 #else
-                        // Linux
                         const char* os_identifier = "-Linux";
 #endif
 
-                        // Find the correct download URL by iterating through assets
                         const cJSON *assets = cJSON_GetObjectItem(json, "assets");
                         if (cJSON_IsArray(assets)) {
                             cJSON* asset;
@@ -164,7 +169,7 @@ bool check_for_updates(const char *current_version, char *out_latest_version, si
                                     if (cJSON_IsString(download_url_json) && (download_url_json->valuestring != nullptr)) {
                                         strncpy(out_download_url, download_url_json->valuestring, url_max_len - 1);
                                         out_download_url[url_max_len - 1] = '\0';
-                                        break; // Found it, stop searching
+                                        break;
                                     }
                                 }
                             }
@@ -190,6 +195,19 @@ bool check_for_updates(const char *current_version, char *out_latest_version, si
 }
 
 bool download_update_zip(const char *url) {
+#ifdef _WIN32
+    // --- Windows-specific implementation using native API ---
+    log_message(LOG_INFO, "[UPDATE] Downloading update using native Windows API from %s\n", url);
+    HRESULT hr = URLDownloadToFileA(nullptr, url, "update.zip", 0, nullptr);
+    if (SUCCEEDED(hr)) {
+        log_message(LOG_INFO, "[UPDATE] Successfully downloaded update.zip\n");
+        return true;
+    } else {
+        log_message(LOG_ERROR, "[UPDATE] URLDownloadToFileA failed. HRESULT: 0x%lX\n", hr);
+        return false;
+    }
+#else
+    // --- macOS and Linux implementation using libcurl ---
     CURL *curl;
     FILE *fp;
     CURLcode res;
@@ -204,7 +222,6 @@ bool download_update_zip(const char *url) {
             curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_callback);
             curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
             curl_easy_setopt(curl, CURLOPT_CAINFO, CERT_BUNDLE_PATH);
-            // Required for GitHub redirects
             curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
             res = curl_easy_perform(curl);
@@ -222,6 +239,7 @@ bool download_update_zip(const char *url) {
         curl_easy_cleanup(curl);
     }
     return success;
+#endif
 }
 
 bool apply_update(const char* main_executable_path) {
