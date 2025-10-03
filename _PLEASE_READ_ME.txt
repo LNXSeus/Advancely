@@ -42,6 +42,9 @@ Due to macOS security (Gatekeeper), you must authorize the app before running it
 6. You can now double-click `Advancely.app` to run it.
 7. This command only needs to be run once for this copy of the application.
 
+Note for Advanced Users: If the command fails, you may need to use `sudo xattr...` (for permission issues)
+or `/usr/bin/xattr...` (if you have multiple developer tools installed).
+
 ✔️ **CORRECT WAY TO INSTALL:**
 
 * For the best experience, move **both** `Advancely.app` and the `resources` folder into your main `/Applications` folder.

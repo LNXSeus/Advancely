@@ -135,14 +135,17 @@ Your download contains the Advancely application (`.exe` on Windows, `.app` on m
 
 **macOS Instructions**
 
-Due to macOS security (Gatekeeper), you will need to perform a one-time bypass to authorize the application after downloading it.
+Due to macOS security (Gatekeeper), you will need to perform a one-time bypass to authorize the application after
+downloading it.
 
 ✔️ **First-Time Run Steps (Easy Method):**
 
-1.  After downloading and unzipping, try to open `Advancely.app`. You will likely see an error saying Apple cannot check it for malicious software. Click **OK**.
-2.  Now, **right-click** (or Control-click) the `Advancely.app` file and select **Open** from the menu.
-3.  A different warning will appear, but this time you will have an **Open** button. Click it.
-4.  macOS will now remember that you trust this application. You only need to do this once and can open it normally by double-clicking from now on.
+1. After downloading and unzipping, try to open `Advancely.app`. You will likely see an error saying Apple cannot check
+   it for malicious software. Click **OK**.
+2. Now, **right-click** (or Control-click) the `Advancely.app` file and select **Open** from the menu.
+3. A different warning will appear, but this time you will have an **Open** button. Click it.
+4. macOS will now remember that you trust this application. You only need to do this once and can open it normally by
+   double-clicking from now on.
 
 ✔️ **Alternative Method (Terminal):**
 
@@ -152,6 +155,13 @@ Due to macOS security (Gatekeeper), you will need to perform a one-time bypass t
 4. The command should now look similar to this: `xattr -cr /path/to/your/Advancely.app`.
 5. Press **Enter**.
 6. You can now open `Advancely.app` normally. This command only needs to be run once.
+
+**Note for Advanced macOS Users:**
+
+If the Terminal command fails with a "permission denied" error, you may need to run it with administrator privileges by
+adding `sudo` at the beginning (e.g., `sudo xattr -cr ...`). This is typically only required if you've placed the app in
+a protected system folder. If you have other developer tools installed, you may also need to specify the full path to
+Apple's native command: `/usr/bin/xattr`.
 
 ✔️ **Recommended Installation:**
 
