@@ -563,12 +563,11 @@ the copyright holder.
 
 ## Credits
 
-*This project uses dmon by Sepehr Taghdisian, licensed under the BSD 2-Clause License.*
+*This project uses [dmon](https://github.com/septag/dmon) by Sepehr Taghdisian, licensed under the BSD 2-Clause License.*
 *This project's user interface is powered by the excellent [Dear ImGui](https://github.com/ocornut/imgui) library.*
 *This project also uses the SDL3 library suite and cJSON.
 *This project uses [curl/libcurl](https://curl.se/libcurl) to download the latest update from github.*
-*This project uses the [miniz](https://github.com/mongoose-os-libs/miniz) compression library to unzip the downloaded
-files.*
+*This project uses the [miniz](https://github.com/mongoose-os-libs/miniz) compression library to unzip the downloaded files.*
 *This project uses [tiny file dialogs](https://sourceforge.net/projects/tinyfiledialogs) to open file dialogs.*
 *More information can be found in the LICENSES.txt file.*
 
