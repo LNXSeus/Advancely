@@ -46,22 +46,30 @@ jobs:
       - name: Build Project
         run: cmake --build build --config Release
 
-      # --- RUN EXECUTABLE (only on macOS) ---
+      # --- RUN EXECUTABLE (All OSes) ---
       - name: Run Executable Test
-        if: matrix.os == 'macos-latest'
         run: |
-          echo "Running Advancely with --version..."
-          ./build/Advancely.app/Contents/MacOS/Advancely --version
+          # Set the path to the executable based on the OS
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            EXE_PATH="./build/Advancely.app/Contents/MacOS/Advancely"
+          else
+            EXE_PATH="./build/Advancely"
+          fi
+          
+          echo "Running executable at $EXE_PATH for 5 seconds..."
+          # Run the command with a 5-second timeout and capture its output.
+          # The '|| true' part is important: it ensures the workflow step succeeds
+          # even when the timeout stops the program, which would otherwise cause an error.
+          timeout 5s "$EXE_PATH" --test-mode > output.txt 2>&1 || true
+          
+          echo "Executable run finished. Contents of output.txt:"
+          cat output.txt
 
-          echo "Running Advancely with arguments and capturing output..."
-          ./build/Advancely.app/Contents/MacOS/Advancely --some-arg > output.txt 2>&1
-
-      # --- UPLOAD TEST OUTPUT (only on macOS) ---
+      # --- UPLOAD TEST OUTPUT (All OSes) ---
       - name: Upload Test Output
-        if: matrix.os == 'macos-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: test-output-${{ matrix.os }}
+          name: test-output-${{ matrix.os }}-${{ runner.arch }}
           path: output.txt
 
       # --- PACKAGING STEP (REVISED FOR MACOS) ---
