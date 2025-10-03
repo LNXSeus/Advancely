@@ -72,7 +72,7 @@ jobs:
       - name: Install dependencies (macOS)
         run: brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
       - name: Configure CMake (macOS)
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$(brew --prefix) -DCMAKE_OSX_DEPLOYMENT_TARGET="11.0"
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$(brew --prefix) -DCMAKE_OSX_DEPLOYMENT_TARGET="13.0"
       - name: Build Project
         run: cmake --build build --config Release
       - name: Install gtimeout (GNU Coreutils)
@@ -143,7 +143,7 @@ jobs:
       - name: Install dependencies (macOS)
         run: brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
       - name: Configure CMake (macOS)
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$(brew --prefix) -DCMAKE_OSX_DEPLOYMENT_TARGET="11.0"
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$(brew --prefix) -DCMAKE_OSX_DEPLOYMENT_TARGET="13.0"
       - name: Build Project
         run: cmake --build build --config Release
       - name: Install gtimeout (GNU Coreutils)
