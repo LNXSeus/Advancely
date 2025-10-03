@@ -65,18 +65,28 @@ jobs:
             cp _PLEASE_READ_ME.txt LICENSES.txt README.md "release/"
 
             # 1. GATHER A UNIQUE LIST OF ALL DEPENDENCIES
-            ALL_DEPS=()
+            ALL_ORIGINAL_DEPS_PATHS=()
             LIBS_TO_PROCESS=($(otool -L "$EXE_DEST_PATH" | grep "$BREW_PREFIX" | awk '{print $1}'))
           
             while [ ${#LIBS_TO_PROCESS[@]} -gt 0 ]; do
-              lib_path=${LIBS_TO_PROCESS[0]}
+              original_lib_path=${LIBS_TO_PROCESS[0]}
               LIBS_TO_PROCESS=("${LIBS_TO_PROCESS[@]:1}")
 
-              # If we haven't seen this library path before, process it
-              if [[ ! " ${ALL_DEPS[*]} " =~ " ${lib_path} " ]]; then
-                ALL_DEPS+=("$lib_path")
-                # Add its own dependencies to the queue to be checked
-                TRANSITIVE_DEPS=$(otool -L "$lib_path" | grep "$BREW_PREFIX" | awk '{print $1}')
+              # If we haven't already queued this exact path, process it
+              if [[ ! " ${ALL_ORIGINAL_DEPS_PATHS[*]} " =~ " ${original_lib_path} " ]]; then
+                ALL_ORIGINAL_DEPS_PATHS+=("$original_lib_path")
+          
+                # The path from the executable might be incorrect; find the real one in /opt/homebrew/lib
+                lib_name=$(basename "$original_lib_path")
+                actual_lib_path="$BREW_PREFIX/lib/$lib_name"
+
+                if [ ! -f "$actual_lib_path" ]; then
+                  echo "::error::Cannot find '$lib_name' at '$actual_lib_path'. Aborting."
+                  exit 1
+                fi
+          
+                # Use the *actual* path to find transitive dependencies
+                TRANSITIVE_DEPS=$(otool -L "$actual_lib_path" | grep "$BREW_PREFIX" | awk '{print $1}')
                 for transitive_dep in $TRANSITIVE_DEPS; do
                   LIBS_TO_PROCESS+=("$transitive_dep")
                 done
@@ -84,25 +94,25 @@ jobs:
             done
           
             # 2. COPY ALL UNIQUE DEPENDENCIES INTO THE BUNDLE
-            for lib_path in "${ALL_DEPS[@]}"; do
-              echo "Copying dependency: $(basename "$lib_path")"
-              cp "$lib_path" "$LIBS_DEST_DIR/"
+            for original_lib_path in "${ALL_ORIGINAL_DEPS_PATHS[@]}"; do
+              lib_name=$(basename "$original_lib_path")
+              actual_lib_path="$BREW_PREFIX/lib/$lib_name"
+              echo "Copying dependency: $lib_name"
+              cp "$actual_lib_path" "$LIBS_DEST_DIR/"
             done
           
             # 3. FIX REFERENCES IN THE MAIN EXECUTABLE
-            for lib_path in "${ALL_DEPS[@]}"; do
-              lib_name=$(basename "$lib_path")
-              install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$EXE_DEST_PATH"
+            for original_lib_path in "${ALL_ORIGINAL_DEPS_PATHS[@]}"; do
+              lib_name=$(basename "$original_lib_path")
+              install_name_tool -change "$original_lib_path" "@executable_path/$lib_name" "$EXE_DEST_PATH"
             done
           
             # 4. FIX INTER-LIBRARY REFERENCES AND IDS FOR ALL COPIED LIBS
             for copied_lib_path in "$LIBS_DEST_DIR"/lib*.dylib; do
-              # Fix the library's own install name ID (good practice)
               copied_lib_name=$(basename "$copied_lib_path")
               install_name_tool -id "@executable_path/$copied_lib_name" "$copied_lib_path"
           
-              # Fix its references to other bundled libraries
-              for original_lib_path in "${ALL_DEPS[@]}"; do
+              for original_lib_path in "${ALL_ORIGINAL_DEPS_PATHS[@]}"; do
                 original_lib_name=$(basename "$original_lib_path")
                 install_name_tool -change "$original_lib_path" "@executable_path/$original_lib_name" "$copied_lib_path"
               done
