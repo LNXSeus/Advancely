@@ -74,7 +74,7 @@ jobs:
       - name: Upload Test Output
         uses: actions/upload-artifact@v4
         with:
-          name: test-output-${{ matrix.os }}-${{ runner.arch }}
+          name: test-output-v${{ env.PROJECT_VERSION }}-${{ matrix.os }}-${{ runner.arch }}
           path: output.txt
 
       # --- PACKAGING STEP (REVISED FOR MACOS) ---
