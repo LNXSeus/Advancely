@@ -50,6 +50,11 @@ jobs:
       - name: Package Artifacts
         shell: bash
         run: |
+          
+          # --- ADD THESE TWO LINES FOR DEBUGGING ---
+          set -x
+          ls -lR build
+          
           mkdir release
           
           if [ "$RUNNER_OS" == "macOS" ]; then
