@@ -100,11 +100,13 @@ static size_t write_callback(void *contents, size_t size, size_t nmemb, std::str
     return new_length;
 }
 
+#ifndef _WIN32 // Only for Linux and macOS
 // This is a callback for curl to write downloaded data into a file
 static size_t write_file_callback(void *ptr, size_t size, size_t nmemb, FILE *stream) {
     size_t written = fwrite(ptr, size, nmemb, stream);
     return written;
 }
+#endif
 
 
 bool check_for_updates(const char *current_version, char *out_latest_version, size_t max_len, char *out_download_url,
@@ -129,14 +131,10 @@ bool check_for_updates(const char *current_version, char *out_latest_version, si
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &read_buffer);
 
-        #ifdef _WIN32
-        // On Windows, use the system's certificate store
-        curl_easy_setopt(curl, CURLOPT_SSL_OPTIONS, CURLSSLOPT_NATIVE_CA);
-        #else
-        // On macOS/Linux, use our bundled certificate
+        // Use the bundled certificate file on ALL platforms for consistency.
         curl_easy_setopt(curl, CURLOPT_CAINFO, CERT_BUNDLE_PATH);
-        #endif
-
+        // Also ensure peer verification is enabled.
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
 
         res = curl_easy_perform(curl);
 

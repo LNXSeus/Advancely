@@ -164,7 +164,7 @@ target_link_libraries(${EXECUTABLE_NAME} PRIVATE
 # Add platform-specific system libraries
 if (WIN32)
     # Link against common Windows libraries needed by SDL and advancely
-    target_link_libraries(${EXECUTABLE_NAME} PRIVATE gdi32 user32 winmm shell32 version ntdll)
+    target_link_libraries(${EXECUTABLE_NAME} PRIVATE gdi32 user32 winmm shell32 version ntdll urlmon)
 elseif (APPLE)
     # On macOS, link against required system frameworks
     target_link_libraries(${EXECUTABLE_NAME} PRIVATE "-framework Cocoa" "-framework Metal" "-framework IOKit")
