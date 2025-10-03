@@ -23,10 +23,16 @@ Special characters, accents (like `é`, `ü`, `ñ`), or symbols in the file path
 Your download contains the `Advancely.app` application and a `resources` folder.
 **Both must be kept in the same directory for the app to work.**
 
-Due to macOS security (Gatekeeper), you must run a one-time command before opening the app for the first time.
-You may see an error saying the application is "damaged" if you skip this step. The app is not damaged.
+Due to macOS security (Gatekeeper), you must authorize the app before running it.
 
-✔️ **CORRECT WAY TO RUN (First Time):**
+✔️ **First-Time Run (Easy Method):**
+
+1. Double-click `Advancely.app`. You will see an error. Click OK.
+2. NOW, RIGHT-CLICK the `Advancely.app` file and choose "Open".
+3. A new window will appear. Click the "Open" button on this window.
+4. You only need to do this once.
+
+✔️ **Alternative Method (Terminal):**
 
 1. Open the **Terminal** app (you can find it in Applications -> Utilities, or search for it with Spotlight).
 2. Type `xattr -cr ` (note the space at the end) but DO NOT press Enter yet.
