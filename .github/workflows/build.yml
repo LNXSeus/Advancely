@@ -51,19 +51,44 @@ jobs:
         shell: bash
         run: |
           
+          set -ex # Be extra verbose and exit immediately on any error
+
+          echo "--- Verifying build output ---"
+          ls -lR build
+          
+          if [ ! -d "build/Advancely.app" ]; then
+            echo "FATAL ERROR: build/Advancely.app was not created by the build step."
+            exit 1
+          fi
+
+          echo "--- Preparing release directory ---"
+          mkdir release
+
+          echo "--- Copying application bundle ---"
+          cp -R "build/Advancely.app" "release/"
+          
+          echo "--- Verifying application bundle copy ---"
+          if [ ! -d "release/Advancely.app/Contents/MacOS" ]; then
+            echo "FATAL ERROR: Failed to copy Advancely.app correctly. The MacOS directory is missing."
+            ls -lR release
+            exit 1
+          fi
+          
+          echo "--- Copying resources and other files ---"
+          cp -r resources "release/"
+          cp _PLEASE_READ_ME.txt LICENSES.txt README.md "release/"
+
+          echo "--- Listing final release directory contents before bundling ---"
+          ls -lR release
+
           if [ "$RUNNER_OS" == "macOS" ]; then
-            # --- FINAL ROBUST RECURSIVE DEPENDENCY BUNDLING SCRIPT ---
+            # The rest of the bundling script for macOS...
             BUNDLE_DEST_PATH="release/Advancely.app"
             EXE_PATH="$BUNDLE_DEST_PATH/Contents/MacOS/Advancely"
             LIBS_DEST_DIR="$BUNDLE_DEST_PATH/Contents/MacOS"
             BREW_PREFIX=$(brew --prefix)
-          
-            echo "Copying app bundle and resources..."
-            cp -R "build/Advancely.app" "release/"
-            cp -r resources "release/"
-            cp _PLEASE_READ_ME.txt LICENSES.txt README.md "release/"
 
-            # Step 1: Discover all unique dependencies recursively
+            # (The rest of the recursive dependency script follows here)
             ALL_DEPENDENCIES=()
             COPIED_LIBS_BASENAMES=()
             FILES_TO_INSPECT=("$EXE_PATH")
@@ -96,14 +121,12 @@ jobs:
               done
             done
 
-            # Step 2: Copy all unique libraries to the bundle
             for lib_path in "${ALL_DEPENDENCIES[@]}"; do
               if [ -f "$lib_path" ]; then
                 cp "$lib_path" "$LIBS_DEST_DIR/"
               fi
             done
           
-            # Step 3: Patch all binaries (the executable and all copied libs)
             ALL_BINARIES=("$EXE_PATH")
             for lib_name in "${COPIED_LIBS_BASENAMES[@]}"; do
                 ALL_BINARIES+=("$LIBS_DEST_DIR/$lib_name")
@@ -119,18 +142,12 @@ jobs:
 
               for dep_path in "${ALL_DEPENDENCIES[@]}"; do
                 dep_name=$(basename "$dep_path")
-                # FIX: Use a robust awk command that doesn't fail on "not found"
                 original_ref=$(otool -L "$binary" | awk -v d="$dep_name" '$0 ~ d {print $1; exit}')
                 if [ -n "$original_ref" ]; then
                     install_name_tool -change "$original_ref" "@executable_path/$dep_name" "$binary"
                 fi
               done
             done
-          
-            # Step 4: Ad-hoc sign everything
-            echo "Signing bundled libraries and application..."
-          
-            ls -lR "$LIBS_DEST_DIR"
           
             codesign --force --sign - --timestamp=none --all-architectures "$LIBS_DEST_DIR"/lib*.dylib
             codesign --force --deep --sign - --timestamp=none --all-architectures "$BUNDLE_DEST_PATH"
