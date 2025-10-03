@@ -550,11 +550,18 @@ int main(int argc, char *argv[]) {
     // TODO: Handle proper quitting for github action runners 5s test
     // Add a simple test/version flag that can run without a GUI
     // This communicates with the build.yml file, where the gtimeout or timeout are
-    if (argc > 1 && (strcmp(argv[1], "--test-mode") == 0 || strcmp(argv[1], "--version") == 0)) {
-        printf("Advancely version: %s\n", ADVANCELY_VERSION);
-        printf("Test mode execution successful.\n");
-        return 0; // Exit successfully before any GUI is initialized
+    bool is_test_mode = false;
+    if (argc > 1) {
+        if (strcmp(argv[1], "--version") == 0) {
+            printf("Advancely version: %s\n", ADVANCELY_VERSION);
+            return 0; // Exit immediately for --version
+        }
+        if (strcmp(argv[1], "--test-mode") == 0) {
+            is_test_mode = true;
+            // We no longer exit here, allowing the app to launch
+        }
     }
+
 
     // TODO: DEBUG FOR AUTO-UPDATE TESTING -> SET FLAG AT THE TOP OF THE FILE
 #ifdef MANUAL_UPDATE_TEST
@@ -1280,6 +1287,13 @@ int main(int argc, char *argv[]) {
         Uint32 last_frame_time = SDL_GetTicks();
         float frame_target_time = 1000.0f / app_settings.fps;
 
+        // Start a timer if test mode is enabled
+        Uint32 test_mode_start_time = 0;
+        if (is_test_mode) {
+            log_message(LOG_INFO, "[MAIN] Test mode enabled. Application will shut down in 5 seconds.\n");
+            test_mode_start_time = SDL_GetTicks();
+        }
+
         // Launch overlay if enabled
         if (app_settings.enable_overlay) {
             log_message(LOG_INFO, "[MAIN] Overlay enabled in settings. Launching on startup.\n");
@@ -1318,6 +1332,14 @@ int main(int argc, char *argv[]) {
 
         // Unified MAIN TRACKER LOOP -------------------------------------------------
         while (is_running) {
+            // Check for timed shutdown in test mode
+            if (is_test_mode) {
+                if (SDL_GetTicks() - test_mode_start_time >= 5000) {
+                    log_message(LOG_INFO, "[MAIN] Test mode 5-second timer elapsed. Shutting down.\n");
+                    is_running = false;
+                    continue; // Exit the loop gracefully
+                }
+            }
             // Force settings window open if the path was invalid on startup
             if (g_force_open_reason != FORCE_OPEN_NONE) {
                 settings_opened = true;
