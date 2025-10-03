@@ -51,7 +51,7 @@ jobs:
         shell: bash
         run: |
           mkdir release
-          if [ "$RUN_OS" == "macOS" ]; then
+          if [ "$RUNNER_OS" == "macOS" ]; then
             # --- SCRIPT WITH RECURSIVE DEPENDENCY BUNDLING FOR .APP ---
             BUNDLE_SRC_PATH="build/Advancely.app"
             BUNDLE_DEST_PATH="release/Advancely.app"
