@@ -51,14 +51,8 @@ jobs:
         shell: bash
         run: |
           
-          # --- ADD THESE TWO LINES FOR DEBUGGING ---
-          set -x
-          ls -lR build
-          
-          mkdir release
-          
           if [ "$RUNNER_OS" == "macOS" ]; then
-            # --- FINAL, ROBUST SCRIPT FOR DEPENDENCY BUNDLING ---
+            # --- FINAL ROBUST RECURSIVE DEPENDENCY BUNDLING SCRIPT ---
             BUNDLE_DEST_PATH="release/Advancely.app"
             EXE_PATH="$BUNDLE_DEST_PATH/Contents/MacOS/Advancely"
             LIBS_DEST_DIR="$BUNDLE_DEST_PATH/Contents/MacOS"
@@ -118,17 +112,15 @@ jobs:
             for binary in "${ALL_BINARIES[@]}"; do
               if [ ! -f "$binary" ]; then continue; fi
 
-              # Update the binary's own ID if it's a library
               if [[ "$binary" == *".dylib" ]]; then
                 lib_name=$(basename "$binary")
                 install_name_tool -id "@executable_path/$lib_name" "$binary"
               fi
 
-              # Update its references to the other bundled libraries
               for dep_path in "${ALL_DEPENDENCIES[@]}"; do
                 dep_name=$(basename "$dep_path")
-                # Get the original reference path from otool for an exact match
-                original_ref=$(otool -L "$binary" | grep "$dep_name" | awk '{print $1}')
+                # FIX: Use a robust awk command that doesn't fail on "not found"
+                original_ref=$(otool -L "$binary" | awk -v d="$dep_name" '$0 ~ d {print $1; exit}')
                 if [ -n "$original_ref" ]; then
                     install_name_tool -change "$original_ref" "@executable_path/$dep_name" "$binary"
                 fi
