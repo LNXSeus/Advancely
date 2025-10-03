@@ -111,9 +111,7 @@ your operating system. The `vX.X.X` is the Advancely version, that is also displ
 
 * **Windows:** `Advancely-vX.X.X-Windows.zip`
 * **Linux:** `Advancely-vX.X.X-Linux.zip`
-* **macOS:**
-    * `Advancely-vX.X.X-macOS-ARM64.zip` is for Apple Silicon Macs (M1, M2, etc.).
-    * `Advancely-vX.X.X-macOS-X64.zip` is for older, Intel-based Macs.
+* **macOS:** `Advancely-vX.X.X-macOS-Universal.zip` for both Intel and Silicon Macs.
 
 ### 2. Installation & First-Time Run
 
@@ -188,17 +186,6 @@ Launch Advancely by running the executable (or the shortcut you created). On its
 your most recently played world from the standard Minecraft installation. To begin customizing, press the `ESC` key to
 open the settings window, where you can switch to `Auto-Track Active Instance` if you use Prism Launcher, MultiMC or
 some other custom launcher.
-
-***
-
-That's a very detailed and important section. The best place to put it is right after the **"Getting Started"** section
-in your `README.md`.
-
-New users will read "Getting Started" to get the application running, and the very next thing they should know is how to
-maintain it and keep it updated. Placing it here ensures they see this crucial information early on.
-
-Here is an updated version of the text you provided. I've restructured it for clarity and updated the technical details
-to accurately reflect the process for all three operating systems, based on the `update_checker.cpp` file.
 
 ***
 
