@@ -53,7 +53,7 @@ jobs:
           mkdir release
           # --- OS-Specific File Copying ---
           if [ "$RUNNER_OS" == "macOS" ]; then
-            # --- FINAL ROBUST RECURSIVE DEPENDENCY BUNDLING SCRIPT ---
+            # --- ROBUST SCRIPT WITH RECURSIVE DEPENDENCY BUNDLING ---
             BUNDLE_DEST_PATH="release/Advancely.app"
             EXE_PATH="$BUNDLE_DEST_PATH/Contents/MacOS/Advancely"
             LIBS_DEST_DIR="$BUNDLE_DEST_PATH/Contents/MacOS"
@@ -61,6 +61,7 @@ jobs:
           
             echo "Copying app bundle and resources..."
             cp -R "build/Advancely.app" "release/"
+            # NOTE: The resources folder is now copied outside the .app bundle
             cp -r resources "release/"
             cp _PLEASE_READ_ME.txt LICENSES.txt README.md "release/"
 
@@ -73,28 +74,22 @@ jobs:
             while [ $idx -lt ${#FILES_TO_INSPECT[@]} ]; do
               file_to_inspect="${FILES_TO_INSPECT[$idx]}"
               idx=$((idx + 1))
+              if [ ! -f "$file_to_inspect" ]; then continue; fi
           
-              # Get the directory of the file being inspected to resolve @rpath
               dir_of_file=$(dirname "$file_to_inspect")
-
-              # Get all non-system dependencies
               DEPS=$(otool -L "$file_to_inspect" | awk '!/:$/ {print $1}' | grep -v '^/System' | grep -v '^/usr/lib')
           
               for dep_path in $DEPS; do
                 resolved_dep_path=""
-                # Resolve @rpath dependencies relative to the library that needs them
                 if [[ $dep_path == @rpath* ]]; then
                   resolved_dep_path="${dep_path/@rpath/$dir_of_file}"
-                # Also handle absolute Homebrew paths
                 elif [[ $dep_path == $BREW_PREFIX* ]]; then
                   resolved_dep_path="$dep_path"
                 fi
           
-                # If we successfully resolved a path, process it
                 if [[ -n "$resolved_dep_path" ]]; then
                   dep_name=$(basename "$resolved_dep_path")
                   if [[ ! " ${COPIED_LIBS_BASENAMES[*]} " =~ " ${dep_name} " ]]; then
-                    echo "Discovered dependency: $resolved_dep_path"
                     ALL_DEPENDENCIES+=("$resolved_dep_path")
                     COPIED_LIBS_BASENAMES+=("$dep_name")
                     FILES_TO_INSPECT+=("$resolved_dep_path")
@@ -106,14 +101,11 @@ jobs:
             # Step 2: Copy all unique libraries to the bundle
             for lib_path in "${ALL_DEPENDENCIES[@]}"; do
               if [ -f "$lib_path" ]; then
-                echo "Copying $lib_path"
                 cp "$lib_path" "$LIBS_DEST_DIR/"
-              else
-                echo "Warning: Could not find dependency to copy: $lib_path"
               fi
             done
           
-            # Step 3: Update all references
+            # Step 3: Add @executable_path as a run path and update references
             ALL_BINARIES=("$EXE_PATH")
             for lib_path in "${ALL_DEPENDENCIES[@]}"; do
               lib_name=$(basename "$lib_path")
@@ -121,11 +113,11 @@ jobs:
             done
 
             for binary in "${ALL_BINARIES[@]}"; do
-              # Ensure the binary exists before trying to modify it
               if [ ! -f "$binary" ]; then continue; fi
+              install_name_tool -add_rpath "@executable_path/" "$binary"
               for lib_path in "${ALL_DEPENDENCIES[@]}"; do
                 lib_name=$(basename "$lib_path")
-                install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$binary"
+                install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$binary" 2>/dev/null || true
               done
             done
           
@@ -157,6 +149,25 @@ jobs:
           if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" ]; then
             mv "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" "$LOWERCASE_DIR/1_16_1_all_advancements_lang.json"
           fi
+          
+      - name: Create DMG for macOS
+        if: runner.os == 'macOS'
+        run: |
+          # Create a temporary directory for the DMG content
+          mkdir -p dmg_content
+          
+          # Move the app and its resources into the temp directory
+          mv release/Advancely.app dmg_content/
+          mv release/resources dmg_content/
+          mv release/_PLEASE_READ_ME.txt dmg_content/
+          mv release/LICENSES.txt dmg_content/
+          mv release/README.md dmg_content/
+          
+          # Create a symbolic link to the Applications folder
+          ln -s /Applications dmg_content/Applications
+          
+          # Use hdiutil to create the final DMG
+          hdiutil create -volname "Advancely" -srcfolder "dmg_content" -ov -format UDZO "release/Advancely.dmg"
 
       # --- ZIPPING AND UPLOADING STEP (FIXED) ---
       - name: Set Final Archive Name
