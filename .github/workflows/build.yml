@@ -45,6 +45,11 @@ jobs:
       # --- BUILD STEP ---
       - name: Build Project
         run: cmake --build build --config Release
+          
+      # --- INSTALL TIMEOUT COMMAND (macOS only) ---
+      - name: Install gtimeout (GNU Coreutils)
+        if: runner.os == 'macOS'
+        run: brew install coreutils
 
       # --- RUN EXECUTABLE (All OSes) ---
       - name: Run Executable Test
