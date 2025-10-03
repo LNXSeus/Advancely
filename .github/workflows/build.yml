@@ -97,9 +97,11 @@ jobs:
             # Now, create a truly unique list of paths using sort
             UNIQUE_ORIGINAL_PATHS=($(echo "${LIBS_TO_PROCESS[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' '))
 
+            # From the unique paths, create a unique list of basenames for the copy step
+            UNIQUE_BASENAMES=($(for path in "${UNIQUE_ORIGINAL_PATHS[@]}"; do basename "$path"; done | sort -u))
+
             # 2. COPY ALL UNIQUE DEPENDENCIES INTO THE BUNDLE
-            for original_lib_path in "${UNIQUE_ORIGINAL_PATHS[@]}"; do
-              lib_name=$(basename "$original_lib_path")
+            for lib_name in "${UNIQUE_BASENAMES[@]}"; do
               actual_lib_path="$BREW_PREFIX/lib/$lib_name"
               echo "Copying dependency: $lib_name"
               cp "$actual_lib_path" "$LIBS_DEST_DIR/"
