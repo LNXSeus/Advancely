@@ -51,9 +51,9 @@ jobs:
         shell: bash
         run: |
           mkdir release
-          # --- OS-Specific File Copying ---
+          
           if [ "$RUNNER_OS" == "macOS" ]; then
-            # --- ROBUST SCRIPT WITH RECURSIVE DEPENDENCY BUNDLING ---
+            # --- FINAL ROBUST RECURSIVE DEPENDENCY BUNDLING SCRIPT ---
             BUNDLE_DEST_PATH="release/Advancely.app"
             EXE_PATH="$BUNDLE_DEST_PATH/Contents/MacOS/Advancely"
             LIBS_DEST_DIR="$BUNDLE_DEST_PATH/Contents/MacOS"
@@ -61,11 +61,10 @@ jobs:
           
             echo "Copying app bundle and resources..."
             cp -R "build/Advancely.app" "release/"
-            # NOTE: The resources folder is now copied outside the .app bundle
             cp -r resources "release/"
             cp _PLEASE_READ_ME.txt LICENSES.txt README.md "release/"
 
-            # Step 1: Discover all unique dependencies recursively, resolving @rpath
+            # Step 1: Discover all unique dependencies recursively
             ALL_DEPENDENCIES=()
             COPIED_LIBS_BASENAMES=()
             FILES_TO_INSPECT=("$EXE_PATH")
@@ -105,7 +104,7 @@ jobs:
               fi
             done
           
-            # Step 3: Add @executable_path as a run path and update references
+            # Step 3: Update library IDs and references
             ALL_BINARIES=("$EXE_PATH")
             for lib_path in "${ALL_DEPENDENCIES[@]}"; do
               lib_name=$(basename "$lib_path")
@@ -114,7 +113,17 @@ jobs:
 
             for binary in "${ALL_BINARIES[@]}"; do
               if [ ! -f "$binary" ]; then continue; fi
-              install_name_tool -add_rpath "@executable_path/" "$binary"
+          
+              # Add rpath to ensure @rpath dependencies are found
+              install_name_tool -add_rpath "@executable_path/" "$binary" 2>/dev/null || true
+
+              # Update the internal ID of the library itself
+              if [[ "$binary" == *".dylib" ]]; then
+                lib_name=$(basename "$binary")
+                install_name_tool -id "@executable_path/$lib_name" "$binary"
+              fi
+
+              # Update references to other libraries
               for lib_path in "${ALL_DEPENDENCIES[@]}"; do
                 lib_name=$(basename "$lib_path")
                 install_name_tool -change "$lib_path" "@executable_path/$lib_name" "$binary" 2>/dev/null || true
