@@ -284,11 +284,19 @@ jobs:
           if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" ]; then
             mv "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" "$LOWERCASE_DIR/1_16_1_all_advancements_lang.json"
           fi
+
+      # Manually zip it
+      - name: Create Zip Archive
+        shell: bash
+        run: |
+          cd release
+          zip -r ../Advancely-Universal.zip .
+
       - name: Upload Universal macOS Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Advancely-v${{ env.PROJECT_VERSION }}-macOS-Universal
-          path: release/
+          path: Advancely-Universal.zip # Taking the zip file
 
   # Job 5: Test the Universal macOS package
   test_universal_macos:
@@ -305,17 +313,23 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: Advancely-v${{ env.PROJECT_VERSION }}-macOS-Universal
-          path: universal-build/
+          # path: universal-build/ # Not needed
+      # Extracting zip
+      - name: Extract Zip Archive
+        run: unzip Advancely-Universal.zip
+
       - name: Install gtimeout (GNU Coreutils)
         run: brew install coreutils
+
       - name: Run Executable Test (macOS Universal)
         run: |
-          # Add this line to debug permissions after downloading
+          # Debug permissions after downloading
           echo "Verifying permissions after download:"
-          ls -l ./universal-build/Advancely.app/Contents/MacOS/Advancely
+          ls -l ./Advancely.app/Contents/MacOS/Advancely
           
           echo "Running universal executable for 5 seconds..."
-          gtimeout 5s ./universal-build/Advancely.app/Contents/MacOS/Advancely --test-mode > output.txt 2>&1 || true
+          # The path no longer has 'universal-build/' in it
+          gtimeout 5s ./Advancely.app/Contents/MacOS/Advancely --test-mode > output.txt 2>&1 || true
           echo "Executable run finished. Contents of output.txt:"
           cat output.txt
       - name: Upload Test Output (macOS Universal)
