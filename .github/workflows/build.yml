@@ -288,6 +288,10 @@ jobs:
     runs-on: macos-latest
     needs: [package_universal_macos]
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Configure CMake to get version # <-- ADD THIS STEP
+        run: cmake -B build -DCMAKE_PREFIX_PATH=$(brew --prefix) # <-- AND THIS ONE
       - name: Download Universal macOS Artifact
         uses: actions/download-artifact@v4
         with:
