@@ -316,7 +316,7 @@ jobs:
           # path: universal-build/ # Not needed
       # Extracting zip
       - name: Extract Zip Archive
-        run: unzip Advancely-Universal.zip
+        run: unzip -o Advancely-Universal.zip
 
       - name: Install gtimeout (GNU Coreutils)
         run: brew install coreutils
