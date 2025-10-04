@@ -121,7 +121,8 @@ static uint64_t get_latest_modification_time(const char *dir_path) {
 
     // Convert FILETIME to a single 64-bit integer for easy comparison
     return ((uint64_t) latest_time.dwHighDateTime << 32) | latest_time.dwLowDateTime;
-#else
+#else // macOS and Linux
+    // NEW, MORE ROBUST IMPLEMENTATION for macOS/Linux
     DIR *dir = opendir(dir_path);
     if (!dir) {
         return 0;
@@ -129,6 +130,14 @@ static uint64_t get_latest_modification_time(const char *dir_path) {
 
     time_t latest_time = 0;
     struct dirent *entry;
+
+    // First, get the modification time of the directory itself as a baseline.
+    struct stat dir_stat;
+    if (stat(dir_path, &dir_stat) == 0) {
+        latest_time = dir_stat.st_mtime;
+    }
+
+    // Now, scan the contents of the directory for anything newer.
     while ((entry = readdir(dir)) != nullptr) {
         if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
             char full_path[MAX_PATH_LENGTH];
@@ -182,68 +191,71 @@ static bool get_active_instance_saves_path(char *out_path, size_t max_len) {
                             cmd_line[params.CommandLine.Length / sizeof(wchar_t)] = L'\0';
 
                             char instance_path_mbs[MAX_PATH_LENGTH] = {0};
-                            // --- NEW, FINAL PARSING LOGIC FOR WINDOWS ---
-                        const wchar_t* keys[] = {L"-Djava.library.path=", L"--gameDir"};
-                        wchar_t extracted_path_w[MAX_PATH_LENGTH] = {0};
+                            // Parsing logic for windows
+                            const wchar_t *keys[] = {L"-Djava.library.path=", L"--gameDir"};
+                            wchar_t extracted_path_w[MAX_PATH_LENGTH] = {0};
 
-                        for (int i = 0; i < 2 && extracted_path_w[0] == L'\0'; ++i) {
-                            const wchar_t* current_key = keys[i];
-                            wchar_t* key_start = wcsstr(cmd_line, current_key);
-                            if (!key_start) continue;
+                            for (int i = 0; i < 2 && extracted_path_w[0] == L'\0'; ++i) {
+                                const wchar_t *current_key = keys[i];
+                                wchar_t *key_start = wcsstr(cmd_line, current_key);
+                                if (!key_start) continue;
 
-                            wchar_t* value_start = key_start + wcslen(current_key);
-                            // For --gameDir, skip the space after the key
-                            if (i == 1) {
-                                while (*value_start == L' ') value_start++;
-                            }
+                                wchar_t *value_start = key_start + wcslen(current_key);
+                                // For --gameDir, skip the space after the key
+                                if (i == 1) {
+                                    while (*value_start == L' ') value_start++;
+                                }
 
-                            wchar_t* value_end = nullptr;
-                            // Check if the value is quoted
-                            if (*value_start == L'"') {
-                                value_start++; // Move past opening quote
-                                value_end = wcschr(value_start, L'"');
-                            }
-                            // Check if the whole argument is quoted (e.g., "-Dkey=value")
-                            else if (key_start > cmd_line && *(key_start - 1) == L'"') {
-                                value_end = wcschr(value_start, L'"');
-                            }
-                            // Else, it's an unquoted value ending at the next space or end of string
-                            else {
-                                value_end = wcschr(value_start, L' ');
-                            }
+                                wchar_t *value_end = nullptr;
+                                // Check if the value is quoted
+                                if (*value_start == L'"') {
+                                    value_start++; // Move past opening quote
+                                    value_end = wcschr(value_start, L'"');
+                                }
+                                // Check if the whole argument is quoted (e.g., "-Dkey=value")
+                                else if (key_start > cmd_line && *(key_start - 1) == L'"') {
+                                    value_end = wcschr(value_start, L'"');
+                                }
+                                // Else, it's an unquoted value ending at the next space or end of string
+                                else {
+                                    value_end = wcschr(value_start, L' ');
+                                }
 
-                            if (value_end) {
-                                wcsncpy(extracted_path_w, value_start, value_end - value_start);
-                                extracted_path_w[value_end - value_start] = L'\0';
-                            } else {
-                                wcscpy(extracted_path_w, value_start);
-                            }
-                        }
-
-                        if (extracted_path_w[0] != L'\0') {
-                            wcstombs(instance_path_mbs, extracted_path_w, sizeof(instance_path_mbs));
-
-                            // Trim /natives if the path came from Djava.library.path
-                            if (wcsstr(cmd_line, keys[0])) {
-                                char *last_sep = strrchr(instance_path_mbs, '/');
-                                if (!last_sep) last_sep = strrchr(instance_path_mbs, '\\');
-                                if (last_sep && (stricmp(last_sep, "/natives") == 0 || stricmp(last_sep, "\\natives") == 0)) {
-                                    *last_sep = '\0';
+                                if (value_end) {
+                                    wcsncpy(extracted_path_w, value_start, value_end - value_start);
+                                    extracted_path_w[value_end - value_start] = L'\0';
+                                } else {
+                                    wcscpy(extracted_path_w, value_start);
                                 }
                             }
 
-                            char path_candidate[MAX_PATH_LENGTH];
-                            snprintf(path_candidate, sizeof(path_candidate), "%s/.minecraft/saves", instance_path_mbs);
-                            if (path_exists(path_candidate)) {
-                                candidate_saves_paths.emplace_back(path_candidate);
-                            } else {
-                                snprintf(path_candidate, sizeof(path_candidate), "%s/minecraft/saves", instance_path_mbs);
+                            if (extracted_path_w[0] != L'\0') {
+                                wcstombs(instance_path_mbs, extracted_path_w, sizeof(instance_path_mbs));
+
+                                // Trim /natives if the path came from Djava.library.path
+                                if (wcsstr(cmd_line, keys[0])) {
+                                    char *last_sep = strrchr(instance_path_mbs, '/');
+                                    if (!last_sep) last_sep = strrchr(instance_path_mbs, '\\');
+                                    if (last_sep && (stricmp(last_sep, "/natives") == 0 || stricmp(
+                                                         last_sep, "\\natives") == 0)) {
+                                        *last_sep = '\0';
+                                    }
+                                }
+
+                                char path_candidate[MAX_PATH_LENGTH];
+                                snprintf(path_candidate, sizeof(path_candidate), "%s/.minecraft/saves",
+                                         instance_path_mbs);
                                 if (path_exists(path_candidate)) {
                                     candidate_saves_paths.emplace_back(path_candidate);
+                                } else {
+                                    snprintf(path_candidate, sizeof(path_candidate), "%s/minecraft/saves",
+                                             instance_path_mbs);
+                                    if (path_exists(path_candidate)) {
+                                        candidate_saves_paths.emplace_back(path_candidate);
+                                    }
                                 }
                             }
-                        }
-                        free(cmd_line);
+                            free(cmd_line);
                         }
                     }
                 }
@@ -398,7 +410,7 @@ static bool get_active_instance_saves_path(char *out_path, size_t max_len) {
     uint64_t latest_time = 0;
     std::string best_path = "";
 
-    for (const auto& path : candidate_saves_paths) {
+    for (const auto &path: candidate_saves_paths) {
         uint64_t current_time = get_latest_modification_time(path.c_str());
         if (current_time > latest_time) {
             latest_time = current_time;
