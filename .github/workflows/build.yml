@@ -242,6 +242,9 @@ jobs:
             "$INTEL_APP_PATH/Contents/MacOS/Advancely" \
             "$ARM_APP_PATH/Contents/MacOS/Advancely"
           
+          # Add execute permission to the new universal binary
+          chmod +x "$UNIVERSAL_APP_PATH/Contents/MacOS/Advancely"
+          
           echo "Creating universal libraries..."
           ARM_LIBS_DIR="$UNIVERSAL_APP_PATH/Contents/MacOS"
           INTEL_LIBS_DIR="$INTEL_APP_PATH/Contents/MacOS"
