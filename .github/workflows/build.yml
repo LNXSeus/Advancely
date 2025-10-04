@@ -282,3 +282,27 @@ jobs:
         with:
           name: Advancely-v${{ env.PROJECT_VERSION }}-macOS-Universal
           path: release/
+
+  # Job 5: Test the Universal macOS package
+  test_universal_macos:
+    runs-on: macos-latest
+    needs: [package_universal_macos]
+    steps:
+      - name: Download Universal macOS Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Advancely-v${{ env.PROJECT_VERSION }}-macOS-Universal
+          path: universal-build/
+      - name: Install gtimeout (GNU Coreutils)
+        run: brew install coreutils
+      - name: Run Executable Test (macOS Universal)
+        run: |
+          echo "Running universal executable for 5 seconds..."
+          gtimeout 5s ./universal-build/Advancely.app/Contents/MacOS/Advancely --test-mode > output.txt 2>&1 || true
+          echo "Executable run finished. Contents of output.txt:"
+          cat output.txt
+      - name: Upload Test Output (macOS Universal)
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output-v${{ env.PROJECT_VERSION }}-macOS-Universal
+          path: output.txt
