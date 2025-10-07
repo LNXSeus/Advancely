@@ -528,9 +528,13 @@ Suggest it in the [Official Advancely Discord](https://discord.gg/TyNgXDz) withi
 * **Is Windows Defender blocking the application?**: I've contacted Microsoft so windows defender does not falsely
   detect Advancely.exe as a virus. So make sure your Windows Defender version is up to date. Get the latest
   version [here](https://docs.microsoft.com/microsoft-365/security/defender-endpoint/manage-updates-baselines-microsoft-defender-antivirus).
+  Also **don't** open Advancely using **Jingle**.
 * **Is the tracker in a path with special characters?**: Ensure the full folder path to `Advancely.exe` (e.g.,
   `C:\Users\Jörg\...`) contains only standard English letters and numbers. Special characters can cause errors when
   loading files.
+* **Multiple Advancely Windows**: If for whatever reason you have Advancely open multiple times the Overlay will most
+  likely glitch out as it's a separate process and it then doesn't know from which main Advancely process to read
+  from. So make sure to only ever have `ONE Advancely window` open at all times.
 * **Check log file**: First, look into the `advancely_log.txt` file to see if there are any errors that were caused by
   wrong usage of the application. With the `Print Debug To Console` setting enabled, the log file will also contain
   detailed progress updates, not just errors.
