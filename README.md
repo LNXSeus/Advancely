@@ -78,14 +78,15 @@ sharp._
       checkbox.
     * **Unlocks**: Fully tracks the unique "unlocks" progression system from the `25w14craftmine` snapshot.
 * **Advanced Goal Types**:
-    * **Multi-Stage Goals**: Create long-term objectives that combine several smaller steps. A single goal can require
-      you to first complete a stat, then an unlock, then a specific **advancement criterion** (e.g., visiting a specific
-      biome), and finally an entire advancement in sequence.
     * **Custom Counters & Manual Goals**: For objectives that can't be automatically tracked (like counting structures
       visited), you can create manual checklist goals or counters with target values. All progress is saved
       automatically into `settings.json`. _Switching templates will thus ERASE the progress of these custom goals._
         * **Hotkeys**: Use configurable hotkeys to increment or decrement your custom counters. Up to 32 hotkeys are
           supported. Hotkeys only work when the tracker window is in focus.
+    * **Multi-Stage Goals**: Create long-term objectives that combine several smaller steps. A single goal can require
+      you to first complete a stat, then an unlock, then a specific **advancement criterion** (e.g., visiting a specific
+      biome), and finally an entire advancement in sequence.
+
 * **Powerful In-App Template Editor**: You don't need to manually edit files. The built-in editor allows you to create,
   copy, and modify any template. You can instantly build a new template by importing advancements, stats, and unlocks
   directly from your world save. Find more information [here](https://github.com/LNXSeus/Advancely#The-Template-Editor).
@@ -563,11 +564,13 @@ the copyright holder.
 
 ## Credits
 
-*This project uses [dmon](https://github.com/septag/dmon) by Sepehr Taghdisian, licensed under the BSD 2-Clause License.*
+*This project uses [dmon](https://github.com/septag/dmon) by Sepehr Taghdisian, licensed under the BSD 2-Clause
+License.*
 *This project's user interface is powered by the excellent [Dear ImGui](https://github.com/ocornut/imgui) library.*
 *This project also uses the SDL3 library suite and cJSON.
 *This project uses [curl/libcurl](https://curl.se/libcurl) to download the latest update from github.*
-*This project uses the [miniz](https://github.com/mongoose-os-libs/miniz) compression library to unzip the downloaded files.*
+*This project uses the [miniz](https://github.com/mongoose-os-libs/miniz) compression library to unzip the downloaded
+files.*
 *This project uses [tiny file dialogs](https://sourceforge.net/projects/tinyfiledialogs) to open file dialogs.*
 *More information can be found in the LICENSES.txt file.*
 
