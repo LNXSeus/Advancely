@@ -150,6 +150,6 @@ bool open_font_file_dialog(char* out_filename, size_t max_len) {
     }
 
     // If the path was invalid, show an error
-    tinyfd_messageBox("Invalid Font Location", "You must select a font from within the application`s resources/fonts directory.", "ok", "error", 1);
+    tinyfd_messageBox("Invalid Font Location", "You must select a font from within the applications resources/fonts directory.", "ok", "error", 1);
     return false;
 }
