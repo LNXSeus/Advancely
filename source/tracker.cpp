@@ -1960,6 +1960,9 @@ static void tracker_calculate_overall_progress(Tracker *t, MC_Version version, c
 
     log_message(LOG_INFO, "Total steps: %d,\ncompleted steps: %d\n", total_steps, completed_steps);
 
+    // Store total steps
+    t->template_data->total_progress_steps = total_steps;
+
 
     // Set 100% if no steps are found
     if (total_steps > 0) {
@@ -4166,19 +4169,34 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
         format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time));
 
-        snprintf(info_buffer, sizeof(info_buffer),
-                 "%s  |  %s - %s%s%s  |  %s: %d/%d  -  Prog: %.2f%%  |  %s IGT  |  Upd: %s",
-                 t->world_name,
-                 settings->version_str,
-                 formatted_category,
-                 *settings->optional_flag ? " - " : "",
-                 formatted_flag,
-                 adv_ach_label,
-                 t->template_data->advancements_completed_count,
-                 t->template_data->advancement_goal_count, // Excluding recipes
-                 t->template_data->overall_progress_percentage,
-                 formatted_time,
-                 formatted_update_time);
+        char temp_chunk[256];
+        bool show_adv_counter = (t->template_data->advancement_goal_count > 0);
+        bool show_prog_percent = (t->template_data->total_progress_steps > 0);
+
+        // Start with the world name and run details
+        snprintf(info_buffer, sizeof(info_buffer), "%s  |  %s - %s%s%s",
+                 t->world_name, settings->version_str, formatted_category,
+                 *settings->optional_flag ? " - " : "", formatted_flag);
+
+        // Conditionally add the progress part
+        if (show_adv_counter && show_prog_percent) {
+            snprintf(temp_chunk, sizeof(temp_chunk), "  |  %s: %d/%d  -  Prog: %.2f%%",
+                     adv_ach_label, t->template_data->advancements_completed_count,
+                     t->template_data->advancement_goal_count, t->template_data->overall_progress_percentage);
+            strncat(info_buffer, temp_chunk, sizeof(info_buffer) - strlen(info_buffer) - 1);
+        } else if (show_adv_counter) {
+            snprintf(temp_chunk, sizeof(temp_chunk), "  |  %s: %d/%d",
+                     adv_ach_label, t->template_data->advancements_completed_count,
+                     t->template_data->advancement_goal_count);
+            strncat(info_buffer, temp_chunk, sizeof(info_buffer) - strlen(info_buffer) - 1);
+        } else if (show_prog_percent) {
+            snprintf(temp_chunk, sizeof(temp_chunk), "  |  Prog: %.2f%%", t->template_data->overall_progress_percentage);
+            strncat(info_buffer, temp_chunk, sizeof(info_buffer) - strlen(info_buffer) - 1);
+        }
+
+        // Add the IGT and Update Timer
+        snprintf(temp_chunk, sizeof(temp_chunk), "  |  %s IGT  |  Upd: %s", formatted_time, formatted_update_time);
+        strncat(info_buffer, temp_chunk, sizeof(info_buffer) - strlen(info_buffer) - 1);
     }
 
     // This text will now be drawn using the user's selected color.
@@ -4955,7 +4973,6 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
     // Optional flag gets formatted as well
     char formatted_flag[128];
     format_category_string(settings->optional_flag, formatted_flag, sizeof(formatted_flag));
-
     format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
 
     // Displaying Ach or Adv depending on the version
@@ -4963,24 +4980,28 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
     MC_Version version = settings_get_version_from_string(settings->version_str);
     const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
 
-    // Creating the title buffer
-    // Displaying last update time doesn't make sense here, so only done in Tracker Info window in tracker_render_gui()
+    char progress_chunk[128] = "";
+    bool show_adv_counter = (t->template_data->advancement_goal_count > 0);
+    bool show_prog_percent = (t->template_data->total_progress_steps > 0);
+
+    if (show_adv_counter && show_prog_percent) {
+        snprintf(progress_chunk, sizeof(progress_chunk), "    |    %s: %d/%d    -    Progress: %.2f%%",
+                 adv_ach_label, t->template_data->advancements_completed_count,
+                 t->template_data->advancement_goal_count, t->template_data->overall_progress_percentage);
+    } else if (show_adv_counter) {
+        snprintf(progress_chunk, sizeof(progress_chunk), "    |    %s: %d/%d",
+                 adv_ach_label, t->template_data->advancements_completed_count,
+                 t->template_data->advancement_goal_count);
+    } else if (show_prog_percent) {
+        snprintf(progress_chunk, sizeof(progress_chunk), "    |    Progress: %.2f%%",
+                 t->template_data->overall_progress_percentage);
+    }
+
     snprintf(title_buffer, sizeof(title_buffer),
-             "  Advancely  %s    |    %s    -    %s    -    %s%s%s    |    %s: %d/%d    -    Progress: %.2f%%    |    %s IGT",
-             ADVANCELY_VERSION,
-             t->world_name,
-             settings->version_str,
-             formatted_category,
-             *settings->optional_flag ? "    -    " : "",
-             formatted_flag,
-             adv_ach_label,
-             t->template_data->advancements_completed_count,
-             t->template_data->advancement_goal_count, // Excluding recipes
-             t->template_data->overall_progress_percentage,
-             formatted_time);
+             "  Advancely  %s    |    %s    -    %s    -    %s%s%s%s    |    %s IGT",
+             ADVANCELY_VERSION, t->world_name, settings->version_str, formatted_category,
+             *settings->optional_flag ? "    -    " : "", formatted_flag, progress_chunk, formatted_time);
 
-
-    // Putting buffer into Window title
     SDL_SetWindowTitle(t->window, title_buffer);
 }
 
@@ -5268,20 +5289,23 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
             }
         }
 
-        // Advancement/Achievement Progress AGAIN
-        if (version >= MC_VERSION_1_12) {
-            log_message(LOG_INFO, "\n[Advancements] %d / %d completed\n",
-                        t->template_data->advancements_completed_count,
-                        t->template_data->advancement_goal_count); // Excluding recipes
-        } else {
-            log_message(LOG_INFO, "\n[Achievements] %d / %d completed\n",
-                        t->template_data->advancements_completed_count,
-                        t->template_data->advancement_goal_count);
+        // Print if advancements are more than zero or progress isn't empty
+        if (t->template_data->advancement_goal_count > 0) {
+            if (version >= MC_VERSION_1_12) {
+                log_message(LOG_INFO, "\n[Advancements] %d / %d completed\n",
+                            t->template_data->advancements_completed_count,
+                            t->template_data->advancement_goal_count); // Excluding recipes
+            } else {
+                log_message(LOG_INFO, "\n[Achievements] %d / %d completed\n",
+                            t->template_data->advancements_completed_count,
+                            t->template_data->advancement_goal_count);
+            }
         }
 
+        if (t->template_data->total_progress_steps > 0) {
+            log_message(LOG_INFO, "[Overall Progress] %.2f%%\n", t->template_data->overall_progress_percentage);
+        }
 
-        // Overall Progress
-        log_message(LOG_INFO, "[Overall Progress] %.2f%%\n", t->template_data->overall_progress_percentage);
         log_message(LOG_INFO, "============================================================\n\n");
     }
     // Force the output buffer to write to the console immediately

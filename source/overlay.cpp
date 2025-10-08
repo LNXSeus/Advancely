@@ -585,14 +585,27 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 add_component(temp_chunk);
             }
 
+            // Show progress sections if they have something
             if (settings->overlay_show_progress) {
+                bool show_adv_counter = (t->template_data->advancement_goal_count > 0);
+                bool show_prog_percent = (t->template_data->total_progress_steps > 0);
                 MC_Version version = settings_get_version_from_string(settings->version_str);
                 const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
-                snprintf(temp_chunk, sizeof(temp_chunk), "%s: %d/%d - Prog: %.2f%%",
-                         adv_ach_label, t->template_data->advancements_completed_count,
-                         t->template_data->advancement_goal_count, // Excluding recipes
-                         t->template_data->overall_progress_percentage);
-                add_component(temp_chunk);
+
+                if (show_adv_counter && show_prog_percent) {
+                    snprintf(temp_chunk, sizeof(temp_chunk), "%s: %d/%d - Prog: %.2f%%",
+                             adv_ach_label, t->template_data->advancements_completed_count,
+                             t->template_data->advancement_goal_count, t->template_data->overall_progress_percentage);
+                    add_component(temp_chunk);
+                } else if (show_adv_counter) {
+                    snprintf(temp_chunk, sizeof(temp_chunk), "%s: %d/%d",
+                             adv_ach_label, t->template_data->advancements_completed_count,
+                             t->template_data->advancement_goal_count);
+                    add_component(temp_chunk);
+                } else if (show_prog_percent) {
+                    snprintf(temp_chunk, sizeof(temp_chunk), "Prog: %.2f%%", t->template_data->overall_progress_percentage);
+                    add_component(temp_chunk);
+                }
             }
 
             if (settings->overlay_show_igt) {

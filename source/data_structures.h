@@ -293,6 +293,7 @@ struct TemplateData {
 
     // Overall Progress Metrics
     int total_criteria_count;
+    int total_progress_steps; // To disable percentage progress text if nothing contributes to it
     int completed_criteria_count;
     float overall_progress_percentage;
     // Percentage score of everything BUT ADVANCEMENTS (have their own advancements_completed_count)
