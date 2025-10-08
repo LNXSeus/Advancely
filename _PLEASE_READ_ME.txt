@@ -16,6 +16,10 @@ Special characters, accents (like `é`, `ü`, `ñ`), or symbols in the file path
 - **BAD Path:** `C:\Users\Jörg\Desktop\Spiele\Advancely\`
 - **GOOD Path:** `C:\Users\Joerg\Desktop\Games\Advancely\`
 
+Sure 👍 here’s your cleaned version with all the `[cite]` text removed, ready to copy exactly as-is:
+
+---
+
 --------------------------------------------------
 --- For macOS Users ---
 --------------------------------------------------
@@ -32,18 +36,22 @@ Due to macOS security (Gatekeeper), you must authorize the app before running it
 3. A new window will appear. Click the "Open" button on this window.
 4. You only need to do this once.
 
-✔️ **Alternative Method (Terminal):**
+✔️ **Alternative Method (Terminal Authorization):**
 
-1. Open the **Terminal** app (you can find it in Applications -> Utilities, or search for it with Spotlight).
+1. Open the **Terminal** app (you can find it in Applications -> Utilities).
 2. Type `xattr -cr ` (note the space at the end) but DO NOT press Enter yet.
 3. Drag the `Advancely.app` file from Finder and drop it onto the Terminal window.
 4. The command should now look like this: `xattr -cr /path/to/your/Advancely.app`
 5. Press **Enter**.
 6. You can now double-click `Advancely.app` to run it.
-7. This command only needs to be run once for this copy of the application.
 
-Note for Advanced Users: If the command fails, you may need to use `sudo xattr...` (for permission issues)
-or `/usr/bin/xattr...` (if you have multiple developer tools installed).
+✔️ **Running from the Terminal (for Debugging):**
+
+If you can't open the app or want to see error messages:
+
+1. Open the **Terminal** app.
+2. Type `cd ` (with a space), then drag the folder containing `Advancely.app` onto the Terminal window and press **Enter**.
+3. Type or paste this command and press **Enter**: `./Advancely.app/Contents/MacOS/Advancely`
 
 ✔️ **CORRECT WAY TO INSTALL:**
 
