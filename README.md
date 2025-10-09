@@ -134,14 +134,17 @@ Your download contains the Advancely application (`.exe` on Windows, `.app` on m
 
 **macOS Instructions**
 
-Due to macOS security (Gatekeeper), you will need to perform a one-time bypass to authorize the application after downloading it.
+Due to macOS security (Gatekeeper), you will need to perform a one-time bypass to authorize the application after
+downloading it.
 
 ✔️ **First-Time Run Steps (Easy Method):**
 
-1. After downloading and unzipping, try to open `Advancely.app`. You will likely see an error saying Apple cannot check it for malicious software. Click **OK**.
+1. After downloading and unzipping, try to open `Advancely.app`. You will likely see an error saying Apple cannot check
+   it for malicious software. Click **OK**.
 2. Now, **right-click** (or Control-click) the `Advancely.app` file and select **Open** from the menu.
 3. A different warning will appear, but this time you will have an **Open** button. Click it.
-4. macOS will now remember that you trust this application. You only need to do this once and can open it normally by double-clicking from now on.
+4. macOS will now remember that you trust this application. You only need to do this once and can open it normally by
+   double-clicking from now on.
 
 ✔️ **Alternative Method (Terminal Authorization):**
 
@@ -158,13 +161,15 @@ If you are having trouble opening the app or want to see live debug messages, yo
 
 1. Open the **Terminal** app.
 2. Type `cd ` (with a space at the end).
-3. Drag the **folder** that contains `Advancely.app` and the `resources` folder onto the Terminal window, then press **Enter**.
+3. Drag the **folder** that contains `Advancely.app` and the `resources` folder onto the Terminal window, then press *
+   *Enter**.
 4. Run the executable with this command: `./Advancely.app/Contents/MacOS/Advancely`
 5. Any errors or log messages will now appear directly in your Terminal window.
 
 ✔️ **Recommended Installation:**
 
-* For the best experience, move **both** `Advancely.app` and the `resources` folder into your main `/Applications` folder.
+* For the best experience, move **both** `Advancely.app` and the `resources` folder into your main `/Applications`
+  folder.
 * You can then drag `Advancely.app` from the Applications folder to your Dock to create a shortcut.
 
 **Windows & Linux Instructions**
@@ -390,9 +395,9 @@ Opening a template reveals a tabbed interface where you can define every goal.
 > and exporting the result.
 
 * **Advancements & Recipes**: List all achievements or advancements you want to track. Each entry has a `Root Name` (the
-  in-game ID, e.g., `minecraft:story/mine_stone`), a `Display Name`, and an `Icon Path`. You can also add `Criteria` to
-  track sub-tasks, and a checkbox designates an entry as a `Recipe` to sort it into its own section and move it to the
-  percentage progress calculation instead.
+  in-game ID, e.g., `minecraft:story/mine_stone`), a `Display Name`, and an `Icon Path`. You can also import or add
+  `Criteria` to track sub-tasks, and a checkbox designates an entry as a `Recipe` to sort it into its own section and
+  move it to the percentage progress calculation instead.
 * **Statistics**: Track any in-game statistic.
     * **Simple Stats**: A single goal with a `Target` value (e.g., track "Blocks Mined" until a goal of 10,000 is
       reached).
@@ -489,18 +494,19 @@ all April Fool's snapshots.
 | Category           | Version(s)                                  | Optional Flag(s) | Languages           |
 |--------------------|---------------------------------------------|------------------|---------------------|
 | `all_advancements` | 1.16.1                                      |                  | Default, ger, zh_cn |
-| `all_advancements` | 1.21.8, 1.21.9                              |                  | Default, ger, zh_cn |
-| `all_advancements` | 1.21.8, 1.21.9                              | `_optimized`     | Default, ger, zh_cn |
+| `all_advancements` | 1.21.8 - 1.21.11                            |                  | Default, ger, zh_cn |
+| `all_advancements` | 1.21.8 - 1.21.11                            | `_optimized`     | Default, ger, zh_cn |
 | `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4 |                  | Default, ger        |
-| `miku%`            | 1.21.8, 1.21.9                              |                  | Default             |
-| `all_trims`        | 1.21.8, 1.21.9                              |                  | Default             |
+| `miku%`            | 1.21.8 - 1.21.11                            |                  | Default             |
+| `all_trims`        | 1.21.8 - 1.21.11                            |                  | Default             |
 | `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 25w14craftmine  | `1`              | Default             |
 
 _The `test1` templates are for you to learn and understand how templates work. These test templates include all the core
 functionalities of all goal types. The `Default` language is the standard english template (`_lang.json`). Any
 non-default languages are appended after `lang_`._
 
-Credits for chinese translation of the 1.16.1 `all_advancements` template go to @towardstars and @yumekotism on dc.
+Credits for the `zh_cn` (chinese) translation of the `all_advancements` templates go to @towardstars and @yumekotism on
+dc.
 Make sure you use the `SourceHanSansCN-Normal.otf` font in all places (tracker, overlay and UI).
 
 ***
