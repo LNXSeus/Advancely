@@ -132,7 +132,8 @@ extern "C" {
     X(MC_VERSION_1_21_7, "1.21.7") \
     X(MC_VERSION_1_21_8, "1.21.8") \
     X(MC_VERSION_1_21_9, "1.21.9") \
-    X(MC_VERSION_1_21_10, "1.21.10")
+    X(MC_VERSION_1_21_10, "1.21.10") \
+    X(MC_VERSION_1_21_11, "1.21.11")
 
 #ifdef __cplusplus
 extern "C" {
