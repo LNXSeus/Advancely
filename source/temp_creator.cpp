@@ -1301,6 +1301,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static bool show_unsaved_changes_popup = false;
     static std::function<void()> pending_action = nullptr;
 
+    // To switch between importing advancements or their criteria
+    enum AdvancementImportMode { BATCH_ADVANCEMENT_IMPORT, CRITERIA_ONLY_IMPORT };
+    static AdvancementImportMode current_advancement_import_mode = BATCH_ADVANCEMENT_IMPORT;
+
     // Searching within template creator
     static char tc_search_buffer[256] = "";
     static bool focus_tc_search_box = false; // Using Ctrl + F to focus the search box
@@ -2843,9 +2847,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
                                                   ? "DAT files"
                                                   : "JSON files";
-
-
-                    const char *selection = tinyfd_openFileDialog("Select Player Advancements File", start_path, 1,
+                    const char* dialog_title = (creator_selected_version < MC_VERSION_1_12)
+                                               ? "Select Player Stats File"
+                                               : "Select Player Advancements File";
+                    const char *selection = tinyfd_openFileDialog(dialog_title, start_path, 1,
                                                                   selected_filter, filter_desc, 0);
 
                     if (selection) {
@@ -3373,6 +3378,57 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         float crit_text_width = ImGui::CalcTextSize(crit_counter_text).x;
                         ImGui::SameLine(ImGui::GetContentRegionAvail().x - crit_text_width);
                         ImGui::TextDisabled("%s", crit_counter_text);
+
+                        // Import Criteria Button
+                        char import_crit_label[128];
+                        snprintf(import_crit_label, sizeof(import_crit_label), "Import %s Criteria",
+                                 advancements_label_upper);
+                        if (ImGui::Button(import_crit_label)) {
+                            current_advancement_import_mode = CRITERIA_ONLY_IMPORT;
+                            // This logic is copied from the main "Import Advancements" button
+                            char start_path[MAX_PATH_LENGTH];
+                            if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
+                            } else {
+                                snprintf(start_path, sizeof(start_path), "%s/%s/advancements/", t->saves_path,
+                                         t->world_name);
+                            }
+                            const char *json_filter[1] = {"*.json"};
+                            const char* dialog_title = (creator_selected_version < MC_VERSION_1_12)
+                                                       ? "Select Player Stats File"
+                                                       : "Select Player Advancements File";
+
+                            const char *selection = tinyfd_openFileDialog(
+                                dialog_title, start_path, 1, json_filter, "JSON files", 0);
+
+                            if (selection) {
+                                import_error_message[0] = '\0';
+                                if (parse_player_advancements_for_import(selection, creator_selected_version,
+                                                                         importable_advancements,
+                                                                         import_error_message,
+                                                                         sizeof(import_error_message))) {
+                                    show_import_advancements_popup = true;
+                                    focus_import_search = true;
+                                } else {
+                                    save_message_type = MSG_ERROR;
+                                    strncpy(status_message, import_error_message, sizeof(status_message) - 1);
+                                }
+                            }
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip[512];
+                            if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                snprintf(tooltip, sizeof(tooltip),
+                                         "Import criteria for this %s directly from a player stats file.",
+                                         advancements_label_singular_lower);
+                            } else {
+                                snprintf(tooltip, sizeof(tooltip),
+                                         "Import criteria for this %s directly from a player advancements file.",
+                                         advancements_label_singular_lower);
+                            }
+                            ImGui::SetTooltip("%s", tooltip);
+                        }
+                        ImGui::SameLine();
 
                         char criterion_add_tooltip_buffer[256];
                         snprintf(criterion_add_tooltip_buffer, sizeof(criterion_add_tooltip_buffer),
@@ -6614,9 +6670,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::EndChild();
 
     // Import Advancement Popup Logic
-    const char *import_popup_title = (creator_selected_version <= MC_VERSION_1_11_2)
-                                         ? "Import Achievements from File"
-                                         : "Import Advancements from File";
+    const char *import_popup_title = (current_advancement_import_mode == CRITERIA_ONLY_IMPORT)
+                                         ? ((creator_selected_version <= MC_VERSION_1_11_2)
+                                                ? "Import Achievement Criteria"
+                                                : "Import Advancement Criteria")
+                                         : ((creator_selected_version <= MC_VERSION_1_11_2)
+                                                ? "Import Achievements from File"
+                                                : "Import Advancements from File");
 
     if (show_import_advancements_popup) {
         ImGui::OpenPopup(import_popup_title);
@@ -6629,41 +6689,52 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             focus_import_search = true;
         }
 
-        // --- Create a filtered list of advancements to display and operate on ---
+        // --- Create a filtered list of advancements to display ---
         std::vector<ImportableAdvancement *> filtered_advancements;
-        if (import_search_buffer[0] != '\0') {
-            // Search logic now uses the new 'import_search_criteria_only' flag
-            if (import_search_criteria_only) {
-                // Search ONLY within criteria, but show their parents
-                for (auto &adv: importable_advancements) {
-                    bool child_match = false;
-                    for (const auto &crit: adv.criteria) {
-                        if (str_contains_insensitive(crit.root_name.c_str(), import_search_buffer)) {
-                            child_match = true;
-                            break;
+        if (current_advancement_import_mode == CRITERIA_ONLY_IMPORT && selected_advancement) {
+            // In criteria mode, find and show only the currently edited advancement
+            for (auto &adv: importable_advancements) {
+                if (adv.root_name == selected_advancement->root_name) {
+                    filtered_advancements.push_back(&adv);
+                    break;
+                }
+            }
+            if (filtered_advancements.empty()) {
+                snprintf(import_error_message, sizeof(import_error_message),
+                         "Error: %s '%s' not found in the selected file.", advancements_label_upper,
+                         selected_advancement->root_name);
+            }
+        } else {
+            // BATCH_ADVANCEMENT_IMPORT mode
+            if (import_search_buffer[0] != '\0') {
+                if (import_search_criteria_only) {
+                    for (auto &adv: importable_advancements) {
+                        bool child_match = false;
+                        for (const auto &crit: adv.criteria) {
+                            if (str_contains_insensitive(crit.root_name.c_str(), import_search_buffer)) {
+                                child_match = true;
+                                break;
+                            }
                         }
+                        if (child_match) filtered_advancements.push_back(&adv);
                     }
-                    if (child_match) {
-                        filtered_advancements.push_back(&adv);
+                } else {
+                    for (auto &adv: importable_advancements) {
+                        if (str_contains_insensitive(adv.root_name.c_str(), import_search_buffer)) {
+                            filtered_advancements.push_back(&adv);
+                        }
                     }
                 }
             } else {
-                // Search ONLY within parent advancements/achievements
                 for (auto &adv: importable_advancements) {
-                    if (str_contains_insensitive(adv.root_name.c_str(), import_search_buffer)) {
-                        filtered_advancements.push_back(&adv);
-                    }
+                    filtered_advancements.push_back(&adv);
                 }
-            }
-        } else {
-            // If no search, all advancements are considered "filtered"
-            for (auto &adv: importable_advancements) {
-                filtered_advancements.push_back(&adv);
             }
         }
 
         // --- Selection Controls & Search Bar (now operating on the filtered list) ---
-        if (current_import_mode == BATCH_IMPORT) {
+        // Only if advancement import or criteria import NOT stage advancement or stage criteria import
+        if (current_import_mode == BATCH_IMPORT && current_advancement_import_mode == BATCH_ADVANCEMENT_IMPORT) {
             // Selecting multiple, not multi-stage goal stage
             if (ImGui::Button("Select All")) {
                 for (auto *adv_ptr: filtered_advancements) {
@@ -6858,46 +6929,54 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 bool is_criterion_select_mode = (
                     current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit->type == SUBGOAL_CRITERION);
 
-                if (is_criterion_select_mode) {
-                    // advancements/achievements checkbox is not interactive
-                    ImGui::BeginDisabled();
-                    ImGui::Checkbox(adv.root_name.c_str(), &adv.is_selected);
+                bool disable_parent_checkbox = is_criterion_select_mode || (
+                                                   current_advancement_import_mode == CRITERIA_ONLY_IMPORT);
+                if (disable_parent_checkbox) {
+                    ImGui::BeginDisabled(); // Disable advancement checkbox
+                }
+
+                // All other modes the achievements/advancements checkbox is interactive
+                if (ImGui::Checkbox(adv.root_name.c_str(), &adv.is_selected)) {
+                    if (current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit->type != SUBGOAL_CRITERION) {
+                        if (adv.is_selected) {
+                            for (auto &other_adv: importable_advancements) {
+                                if (&other_adv != &adv) other_adv.is_selected = false;
+                                for (auto &crit: other_adv.criteria) crit.is_selected = false;
+                            }
+                        }
+                    } else if (current_import_mode == BATCH_IMPORT) {
+                        if (ImGui::GetIO().KeyShift && last_clicked_adv_index != -1) {
+                            int start = std::min((int) i, last_clicked_adv_index);
+                            int end = std::max((int) i, last_clicked_adv_index);
+                            for (int j = start; j <= end; ++j) {
+                                auto &ranged_adv = *filtered_advancements[j];
+                                ranged_adv.is_selected = adv.is_selected;
+                                if (import_select_criteria) {
+                                    for (auto &crit: ranged_adv.criteria) crit.is_selected = adv.is_selected;
+                                }
+                            }
+                        }
+                        last_clicked_adv_index = i;
+                        last_clicked_crit_parent = nullptr;
+                        last_clicked_crit_index = -1;
+                        if (!adv.is_selected) {
+                            for (auto &crit: adv.criteria) crit.is_selected = false;
+                        }
+                    }
+                }
+                if (disable_parent_checkbox) {
                     ImGui::EndDisabled();
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                }
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                    if (current_advancement_import_mode == CRITERIA_ONLY_IMPORT) {
+                        char tooltip_buffer[256];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Only criteria can be selected in this mode.");
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    } else if (is_criterion_select_mode) {
                         char tooltip_buffer[256];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a specific criterion below.\n"
                                  "The parent will be selected automatically.");
                         ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-                } else {
-                    // All other modes the achievements/advancements checkbox is interactive
-                    if (ImGui::Checkbox(adv.root_name.c_str(), &adv.is_selected)) {
-                        if (current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit->type != SUBGOAL_CRITERION) {
-                            if (adv.is_selected) {
-                                for (auto &other_adv: importable_advancements) {
-                                    if (&other_adv != &adv) other_adv.is_selected = false;
-                                    for (auto &crit: other_adv.criteria) crit.is_selected = false;
-                                }
-                            }
-                        } else if (current_import_mode == BATCH_IMPORT) {
-                            if (ImGui::GetIO().KeyShift && last_clicked_adv_index != -1) {
-                                int start = std::min((int) i, last_clicked_adv_index);
-                                int end = std::max((int) i, last_clicked_adv_index);
-                                for (int j = start; j <= end; ++j) {
-                                    auto &ranged_adv = *filtered_advancements[j];
-                                    ranged_adv.is_selected = adv.is_selected;
-                                    if (import_select_criteria) {
-                                        for (auto &crit: ranged_adv.criteria) crit.is_selected = adv.is_selected;
-                                    }
-                                }
-                            }
-                            last_clicked_adv_index = i;
-                            last_clicked_crit_parent = nullptr;
-                            last_clicked_crit_index = -1;
-                            if (!adv.is_selected) {
-                                for (auto &crit: adv.criteria) crit.is_selected = false;
-                            }
-                        }
                     }
                 }
                 if (!adv.criteria.empty()) {
@@ -6987,7 +7066,53 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         const char *confirm_text = (current_import_mode == SINGLE_SELECT_STAGE) ? "Select" : "Confirm Import";
 
         if (ImGui::Button(confirm_text, ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
-            if (current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit != nullptr) {
+            if (current_advancement_import_mode == CRITERIA_ONLY_IMPORT) {
+                // Importing Advancement/Achievement Criteria
+                import_error_message[0] = '\0';
+                bool has_duplicates = false;
+
+                std::unordered_set<std::string> existing_crit_names;
+                for (const auto &crit: selected_advancement->criteria) {
+                    existing_crit_names.insert(crit.root_name);
+                }
+
+                ImportableAdvancement *source_adv = nullptr;
+                if (!filtered_advancements.empty()) {
+                    source_adv = filtered_advancements[0];
+                }
+
+                if (source_adv) {
+                    for (const auto &new_crit: source_adv->criteria) {
+                        if (new_crit.is_selected) {
+                            if (existing_crit_names.count(new_crit.root_name)) {
+                                snprintf(import_error_message, sizeof(import_error_message),
+                                         "Error: Criterion '%s' already exists.", new_crit.root_name.c_str());
+                                has_duplicates = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (!has_duplicates && source_adv) {
+                    for (const auto &new_crit: source_adv->criteria) {
+                        if (new_crit.is_selected) {
+                            EditorTrackableItem imported_crit = {};
+                            strncpy(imported_crit.root_name, new_crit.root_name.c_str(),
+                                    sizeof(imported_crit.root_name) - 1);
+                            imported_crit.root_name[sizeof(imported_crit.root_name) - 1] = '\0';
+                            strncpy(imported_crit.display_name, new_crit.root_name.c_str(),
+                                    sizeof(imported_crit.display_name) - 1);
+                            imported_crit.display_name[sizeof(imported_crit.display_name) - 1] = '\0';
+                            strncpy(imported_crit.icon_path, "blocks/placeholder.png",
+                                    sizeof(imported_crit.icon_path) - 1);
+                            imported_crit.icon_path[sizeof(imported_crit.icon_path) - 1] = '\0';
+                            selected_advancement->criteria.push_back(imported_crit);
+                        }
+                    }
+                    show_import_advancements_popup = false; // Close on success
+                }
+            } else if (current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit != nullptr) {
                 // Part of a stage import
                 ImportableAdvancement *selected_adv = nullptr;
                 ImportableCriterion *selected_crit = nullptr;
@@ -7085,6 +7210,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (!show_import_advancements_popup) {
                 // If closed
                 current_import_mode = BATCH_IMPORT;
+                current_advancement_import_mode = BATCH_ADVANCEMENT_IMPORT;
                 stage_to_edit = nullptr;
                 import_search_buffer[0] = '\0'; // Clear search after import
             }
@@ -7099,9 +7225,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             show_import_advancements_popup = false;
             current_import_mode = BATCH_IMPORT;
+            current_advancement_import_mode = BATCH_ADVANCEMENT_IMPORT;
             stage_to_edit = nullptr;
             import_error_message[0] = '\0';
-            show_import_advancements_popup = false;
             import_search_buffer[0] = '\0'; // Clear search after cancel
         }
         if (ImGui::IsItemHovered()) {
@@ -7114,34 +7240,23 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // --- Display the counters, aligned to the right ---
         ImGui::SameLine();
         char counter_text[128];
-        if (creator_selected_version <= MC_VERSION_1_6_4) {
+        if (current_advancement_import_mode == CRITERIA_ONLY_IMPORT) {
+            snprintf(counter_text, sizeof(counter_text), "Selected: %d Criteria", selected_crit_count);
+        } else if (creator_selected_version <= MC_VERSION_1_6_4) {
             // Only achievements
             if (current_import_mode == BATCH_IMPORT) {
                 snprintf(counter_text, sizeof(counter_text), "Selected: %d Achievements", selected_adv_count);
             } else {
                 snprintf(counter_text, sizeof(counter_text), "Selected: %d / 1 Achievements", selected_adv_count);
             }
-        } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-            // Achievements and criteria
-            if (current_import_mode == BATCH_IMPORT) {
-                snprintf(counter_text, sizeof(counter_text), "Selected: %d Achievements, %d Criteria",
-                         selected_adv_count,
-                         selected_crit_count);
-            } else {
-                snprintf(counter_text, sizeof(counter_text),
-                         "Selected: %d / 1 Achievements, %d / 1 Criteria", selected_adv_count,
-                         selected_crit_count);
-            }
         } else {
-            // Advancements and criteria
+            // Achievements/Advancements and criteria
             if (current_import_mode == BATCH_IMPORT) {
-                snprintf(counter_text, sizeof(counter_text), "Selected: %d Advancements, %d Criteria",
-                         selected_adv_count,
-                         selected_crit_count);
+                snprintf(counter_text, sizeof(counter_text), "Selected: %d %s, %d Criteria",
+                         selected_adv_count, advancements_label_plural_upper, selected_crit_count);
             } else {
                 snprintf(counter_text, sizeof(counter_text),
-                         "Selected: %d / 1 Advancements, %d / 1 Criteria", selected_adv_count,
-                         selected_crit_count);
+                         "Selected: %d / 1 %s, %d / 1 Criteria", selected_adv_count, advancements_label_upper, selected_crit_count);
             }
         }
 
