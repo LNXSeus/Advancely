@@ -7090,7 +7090,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         const char *confirm_text = (current_import_mode == SINGLE_SELECT_STAGE) ? "Select" : "Confirm Import";
 
         if (ImGui::Button(confirm_text, ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
-            if (current_advancement_import_mode == CRITERIA_ONLY_IMPORT) {
+            if (selected_adv_count == 0 && selected_crit_count == 0) {
+                snprintf(import_error_message, sizeof(import_error_message), "Error: No items selected for import.");
+            } else if (current_advancement_import_mode == CRITERIA_ONLY_IMPORT) {
                 // Importing Advancement/Achievement Criteria
                 import_error_message[0] = '\0';
                 bool has_duplicates = false;
@@ -7458,7 +7460,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::Button(confirm_text, ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
             import_error_message[0] = '\0';
 
-            if (current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit != nullptr) {
+            if (selected_stats_count == 0) {
+                snprintf(import_error_message, sizeof(import_error_message), "Error: No stats selected for import.");
+            } else if (current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit != nullptr) {
                 // --- Logic for SINGLE_SELECT_STAGE ---
                 for (const auto &new_stat: importable_stats) {
                     if (new_stat.is_selected) {
@@ -7734,7 +7738,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         if (ImGui::Button(confirm_unlock_text, ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
             import_error_message[0] = '\0';
-            if (current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit != nullptr) {
+            if (selected_unlocks_count == 0) {
+                snprintf(import_error_message, sizeof(import_error_message), "Error: No unlocks selected for import.");
+            } else if (current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit != nullptr) {
                 for (const auto &new_unlock: importable_unlocks) {
                     if (new_unlock.is_selected) {
                         strncpy(stage_to_edit->root_name, new_unlock.root_name.c_str(),
