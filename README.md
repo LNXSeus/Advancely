@@ -12,11 +12,23 @@
 
 ***
 
+## Become a Supporter!
+
+Love using Advancely? You can have your name immortalized in the tracker!
+
+Simply [**donate here**](https://streamlabs.com/lnxseus/tip) and include the word "**Advancely**" in your donation
+message. Your name will be added to the official supporter showcase that appears on the stream overlay when anyone
+completes a run.
+
+Thank you for supporting the project!
+
+***
+
 ## Socials
 
 **Put `#Advancely` in your content to support the project!**
 
-* [Support Advancely](https://streamlabs.com/lnxseus/tip)
+* [Support Advancely (be featured on the overlay)](https://streamlabs.com/lnxseus/tip)
 * [My YouTube](https://www.youtube.com/@lnxs?sub_confirmation=1)
 * [My Twitch](https://www.twitch.tv/lnxseus)
 * [My Twitch Archive + Advancely Devlogs](https://www.youtube.com/@lnxsarchive/playlists?view=1&sort=lad&flow=grid&sub_confirmation=1)

@@ -43,6 +43,40 @@ const char *SOCIALS[] = {
 };
 const int NUM_SOCIALS = sizeof(SOCIALS) / sizeof(char *);
 
+// --- Supporter Showcase for Completed Runs ---
+// A list of all available icons for the supporter showcase.
+const char *SUPPORTER_ICONS[] = {
+    "emotes/glorpLove-4x.png",
+    "emotes/Lnxseuheart.png",
+    "emotes/Love_emote.png",
+    "emotes/luvv-4x.png",
+    "emotes/poggSpin-4x_unoptimized.gif"
+};
+const int NUM_SUPPORTER_ICONS = sizeof(SUPPORTER_ICONS) / sizeof(char *);
+
+// A structure to hold supporter information.
+typedef struct {
+    const char *name;
+    float amount;
+} Supporter;
+
+// The list of supporters and their donation amounts.
+Supporter SUPPORTERS[] = {
+    {"YourNameHere", 10.0f},
+    {"LNXS", 20.0f},
+    {"Test", 2.0f},
+    {"Anonymous", 15.0f},
+    {"Another Supporter", 2.5f},
+};
+const int NUM_SUPPORTERS = sizeof(SUPPORTERS) / sizeof(Supporter);
+
+// A structure to hold the pre-calculated rendering info for each supporter.
+typedef struct {
+    const Supporter *supporter;
+    const char *icon_path;
+    SDL_Texture *background;
+} SupporterRenderInfo;
+
 /**
  * @brief Helper function for text caching to improve performance.
  * @param o The Overlay instance
@@ -565,7 +599,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         if (is_run_complete) {
             char formatted_time[64];
             format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
-            snprintf(info_buffer, sizeof(info_buffer), "*** RUN COMPLETE! *** | Final Time: %s", formatted_time);
+            snprintf(info_buffer, sizeof(info_buffer),
+                     "*** RUN COMPLETE! *** | Final Time: %s | Donate (mentioning 'Advancely') to be featured!",
+                     formatted_time);
         } else {
             // Conditionally build the progress string section by section
             if (settings->overlay_show_world && t->world_name[0] != '\0') {
@@ -603,7 +639,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                              t->template_data->advancement_goal_count);
                     add_component(temp_chunk);
                 } else if (show_prog_percent) {
-                    snprintf(temp_chunk, sizeof(temp_chunk), "Prog: %.2f%%", t->template_data->overall_progress_percentage);
+                    snprintf(temp_chunk, sizeof(temp_chunk), "Prog: %.2f%%",
+                             t->template_data->overall_progress_percentage);
                     add_component(temp_chunk);
                 }
             }
@@ -787,152 +824,279 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
     }
 
     // --- ROW 2: Advancements & Unlocks ---
+    // ROW 2 ALSO SHOWS SUPPORTERS WHEN RUN IS COMPLETED
     {
         const float ROW2_Y_POS = 108.0f;
         const float ITEM_WIDTH = 96.0f;
         const float ITEM_SPACING = 16.0f;
         const float TEXT_Y_OFFSET = 4.0f;
 
-        std::vector<OverlayDisplayItem> row2_items;
-        for (int i = 0; i < t->template_data->advancement_count; ++i)
-            row2_items.push_back({
-                t->template_data->advancements[i], OverlayDisplayItem::ADVANCEMENT
-            });
-        for (int i = 0; i < t->template_data->unlock_count; ++i)
-            row2_items.push_back({
-                t->template_data->unlocks[i], OverlayDisplayItem::UNLOCK
-            });
+        bool is_run_complete = t->template_data->advancements_completed_count >= t->template_data->
+                               advancement_goal_count &&
+                               t->template_data->overall_progress_percentage >= 100.0f;
 
-        size_t visible_item_count = 0;
-        for (const auto &item: row2_items) {
-            if (!is_display_item_done(item, settings)) {
-                visible_item_count++;
+        if (is_run_complete && NUM_SUPPORTERS > 0) {
+            // --- Completed Run: Render Supporter Showcase ---
+            std::vector<SupporterRenderInfo> supporter_render_list;
+            float min_amount = SUPPORTERS[0].amount;
+            float max_amount = SUPPORTERS[0].amount;
+            for (int i = 1; i < NUM_SUPPORTERS; ++i) {
+                if (SUPPORTERS[i].amount < min_amount) min_amount = SUPPORTERS[i].amount;
+                if (SUPPORTERS[i].amount > max_amount) max_amount = SUPPORTERS[i].amount;
             }
-        }
 
-        if (visible_item_count > 0) {
+            float range = max_amount - min_amount;
+            float tier1_cutoff = min_amount + range / 3.0f;
+            float tier2_cutoff = min_amount + (range * 2.0f) / 3.0f;
+
             float max_text_width = 0.0f;
-            // First pass: calculate the max width required by any visible item in the row
-            for (const auto &display_item: row2_items) {
-                if (is_display_item_done(display_item, settings)) continue;
-                char name_buf[256] = {0}, progress_buf[64] = {0};
 
-                if (display_item.type == OverlayDisplayItem::ADVANCEMENT) {
-                    auto *adv = static_cast<TrackableCategory *>(display_item.item_ptr);
-                    strncpy(name_buf, adv->display_name, sizeof(name_buf) - 1);
-                    name_buf[sizeof(name_buf) - 1] = '\0';
-                    if (adv->criteria_count > 0)
-                        snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
-                                 adv->completed_criteria_count, adv->criteria_count);
-                } else if (display_item.type == OverlayDisplayItem::UNLOCK) {
-                    auto *unlock = static_cast<TrackableItem *>(display_item.item_ptr);
-                    strncpy(name_buf, unlock->display_name, sizeof(name_buf) - 1);
-                    name_buf[sizeof(name_buf) - 1] = '\0';
-                }
+            // First pass: Prepare render info and calculate max width
+            for (int i = 0; i < NUM_SUPPORTERS; ++i) {
+                SupporterRenderInfo info = {};
+                info.supporter = &SUPPORTERS[i];
+                info.icon_path = SUPPORTER_ICONS[i % NUM_SUPPORTER_ICONS];
 
-                // Use TTF_MeasureString for Row 3 as well
-                int w;
-                if (name_buf[0] != '\0') {
-                    TTF_MeasureString(o->font, name_buf, 0, 0, &w, nullptr);
-                    max_text_width = fmaxf(max_text_width, (float) w);
+                // Determine background based on donation amount (split into 3 sections)
+                if (info.supporter->amount >= tier2_cutoff) {
+                    info.background = o->adv_bg_done;
+                } else if (info.supporter->amount >= tier1_cutoff) {
+                    info.background = o->adv_bg_half_done;
+                } else {
+                    info.background = o->adv_bg;
                 }
-                if (progress_buf[0] != '\0') {
-                    TTF_MeasureString(o->font, progress_buf, 0, 0, &w, nullptr);
-                    max_text_width = fmaxf(max_text_width, (float) w);
-                }
+                supporter_render_list.push_back(info);
+
+                // --- TODO: DEBUG CODE ---
+                char full_icon_path[MAX_PATH_LENGTH];
+                snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_resources_path(), info.icon_path);
+                log_message(LOG_ERROR, "Checking for supporter icon: %s. Exists: %s\n",
+                            full_icon_path, path_exists(full_icon_path) ? "Yes" : "NO");
+                // --- END DEBUG CODE ---
+
+                // Measure text widths for layout calculation
+                char amount_buf[64];
+                snprintf(amount_buf, sizeof(amount_buf), "$%.2f", info.supporter->amount);
+                int name_w = 0, amount_w = 0;
+                TTF_MeasureString(o->font, info.supporter->name, 0, 0, &name_w, nullptr);
+                TTF_MeasureString(o->font, amount_buf, 0, 0, &amount_w, nullptr);
+                max_text_width = fmaxf(max_text_width, (float) fmax(name_w, amount_w));
             }
 
             const float cell_width = fmaxf(ITEM_WIDTH, max_text_width);
             const float item_full_width = cell_width + ITEM_SPACING;
 
-            int items_to_draw = (item_full_width > 0) ? ceil((float) window_w / item_full_width) + 2 : 0;
-            int current_item_idx = o->start_index_row2;
+            float total_row_width = NUM_SUPPORTERS * item_full_width;
+            float start_pos = fmod(o->scroll_offset_row3, total_row_width); // Sync with row 3's speed
+            int blocks_to_draw = (total_row_width > 0) ? (int) ceil((float) window_w / total_row_width) + 2 : 0;
 
-            for (int k = 0; k < items_to_draw; k++) {
-                size_t loop_guard = 0;
-                while (is_display_item_done(row2_items[current_item_idx], settings)) {
-                    current_item_idx = (current_item_idx + 1) % row2_items.size();
-                    loop_guard++;
-                    if (loop_guard > row2_items.size()) goto end_row2_render;
+            for (int block = -blocks_to_draw; block <= blocks_to_draw; ++block) {
+                float block_offset = start_pos + (block * total_row_width);
+                for (int i = 0; i < NUM_SUPPORTERS; ++i) {
+                    float current_x = block_offset + (i * item_full_width);
+                    if (current_x + item_full_width < 0 || current_x > window_w) continue;
+
+                    const auto &render_info = supporter_render_list[i];
+
+                    // Render background
+                    float bg_x_offset = (cell_width - ITEM_WIDTH) / 2.0f;
+                    SDL_FRect bg_rect = {current_x + bg_x_offset, ROW2_Y_POS, ITEM_WIDTH, ITEM_WIDTH};
+                    if (render_info.background)
+                        SDL_RenderTexture(o->renderer, render_info.background, nullptr,
+                                          &bg_rect);
+
+                    // Render icon
+                    SDL_FRect icon_rect = {bg_rect.x + 16.0f, bg_rect.y + 16.0f, 64.0f, 64.0f};
+
+                    // Also support .gif icons
+                    SDL_Texture* tex = nullptr;
+                    AnimatedTexture* anim_tex = nullptr;
+                    char full_icon_path[MAX_PATH_LENGTH];
+                    snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_resources_path(), render_info.icon_path);
+
+                    // Check the file extension to decide which cache function to use
+                    if (strstr(full_icon_path, ".gif")) {
+                        anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity, full_icon_path, SDL_SCALEMODE_NEAREST);
+                    } else {
+                        tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count, &o->texture_cache_capacity, full_icon_path, SDL_SCALEMODE_NEAREST);
+                    }
+
+                    if (tex || anim_tex) {
+                        // Pass both pointers; the function will correctly choose which one to use
+                        render_texture_with_alpha(o->renderer, tex, anim_tex, &icon_rect, 255);
+                    } else {
+                        // If texture loading fails for any reason, draw a placeholder
+                        SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, 255); // Bright Pink
+                        SDL_RenderFillRect(o->renderer, &icon_rect);
+                    }
+
+                    // Render name
+                    SDL_Texture *name_tex = get_text_texture_from_cache(o, render_info.supporter->name, text_color);
+                    if (name_tex) {
+                        float w, h;
+                        SDL_GetTextureSize(name_tex, &w, &h);
+                        float text_x = current_x + (cell_width - w) / 2.0f;
+                        SDL_FRect dest_rect = {text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET, w, h};
+                        SDL_RenderTexture(o->renderer, name_tex, nullptr, &dest_rect);
+
+                        // Render amount
+                        char amount_buf[64];
+                        snprintf(amount_buf, sizeof(amount_buf), "$%.2f", render_info.supporter->amount);
+                        SDL_Texture *amount_tex = get_text_texture_from_cache(o, amount_buf, text_color);
+                        if (amount_tex) {
+                            float pw, ph;
+                            SDL_GetTextureSize(amount_tex, &pw, &ph);
+                            float p_text_x = current_x + (cell_width - pw) / 2.0f;
+                            SDL_FRect p_dest_rect = {p_text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + h, pw, ph};
+                            SDL_RenderTexture(o->renderer, amount_tex, nullptr, &p_dest_rect);
+                        }
+                    }
                 }
+            }
+        } else {
+            // --- Default Behavior: Render Advancements & Unlocks ---
+            std::vector<OverlayDisplayItem> row2_items;
+            for (int i = 0; i < t->template_data->advancement_count; ++i)
+                row2_items.push_back({
+                    t->template_data->advancements[i], OverlayDisplayItem::ADVANCEMENT
+                });
+            for (int i = 0; i < t->template_data->unlock_count; ++i)
+                row2_items.push_back({
+                    t->template_data->unlocks[i], OverlayDisplayItem::UNLOCK
+                });
 
-                const auto &display_item = row2_items[current_item_idx];
-                float x_pos = ((k - 1) * item_full_width) - o->scroll_offset_row2;
+            size_t visible_item_count = 0;
+            for (const auto &item: row2_items) {
+                if (!is_display_item_done(item, settings)) {
+                    visible_item_count++;
+                }
+            }
 
-                // --- Render the item ---
-                SDL_Texture *bg_texture = o->adv_bg;
-                std::string icon_path;
-                char name_buf[256] = {0}, progress_buf[64] = {0};
+            if (visible_item_count > 0) {
+                float max_text_width = 0.0f;
+                // First pass: calculate the max width required by any visible item in the row
+                for (const auto &display_item: row2_items) {
+                    if (is_display_item_done(display_item, settings)) continue;
+                    char name_buf[256] = {0}, progress_buf[64] = {0};
 
-                switch (display_item.type) {
-                    case OverlayDisplayItem::ADVANCEMENT: {
+                    if (display_item.type == OverlayDisplayItem::ADVANCEMENT) {
                         auto *adv = static_cast<TrackableCategory *>(display_item.item_ptr);
-                        if (adv->done) bg_texture = o->adv_bg_done;
-                        else if (adv->completed_criteria_count > 0) bg_texture = o->adv_bg_half_done;
-                        icon_path = adv->icon_path;
                         strncpy(name_buf, adv->display_name, sizeof(name_buf) - 1);
                         name_buf[sizeof(name_buf) - 1] = '\0';
-                        if (adv->criteria_count > 0) {
-                            snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)", adv->completed_criteria_count,
-                                     adv->criteria_count);
-                        }
-                        break;
-                    }
-                    case OverlayDisplayItem::UNLOCK: {
+                        if (adv->criteria_count > 0)
+                            snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
+                                     adv->completed_criteria_count, adv->criteria_count);
+                    } else if (display_item.type == OverlayDisplayItem::UNLOCK) {
                         auto *unlock = static_cast<TrackableItem *>(display_item.item_ptr);
-                        if (unlock->done) bg_texture = o->adv_bg_done;
-                        icon_path = unlock->icon_path;
                         strncpy(name_buf, unlock->display_name, sizeof(name_buf) - 1);
                         name_buf[sizeof(name_buf) - 1] = '\0';
-                        break;
                     }
-                    default: break;
-                }
 
-                float bg_x_offset = (cell_width - ITEM_WIDTH) / 2.0f;
-                SDL_FRect bg_rect = {x_pos + bg_x_offset, ROW2_Y_POS, ITEM_WIDTH, ITEM_WIDTH};
-                if (bg_texture) SDL_RenderTexture(o->renderer, bg_texture, nullptr, &bg_rect);
-
-                SDL_FRect icon_rect = {bg_rect.x + 16.0f, bg_rect.y + 16.0f, 64.0f, 64.0f};
-                SDL_Texture *tex = nullptr;
-                AnimatedTexture *anim_tex = nullptr;
-                if (!icon_path.empty() && strstr(icon_path.c_str(), ".gif")) {
-                    anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
-                                                               &o->anim_cache_capacity, icon_path.c_str(),
-                                                               SDL_SCALEMODE_NEAREST);
-                } else if (!icon_path.empty()) {
-                    tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
-                                                 &o->texture_cache_capacity, icon_path.c_str(), SDL_SCALEMODE_NEAREST);
-                }
-                render_texture_with_alpha(o->renderer, tex, anim_tex, &icon_rect, 255);
-
-
-                // Text rendering now uses the cache
-                SDL_Texture *name_texture = get_text_texture_from_cache(o, name_buf, text_color);
-                if (name_texture) {
-                    float w, h;
-                    SDL_GetTextureSize(name_texture, &w, &h);
-                    float text_x = x_pos + (cell_width - w) / 2.0f;
-                    SDL_FRect dest_rect = {text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET, w, h};
-                    SDL_RenderTexture(o->renderer, name_texture, nullptr, &dest_rect);
-
+                    // Use TTF_MeasureString for Row 3 as well
+                    int w;
+                    if (name_buf[0] != '\0') {
+                        TTF_MeasureString(o->font, name_buf, 0, 0, &w, nullptr);
+                        max_text_width = fmaxf(max_text_width, (float) w);
+                    }
                     if (progress_buf[0] != '\0') {
-                        SDL_Texture *progress_texture = get_text_texture_from_cache(o, progress_buf, text_color);
-                        if (progress_texture) {
-                            float pw, ph;
-                            SDL_GetTextureSize(progress_texture, &pw, &ph);
-                            float p_text_x = x_pos + (cell_width - pw) / 2.0f;
-                            SDL_FRect p_dest_rect = {p_text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + h, pw, ph};
-                            SDL_RenderTexture(o->renderer, progress_texture, nullptr, &p_dest_rect);
+                        TTF_MeasureString(o->font, progress_buf, 0, 0, &w, nullptr);
+                        max_text_width = fmaxf(max_text_width, (float) w);
+                    }
+                }
+
+                const float cell_width = fmaxf(ITEM_WIDTH, max_text_width);
+                const float item_full_width = cell_width + ITEM_SPACING;
+
+                int items_to_draw = (item_full_width > 0) ? ceil((float) window_w / item_full_width) + 2 : 0;
+                int current_item_idx = o->start_index_row2;
+
+                for (int k = 0; k < items_to_draw; k++) {
+                    size_t loop_guard = 0;
+                    while (is_display_item_done(row2_items[current_item_idx], settings)) {
+                        current_item_idx = (current_item_idx + 1) % row2_items.size();
+                        loop_guard++;
+                        if (loop_guard > row2_items.size()) goto end_row2_render;
+                    }
+
+                    const auto &display_item = row2_items[current_item_idx];
+                    float x_pos = ((k - 1) * item_full_width) - o->scroll_offset_row2;
+
+                    // --- Render the item ---
+                    SDL_Texture *bg_texture = o->adv_bg;
+                    std::string icon_path;
+                    char name_buf[256] = {0}, progress_buf[64] = {0};
+
+                    switch (display_item.type) {
+                        case OverlayDisplayItem::ADVANCEMENT: {
+                            auto *adv = static_cast<TrackableCategory *>(display_item.item_ptr);
+                            if (adv->done) bg_texture = o->adv_bg_done;
+                            else if (adv->completed_criteria_count > 0) bg_texture = o->adv_bg_half_done;
+                            icon_path = adv->icon_path;
+                            strncpy(name_buf, adv->display_name, sizeof(name_buf) - 1);
+                            name_buf[sizeof(name_buf) - 1] = '\0';
+                            if (adv->criteria_count > 0) {
+                                snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)", adv->completed_criteria_count,
+                                         adv->criteria_count);
+                            }
+                            break;
+                        }
+                        case OverlayDisplayItem::UNLOCK: {
+                            auto *unlock = static_cast<TrackableItem *>(display_item.item_ptr);
+                            if (unlock->done) bg_texture = o->adv_bg_done;
+                            icon_path = unlock->icon_path;
+                            strncpy(name_buf, unlock->display_name, sizeof(name_buf) - 1);
+                            name_buf[sizeof(name_buf) - 1] = '\0';
+                            break;
+                        }
+                        default: break;
+                    }
+
+                    float bg_x_offset = (cell_width - ITEM_WIDTH) / 2.0f;
+                    SDL_FRect bg_rect = {x_pos + bg_x_offset, ROW2_Y_POS, ITEM_WIDTH, ITEM_WIDTH};
+                    if (bg_texture) SDL_RenderTexture(o->renderer, bg_texture, nullptr, &bg_rect);
+
+                    SDL_FRect icon_rect = {bg_rect.x + 16.0f, bg_rect.y + 16.0f, 64.0f, 64.0f};
+                    SDL_Texture *tex = nullptr;
+                    AnimatedTexture *anim_tex = nullptr;
+                    if (!icon_path.empty() && strstr(icon_path.c_str(), ".gif")) {
+                        anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
+                                                                   &o->anim_cache_capacity, icon_path.c_str(),
+                                                                   SDL_SCALEMODE_NEAREST);
+                    } else if (!icon_path.empty()) {
+                        tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                                     &o->texture_cache_capacity, icon_path.c_str(),
+                                                     SDL_SCALEMODE_NEAREST);
+                    }
+                    render_texture_with_alpha(o->renderer, tex, anim_tex, &icon_rect, 255);
+
+
+                    // Text rendering now uses the cache
+                    SDL_Texture *name_texture = get_text_texture_from_cache(o, name_buf, text_color);
+                    if (name_texture) {
+                        float w, h;
+                        SDL_GetTextureSize(name_texture, &w, &h);
+                        float text_x = x_pos + (cell_width - w) / 2.0f;
+                        SDL_FRect dest_rect = {text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET, w, h};
+                        SDL_RenderTexture(o->renderer, name_texture, nullptr, &dest_rect);
+
+                        if (progress_buf[0] != '\0') {
+                            SDL_Texture *progress_texture = get_text_texture_from_cache(o, progress_buf, text_color);
+                            if (progress_texture) {
+                                float pw, ph;
+                                SDL_GetTextureSize(progress_texture, &pw, &ph);
+                                float p_text_x = x_pos + (cell_width - pw) / 2.0f;
+                                SDL_FRect p_dest_rect = {p_text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + h, pw, ph};
+                                SDL_RenderTexture(o->renderer, progress_texture, nullptr, &p_dest_rect);
+                            }
                         }
                     }
-                }
 
-                // This is the correct place to advance to the next item for the next screen slot.
-                current_item_idx = (current_item_idx + 1) % row2_items.size();
+                    // This is the correct place to advance to the next item for the next screen slot.
+                    current_item_idx = (current_item_idx + 1) % row2_items.size();
+                }
             }
         }
-    end_row2_render:; // FIX: Corrected goto label name
+    end_row2_render:; // Corrected goto label name
     }
 
     // --- ROW 3: Stats & Goals ---
