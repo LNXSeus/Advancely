@@ -2815,6 +2815,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 snprintf(import_button_label, sizeof(import_button_label), "Import %s",
                          advancements_label_plural_upper);
                 if (ImGui::Button(import_button_label)) {
+                    current_advancement_import_mode = BATCH_ADVANCEMENT_IMPORT; // Reset mode to default
                     char start_path[MAX_PATH_LENGTH];
                     // Determine the correct starting path based on version and settings
                     if (creator_selected_version <= MC_VERSION_1_6_4) {
