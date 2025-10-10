@@ -7308,7 +7308,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     if (show_import_stats_popup) {
         ImGui::OpenPopup(stats_import_title);
     }
-    if (ImGui::BeginPopupModal(stats_import_title, &show_import_stats_popup, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal(stats_import_title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         // Hotkey logic for search bar
         if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
             ImGui::IsKeyPressed(ImGuiKey_F)) {
@@ -7619,7 +7619,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     if (show_import_unlocks_popup) {
         ImGui::OpenPopup(unlocks_import_title);
     }
-    if (ImGui::BeginPopupModal(unlocks_import_title, &show_import_unlocks_popup,
+    if (ImGui::BeginPopupModal(unlocks_import_title, nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         // Hotkey logic for search bar
         if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
