@@ -5229,6 +5229,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::BeginChild("MSGoalListPane", ImVec2(pane_width, 0), true);
 
                 if (ImGui::Button("Add New Multi-Stage Goal")) {
+                    // Before modifying the vector, store the root_name of the currently selected item.
+                    char selected_root_name_before_op[192] = {};
+                    if (selected_ms_goal) {
+                        strncpy(selected_root_name_before_op, selected_ms_goal->root_name,
+                                sizeof(selected_root_name_before_op) - 1);
+                        selected_root_name_before_op[sizeof(selected_root_name_before_op) - 1] = '\0';
+                    }
+
                     // Create a new multi-stage goal with default values and a final stage
                     EditorMultiStageGoal new_goal = {};
                     int counter = 1;
@@ -5258,6 +5266,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     new_goal.stages.push_back(final_stage);
 
                     current_template_data.multi_stage_goals.push_back(new_goal);
+
+                    // After modifying the vector, re-find the selected item to get a valid pointer.
+                    if (selected_root_name_before_op[0] != '\0') {
+                        for (auto &goal: current_template_data.multi_stage_goals) {
+                            if (strcmp(goal.root_name, selected_root_name_before_op) == 0) {
+                                selected_ms_goal = &goal;
+                                break;
+                            }
+                        }
+                    }
+
                     ms_goal_data_changed = true;
                     save_message_type = MSG_NONE;
                 }
