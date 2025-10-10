@@ -6150,15 +6150,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
 
-                            if (ImGui::InputInt("Target Value", &stage.required_progress)) {
-                                ms_goal_data_changed = true;
-                                save_message_type = MSG_NONE;
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char tooltip_buffer[256];
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                         "For 'Stat' type stages, this is the value the stat must reach to complete the stage.\n");
-                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            // Only show target value for stat/achievements
+                            if (stage.type == SUBGOAL_STAT) {
+                                if (ImGui::InputInt("Target Value", &stage.required_progress)) {
+                                    ms_goal_data_changed = true;
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip_buffer[256];
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "For 'Stat' type stages, this is the value the stat must reach to complete the stage.\n");
+                                    ImGui::SetTooltip("%s", tooltip_buffer);
+                                }
                             }
                         }
 
