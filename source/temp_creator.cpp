@@ -2847,10 +2847,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
                                                   ? "DAT files"
                                                   : "JSON files";
-                    char dialog_title[128];
-                    const char* file_type_label = (creator_selected_version < MC_VERSION_1_12) ? "Stats File" : "Advancements File";
-                    snprintf(dialog_title, sizeof(dialog_title), "Select %s from Player %s", advancements_label_plural_upper, file_type_label);
-
+                    const char* dialog_title = (creator_selected_version < MC_VERSION_1_12)
+                                               ? "Select Player Stats File"
+                                               : "Select Player Advancements File";
                     const char *selection = tinyfd_openFileDialog(dialog_title, start_path, 1,
                                                                   selected_filter, filter_desc, 0);
 
@@ -3395,9 +3394,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          t->world_name);
                             }
                             const char *json_filter[1] = {"*.json"};
-                            char dialog_title[128];
-                            const char* file_type_label = (creator_selected_version < MC_VERSION_1_12) ? "Stats File" : "Advancements File";
-                            snprintf(dialog_title, sizeof(dialog_title), "Select Criteria from Player %s", file_type_label);
+                            const char* dialog_title = (creator_selected_version < MC_VERSION_1_12)
+                                                       ? "Select Player Stats File"
+                                                       : "Select Player Advancements File";
 
                             const char *selection = tinyfd_openFileDialog(
                                 dialog_title, start_path, 1, json_filter, "JSON files", 0);
@@ -5237,6 +5236,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         selected_root_name_before_op[sizeof(selected_root_name_before_op) - 1] = '\0';
                     }
 
+
                     // Create a new multi-stage goal with default values and a final stage
                     EditorMultiStageGoal new_goal = {};
                     int counter = 1;
@@ -6014,15 +6014,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 char start_path[MAX_PATH_LENGTH];
                                 const char *selection = nullptr;
 
-                                char dialog_title[128];
-                                const char* file_type_label = (creator_selected_version < MC_VERSION_1_12) ? "Stats File" : "Advancements File";
-
-                                if (stage_to_edit->type == SUBGOAL_CRITERION) {
-                                    snprintf(dialog_title, sizeof(dialog_title), "Select Criterion from Player %s", file_type_label);
-                                } else { // SUBGOAL_ADVANCEMENT
-                                    snprintf(dialog_title, sizeof(dialog_title), "Select %s from Player %s", advancements_label_upper, file_type_label);
-                                }
-
                                 switch (stage.type) {
                                     case SUBGOAL_STAT: {
                                         if (creator_selected_version <= MC_VERSION_1_6_4) {
@@ -6079,7 +6070,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         const char *json_filter[] = {"*.json"};
                                         const char *dat_filter[] = {"*.dat"};
                                         selection = tinyfd_openFileDialog(
-                                            dialog_title, start_path, 1,
+                                            "Select Player File", start_path, 1,
                                             (creator_selected_version <= MC_VERSION_1_6_4) ? dat_filter : json_filter,
                                             (creator_selected_version <= MC_VERSION_1_6_4) ? "DAT files" : "JSON files",
                                             0);
@@ -6699,18 +6690,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::EndChild();
 
     // Import Advancement Popup Logic
-    const char *import_popup_title;
-    if (current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit && stage_to_edit->type == SUBGOAL_CRITERION) {
-        import_popup_title = "Import Criterion from File";
-    } else if (current_advancement_import_mode == CRITERIA_ONLY_IMPORT) {
-        import_popup_title = (creator_selected_version <= MC_VERSION_1_11_2)
-                             ? "Import Achievement Criteria"
-                             : "Import Advancement Criteria";
-    } else {
-        import_popup_title = (creator_selected_version <= MC_VERSION_1_11_2)
-                             ? "Import Achievements from File"
-                             : "Import Advancements from File";
-    }
+    const char *import_popup_title = (current_advancement_import_mode == CRITERIA_ONLY_IMPORT)
+                                         ? ((creator_selected_version <= MC_VERSION_1_11_2)
+                                                ? "Import Achievement Criteria"
+                                                : "Import Advancement Criteria")
+                                         : ((creator_selected_version <= MC_VERSION_1_11_2)
+                                                ? "Import Achievements from File"
+                                                : "Import Advancements from File");
 
     if (show_import_advancements_popup) {
         ImGui::OpenPopup(import_popup_title);
@@ -7045,14 +7031,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             } else if (current_import_mode == BATCH_IMPORT) {
                                 if (crit.is_selected) adv.is_selected = true;
-                                // Allow range selection for anything that is not a subgoal advancement/criterion
-                                bool allow_shift_click =
-                                        (current_advancement_import_mode == BATCH_ADVANCEMENT_IMPORT &&
-                                         import_select_criteria) ||
-                                        (current_advancement_import_mode == CRITERIA_ONLY_IMPORT);
-
-                                if (ImGui::GetIO().KeyShift && allow_shift_click && last_clicked_crit_parent == &adv &&
-                                    last_clicked_crit_index != -1) {
+                                if (ImGui::GetIO().KeyShift && import_select_criteria && last_clicked_crit_parent == &
+                                    adv && last_clicked_crit_index != -1) {
                                     int start = std::min((int) j, last_clicked_crit_index);
                                     int end = std::max((int) j, last_clicked_crit_index);
                                     for (int k = start; k <= end; ++k) {
@@ -7111,63 +7091,47 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 import_error_message[0] = '\0';
                 bool has_duplicates = false;
 
-                // Error and keeping popup open when no criteria are selected
-                int selected_count = 0;
-                for (const auto &adv: importable_advancements) {
-                    for (const auto &crit: adv.criteria) {
-                        if (crit.is_selected) {
-                            selected_count++;
-                            break;
-                        }
-                    }
-                    if (selected_count > 0) break;
+                std::unordered_set<std::string> existing_crit_names;
+                for (const auto &crit: selected_advancement->criteria) {
+                    existing_crit_names.insert(crit.root_name);
                 }
-                if (selected_count == 0) {
-                    snprintf(import_error_message, sizeof(import_error_message),
-                             "Error: No criteria selected for import.");
-                } else {
-                    std::unordered_set<std::string> existing_crit_names;
-                    for (const auto &crit: selected_advancement->criteria) {
-                        existing_crit_names.insert(crit.root_name);
-                    }
 
-                    ImportableAdvancement *source_adv = nullptr;
-                    if (!filtered_advancements.empty()) {
-                        source_adv = filtered_advancements[0];
-                    }
+                ImportableAdvancement *source_adv = nullptr;
+                if (!filtered_advancements.empty()) {
+                    source_adv = filtered_advancements[0];
+                }
 
-                    if (source_adv) {
-                        for (const auto &new_crit: source_adv->criteria) {
-                            if (new_crit.is_selected) {
-                                if (existing_crit_names.count(new_crit.root_name)) {
-                                    snprintf(import_error_message, sizeof(import_error_message),
-                                             "Error: Criterion '%s' already exists.", new_crit.root_name.c_str());
-                                    has_duplicates = true;
-                                    break;
-                                }
+                if (source_adv) {
+                    for (const auto &new_crit: source_adv->criteria) {
+                        if (new_crit.is_selected) {
+                            if (existing_crit_names.count(new_crit.root_name)) {
+                                snprintf(import_error_message, sizeof(import_error_message),
+                                         "Error: Criterion '%s' already exists.", new_crit.root_name.c_str());
+                                has_duplicates = true;
+                                break;
                             }
                         }
                     }
+                }
 
-                    if (!has_duplicates && source_adv) {
-                        for (const auto &new_crit: source_adv->criteria) {
-                            if (new_crit.is_selected) {
-                                EditorTrackableItem imported_crit = {};
-                                strncpy(imported_crit.root_name, new_crit.root_name.c_str(),
-                                        sizeof(imported_crit.root_name) - 1);
-                                imported_crit.root_name[sizeof(imported_crit.root_name) - 1] = '\0';
-                                strncpy(imported_crit.display_name, new_crit.root_name.c_str(),
-                                        sizeof(imported_crit.display_name) - 1);
-                                imported_crit.display_name[sizeof(imported_crit.display_name) - 1] = '\0';
-                                strncpy(imported_crit.icon_path, "blocks/placeholder.png",
-                                        sizeof(imported_crit.icon_path) - 1);
-                                imported_crit.icon_path[sizeof(imported_crit.icon_path) - 1] = '\0';
-                                selected_advancement->criteria.push_back(imported_crit);
-                            }
+                if (!has_duplicates && source_adv) {
+                    for (const auto &new_crit: source_adv->criteria) {
+                        if (new_crit.is_selected) {
+                            EditorTrackableItem imported_crit = {};
+                            strncpy(imported_crit.root_name, new_crit.root_name.c_str(),
+                                    sizeof(imported_crit.root_name) - 1);
+                            imported_crit.root_name[sizeof(imported_crit.root_name) - 1] = '\0';
+                            strncpy(imported_crit.display_name, new_crit.root_name.c_str(),
+                                    sizeof(imported_crit.display_name) - 1);
+                            imported_crit.display_name[sizeof(imported_crit.display_name) - 1] = '\0';
+                            strncpy(imported_crit.icon_path, "blocks/placeholder.png",
+                                    sizeof(imported_crit.icon_path) - 1);
+                            imported_crit.icon_path[sizeof(imported_crit.icon_path) - 1] = '\0';
+                            selected_advancement->criteria.push_back(imported_crit);
                         }
-                        show_import_advancements_popup = false; // Close on success
                     }
-                } // Closing selected_count == 0 check
+                    show_import_advancements_popup = false; // Close on success
+                }
             } else if (current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit != nullptr) {
                 // Part of a stage import
                 ImportableAdvancement *selected_adv = nullptr;
@@ -7312,8 +7276,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                          selected_adv_count, advancements_label_plural_upper, selected_crit_count);
             } else {
                 snprintf(counter_text, sizeof(counter_text),
-                         "Selected: %d / 1 %s, %d / 1 Criteria", selected_adv_count, advancements_label_upper,
-                         selected_crit_count);
+                         "Selected: %d / 1 %s, %d / 1 Criteria", selected_adv_count, advancements_label_upper, selected_crit_count);
             }
         }
 
@@ -7324,18 +7287,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         ImGui::EndPopup();
     } // End of import advancements popup
-
-    // Reset import mode if popup is closed
-    if (!ImGui::IsPopupOpen(import_popup_title) && !show_import_advancements_popup) {
-        // This code runs in the frame AFTER the popup has been closed.
-        if (current_advancement_import_mode == CRITERIA_ONLY_IMPORT || current_import_mode == SINGLE_SELECT_STAGE) {
-            current_advancement_import_mode = BATCH_ADVANCEMENT_IMPORT;
-            current_import_mode = BATCH_IMPORT;
-            stage_to_edit = nullptr;
-            import_error_message[0] = '\0';
-            import_search_buffer[0] = '\0';
-        }
-    }
 
     // Import Stats OR Sub-Stats from file
     const char *stats_import_title = (current_import_mode == SINGLE_SELECT_STAGE)
