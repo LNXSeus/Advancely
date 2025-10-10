@@ -6705,7 +6705,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     if (show_import_advancements_popup) {
         ImGui::OpenPopup(import_popup_title);
     }
-    if (ImGui::BeginPopupModal(import_popup_title, &show_import_advancements_popup,
+    if (ImGui::BeginPopupModal(import_popup_title, nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         // Hotkey logic for search bar
         if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
@@ -7137,6 +7137,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
                     show_import_advancements_popup = false; // Close on success
+                    ImGui::CloseCurrentPopup();
                 }
             } else if (current_import_mode == SINGLE_SELECT_STAGE && stage_to_edit != nullptr) {
                 // Part of a stage import
@@ -7169,6 +7170,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                 }
                 show_import_advancements_popup = false;
+                ImGui::CloseCurrentPopup();
             } else {
                 // Regular batch import
                 import_error_message[0] = '\0'; // Clear previous error
@@ -7231,6 +7233,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
                     show_import_advancements_popup = false;
+                    ImGui::CloseCurrentPopup();
                 }
             }
             if (!show_import_advancements_popup) {
@@ -7250,6 +7253,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             show_import_advancements_popup = false;
+            ImGui::CloseCurrentPopup(); // Close popup actually
             current_import_mode = BATCH_IMPORT;
             current_advancement_import_mode = BATCH_ADVANCEMENT_IMPORT;
             stage_to_edit = nullptr;
@@ -7477,6 +7481,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                 }
                 show_import_stats_popup = false;
+                ImGui::CloseCurrentPopup();
             } else {
                 // BATCH_IMPORT
                 if (current_stat_import_mode == IMPORT_AS_SUB_STAT) {
@@ -7545,6 +7550,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 // Close popup only if no error occurred during batch import
                 if (import_error_message[0] == '\0') {
                     show_import_stats_popup = false;
+                    ImGui::CloseCurrentPopup();
                 }
             }
 
@@ -7572,6 +7578,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             show_import_stats_popup = false;
+            ImGui::CloseCurrentPopup(); // Actually closing popup
             current_import_mode = BATCH_IMPORT; // Reset to batch import on cancel
             stage_to_edit = nullptr;
             import_search_buffer[0] = '\0';
@@ -7754,6 +7761,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                 }
                 show_import_unlocks_popup = false;
+                ImGui::CloseCurrentPopup();
             } else {
                 std::unordered_set<std::string> existing_names;
                 for (const auto &existing_unlock: current_template_data.unlocks) {
@@ -7782,6 +7790,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 if (import_error_message[0] == '\0') {
                     show_import_unlocks_popup = false;
+                    ImGui::CloseCurrentPopup();
                     import_search_buffer[0] = '\0';
                 }
             }
@@ -7800,6 +7809,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             show_import_unlocks_popup = false;
+            ImGui::CloseCurrentPopup();
             current_import_mode = BATCH_IMPORT;
             stage_to_edit = nullptr;
             import_search_buffer[0] = '\0';
