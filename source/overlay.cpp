@@ -50,7 +50,8 @@ const char *SUPPORTER_ICONS[] = {
     "emotes/Lnxseuheart.png",
     "emotes/Love_emote.png",
     "emotes/luvv-4x.png",
-    "emotes/poggSpin-4x_unoptimized.gif"
+    "emotes/poggSpin-4x_unoptimized.gif",
+    "emotes/peepoLove-4x.png"
 };
 const int NUM_SUPPORTER_ICONS = sizeof(SUPPORTER_ICONS) / sizeof(char *);
 
@@ -67,6 +68,7 @@ Supporter SUPPORTERS[] = {
     {"Test", 2.0f},
     {"Anonymous", 15.0f},
     {"Another Supporter", 2.5f},
+    {"This could be you", 12.0f}
 };
 const int NUM_SUPPORTERS = sizeof(SUPPORTERS) / sizeof(Supporter);
 
@@ -837,42 +839,43 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
         if (is_run_complete && NUM_SUPPORTERS > 0) {
             // --- Completed Run: Render Supporter Showcase ---
-            std::vector<SupporterRenderInfo> supporter_render_list;
-            float min_amount = SUPPORTERS[0].amount;
-            float max_amount = SUPPORTERS[0].amount;
-            for (int i = 1; i < NUM_SUPPORTERS; ++i) {
-                if (SUPPORTERS[i].amount < min_amount) min_amount = SUPPORTERS[i].amount;
-                if (SUPPORTERS[i].amount > max_amount) max_amount = SUPPORTERS[i].amount;
+
+            // 1. Create a sortable list of pointers to the original supporters.
+            std::vector<const Supporter*> sorted_supporters;
+            for (int i = 0; i < NUM_SUPPORTERS; ++i) {
+                sorted_supporters.push_back(&SUPPORTERS[i]);
             }
 
-            float range = max_amount - min_amount;
-            float tier1_cutoff = min_amount + range / 3.0f;
-            float tier2_cutoff = min_amount + (range * 2.0f) / 3.0f;
+            // 2. Sort the pointers in descending order based on donation amount.
+            std::sort(sorted_supporters.begin(), sorted_supporters.end(), [](const Supporter* a, const Supporter* b) {
+                return a->amount > b->amount;
+            });
 
+            // 3. Calculate the index cutoffs for the top and middle thirds.
+            const int top_third_count = (NUM_SUPPORTERS + 2) / 3; // Ensures a fair split, e.g., 5 supporters -> top 2
+            const int middle_third_count = (NUM_SUPPORTERS * 2 + 2) / 3;
+
+            std::vector<SupporterRenderInfo> supporter_render_list;
             float max_text_width = 0.0f;
 
             // First pass: Prepare render info and calculate max width
             for (int i = 0; i < NUM_SUPPORTERS; ++i) {
                 SupporterRenderInfo info = {};
-                info.supporter = &SUPPORTERS[i];
+                info.supporter = sorted_supporters[i];
                 info.icon_path = SUPPORTER_ICONS[i % NUM_SUPPORTER_ICONS];
 
-                // Determine background based on donation amount (split into 3 sections)
-                if (info.supporter->amount >= tier2_cutoff) {
+                // 4. Assign background texture based on the supporter's rank (their index 'i' in the sorted list).
+                if (i < top_third_count) {
                     info.background = o->adv_bg_done;
-                } else if (info.supporter->amount >= tier1_cutoff) {
+                } else if (i < middle_third_count) {
                     info.background = o->adv_bg_half_done;
                 } else {
                     info.background = o->adv_bg;
                 }
                 supporter_render_list.push_back(info);
 
-                // --- TODO: DEBUG CODE ---
                 char full_icon_path[MAX_PATH_LENGTH];
                 snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_resources_path(), info.icon_path);
-                log_message(LOG_ERROR, "Checking for supporter icon: %s. Exists: %s\n",
-                            full_icon_path, path_exists(full_icon_path) ? "Yes" : "NO");
-                // --- END DEBUG CODE ---
 
                 // Measure text widths for layout calculation
                 char amount_buf[64];
