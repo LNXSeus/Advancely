@@ -1346,6 +1346,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static int last_clicked_adv_index = -1;
     [[maybe_unused]] static int last_clicked_crit_index = -1;
     [[maybe_unused]] static ImportableAdvancement *last_clicked_crit_parent = nullptr;
+    [[maybe_unused]] static ImportableAdvancement *stage_to_edit_source_adv = nullptr;
+    [[maybe_unused]] static int last_clicked_criterion_index = -1; // For range selection
     static bool focus_import_search = false;
 
     // Stats
@@ -2861,6 +2863,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                                  import_error_message, sizeof(import_error_message))) {
                             show_import_advancements_popup = true;
                             focus_import_search = true; // Focus search bar as soon as popup opens
+                            import_search_criteria_only = false; // Reset search mode
+                            import_select_criteria = false;      // Reset selection mode
                         } else {
                             // If parsing fails, show the error in the main status message
                             save_message_type = MSG_ERROR;
@@ -3410,6 +3414,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                                          sizeof(import_error_message))) {
                                     show_import_advancements_popup = true;
                                     focus_import_search = true;
+                                    import_search_criteria_only = true; // Default search to criteria
+                                    import_select_criteria = true;      // Default selection to criteria
                                 } else {
                                     save_message_type = MSG_ERROR;
                                     strncpy(status_message, import_error_message, sizeof(status_message) - 1);
@@ -6079,6 +6085,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                 selection, creator_selected_version, importable_advancements,
                                                 import_error_message, sizeof(import_error_message))) {
                                             show_import_advancements_popup = true;
+                                            // Set search mode based on the type of trigger being imported
+                                            if (stage_to_edit->type == SUBGOAL_ADVANCEMENT) {
+                                                import_search_criteria_only = false; // Default to advancement search
+                                            } else if (stage_to_edit->type == SUBGOAL_CRITERION) {
+                                                import_search_criteria_only = true; // Default to criterion search
+                                            }
                                         }
                                         break;
                                     }
@@ -6757,12 +6769,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
 
         // --- Selection Controls & Search Bar (now operating on the filtered list) ---
-        // Only if advancement import or criteria import NOT stage advancement or stage criteria import
-        if (current_import_mode == BATCH_IMPORT && current_advancement_import_mode == BATCH_ADVANCEMENT_IMPORT) {
+        // Only show batch controls when not doing a single selection for a multi-stage goal
+        if (current_import_mode == BATCH_IMPORT) {
             // Selecting multiple, not multi-stage goal stage
             if (ImGui::Button("Select All")) {
                 for (auto *adv_ptr: filtered_advancements) {
-                    adv_ptr->is_selected = true;
+                    // In criteria-only mode, we don't select the parent, only its children.
+                    if (current_advancement_import_mode != CRITERIA_ONLY_IMPORT) {
+                        adv_ptr->is_selected = true;
+                    }
                     if (import_select_criteria) {
                         bool parent_matched =
                                 str_contains_insensitive(adv_ptr->root_name.c_str(), import_search_buffer);
@@ -6838,8 +6853,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 ImGui::SetTooltip("%s", deselct_all_tooltip_buffer);
             }
-            // --- Include Criteria Checkbox ONLY for 1.7+ ---
-            if (creator_selected_version > MC_VERSION_1_6_4) {
+            // --- Include Criteria Checkbox ONLY for 1.7+ and not in criteria-only import mode ---
+            if (creator_selected_version > MC_VERSION_1_6_4 &&
+                current_advancement_import_mode != CRITERIA_ONLY_IMPORT) {
                 ImGui::SameLine();
                 ImGui::Checkbox("Include Crit.", &import_select_criteria);
                 if (ImGui::IsItemHovered()) {
@@ -7284,9 +7300,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (current_import_mode == BATCH_IMPORT) {
                 snprintf(counter_text, sizeof(counter_text), "Selected: %d %s, %d Criteria",
                          selected_adv_count, advancements_label_plural_upper, selected_crit_count);
-            } else {
-                snprintf(counter_text, sizeof(counter_text),
-                         "Selected: %d / 1 %s, %d / 1 Criteria", selected_adv_count, advancements_label_upper, selected_crit_count);
+            } else { // SINGLE_SELECT_STAGE mode
+                if (stage_to_edit != nullptr && stage_to_edit->type == SUBGOAL_ADVANCEMENT) {
+                    // For SUBGOAL_ADVANCEMENT, only show the parent count
+                    snprintf(counter_text, sizeof(counter_text), "Selected: %d / 1 %s",
+                             selected_adv_count, advancements_label_upper);
+                } else {
+                    // For SUBGOAL_CRITERION, show both counts
+                    snprintf(counter_text, sizeof(counter_text),
+                             "Selected: %d / 1 %s, %d / 1 Criteria", selected_adv_count, advancements_label_upper, selected_crit_count);
+                }
             }
         }
 
