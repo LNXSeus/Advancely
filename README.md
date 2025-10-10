@@ -30,7 +30,7 @@ Thank you for supporting the project!
 
 **Put `#Advancely` in your content to support the project!**
 
-* [Support Advancely (be featured on the overlay)](https://streamlabs.com/lnxseus/tip)
+* [Support Advancely (be featured on the overlay by mentioning "Advancely" in your donation message)](https://streamlabs.com/lnxseus/tip)
 * [My YouTube](https://www.youtube.com/@lnxs?sub_confirmation=1)
 * [My Twitch](https://www.twitch.tv/lnxseus)
 * [My Twitch Archive + Advancely Devlogs](https://www.youtube.com/@lnxsarchive/playlists?view=1&sort=lad&flow=grid&sub_confirmation=1)
