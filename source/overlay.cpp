@@ -63,12 +63,12 @@ typedef struct {
 
 // The list of supporters and their donation amounts.
 Supporter SUPPORTERS[] = {
-    {"YourNameHere", 10.0f},
-    {"LNXS", 20.0f},
-    {"Test", 2.0f},
-    {"Anonymous", 15.0f},
-    {"Another Supporter", 2.5f},
-    {"This could be you", 12.0f}
+    {"zurtleTif", 20.0f}
+    // {"LNXS", 20.0f},
+    // {"Test", 2.0f},
+    // {"Anonymous", 15.0f},
+    // {"Another Supporter", 2.5f},
+    // {"This could be you", 12.0f}
 };
 const int NUM_SUPPORTERS = sizeof(SUPPORTERS) / sizeof(Supporter);
 

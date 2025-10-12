@@ -18,6 +18,9 @@ Love using Advancely? You can have your name immortalized in the tracker!
 
 ![Supporters Screen](readme_assets/Supporters_Screen_Overlay.png)
 
+**Supporters:**
+*  zurtleTif: $20
+
 Simply [**donate here**](https://streamlabs.com/lnxseus/tip) and include the word "**Advancely**" in your donation
 message. Your name will be added to the official supporter showcase that appears on the stream overlay when anyone
 completes a run.
