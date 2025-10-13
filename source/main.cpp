@@ -547,6 +547,9 @@ const char *get_notes_manifest_path() {
 
 int main(int argc, char *argv[]) {
 
+    // Seed random number generator once at startup
+    srand(time(nullptr));
+
     // TODO: Handle proper quitting for github action runners 5s test
     // Add a simple test/version flag that can run without a GUI
     // This communicates with the build.yml file, where the gtimeout or timeout are

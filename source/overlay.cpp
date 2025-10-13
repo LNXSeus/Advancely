@@ -51,7 +51,8 @@ const char *SUPPORTER_ICONS[] = {
     "emotes/Love_emote.png",
     "emotes/luvv-4x.png",
     "emotes/poggSpin-4x_unoptimized.gif",
-    "emotes/peepoLove-4x.png"
+    "emotes/peepoLove-4x.png",
+    "emotes/catHeart-4x_unoptimized.gif"
 };
 const int NUM_SUPPORTER_ICONS = sizeof(SUPPORTER_ICONS) / sizeof(char *);
 
@@ -833,21 +834,26 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         const float ITEM_SPACING = 16.0f;
         const float TEXT_Y_OFFSET = 4.0f;
 
+        // Static variables to store the randomized supporter list and track completion state
+        static std::vector<SupporterRenderInfo> static_supporter_render_list;
+        static bool run_was_complete_last_frame = false;
+
         bool is_run_complete = t->template_data->advancements_completed_count >= t->template_data->
                                advancement_goal_count &&
                                t->template_data->overall_progress_percentage >= 100.0f;
 
-        if (is_run_complete && NUM_SUPPORTERS > 0) {
-            // --- Completed Run: Render Supporter Showcase ---
+        // If the run has just been completed, generate the randomized list ONCE.
+        if (is_run_complete && !run_was_complete_last_frame) {
+            static_supporter_render_list.clear(); // Clear any previous run's data
 
             // 1. Create a sortable list of pointers to the original supporters.
-            std::vector<const Supporter*> sorted_supporters;
+            std::vector<const Supporter *> sorted_supporters;
             for (int i = 0; i < NUM_SUPPORTERS; ++i) {
                 sorted_supporters.push_back(&SUPPORTERS[i]);
             }
 
             // 2. Sort the pointers in descending order based on donation amount.
-            std::sort(sorted_supporters.begin(), sorted_supporters.end(), [](const Supporter* a, const Supporter* b) {
+            std::sort(sorted_supporters.begin(), sorted_supporters.end(), [](const Supporter *a, const Supporter *b) {
                 return a->amount > b->amount;
             });
 
@@ -855,16 +861,14 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             const int top_third_count = (NUM_SUPPORTERS + 2) / 3; // Ensures a fair split, e.g., 5 supporters -> top 2
             const int middle_third_count = (NUM_SUPPORTERS * 2 + 2) / 3;
 
-            std::vector<SupporterRenderInfo> supporter_render_list;
-            float max_text_width = 0.0f;
-
-            // First pass: Prepare render info and calculate max width
+            // Prepare the persistent render info list
             for (int i = 0; i < NUM_SUPPORTERS; ++i) {
                 SupporterRenderInfo info = {};
                 info.supporter = sorted_supporters[i];
-                info.icon_path = SUPPORTER_ICONS[i % NUM_SUPPORTER_ICONS];
+                // Assign a RANDOM icon and store it
+                info.icon_path = SUPPORTER_ICONS[rand() % NUM_SUPPORTER_ICONS];
 
-                // 4. Assign background texture based on the supporter's rank (their index 'i' in the sorted list).
+                // 4. Assign background texture based on the supporter's rank.
                 if (i < top_third_count) {
                     info.background = o->adv_bg_done;
                 } else if (i < middle_third_count) {
@@ -872,16 +876,21 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 } else {
                     info.background = o->adv_bg;
                 }
-                supporter_render_list.push_back(info);
+                static_supporter_render_list.push_back(info);
+            }
+        }
 
-                char full_icon_path[MAX_PATH_LENGTH];
-                snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_resources_path(), info.icon_path);
+        if (is_run_complete && NUM_SUPPORTERS > 0) {
+            // --- Completed Run: Render Supporter Showcase ---
+            float max_text_width = 0.0f;
 
+            // First pass: Prepare render info and calculate max width from the static list
+            for (const auto &render_info: static_supporter_render_list) {
                 // Measure text widths for layout calculation
                 char amount_buf[64];
-                snprintf(amount_buf, sizeof(amount_buf), "$%.2f", info.supporter->amount);
+                snprintf(amount_buf, sizeof(amount_buf), "$%.2f", render_info.supporter->amount);
                 int name_w = 0, amount_w = 0;
-                TTF_MeasureString(o->font, info.supporter->name, 0, 0, &name_w, nullptr);
+                TTF_MeasureString(o->font, render_info.supporter->name, 0, 0, &name_w, nullptr);
                 TTF_MeasureString(o->font, amount_buf, 0, 0, &amount_w, nullptr);
                 max_text_width = fmaxf(max_text_width, (float) fmax(name_w, amount_w));
             }
@@ -895,11 +904,11 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
             for (int block = -blocks_to_draw; block <= blocks_to_draw; ++block) {
                 float block_offset = start_pos + (block * total_row_width);
-                for (int i = 0; i < NUM_SUPPORTERS; ++i) {
+                for (size_t i = 0; i < static_supporter_render_list.size(); ++i) {
                     float current_x = block_offset + (i * item_full_width);
                     if (current_x + item_full_width < 0 || current_x > window_w) continue;
 
-                    const auto &render_info = supporter_render_list[i];
+                    const auto &render_info = static_supporter_render_list[i];
 
                     // Render background
                     float bg_x_offset = (cell_width - ITEM_WIDTH) / 2.0f;
@@ -912,16 +921,20 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     SDL_FRect icon_rect = {bg_rect.x + 16.0f, bg_rect.y + 16.0f, 64.0f, 64.0f};
 
                     // Also support .gif icons
-                    SDL_Texture* tex = nullptr;
-                    AnimatedTexture* anim_tex = nullptr;
+                    SDL_Texture *tex = nullptr;
+                    AnimatedTexture *anim_tex = nullptr;
                     char full_icon_path[MAX_PATH_LENGTH];
-                    snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_resources_path(), render_info.icon_path);
+                    snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_resources_path(),
+                             render_info.icon_path);
 
                     // Check the file extension to decide which cache function to use
                     if (strstr(full_icon_path, ".gif")) {
-                        anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity, full_icon_path, SDL_SCALEMODE_NEAREST);
+                        anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
+                                                                   &o->anim_cache_capacity, full_icon_path,
+                                                                   SDL_SCALEMODE_NEAREST);
                     } else {
-                        tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count, &o->texture_cache_capacity, full_icon_path, SDL_SCALEMODE_NEAREST);
+                        tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                                     &o->texture_cache_capacity, full_icon_path, SDL_SCALEMODE_NEAREST);
                     }
 
                     if (tex || anim_tex) {
@@ -1099,6 +1112,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 }
             }
         }
+
+        // Update the state for the next frame
+        run_was_complete_last_frame = is_run_complete;
     end_row2_render:; // Corrected goto label name
     }
 
