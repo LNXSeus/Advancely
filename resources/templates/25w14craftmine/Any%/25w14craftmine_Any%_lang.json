@@ -1,0 +1,15 @@
+{
+	"advancement.minecraft.mines.enter_a_mine":	"Down the Hatch",
+	"advancement.minecraft.mines.level_completed":	"It Begins",
+	"advancement.minecraft.feats.end_world":	"Beginning of End",
+	"advancement.minecraft.feats.ender_dragon":	"Rim of Sky",
+	"unlock.minecraft:fletcher":	"Stack of Arrows",
+	"multi_stage_goal.any%.display_name":	"Any% Route",
+	"multi_stage_goal.any%.stage.1":	"Enter 1st Mine",
+	"multi_stage_goal.any%.stage.2":	"Complete 1st Mine",
+	"multi_stage_goal.any%.stage.3":	"Kill Blaze",
+	"multi_stage_goal.any%.stage.4":	"Complete End Mine",
+	"multi_stage_goal.any%.stage.5":	"Kill Ender Dragon",
+	"multi_stage_goal.any%.stage.6":	"Exit End Fight",
+	"multi_stage_goal.any%.stage.final":	"Any% Done!"
+}

@@ -1,0 +1,70 @@
+{
+	"advancements":	{
+		"minecraft:mines/enter_a_mine":	{
+			"icon":	"blocks/Mine_Crafter_unoptimized.gif",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/level_completed":	{
+			"icon":	"items/mine_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:feats/end_world":	{
+			"icon":	"items/end_crystal_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:feats/ender_dragon":	{
+			"icon":	"blocks/Dragon_Head_(S)_JE1.png",
+			"criteria":	{
+			}
+		}
+	},
+	"stats":	{
+	},
+	"unlocks":	[{
+			"root_name":	"minecraft:fletcher",
+			"icon":	"blocks/Fletching_Table_JE2_BE1.png"
+		}],
+	"custom":	[],
+	"multi_stage_goals":	[{
+			"root_name":	"any%",
+			"icon":	"blocks/Dragon_Head_(S)_JE1.png",
+			"stages":	[{
+					"stage_id":	"1",
+					"type":	"advancement",
+					"root_name":	"minecraft:mines/enter_a_mine",
+					"target":	1
+				}, {
+					"stage_id":	"2",
+					"type":	"advancement",
+					"root_name":	"minecraft:mines/level_completed",
+					"target":	1
+				}, {
+					"stage_id":	"3",
+					"type":	"stat",
+					"root_name":	"minecraft:killed/minecraft:blaze",
+					"target":	1
+				}, {
+					"stage_id":	"4",
+					"type":	"advancement",
+					"root_name":	"minecraft:feats/end_world",
+					"target":	1
+				}, {
+					"stage_id":	"5",
+					"type":	"stat",
+					"root_name":	"minecraft:killed/minecraft:ender_dragon",
+					"target":	1
+				}, {
+					"stage_id":	"6",
+					"type":	"advancement",
+					"root_name":	"minecraft:feats/ender_dragon",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}]
+}
