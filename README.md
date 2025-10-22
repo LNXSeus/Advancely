@@ -16,7 +16,7 @@
 
 Love using Advancely? You can have your name immortalized in the tracker!
 
-![Supporters Screen](readme_assets/Supporters_Screen_Overlay.png)
+![Supporters Screen](readme_assets/Supporters_Screen_Overlay_v0.9.399.png)
 
 **Supporters:**
 *  zurtleTif: $20
