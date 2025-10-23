@@ -6208,7 +6208,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         ImGui::PushTextWrapPos(ImGui::GetFontSize() * 50.0f); // Helps the text wrap nicely
 
         ImGui::TextUnformatted(
-            "Search for goals by name (case-insensitive). You can also use Ctrl + F (or Cmd + F on macOS).");
+            "Search for goals by name (case-insensitive). You can also use Ctrl + F (or Cmd + F on macOS).\n"
+            "Using the search filter also dynamically updates the completion counters in the section headers.");
         ImGui::Separator();
         ImGui::TextUnformatted("It applies the filter to anything currently visible in the following way:");
 

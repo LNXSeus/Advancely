@@ -904,22 +904,31 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::SeparatorText("Goal Visibility");
     ImGui::RadioButton("Hide All Completed", (int *) &temp_settings.goal_hiding_mode, HIDE_ALL_COMPLETED);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip(
-            "Strictest hiding. Hides goals when they are completed AND hides goals marked as \"hidden\" in the template file.");
+        char tooltip_buffer[1024];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Strictest hiding. Hides goals when they are completed AND hides goals marked as \"hidden\" in the template file.\n"
+                 "Section counters will only count items currently visible (not hidden and not complete).");
+        ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
     ImGui::SameLine();
     ImGui::RadioButton("Hide Template-Hidden Only", (int *) &temp_settings.goal_hiding_mode, HIDE_ONLY_TEMPLATE_HIDDEN);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip(
-            "Hides goals marked as \"hidden\" in the template file, but keeps all other completed goals visible.");
+        char tooltip_buffer[1024];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Hides goals marked as \"hidden\" in the template file, but keeps all other completed goals visible.\n"
+                 "Section counters will count all items *not* marked as hidden in the template, regardless of completion.");
+        ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
     ImGui::SameLine();
     ImGui::RadioButton("Show All", (int *) &temp_settings.goal_hiding_mode, SHOW_ALL);
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip(
-            "Shows everything. No goals will be hidden, regardless of their completion or template status.");
+        char tooltip_buffer[1024];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Shows everything. No goals will be hidden, regardless of their completion or template status.\n"
+                 "Section counters will count every single item defined in the template for that section.");
+        ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
     ImGui::Separator();
