@@ -2609,91 +2609,86 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
         // Skip hidden legacy stats entirely from counting
         if (is_stat_section && version <= MC_VERSION_1_6_4 && cat->criteria_count == 1 && cat->criteria[0]->goal == 0) {
-            continue;
+             continue;
         }
 
+        // Determine completion status for counting purposes
         bool is_category_considered_complete = false;
         if (is_stat_section) {
             is_category_considered_complete = cat->done;
         } else {
-            // For advancements, use all_template_criteria_met for the "completed" count display,
-            // unless it's a simple advancement (no criteria) where we use 'done'.
-            is_category_considered_complete = (cat->criteria_count > 0) ? cat->all_template_criteria_met : cat->done;
+             is_category_considered_complete = (cat->criteria_count > 0) ? cat->all_template_criteria_met : cat->done;
         }
 
-
-        // TODO: Remove
-        // // bool is_category_visible_for_counting = false;
-        // switch (settings->goal_hiding_mode) {
-        //     case HIDE_ALL_COMPLETED:
-        //         // Visible if NOT hidden in template AND NOT completed
-        //         // is_category_visible_for_counting = !cat->is_hidden && !is_category_considered_complete;
-        //         break;
-        //     case HIDE_ONLY_TEMPLATE_HIDDEN:
-        //         // Visible if NOT hidden in template
-        //         // is_category_visible_for_counting = !cat->is_hidden;
-        //         break;
-        //     case SHOW_ALL:
-        //         // Always visible for counting totals
-        //         // is_category_visible_for_counting = true;
-        //         break;
-        // }
-
-        // --- Count Main Items ---
-        if (settings->goal_hiding_mode == SHOW_ALL) {
-            // SHOW_ALL counts everything for the total
-            total_visible_count++;
-            if (is_category_considered_complete) {
-                completed_count++;
-            }
-        } else {
-            // HIDE modes only count items not hidden by the template
-            if (!cat->is_hidden) {
-                total_visible_count++; // Count towards total if not template-hidden
-                if (is_category_considered_complete) {
-                    completed_count++; // Count towards completed if applicable for the mode
-                }
-            }
+        // Determine if parent should be hidden based *only* on hiding mode + template hidden status
+        bool should_hide_parent_based_on_mode = false;
+        switch (settings->goal_hiding_mode) {
+            case HIDE_ALL_COMPLETED:
+                should_hide_parent_based_on_mode = cat->is_hidden || is_category_considered_complete;
+                break;
+            case HIDE_ONLY_TEMPLATE_HIDDEN:
+                should_hide_parent_based_on_mode = cat->is_hidden;
+                break;
+            case SHOW_ALL:
+                should_hide_parent_based_on_mode = false;
+                break;
         }
 
+        // Skip entire category if hidden by mode
+        if (should_hide_parent_based_on_mode) continue;
 
-        // --- Count Sub-Items (Criteria/Sub-Stats) ---
-        // Only count if the *category itself* isn't template-hidden (unless SHOW_ALL is on)
-        // AND only if it's NOT a single-stat category (simple stat)
-        if (!cat->is_single_stat_category && cat->criteria_count > 0 && (
-                settings->goal_hiding_mode == SHOW_ALL || !cat->is_hidden)) {
-            section_has_sub_items = true; // Mark that this section uses sub-item counts
+        // Apply Search Filter for counting
+        bool parent_matches_search = str_contains_insensitive(cat->display_name, t->search_buffer);
+        bool any_visible_child_matches_search = false;
+        int visible_children_matching_search_count = 0; // Count children matching search *after* hiding filter
+
+        if (cat->criteria_count > 0 && !cat->is_single_stat_category) { // Only check children for complex types
+            section_has_sub_items = true;
             for (int j = 0; j < cat->criteria_count; ++j) {
                 TrackableItem *crit = cat->criteria[j];
                 if (!crit) continue;
 
-                // TODO: Remove
-                // // bool is_subitem_visible_for_counting = false;
-                // switch (settings->goal_hiding_mode) {
-                //     case HIDE_ALL_COMPLETED:
-                //         // is_subitem_visible_for_counting = !crit->is_hidden && !crit->done;
-                //         break;
-                //     case HIDE_ONLY_TEMPLATE_HIDDEN:
-                //         // is_subitem_visible_for_counting = !crit->is_hidden;
-                //         break;
-                //     case SHOW_ALL:
-                //         // is_subitem_visible_for_counting = true;
-                //         break;
-                // }
+                // Determine if child should be hidden based *only* on hiding mode + template hidden status
+                bool should_hide_child_based_on_mode = false;
+                switch (settings->goal_hiding_mode) {
+                    case HIDE_ALL_COMPLETED:
+                        should_hide_child_based_on_mode = crit->is_hidden || crit->done;
+                        break;
+                    case HIDE_ONLY_TEMPLATE_HIDDEN:
+                        should_hide_child_based_on_mode = crit->is_hidden;
+                        break;
+                    case SHOW_ALL:
+                        should_hide_child_based_on_mode = false;
+                        break;
+                }
 
-                if (settings->goal_hiding_mode == SHOW_ALL) {
+                if (should_hide_child_based_on_mode) continue; // Skip hidden child
+
+                // Now check search filter for this visible child
+                if (str_contains_insensitive(crit->display_name, t->search_buffer)) {
+                    any_visible_child_matches_search = true;
+                    visible_children_matching_search_count++; // Increment count of matching children
+                    // Count this child towards sub-totals if it matches search
                     total_visible_sub_count++;
                     if (crit->done) {
                         completed_sub_count++;
                     }
-                } else {
-                    if (!crit->is_hidden) {
-                        total_visible_sub_count++;
-                        if (crit->done) {
-                            completed_sub_count++;
-                        }
-                    }
+                } else if (parent_matches_search) {
+                     // If parent matches, still count this visible (but non-matching) child towards sub-totals
+                     total_visible_sub_count++;
+                     if (crit->done) {
+                         completed_sub_count++;
+                     }
                 }
+            }
+        }
+
+        // --- Count Main Item ---
+        // Count if parent matches OR at least one visible child matches
+        if (parent_matches_search || any_visible_child_matches_search) {
+            total_visible_count++;
+            if (is_category_considered_complete) {
+                completed_count++;
             }
         }
     }
@@ -4395,37 +4390,28 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         // Determine completion status (simple boolean)
         bool is_item_considered_complete = item->done;
 
-        // TODO: Remove
         // Determine visibility based on hiding mode
-        // // bool is_item_visible_for_counting = false;
-        // switch (settings->goal_hiding_mode) {
-        //     case HIDE_ALL_COMPLETED:
-        //         // Visible if NOT hidden in template AND NOT completed
-        //         // is_item_visible_for_counting = !item->is_hidden && !is_item_considered_complete;
-        //         break;
-        //     case HIDE_ONLY_TEMPLATE_HIDDEN:
-        //         // Visible if NOT hidden in template
-        //         // is_item_visible_for_counting = !item->is_hidden;
-        //         break;
-        //     case SHOW_ALL:
-        //         // Always visible for counting totals
-        //         // is_item_visible_for_counting = true;
-        //         break;
-        // }
+        bool should_hide_based_on_mode = false;
+        switch (settings->goal_hiding_mode) {
+            case HIDE_ALL_COMPLETED:
+                should_hide_based_on_mode = item->is_hidden || is_item_considered_complete;
+                break;
+            case HIDE_ONLY_TEMPLATE_HIDDEN:
+                should_hide_based_on_mode = item->is_hidden;
+                break;
+            case SHOW_ALL:
+                should_hide_based_on_mode = false;
+                break;
+        }
 
-        // Count items based on mode
-        if (settings->goal_hiding_mode == SHOW_ALL) {
-            total_visible_count++; // Count everything
+        // Apply Search Filter for counting
+        bool matches_search = str_contains_insensitive(item->display_name, t->search_buffer);
+
+        // Count items only if they are not hidden by mode AND match the search
+        if (!should_hide_based_on_mode && matches_search) {
+            total_visible_count++;
             if (is_item_considered_complete) {
                 completed_count++;
-            }
-        } else {
-            // HIDE modes only count non-template-hidden items
-            if (!item->is_hidden) {
-                total_visible_count++;
-                if (is_item_considered_complete) {
-                    completed_count++;
-                }
             }
         }
     }
@@ -4926,37 +4912,28 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         // Determine completion status (simple boolean 'done')
         bool is_item_considered_complete = item->done;
 
-        // TODO: Remove
-        // // Determine visibility based on hiding mode
-        // // bool is_item_visible_for_counting = false;
-        // switch (settings->goal_hiding_mode) {
-        //     case HIDE_ALL_COMPLETED:
-        //         // Visible if NOT hidden in template AND NOT completed
-        //         // is_item_visible_for_counting = !item->is_hidden && !is_item_considered_complete;
-        //         break;
-        //     case HIDE_ONLY_TEMPLATE_HIDDEN:
-        //         // Visible if NOT hidden in template
-        //         // is_item_visible_for_counting = !item->is_hidden;
-        //         break;
-        //     case SHOW_ALL:
-        //         // Always visible for counting totals
-        //         // is_item_visible_for_counting = true;
-        //         break;
-        // }
+        // Determine visibility based on hiding mode
+        bool should_hide_based_on_mode = false;
+        switch (settings->goal_hiding_mode) {
+            case HIDE_ALL_COMPLETED:
+                should_hide_based_on_mode = item->is_hidden || is_item_considered_complete;
+                break;
+            case HIDE_ONLY_TEMPLATE_HIDDEN:
+                should_hide_based_on_mode = item->is_hidden;
+                break;
+            case SHOW_ALL:
+                should_hide_based_on_mode = false;
+                break;
+        }
 
-        // Count items based on mode
-        if (settings->goal_hiding_mode == SHOW_ALL) {
-            total_visible_count++; // Count everything
+        // Apply Search Filter for counting
+        bool matches_search = str_contains_insensitive(item->display_name, t->search_buffer);
+
+        // Count items only if they are not hidden by mode AND match the search
+        if (!should_hide_based_on_mode && matches_search) {
+            total_visible_count++;
             if (is_item_considered_complete) {
                 completed_count++;
-            }
-        } else {
-            // HIDE modes only count non-template-hidden items
-            if (!item->is_hidden) {
-                total_visible_count++;
-                if (is_item_considered_complete) {
-                    completed_count++;
-                }
             }
         }
     }
@@ -5522,73 +5499,56 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
     int total_visible_sub_count = 0; // Count of *completable stages* across all relevant goals
     int completed_sub_count = 0; // Count of *completed stages* across all relevant goals
 
-    for (int i = 0; i < count; ++i) {
+        for (int i = 0; i < count; ++i) {
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
         if (!goal || goal->stage_count <= 0) continue; // Skip invalid goals
 
         // Determine completion status of the main goal
-        // Considered complete if the current stage index is at or beyond the *last completable stage*
-        // (i.e., index >= stage_count - 1)
         bool is_goal_considered_complete = (goal->current_stage >= goal->stage_count - 1);
 
-        // TODO: Remove
-        // // Determine visibility of the main goal based on hiding mode
-        // // bool is_goal_visible_for_counting = false;
-        // switch (settings->goal_hiding_mode) {
-        //     case HIDE_ALL_COMPLETED:
-        //         // Visible if NOT hidden in template AND NOT completed
-        //         // is_goal_visible_for_counting = !goal->is_hidden && !is_goal_considered_complete;
-        //         break;
-        //     case HIDE_ONLY_TEMPLATE_HIDDEN:
-        //         // Visible if NOT hidden in template
-        //         // is_goal_visible_for_counting = !goal->is_hidden;
-        //         break;
-        //     case SHOW_ALL:
-        //         // Always visible for counting totals
-        //         // is_goal_visible_for_counting = true;
-        //         break;
-        // }
+        // Determine visibility of the main goal based on hiding mode
+        bool should_hide_based_on_mode = false;
+        switch (settings->goal_hiding_mode) {
+            case HIDE_ALL_COMPLETED:
+                should_hide_based_on_mode = goal->is_hidden || is_goal_considered_complete;
+                break;
+            case HIDE_ONLY_TEMPLATE_HIDDEN:
+                should_hide_based_on_mode = goal->is_hidden;
+                break;
+            case SHOW_ALL:
+                should_hide_based_on_mode = false;
+                break;
+        }
 
-        // --- Count Main Items (Multi-Stage Goals) ---
-        if (settings->goal_hiding_mode == SHOW_ALL) {
-            total_visible_count++; // Count everything
-            if (is_goal_considered_complete) {
-                completed_count++;
-            }
-        } else {
-            // HIDE modes only count non-template-hidden items
-            if (!goal->is_hidden) {
-                total_visible_count++;
-                if (is_goal_considered_complete) {
-                    completed_count++;
-                }
-            }
+        // Apply Search Filter for counting (check main name AND active stage)
+        SubGoal *active_stage_count = goal->stages[goal->current_stage];
+        bool name_matches_search = str_contains_insensitive(goal->display_name, t->search_buffer);
+        bool stage_matches_search = str_contains_insensitive(active_stage_count->display_text, t->search_buffer);
+        bool goal_matches_search = name_matches_search || stage_matches_search;
+
+        // Skip entire goal if hidden by mode OR doesn't match search
+        if (should_hide_based_on_mode || !goal_matches_search) continue;
+
+        // --- Count Main Item (Multi-Stage Goal) ---
+        total_visible_count++;
+        if (is_goal_considered_complete) {
+            completed_count++;
         }
 
         // --- Count Sub-Items (Stages) ---
-        // Only count stages if the goal itself isn't template-hidden (unless SHOW_ALL is on)
-        if (goal->stage_count > 1 && (settings->goal_hiding_mode == SHOW_ALL || !goal->is_hidden)) {
+        // Only count stages if the goal itself isn't template-hidden (already checked above)
+        // and has more than one stage (meaning it has completable stages)
+        if (goal->stage_count > 1) {
             // Iterate through *completable* stages (all except the last one)
             for (int j = 0; j < goal->stage_count - 1; ++j) {
-                // Stages don't have individual 'is_hidden' flags in the template,
-                // their visibility for counting depends on the parent goal's status.
+                 // Determine if the *stage* is considered complete
+                 bool is_stage_complete = (goal->current_stage > j);
 
-                // Determine if the *stage* is considered complete (current_stage index is past this stage's index)
-                bool is_stage_complete = (goal->current_stage > j);
-
-                if (settings->goal_hiding_mode == SHOW_ALL) {
-                    total_visible_sub_count++; // Count every completable stage
-                    if (is_stage_complete) {
-                        completed_sub_count++;
-                    }
-                } else {
-                    // HIDE modes: Still count all completable stages of non-template-hidden goals towards the total.
-                    // The visibility filtering happens during rendering.
-                    total_visible_sub_count++;
-                    if (is_stage_complete) {
-                        completed_sub_count++;
-                    }
-                }
+                 // Count this stage towards totals as the parent goal is visible
+                 total_visible_sub_count++;
+                 if (is_stage_complete) {
+                    completed_sub_count++;
+                 }
             }
         }
     }

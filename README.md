@@ -19,7 +19,8 @@ Love using Advancely? You can have your name immortalized in the tracker!
 ![Supporters Screen](readme_assets/Supporters_Screen_Overlay_v0.9.399.png)
 
 **Supporters:**
-*  zurtleTif: $20
+
+* zurtleTif: $20
 
 Simply [**donate here**](https://streamlabs.com/lnxseus/tip) and include the word "**Advancely**" in your donation
 message. Your name will be added to the official supporter showcase that appears on the stream overlay when anyone
@@ -33,7 +34,8 @@ Thank you for supporting the project!
 
 **Put `#Advancely` in your content to support the project!**
 
-* [Support Advancely (be featured on the overlay by mentioning `Advancely` in your donation message)](https://streamlabs.com/lnxseus/tip)
+* [Support Advancely (be featured on the overlay by mentioning
+  `Advancely` in your donation message)](https://streamlabs.com/lnxseus/tip)
 * [My YouTube](https://www.youtube.com/@lnxs?sub_confirmation=1)
 * [My Twitch](https://www.twitch.tv/lnxseus)
 * [My Twitch Archive + Advancely Devlogs](https://www.youtube.com/@lnxsarchive/playlists?view=1&sort=lad&flow=grid&sub_confirmation=1)
@@ -103,6 +105,12 @@ sharp._
     * **Multi-Stage Goals**: Create long-term objectives that combine several smaller steps. A single goal can require
       you to first complete a stat, then an unlock, then a specific **advancement criterion** (e.g., visiting a specific
       biome), and finally an entire advancement in sequence.
+* **Section Completion Counters**: Each section header displays dynamic counters showing completed items versus the
+  total visible items for that section, respecting both the current Goal Visibility setting and any active search
+  filter.
+    * **Format**: `(Completed Main / Total Main)` or `(Completed Main / Total Main - Completed Sub / Total Sub)` for
+      sections with sub-items like Advancement Criteria or Multi-Stage Goal steps.
+
 
 * **Powerful In-App Template Editor**: You don't need to manually edit files. The built-in editor allows you to create,
   copy, and modify any template. You can instantly build a new template by importing advancements, stats, and unlocks
@@ -284,13 +292,35 @@ You can manipulate the view using several intuitive controls:
 ### Searching & Filtering
 
 To quickly find a specific goal, press `Ctrl+F` (or `Cmd+F` on macOS) to focus the search box in the bottom-right
-corner. The filter is case-insensitive and intelligently searches across different goal types:
+corner. The filter is case-insensitive and intelligently searches across different goal types. Using the search filter
+also dynamically updates the completion counters in the section headers.
 
 * **Advancements, Recipes & Statistics**: Shows a category if its main title or any of its sub-criteria/sub-stats match
   the search term. If only a sub-item matches, it will be the only one shown under its parent.
 * **Unlocks & Custom Goals**: Shows the goal if its name matches the search term.
 * **Multi-Stage Goals**: Shows the goal if its main title or the text of its *currently active stage* matches the search
   term.
+
+### Section Completion Counters
+
+Each section header (e.g., "Advancements", "Statistics") now displays dynamic counters reflecting the completion status
+based on the currently visible items. These counters respect both the "Goal Visibility" setting and any active search
+filter.
+
+**Format:**
+
+* Sections with sub-items (Advancements/Recipes with criteria, Statistics with sub-stats, Multi-Stage Goals) show:
+  `(Completed Main / Total Main - Completed Sub / Total Sub)`
+* Sections without sub-items (Unlocks, Custom Goals, simple Statistics) show: `(Completed Main / Total Main)`
+
+**How Goal Visibility Affects Counters:**
+
+* **Hide All Completed**: Counts only items currently visible (i.e., not hidden in the template AND not yet complete).
+  The total represents the number of remaining items.
+* **Hide Template-Hidden Only**: Counts all items not marked as hidden in the template, regardless of completion status.
+  The total represents all non-hidden goals.
+* **Show All**: Counts every single item defined in the template for that section, including those marked as hidden and
+  those already completed. The total represents all defined goals.
 
 ### The Info Bar
 
@@ -468,7 +498,7 @@ settings window, which can be opened at any time by pressing the `ESC` key.
 | **Path Settings**     | Choose how Advancely finds your saves. `Auto-Detect` finds the default Minecraft path. `Track Custom Saves Folder` lets you specify a manual path. `Auto-Track Active Instance` automatically finds and follows the instance you are playing from **Prism Launcher**, **MultiMC** etc.. The `Open Instances Folder` button helps you quickly navigate to your launcher's instance directory.                                               |
 | **Template Settings** | Select the `Version`, `Category`, `Optional Flag`, and `Language` to load a specific ruleset. You can also use the `Open Template Folder` button for quick access to the files on your disk.                                                                                                                                                                                                                                               |
 | **General Settings**  | Toggle the stream `Overlay`, set the `Tracker FPS Limit`, keep the tracker `Always On Top`, and enable `Using StatsPerWorld Mod` compatibility for legacy Minecraft versions (1.0 - 1.6.4).                                                                                                                                                                                                                                                |
-| **Goal Visibility**   | Fine-tune which completed goals are displayed on the tracker with three modes: `Hide All Completed` (strictest), `Hide Template-Hidden Only`, or `Show All`.                                                                                                                                                                                                                                                                               |
+| **Goal Visibility**   | Fine-tune which completed goals are displayed on the tracker with three modes: `Hide All Completed` (strictest), `Hide Template-Hidden Only`, or `Show All`. This setting also affects which items are counted in the section completion counters.                                                                                                                                                                                         |                                                                                                                                                                                                                                                                           |
 | **Visual Settings**   | Full RGBA color customization for the tracker `background` and `text`, as well as the overlay `background` and `text`. You can also adjust the `Overlay Width` with a pixel-perfect slider.                                                                                                                                                                                                                                                |
 | **Font Settings**     | Independently set the font for the **Tracker**, **Overlay**, and **UI (Settings/Notes)**. Both `.ttf` and `.otf` font files are supported. *Note: Changes to the Tracker and UI fonts require an application restart to take effect.*                                                                                                                                                                                                      |
 | **Overlay Settings**  | Set the `Overlay FPS Limit` independently from the tracker. Configure the `Overlay Scroll Speed` (negative values reverse the direction), the `Sub-Stat Cycle Interval` for multi-stat animations, and toggle a constant `Speed Up Animation`. You can also align the top progress text (`Left`, `Center`, or `Right`) and toggle visibility for each section of the info bar (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`). |
