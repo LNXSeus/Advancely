@@ -2531,12 +2531,12 @@ static void render_section_separator(Tracker *t, const AppSettings *settings, fl
             if (completed_sub_count != -1 && total_visible_sub_count > 0) {
                 // Sections with sub-items (Advancements/Stats with criteria, Multi-Stage)
                 // Format: "Title (Total Main | Total Sub)"
-                snprintf(counter_str, sizeof(counter_str), " (%d  -  %d)",
+                snprintf(counter_str, sizeof(counter_str), "  (%d  -  %d)",
                          total_visible_count, total_visible_sub_count);
             } else {
                 // Sections without sub-items (Unlocks, Custom Goals, simple Adv/Stats)
                 // Format: "Title (Total Main)"
-                snprintf(counter_str, sizeof(counter_str), " (%d)",
+                snprintf(counter_str, sizeof(counter_str), "  (%d)",
                          total_visible_count);
             }
         } else {
@@ -2544,13 +2544,13 @@ static void render_section_separator(Tracker *t, const AppSettings *settings, fl
             if (completed_sub_count != -1 && total_visible_sub_count > 0) {
                 // Sections with sub-items
                 // Format: "Title (Completed Main / Total Main | Completed Sub / Total Sub)"
-                snprintf(counter_str, sizeof(counter_str), " (%d/%d  -  %d/%d)",
+                snprintf(counter_str, sizeof(counter_str), "  (%d/%d  -  %d/%d)",
                          completed_count, total_visible_count,
                          completed_sub_count, total_visible_sub_count);
             } else {
                 // Sections without sub-items
                 // Format: "Title (Completed Main / Total Main)"
-                snprintf(counter_str, sizeof(counter_str), " (%d/%d)",
+                snprintf(counter_str, sizeof(counter_str), "  (%d/%d)",
                          completed_count, total_visible_count);
             }
         }
