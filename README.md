@@ -108,8 +108,10 @@ sharp._
 * **Section Completion Counters**: Each section header displays dynamic counters showing completed items versus the
   total visible items for that section, respecting both the current Goal Visibility setting and any active search
   filter.
-    * **Format**: `(Completed Main / Total Main)` or `(Completed Main / Total Main - Completed Sub / Total Sub)` for
-      sections with sub-items like Advancement Criteria or Multi-Stage Goal steps.
+    * **Format**:
+        * Sections with sub-items (Advancements/Recipes with criteria, Statistics with sub-stats, Multi-Stage Goals)
+          show counts for both main items and sub-items.
+        * Sections without sub-items (Unlocks, Custom Goals, simple Statistics) show counts for main items only.
 
 
 * **Powerful In-App Template Editor**: You don't need to manually edit files. The built-in editor allows you to create,
@@ -314,13 +316,12 @@ filter.
 * Sections without sub-items (Unlocks, Custom Goals, simple Statistics) show: `(Completed Main / Total Main)`
 
 **How Goal Visibility Affects Counters:**
-
-* **Hide All Completed**: Counts only items currently visible (i.e., not hidden in the template AND not yet complete).
-  The total represents the number of remaining items.
-* **Hide Template-Hidden Only**: Counts all items not marked as hidden in the template, regardless of completion status.
-  The total represents all non-hidden goals.
-* **Show All**: Counts every single item defined in the template for that section, including those marked as hidden and
-  those already completed. The total represents all defined goals.
+* **Hide All Completed**: Since only incomplete items are shown, the counters display only the **total number of remaining
+  items** (e.g., `(Remaining Main - Remaining Sub)` or `(Remaining Main)`).
+* **Hide Template-Hidden Only**: Counts show **completed vs. total** for all items not marked as hidden in the template (
+  e.g., `(Completed Main / Total Main)`).
+* **Show All**: Counts show completed vs. total for every single item defined in the template for that section,
+  including hidden ones (e.g., `(Completed Main / Total Main)`).
 
 ### The Info Bar
 

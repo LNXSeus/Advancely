@@ -2522,23 +2522,40 @@ static void render_section_separator(Tracker *t, const AppSettings *settings, fl
 
     current_y += 12.0f; // Padding before the separator
 
-    // Construct counter string
+    // Construct counter string based on hiding mode
     char counter_str[128] = "";
     if (total_visible_count > 0) {
         // Only show counters if there are items to count
-        if (completed_sub_count != -1 && total_visible_sub_count > 0) {
-            // Sections with sub-items (Advancements/Stats with criteria, Multi-Stage)
-            // Format: "Title (Main: X/Y | Sub: A/B)"
-            snprintf(counter_str, sizeof(counter_str), "  (%d/%d  -  %d/%d)",
-                     completed_count, total_visible_count,
-                     completed_sub_count, total_visible_sub_count);
+        if (settings->goal_hiding_mode == HIDE_ALL_COMPLETED) {
+            // --- HIDE_ALL_COMPLETED Mode: Show only totals ---
+            if (completed_sub_count != -1 && total_visible_sub_count > 0) {
+                // Sections with sub-items (Advancements/Stats with criteria, Multi-Stage)
+                // Format: "Title (Total Main | Total Sub)"
+                snprintf(counter_str, sizeof(counter_str), " (%d  -  %d)",
+                         total_visible_count, total_visible_sub_count);
+            } else {
+                // Sections without sub-items (Unlocks, Custom Goals, simple Adv/Stats)
+                // Format: "Title (Total Main)"
+                snprintf(counter_str, sizeof(counter_str), " (%d)",
+                         total_visible_count);
+            }
         } else {
-            // Sections without sub-items (Unlocks, Custom Goals, simple Adv/Stats)
-            // Format: "Title (X/Y)"
-            snprintf(counter_str, sizeof(counter_str), "  (%d/%d)",
-                     completed_count, total_visible_count);
+            // --- HIDE_ONLY_TEMPLATE_HIDDEN or SHOW_ALL Mode: Show completed/total ---
+            if (completed_sub_count != -1 && total_visible_sub_count > 0) {
+                // Sections with sub-items
+                // Format: "Title (Completed Main / Total Main | Completed Sub / Total Sub)"
+                snprintf(counter_str, sizeof(counter_str), " (%d/%d  -  %d/%d)",
+                         completed_count, total_visible_count,
+                         completed_sub_count, total_visible_sub_count);
+            } else {
+                // Sections without sub-items
+                // Format: "Title (Completed Main / Total Main)"
+                snprintf(counter_str, sizeof(counter_str), " (%d/%d)",
+                         completed_count, total_visible_count);
+            }
         }
     }
+
 
     // Combine title and counter string
     char full_title[512];
@@ -2640,7 +2657,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         // Apply Search Filter for counting
         bool parent_matches_search = str_contains_insensitive(cat->display_name, t->search_buffer);
         bool any_visible_child_matches_search = false;
-        int visible_children_matching_search_count = 0; // Count children matching search *after* hiding filter
+        // TODO: Remove
+        // int visible_children_matching_search_count = 0; // Count children matching search *after* hiding filter
 
         if (cat->criteria_count > 0 && !cat->is_single_stat_category) { // Only check children for complex types
             section_has_sub_items = true;
@@ -2667,7 +2685,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 // Now check search filter for this visible child
                 if (str_contains_insensitive(crit->display_name, t->search_buffer)) {
                     any_visible_child_matches_search = true;
-                    visible_children_matching_search_count++; // Increment count of matching children
+                    // TODO: Remove
+                    // visible_children_matching_search_count++; // Increment count of matching children
                     // Count this child towards sub-totals if it matches search
                     total_visible_sub_count++;
                     if (crit->done) {

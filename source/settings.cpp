@@ -906,8 +906,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[1024];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                 "Strictest hiding. Hides goals when they are completed AND hides goals marked as \"hidden\" in the template file.\n"
-                 "Section counters will only count items currently visible (not hidden and not complete).");
+        "Strictest hiding. Hides goals when they are completed AND hides goals marked as \"hidden\" in the template file.\n"
+        "Section counters will only display the total number of remaining (visible) items, e.g., (5 - 12) or (5).");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
@@ -916,8 +916,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[1024];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                 "Hides goals marked as \"hidden\" in the template file, but keeps all other completed goals visible.\n"
-                 "Section counters will count all items *not* marked as hidden in the template, regardless of completion.");
+        "Hides goals marked as \"hidden\" in the template file, but keeps all other completed goals visible.\n"
+        "Section counters will count all items NOT marked as hidden in the template,\n"
+        "regardless of completion e.g., (5/10 - 12/20) or (5/10).");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
@@ -926,8 +927,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[1024];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                 "Shows everything. No goals will be hidden, regardless of their completion or template status.\n"
-                 "Section counters will count every single item defined in the template for that section.");
+        "Shows everything. No goals will be hidden, regardless of their completion or template status.\n"
+        "Section counters will count every single item defined in the template\n"
+        "for that section e.g., (5/10 - 12/20) or (5/10).");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
