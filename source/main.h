@@ -55,11 +55,9 @@ const char* get_notes_manifest_path();
 #define TRACKER_TITLE "Advancely"
 
 // This is the version that gets compared with the latest release tag on GitHub
-#define ADVANCELY_VERSION "v0.9.402" // vMAJOR.MINOR.PATCH // TODO: Update this always, SAME FORMAT ON RELEASE TAG!
-// Starting from /gui folder
-#define ADVANCELY_ICON_PATH "/gui/Advancely_Logo_NoText.png"
-// Starting from /gui folder
-#define ADVANCELY_LOGO_PATH "/gui/Advancely_Logo.png"
+#define ADVANCELY_VERSION "v0.9.403" // vMAJOR.MINOR.PATCH // TODO: Update this always, SAME FORMAT ON RELEASE TAG!
+#define ADVANCELY_ICON_PATH "/gui/Advancely_Logo_NoText.png" // Starting from /gui folder
+#define ADVANCELY_LOGO_PATH "/gui/Advancely_Logo.png" // Starting from /gui folder
 #define ADVANCELY_LOGO_SIZE 512.0f // Logo size on startup message window or update successful window
 #define ADVANCELY_FADED_ALPHA 100
 #define TRACKER_SEPARATOR_LINE_WIDTH 0.80f
