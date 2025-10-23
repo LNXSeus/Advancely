@@ -906,166 +906,166 @@
 			"icon":	"items/diamond_boots_20w14infinite.png",
 			"criteria":	{
 				"minecraft:plains":	{
-					"icon":	"ovBiomes/plains.png"
+					"icon":	"ovBiomes/1.21.11+/plains.png"
 				},
 				"minecraft:forest":	{
-					"icon":	"ovBiomes/forest.png"
+					"icon":	"ovBiomes/1.21.11+/forest.png"
 				},
 				"minecraft:birch_forest":	{
-					"icon":	"ovBiomes/birch_forest.png"
+					"icon":	"ovBiomes/1.21.11+/birch_forest.png"
 				},
 				"minecraft:old_growth_birch_forest":	{
-					"icon":	"ovBiomes/old_growth_birch_forest.png"
+					"icon":	"ovBiomes/1.21.11+/old_growth_birch_forest.png"
 				},
 				"minecraft:dark_forest":	{
-					"icon":	"ovBiomes/dark_forest.png"
+					"icon":	"ovBiomes/1.21.11+/dark_forest.png"
 				},
 				"minecraft:swamp":	{
-					"icon":	"ovBiomes/swamp.png"
+					"icon":	"ovBiomes/1.21.11+/swamp.png"
 				},
 				"minecraft:mangrove_swamp":	{
-					"icon":	"ovBiomes/mangrove_swamp.png"
+					"icon":	"ovBiomes/1.21.11+/mangrove_swamp.png"
 				},
 				"minecraft:taiga":	{
-					"icon":	"ovBiomes/taiga.png"
+					"icon":	"ovBiomes/1.21.11+/taiga.png"
 				},
 				"minecraft:old_growth_pine_taiga":	{
-					"icon":	"ovBiomes/old_growth_pine_taiga.png"
+					"icon":	"ovBiomes/1.21.11+/old_growth_pine_taiga.png"
 				},
 				"minecraft:old_growth_spruce_taiga":	{
-					"icon":	"ovBiomes/old_growth_spruce_taiga.png"
+					"icon":	"ovBiomes/1.21.11+/old_growth_spruce_taiga.png"
 				},
 				"minecraft:snowy_taiga":	{
-					"icon":	"ovBiomes/snowy_taiga.png"
+					"icon":	"ovBiomes/1.21.11+/snowy_taiga.png"
 				},
 				"minecraft:grove":	{
-					"icon":	"ovBiomes/grove.png"
+					"icon":	"ovBiomes/1.21.11+/grove.png"
 				},
 				"minecraft:ice_spikes":	{
-					"icon":	"ovBiomes/ice_spikes.png"
+					"icon":	"ovBiomes/1.21.11+/ice_spikes.png"
 				},
 				"minecraft:snowy_plains":	{
-					"icon":	"ovBiomes/snowy_plains.png"
+					"icon":	"ovBiomes/1.21.11+/snowy_plains.png"
 				},
 				"minecraft:snowy_slopes":	{
-					"icon":	"ovBiomes/snowy_slopes.png"
+					"icon":	"ovBiomes/1.21.11+/snowy_slopes.png"
 				},
 				"minecraft:snowy_beach":	{
-					"icon":	"ovBiomes/snowy_beach.png"
+					"icon":	"ovBiomes/1.21.11+/snowy_beach.png"
 				},
 				"minecraft:frozen_river":	{
-					"icon":	"ovBiomes/frozen_river.png"
+					"icon":	"ovBiomes/1.21.11+/frozen_river.png"
 				},
 				"minecraft:frozen_peaks":	{
-					"icon":	"ovBiomes/frozen_peaks.png"
+					"icon":	"ovBiomes/1.21.11+/frozen_peaks.png"
 				},
 				"minecraft:jagged_peaks":	{
-					"icon":	"ovBiomes/jagged_peaks.png"
+					"icon":	"ovBiomes/1.21.11+/jagged_peaks.png"
 				},
 				"minecraft:stony_peaks":	{
-					"icon":	"ovBiomes/stony_peaks.png"
+					"icon":	"ovBiomes/1.21.11+/stony_peaks.png"
 				},
 				"minecraft:stony_shore":	{
-					"icon":	"ovBiomes/stony_shore.png"
+					"icon":	"ovBiomes/1.21.11+/stony_shore.png"
 				},
 				"minecraft:windswept_hills":	{
-					"icon":	"ovBiomes/windswept_hills.png"
+					"icon":	"ovBiomes/1.21.11+/windswept_hills.png"
 				},
 				"minecraft:flower_forest":	{
-					"icon":	"ovBiomes/flower_forest.png"
+					"icon":	"ovBiomes/1.21.11+/flower_forest.png"
 				},
 				"minecraft:sunflower_plains":	{
-					"icon":	"ovBiomes/sunflower_plains.png"
+					"icon":	"ovBiomes/1.21.11+/sunflower_plains.png"
 				},
 				"minecraft:meadow":	{
-					"icon":	"ovBiomes/meadow.png"
+					"icon":	"ovBiomes/1.21.11+/meadow.png"
 				},
 				"minecraft:river":	{
-					"icon":	"ovBiomes/river.png"
+					"icon":	"ovBiomes/1.21.11+/river.png"
 				},
 				"minecraft:beach":	{
-					"icon":	"ovBiomes/beach.png"
+					"icon":	"ovBiomes/1.21.11+/beach.png"
 				},
 				"minecraft:desert":	{
-					"icon":	"ovBiomes/desert.png"
+					"icon":	"ovBiomes/1.21.11+/desert.png"
 				},
 				"minecraft:savanna":	{
-					"icon":	"ovBiomes/savanna.png"
+					"icon":	"ovBiomes/1.21.11+/savanna.png"
 				},
 				"minecraft:savanna_plateau":	{
-					"icon":	"ovBiomes/savanna_plateau.png"
+					"icon":	"ovBiomes/1.21.11+/savanna_plateau.png"
 				},
 				"minecraft:windswept_savanna":	{
-					"icon":	"ovBiomes/windswept_savanna.png"
+					"icon":	"ovBiomes/1.21.11+/windswept_savanna.png"
 				},
 				"minecraft:windswept_forest":	{
-					"icon":	"ovBiomes/windswept_forest.png"
+					"icon":	"ovBiomes/1.21.11+/windswept_forest.png"
 				},
 				"minecraft:windswept_gravelly_hills":	{
-					"icon":	"ovBiomes/windswept_gravelly_hills.png"
+					"icon":	"ovBiomes/1.21.11+/windswept_gravelly_hills.png"
 				},
 				"minecraft:ocean":	{
-					"icon":	"ovBiomes/ocean.png"
+					"icon":	"ovBiomes/1.21.11+/ocean.png"
 				},
 				"minecraft:cold_ocean":	{
-					"icon":	"ovBiomes/cold_ocean.png"
+					"icon":	"ovBiomes/1.21.11+/cold_ocean.png"
 				},
 				"minecraft:warm_ocean":	{
-					"icon":	"ovBiomes/warm_ocean.png"
+					"icon":	"ovBiomes/1.21.11+/warm_ocean.png"
 				},
 				"minecraft:lukewarm_ocean":	{
-					"icon":	"ovBiomes/lukewarm_ocean.png"
+					"icon":	"ovBiomes/1.21.11+/lukewarm_ocean.png"
 				},
 				"minecraft:frozen_ocean":	{
-					"icon":	"ovBiomes/frozen_ocean.png"
+					"icon":	"ovBiomes/1.21.11+/frozen_ocean.png"
 				},
 				"minecraft:deep_ocean":	{
-					"icon":	"ovBiomes/deep_ocean.png"
+					"icon":	"ovBiomes/1.21.11+/deep_ocean.png"
 				},
 				"minecraft:deep_cold_ocean":	{
-					"icon":	"ovBiomes/deep_cold_ocean.png"
+					"icon":	"ovBiomes/1.21.11+/deep_cold_ocean.png"
 				},
 				"minecraft:deep_frozen_ocean":	{
-					"icon":	"ovBiomes/deep_frozen_ocean.png"
+					"icon":	"ovBiomes/1.21.11+/deep_frozen_ocean.png"
 				},
 				"minecraft:deep_lukewarm_ocean":	{
-					"icon":	"ovBiomes/deep_lukewarm_ocean.png"
+					"icon":	"ovBiomes/1.21.11+/deep_lukewarm_ocean.png"
 				},
 				"minecraft:mushroom_fields":	{
-					"icon":	"ovBiomes/mushroom_fields.png"
+					"icon":	"ovBiomes/1.21.11+/mushroom_fields.png"
 				},
 				"minecraft:cherry_grove":	{
-					"icon":	"ovBiomes/cherry_grove_new.png"
+					"icon":	"ovBiomes/1.21.11+/cherry_grove.png"
 				},
 				"minecraft:pale_garden":	{
-					"icon":	"ovBiomes/pale_garden.png"
+					"icon":	"ovBiomes/1.21.11+/pale_garden.png"
 				},
 				"minecraft:jungle":	{
-					"icon":	"ovBiomes/jungle.png"
+					"icon":	"ovBiomes/1.21.11+/jungle.png"
 				},
 				"minecraft:sparse_jungle":	{
-					"icon":	"ovBiomes/sparse_jungle.png"
+					"icon":	"ovBiomes/1.21.11+/sparse_jungle.png"
 				},
 				"minecraft:bamboo_jungle":	{
-					"icon":	"ovBiomes/bamboo_jungle.png"
+					"icon":	"ovBiomes/1.21.11+/bamboo_jungle.png"
 				},
 				"minecraft:badlands":	{
-					"icon":	"ovBiomes/badlands.png"
+					"icon":	"ovBiomes/1.21.11+/badlands.png"
 				},
 				"minecraft:wooded_badlands":	{
-					"icon":	"ovBiomes/wooded_badlands.png"
+					"icon":	"ovBiomes/1.21.11+/wooded_badlands.png"
 				},
 				"minecraft:eroded_badlands":	{
-					"icon":	"ovBiomes/eroded_badlands.png"
+					"icon":	"ovBiomes/1.21.11+/eroded_badlands.png"
 				},
 				"minecraft:dripstone_caves":	{
-					"icon":	"ovBiomes/dripstone_caves.png"
+					"icon":	"ovBiomes/1.21.11+/dripstone_caves.png"
 				},
 				"minecraft:lush_caves":	{
-					"icon":	"ovBiomes/lush_caves.png"
+					"icon":	"ovBiomes/1.21.11+/lush_caves.png"
 				},
 				"minecraft:deep_dark":	{
-					"icon":	"ovBiomes/deep_dark.png"
+					"icon":	"ovBiomes/1.21.11+/deep_dark.png"
 				}
 			}
 		},
