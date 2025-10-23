@@ -42,19 +42,26 @@ void format_time(long long ticks, char *output, size_t max_len) {
     if (!output || max_len == 0) return;
 
     long long total_seconds = ticks / 20;
-    long long days = total_seconds / 86400;
+    long long days_total = total_seconds / 86400; // Total days first
+    long long years = days_total / 365; // Simple year calculation
+    long long days = days_total % 365; // Remaining days after years
+
     long long hours = (total_seconds % 86400) / 3600;
     long long minutes = (total_seconds % 3600) / 60;
     long long seconds = total_seconds % 60;
-    long long milliseconds = (ticks % 20) * 50;
+    long long milliseconds = (ticks % 20) * 50; // Milliseconds remain for precision at low durations
 
-    if (days > 0) {
+    // Build the string conditionally based on the largest non-zero unit
+    if (years > 0) {
+        snprintf(output, max_len, "%lldy %lldd %02lldh %02lldm %02llds", years, days, hours, minutes, seconds);
+    } else if (days > 0) {
         snprintf(output, max_len, "%lldd %02lldh %02lldm %02llds", days, hours, minutes, seconds);
     } else if (hours > 0) {
         snprintf(output, max_len, "%02lldh %02lldm %02llds", hours, minutes, seconds);
     } else if (minutes > 0) {
         snprintf(output, max_len, "%02lldm %02llds", minutes, seconds);
     } else {
+        // Only show milliseconds if total time is less than a minute
         snprintf(output, max_len, "%02lld.%03llds", seconds, milliseconds);
     }
 }
