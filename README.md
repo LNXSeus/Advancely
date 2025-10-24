@@ -5,6 +5,11 @@
 ***
 
 # A highly customizable and interactive tool to track Minecraft progress beyond just Advancements.
+![Advancely_Tracker_Preview](readme_assets/Advancely-v0.9.313-Preview.gif)
+_This animation here is compressed. When you use the tracker the framerate will be higher and the resolution perfectly
+sharp._
+
+***
 
 ## This tracker supports an arbitrary number of advancements, recipes, custom statistics, unlocks, multi-stage goals, manual goals, and custom counters for over 100 Minecraft versions.
 
@@ -46,9 +51,7 @@ Thank you for supporting the project!
 
 ## What is Advancely?
 
-![Advancely_Tracker_Preview](readme_assets/Advancely-v0.9.313-Preview.gif)
-_This animation here is compressed. When you use the tracker the framerate will be higher and the resolution perfectly
-sharp._
+![Advancely Preview v0.9.409](readme_assets/Advancely_v0.9.409_Preview.png)
 
 Advancely is a sophisticated, data-driven progress tracker designed for Minecraft speedrunners, completionists, and
 content creators. Unlike other tools that only track vanilla advancements (e.g., AATool by Darwin Baker), Advancely can
