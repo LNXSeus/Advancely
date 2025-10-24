@@ -1144,7 +1144,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     ImGui::SeparatorText("Fonts");
 
-    // --- Tracker/Overlay Font ---
+    // --- Tracker Font ---
     ImGui::Text("Tracker Font: %s", temp_settings.tracker_font_name);
     ImGui::SameLine();
     if (ImGui::Button("Browse##TrackerFont")) {
@@ -1165,8 +1165,18 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "A restart is required to properly apply changes.");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
-    // Font size change only possible through settings.json directly -> EXPERIMENTAL
-    // ImGui::DragFloat("Tracker Font Size", &temp_settings.tracker_font_size, 0.5f, 8.0f, 72.0f, "%.1f");
+    // Tracker Font Size
+    ImGui::DragFloat("Tracker Font Size", &temp_settings.tracker_font_size, 0.5f, 8.0f, 64.0f, "%.1f pt");
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buffer[1024];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Adjust the base font size for the main tracker view.\n"
+                 "Affects goal display text, info bar, and controls.\n"
+                 "Default: %.1f pt.\n\n"
+                 "IMPORTANT: Requires restarting Advancely to apply.",
+                 DEFAULT_TRACKER_FONT_SIZE);
+        ImGui::SetTooltip("%s", tooltip_buffer);
+    }
 
     // --- Overlay Font ---
     if (temp_settings.enable_overlay) {
@@ -1209,21 +1219,29 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "A restart is required to properly apply changes.");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
-    // Font size change only possible through settings.json directly -> EXPERIMENTAL
-    // ImGui::DragFloat("Settings Font Size", &temp_settings.ui_font_size, 0.5f, 8.0f, 72.0f, "%.1f");
+    // UI Font Size
+    ImGui::DragFloat("Settings/UI Font Size", &temp_settings.ui_font_size, 0.5f, 8.0f, 64.0f, "%.1f pt");
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buffer[1024];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Adjust the font size for UI windows.\n"
+                 "Affects Settings, Template Editor, and Notes windows.\n"
+                 "Default: %.1f pt.\n\n"
+                 "IMPORTANT: Requires restarting Advancely to apply.",
+                 DEFAULT_UI_FONT_SIZE);
+        ImGui::SetTooltip("%s", tooltip_buffer);
+    }
 
-    // --- Restart Warning ---
+    // --- Restart Warning (doesn't apply to overlay font/size changes) ---
     bool font_settings_changed =
             strcmp(temp_settings.tracker_font_name, saved_settings.tracker_font_name) != 0 ||
             temp_settings.tracker_font_size != saved_settings.tracker_font_size ||
-            // Overlay restarts automatically when changes are applied
-            // strcmp(temp_settings.overlay_font_name, saved_settings.overlay_font_name) != 0 ||
             strcmp(temp_settings.ui_font_name, saved_settings.ui_font_name) != 0 ||
             temp_settings.ui_font_size != saved_settings.ui_font_size;
 
     if (font_settings_changed) {
         ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
-                           "First apply the settings then restart the app to apply font changes.");
+                           "First apply the settings then restart the app to apply font/size changes.");
     }
 
     ImGui::Separator();
@@ -1628,9 +1646,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Speed Up Animation: %s\n"
                  "  - Hide Completed Row 3 Goals: %s\n"
                  "  - Always On Top: %s\n"
-                 "  - Tracker Font: %s\n"
+                 "  - Tracker Font: %s (%.1f pt)\n"
                  "  - Overlay Font: %s\n"
-                 "  - UI Font: %s\n"
+                 "  - Settings/UI Font: %s (%.1f pt)\n"
                  "  - Goal Visibility: Hide All Completed\n"
                  "  - Overlay Width: %dpx\n"
                  "  - Notes Use Settings Font: %s\n"
@@ -1652,8 +1670,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
                  DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
                  DEFAULT_TRACKER_FONT,
+                 DEFAULT_TRACKER_FONT_SIZE,
                  DEFAULT_OVERLAY_FONT,
                  DEFAULT_UI_FONT,
+                 DEFAULT_UI_FONT_SIZE,
                  OVERLAY_DEFAULT_WIDTH,
                  DEFAULT_NOTES_USE_ROBOTO ? "Enabled" : "Disabled",
                  DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled",

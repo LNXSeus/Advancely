@@ -167,7 +167,7 @@ struct AppSettings {
     char tracker_font_name[256];      // Filename of the font for the trackermap/overlay.
     float tracker_font_size;          // Base size for the main trackermap font. Overlay is fixed.
     char ui_font_name[256];           // Filename of the font for ImGui UI (settings, etc.).
-    float ui_font_size;               // // EXPERIMENTAL: Only changeable in settings.json directly
+    float ui_font_size;               // Size for the UI font, may cause non-destructive overlap of buttons.
     char overlay_font_name[256];      // Filename of the font for the overlay.
     float overlay_font_size; // EXPERIMENTAL: Only changeable in settings.json directly
 

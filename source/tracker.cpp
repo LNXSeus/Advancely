@@ -4991,7 +4991,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             if (ImGui::IsItemHovered()) {
                 char use_settings_font_tooltip_buffer[512];
                 snprintf(use_settings_font_tooltip_buffer, sizeof(use_settings_font_tooltip_buffer),
-                         "Toggle whether to use the settings window font for the notes editor (better readability).");
+                         "Toggle whether to use the settings font and -size for the notes editor (better readability).");
                 ImGui::SetTooltip(
                     "%s", use_settings_font_tooltip_buffer);
             }
