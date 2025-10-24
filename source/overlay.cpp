@@ -999,13 +999,28 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         auto *adv = static_cast<TrackableCategory *>(display_item.item_ptr);
                         strncpy(name_buf, adv->display_name, sizeof(name_buf) - 1);
                         name_buf[sizeof(name_buf) - 1] = '\0';
-                        if (adv->criteria_count > 0)
+                        // Check if only one criterion remains
+                        if (adv->criteria_count > 0 && adv->completed_criteria_count == adv->criteria_count - 1) {
+                            // Find the single incomplete criterion
+                            for (int j = 0; j < adv->criteria_count; ++j) {
+                                if (!adv->criteria[j]->done) {
+                                    // Copy its display name into progress_buf
+                                    strncpy(progress_buf, adv->criteria[j]->display_name, sizeof(progress_buf) - 1);
+                                    progress_buf[sizeof(progress_buf) - 1] = '\0';
+                                    break; // Found the one, no need to continue loop
+                                }
+                            }
+                        }
+                        // Fallback to if more than one or zero criteria remain
+                        else if (adv->criteria_count > 0) {
                             snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
-                                     adv->completed_criteria_count, adv->criteria_count);
+                                    adv->completed_criteria_count, adv->criteria_count);
+                        }
                     } else if (display_item.type == OverlayDisplayItem::UNLOCK) {
                         auto *unlock = static_cast<TrackableItem *>(display_item.item_ptr);
                         strncpy(name_buf, unlock->display_name, sizeof(name_buf) - 1);
                         name_buf[sizeof(name_buf) - 1] = '\0';
+                        // Unlocks don't have progress text
                     }
 
                     // Use TTF_MeasureString for Row 3 as well
@@ -1050,7 +1065,20 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             icon_path = adv->icon_path;
                             strncpy(name_buf, adv->display_name, sizeof(name_buf) - 1);
                             name_buf[sizeof(name_buf) - 1] = '\0';
-                            if (adv->criteria_count > 0) {
+                            // If one last adv criteria is remaining, show it instead of progress on criteria
+                            if (adv->criteria_count > 0 && adv->completed_criteria_count == adv->criteria_count - 1) {
+                                // Find the single incomplete criterion
+                                for (int j = 0; j < adv->criteria_count; ++j) {
+                                    if (!adv->criteria[j]->done) {
+                                        // Copy its display name into progress_buf
+                                        strncpy(progress_buf, adv->criteria[j]->display_name, sizeof(progress_buf) - 1);
+                                        progress_buf[sizeof(progress_buf) - 1] = '\0';
+                                        break;
+                                    }
+                                }
+                            }
+                            // Fallback if it's not the last remaining criteria
+                            else if (adv->criteria_count > 0) {
                                 snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)", adv->completed_criteria_count,
                                          adv->criteria_count);
                             }
