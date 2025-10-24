@@ -51,7 +51,7 @@ Thank you for supporting the project!
 
 ## What is Advancely?
 
-![Advancely Preview v0.9.409](readme_assets/Advancely_v0.9.409_Preview.png)
+![Advancely Preview v0.9.413](readme_assets/Advancely_v0.9.413_Preview.png)
 
 Advancely is a sophisticated, data-driven progress tracker designed for Minecraft speedrunners, completionists, and
 content creators. Unlike other tools that only track vanilla advancements (e.g., AATool by Darwin Baker), Advancely can
