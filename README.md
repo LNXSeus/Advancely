@@ -316,9 +316,12 @@ filter.
 * Sections without sub-items (Unlocks, Custom Goals, simple Statistics) show: `(Completed Main / Total Main)`
 
 **How Goal Visibility Affects Counters:**
-* **Hide All Completed**: Since only incomplete items are shown, the counters display only the **total number of remaining
+
+* **Hide All Completed**: Since only incomplete items are shown, the counters display only the **total number of
+  remaining
   items** (e.g., `(Remaining Main - Remaining Sub)` or `(Remaining Main)`).
-* **Hide Template-Hidden Only**: Counts show **completed vs. total** for all items not marked as hidden in the template (
+* **Hide Template-Hidden Only**: Counts show **completed vs. total** for all items not marked as hidden in the
+  template (
   e.g., `(Completed Main / Total Main)`).
 * **Show All**: Counts show completed vs. total for every single item defined in the template for that section,
   including hidden ones (e.g., `(Completed Main / Total Main)`).
@@ -541,6 +544,7 @@ all April Fool's snapshots.
 
 | Category           | Version(s)                                  | Optional Flag(s) | Languages           |
 |--------------------|---------------------------------------------|------------------|---------------------|
+| `any%`             | 25w14craftmine                              |                  | Default             |
 | `all_advancements` | 1.16.1                                      |                  | Default, ger, zh_cn |
 | `all_advancements` | 1.21.8 - 1.21.11                            |                  | Default, ger, zh_cn |
 | `all_advancements` | 1.21.8 - 1.21.11                            | `_optimized`     | Default, ger, zh_cn |
