@@ -52,6 +52,7 @@ Thank you for supporting the project!
 ## What is Advancely?
 
 ![Advancely Preview v0.9.413](readme_assets/Advancely_v0.9.413_Preview.png)
+_This screenshot has the `tracker_font_size` within the `settings/config/settings.json` set to `24`._
 
 Advancely is a sophisticated, data-driven progress tracker designed for Minecraft speedrunners, completionists, and
 content creators. Unlike other tools that only track vanilla advancements (e.g., AATool by Darwin Baker), Advancely can
