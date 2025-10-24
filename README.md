@@ -231,6 +231,8 @@ Advancely is designed to be easy to maintain. By default, **the tracker will aut
 startup**. When an update is available, you will be notified with a prompt offering to download and install it for you.
 This process is designed to be as safe as possible for your custom files.
 
+![Automatic Update Preview](readme_assets/Automatic_Updating_v0.9.414.png)
+
 ### How the Automatic Update Works
 
 The updater is smart about which files it replaces to ensure your personal configurations are preserved.
