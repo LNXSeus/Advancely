@@ -46,6 +46,10 @@ Thank you for supporting the project!
 
 ## What is Advancely?
 
+![Advancely_Tracker_Preview](readme_assets/Advancely-v0.9.313-Preview.gif)
+_This animation here is compressed. When you use the tracker the framerate will be higher and the resolution perfectly
+sharp._
+
 Advancely is a sophisticated, data-driven progress tracker designed for Minecraft speedrunners, completionists, and
 content creators. Unlike other tools that only track vanilla advancements (e.g., AATool by Darwin Baker), Advancely can
 be configured to monitor virtually any goal imaginable. It operates in real-time by watching your singleplayer save
@@ -72,10 +76,6 @@ import, create, copy, and modify any template directly within Advancely.
 
 This powerful and flexible system makes Advancely the ultimate tool for any Minecraft challenge, from a vanilla "All
 Advancements" run to a heavily modded playthrough with hundreds of custom milestones.
-
-![Advancely_Tracker_Preview](readme_assets/Advancely-v0.9.313-Preview.gif)
-_This animation here is compressed. When you use the tracker the framerate will be higher and the resolution perfectly
-sharp._
 
 ***
 
@@ -504,7 +504,7 @@ settings window, which can be opened at any time by pressing the `ESC` key.
 | **General Settings**  | Toggle the stream `Overlay`, set the `Tracker FPS Limit`, keep the tracker `Always On Top`, and enable `Using StatsPerWorld Mod` compatibility for legacy Minecraft versions (1.0 - 1.6.4).                                                                                                                                                                                                                                                |
 | **Goal Visibility**   | Fine-tune which completed goals are displayed on the tracker with three modes: `Hide All Completed` (strictest), `Hide Template-Hidden Only`, or `Show All`. This setting also affects which items are counted in the section completion counters.                                                                                                                                                                                         |                                                                                                                                                                                                                                                                           |
 | **Visual Settings**   | Full RGBA color customization for the tracker `background` and `text`, as well as the overlay `background` and `text`. You can also adjust the `Overlay Width` with a pixel-perfect slider.                                                                                                                                                                                                                                                |
-| **Font Settings**     | Independently set the font for the **Tracker**, **Overlay**, and **UI (Settings/Notes)**. Both `.ttf` and `.otf` font files are supported. *Note: Changes to the Tracker and UI fonts require an application restart to take effect.*                                                                                                                                                                                                      |
+| **Font Settings**     | Independently set the font for the **Tracker**, **Overlay**, and **UI (Settings/Notes)**. Both `.ttf` and `.otf` font files are supported. *Note: Changes to the Tracker and UI fonts require an application restart to take effect.* You can change the the tracker and ui **font sizes** in the `resources/config/settings.json` file next to `tracker_font_size` and `ui_font_size` directly (default 16, but it's experimental).       |
 | **Overlay Settings**  | Set the `Overlay FPS Limit` independently from the tracker. Configure the `Overlay Scroll Speed` (negative values reverse the direction), the `Sub-Stat Cycle Interval` for multi-stat animations, and toggle a constant `Speed Up Animation`. You can also align the top progress text (`Left`, `Center`, or `Right`) and toggle visibility for each section of the info bar (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`). |
 | **Hotkey Settings**   | This section appears if your template contains custom counters. Assign keyboard hotkeys to increment or decrement any counter (hotkeys only work when the tracker window is focused).                                                                                                                                                                                                                                                      |
 | **Section Order**     | Drag and drop the section names (`Advancements`, `Stats`, `Unlocks`, etc.) to reorder how they appear in the main tracker window.                                                                                                                                                                                                                                                                                                          |

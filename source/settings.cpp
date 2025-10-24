@@ -1159,6 +1159,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                  "Select the font for the main tracker view.\n"
                  "This affects the goal display text, the top info bar, and the bottom control buttons.\n"
+                 "The font size can be adjusted in the resources/config/settings.json file next to\n"
+                 "'tracker_font_size' directly (default 16, but it's experimental).\n"
                  "Only choose fonts within the resources/fonts directory.\n\n"
                  "A restart is required to properly apply changes.");
         ImGui::SetTooltip("%s", tooltip_buffer);
@@ -1201,6 +1203,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                  "Select the font for UI windows.\n"
                  "This affects the Settings, Template Creator, and Notes windows.\n"
+                 "The font size can be adjusted in the resources/config/settings.json file next to\n"
+                 "'ui_font_size' directly (default 16, but it's experimental).\n"
                  "Only choose fonts within the resources/fonts directory.\n\n"
                  "A restart is required to properly apply changes.");
         ImGui::SetTooltip("%s", tooltip_buffer);
