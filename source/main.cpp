@@ -923,14 +923,16 @@ int main(int argc, char *argv[]) {
                          "   Use the 'Copy Template' feature to create a separate version with a unique name or optional flag (e.g., '_custom'). Your copy will not be overwritten.\n\n"
                          "----------------------------------------------------------------\n"
                          "The update will KEEP your settings.json and _notes.txt files.\n"
-                         "It will REPLACE the main executable, libraries (.dll), and official files in the 'resources' folder (fonts, icons, templates, etc.).\n\n"
+                         "It will REPLACE the main executable, libraries (.dll, .dylib, .so), and official files in the 'resources' folder (fonts, icons, templates, etc.).\n\n"
                          "Options:\n"
                          " - Update: Install the new version now.\n"
                          " - Templates: Open your local templates folder to make backups.\n"
                          " - Official: View official templates online.\n"
                          " - Later: Skip updating until the next restart.\n\n"
                          "Would you like to install it now?\n"
-                         "Expect 3 more windows after clicking \"Update\" that you need to confirm with \"OK\".",
+                         "Expect 3 more windows after clicking \"Update\" that you need to confirm with \"OK\".\n\n"
+                         "----------------------------------------------------------------\n"
+                         "**DO NOT CLOSE ADVANCELY DURING THE UPDATE PROCESS!**",
                          ADVANCELY_VERSION, latest_version_str);
 
 
