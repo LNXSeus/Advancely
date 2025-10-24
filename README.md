@@ -575,8 +575,8 @@ Make sure you use the `SourceHanSansCN-Normal.otf` font in all places (tracker, 
 * **Symbolic Links**: On Windows and macOS, the real-time file watcher may not function correctly if your
   `.minecraft/saves` folder is a symbolic link. For best results, please provide a direct path to your saves folder in
   the settings if you use a custom location.
-* **Shortcuts**: You must always run the application from its installation directory where all the necessary `.dll`
-  files are located. Do not create a shortcut directly to the executable file.
+* **Font Support**: The default `Minecraft.ttf` font doesn't support many more characters beyond the standard english
+  language. Simply import your own `.ttf` or `.otf` file if needed (has to be within the `resources/fonts` folder).
 
 ***
 

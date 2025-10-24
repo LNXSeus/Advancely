@@ -1241,7 +1241,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     if (font_settings_changed) {
         ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
-                           "First apply the settings then restart the app to apply font/size changes.");
+                           "Click 'Restart Advancely' to properly apply these font/size changes.");
     }
 
     ImGui::Separator();
