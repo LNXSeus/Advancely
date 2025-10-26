@@ -64,7 +64,9 @@ typedef struct {
 
 // The list of supporters and their donation amounts.
 Supporter SUPPORTERS[] = {
-    {"zurtleTif", 20.0f}
+    {"zurtleTif", 20.0f},
+    {"ethansplace98", 30.0f},
+    {"Totorewa", 31.0f}
     // {"LNXS", 20.0f},
     // {"Test", 2.0f},
     // {"Anonymous", 15.0f},
