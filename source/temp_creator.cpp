@@ -1088,6 +1088,30 @@ static bool validate_and_save_template(const char *creator_version_str,
             validation_passed = false;
         }
     }
+    // --- Check for stats/sub-stats with goal 0 ---
+    if (validation_passed) {
+        for (const auto &stat_cat: current_template_data.stats) {
+            // Skip hidden legacy helper stats
+            if (version <= MC_VERSION_1_6_4 && strncmp(stat_cat.root_name, "hidden_ms_stat_", 15) == 0) {
+                continue; // Skip goal=0 check for hidden legacy helper stats, no target goal is the same as 0
+            }
+            for (const auto &crit: stat_cat.criteria) {
+                // Regular stats/sub-stats shouldn't have a target value of 0
+                if (!stat_cat.is_simple_stat && crit.goal == 0) {
+                    snprintf(status_message, 256, "Error: Sub-stat '%s' in category '%s' cannot have a Target Value of 0.", crit.root_name, stat_cat.root_name);
+                    validation_passed = false;
+                    break; // Stop checking criteria for this category
+                }
+                // For simple stats that are NOT hidden legacy stats, check goal 0
+                else if (stat_cat.is_simple_stat && crit.goal == 0) {
+                    snprintf(status_message, 256, "Error: Stat '%s' cannot have a Target Value of 0.", stat_cat.root_name);
+                    validation_passed = false;
+                    break; // Stop checking criteria (there's only one anyway)
+                }
+            }
+            if (!validation_passed) break; // Stop checking categories
+        }
+    }
     // Prevent orphaned/manual 'hidden_ms_stat_' entries for legacy versions.
     if (validation_passed && version <= MC_VERSION_1_6_4) {
         // 1. Get all stat IDs required by multi-stage goals.
@@ -2338,14 +2362,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             system(command);
 #else // macOS and Linux
             pid_t pid = fork();
-            if (pid == 0) { // Child process
+            if (pid == 0) {  // Child process
 #if __APPLE__
-                char* args[] = {(char*)"open", path_to_open, nullptr};
+            char *args[] = {(char *) "open", path_to_open, nullptr};
 #else
-                char* args[] = {(char*)"xdg-open", path_to_open, nullptr};
+            char *args[] = {(char *) "xdg-open", path_to_open, nullptr};
 #endif
-                execvp(args[0], args);
-                _exit(127); // Exit if exec fails
+            execvp(args[0], args);
+            _exit(127); // Exit if exec fails
             } else if (pid < 0) {
                 log_message(LOG_ERROR, "[TEMP CREATOR] Failed to fork process to open folder.\n");
             }
@@ -2407,14 +2431,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         system(command);
 #else // macOS and Linux
         pid_t pid = fork();
-        if (pid == 0) { // Child process
+        if (pid == 0) {  // Child process
 #if __APPLE__
-            char* args[] = {(char*)"open", reference_path, nullptr};
+        char *args[] = {(char *) "open", reference_path, nullptr};
 #else
-            char* args[] = {(char*)"xdg-open", reference_path, nullptr};
+        char *args[] = {(char *) "xdg-open", reference_path, nullptr};
 #endif
-            execvp(args[0], args);
-            _exit(127); // Exit if exec fails
+        execvp(args[0], args);
+        _exit(127); // Exit if exec fails
         } else if (pid < 0) {
             log_message(LOG_ERROR, "[TEMP CREATOR] Failed to fork process to open folder.\n");
         }
@@ -2850,9 +2874,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
                                                   ? "DAT files"
                                                   : "JSON files";
-                    const char* dialog_title = (creator_selected_version < MC_VERSION_1_12)
-                                               ? "Select Player Stats File"
-                                               : "Select Player Advancements File";
+                    const char *dialog_title = (creator_selected_version < MC_VERSION_1_12)
+                                                   ? "Select Player Stats File"
+                                                   : "Select Player Advancements File";
                     const char *selection = tinyfd_openFileDialog(dialog_title, start_path, 1,
                                                                   selected_filter, filter_desc, 0);
 
@@ -2864,7 +2888,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             show_import_advancements_popup = true;
                             focus_import_search = true; // Focus search bar as soon as popup opens
                             import_search_criteria_only = false; // Reset search mode
-                            import_select_criteria = false;      // Reset selection mode
+                            import_select_criteria = false; // Reset selection mode
                         } else {
                             // If parsing fails, show the error in the main status message
                             save_message_type = MSG_ERROR;
@@ -3399,9 +3423,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          t->world_name);
                             }
                             const char *json_filter[1] = {"*.json"};
-                            const char* dialog_title = (creator_selected_version < MC_VERSION_1_12)
-                                                       ? "Select Player Stats File"
-                                                       : "Select Player Advancements File";
+                            const char *dialog_title = (creator_selected_version < MC_VERSION_1_12)
+                                                           ? "Select Player Stats File"
+                                                           : "Select Player Advancements File";
 
                             const char *selection = tinyfd_openFileDialog(
                                 dialog_title, start_path, 1, json_filter, "JSON files", 0);
@@ -3415,7 +3439,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     show_import_advancements_popup = true;
                                     focus_import_search = true;
                                     import_search_criteria_only = true; // Default search to criteria
-                                    import_select_criteria = true;      // Default selection to criteria
+                                    import_select_criteria = true; // Default selection to criteria
                                 } else {
                                     save_message_type = MSG_ERROR;
                                     strncpy(status_message, import_error_message, sizeof(status_message) - 1);
@@ -4280,13 +4304,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             ImGui::SetTooltip("%s", stat_root_name_tooltip_buffer);
                         }
-                        if (ImGui::InputInt("Target", &simple_crit.goal)) {
+                        if (ImGui::InputInt("Target Value", &simple_crit.goal)) {
+                            // Clamping to -1
+                            if (simple_crit.goal < -1) {
+                                simple_crit.goal = -1;
+                            }
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
-                            char target_tooltip_buffer[256];
+                            char target_tooltip_buffer[512];
                             snprintf(target_tooltip_buffer, sizeof(target_tooltip_buffer),
-                                     "The value required to complete this goal.");
+                                     "Set the stat's behavior:\n"
+                                     "-1 = Infinite counter (manual completion via checkbox).\n"
+                                     ">0 = Progress-based counter (completes when value reached).\n"
+                                     "0 = NOT ALLOWED (Use a Custom Goal toggle instead).");
                             ImGui::SetTooltip("%s", target_tooltip_buffer);
                         }
                     } else {
@@ -4515,13 +4546,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          "The icon must be inside the 'resources/icons' folder!");
                                 ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                             }
-                            if (ImGui::InputInt("Target", &crit.goal)) {
+                            if (ImGui::InputInt("Target Value", &crit.goal)) {
+                                // Clamping to -1
+                                if (crit.goal < -1) {
+                                    crit.goal = -1;
+                                }
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
-                                char target_tooltip_buffer[256];
+                                char target_tooltip_buffer[512];
                                 snprintf(target_tooltip_buffer, sizeof(target_tooltip_buffer),
-                                         "The value required to complete this goal.");
+                                         "Set the sub-stat's behavior:\n"
+                                         "-1 = Infinite counter (manual completion via checkbox).\n"
+                                         ">0 = Progress-based counter (completes when value reached).\n"
+                                         "0 = NOT ALLOWED (Use a Custom Goal toggle instead).");
                                 ImGui::SetTooltip("%s", target_tooltip_buffer);
                             }
                             if (ImGui::Checkbox("Hidden", &crit.is_hidden)) {
@@ -5089,7 +5127,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  "The icon must be inside the 'resources/icons' folder!");
                         ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                     }
-                    if (ImGui::InputInt("Target Goal", &goal.goal)) {
+                    if (ImGui::InputInt("Target Value", &goal.goal)) {
                         // No values below -1 allowed
                         if (goal.goal < -1) {
                             goal.goal = -1;
@@ -5100,7 +5138,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         char target_goal_tooltip_buffer[1024];
                         snprintf(target_goal_tooltip_buffer, sizeof(target_goal_tooltip_buffer),
                                  "Set the goal's behavior:\n"
-                                 "0 = Simple on/off toggle.\n-1 = Infinite counter.\n"
+                                 "0 = Simple on/off toggle.\n"
+                                 "-1 = Infinite counter.\n"
                                  ">0 = Progress-based counter that completes at this value.");
                         ImGui::SetTooltip("%s", target_goal_tooltip_buffer);
                     }
@@ -7300,7 +7339,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (current_import_mode == BATCH_IMPORT) {
                 snprintf(counter_text, sizeof(counter_text), "Selected: %d %s, %d Criteria",
                          selected_adv_count, advancements_label_plural_upper, selected_crit_count);
-            } else { // SINGLE_SELECT_STAGE mode
+            } else {
+                // SINGLE_SELECT_STAGE mode
                 if (stage_to_edit != nullptr && stage_to_edit->type == SUBGOAL_ADVANCEMENT) {
                     // For SUBGOAL_ADVANCEMENT, only show the parent count
                     snprintf(counter_text, sizeof(counter_text), "Selected: %d / 1 %s",
@@ -7308,7 +7348,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 } else {
                     // For SUBGOAL_CRITERION, show both counts
                     snprintf(counter_text, sizeof(counter_text),
-                             "Selected: %d / 1 %s, %d / 1 Criteria", selected_adv_count, advancements_label_upper, selected_crit_count);
+                             "Selected: %d / 1 %s, %d / 1 Criteria", selected_adv_count, advancements_label_upper,
+                             selected_crit_count);
                 }
             }
         }
