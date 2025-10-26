@@ -1,0 +1,378 @@
+{
+	"advancements":	{
+		"minecraft:story/root":	{
+			"icon":	"blocks/Grass_Block_JE7_BE6.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:story/smelt_iron":	{
+			"icon":	"items/iron_ingot_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:story/obtain_armor":	{
+			"icon":	"items/iron_chestplate_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/enter_a_mine":	{
+			"icon":	"blocks/Mine_Crafter_unoptimized.gif",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/level_completed":	{
+			"icon":	"items/mine_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/get_mine_ingredient":	{
+			"icon":	"items/mine_ingredient_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/cash_in_mine_ingredient":	{
+			"icon":	"items/gold_ingot_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/player_failed_level":	{
+			"icon":	"items/grave_advancement_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:unlocks/how_do_i_unlock_that":	{
+			"icon":	"items/poisonous_potato_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:feats/root":	{
+			"icon":	"items/netherite_sword_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:feats/crystal":	{
+			"icon":	"blocks/Large_Amethyst_Bud_(U)_JE1 (1).png",
+			"criteria":	{
+			}
+		},
+		"minecraft:unlocks/root":	{
+			"icon":	"items/experience_bottle_3d_shareware_v1.34.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:unlocks/kaizen":	{
+			"icon":	"items/book_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:unlocks/jump_king":	{
+			"icon":	"blocks/Slime_Block_JE2_BE3.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/special_mine_completed":	{
+			"icon":	"items/mine_25w14craftmine.png",
+			"criteria":	{
+			}
+		}
+	},
+	"stats":	{
+		"minecraft:custom/minecraft:aviate_one_cm":	{
+			"icon":	"items/elytra_25w14craftmine.png",
+			"root_name":	"minecraft:custom/minecraft:aviate_one_cm",
+			"target":	-1
+		},
+		"minecraft:killed/minecraft:pig":	{
+			"icon":	"animals/pig.png",
+			"root_name":	"minecraft:killed/minecraft:pig",
+			"target":	-1
+		},
+		"minecraft:used/minecraft:iron_hoe":	{
+			"icon":	"items/iron_hoe_3d_shareware_v1.34.png",
+			"root_name":	"minecraft:used/minecraft:iron_hoe",
+			"target":	-1
+		}
+	},
+	"unlocks":	[],
+	"custom":	[{
+			"root_name":	"surface_world",
+			"icon":	"items/surface_world_25w14craftmine.png"
+		}, {
+			"root_name":	"floating_islands",
+			"icon":	"items/floating_islands_world_25w14craftmine.png"
+		}, {
+			"root_name":	"amplified",
+			"icon":	"items/amplified_25w14craftmine.png"
+		}, {
+			"root_name":	"cave_world",
+			"icon":	"items/cave_world_25w14craftmine.png"
+		}, {
+			"root_name":	"shattered_blocks",
+			"icon":	"items/shattered_blocks_25w14craftmine.png"
+		}, {
+			"root_name":	"grid_world",
+			"icon":	"items/grid_world_25w14craftmine.png"
+		}, {
+			"root_name":	"dark_cave",
+			"icon":	"items/dark_cave_world_25w14craftmine.png"
+		}, {
+			"root_name":	"surface_exit",
+			"icon":	"items/surface_exits_25w14craftmine.png"
+		}, {
+			"root_name":	"cave_exit",
+			"icon":	"items/cave_exits_25w14craftmine.png"
+		}, {
+			"root_name":	"rare_surface_exit",
+			"icon":	"items/rare_surface_exits_25w14craftmine.png"
+		}, {
+			"root_name":	"sheep",
+			"icon":	"items/sheep_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"cows",
+			"icon":	"items/cow_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"pigs",
+			"icon":	"items/pig_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"chickens",
+			"icon":	"items/chicken_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"frogs",
+			"icon":	"items/frog_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"foxes",
+			"icon":	"items/fox_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"goats",
+			"icon":	"items/goat_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"ocelots",
+			"icon":	"items/ocelot_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"axolotls",
+			"icon":	"items/axolotl_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"armadillos",
+			"icon":	"items/armadillo_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"mooshrooms",
+			"icon":	"items/mooshroom_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"pandas",
+			"icon":	"items/panda_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"parrots",
+			"icon":	"items/parrot_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"rabbits",
+			"icon":	"items/rabbit_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"sniffers",
+			"icon":	"items/sniffer_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"striders",
+			"icon":	"items/strider_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"zombies",
+			"icon":	"items/zombie_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"skeletons",
+			"icon":	"items/skeleton_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"spiders",
+			"icon":	"items/spider_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"cave_spiders",
+			"icon":	"items/cave_spider_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"creepers",
+			"icon":	"items/creeper_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"slimes",
+			"icon":	"items/slime_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"endermen",
+			"icon":	"items/enderman_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"witches",
+			"icon":	"items/witch_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"magma_cubes",
+			"icon":	"items/magma_cube_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"blazes",
+			"icon":	"items/blaze_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"breezes",
+			"icon":	"items/breeze_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"pillagers",
+			"icon":	"items/pillager_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"vindicators",
+			"icon":	"items/vindicator_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"evokers",
+			"icon":	"items/evoker_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"ravagers",
+			"icon":	"items/ravager_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"illusioners",
+			"icon":	"items/illusioners_25w14craftmine.png"
+		}, {
+			"root_name":	"guardians",
+			"icon":	"items/guardian_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"endermites",
+			"icon":	"items/endermite_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"shulkers",
+			"icon":	"items/shulker_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"ghasts",
+			"icon":	"items/ghast_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"zombified_piglins",
+			"icon":	"items/zombified_piglin_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"piglins",
+			"icon":	"items/piglin_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"wither_skeleton",
+			"icon":	"items/wither_skeleton_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"bees",
+			"icon":	"items/bee_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"hoglins",
+			"icon":	"items/hoglin_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"zoglins",
+			"icon":	"items/zoglin_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"stone",
+			"icon":	"blocks/Stone_JE8.png"
+		}, {
+			"root_name":	"blackstone",
+			"icon":	"blocks/Blackstone_JE3_BE2.png"
+		}, {
+			"root_name":	"diorite",
+			"icon":	"blocks/Diorite.png"
+		}, {
+			"root_name":	"andesite",
+			"icon":	"blocks/Andesite.png"
+		}, {
+			"root_name":	"granite",
+			"icon":	"blocks/Granite.png"
+		}, {
+			"root_name":	"tuff",
+			"icon":	"blocks/Tuff.png"
+		}, {
+			"root_name":	"deepslate",
+			"icon":	"blocks/Deepslate.png"
+		}, {
+			"root_name":	"endstone",
+			"icon":	"blocks/End_Stone_JE3_BE2.png"
+		}, {
+			"root_name":	"plains",
+			"icon":	"blocks/Grass_Block_JE7_BE6.png"
+		}, {
+			"root_name":	"savanna",
+			"icon":	"blocks/Acacia_Sapling_JE7_BE2.png"
+		}, {
+			"root_name":	"forest",
+			"icon":	"blocks/Oak_Sapling_JE14.png"
+		}, {
+			"root_name":	"taiga",
+			"icon":	"blocks/Spruce_Sapling_JE7_BE2.png"
+		}, {
+			"root_name":	"jungle",
+			"icon":	"blocks/Jungle_Sapling_JE7_BE2.png"
+		}, {
+			"root_name":	"snowy",
+			"icon":	"items/snowball_25w14craftmine.png"
+		}, {
+			"root_name":	"desert",
+			"icon":	"blocks/Sand_JE5_BE3.png"
+		}, {
+			"root_name":	"badlands",
+			"icon":	"blocks/Gray_Terracotta_JE1_BE1.png"
+		}, {
+			"root_name":	"swamp",
+			"icon":	"blocks/Mangrove_Roots_JE2.png"
+		}, {
+			"root_name":	"dark_forest",
+			"icon":	"blocks/Creaking_Heart_JE2_BE2.png"
+		}, {
+			"root_name":	"ice_spikes",
+			"icon":	"blocks/Packed_Ice_JE2_BE3.png"
+		}, {
+			"root_name":	"mushroom",
+			"icon":	"blocks/Red_Mushroom_JE9.png"
+		}, {
+			"root_name":	"barren_nether",
+			"icon":	"blocks/Netherrack_JE4_BE2.png"
+		}, {
+			"root_name":	"nether_forest",
+			"icon":	"blocks/Warped_Fungus_JE1_BE1.png"
+		}, {
+			"root_name":	"deep_dark",
+			"icon":	"blocks/Sculk_JE1_BE1_unoptimized.gif"
+		}, {
+			"root_name":	"end",
+			"icon":	"blocks/End_Stone_JE3_BE2.png"
+		}, {
+			"root_name":	"dry",
+			"icon":	"items/bucket_25w14craftmine.png"
+		}, {
+			"root_name":	"water",
+			"icon":	"items/water_bucket_25w14craftmine.png"
+		}, {
+			"root_name":	"ultrawarm",
+			"icon":	"items/lava_bucket_25w14craftmine.png"
+		}, {
+			"root_name":	"icy_surfaces",
+			"icon":	"blocks/Blue_Ice_JE3_BE2.png"
+		}, {
+			"root_name":	"bouncy_blocks",
+			"icon":	"blocks/Slime_Block_JE2_BE3.png"
+		}, {
+			"root_name":	"one_hp",
+			"icon":	"items/Water_Bottle_JE2_BE2.png"
+		}, {
+			"root_name":	"wednesday_frogs",
+			"icon":	"items/frog_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"universal_anger",
+			"icon":	"items/rotten_flesh_25w14craftmine.png"
+		}, {
+			"root_name":	"eternal_night",
+			"icon":	"items/blue_dye_3d_shareware_v1.34.png"
+		}, {
+			"root_name":	"eternal_rain",
+			"icon":	"items/black_dye_25w14craftmine.png"
+		}, {
+			"root_name":	"eternal_lightning",
+			"icon":	"items/yellow_dye_25w14craftmine.png"
+		}, {
+			"root_name":	"insomniacs",
+			"icon":	"items/phantom_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"no_drops",
+			"icon":	"blocks/Dirt.png"
+		}, {
+			"root_name":	"explosive",
+			"icon":	"blocks/TNT_JE3_BE2.png"
+		}, {
+			"root_name":	"fish_out_water",
+			"icon":	"items/tropical_fish_25w14craftmine.png"
+		}, {
+			"root_name":	"soul_link",
+			"icon":	"items/lead_25w14craftmine.png"
+		}, {
+			"root_name":	"warden_boss",
+			"icon":	"items/warden_spawn_egg_1.21.5.png"
+		}],
+	"multi_stage_goals":	[]
+}

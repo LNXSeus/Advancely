@@ -554,6 +554,7 @@ all April Fool's snapshots.
 | Category           | Version(s)                                  | Optional Flag(s) | Languages           |
 |--------------------|---------------------------------------------|------------------|---------------------|
 | `any%`             | 25w14craftmine                              |                  | Default             |
+| `AMI`              | 25w14craftmine                              |                  | Default             |
 | `all_advancements` | 1.16.1                                      |                  | Default, ger, zh_cn |
 | `all_advancements` | 1.21.8 - 1.21.11                            |                  | Default, ger, zh_cn |
 | `all_advancements` | 1.21.8 - 1.21.11                            | `_optimized`     | Default, ger, zh_cn |
