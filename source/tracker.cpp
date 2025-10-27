@@ -2626,7 +2626,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
         // Skip hidden legacy stats entirely from counting
         if (is_stat_section && version <= MC_VERSION_1_6_4 && cat->criteria_count == 1 && cat->criteria[0]->goal == 0) {
-             continue;
+            continue;
         }
 
         // Determine completion status for counting purposes
@@ -2634,7 +2634,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         if (is_stat_section) {
             is_category_considered_complete = cat->done;
         } else {
-             is_category_considered_complete = (cat->criteria_count > 0) ? cat->all_template_criteria_met : cat->done;
+            is_category_considered_complete = (cat->criteria_count > 0) ? cat->all_template_criteria_met : cat->done;
         }
 
         // Determine if parent should be hidden based *only* on hiding mode + template hidden status
@@ -2658,7 +2658,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         bool parent_matches_search = str_contains_insensitive(cat->display_name, t->search_buffer);
         bool any_visible_child_matches_search = false;
 
-        if (cat->criteria_count > 0 && !cat->is_single_stat_category) { // Only check children for complex types
+        if (cat->criteria_count > 0 && !cat->is_single_stat_category) {
+            // Only check children for complex types
             section_has_sub_items = true;
             for (int j = 0; j < cat->criteria_count; ++j) {
                 TrackableItem *crit = cat->criteria[j];
@@ -2689,11 +2690,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         completed_sub_count++;
                     }
                 } else if (parent_matches_search) {
-                     // If parent matches, still count this visible (but non-matching) child towards sub-totals
-                     total_visible_sub_count++;
-                     if (crit->done) {
-                         completed_sub_count++;
-                     }
+                    // If parent matches, still count this visible (but non-matching) child towards sub-totals
+                    total_visible_sub_count++;
+                    if (crit->done) {
+                        completed_sub_count++;
+                    }
                 }
             }
         }
@@ -2869,26 +2870,27 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         if (!parent_matches && !child_matches_render) continue; // Skip if neither parent nor child matches search
 
         // --- Calculate width needed by this item ---
-        float required_width = ImGui::CalcTextSize(cat->display_name).x;
-        // Add width for progress text if applicable
+        float required_width = 0.0f;
+
+        // Determine if this is a simple stat category
+        bool is_simple_stat_category = is_stat_section && cat->is_single_stat_category;
+
+        // Calculate wdith for the parent display name
+        required_width = fmax(required_width, ImGui::CalcTextSize(cat->display_name).x);
+
+        // Calculate width for the progress text below the parent
         char progress_text_width_calc[32] = "";
-        if (is_stat_section) {
-            if (cat->criteria_count > 1) {
-                // Multi-stat category
-                snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d / %d)",
-                         cat->completed_criteria_count, cat->criteria_count);
-            } else if (cat->criteria_count == 1) {
-                // Single-stat category
-                TrackableItem *crit = cat->criteria[0];
-                if (crit->goal > 0) {
-                    snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d / %d)", crit->progress,
-                             crit->goal);
-                } else if (crit->goal == -1) {
-                    snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d)", crit->progress);
-                }
+        if (is_simple_stat_category && cat->criteria_count == 1) {
+            // Simple stat progress text calculation
+            TrackableItem *crit = cat->criteria[0];
+            if (crit->goal > 0) {
+                snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d / %d)", crit->progress,
+                         crit->goal);
+            } else if (crit->goal == -1) {
+                snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d)", crit->progress);
             }
-        } else {
-            // Advancement category
+        } else if (!is_simple_stat_category) {
+            // Complex stat or Advancement
             if (cat->criteria_count > 0) {
                 snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d / %d)",
                          cat->completed_criteria_count, cat->criteria_count);
@@ -2896,11 +2898,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         }
         // Ensure the required width accounts for the progress text below the main name
         float progress_text_actual_width = ImGui::CalcTextSize(progress_text_width_calc).x;
-        required_width = fmaxf(required_width, progress_text_actual_width);
+        required_width = fmaxf(required_width, progress_text_actual_width); // Ensure width accommodates progress text
 
 
-        // Check children widths
-        if (cat->criteria_count > 0) {
+        // Check children widths ONLY for complex items
+        if (!is_simple_stat_category && cat->criteria_count > 0) {
             for (int j = 0; j < cat->criteria_count; j++) {
                 TrackableItem *crit = cat->criteria[j];
                 // Child Hiding Logic (for width calculation)
@@ -2923,7 +2925,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                 if (crit && !crit_should_hide_width && crit_matches_search) {
                     char crit_progress_text_width[32] = "";
-                    if (is_stat_section) {
+                    if (is_stat_section) { // Only calculate progress width for sub-stats
                         if (crit->goal > 0) {
                             snprintf(crit_progress_text_width, sizeof(crit_progress_text_width), "(%d / %d)",
                                      crit->progress,
@@ -4101,7 +4103,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
     int total_visible_sub_count = 0; // Count of *completable stages* across all relevant goals
     int completed_sub_count = 0; // Count of *completed stages* across all relevant goals
 
-        for (int i = 0; i < count; ++i) {
+    for (int i = 0; i < count; ++i) {
         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
         if (!goal || goal->stage_count <= 0) continue; // Skip invalid goals
 
@@ -4143,14 +4145,14 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         if (goal->stage_count > 1) {
             // Iterate through *completable* stages (all except the last one)
             for (int j = 0; j < goal->stage_count - 1; ++j) {
-                 // Determine if the *stage* is considered complete
-                 bool is_stage_complete = (goal->current_stage > j);
+                // Determine if the *stage* is considered complete
+                bool is_stage_complete = (goal->current_stage > j);
 
-                 // Count this stage towards totals as the parent goal is visible
-                 total_visible_sub_count++;
-                 if (is_stage_complete) {
+                // Count this stage towards totals as the parent goal is visible
+                total_visible_sub_count++;
+                if (is_stage_complete) {
                     completed_sub_count++;
-                 }
+                }
             }
         }
     }
