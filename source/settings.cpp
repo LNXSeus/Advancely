@@ -1166,14 +1166,15 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
     // Tracker Font Size
-    ImGui::DragFloat("Tracker Font Size", &temp_settings.tracker_font_size, 0.5f, 8.0f, 64.0f, "%.1f pt");
+    ImGui::DragFloat("Tracker Font Size", &temp_settings.tracker_font_size, 0.5f, 8.0f, 32.0f, "%.1f pt");
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[1024];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                 "Adjust the base font size for the main tracker view.\n"
-                 "Affects goal display text, info bar, and controls.\n"
-                 "Default: %.1f pt.\n\n"
-                 "IMPORTANT: Requires restarting Advancely to apply.",
+                     "Adjust the base font size for the main tracker view.\n"
+                     "Affects goal display text, info bar, and controls.\n"
+                     "Default: %.1f pt. Max: 32.0 pt(can be increased in settings.json\n"
+                     "(tracker_font_size), but causes criteria text to be shifted downwards).\n\n"
+                     "IMPORTANT: Requires restarting Advancely to apply.",
                  DEFAULT_TRACKER_FONT_SIZE);
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
