@@ -73,6 +73,22 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         memcmp(&a->overlay_bg_color, &b->overlay_bg_color, sizeof(ColorRGBA)) != 0 ||
         memcmp(&a->text_color, &b->text_color, sizeof(ColorRGBA)) != 0 ||
         memcmp(&a->overlay_text_color, &b->overlay_text_color, sizeof(ColorRGBA)) != 0 ||
+
+        // UI Colors
+        memcmp(&a->ui_text_color, &b->ui_text_color, sizeof(ColorRGBA)) != 0 ||
+        memcmp(&a->ui_window_bg_color, &b->ui_window_bg_color, sizeof(ColorRGBA)) != 0 ||
+        memcmp(&a->ui_frame_bg_color, &b->ui_frame_bg_color, sizeof(ColorRGBA)) != 0 ||
+        memcmp(&a->ui_frame_bg_hovered_color, &b->ui_frame_bg_hovered_color, sizeof(ColorRGBA)) != 0 ||
+        memcmp(&a->ui_frame_bg_active_color, &b->ui_frame_bg_active_color, sizeof(ColorRGBA)) != 0 ||
+        memcmp(&a->ui_title_bg_active_color, &b->ui_title_bg_active_color, sizeof(ColorRGBA)) != 0 ||
+        memcmp(&a->ui_button_color, &b->ui_button_color, sizeof(ColorRGBA)) != 0 ||
+        memcmp(&a->ui_button_hovered_color, &b->ui_button_hovered_color, sizeof(ColorRGBA)) != 0 ||
+        memcmp(&a->ui_button_active_color, &b->ui_button_active_color, sizeof(ColorRGBA)) != 0 ||
+        memcmp(&a->ui_header_color, &b->ui_header_color, sizeof(ColorRGBA)) != 0 ||
+        memcmp(&a->ui_header_hovered_color, &b->ui_header_hovered_color, sizeof(ColorRGBA)) != 0 ||
+        memcmp(&a->ui_header_active_color, &b->ui_header_active_color, sizeof(ColorRGBA)) != 0 ||
+        memcmp(&a->ui_check_mark_color, &b->ui_check_mark_color, sizeof(ColorRGBA)) != 0 ||
+
         memcmp(a->section_order, b->section_order, sizeof(a->section_order)) != 0) {
         return true;
     }
@@ -293,17 +309,17 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             // On POSIX systems (macOS, Linux), use fork() + execvp() for a more robust launch.
             // This avoids shell environment issues that can affect system().
             pid_t pid = fork();
-            if (pid == 0) { // This is the child process
-                // execvp requires a null-terminated array of arguments.
-                // The path does not need to be quoted here.
+            if (pid == 0) {  // This is the child process
+            // execvp requires a null-terminated array of arguments.
+            // The path does not need to be quoted here.
 #if __APPLE__
-                char* args[] = {(char*)"open", instances_path, nullptr};
+            char *args[] = {(char *) "open", instances_path, nullptr};
 #else
-                char* args[] = {(char*)"xdg-open", instances_path, nullptr};
+            char *args[] = {(char *) "xdg-open", instances_path, nullptr};
 #endif
-                execvp(args[0], args);
-                // If execvp returns, it means an error occurred.
-                _exit(127);
+            execvp(args[0], args);
+            // If execvp returns, it means an error occurred.
+            _exit(127);
             } else if (pid < 0) {
                 log_message(LOG_ERROR, "[SETTINGS] Failed to fork process to open folder.\n");
             }
@@ -374,14 +390,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         system(command);
 #else // macOS and Linux
         pid_t pid = fork();
-        if (pid == 0) { // Child process
+        if (pid == 0) {  // Child process
 #if __APPLE__
-            char* args[] = {(char*)"open", (char*)url, nullptr};
+        char *args[] = {(char *) "open", (char *) url, nullptr};
 #else
-            char* args[] = {(char*)"xdg-open", (char*)url, nullptr};
+        char *args[] = {(char *) "xdg-open", (char *) url, nullptr};
 #endif
-            execvp(args[0], args);
-            _exit(127); // Exit if exec fails
+        execvp(args[0], args);
+        _exit(127); // Exit if exec fails
         } else if (pid < 0) {
             log_message(LOG_ERROR, "[SETTINGS] Failed to fork process to open URL.\n");
         }
@@ -432,14 +448,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         system(command);
 #else // macOS and Linux
         pid_t pid = fork();
-        if (pid == 0) { // Child process
+        if (pid == 0) {  // Child process
 #if __APPLE__
-            char* args[] = {(char*)"open", (char*)url, nullptr};
+        char *args[] = {(char *) "open", (char *) url, nullptr};
 #else
-            char* args[] = {(char*)"xdg-open", (char*)url, nullptr};
+        char *args[] = {(char *) "xdg-open", (char *) url, nullptr};
 #endif
-            execvp(args[0], args);
-            _exit(127); // Exit if exec fails
+        execvp(args[0], args);
+        _exit(127); // Exit if exec fails
         } else if (pid < 0) {
             log_message(LOG_ERROR, "[SETTINGS] Failed to fork process to open URL.\n");
         }
@@ -707,14 +723,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         system(command);
 #else // macOS and Linux
         pid_t pid = fork();
-        if (pid == 0) { // Child process
+        if (pid == 0) {  // Child process
 #if __APPLE__
-            char* args[] = {(char*)"open", templates_path, nullptr};
+        char *args[] = {(char *) "open", templates_path, nullptr};
 #else
-            char* args[] = {(char*)"xdg-open", templates_path, nullptr};
+        char *args[] = {(char *) "xdg-open", templates_path, nullptr};
 #endif
-            execvp(args[0], args);
-            _exit(127); // Exit if exec fails
+        execvp(args[0], args);
+        _exit(127); // Exit if exec fails
         } else if (pid < 0) {
             log_message(LOG_ERROR, "[SETTINGS] Failed to fork process to open folder.\n");
         }
@@ -906,8 +922,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[1024];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-        "Strictest hiding. Hides goals when they are completed AND hides goals marked as \"hidden\" in the template file.\n"
-        "Section counters will only display the total number of remaining (visible) items, e.g., (5 - 12) or (5).");
+                 "Strictest hiding. Hides goals when they are completed AND hides goals marked as \"hidden\" in the template file.\n"
+                 "Section counters will only display the total number of remaining (visible) items, e.g., (5 - 12) or (5).");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
@@ -916,9 +932,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[1024];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-        "Hides goals marked as \"hidden\" in the template file, but keeps all other completed goals visible.\n"
-        "Section counters will count all items NOT marked as hidden in the template,\n"
-        "regardless of completion e.g., (5/10 - 12/20) or (5/10).");
+                 "Hides goals marked as \"hidden\" in the template file, but keeps all other completed goals visible.\n"
+                 "Section counters will count all items NOT marked as hidden in the template,\n"
+                 "regardless of completion e.g., (5/10 - 12/20) or (5/10).");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
@@ -927,9 +943,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[1024];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-        "Shows everything. No goals will be hidden, regardless of their completion or template status.\n"
-        "Section counters will count every single item defined in the template\n"
-        "for that section e.g., (5/10 - 12/20) or (5/10).");
+                 "Shows everything. No goals will be hidden, regardless of their completion or template status.\n"
+                 "Section counters will count every single item defined in the template\n"
+                 "for that section e.g., (5/10 - 12/20) or (5/10).");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
@@ -1142,6 +1158,59 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         }
     }
 
+    // --- UI Theme Colors Section ---
+     ImGui::SeparatorText("UI Theme Colors");
+    // ImGuiTreeNodeFlags_None makes it closed by default
+    if (ImGui::TreeNodeEx("Customize Interface Colors...", ImGuiTreeNodeFlags_None)) {
+         ImGui::TextWrapped("Adjust the colors for UI elements like windows, buttons, and text fields. Click 'Restart Advancely' afterwards.");
+         ImGui::Spacing();
+
+         // Helper macro to reduce boilerplate for color pickers
+         #define UI_COLOR_PICKER(label, field_name, tooltip_fmt, ...) \
+             static float field_name##_arr[4]; \
+             field_name##_arr[0] = (float)temp_settings.field_name.r / 255.0f; \
+             field_name##_arr[1] = (float)temp_settings.field_name.g / 255.0f; \
+             field_name##_arr[2] = (float)temp_settings.field_name.b / 255.0f; \
+             field_name##_arr[3] = (float)temp_settings.field_name.a / 255.0f; \
+             if (ImGui::ColorEdit4(label, field_name##_arr)) { \
+                 temp_settings.field_name = { \
+                     (Uint8)(field_name##_arr[0] * 255), (Uint8)(field_name##_arr[1] * 255), \
+                     (Uint8)(field_name##_arr[2] * 255), (Uint8)(field_name##_arr[3] * 255) \
+                 }; \
+             } \
+             if (ImGui::IsItemHovered()) { \
+                 char tooltip_buffer[512]; \
+                 snprintf(tooltip_buffer, sizeof(tooltip_buffer), tooltip_fmt, ##__VA_ARGS__); \
+                 ImGui::SetTooltip("%s", tooltip_buffer); \
+             }
+
+         UI_COLOR_PICKER("UI Text", ui_text_color, "Color for most text within UI windows (Settings, Editor, Notes).");
+         UI_COLOR_PICKER("Window Background", ui_window_bg_color, "Background color of UI windows.");
+         UI_COLOR_PICKER("Frame Background", ui_frame_bg_color, "Background color for input fields, checkboxes, sliders etc.");
+         UI_COLOR_PICKER("Frame Bg Hovered", ui_frame_bg_hovered_color, "Background color for frames when hovered.");
+         UI_COLOR_PICKER("Frame Bg Active", ui_frame_bg_active_color, "Background color for frames when active (e.g., clicking a slider).");
+         UI_COLOR_PICKER("Active Title Bar", ui_title_bg_active_color, "Background color of the title bar for the currently active window.");
+         UI_COLOR_PICKER("Button", ui_button_color, "Background color of buttons.");
+         UI_COLOR_PICKER("Button Hovered", ui_button_hovered_color, "Background color of buttons when hovered.");
+         UI_COLOR_PICKER("Button Active", ui_button_active_color, "Background color of buttons when clicked.");
+         UI_COLOR_PICKER("Header", ui_header_color, "Background color of collapsable headers (like this one).");
+         UI_COLOR_PICKER("Header Hovered", ui_header_hovered_color, "Background color of headers when hovered.");
+         UI_COLOR_PICKER("Header Active", ui_header_active_color, "Background color of headers when active/open.");
+         UI_COLOR_PICKER("Check Mark", ui_check_mark_color, "Color of the check mark inside checkboxes.");
+
+         #undef UI_COLOR_PICKER // Clean up the macro
+
+         ImGui::TreePop();
+     }
+      if (ImGui::IsItemHovered()) {
+         char tooltip_buffer[256];
+         snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Expand to customize the theme colors of the user interface.\n"
+                                                          "Requires restarting Advancely to apply.");
+         ImGui::SetTooltip("%s", tooltip_buffer);
+      }
+     ImGui::Separator();
+     ImGui::Spacing();
+
     ImGui::SeparatorText("Fonts");
 
     // --- Tracker Font ---
@@ -1170,11 +1239,11 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[1024];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Adjust the base font size for the main tracker view.\n"
-                     "Affects goal display text, info bar, and controls.\n"
-                     "Default: %.1f pt. Max: 32.0 pt(can be increased in settings.json\n"
-                     "(tracker_font_size), but causes criteria text to be shifted downwards).\n\n"
-                     "IMPORTANT: Requires restarting Advancely to apply.",
+                 "Adjust the base font size for the main tracker view.\n"
+                 "Affects goal display text, info bar, and controls.\n"
+                 "Default: %.1f pt. Max: 32.0 pt(can be increased in settings.json\n"
+                 "(tracker_font_size), but causes criteria text to be shifted downwards).\n\n"
+                 "IMPORTANT: Requires restarting Advancely to apply.",
                  DEFAULT_TRACKER_FONT_SIZE);
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
@@ -1626,7 +1695,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
     // TODO: Add default values always to this tooltip here
     if (ImGui::IsItemHovered()) {
-        char tooltip_buffer[1024];
+        char tooltip_buffer[2048];
 
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                  "Resets all settings (besides window size/position & hotkeys) in this window to their default values.\n"
@@ -1655,7 +1724,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Notes Use Settings Font: %s\n"
                  "  - Print Debug To Console: %s\n"
                  "  - Check For Updates: %s\n"
-                 "  - Show Welcome on Startup: %s",
+                 "  - Show Welcome on Startup: %s\n\n"
+                 "More found in resources/reference_files/Default_Settings.png",
 
                  DEFAULT_VERSION,
                  DEFAULT_CATEGORY,

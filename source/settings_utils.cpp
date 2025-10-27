@@ -22,6 +22,20 @@ const ColorRGBA DEFAULT_OVERLAY_BG_COLOR = {0, 80, 255, 255};
 const ColorRGBA DEFAULT_TEXT_COLOR = {255, 255, 255, 255};
 const ColorRGBA DEFAULT_OVERLAY_TEXT_COLOR = {255, 255, 255, 255};
 
+const ColorRGBA DEFAULT_UI_TEXT_COLOR = {255, 255, 255, 255}; // ImGuiCol_Text
+const ColorRGBA DEFAULT_UI_WINDOW_BG_COLOR = {15, 15, 15, 240}; // ImGuiCol_WindowBg
+const ColorRGBA DEFAULT_UI_FRAME_BG_COLOR = {41, 74, 122, 138}; // ImGuiCol_FrameBg
+const ColorRGBA DEFAULT_UI_FRAME_BG_HOVERED_COLOR = {66, 150, 250, 102}; // ImGuiCol_FrameBgHovered
+const ColorRGBA DEFAULT_UI_FRAME_BG_ACTIVE_COLOR = {66, 150, 250, 171}; // ImGuiCol_FrameBgActive
+const ColorRGBA DEFAULT_UI_TITLE_BG_ACTIVE_COLOR = {41, 74, 122, 255}; // ImGuiCol_TitleBgActive
+const ColorRGBA DEFAULT_UI_BUTTON_COLOR = {66, 150, 250, 102}; // ImGuiCol_Button
+const ColorRGBA DEFAULT_UI_BUTTON_HOVERED_COLOR = {66, 150, 250, 255}; // ImGuiCol_ButtonHovered
+const ColorRGBA DEFAULT_UI_BUTTON_ACTIVE_COLOR = {15, 135, 250, 255}; // ImGuiCol_ButtonActive
+const ColorRGBA DEFAULT_UI_HEADER_COLOR = {66, 150, 250, 79}; // ImGuiCol_Header
+const ColorRGBA DEFAULT_UI_HEADER_HOVERED_COLOR = {66, 150, 250, 204}; // ImGuiCol_HeaderHovered
+const ColorRGBA DEFAULT_UI_HEADER_ACTIVE_COLOR = {66, 150, 250, 255}; // ImGuiCol_HeaderActive
+const ColorRGBA DEFAULT_UI_CHECK_MARK_COLOR = {66, 150, 250, 255}; // ImGuiCol_CheckMark
+
 // Define the array of section names
 const char *TRACKER_SECTION_NAMES[SECTION_COUNT] = {
     "Advancements",
@@ -280,6 +294,21 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_bg_color = DEFAULT_OVERLAY_BG_COLOR;
     settings->text_color = DEFAULT_TEXT_COLOR;
     settings->overlay_text_color = DEFAULT_OVERLAY_TEXT_COLOR;
+
+    // UI Theme Colors
+    settings->ui_text_color = DEFAULT_UI_TEXT_COLOR;
+    settings->ui_window_bg_color = DEFAULT_UI_WINDOW_BG_COLOR;
+    settings->ui_frame_bg_color = DEFAULT_UI_FRAME_BG_COLOR;
+    settings->ui_frame_bg_hovered_color = DEFAULT_UI_FRAME_BG_HOVERED_COLOR;
+    settings->ui_frame_bg_active_color = DEFAULT_UI_FRAME_BG_ACTIVE_COLOR;
+    settings->ui_title_bg_active_color = DEFAULT_UI_TITLE_BG_ACTIVE_COLOR;
+    settings->ui_button_color = DEFAULT_UI_BUTTON_COLOR;
+    settings->ui_button_hovered_color = DEFAULT_UI_BUTTON_HOVERED_COLOR;
+    settings->ui_button_active_color = DEFAULT_UI_BUTTON_ACTIVE_COLOR;
+    settings->ui_header_color = DEFAULT_UI_HEADER_COLOR;
+    settings->ui_header_hovered_color = DEFAULT_UI_HEADER_HOVERED_COLOR;
+    settings->ui_header_active_color = DEFAULT_UI_HEADER_ACTIVE_COLOR;
+    settings->ui_check_mark_color = DEFAULT_UI_CHECK_MARK_COLOR;
 
     // Default Overlay Text Toggles
     settings->overlay_show_world = true;
@@ -627,6 +656,43 @@ bool settings_load(AppSettings *settings) {
         if (load_color(visual_settings, "overlay_text_color", &settings->overlay_text_color,
                        &DEFAULT_OVERLAY_TEXT_COLOR))
             defaults_were_used = true;
+
+        // Load UI Theme Colors
+        if (load_color(visual_settings, "ui_text_color", &settings->ui_text_color, &DEFAULT_UI_TEXT_COLOR))
+            defaults_were_used = true;
+        if (load_color(visual_settings, "ui_window_bg_color", &settings->ui_window_bg_color,
+                       &DEFAULT_UI_WINDOW_BG_COLOR))
+            defaults_were_used = true;
+        if (load_color(visual_settings, "ui_frame_bg_color", &settings->ui_frame_bg_color, &DEFAULT_UI_FRAME_BG_COLOR))
+            defaults_were_used = true;
+        if (load_color(visual_settings, "ui_frame_bg_hovered_color", &settings->ui_frame_bg_hovered_color,
+                       &DEFAULT_UI_FRAME_BG_HOVERED_COLOR))
+            defaults_were_used = true;
+        if (load_color(visual_settings, "ui_frame_bg_active_color", &settings->ui_frame_bg_active_color,
+                       &DEFAULT_UI_FRAME_BG_ACTIVE_COLOR))
+            defaults_were_used = true;
+        if (load_color(visual_settings, "ui_title_bg_active_color", &settings->ui_title_bg_active_color,
+                       &DEFAULT_UI_TITLE_BG_ACTIVE_COLOR))
+            defaults_were_used = true;
+        if (load_color(visual_settings, "ui_button_color", &settings->ui_button_color, &DEFAULT_UI_BUTTON_COLOR))
+            defaults_were_used = true;
+        if (load_color(visual_settings, "ui_button_hovered_color", &settings->ui_button_hovered_color,
+                       &DEFAULT_UI_BUTTON_HOVERED_COLOR))
+            defaults_were_used = true;
+        if (load_color(visual_settings, "ui_button_active_color", &settings->ui_button_active_color,
+                       &DEFAULT_UI_BUTTON_ACTIVE_COLOR))
+            defaults_were_used = true;
+        if (load_color(visual_settings, "ui_header_color", &settings->ui_header_color, &DEFAULT_UI_HEADER_COLOR))
+            defaults_were_used = true;
+        if (load_color(visual_settings, "ui_header_hovered_color", &settings->ui_header_hovered_color,
+                       &DEFAULT_UI_HEADER_HOVERED_COLOR))
+            defaults_were_used = true;
+        if (load_color(visual_settings, "ui_header_active_color", &settings->ui_header_active_color,
+                       &DEFAULT_UI_HEADER_ACTIVE_COLOR))
+            defaults_were_used = true;
+        if (load_color(visual_settings, "ui_check_mark_color", &settings->ui_check_mark_color,
+                       &DEFAULT_UI_CHECK_MARK_COLOR))
+            defaults_were_used = true;
     } else {
         defaults_were_used = true;
     }
@@ -795,6 +861,21 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         save_color(visuals_obj, "overlay_bg_color", &settings->overlay_bg_color);
         save_color(visuals_obj, "text_color", &settings->text_color);
         save_color(visuals_obj, "overlay_text_color", &settings->overlay_text_color);
+
+        // UI Colors
+        save_color(visuals_obj, "ui_text_color", &settings->ui_text_color);
+        save_color(visuals_obj, "ui_window_bg_color", &settings->ui_window_bg_color);
+        save_color(visuals_obj, "ui_frame_bg_color", &settings->ui_frame_bg_color);
+        save_color(visuals_obj, "ui_frame_bg_hovered_color", &settings->ui_frame_bg_hovered_color);
+        save_color(visuals_obj, "ui_frame_bg_active_color", &settings->ui_frame_bg_active_color);
+        save_color(visuals_obj, "ui_title_bg_active_color", &settings->ui_title_bg_active_color);
+        save_color(visuals_obj, "ui_button_color", &settings->ui_button_color);
+        save_color(visuals_obj, "ui_button_hovered_color", &settings->ui_button_hovered_color);
+        save_color(visuals_obj, "ui_button_active_color", &settings->ui_button_active_color);
+        save_color(visuals_obj, "ui_header_color", &settings->ui_header_color);
+        save_color(visuals_obj, "ui_header_hovered_color", &settings->ui_header_hovered_color);
+        save_color(visuals_obj, "ui_header_active_color", &settings->ui_header_active_color);
+        save_color(visuals_obj, "ui_check_mark_color", &settings->ui_check_mark_color);
     }
 
     // Update Custom Progress if provided

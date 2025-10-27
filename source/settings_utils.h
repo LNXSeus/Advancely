@@ -116,9 +116,23 @@ enum OverlayProgressTextAlignment {
 // Default colors when it's just {} in settings.json, so no r, g, b, a values
 extern const ColorRGBA DEFAULT_TRACKER_BG_COLOR;
 extern const ColorRGBA DEFAULT_OVERLAY_BG_COLOR;
-extern const ColorRGBA DEFAULT_SETTINGS_BG_COLOR;
 extern const ColorRGBA DEFAULT_TEXT_COLOR;
 extern const ColorRGBA DEFAULT_OVERLAY_TEXT_COLOR;
+
+// Default UI Colors
+extern const ColorRGBA DEFAULT_UI_TEXT_COLOR;
+extern const ColorRGBA DEFAULT_UI_WINDOW_BG_COLOR;
+extern const ColorRGBA DEFAULT_UI_FRAME_BG_COLOR;
+extern const ColorRGBA DEFAULT_UI_FRAME_BG_HOVERED_COLOR;
+extern const ColorRGBA DEFAULT_UI_FRAME_BG_ACTIVE_COLOR;
+extern const ColorRGBA DEFAULT_UI_TITLE_BG_ACTIVE_COLOR;
+extern const ColorRGBA DEFAULT_UI_BUTTON_COLOR;
+extern const ColorRGBA DEFAULT_UI_BUTTON_HOVERED_COLOR;
+extern const ColorRGBA DEFAULT_UI_BUTTON_ACTIVE_COLOR;
+extern const ColorRGBA DEFAULT_UI_HEADER_COLOR;
+extern const ColorRGBA DEFAULT_UI_HEADER_HOVERED_COLOR;
+extern const ColorRGBA DEFAULT_UI_HEADER_ACTIVE_COLOR;
+extern const ColorRGBA DEFAULT_UI_CHECK_MARK_COLOR;
 
 // A Struct to hold all application settings in one place
 struct AppSettings {
@@ -180,6 +194,21 @@ struct AppSettings {
     ColorRGBA overlay_bg_color; // Background color for the overlay window.
     ColorRGBA text_color; // Global text color for UI elements.
     ColorRGBA overlay_text_color; // Text color for the overlay window.
+
+    // --- UI Theme Colors (collapsible section) ---
+    ColorRGBA ui_text_color; // Text color for the UI elements.
+    ColorRGBA ui_window_bg_color; // Background color of UI windows
+    ColorRGBA ui_frame_bg_color; // Background color for input fields, checkboxes, sliders etc.
+    ColorRGBA ui_frame_bg_hovered_color; // Background color for frames when hovered
+    ColorRGBA ui_frame_bg_active_color; // Background color for frames when active
+    ColorRGBA ui_title_bg_active_color; // Background color of the title bar when active
+    ColorRGBA ui_button_color; // Color of buttons
+    ColorRGBA ui_button_hovered_color; // Background color of buttons when hovered
+    ColorRGBA ui_button_active_color; // Background color of buttons when clicked
+    ColorRGBA ui_header_color; // Background color of collapsable headers
+    ColorRGBA ui_header_hovered_color; // Background color of headers when hovered
+    ColorRGBA ui_header_active_color; // background color of headers when active/open
+    ColorRGBA ui_check_mark_color; // Color of the checkmark inside checkboxes
 
     // --- Overlay Text Sections ---
     bool overlay_show_world; // If true, the world name is shown in the overlay.

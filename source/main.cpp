@@ -546,7 +546,6 @@ const char *get_notes_manifest_path() {
 }
 
 int main(int argc, char *argv[]) {
-
     // Seed random number generator once at startup
     srand(time(nullptr));
 
@@ -596,7 +595,8 @@ int main(int argc, char *argv[]) {
             // Initialize SDL video subsystem just to be able to show a message box
             if (!SDL_Init(SDL_INIT_VIDEO)) {
                 // Fallback if SDL can't even initialize
-                log_message(LOG_ERROR, "Critical Path Error: Advancely cannot run from a path with special characters.\n");
+                log_message(
+                    LOG_ERROR, "Critical Path Error: Advancely cannot run from a path with special characters.\n");
                 return EXIT_FAILURE;
             }
             SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,
@@ -730,7 +730,7 @@ int main(int argc, char *argv[]) {
         }
 
         overlay->shm_fd = shm_open(SHARED_MEM_NAME, O_RDONLY, 0666);
-        overlay->p_shared_data = (SharedData*)mmap(0, sizeof(SharedData), PROT_READ, MAP_SHARED, overlay->shm_fd, 0);
+        overlay->p_shared_data = (SharedData *) mmap(0, sizeof(SharedData), PROT_READ, MAP_SHARED, overlay->shm_fd, 0);
 
         if (overlay->p_shared_data == MAP_FAILED) {
             log_message(LOG_ERROR, "[OVERLAY IPC] Failed to map shared memory. Is the tracker running?\n");
@@ -773,7 +773,7 @@ int main(int argc, char *argv[]) {
                 DWORD wait_result = WaitForSingleObject(overlay->h_mutex, 50);
                 if (wait_result == WAIT_OBJECT_0) {
 #else
-                if (sem_wait(overlay->mutex) == 0) {
+                    if (sem_wait(overlay->mutex) == 0) {
 #endif
                     // --- Critical Section: We have the lock ---
                     if (overlay->p_shared_data->data_size > 0) {
@@ -977,14 +977,14 @@ int main(int argc, char *argv[]) {
                             (void) system(command);
 #else // macOS and Linux
                             pid_t pid = fork();
-                            if (pid == 0) { // Child process
+                            if (pid == 0) {  // Child process
 #if __APPLE__
-                                    char* args[] = {(char*)"open", templates_path, nullptr};
+                            char *args[] = {(char *) "open", templates_path, nullptr};
 #else
-                                    char* args[] = {(char*)"xdg-open", templates_path, nullptr};
+                            char *args[] = {(char *) "xdg-open", templates_path, nullptr};
 #endif
-                                execvp(args[0], args);
-                                _exit(127); // Exit if exec fails
+                            execvp(args[0], args);
+                            _exit(127); // Exit if exec fails
                             } else if (pid < 0) {
                                 log_message(LOG_ERROR, "[MAIN] Failed to fork process to open folder.\n");
                             }
@@ -1001,14 +1001,14 @@ int main(int argc, char *argv[]) {
                             (void) system(command);
 #else // macOS and Linux
                             pid_t pid = fork();
-                            if (pid == 0) { // Child process
+                            if (pid == 0) {  // Child process
 #if __APPLE__
-                                    char* args[] = {(char*)"open", (char*)url, nullptr};
+                            char *args[] = {(char *) "open", (char *) url, nullptr};
 #else
-                                    char* args[] = {(char*)"xdg-open", (char*)url, nullptr};
+                            char *args[] = {(char *) "xdg-open", (char *) url, nullptr};
 #endif
-                                execvp(args[0], args);
-                                _exit(127); // Exit if exec fails
+                            execvp(args[0], args);
+                            _exit(127); // Exit if exec fails
                             } else if (pid < 0) {
                                 log_message(LOG_ERROR, "[MAIN] Failed to fork process to open URL.\n");
                             }
@@ -1052,7 +1052,7 @@ int main(int argc, char *argv[]) {
 #ifdef _WIN32
                             _mkdir(temp_dir);
 #else
-                mkdir(temp_dir, 0755);
+                            mkdir(temp_dir, 0755);
 #endif
 
                             mz_uint i;
@@ -1069,7 +1069,7 @@ int main(int argc, char *argv[]) {
 #ifdef _WIN32
                                     _mkdir(out_path);
 #else
-                        mkdir(out_path, 0755);
+                                    mkdir(out_path, 0755);
 #endif
                                 } else {
                                     mz_zip_reader_extract_to_file(&zip_archive, i, out_path, 0);
@@ -1179,10 +1179,10 @@ int main(int argc, char *argv[]) {
 
         // Create the shared memory object
         tracker->shm_fd = shm_open(SHARED_MEM_NAME, O_CREAT | O_RDWR, 0666);
-        (void)ftruncate(tracker->shm_fd, sizeof(SharedData));
+        (void) ftruncate(tracker->shm_fd, sizeof(SharedData));
 
         // Map the shared memory object
-        tracker->p_shared_data = (SharedData*)mmap(0, sizeof(SharedData), PROT_WRITE, MAP_SHARED, tracker->shm_fd, 0);
+        tracker->p_shared_data = (SharedData *) mmap(0, sizeof(SharedData), PROT_WRITE, MAP_SHARED, tracker->shm_fd, 0);
 #endif
 
 
@@ -1194,6 +1194,61 @@ int main(int argc, char *argv[]) {
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
 
         ImGui::StyleColorsDark(); // Or ImGui::StyleColorsClassic()
+
+        // Apply Custom UI Theme Colors
+        ImGuiStyle &style = ImGui::GetStyle();
+        style.Colors[ImGuiCol_Text] = ImVec4((float) app_settings.ui_text_color.r / 255.f,
+                                             (float) app_settings.ui_text_color.g / 255.f,
+                                             (float) app_settings.ui_text_color.b / 255.f,
+                                             (float) app_settings.ui_text_color.a / 255.f);
+        style.Colors[ImGuiCol_WindowBg] = ImVec4((float) app_settings.ui_window_bg_color.r / 255.f,
+                                                 (float) app_settings.ui_window_bg_color.g / 255.f,
+                                                 (float) app_settings.ui_window_bg_color.b / 255.f,
+                                                 (float) app_settings.ui_window_bg_color.a / 255.f);
+        style.Colors[ImGuiCol_FrameBg] = ImVec4((float) app_settings.ui_frame_bg_color.r / 255.f,
+                                                (float) app_settings.ui_frame_bg_color.g / 255.f,
+                                                (float) app_settings.ui_frame_bg_color.b / 255.f,
+                                                (float) app_settings.ui_frame_bg_color.a / 255.f);
+        style.Colors[ImGuiCol_FrameBgHovered] = ImVec4((float) app_settings.ui_frame_bg_hovered_color.r / 255.f,
+                                                       (float) app_settings.ui_frame_bg_hovered_color.g / 255.f,
+                                                       (float) app_settings.ui_frame_bg_hovered_color.b / 255.f,
+                                                       (float) app_settings.ui_frame_bg_hovered_color.a / 255.f);
+        style.Colors[ImGuiCol_FrameBgActive] = ImVec4((float) app_settings.ui_frame_bg_active_color.r / 255.f,
+                                                      (float) app_settings.ui_frame_bg_active_color.g / 255.f,
+                                                      (float) app_settings.ui_frame_bg_active_color.b / 255.f,
+                                                      (float) app_settings.ui_frame_bg_active_color.a / 255.f);
+        style.Colors[ImGuiCol_TitleBgActive] = ImVec4((float) app_settings.ui_title_bg_active_color.r / 255.f,
+                                                      (float) app_settings.ui_title_bg_active_color.g / 255.f,
+                                                      (float) app_settings.ui_title_bg_active_color.b / 255.f,
+                                                      (float) app_settings.ui_title_bg_active_color.a / 255.f);
+        style.Colors[ImGuiCol_Button] = ImVec4((float) app_settings.ui_button_color.r / 255.f,
+                                               (float) app_settings.ui_button_color.g / 255.f,
+                                               (float) app_settings.ui_button_color.b / 255.f,
+                                               (float) app_settings.ui_button_color.a / 255.f);
+        style.Colors[ImGuiCol_ButtonHovered] = ImVec4((float) app_settings.ui_button_hovered_color.r / 255.f,
+                                                      (float) app_settings.ui_button_hovered_color.g / 255.f,
+                                                      (float) app_settings.ui_button_hovered_color.b / 255.f,
+                                                      (float) app_settings.ui_button_hovered_color.a / 255.f);
+        style.Colors[ImGuiCol_ButtonActive] = ImVec4((float) app_settings.ui_button_active_color.r / 255.f,
+                                                     (float) app_settings.ui_button_active_color.g / 255.f,
+                                                     (float) app_settings.ui_button_active_color.b / 255.f,
+                                                     (float) app_settings.ui_button_active_color.a / 255.f);
+        style.Colors[ImGuiCol_Header] = ImVec4((float) app_settings.ui_header_color.r / 255.f,
+                                               (float) app_settings.ui_header_color.g / 255.f,
+                                               (float) app_settings.ui_header_color.b / 255.f,
+                                               (float) app_settings.ui_header_color.a / 255.f);
+        style.Colors[ImGuiCol_HeaderHovered] = ImVec4((float) app_settings.ui_header_hovered_color.r / 255.f,
+                                                      (float) app_settings.ui_header_hovered_color.g / 255.f,
+                                                      (float) app_settings.ui_header_hovered_color.b / 255.f,
+                                                      (float) app_settings.ui_header_hovered_color.a / 255.f);
+        style.Colors[ImGuiCol_HeaderActive] = ImVec4((float) app_settings.ui_header_active_color.r / 255.f,
+                                                     (float) app_settings.ui_header_active_color.g / 255.f,
+                                                     (float) app_settings.ui_header_active_color.b / 255.f,
+                                                     (float) app_settings.ui_header_active_color.a / 255.f);
+        style.Colors[ImGuiCol_CheckMark] = ImVec4((float) app_settings.ui_check_mark_color.r / 255.f,
+                                                  (float) app_settings.ui_check_mark_color.g / 255.f,
+                                                  (float) app_settings.ui_check_mark_color.b / 255.f,
+                                                  (float) app_settings.ui_check_mark_color.a / 255.f);
 
         // Setup Platform/Renderer backends
         ImGui_ImplSDL3_InitForSDLRenderer(tracker->window, tracker->renderer);
@@ -1321,11 +1376,13 @@ int main(int argc, char *argv[]) {
                 }
 #else
                 pid_t pid = fork();
-                if (pid == 0) { // Child process
-                    char* args[] = {exe_path, (char*)"--overlay", nullptr};
+                if (pid == 0) {
+                    // Child process
+                    char *args[] = {exe_path, (char *) "--overlay", nullptr};
                     execv(exe_path, args);
                     _exit(1); // Should not be reached
-                } else if (pid > 0) { // Parent process
+                } else if (pid > 0) {
+                    // Parent process
                     tracker->overlay_pid = pid;
                     log_message(LOG_INFO, "[MAIN] Overlay process started with PID: %d\n", pid);
                 } else {
@@ -1458,13 +1515,15 @@ int main(int argc, char *argv[]) {
                         }
 #else
                         pid_t pid = fork();
-                        if (pid == 0) { // Child process
-                            char* args[] = {exe_path, (char*)"--overlay", nullptr};
+                        if (pid == 0) {
+                            // Child process
+                            char *args[] = {exe_path, (char *) "--overlay", nullptr};
                             execv(exe_path, args);
                             // If execv returns, it's an error
                             log_message(LOG_ERROR, "[MAIN] Child process execv failed.\n");
                             _exit(1);
-                        } else if (pid > 0) { // Parent process
+                        } else if (pid > 0) {
+                            // Parent process
                             tracker->overlay_pid = pid;
                             log_message(LOG_INFO, "[MAIN] Overlay process started with PID: %d\n", pid);
                         } else {
@@ -1567,7 +1626,7 @@ int main(int argc, char *argv[]) {
                     DWORD wait_result = WaitForSingleObject(tracker->h_mutex, 50); // Wait up to 50ms
                     if (wait_result == WAIT_OBJECT_0) {
 #else
-                    if (sem_wait(tracker->mutex) == 0) {
+                        if (sem_wait(tracker->mutex) == 0) {
 #endif
                         // --- Critical Section: We have the lock ---
 
