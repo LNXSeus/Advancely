@@ -1159,14 +1159,15 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     // --- UI Theme Colors Section ---
-     ImGui::SeparatorText("UI Theme Colors");
+    ImGui::SeparatorText("UI Theme Colors");
     // ImGuiTreeNodeFlags_None makes it closed by default
     if (ImGui::TreeNodeEx("Customize Interface Colors...", ImGuiTreeNodeFlags_None)) {
-         ImGui::TextWrapped("Adjust the colors for UI elements like windows, buttons, and text fields. Click 'Restart Advancely' afterwards.");
-         ImGui::Spacing();
+        ImGui::TextWrapped(
+            "Adjust the colors for UI elements like windows, buttons, and text fields. Click 'Restart Advancely' afterwards.");
+        ImGui::Spacing();
 
-         // Helper macro to reduce boilerplate for color pickers
-         #define UI_COLOR_PICKER(label, field_name, tooltip_fmt, ...) \
+        // Helper macro to reduce boilerplate for color pickers
+#define UI_COLOR_PICKER(label, field_name, tooltip_fmt, ...) \
              static float field_name##_arr[4]; \
              field_name##_arr[0] = (float)temp_settings.field_name.r / 255.0f; \
              field_name##_arr[1] = (float)temp_settings.field_name.g / 255.0f; \
@@ -1184,32 +1185,66 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  ImGui::SetTooltip("%s", tooltip_buffer); \
              }
 
-         UI_COLOR_PICKER("UI Text", ui_text_color, "Color for most text within UI windows (Settings, Editor, Notes).");
-         UI_COLOR_PICKER("Window Background", ui_window_bg_color, "Background color of UI windows.");
-         UI_COLOR_PICKER("Frame Background", ui_frame_bg_color, "Background color for input fields, checkboxes, sliders etc.");
-         UI_COLOR_PICKER("Frame Bg Hovered", ui_frame_bg_hovered_color, "Background color for frames when hovered.");
-         UI_COLOR_PICKER("Frame Bg Active", ui_frame_bg_active_color, "Background color for frames when active (e.g., clicking a slider).");
-         UI_COLOR_PICKER("Active Title Bar", ui_title_bg_active_color, "Background color of the title bar for the currently active window.");
-         UI_COLOR_PICKER("Button", ui_button_color, "Background color of buttons.");
-         UI_COLOR_PICKER("Button Hovered", ui_button_hovered_color, "Background color of buttons when hovered.");
-         UI_COLOR_PICKER("Button Active", ui_button_active_color, "Background color of buttons when clicked.");
-         UI_COLOR_PICKER("Header", ui_header_color, "Background color of collapsable headers (like this one).");
-         UI_COLOR_PICKER("Header Hovered", ui_header_hovered_color, "Background color of headers when hovered.");
-         UI_COLOR_PICKER("Header Active", ui_header_active_color, "Background color of headers when active/open.");
-         UI_COLOR_PICKER("Check Mark", ui_check_mark_color, "Color of the check mark inside checkboxes.");
+        UI_COLOR_PICKER("UI Text", ui_text_color, "Color for most text within UI windows (Settings, Editor, Notes).");
+        UI_COLOR_PICKER("Window Background", ui_window_bg_color, "Background color of UI windows.");
+        UI_COLOR_PICKER("Frame Background", ui_frame_bg_color,
+                        "Background color for input fields, checkboxes, sliders etc.");
+        UI_COLOR_PICKER("Frame Bg Hovered", ui_frame_bg_hovered_color, "Background color for frames when hovered.");
+        UI_COLOR_PICKER("Frame Bg Active", ui_frame_bg_active_color,
+                        "Background color for frames when active (e.g., clicking a slider).");
+        UI_COLOR_PICKER("Active Title Bar", ui_title_bg_active_color,
+                        "Background color of the title bar for the currently active window.");
+        UI_COLOR_PICKER("Button", ui_button_color, "Background color of buttons.");
+        UI_COLOR_PICKER("Button Hovered", ui_button_hovered_color, "Background color of buttons when hovered.");
+        UI_COLOR_PICKER("Button Active", ui_button_active_color, "Background color of buttons when clicked.");
+        UI_COLOR_PICKER("Header", ui_header_color, "Background color of collapsable headers (like this one).");
+        UI_COLOR_PICKER("Header Hovered", ui_header_hovered_color, "Background color of headers when hovered.");
+        UI_COLOR_PICKER("Header Active", ui_header_active_color, "Background color of headers when active/open.");
+        UI_COLOR_PICKER("Check Mark", ui_check_mark_color, "Color of the check mark inside checkboxes.");
 
-         #undef UI_COLOR_PICKER // Clean up the macro
+#undef UI_COLOR_PICKER // Clean up the macro
 
-         ImGui::TreePop();
-     }
-      if (ImGui::IsItemHovered()) {
-         char tooltip_buffer[256];
-         snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Expand to customize the theme colors of the user interface.\n"
-                                                          "Requires restarting Advancely to apply.");
-         ImGui::SetTooltip("%s", tooltip_buffer);
-      }
-     ImGui::Separator();
-     ImGui::Spacing();
+        // Restart Warning
+        // --- Check if any UI theme color settings have changed ---
+        bool ui_theme_colors_changed =
+                memcmp(&temp_settings.ui_text_color, &saved_settings.ui_text_color, sizeof(ColorRGBA)) != 0 ||
+                memcmp(&temp_settings.ui_window_bg_color, &saved_settings.ui_window_bg_color, sizeof(ColorRGBA)) != 0 ||
+                memcmp(&temp_settings.ui_frame_bg_color, &saved_settings.ui_frame_bg_color, sizeof(ColorRGBA)) != 0 ||
+                memcmp(&temp_settings.ui_frame_bg_hovered_color, &saved_settings.ui_frame_bg_hovered_color,
+                       sizeof(ColorRGBA)) != 0 ||
+                memcmp(&temp_settings.ui_frame_bg_active_color, &saved_settings.ui_frame_bg_active_color,
+                       sizeof(ColorRGBA)) != 0 ||
+                memcmp(&temp_settings.ui_title_bg_active_color, &saved_settings.ui_title_bg_active_color,
+                       sizeof(ColorRGBA)) != 0 ||
+                memcmp(&temp_settings.ui_button_color, &saved_settings.ui_button_color, sizeof(ColorRGBA)) != 0 ||
+                memcmp(&temp_settings.ui_button_hovered_color, &saved_settings.ui_button_hovered_color,
+                       sizeof(ColorRGBA)) != 0 ||
+                memcmp(&temp_settings.ui_button_active_color, &saved_settings.ui_button_active_color,
+                       sizeof(ColorRGBA)) != 0 ||
+                memcmp(&temp_settings.ui_header_color, &saved_settings.ui_header_color, sizeof(ColorRGBA)) != 0 ||
+                memcmp(&temp_settings.ui_header_hovered_color, &saved_settings.ui_header_hovered_color,
+                       sizeof(ColorRGBA)) != 0 ||
+                memcmp(&temp_settings.ui_header_active_color, &saved_settings.ui_header_active_color,
+                       sizeof(ColorRGBA)) != 0 ||
+                memcmp(&temp_settings.ui_check_mark_color, &saved_settings.ui_check_mark_color, sizeof(ColorRGBA)) != 0;
+
+        // Conditionally show the warning
+        if (ui_theme_colors_changed) {
+            ImGui::Spacing(); // Add a little space before the warning
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
+                               "Click 'Restart Advancely' to properly apply these theme color changes.");
+        }
+
+        ImGui::TreePop();
+    }
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buffer[256];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Expand to customize the theme colors of the user interface.\n"
+                 "Requires restarting Advancely to apply.");
+        ImGui::SetTooltip("%s", tooltip_buffer);
+    }
+    ImGui::Separator();
+    ImGui::Spacing();
 
     ImGui::SeparatorText("Fonts");
 

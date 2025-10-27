@@ -1,84 +1,164 @@
 {
-  "path_mode":	"auto",
-  "manual_saves_path":	"",
-  "version":	"1.16.1",
-  "category":	"all_advancements",
-  "optional_flag":	"",
-  "lang_flag": "",
-  "general":	{
-    "section_order":	[0, 1, 2, 3, 4, 5],
-    "enable_overlay":	false,
-    "using_stats_per_world_legacy":	true,
-    "fps":	60,
-    "overlay_fps": 60,
-    "always_on_top":	true,
-    "overlay_scroll_speed":	1,
-    "goal_hiding_mode":	"HIDE_ALL_COMPLETED",
-    "print_debug_status":	false,
-    "overlay_progress_text_align":	"left",
-    "overlay_animation_speedup":	false,
-    "overlay_stat_cycle_speed": 3.0,
-    "overlay_row3_remove_completed":	false,
-    "overlay_show_world":	true,
-    "overlay_show_run_details":	true,
-    "overlay_show_progress":	true,
-    "overlay_show_igt":	true,
-    "overlay_show_update_timer":	true,
-    "notes_use_roboto_font":	false,
-    "per_world_notes": true,
-    "check_for_updates": true,
-    "show_welcome_on_startup": true,
-    "tracker_font_name": "Minecraft.ttf",
-    "tracker_font_size": 16.0,
-    "overlay_font_name": "Minecraft.ttf",
-    "ui_font_name": "Roboto-Regular.ttf",
-    "ui_font_size": 16.0
-  },
-  "stat_progress_override":	{
-    "stat:gold_blocks_picked_up":	false,
-    "stat:wither_skeletons_killed":	false,
-    "stat:tnt_picked_up":	false,
-    "stat:debris_picked_up":	false,
-    "stat:bee_nests_picked_up":	false
-  },
-  "custom_progress":	{},
-  "visuals":	{
-    "tracker_window":	{
-      "x":	-1,
-      "y":	-1,
-      "w":	-1,
-      "h":	-1
-    },
-    "overlay_window":	{
-      "x":	-1,
-      "y":	-1,
-      "w":	-1,
-      "h":	-1
-    },
-    "tracker_bg_color":	{
-      "r":	13,
-      "g":	17,
-      "b":	23,
-      "a":	255
-    },
-    "overlay_bg_color":	{
-      "r":	0,
-      "g":	80,
-      "b":	255,
-      "a":	255
-    },
-    "text_color":	{
-      "r":	255,
-      "g":	255,
-      "b":	255,
-      "a":	255
-    },
-    "overlay_text_color":	{
-      "r":	255,
-      "g":	255,
-      "b":	255,
-      "a":	255
-    }
-  },
-  "hotkeys": []
+	"general":	{
+		"tracker_font_name":	"Minecraft.ttf",
+		"tracker_font_size":	16,
+		"overlay_font_name":	"Minecraft.ttf",
+		"ui_font_name":	"Roboto-Regular.ttf",
+		"ui_font_size":	16,
+		"section_order":	[0, 1, 2, 3, 4, 5],
+		"using_stats_per_world_legacy":	true,
+		"fps":	60,
+		"overlay_fps":	60,
+		"always_on_top":	true,
+		"goal_hiding_mode":	0,
+		"print_debug_status":	false,
+		"enable_overlay":	false,
+		"overlay_scroll_speed":	1,
+		"overlay_progress_text_align":	"left",
+		"overlay_animation_speedup":	false,
+		"overlay_row3_remove_completed":	false,
+		"overlay_stat_cycle_speed":	3,
+		"notes_use_roboto_font":	false,
+		"per_world_notes":	true,
+		"check_for_updates":	true,
+		"show_welcome_on_startup":	true,
+		"overlay_show_world":	true,
+		"overlay_show_run_details":	true,
+		"overlay_show_progress":	true,
+		"overlay_show_igt":	true,
+		"overlay_show_update_timer":	true
+	},
+	"stat_progress_override":	{
+		"stat:gold_blocks_picked_up":	false,
+		"stat:drowneds_killed":	false,
+		"stat:wither_skeletons_killed":	false,
+		"stat:tnt_picked_up":	false,
+		"stat:debris_picked_up":	false,
+		"stat:bee_nests_picked_up":	false
+	},
+	"custom_progress":	{
+	},
+	"visuals":	{
+		"tracker_window":	{
+			"x":	-1,
+			"y":	-1,
+			"w":	-1,
+			"h":	-1
+		},
+		"overlay_window":	{
+			"x":	-1,
+			"y":	-1,
+			"w":	-1,
+			"h":	-1
+		},
+		"tracker_bg_color":	{
+			"r":	13,
+			"g":	17,
+			"b":	23,
+			"a":	255
+		},
+		"overlay_bg_color":	{
+			"r":	0,
+			"g":	80,
+			"b":	255,
+			"a":	255
+		},
+		"text_color":	{
+			"r":	255,
+			"g":	255,
+			"b":	255,
+			"a":	255
+		},
+		"overlay_text_color":	{
+			"r":	255,
+			"g":	255,
+			"b":	255,
+			"a":	255
+		},
+		"ui_text_color":	{
+			"r":	255,
+			"g":	255,
+			"b":	255,
+			"a":	255
+		},
+		"ui_window_bg_color":	{
+			"r":	15,
+			"g":	15,
+			"b":	15,
+			"a":	240
+		},
+		"ui_frame_bg_color":	{
+			"r":	41,
+			"g":	74,
+			"b":	122,
+			"a":	138
+		},
+		"ui_frame_bg_hovered_color":	{
+			"r":	66,
+			"g":	150,
+			"b":	250,
+			"a":	102
+		},
+		"ui_frame_bg_active_color":	{
+			"r":	66,
+			"g":	150,
+			"b":	250,
+			"a":	171
+		},
+		"ui_title_bg_active_color":	{
+			"r":	41,
+			"g":	74,
+			"b":	122,
+			"a":	255
+		},
+		"ui_button_color":	{
+			"r":	66,
+			"g":	150,
+			"b":	250,
+			"a":	102
+		},
+		"ui_button_hovered_color":	{
+			"r":	66,
+			"g":	150,
+			"b":	250,
+			"a":	255
+		},
+		"ui_button_active_color":	{
+			"r":	15,
+			"g":	135,
+			"b":	250,
+			"a":	255
+		},
+		"ui_header_color":	{
+			"r":	66,
+			"g":	150,
+			"b":	250,
+			"a":	79
+		},
+		"ui_header_hovered_color":	{
+			"r":	66,
+			"g":	150,
+			"b":	250,
+			"a":	204
+		},
+		"ui_header_active_color":	{
+			"r":	66,
+			"g":	150,
+			"b":	250,
+			"a":	255
+		},
+		"ui_check_mark_color":	{
+			"r":	66,
+			"g":	150,
+			"b":	250,
+			"a":	255
+		}
+	},
+	"path_mode":	"auto",
+	"manual_saves_path":	"",
+	"version":	"1.16.1",
+	"category":	"all_advancements",
+	"optional_flag":	"",
+	"lang_flag":	"",
+	"hotkeys":	[]
 }
