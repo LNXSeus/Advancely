@@ -3611,11 +3611,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
-                            char hidden_tooltip_buffer[256];
+                            char hidden_tooltip_buffer[1024];
                             snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
-                                     "If checked, this criterion will be fully hidden on the overlay\n"
-                                     "and hidden settings-based on the tracker.\n"
-                                     "Visibility can be toggled in the main tracker settings");
+                                     "If checked, the icon of the criterion will be fully hidden on the overlay\n"
+                                     "(within 1st row) and hidden settings-based on the tracker.\n"
+                                     "The criterion name will still display below the %s name\n"
+                                     "on the overlay if it's the last one remaining.\n"
+                                     "This means it will still contribute to the horizontal spacing\n"
+                                     "of the second row unless the advancement is hidden.\n"
+                                     "Visibility can be toggled in the main tracker settings.", advancements_label_singular_lower);
                             ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                         }
 

@@ -77,6 +77,9 @@ struct Overlay {
     int start_index_row2;
     int start_index_row3;
     float last_delta_time; // To store the delta time for the last frame for debugging.
+
+    float calculated_row2_item_width; // Store calculated width for update func
+    float calculated_row3_item_width; // Store calculated width for update func
 };
 
 /**
