@@ -20,7 +20,6 @@ file(READ "${CMAKE_SOURCE_DIR}/source/main.h" MAIN_H_CONTENTS)
 string(REGEX MATCH "#define ADVANCELY_VERSION \"v([0-9]+\\.[0-9]+\\.[0-9]+)\"" _ ${MAIN_H_CONTENTS})
 
 
-
 # The captured version number is now in the variable CMAKE_MATCH_1
 if (CMAKE_MATCH_1)
     set(PROJECT_VERSION ${CMAKE_MATCH_1})
@@ -30,10 +29,10 @@ else ()
 endif ()
 
 # If running in GitHub Actions, export the version to the environment
-if(DEFINED ENV{GITHUB_ENV})
+if (DEFINED ENV{GITHUB_ENV})
     file(APPEND "$ENV{GITHUB_ENV}" "PROJECT_VERSION=${PROJECT_VERSION}\n")
     message(STATUS "Exporting PROJECT_VERSION=${PROJECT_VERSION} to GITHUB_ENV")
-endif()
+endif ()
 
 # Enable the RC (Resource Compiler) language for Windows executables
 if (WIN32)
@@ -192,7 +191,7 @@ endif ()
 
 # This block will ONLY run for MinGW/GCC compilers (your local setup)
 # and will copy your exact list of required DLLs.
-if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+if (WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     get_filename_component(MINGW_BIN_DIR ${CMAKE_C_COMPILER} DIRECTORY)
     set(MINGW_DLLS
             "SDL3.dll" "SDL3_image.dll" "SDL3_ttf.dll"
@@ -205,14 +204,14 @@ if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
             "libunistring-5.dll" "libwebp-7.dll" "libwebpdemux-2.dll" "libwinpthread-1.dll"
             "libzstd.dll" "zlib1.dll"
     )
-    foreach(DLL_NAME ${MINGW_DLLS})
+    foreach (DLL_NAME ${MINGW_DLLS})
         add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "${MINGW_BIN_DIR}/${DLL_NAME}"
                 "$<TARGET_FILE_DIR:${EXECUTABLE_NAME}>"
         )
-    endforeach()
-endif()
+    endforeach ()
+endif ()
 
 # This command is needed on Windows/Linux platforms to copy the resources to where executable is
 # macOS .app bundle is handled further above
@@ -225,29 +224,29 @@ if (NOT APPLE)
     )
 endif ()
 
-if(NOT APPLE)
-# Move the _PLEASE_READ_ME.txt file to the output directory
-add_custom_command(TARGET Advancely POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_SOURCE_DIR}/_PLEASE_READ_ME.txt"
-        "$<TARGET_FILE_DIR:Advancely>"
-        COMMENT "[CMAKE] Copying _PLEASE_READ_ME.txt to output directory..."
-)
+if (NOT APPLE)
+    # Move the _PLEASE_READ_ME.txt file to the output directory
+    add_custom_command(TARGET Advancely POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy
+            "${CMAKE_SOURCE_DIR}/_PLEASE_READ_ME.txt"
+            "$<TARGET_FILE_DIR:Advancely>"
+            COMMENT "[CMAKE] Copying _PLEASE_READ_ME.txt to output directory..."
+    )
 
-add_custom_command(TARGET Advancely POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_SOURCE_DIR}/LICENSES.txt"
-        "$<TARGET_FILE_DIR:Advancely>"
-        COMMENT "[CMAKE] Copying LICENSES.txt to output directory..."
-)
+    add_custom_command(TARGET Advancely POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy
+            "${CMAKE_SOURCE_DIR}/LICENSES.txt"
+            "$<TARGET_FILE_DIR:Advancely>"
+            COMMENT "[CMAKE] Copying LICENSES.txt to output directory..."
+    )
 
-add_custom_command(TARGET Advancely POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_SOURCE_DIR}/README.md"
-        "$<TARGET_FILE_DIR:Advancely>"
-        COMMENT "[CMAKE] Copying README.md to output directory..."
-)
-endif()
+    add_custom_command(TARGET Advancely POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy
+            "${CMAKE_SOURCE_DIR}/README.md"
+            "$<TARGET_FILE_DIR:Advancely>"
+            COMMENT "[CMAKE] Copying README.md to output directory..."
+    )
+endif ()
 
 
 # --- 6. COMPILER FLAGS & SANITIZERS ---
@@ -276,6 +275,8 @@ else ()
             -Wpedantic              # Warn on non-standard language extensions
             -Werror                 # Treat all warnings as errors, forcing you to fix them
             -Wno-unused-result      # Ignore unused result warnings
+            # Disable specific GNU extension warning for Clang
+            $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-Wno-gnu-zero-variadic-macro-arguments>
     )
 
     # Add GCC-specific warning suppressions only when using the GCC compiler
