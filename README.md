@@ -580,6 +580,9 @@ Make sure you use the `SourceHanSansCN-Normal.otf` font in all places (tracker, 
   the settings if you use a custom location.
 * **Font Support**: The default `Minecraft.ttf` font doesn't support many more characters beyond the standard english
   language. Simply import your own `.ttf` or `.otf` file if needed (has to be within the `resources/fonts` folder).
+* **No Coop Support**: Unfortunately this tracker doesn't fully support coop speedruns as it always updates based on the
+  player file that has most recently been modified. This means Advancely doesn't `combine` progress of multiple
+  players. (e.g., each player completes different advancements).
 
 ***
 
