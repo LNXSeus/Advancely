@@ -34,6 +34,16 @@
 
 #include "imgui_internal.h"
 
+// Helper macros for font scaling
+#define SET_FONT_SCALE(size, base_size) \
+do { \
+scale_factor = 1.0f; /* Assign, don't declare */ \
+if (base_size > 0.0f) scale_factor = size / base_size; \
+ImGui::SetWindowFontScale(scale_factor); \
+} while(0) // Use do-while(0) for macro safety
+
+#define RESET_FONT_SCALE() ImGui::SetWindowFontScale(1.0f)
+
 // Simple string hashing function (djb2) to create a safe filename from a world path
 static unsigned long hash_string(const char *str) {
     unsigned long hash = 5381;
@@ -2519,6 +2529,7 @@ static void render_section_separator(Tracker *t, const AppSettings *settings, fl
     ImGuiIO &io = ImGui::GetIO();
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     float zoom = t->zoom_level;
+    float scale_factor;
 
     current_y += 12.0f; // Padding before the separator
 
@@ -2565,7 +2576,9 @@ static void render_section_separator(Tracker *t, const AppSettings *settings, fl
     float main_text_size = settings->tracker_font_size;
 
     // Measure the combined text
+    SET_FONT_SCALE(main_text_size, t->tracker_font->LegacySize);
     ImVec2 full_text_size = ImGui::CalcTextSize(full_title);
+    RESET_FONT_SCALE();
 
     float screen_width_in_world = io.DisplaySize.x / zoom;
 
@@ -2790,6 +2803,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
     ImU32 text_color_faded = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
                                       ADVANCELY_FADED_ALPHA);
     ImU32 icon_tint_faded = IM_COL32(255, 255, 255, ADVANCELY_FADED_ALPHA);
+    float scale_factor; // Declare scale_factor here
 
     // Define checkbox colors from settings
     ImU32 checkmark_color = text_color;
@@ -2877,7 +2891,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
         // --- Calculate width needed for PARENT text (using main font size) ---
         float parent_text_required_width = 0.0f;
+        SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
         parent_text_required_width = fmax(parent_text_required_width, ImGui::CalcTextSize(cat->display_name).x);
+        RESET_FONT_SCALE();
 
         // Calculate width for the progress text below the parent
         char progress_text_width_calc[32] = "";
@@ -2898,14 +2914,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             }
         }
         // Scale for progress text width calculation
-        float scale_factor = 1.0f;
-        if (settings->tracker_font_size > 0.0f) {
-            // Prevent division by zero
-            scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
-        }
-        ImGui::SetWindowFontScale(scale_factor);
+        SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
         float progress_text_actual_width = ImGui::CalcTextSize(progress_text_width_calc).x;
-        ImGui::SetWindowFontScale(1.0f); // Restore
+        RESET_FONT_SCALE();
         parent_text_required_width = fmaxf(parent_text_required_width, progress_text_actual_width);
         // Ensure width accommodates progress text
 
@@ -3083,18 +3094,16 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
 
             // Calculate text sizes with correct font scaling
+            SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
             ImVec2 text_size = ImGui::CalcTextSize(cat->display_name); // Uses main tracker_font_size
+            RESET_FONT_SCALE();
 
             // Scale font to sub-size for progress/snapshot text measurement
-            float scale_factor = 1.0f;
-            if (settings->tracker_font_size > 0.0f) {
-                // Prevent division by zero
-                scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
-            }
-            ImGui::SetWindowFontScale(scale_factor);
+            SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
             ImVec2 progress_text_size = ImGui::CalcTextSize(progress_text);
             ImVec2 snapshot_text_size = ImGui::CalcTextSize(snapshot_text);
-            ImGui::SetWindowFontScale(1.0f); // Restore default scale
+            RESET_FONT_SCALE();
+
             int visible_criteria_render_count = 0; // How many criteria *will be rendered* for height calc
 
             if (is_complex) {
@@ -3625,6 +3634,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                                 settings->text_color.a);
     ImU32 text_color_faded = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
                                       ADVANCELY_FADED_ALPHA);
+    float scale_factor; // Declare scale_factor here
 
     // Call separator with calculated counts (sub-counts are -1)
     render_section_separator(t, settings, current_y, section_title, text_color,
@@ -3655,6 +3665,10 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
         // Only consider items that will actually be rendered for width calculation
         if (!should_hide_width && matches_search_width) {
+            // Calculate width needed for text
+            SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize); // Use macro
+            RESET_FONT_SCALE(); // Reset scale
+
             uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, ImGui::CalcTextSize(item->display_name).x));
         }
     }
@@ -3694,8 +3708,10 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
 
         // --- Item Height and Layout ---
+        SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize); // Use macro for CalcTextSize
         ImVec2 text_size = ImGui::CalcTextSize(item->display_name);
-        float item_height = 96.0f + text_size.y + 4.0f; // Icon + Text + Padding
+        RESET_FONT_SCALE(); // Reset scale
+        float item_height = 96.0f + text_size.y + 4.0f;
 
         if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
             current_x = padding;
@@ -3892,6 +3908,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                                          ADVANCELY_FADED_ALPHA);
     ImU32 checkbox_hover_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
                                           (int)fminf(255.0f, ADVANCELY_FADED_ALPHA + 60));
+    float scale_factor; // Declare scale_factor here
 
     // Call separator with calculated counts (sub-counts are -1)
     render_section_separator(t, settings, current_y, section_title, text_color,
@@ -3924,7 +3941,10 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         // Only consider items that will actually be rendered for width calculation
         if (!should_hide_width && matches_search_width) {
             // Calculate width needed for text + progress text if applicable
+            SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
             float text_width = ImGui::CalcTextSize(item->display_name).x;
+            RESET_FONT_SCALE();
+
             char progress_text_width_calc[32] = "";
             if (item->goal > 0) {
                 snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d / %d)", item->progress,
@@ -3934,14 +3954,10 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             }
 
             // Scale for progress text width calculation
-            float scale_factor = 1.0f;
-            if (settings->tracker_font_size > 0.0f) {
-                // Prevent division by zero
-                scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
-            }
-            ImGui::SetWindowFontScale(scale_factor);
+            SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
             float progress_width = ImGui::CalcTextSize(progress_text_width_calc).x;
-            ImGui::SetWindowFontScale(1.0f); // Restore
+            RESET_FONT_SCALE();
+
             // The required width is the max of the main text width and the progress text width (as they are on separate lines)
             float required_text_width = fmaxf(text_width, progress_width);
             // Ensure minimum width accommodates the 96px background
@@ -3992,18 +4008,15 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         else if (item->goal == -1 && !item->done)
             snprintf(progress_text, sizeof(progress_text), "(%d)", item->progress);
 
-        // Calculate text sizes with correct font scaling
+        // Scale font to sub-size for progress text measurement
+        SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
         ImVec2 text_size = ImGui::CalcTextSize(item->display_name); // Uses main tracker_font_size
+        RESET_FONT_SCALE();
 
         // Scale font to sub-size for progress text measurement
-        float scale_factor = 1.0f;
-        if (settings->tracker_font_size > 0.0f) {
-            // Prevent division by zero
-            scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
-        }
-        ImGui::SetWindowFontScale(scale_factor);
+        SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
         ImVec2 progress_text_size = ImGui::CalcTextSize(progress_text);
-        ImGui::SetWindowFontScale(1.0f); // Restore default scale
+        RESET_FONT_SCALE();
 
         // Calculate height: Icon bg + main text + progress text (if any) + padding
         float item_height = 96.0f + text_size.y + 4.0f + (progress_text[0] != '\0' ? progress_text_size.y + 4.0f : 0);
@@ -4288,6 +4301,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                                 settings->text_color.a);
     ImU32 text_color_faded = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
                                       ADVANCELY_FADED_ALPHA); // Faded text color
+    float scale_factor; // Declare scale_factor here
 
     // Call separator with calculated counts
     render_section_separator(t, settings, current_y, section_title, text_color,
@@ -4325,7 +4339,9 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         // Only consider items that will actually be rendered for width calculation
         if (!should_hide_width && (name_matches_width || stage_matches_width)) {
             // Calculate width needed for text (main name and current stage text)
+            SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
             float name_width = ImGui::CalcTextSize(goal->display_name).x;
+            RESET_FONT_SCALE();
 
             // Format stage text including progress if applicable
             char stage_text_width_calc[256];
@@ -4338,14 +4354,9 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                 stage_text_width_calc[sizeof(stage_text_width_calc) - 1] = '\0';
             }
             // Scale for stage text width calculation
-            float scale_factor = 1.0f;
-            if (settings->tracker_font_size > 0.0f) {
-                // Prevent division by zero
-                scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
-            }
-            ImGui::SetWindowFontScale(scale_factor);
+            SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
             float stage_width = ImGui::CalcTextSize(stage_text_width_calc).x;
-            ImGui::SetWindowFontScale(1.0f); // Restore
+            RESET_FONT_SCALE();
 
             // Required width is the max needed for either line
             float required_text_width = fmaxf(name_width, stage_width);
@@ -4403,18 +4414,15 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             stage_text[sizeof(stage_text) - 1] = '\0';
         }
 
-        // Calculate text sizes with correct font scaling
+        // Scale font to sub-size for stage text measurement
+        SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
         ImVec2 text_size = ImGui::CalcTextSize(goal->display_name); // Uses main tracker_font_size
+        RESET_FONT_SCALE();
 
         // Scale font to sub-size for stage text measurement
-        float scale_factor = 1.0f;
-        if (settings->tracker_font_size > 0.0f) {
-            // Prevent division by zero
-            scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
-        }
-        ImGui::SetWindowFontScale(scale_factor);
+        SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
         ImVec2 stage_text_size = ImGui::CalcTextSize(stage_text);
-        ImGui::SetWindowFontScale(1.0f); // Restore default scale
+        RESET_FONT_SCALE();
 
         // Calculate height: Icon bg + main name + stage text + padding
         float item_height = 96.0f + text_size.y + 4.0f + stage_text_size.y + 4.0f;
@@ -4514,7 +4522,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                                       text_y_pos), current_text_color,
                                goal->display_name);
 
-            // Draw Current Stage Text below main name (centered)
+            // Draw Current Stage Text (uses sub_font_size)
             text_y_pos += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // Move Y down
             draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                ImVec2(
@@ -4660,6 +4668,12 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
     // --- Info Bar ---
 
+    // TODO: Remove?
+    // // --- Set Font Scale for Info Bar ---
+    // if (t->tracker_font && t->tracker_font->LegacySize > 0.0f) {
+    //     ImGui::SetWindowFontScale(settings->tracker_ui_font_size / t->tracker_font->LegacySize);
+    // }
+
     // Set the background color to match the tracker, with slight opacity.
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4((float) settings->tracker_bg_color.r / 255.f,
                                                     (float) settings->tracker_bg_color.g / 255.f,
@@ -4682,6 +4696,13 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // This Begin() call draws the window frame and title bar using the styles we just pushed.
     ImGui::Begin("Info | ESC: Settings | Pan: RMB/MMB Drag | Zoom: Wheel | Click: LMB | Move Win: LMB Drag", nullptr,
                  ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing);
+
+    // --- Set Font Scale for Info Bar CONTENT ---
+    float scale_factor_info = 1.0f; // Declare local scale factor
+    if (t->tracker_font && t->tracker_font->LegacySize > 0.0f) {
+        scale_factor_info = settings->tracker_ui_font_size / t->tracker_font->LegacySize;
+    }
+    ImGui::SetWindowFontScale(scale_factor_info); // Apply scale HERE, after Begin
 
     // Now that the title bar is drawn, we pop its text color and push the user's
     // original text color to use for the content inside the window.
@@ -4811,34 +4832,63 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // Pop the two style colors still on the stack (WindowBg and the content's Text color).
     ImGui::PopStyleColor(2);
 
+    // Reset Font Scale after Info Bar
+    ImGui::SetWindowFontScale(1.0f);
+
     // Layout Control Buttons
-    const float button_padding = 10.0f;
-    const float search_box_width = 250.0f;
-    const float clear_button_width = ImGui::GetFrameHeight(); // A nice square size for the "X" button
-    ImVec2 lock_button_text_size = ImGui::CalcTextSize("Lock Layout");
-    ImVec2 reset_button_text_size = ImGui::CalcTextSize("Reset Layout");
-    ImVec2 notes_button_text_size = ImGui::CalcTextSize("Notes");
 
-    // Add padding and space for the checkbox square
-    ImVec2 lock_button_size = ImVec2(lock_button_text_size.x + 25.0f, lock_button_text_size.y + 8.0f);
-    ImVec2 reset_button_size = ImVec2(reset_button_text_size.x + 25.0f, reset_button_text_size.y + 8.0f);
-    ImVec2 notes_button_size = ImVec2(notes_button_text_size.x - 13.0f, notes_button_text_size.y + 8.0f);
-    // -13 to shift it to the left
+    // --- Apply Font Scale for Control Bar Calculations AND Rendering ---
+    float scale_factor_controls = 1.0f;
+    if (t->tracker_font && t->tracker_font->LegacySize > 0.0f) {
+        scale_factor_controls = settings->tracker_ui_font_size / t->tracker_font->LegacySize;
+    }
+    ImGui::SetWindowFontScale(scale_factor_controls); // Apply scale FIRST
 
+    // --- Calculate control sizes AFTER setting the scale, using ImGui styles ---
+    ImGuiStyle& style = ImGui::GetStyle();
+    const float button_padding_x = style.ItemSpacing.x; // Use ImGui's item spacing
+    const float frame_padding_x = style.FramePadding.x;
+    // const float frame_padding_y = style.FramePadding.y;
+    const float frame_height = ImGui::GetFrameHeight(); // Scaled height for buttons/checkboxes
 
-    float controls_total_width = clear_button_width + search_box_width + lock_button_size.x + reset_button_size.x +
-                                 notes_button_size.x + (button_padding * 5.0f);
+    const float clear_button_width = frame_height; // Square button
+    const float search_box_width = 250.0f; // Keep this fixed for now
 
+    // Calculate sizes for Checkboxes (Square + Spacing + Label + Padding)
+    // Checkbox square is roughly frame_height wide.
+    ImVec2 lock_text_size = ImGui::CalcTextSize("Lock Layout");
+    float lock_checkbox_width = frame_height + style.ItemInnerSpacing.x + lock_text_size.x + frame_padding_x * 0.5f; // Approx checkbox width calculation
 
-    // Position a new transparent window in the bottom right to hold the buttons
-    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - controls_total_width - button_padding,
-                                   io.DisplaySize.y - lock_button_size.y - button_padding));
-    ImGui::SetNextWindowSize(ImVec2(controls_total_width, lock_button_size.y));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImVec2 reset_text_size = ImGui::CalcTextSize("Reset Layout");
+    float reset_checkbox_width = frame_height + style.ItemInnerSpacing.x + reset_text_size.x + frame_padding_x * 0.5f;
 
-    // ImGuiWindowFlags_NoMove could be defined here
-    ImGui::Begin("Controls", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground);
+    ImVec2 notes_text_size = ImGui::CalcTextSize("Notes");
+    float notes_checkbox_width = frame_height + style.ItemInnerSpacing.x + notes_text_size.x + frame_padding_x * 0.5f;
+
+    // Calculate total width using ImGui's ItemSpacing
+    // 6 elements = 5 gaps between them
+    float controls_total_width = clear_button_width + button_padding_x +
+                                 search_box_width + button_padding_x +
+                                 lock_checkbox_width + button_padding_x +
+                                 reset_checkbox_width + button_padding_x +
+                                 notes_checkbox_width;
+
+    // Calculate button height consistently
+    float control_height = frame_height; // All controls should share the same height
+
+    // --- Position the Controls window ---
+    ImVec2 controls_window_pos = ImVec2(io.DisplaySize.x - controls_total_width - style.WindowPadding.x, // Use window padding for edge spacing
+                                        io.DisplaySize.y - control_height - style.WindowPadding.y);
+    ImVec2 controls_window_size = ImVec2(controls_total_width, control_height);
+
+    ImGui::SetNextWindowPos(controls_window_pos);
+    ImGui::SetNextWindowSize(controls_window_size);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0)); // No internal padding needed for this wrapper
+
+    ImGui::Begin("Controls", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoMove);
     ImGui::PopStyleVar();
+
+    ImGui::SetWindowFontScale(scale_factor_controls);
 
     // Style for transparent buttons and checkbox
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4((float) settings->text_color.r / 255.f,
@@ -4854,8 +4904,6 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     ImGui::PushStyleColor(ImGuiCol_CheckMark, ImVec4((float) settings->text_color.r / 255.f,
                                                      (float) settings->text_color.g / 255.f,
                                                      (float) settings->text_color.b / 255.f, 1.0f));
-
-    ImGui::SetWindowFontScale(0.9f); // Slightly smaller text for controls
 
     // We use the tracker's main text color but with the faded alpha value.
     ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4((float) settings->text_color.r / 255.f,
@@ -5006,7 +5054,14 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     }
 
     ImGui::PopStyleColor(5); // Pop the style colors, there's 5 of them
+
+    // Reset Font Scale after Control Bar content
+    ImGui::SetWindowFontScale(1.0f); // Reset scale HERE, before End
+
     ImGui::End(); // End Layout Controls Window
+
+    // Reset Font Scale after Control Bar
+    ImGui::SetWindowFontScale(1.0f);
 
 
     // --- Render Notes Window ---

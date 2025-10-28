@@ -79,6 +79,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_TRACKER_FONT "Minecraft.ttf" // The overlay also uses this font
 #define DEFAULT_TRACKER_FONT_SIZE 16.0f
 #define DEFAULT_TRACKER_SUB_FONT_SIZE 14.0f // (DEFAULT_TRACKER_FONT_SIZE * 0.875f)
+#define DEFAULT_TRACKER_UI_FONT_SIZE 16.0f
 #define DEFAULT_OVERLAY_FONT "Minecraft.ttf"
 #define DEFAULT_UI_FONT "Roboto-Regular.ttf"
 #define DEFAULT_UI_FONT_SIZE 16.0f
@@ -182,6 +183,7 @@ struct AppSettings {
     char tracker_font_name[256];      // Filename of the font for the trackermap/overlay.
     float tracker_font_size;          // Base size for the main trackermap font. Overlay is fixed.
     float tracker_sub_font_size;      // Size for the sub-fonts (e.g., criteria) in the trackermap.
+    float tracker_ui_font_size;       // Size for the info bar and bottom controls.
     char ui_font_name[256];           // Filename of the font for ImGui UI (settings, etc.).
     float ui_font_size;               // Size for the UI font, may cause non-destructive overlap of buttons.
     char overlay_font_name[256];      // Filename of the font for the overlay.
