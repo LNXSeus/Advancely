@@ -1087,6 +1087,12 @@
 				"minecraft:husk":	{
 					"icon":	"monsters/husk.png"
 				},
+				"minecraft:parched":	{
+					"icon":	"monsters/parched.png"
+				},
+				"minecraft:camel_husk":	{
+					"icon":	"monsters/camel_husk.png"
+				},
 				"minecraft:drowned":	{
 					"icon":	"monsters/drowned.png"
 				},

@@ -280,6 +280,8 @@
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:zombie_horse":	"Zombie Horse",
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:skeleton":	"Skeleton",
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:husk":	"Husk",
+	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:parched":	"Parched",
+	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:camel_husk":	"Camel Husk",
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:drowned":	"Drowned",
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:zombie_nautilus":	"Zombie Nautilus",
 	"advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:stray":	"Stray",
