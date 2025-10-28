@@ -2897,8 +2897,14 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                          cat->completed_criteria_count, cat->criteria_count);
             }
         }
-        // Ensure the required width accounts for the progress text below the main name
+        // Scale for progress text width calculation
+        float scale_factor = 1.0f;
+        if (settings->tracker_font_size > 0.0f) { // Prevent division by zero
+            scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
+        }
+        ImGui::SetWindowFontScale(scale_factor);
         float progress_text_actual_width = ImGui::CalcTextSize(progress_text_width_calc).x;
+        ImGui::SetWindowFontScale(1.0f); // Restore
         parent_text_required_width = fmaxf(parent_text_required_width, progress_text_actual_width); // Ensure width accommodates progress text
 
         float children_max_required_width = 0.0f;
@@ -3073,9 +3079,18 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             }
 
 
-            ImVec2 text_size = ImGui::CalcTextSize(cat->display_name);
+            // Calculate text sizes with correct font scaling
+            ImVec2 text_size = ImGui::CalcTextSize(cat->display_name); // Uses main tracker_font_size
+
+            // Scale font to sub-size for progress/snapshot text measurement
+            float scale_factor = 1.0f;
+            if (settings->tracker_font_size > 0.0f) { // Prevent division by zero
+                scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
+            }
+            ImGui::SetWindowFontScale(scale_factor);
             ImVec2 progress_text_size = ImGui::CalcTextSize(progress_text);
             ImVec2 snapshot_text_size = ImGui::CalcTextSize(snapshot_text);
+            ImGui::SetWindowFontScale(1.0f); // Restore default scale
             int visible_criteria_render_count = 0; // How many criteria *will be rendered* for height calc
 
             if (is_complex) {
@@ -3890,7 +3905,15 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             } else if (item->goal == -1 && !item->done) {
                 snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d)", item->progress);
             }
+
+            // Scale for progress text width calculation
+            float scale_factor = 1.0f;
+            if (settings->tracker_font_size > 0.0f) { // Prevent division by zero
+                scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
+            }
+            ImGui::SetWindowFontScale(scale_factor);
             float progress_width = ImGui::CalcTextSize(progress_text_width_calc).x;
+            ImGui::SetWindowFontScale(1.0f); // Restore
             // The required width is the max of the main text width and the progress text width (as they are on separate lines)
             float required_text_width = fmaxf(text_width, progress_width);
             // Ensure minimum width accommodates the 96px background
@@ -3941,8 +3964,18 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         else if (item->goal == -1 && !item->done)
             snprintf(progress_text, sizeof(progress_text), "(%d)", item->progress);
 
-        ImVec2 text_size = ImGui::CalcTextSize(item->display_name);
+        // Calculate text sizes with correct font scaling
+        ImVec2 text_size = ImGui::CalcTextSize(item->display_name); // Uses main tracker_font_size
+
+        // Scale font to sub-size for progress text measurement
+        float scale_factor = 1.0f;
+        if (settings->tracker_font_size > 0.0f) { // Prevent division by zero
+            scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
+        }
+        ImGui::SetWindowFontScale(scale_factor);
         ImVec2 progress_text_size = ImGui::CalcTextSize(progress_text);
+        ImGui::SetWindowFontScale(1.0f); // Restore default scale
+
         // Calculate height: Icon bg + main text + progress text (if any) + padding
         float item_height = 96.0f + text_size.y + 4.0f + (progress_text[0] != '\0' ? progress_text_size.y + 4.0f : 0);
 
@@ -4275,7 +4308,14 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                 strncpy(stage_text_width_calc, active_stage_width->display_text, sizeof(stage_text_width_calc) - 1);
                 stage_text_width_calc[sizeof(stage_text_width_calc) - 1] = '\0';
             }
+            // Scale for stage text width calculation
+            float scale_factor = 1.0f;
+            if (settings->tracker_font_size > 0.0f) { // Prevent division by zero
+                scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
+            }
+            ImGui::SetWindowFontScale(scale_factor);
             float stage_width = ImGui::CalcTextSize(stage_text_width_calc).x;
+            ImGui::SetWindowFontScale(1.0f); // Restore
 
             // Required width is the max needed for either line
             float required_text_width = fmaxf(name_width, stage_width);
@@ -4333,8 +4373,18 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             stage_text[sizeof(stage_text) - 1] = '\0';
         }
 
-        ImVec2 text_size = ImGui::CalcTextSize(goal->display_name);
+        // Calculate text sizes with correct font scaling
+        ImVec2 text_size = ImGui::CalcTextSize(goal->display_name); // Uses main tracker_font_size
+
+        // Scale font to sub-size for stage text measurement
+        float scale_factor = 1.0f;
+        if (settings->tracker_font_size > 0.0f) { // Prevent division by zero
+            scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
+        }
+        ImGui::SetWindowFontScale(scale_factor);
         ImVec2 stage_text_size = ImGui::CalcTextSize(stage_text);
+        ImGui::SetWindowFontScale(1.0f); // Restore default scale
+
         // Calculate height: Icon bg + main name + stage text + padding
         float item_height = 96.0f + text_size.y + 4.0f + stage_text_size.y + 4.0f;
 

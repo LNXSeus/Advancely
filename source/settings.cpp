@@ -1340,7 +1340,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                  "Adjust the font size for UI windows.\n"
                  "Affects Settings, Template Editor, and Notes windows.\n"
-                 "Default: %.1f pt.\n\n"
+                 "Default: %.1f pt. Max: 64.0 pt.\n\n"
                  "IMPORTANT: Requires restarting Advancely to apply.",
                  DEFAULT_UI_FONT_SIZE);
         ImGui::SetTooltip("%s", tooltip_buffer);
