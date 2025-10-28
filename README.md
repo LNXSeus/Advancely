@@ -12,8 +12,8 @@ sharp._
 
 ***
 
-## This tracker supports an arbitrary number of advancements, recipes, custom statistics, unlocks, multi-stage goals, manual goals, and custom counters for over 100 Minecraft versions and is fully speedrun legal based on the [rules](https://www.minecraftspeedrunning.com/public-resources/rules) by only reading from within the
-## `advancements`, `stats` and `unlocks` (_25w14craftmine_) folder of a world that update through pauses.
+## This tracker supports an arbitrary number of advancements, recipes, custom statistics, unlocks, multi-stage goals, manual goals, and custom counters for over 100 Minecraft versions.
+## Advancely is fully speedrun legal based on the [Minecraft Speedrunning rules](https://www.minecraftspeedrunning.com/public-resources/rules) by only reading from within the 'advancements', 'stats' and 'unlocks' (25w14craftmine) folders of a world that update when the game saves.
 
 ### Built for flexibility, Advancely supports everything from vanilla speedruns to modded adventures and datapacks through the creation of custom templates with a built-in template editor. It automatically detects changes in your latest singleplayer world, providing real-time progress updates.
 
