@@ -2899,13 +2899,15 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         }
         // Scale for progress text width calculation
         float scale_factor = 1.0f;
-        if (settings->tracker_font_size > 0.0f) { // Prevent division by zero
+        if (settings->tracker_font_size > 0.0f) {
+            // Prevent division by zero
             scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
         }
         ImGui::SetWindowFontScale(scale_factor);
         float progress_text_actual_width = ImGui::CalcTextSize(progress_text_width_calc).x;
         ImGui::SetWindowFontScale(1.0f); // Restore
-        parent_text_required_width = fmaxf(parent_text_required_width, progress_text_actual_width); // Ensure width accommodates progress text
+        parent_text_required_width = fmaxf(parent_text_required_width, progress_text_actual_width);
+        // Ensure width accommodates progress text
 
         float children_max_required_width = 0.0f;
 
@@ -2938,7 +2940,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     ImGui::SetWindowFontScale(sub_font_size / t->tracker_font->LegacySize); // Scale to sub-size
 
                     char crit_progress_text_width[32] = "";
-                    if (is_stat_section) { // Only calculate progress width for sub-stats
+                    if (is_stat_section) {
+                        // Only calculate progress width for sub-stats
                         if (crit->goal > 0) {
                             snprintf(crit_progress_text_width, sizeof(crit_progress_text_width), "(%d / %d)",
                                      crit->progress,
@@ -3084,7 +3087,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
             // Scale font to sub-size for progress/snapshot text measurement
             float scale_factor = 1.0f;
-            if (settings->tracker_font_size > 0.0f) { // Prevent division by zero
+            if (settings->tracker_font_size > 0.0f) {
+                // Prevent division by zero
                 scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
             }
             ImGui::SetWindowFontScale(scale_factor);
@@ -3415,7 +3419,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                         // Calculate text height using the correct font scale
                         float scale_factor = 1.0f;
-                        if (settings->tracker_font_size > 0.0f) { // Prevent division by zero
+                        if (settings->tracker_font_size > 0.0f) {
+                            // Prevent division by zero
                             scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
                         }
 
@@ -3430,7 +3435,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                         // Calculate the vertically centered Y position
                         // (BoxTop) + ( (BoxHeight - TextHeight) / 2 )
-                        float text_y_pos = crit_base_pos_screen.y + (32.0f * t->zoom_level - child_text_size.y) * 0.5f;
+                        // Both the box height AND the text height must be scaled by zoom.
+                        float text_y_pos = crit_base_pos_screen.y + (
+                                               (32.0f * t->zoom_level) - (child_text_size.y * t->zoom_level)) * 0.5f;
 
                         // Draw the text
                         ImVec2 child_text_pos = ImVec2(current_element_x_screen, text_y_pos);
@@ -3438,7 +3445,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                            current_child_text_color, crit->display_name);
 
                         // Advance X position using the width we just calculated
-                        current_element_x_screen += child_text_size.x + 4.0f * t->zoom_level;
+                        current_element_x_screen += (child_text_size.x * t->zoom_level) + (4.0f * t->zoom_level);
 
                         char crit_progress_text[32] = "";
                         if (is_stat_section) {
@@ -3928,7 +3935,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
             // Scale for progress text width calculation
             float scale_factor = 1.0f;
-            if (settings->tracker_font_size > 0.0f) { // Prevent division by zero
+            if (settings->tracker_font_size > 0.0f) {
+                // Prevent division by zero
                 scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
             }
             ImGui::SetWindowFontScale(scale_factor);
@@ -3989,7 +3997,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
         // Scale font to sub-size for progress text measurement
         float scale_factor = 1.0f;
-        if (settings->tracker_font_size > 0.0f) { // Prevent division by zero
+        if (settings->tracker_font_size > 0.0f) {
+            // Prevent division by zero
             scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
         }
         ImGui::SetWindowFontScale(scale_factor);
@@ -4330,7 +4339,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             }
             // Scale for stage text width calculation
             float scale_factor = 1.0f;
-            if (settings->tracker_font_size > 0.0f) { // Prevent division by zero
+            if (settings->tracker_font_size > 0.0f) {
+                // Prevent division by zero
                 scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
             }
             ImGui::SetWindowFontScale(scale_factor);
@@ -4398,7 +4408,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
         // Scale font to sub-size for stage text measurement
         float scale_factor = 1.0f;
-        if (settings->tracker_font_size > 0.0f) { // Prevent division by zero
+        if (settings->tracker_font_size > 0.0f) {
+            // Prevent division by zero
             scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
         }
         ImGui::SetWindowFontScale(scale_factor);
