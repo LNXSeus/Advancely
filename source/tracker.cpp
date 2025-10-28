@@ -3202,11 +3202,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                 // Render Text (Main Name, Snapshot, Progress)
                 float current_text_y = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
-                float base_font_size = settings->tracker_font_size;
-                float sub_font_size = base_font_size * 0.875f;
+                float main_font_size = settings->tracker_font_size;
+                float sub_font_size = settings->tracker_sub_font_size; // Max 32 to prevent shifting downwards
 
                 // Main Name
-                draw_list->AddText(nullptr, base_font_size * t->zoom_level,
+                draw_list->AddText(nullptr, main_font_size * t->zoom_level,
                                    ImVec2(
                                        screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
                                        current_text_y), text_color, cat->display_name);
@@ -4016,15 +4016,15 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             }
 
             // Render Text (Name and Progress)
-            float main_text_size = settings->tracker_font_size;
-            float sub_text_size = main_text_size * 0.875f; // e.g., 14pt for a 16pt base
+            float main_font_size = settings->tracker_font_size;
+            float sub_font_size = settings->tracker_sub_font_size; // Max 32 pt
             ImU32 current_text_color = item->done ? text_color_faded : text_color; // Fade if done
 
             // Calculate Y position for the first line of text
             float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
 
             // Draw Main Name (centered)
-            draw_list->AddText(nullptr, main_text_size * t->zoom_level,
+            draw_list->AddText(nullptr, main_font_size * t->zoom_level,
                                ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
                                       text_y_pos), current_text_color,
                                item->display_name);
@@ -4032,7 +4032,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             // Draw Progress Text below main name (if applicable, centered)
             if (progress_text[0] != '\0') {
                 text_y_pos += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // Move Y down
-                draw_list->AddText(nullptr, sub_text_size * t->zoom_level,
+                draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                    ImVec2(
                                        screen_pos.x + (bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level)
                                        * 0.5f,
@@ -4403,22 +4403,22 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             }
 
             // Render Text (Main Name and Current Stage Text)
-            float main_text_size = settings->tracker_font_size;
-            float sub_text_size = main_text_size * 0.875f; // e.g., 14pt for a 16pt base
+            float main_font_size = settings->tracker_font_size;
+            float sub_font_size = settings->tracker_sub_font_size;
             ImU32 current_text_color = is_done_render ? text_color_faded : text_color; // Fade if done
 
             // Calculate Y position for the first line of text
             float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
 
             // Draw Main Name (centered)
-            draw_list->AddText(nullptr, main_text_size * t->zoom_level,
+            draw_list->AddText(nullptr, main_font_size * t->zoom_level,
                                ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
                                       text_y_pos), current_text_color,
                                goal->display_name);
 
             // Draw Current Stage Text below main name (centered)
             text_y_pos += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // Move Y down
-            draw_list->AddText(nullptr, sub_text_size * t->zoom_level,
+            draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                ImVec2(
                                    screen_pos.x + (bg_size.x * t->zoom_level - stage_text_size.x * t->zoom_level) *
                                    0.5f,

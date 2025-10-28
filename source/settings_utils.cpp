@@ -22,6 +22,7 @@ const ColorRGBA DEFAULT_OVERLAY_BG_COLOR = {0, 80, 255, 255};
 const ColorRGBA DEFAULT_TEXT_COLOR = {255, 255, 255, 255};
 const ColorRGBA DEFAULT_OVERLAY_TEXT_COLOR = {255, 255, 255, 255};
 
+// UI Colors
 const ColorRGBA DEFAULT_UI_TEXT_COLOR = {255, 255, 255, 255}; // ImGuiCol_Text
 const ColorRGBA DEFAULT_UI_WINDOW_BG_COLOR = {15, 15, 15, 240}; // ImGuiCol_WindowBg
 const ColorRGBA DEFAULT_UI_FRAME_BG_COLOR = {41, 74, 122, 138}; // ImGuiCol_FrameBg
@@ -277,6 +278,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->tracker_font_name[sizeof(settings->tracker_font_name) - 1] = '\0';
 
     settings->tracker_font_size = DEFAULT_TRACKER_FONT_SIZE;
+    settings->tracker_sub_font_size = DEFAULT_TRACKER_SUB_FONT_SIZE;
     strncpy(settings->ui_font_name, DEFAULT_UI_FONT, sizeof(settings->ui_font_name) - 1);
     settings->ui_font_name[sizeof(settings->ui_font_name) - 1] = '\0';
 
@@ -610,6 +612,14 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
+        const cJSON *tracker_sub_font_size = cJSON_GetObjectItem(general_settings, "tracker_sub_font_size");
+        if (tracker_sub_font_size && cJSON_IsNumber(tracker_sub_font_size))
+            settings->tracker_sub_font_size = (float) tracker_sub_font_size->valuedouble;
+        else {
+            settings->tracker_sub_font_size = DEFAULT_TRACKER_SUB_FONT_SIZE;
+            defaults_were_used = true;
+        }
+
         const cJSON *overlay_font = cJSON_GetObjectItem(general_settings, "overlay_font_name");
         if (overlay_font && cJSON_IsString(overlay_font)) {
             strncpy(settings->overlay_font_name, overlay_font->valuestring, sizeof(settings->overlay_font_name) - 1);
@@ -774,6 +784,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(general_obj, "tracker_font_name", cJSON_CreateString(settings->tracker_font_name));
         cJSON_DeleteItemFromObject(general_obj, "tracker_font_size");
         cJSON_AddItemToObject(general_obj, "tracker_font_size", cJSON_CreateNumber(settings->tracker_font_size));
+        cJSON_DeleteItemFromObject(general_obj, "tracker_sub_font_size");
+        cJSON_AddItemToObject(general_obj, "tracker_sub_font_size", cJSON_CreateNumber(settings->tracker_sub_font_size));
         cJSON_DeleteItemFromObject(general_obj, "overlay_font_name");
         cJSON_AddItemToObject(general_obj, "overlay_font_name", cJSON_CreateString(settings->overlay_font_name));
         cJSON_DeleteItemFromObject(general_obj, "ui_font_name");

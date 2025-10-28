@@ -2,6 +2,7 @@
 	"general":	{
 		"tracker_font_name":	"Minecraft.ttf",
 		"tracker_font_size":	16,
+		"tracker_sub_font_size": 14,
 		"overlay_font_name":	"Minecraft.ttf",
 		"ui_font_name":	"Roboto-Regular.ttf",
 		"ui_font_size":	16,

@@ -65,6 +65,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
 
         strcmp(a->tracker_font_name, b->tracker_font_name) != 0 ||
         a->tracker_font_size != b->tracker_font_size ||
+        a->tracker_sub_font_size != b->tracker_sub_font_size ||
         strcmp(a->ui_font_name, b->ui_font_name) != 0 ||
         a->ui_font_size != a->ui_font_size ||
         strcmp(a->overlay_font_name, b->overlay_font_name) != 0 ||
@@ -1262,24 +1263,34 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         char tooltip_buffer[1024];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                  "Select the font for the main tracker view.\n"
-                 "This affects the goal display text, the top info bar, and the bottom control buttons.\n"
-                 "The font size can be adjusted in the resources/config/settings.json file next to\n"
-                 "'tracker_font_size' directly (default 16, but it's experimental).\n"
+                 "This affects the goal display text, the top info bar,\n"
+                 "and the bottom control buttons.\n"
                  "Only choose fonts within the resources/fonts directory.\n\n"
                  "A restart is required to properly apply changes.");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
     // Tracker Font Size
-    ImGui::DragFloat("Tracker Font Size", &temp_settings.tracker_font_size, 0.5f, 8.0f, 32.0f, "%.1f pt");
+    ImGui::DragFloat("Tracker Font Size", &temp_settings.tracker_font_size, 0.5f, 8.0f, 64.0f, "%.1f pt");
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[1024];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                 "Adjust the base font size for the main tracker view.\n"
-                 "Affects goal display text, info bar, and controls.\n"
-                 "Default: %.1f pt. Max: 32.0 pt(can be increased in settings.json\n"
-                 "(tracker_font_size), but causes criteria text to be shifted downwards).\n\n"
+                 "Adjust the font size for main goal names and the top info bar.\n"
+                 "Default: %.1f pt. Max: 64.0 pt.\n\n"
                  "IMPORTANT: Requires restarting Advancely to apply.",
                  DEFAULT_TRACKER_FONT_SIZE);
+        ImGui::SetTooltip("%s", tooltip_buffer);
+    }
+
+    // Tracker Sub-Font Size
+    ImGui::DragFloat("Sub-Item Font Size", &temp_settings.tracker_sub_font_size, 0.5f, 8.0f, 32.0f, "%.1f pt");
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buffer[1024];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Adjust the font size for sub-items like criteria,\n"
+                 "sub-stats, and multi-stage goal stages.\n"
+                 "Default: %.1f pt. Max: 32.0 pt.\n\n"
+                 "IMPORTANT: Requires restarting Advancely to apply.",
+                 DEFAULT_TRACKER_SUB_FONT_SIZE);
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
@@ -1318,8 +1329,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                  "Select the font for UI windows.\n"
                  "This affects the Settings, Template Creator, and Notes windows.\n"
-                 "The font size can be adjusted in the resources/config/settings.json file next to\n"
-                 "'ui_font_size' directly (default 16, but it's experimental).\n"
                  "Only choose fonts within the resources/fonts directory.\n\n"
                  "A restart is required to properly apply changes.");
         ImGui::SetTooltip("%s", tooltip_buffer);
@@ -1341,6 +1350,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     bool font_settings_changed =
             strcmp(temp_settings.tracker_font_name, saved_settings.tracker_font_name) != 0 ||
             temp_settings.tracker_font_size != saved_settings.tracker_font_size ||
+            temp_settings.tracker_sub_font_size != saved_settings.tracker_sub_font_size ||
             strcmp(temp_settings.ui_font_name, saved_settings.ui_font_name) != 0 ||
             temp_settings.ui_font_size != saved_settings.ui_font_size;
 
@@ -1751,7 +1761,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Speed Up Animation: %s\n"
                  "  - Hide Completed Row 3 Goals: %s\n"
                  "  - Always On Top: %s\n"
-                 "  - Tracker Font: %s (%.1f pt)\n"
+                 "  - Tracker Font: %s (Main: %.1f pt, Sub: %.1f pt)\n"
                  "  - Overlay Font: %s\n"
                  "  - Settings/UI Font: %s (%.1f pt)\n"
                  "  - Goal Visibility: Hide All Completed\n"
@@ -1777,6 +1787,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
                  DEFAULT_TRACKER_FONT,
                  DEFAULT_TRACKER_FONT_SIZE,
+                 DEFAULT_TRACKER_SUB_FONT_SIZE,
                  DEFAULT_OVERLAY_FONT,
                  DEFAULT_UI_FONT,
                  DEFAULT_UI_FONT_SIZE,
