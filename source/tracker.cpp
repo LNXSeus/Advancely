@@ -2875,8 +2875,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         // Determine if this is a simple stat category
         bool is_simple_stat_category = is_stat_section && cat->is_single_stat_category;
 
-        // Calculate wdith for the parent display name
-        required_width = fmax(required_width, ImGui::CalcTextSize(cat->display_name).x);
+        // --- Calculate width needed for PARENT text (using main font size) ---
+        float parent_text_required_width = 0.0f;
+        parent_text_required_width = fmax(parent_text_required_width, ImGui::CalcTextSize(cat->display_name).x);
 
         // Calculate width for the progress text below the parent
         char progress_text_width_calc[32] = "";
@@ -2898,8 +2899,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         }
         // Ensure the required width accounts for the progress text below the main name
         float progress_text_actual_width = ImGui::CalcTextSize(progress_text_width_calc).x;
-        required_width = fmaxf(required_width, progress_text_actual_width); // Ensure width accommodates progress text
+        parent_text_required_width = fmaxf(parent_text_required_width, progress_text_actual_width); // Ensure width accommodates progress text
 
+        float children_max_required_width = 0.0f;
 
         // Check children widths ONLY for complex items
         if (!is_simple_stat_category && cat->criteria_count > 0) {
@@ -2924,6 +2926,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                                   crit->display_name, t->search_buffer));
 
                 if (crit && !crit_should_hide_width && crit_matches_search) {
+                    // Use sub_font_size for calculations here
+                    float sub_font_size = settings->tracker_sub_font_size;
+                    ImGui::PushFont(t->tracker_font); // Assume tracker font needed for CalcTextSize
+                    ImGui::SetWindowFontScale(sub_font_size / t->tracker_font->LegacySize); // Scale to sub-size
+
                     char crit_progress_text_width[32] = "";
                     if (is_stat_section) { // Only calculate progress width for sub-stats
                         if (crit->goal > 0) {
@@ -2942,10 +2949,20 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     float total_crit_width = 32 + 4 + checkbox_width + crit_text_width + (
                                                  crit_progress_width > 0 ? 4 + crit_progress_width : 0);
                     // Icon + padding + checkbox + text + progress
-                    required_width = fmaxf(required_width, total_crit_width);
+
+                    // --- Pop font scaling ---
+                    ImGui::SetWindowFontScale(1.0f);
+                    ImGui::PopFont();
+
+                    children_max_required_width = fmaxf(children_max_required_width, total_crit_width);
                 }
             }
         }
+        // Determine final required width
+        // It's the maximum of the parent's text needs OR the children's needs
+        required_width = fmaxf(parent_text_required_width, children_max_required_width);
+
+        // Ensure minimum width accommodates the 96px background for all items
         uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, required_width));
         // Ensure minimum width for icon bg
     }
@@ -4617,7 +4634,6 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         format_category_string(settings->category, formatted_category, sizeof(formatted_category));
         char formatted_flag[128];
         format_category_string(settings->optional_flag, formatted_flag, sizeof(formatted_flag));
-        MC_Version version = settings_get_version_from_string(settings->version_str);
         const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
         float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
         format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time));
@@ -5143,7 +5159,6 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
         if (!template_json) {
             // If it fails even with the default, something is critically wrong.
             // Temporarily disable 'Always On Top' to ensure the popup is visible
-            bool was_on_top = (SDL_GetWindowFlags(t->window) & SDL_WINDOW_ALWAYS_ON_TOP);
             if (was_on_top) {
                 SDL_SetWindowAlwaysOnTop(t->window, false);
             }
