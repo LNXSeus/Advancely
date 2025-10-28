@@ -780,7 +780,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                      "Tips:\n"
                      " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
                      " • A negative scroll speed animates items from right to left.\n"
-                     " • To adjust horizontal spacing, shorten display names in the template creator.\n\n"
+                     " • Horizontal spacing depends on the length of the display text.\n\n"
                      "IMPORTANT FOR STREAMERS:\n"
                      "Applying settings will restart the overlay window.\n"
                      "You may need to reselect it in your streaming software (e.g., OBS).",
@@ -798,7 +798,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                      "Tips:\n"
                      " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
                      " • A negative scroll speed animates items from right to left.\n"
-                     " • To adjust horizontal spacing, shorten display names in the template creator.\n\n"
+                     " • Horizontal spacing depends on the length of the display text.\n\n"
                      "IMPORTANT FOR STREAMERS:\n"
                      "Applying settings will restart the overlay window.\n"
                      "You may need to reselect it in your streaming software (e.g., OBS).",
@@ -816,7 +816,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                      "Tips:\n"
                      " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
                      " • A negative scroll speed animates items from right to left.\n"
-                     " • To adjust horizontal spacing, shorten display names in the template creator.\n\n"
+                     " • Horizontal spacing depends on the length of the display text.\n\n"
                      "IMPORTANT FOR STREAMERS:\n"
                      "Applying settings will restart the overlay window.\n"
                      "You may need to reselect it in your streaming software (e.g., OBS).",
@@ -834,7 +834,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                      "Tips:\n"
                      " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
                      " • A negative scroll speed animates items from right to left.\n"
-                     " • To adjust horizontal spacing, shorten display names in the template creator.\n\n"
+                     " • Horizontal spacing depends on the length of the display text.\n\n"
                      "IMPORTANT FOR STREAMERS:\n"
                      "Applying settings will restart the overlay window.\n"
                      "You may need to reselect it in your streaming software (e.g., OBS).",
@@ -882,6 +882,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                      "Adjusts the horizontal gap (in pixels) between icons\n"
                      "in the top row (Row 1) of the overlay.\n"
+                     "The horizontal spacing of the 2nd and 3rd row\n"
+                     "depends on the length of the display text.\n"
                      "Default: %.1f px",
                      DEFAULT_OVERLAY_ROW1_SPACING);
             ImGui::SetTooltip("%s", tooltip_buffer);
