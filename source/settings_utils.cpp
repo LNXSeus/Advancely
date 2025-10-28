@@ -267,6 +267,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->print_debug_status = DEFAULT_PRINT_DEBUG_STATUS;
     settings->overlay_progress_text_align = DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN;
     settings->overlay_animation_speedup = DEFAULT_OVERLAY_SPEED_UP;
+    settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING;
     settings->overlay_row3_remove_completed = DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED;
     settings->overlay_stat_cycle_speed = DEFAULT_OVERLAY_STAT_CYCLE_SPEED;
     settings->notes_use_roboto_font = DEFAULT_NOTES_USE_ROBOTO;
@@ -677,6 +678,14 @@ bool settings_load(AppSettings *settings) {
                        &DEFAULT_OVERLAY_TEXT_COLOR))
             defaults_were_used = true;
 
+        const cJSON *row1_spacing_json = cJSON_GetObjectItem(visual_settings, "overlay_row1_spacing");
+        if (row1_spacing_json && cJSON_IsNumber(row1_spacing_json)) {
+            settings->overlay_row1_spacing = (float)row1_spacing_json->valuedouble;
+        } else {
+            settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING;
+            defaults_were_used = true;
+        }
+
         // Load UI Theme Colors
         if (load_color(visual_settings, "ui_text_color", &settings->ui_text_color, &DEFAULT_UI_TEXT_COLOR))
             defaults_were_used = true;
@@ -715,6 +724,7 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
     } else {
         defaults_were_used = true;
+        settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING; // Ensure default if visuals section missing
     }
 
     // Parse hotkeys
@@ -885,6 +895,9 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         save_color(visuals_obj, "overlay_bg_color", &settings->overlay_bg_color);
         save_color(visuals_obj, "text_color", &settings->text_color);
         save_color(visuals_obj, "overlay_text_color", &settings->overlay_text_color);
+
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_spacing");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row1_spacing", cJSON_CreateNumber(settings->overlay_row1_spacing));
 
         // UI Colors
         save_color(visuals_obj, "ui_text_color", &settings->ui_text_color);

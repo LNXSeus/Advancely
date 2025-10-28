@@ -452,7 +452,7 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
         }
 
         if (visible_item_count > 0) {
-            const float item_full_width = 48.0f + 8.0f; // ROW1_ICON_SIZE + ROW1_SPACING
+            const float item_full_width = 48.0f + settings->overlay_row1_spacing; // ROW1_ICON_SIZE + ROW1_SPACING
             o->scroll_offset_row1 += scroll_delta;
             int items_scrolled = floor(fabs(o->scroll_offset_row1) / item_full_width);
             if (items_scrolled > 0) {
@@ -696,9 +696,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
     {
         const float ROW1_Y_POS = 48.0f; // Initially 52
         const float ROW1_ICON_SIZE = 48.0f;
-        const float ROW1_SPACING = 8.0f;
         const float ROW1_SHARED_ICON_SIZE = 30.0f;
-        const float item_full_width = ROW1_ICON_SIZE + ROW1_SPACING;
+        const float item_full_width = ROW1_ICON_SIZE + settings->overlay_row1_spacing;
 
         // Gather items to determine the list we are animating
         std::vector<std::pair<TrackableItem *, TrackableCategory *> > row1_items;
@@ -727,7 +726,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
         if (!row1_items.empty()) {
             // Determine how many slots to draw based on screen width.
-            int items_to_draw = ceil((float) window_w / item_full_width) + 2; // To render items off screen
+            int items_to_draw = (item_full_width > 0) ? ceil((float) window_w / item_full_width) + 2 : 0; // Use dynamic width
             // Only draw as many items as are visible, but repeat them if needed to fill the screen (marquee effect).
 
             // Draw either enough slots to fill the screen OR only the visible items, whichever is smaller.

@@ -876,6 +876,17 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::SetTooltip("%s", overlay_scroll_speed_tooltip_buffer);
         }
 
+        ImGui::DragFloat("Row 1 Icon Spacing", &temp_settings.overlay_row1_spacing, 0.1f, 0.0f, 256.0f, "%.1f px");
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Adjusts the horizontal gap (in pixels) between icons\n"
+                     "in the top row (Row 1) of the overlay.\n"
+                     "Default: %.1f px",
+                     DEFAULT_OVERLAY_ROW1_SPACING);
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+
         ImGui::DragFloat("Sub-Stat Cycle Interval (s)", &temp_settings.overlay_stat_cycle_speed, 0.1f, 0.1f, 60.0f,
                          "%.3f s");
         if (ImGui::IsItemHovered()) {
@@ -1769,6 +1780,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Tracker FPS Limit: %d\n"
                  "  - Overlay FPS Limit: %d\n"
                  "  - Overlay Scroll Speed: %.2f\n"
+                 "  - Row 1 Icon Spacing: %.1f px\n"
                  "  - Sub-Stat Cycle Speed: %.1f s\n"
                  "  - Speed Up Animation: %s\n"
                  "  - Hide Completed Row 3 Goals: %s\n"
@@ -1793,6 +1805,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_FPS,
                  DEFAULT_OVERLAY_FPS,
                  DEFAULT_OVERLAY_SCROLL_SPEED,
+                 DEFAULT_OVERLAY_ROW1_SPACING,
                  DEFAULT_OVERLAY_STAT_CYCLE_SPEED,
                  DEFAULT_OVERLAY_SPEED_UP ? "Enabled" : "Disabled",
                  DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
