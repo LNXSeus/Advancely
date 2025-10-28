@@ -2,6 +2,8 @@
 	"general":	{
 		"tracker_font_name":	"Minecraft.ttf",
 		"tracker_font_size":	16,
+		"tracker_sub_font_size": 14,
+		"tracker_ui_font_size": 16,
 		"overlay_font_name":	"Minecraft.ttf",
 		"ui_font_name":	"Roboto-Regular.ttf",
 		"ui_font_size":	16,
@@ -16,6 +18,7 @@
 		"overlay_scroll_speed":	1,
 		"overlay_progress_text_align":	"left",
 		"overlay_animation_speedup":	false,
+		"overlay_row1_spacing":	8,
 		"overlay_row3_remove_completed":	false,
 		"overlay_stat_cycle_speed":	3,
 		"notes_use_roboto_font":	false,
