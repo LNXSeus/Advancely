@@ -1286,7 +1286,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[1024];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                 "Adjust the font size for main goal names and the top info bar.\n"
+                 "Adjust the font size for main goal names and the notes window.\n"
                  "Default: %.1f pt.",
                  DEFAULT_TRACKER_FONT_SIZE);
         ImGui::SetTooltip("%s", tooltip_buffer);
@@ -1370,8 +1370,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // --- Restart Warning (only applies to UI font size and fonts) ---
     bool font_settings_changed =
             strcmp(temp_settings.tracker_font_name, saved_settings.tracker_font_name) != 0 ||
-            // No restart needed for any sizes
-            // temp_settings.tracker_font_size != saved_settings.tracker_font_size ||
+            // Restart needed for tracker font size because of notes window
+            temp_settings.tracker_font_size != saved_settings.tracker_font_size ||
             // temp_settings.tracker_sub_font_size != saved_settings.tracker_sub_font_size ||
             // temp_settings.tracker_ui_font_size != saved_settings.tracker_ui_font_size ||
             strcmp(temp_settings.ui_font_name, saved_settings.ui_font_name) != 0 ||
