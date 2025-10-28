@@ -3412,12 +3412,33 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                         // Render Child Text and Progress
                         ImU32 current_child_text_color = crit->done ? text_color_faded : text_color;
-                        ImVec2 child_text_pos = ImVec2(current_element_x_screen,
-                                                       crit_base_pos_screen.y + 8.0f * t->zoom_level);
+
+                        // Calculate text height using the correct font scale
+                        float scale_factor = 1.0f;
+                        if (settings->tracker_font_size > 0.0f) { // Prevent division by zero
+                            scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
+                        }
+
+                        ImGui::PushFont(t->tracker_font); // Ensure we're scaling from the correct base font
+                        ImGui::SetWindowFontScale(scale_factor);
+
+                        // Calculate the height of the text. (Width is also needed for the X advance)
                         ImVec2 child_text_size = ImGui::CalcTextSize(crit->display_name);
+
+                        ImGui::SetWindowFontScale(1.0f); // Restore scale
+                        ImGui::PopFont();
+
+                        // Calculate the vertically centered Y position
+                        // (BoxTop) + ( (BoxHeight - TextHeight) / 2 )
+                        float text_y_pos = crit_base_pos_screen.y + (32.0f * t->zoom_level - child_text_size.y) * 0.5f;
+
+                        // Draw the text
+                        ImVec2 child_text_pos = ImVec2(current_element_x_screen, text_y_pos);
                         draw_list->AddText(nullptr, sub_font_size * t->zoom_level, child_text_pos,
                                            current_child_text_color, crit->display_name);
-                        current_element_x_screen += child_text_size.x * t->zoom_level + 4.0f * t->zoom_level;
+
+                        // Advance X position using the width we just calculated
+                        current_element_x_screen += child_text_size.x + 4.0f * t->zoom_level;
 
                         char crit_progress_text[32] = "";
                         if (is_stat_section) {
@@ -3429,8 +3450,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             }
 
                             if (crit_progress_text[0] != '\0') {
-                                ImVec2 crit_progress_pos = ImVec2(current_element_x_screen,
-                                                                  crit_base_pos_screen.y + 8.0f * t->zoom_level);
+                                ImVec2 crit_progress_pos = ImVec2(current_element_x_screen, text_y_pos);
                                 draw_list->AddText(nullptr, sub_font_size * t->zoom_level, crit_progress_pos,
                                                    current_child_text_color, crit_progress_text);
                             }
