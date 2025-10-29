@@ -876,7 +876,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::SetTooltip("%s", overlay_scroll_speed_tooltip_buffer);
         }
 
-        ImGui::DragFloat("Row 1 Icon Spacing", &temp_settings.overlay_row1_spacing, 0.1f, 0.0f, 256.0f, "%.1f px");
+        ImGui::DragFloat("Row 1 Icon Spacing", &temp_settings.overlay_row1_spacing, 1.0f, 0.0f, 256.0f, "%.0f px");
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[256];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -884,7 +884,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                      "in the top row (Row 1) of the overlay.\n"
                      "The horizontal spacing of the 2nd and 3rd row\n"
                      "depends on the length of the display text.\n"
-                     "Default: %.1f px",
+                     "Default: %.0f px",
                      DEFAULT_OVERLAY_ROW1_SPACING);
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
