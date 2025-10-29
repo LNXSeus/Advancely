@@ -51,7 +51,6 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->print_debug_status != b->print_debug_status ||
         a->overlay_scroll_speed != b->overlay_scroll_speed ||
         a->overlay_progress_text_align != b->overlay_progress_text_align ||
-        a->overlay_animation_speedup != b->overlay_animation_speedup ||
         a->overlay_row3_remove_completed != b->overlay_row3_remove_completed ||
         a->overlay_stat_cycle_speed != b->overlay_stat_cycle_speed ||
         a->notes_use_roboto_font != b->notes_use_roboto_font ||
@@ -872,7 +871,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                      "A negative scroll speed animates from right-to-left\n"
                      "(items always appear in the same order as they are on the tracker).\n"
                      "A scroll speed of 0.0 is static.\n"
-                     "Default of 1.0 scrolls 1440 pixels (default width) in 24 seconds.");
+                     "Default of 1.0 scrolls 1440 pixels (default width) in 24 seconds.\n"
+                     "Holding SPACE while the overlay window is focused speeds up the animation.");
             ImGui::SetTooltip("%s", overlay_scroll_speed_tooltip_buffer);
         }
 
@@ -899,20 +899,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 "%s", substat_cycling_interval_tooltip_buffer);
         }
 
-        if (ImGui::Checkbox("Speed Up Animation", &temp_settings.overlay_animation_speedup)) {
-        }
-        if (ImGui::IsItemHovered()) {
-            char speed_up_tooltip_buffer[1024];
-            snprintf(speed_up_tooltip_buffer, sizeof(speed_up_tooltip_buffer),
-                     "Toggles speeding up the overlay animation by a factor of %.1f. Don't forget to hit apply!\n"
-                     "On top of that you can also hold SPACE (also %.1f) when tabbed into the overlay window.",
-                     OVERLAY_SPEEDUP_FACTOR, OVERLAY_SPEEDUP_FACTOR);
-
-            ImGui::SetTooltip("%s", speed_up_tooltip_buffer);
-        }
-
-        ImGui::SameLine();
-
         ImGui::Checkbox("Hide Completed Row 3 Goals", &temp_settings.overlay_row3_remove_completed);
         if (ImGui::IsItemHovered()) {
             char hide_completed_row_3_tooltip_buffer[1024];
@@ -923,6 +909,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
             ImGui::SetTooltip("%s", hide_completed_row_3_tooltip_buffer);
         }
+
+        ImGui::SameLine();
     }
 
     ImGui::Checkbox("Always On Top", &temp_settings.tracker_always_on_top);
@@ -1784,7 +1772,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Overlay Scroll Speed: %.2f\n"
                  "  - Row 1 Icon Spacing: %.1f px\n"
                  "  - Sub-Stat Cycle Speed: %.1f s\n"
-                 "  - Speed Up Animation: %s\n"
                  "  - Hide Completed Row 3 Goals: %s\n"
                  "  - Always On Top: %s\n"
                  "  - Tracker Font: %s (Main: %.1f pt, Sub: %.1f pt, UI: %.1f pt)\n"
@@ -1809,7 +1796,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_OVERLAY_SCROLL_SPEED,
                  DEFAULT_OVERLAY_ROW1_SPACING,
                  DEFAULT_OVERLAY_STAT_CYCLE_SPEED,
-                 DEFAULT_OVERLAY_SPEED_UP ? "Enabled" : "Disabled",
                  DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
                  DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
                  DEFAULT_TRACKER_FONT,

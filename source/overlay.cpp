@@ -432,7 +432,7 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
     // --- Update Animation State ---
     const float base_scroll_speed = 60.0f;
     float speed_multiplier = settings->overlay_scroll_speed;
-    if (settings->overlay_animation_speedup) speed_multiplier *= OVERLAY_SPEEDUP_FACTOR;
+    // Speedup from holding SPACE is handled in overlay_events directly, mutliplying by deltatime
     float scroll_delta = -(base_scroll_speed * speed_multiplier * (*deltaTime));
 
     // --- Row 1 Update Logic ---

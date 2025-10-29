@@ -266,7 +266,6 @@ void settings_set_defaults(AppSettings *settings) {
     settings->goal_hiding_mode = DEFAULT_GOAL_HIDING_MODE;
     settings->print_debug_status = DEFAULT_PRINT_DEBUG_STATUS;
     settings->overlay_progress_text_align = DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN;
-    settings->overlay_animation_speedup = DEFAULT_OVERLAY_SPEED_UP;
     settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING;
     settings->overlay_row3_remove_completed = DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED;
     settings->overlay_stat_cycle_speed = DEFAULT_OVERLAY_STAT_CYCLE_SPEED;
@@ -507,14 +506,6 @@ bool settings_load(AppSettings *settings) {
             settings->overlay_progress_text_align = string_to_overlay_text_align(align_text->valuestring);
         else {
             settings->overlay_progress_text_align = DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN;
-            defaults_were_used = true;
-        }
-
-        const cJSON *overlay_speedup = cJSON_GetObjectItem(general_settings, "overlay_animation_speedup");
-        if (overlay_speedup && cJSON_IsBool(overlay_speedup))
-            settings->overlay_animation_speedup = cJSON_IsTrue(overlay_speedup);
-        else {
-            settings->overlay_animation_speedup = DEFAULT_OVERLAY_SPEED_UP;
             defaults_were_used = true;
         }
 
@@ -845,9 +836,6 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(general_obj, "overlay_progress_text_align");
         cJSON_AddItemToObject(general_obj, "overlay_progress_text_align",
                               cJSON_CreateString(overlay_text_align_to_string(settings->overlay_progress_text_align)));
-        cJSON_DeleteItemFromObject(general_obj, "overlay_animation_speedup");
-        cJSON_AddItemToObject(general_obj, "overlay_animation_speedup",
-                              cJSON_CreateBool(settings->overlay_animation_speedup));
         cJSON_DeleteItemFromObject(general_obj, "overlay_row3_remove_completed");
         cJSON_AddItemToObject(general_obj, "overlay_row3_remove_completed",
                               cJSON_CreateBool(settings->overlay_row3_remove_completed));
