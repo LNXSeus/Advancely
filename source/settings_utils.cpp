@@ -384,7 +384,7 @@ bool settings_load(AppSettings *settings) {
         defaults_were_used = true;
     }
 
-    const cJSON *display_version_json = cJSON_GetObjectItem(json, "display_version_str");
+    const cJSON *display_version_json = cJSON_GetObjectItem(json, "display_version");
     if (display_version_json && cJSON_IsString(display_version_json)) {
         strncpy(settings->display_version_str, display_version_json->valuestring, sizeof(settings->display_version_str) - 1);
         settings->display_version_str[sizeof(settings->display_version_str) - 1] = '\0';
@@ -842,8 +842,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(root, "manual_saves_path", cJSON_CreateString(settings->manual_saves_path));
         cJSON_DeleteItemFromObject(root, "version");
         cJSON_AddItemToObject(root, "version", cJSON_CreateString(settings->version_str));
-        cJSON_DeleteItemFromObject(root, "display_version_str");
-        cJSON_AddItemToObject(root, "display_version_str", cJSON_CreateString(settings->display_version_str));
+        cJSON_DeleteItemFromObject(root, "display_version");
+        cJSON_AddItemToObject(root, "display_version", cJSON_CreateString(settings->display_version_str));
         cJSON_DeleteItemFromObject(root, "category");
         cJSON_AddItemToObject(root, "category", cJSON_CreateString(settings->category));
         cJSON_DeleteItemFromObject(root, "optional_flag");
