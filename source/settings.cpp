@@ -373,13 +373,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     ImGui::SameLine();
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.6f, 1.0f, 1.0f)); // Use a link-like color
-    ImGui::Text("(Learn more)");
+    ImGui::Text("(Official Templates)");
     ImGui::PopStyleColor();
 
     if (ImGui::IsItemHovered()) {
         char open_official_templates_tooltip_buffer[1024];
         snprintf(open_official_templates_tooltip_buffer, sizeof(open_official_templates_tooltip_buffer),
-                 "Opens a table of officially added templates in your browser.");
+                 "Opens a table of officially added templates in your browser.\n"
+                 "These templates/languages get replaced through auto-updates.");
         ImGui::SetTooltip("%s", open_official_templates_tooltip_buffer);
     }
 
@@ -399,6 +400,42 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 #endif
         execvp(args[0], args);
         _exit(127); // Exit if exec fails
+        } else if (pid < 0) {
+            log_message(LOG_ERROR, "[SETTINGS] Failed to fork process to open URL.\n");
+        }
+#endif
+    }
+
+    ImGui::SameLine();
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.6f, 1.0f, 1.0f)); // Use a link-like color
+    ImGui::Text("(Version Support)");
+    ImGui::PopStyleColor();
+
+    if (ImGui::IsItemHovered()) {
+        char open_official_templates_tooltip_buffer[1024];
+        snprintf(open_official_templates_tooltip_buffer, sizeof(open_official_templates_tooltip_buffer),
+                 "Opens the version support page in your browser.\n"
+                 "This page shows which versions are functionally equal.\n"
+                 "for Advancely.");
+        ImGui::SetTooltip("%s", open_official_templates_tooltip_buffer);
+    }
+
+    if (ImGui::IsItemClicked()) {
+        const char *url = "https://github.com/LNXSeus/Advancely#extensive-version-support";
+#ifdef _WIN32
+        char command[1024];
+        snprintf(command, sizeof(command), "start %s", url);
+        system(command);
+#else // macOS and Linux
+        pid_t pid = fork();
+        if (pid == 0) {  // Child process
+#if __APPLE__
+            char *args[] = {(char *) "open", (char *) url, nullptr};
+#else
+            char *args[] = {(char *) "xdg-open", (char *) url, nullptr};
+#endif
+            execvp(args[0], args);
+            _exit(127); // Exit if exec fails
         } else if (pid < 0) {
             log_message(LOG_ERROR, "[SETTINGS] Failed to fork process to open URL.\n");
         }
@@ -433,42 +470,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "This doesn't necessarily have to be the exact version of your minecraft instance.\n"
                  "(E.g., Playing 1.21.6 (Template Version) all_advancements in 1.21.10 (Display Version).)\n"
                  "This way templates don't need to be copied for each subversion.\n"
-                 "Click on '(Learn more)' on the right to see the version ranges that functionally equal.");
+                 "Click on '(Version Support)' to see the version ranges that functionally equal.");
         ImGui::SetTooltip("%s", version_tooltip_buffer);
-    }
-
-    ImGui::SameLine();
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.6f, 1.0f, 1.0f)); // Use a link-like color
-    ImGui::Text("(Learn more)");
-    ImGui::PopStyleColor();
-
-    if (ImGui::IsItemHovered()) {
-        char open_official_templates_tooltip_buffer[1024];
-        snprintf(open_official_templates_tooltip_buffer, sizeof(open_official_templates_tooltip_buffer),
-                 "Opens the version support page in your browser.");
-        ImGui::SetTooltip("%s", open_official_templates_tooltip_buffer);
-    }
-
-    if (ImGui::IsItemClicked()) {
-        const char *url = "https://github.com/LNXSeus/Advancely#extensive-version-support";
-#ifdef _WIN32
-        char command[1024];
-        snprintf(command, sizeof(command), "start %s", url);
-        system(command);
-#else // macOS and Linux
-        pid_t pid = fork();
-        if (pid == 0) {  // Child process
-#if __APPLE__
-        char *args[] = {(char *) "open", (char *) url, nullptr};
-#else
-        char *args[] = {(char *) "xdg-open", (char *) url, nullptr};
-#endif
-        execvp(args[0], args);
-        _exit(127); // Exit if exec fails
-        } else if (pid < 0) {
-            log_message(LOG_ERROR, "[SETTINGS] Failed to fork process to open URL.\n");
-        }
-#endif
     }
 
     // "Display Version" dropdown
