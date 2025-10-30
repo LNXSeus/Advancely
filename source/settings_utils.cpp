@@ -15,6 +15,7 @@
 #include "file_utils.h" // has the cJSON_from_file function
 #include "global_event_handler.h"
 #include "main.h"
+#include "format_utils.h"
 
 // Define the actual constant values for the colors here in the .cpp file.
 const ColorRGBA DEFAULT_TRACKER_BG_COLOR = {13, 17, 23, 255};
@@ -232,6 +233,31 @@ PathMode settings_get_path_mode_from_string(const char *mode_str) {
     return PATH_MODE_AUTO; // Default to auto
 }
 
+/**
+ * @brief Formats and combines a category and flag into a user-friendly display name.
+ * e.g., "all_advancements" + "_optimized" -> "All Advancements - Optimized"
+ * This is used to pre-fill the "Display Category" setting in the settings menu.
+ * @param category The internal category name (e.g., "all_advancements").
+ * @param flag The internal optional flag (e.g., "_optimized").
+ * @param out_buffer The buffer to write the formatted string into.
+ * @param buffer_size The size of the output buffer.
+ */
+static void generate_display_category_name(const char* category, const char* flag, char* out_buffer, size_t buffer_size) {
+    if (!out_buffer || buffer_size == 0) return;
+
+    char formatted_category[MAX_PATH_LENGTH];
+    format_category_string(category, formatted_category, sizeof(formatted_category)); // Use the provided function
+
+    if (flag && flag[0] != '\0') {
+        char formatted_flag[MAX_PATH_LENGTH];
+        format_category_string(flag, formatted_flag, sizeof(formatted_flag)); // Use the provided function again
+        snprintf(out_buffer, buffer_size, "%s - %s", formatted_category, formatted_flag);
+    } else {
+        strncpy(out_buffer, formatted_category, buffer_size - 1);
+        out_buffer[buffer_size - 1] = '\0';
+    }
+}
+
 // ------------------- SETTINGS UTILS -------------------
 
 void settings_set_defaults(AppSettings *settings) {
@@ -251,6 +277,10 @@ void settings_set_defaults(AppSettings *settings) {
 
     strncpy(settings->optional_flag, DEFAULT_OPTIONAL_FLAG, sizeof(settings->optional_flag) - 1);
     settings->optional_flag[sizeof(settings->optional_flag) - 1] = '\0';
+
+    // Format the default display name
+    generate_display_category_name(settings->category, settings->optional_flag,
+                                   settings->category_display_name, sizeof(settings->category_display_name));
 
     settings->lang_flag[0] = '\0';
 
@@ -335,8 +365,8 @@ void settings_set_defaults(AppSettings *settings) {
 }
 
 bool settings_load(AppSettings *settings) {
-    bool defaults_were_used = false;
     // Flag to signal re-save when default values need to be written back to settings.json
+    bool defaults_were_used = false;
 
     // Set safe defaults first by calling settings_set_defaults
     settings_set_defaults(settings);
@@ -413,6 +443,17 @@ bool settings_load(AppSettings *settings) {
         settings->optional_flag[sizeof(settings->optional_flag) - 1] = '\0';
     } else {
         settings->optional_flag[0] = '\0';
+        defaults_were_used = true;
+    }
+
+    const cJSON *category_display_json = cJSON_GetObjectItem(json, "category_display_name");
+    if (category_display_json && cJSON_IsString(category_display_json)) {
+        strncpy(settings->category_display_name, category_display_json->valuestring, sizeof(settings->category_display_name) - 1);
+        settings->category_display_name[sizeof(settings->category_display_name) - 1] = '\0';
+    } else {
+        // If missing, generate it from the loaded category and flag
+        generate_display_category_name(settings->category, settings->optional_flag,
+                                       settings->category_display_name, sizeof(settings->category_display_name));
         defaults_were_used = true;
     }
 
@@ -848,6 +889,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(root, "category", cJSON_CreateString(settings->category));
         cJSON_DeleteItemFromObject(root, "optional_flag");
         cJSON_AddItemToObject(root, "optional_flag", cJSON_CreateString(settings->optional_flag));
+        cJSON_DeleteItemFromObject(root, "category_display_name");
+        cJSON_AddItemToObject(root, "category_display_name", cJSON_CreateString(settings->category_display_name));
         cJSON_DeleteItemFromObject(root, "lang_flag");
         cJSON_AddItemToObject(root, "lang_flag", cJSON_CreateString(settings->lang_flag));
 

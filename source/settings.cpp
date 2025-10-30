@@ -10,6 +10,8 @@
 
 #include "settings.h"
 
+#include "format_utils.h"
+
 // Includes for fork() and execvp() on Linux/macOS
 #ifndef _WIN32
 #include <unistd.h>
@@ -30,7 +32,6 @@
 #include "path_utils.h" // For path_exists()
 #include "template_scanner.h"
 #include "temp_creator.h"
-#include "tinyfiledialogs.h"
 #include "update_checker.h"
 
 // Helper function to robustly compare two AppSettings structs
@@ -39,8 +40,10 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
     if (a->path_mode != b->path_mode ||
         strcmp(a->manual_saves_path, b->manual_saves_path) != 0 ||
         strcmp(a->version_str, b->version_str) != 0 ||
+        strcmp(a->display_version_str, b->display_version_str) != 0 ||
         strcmp(a->category, b->category) != 0 ||
         strcmp(a->optional_flag, b->optional_flag) != 0 ||
+        strcmp(a->category_display_name, b->category_display_name) != 0 ||
         strcmp(a->lang_flag, b->lang_flag) != 0 ||
         a->enable_overlay != b->enable_overlay ||
         a->using_stats_per_world_legacy != b->using_stats_per_world_legacy ||
@@ -187,6 +190,25 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     was_open_last_frame = *p_open;
 
     if (!*p_open) return;
+
+    // Helper Lmbda to auto-fill display category
+    auto update_temp_display_category = [&]() {
+        char formatted_category[MAX_PATH_LENGTH];
+        format_category_string(temp_settings.category, formatted_category, sizeof(formatted_category));
+        // Use provided function
+
+        if (temp_settings.optional_flag[0] != '\0') {
+            char formatted_flag[MAX_PATH_LENGTH];
+            format_category_string(temp_settings.optional_flag, formatted_flag, sizeof(formatted_flag));
+            // Use provided function
+            snprintf(temp_settings.category_display_name, sizeof(temp_settings.category_display_name), "%s - %s",
+                     formatted_category, formatted_flag);
+        } else {
+            strncpy(temp_settings.category_display_name, formatted_category,
+                    sizeof(temp_settings.category_display_name) - 1);
+            temp_settings.category_display_name[sizeof(temp_settings.category_display_name) - 1] = '\0';
+        }
+    };
 
     // If the window was just opened (i.e., it was closed last frame but is open now),
     // we copy the current live settings into our temporary editing struct.
@@ -430,12 +452,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         pid_t pid = fork();
         if (pid == 0) {  // Child process
 #if __APPLE__
-            char *args[] = {(char *) "open", (char *) url, nullptr};
+        char *args[] = {(char *) "open", (char *) url, nullptr};
 #else
-            char *args[] = {(char *) "xdg-open", (char *) url, nullptr};
+        char *args[] = {(char *) "xdg-open", (char *) url, nullptr};
 #endif
-            execvp(args[0], args);
-            _exit(127); // Exit if exec fails
+        execvp(args[0], args);
+        _exit(127); // Exit if exec fails
         } else if (pid < 0) {
             log_message(LOG_ERROR, "[SETTINGS] Failed to fork process to open URL.\n");
         }
@@ -457,8 +479,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             temp_settings.version_str[sizeof(temp_settings.version_str) - 1] = '\0';
 
             // Always update the display version to match the template version for convenience
-            strncpy(temp_settings.display_version_str, temp_settings.version_str, sizeof(temp_settings.display_version_str) - 1);
+            strncpy(temp_settings.display_version_str, temp_settings.version_str,
+                    sizeof(temp_settings.display_version_str) - 1);
             temp_settings.display_version_str[sizeof(temp_settings.display_version_str) - 1] = '\0';
+
+            // This logic will be handled by the rescan block below, but we call it
+            // here to make the UI feel responsive *before* the rescan happens.
+            update_temp_display_category();
         }
     }
     if (ImGui::IsItemHovered()) {
@@ -606,6 +633,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             // Since the flag was reset, the language must also be reset.
             temp_settings.lang_flag[0] = '\0';
         }
+
+        // Reformat display name AFTER validation/resets
+        update_temp_display_category();
     }
 
 
@@ -640,6 +670,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 }
             }
             if (!flag_set) temp_settings.optional_flag[0] = '\0';
+
+            update_temp_display_category(); // Update Display Category Name (in settings)
         }
     }
 
@@ -685,6 +717,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             strncpy(temp_settings.optional_flag, flag_values[flag_idx].c_str(),
                     sizeof(temp_settings.optional_flag) - 1);
             temp_settings.optional_flag[sizeof(temp_settings.optional_flag) - 1] = '\0';
+
+            update_temp_display_category(); // Update Display Category Name (in settings)
         }
     }
 
@@ -694,6 +728,17 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "Choose between available optional flags for the selected version and category.\n"
                  "The optional flag is used to differentiate between different versions of the same template.\n");
         ImGui::SetTooltip("%s", flag_tooltip_buffer);
+    }
+
+    // --- Category Display Name Text Input ---
+    ImGui::InputText("Display Category", temp_settings.category_display_name, sizeof(temp_settings.category_display_name));
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buffer[512];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "This is the name used for display on the tracker, overlay, and in debug logs.\n"
+                 "It is automatically formatted from the Category and Optional Flag,\n"
+                 "but you can override it with any custom text here.");
+        ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
     // --- LANGUAGE DROPDOWN ---
@@ -1857,6 +1902,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Template/Display Version: %s\n"
                  "  - Category: %s\n"
                  "  - Optional Flag: %s\n"
+                 "  - Display Category: %s\n"
                  "  - Language: Default\n"
                  "  - StatsPerWorld Mod (Legacy): %s\n"
                  "  - Section Order: %s -> Recipes -> Unlocks -> Stats -> Custom -> Multi-Stage\n"
@@ -1885,6 +1931,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_VERSION,
                  DEFAULT_CATEGORY,
                  DEFAULT_OPTIONAL_FLAG,
+                 DEFAULT_DISPLAY_CATEGORY,
                  DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
                  advancements_label_plural_uppercase,
                  DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",

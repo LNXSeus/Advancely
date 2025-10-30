@@ -165,6 +165,7 @@
 	"display_version": "1.16.1",
 	"category":	"all_advancements",
 	"optional_flag":	"",
+	"category_display_name": "All Advancements",
 	"lang_flag":	"",
 	"hotkeys":	[]
 }

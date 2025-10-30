@@ -75,6 +75,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_VERSION "1.16.1"  // Also needs to be changed in settings_load()
 #define DEFAULT_CATEGORY "all_advancements" // Also needs to be changed in settings_load()
 #define DEFAULT_OPTIONAL_FLAG ""  // Also needs to be changed in settings_load()
+#define DEFAULT_DISPLAY_CATEGORY "All Advancements"
 
 #define DEFAULT_TRACKER_FONT "Minecraft.ttf" // The overlay also uses this font
 #define DEFAULT_TRACKER_FONT_SIZE 16.0f
@@ -148,6 +149,7 @@ struct AppSettings {
     char manual_saves_path[MAX_PATH_LENGTH]; // The user-defined path to the saves folder if path_mode is manual.
     char category[MAX_PATH_LENGTH]; // The speedrun or goal category, used to build the template file name.
     char optional_flag[MAX_PATH_LENGTH]; // An optional string appended to the template file name for variants.
+    char category_display_name[MAX_PATH_LENGTH]; // The user-configurable display name for the category.
     char lang_flag[64]; // Selected language flag (e.g., "eng", "pl") empty for default
 
     // --- Section Order ---

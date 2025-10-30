@@ -630,15 +630,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             }
 
             if (settings->overlay_show_run_details) {
-                char formatted_category[128];
-                format_category_string(settings->category, formatted_category, sizeof(formatted_category));
-                char formatted_flag[128];
-                format_category_string(settings->optional_flag, formatted_flag, sizeof(formatted_flag));
-                snprintf(temp_chunk, sizeof(temp_chunk), "%s - %s%s%s",
+                snprintf(temp_chunk, sizeof(temp_chunk), "%s - %s",
                          settings->display_version_str,
-                         formatted_category,
-                         *settings->optional_flag ? " - " : "",
-                         formatted_flag);
+                         settings->category_display_name);
                 add_component(temp_chunk);
             }
 
@@ -1396,10 +1390,11 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 static_bg = o->adv_bg_done;
                                 anim_bg = o->adv_bg_done_anim;
                             } else if ((!stat->is_single_stat_category && stat->completed_criteria_count > 0) ||
-                                     (stat->is_single_stat_category && stat->criteria_count > 0 && stat->criteria[0]->progress > 0)) {
+                                       (stat->is_single_stat_category && stat->criteria_count > 0 && stat->criteria[0]->
+                                        progress > 0)) {
                                 static_bg = o->adv_bg_half_done;
                                 anim_bg = o->adv_bg_half_done_anim;
-                                     }
+                            }
                             icon_path = stat->icon_path;
 
                             if (stat->criteria_count > 1) {

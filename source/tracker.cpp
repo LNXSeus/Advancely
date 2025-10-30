@@ -3801,12 +3801,11 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
             ImVec2 bg_size = ImVec2(96.0f, 96.0f);
 
             // Select texture *pair* and render
-            SDL_Texture* static_bg = item->done ? t->adv_bg_done : t->adv_bg;
-            AnimatedTexture* anim_bg = item->done ? t->adv_bg_done_anim : t->adv_bg_anim;
+            SDL_Texture *static_bg = item->done ? t->adv_bg_done : t->adv_bg;
+            AnimatedTexture *anim_bg = item->done ? t->adv_bg_done_anim : t->adv_bg_anim;
 
-            SDL_Texture* texture_to_draw = static_bg;
+            SDL_Texture *texture_to_draw = static_bg;
             if (anim_bg && anim_bg->frame_count > 0) {
-
                 // Standard GIF Frame Selection Logic
                 if (anim_bg->delays && anim_bg->total_duration > 0) {
                     Uint32 current_ticks = SDL_GetTicks();
@@ -4133,8 +4132,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             ImVec2 bg_size = ImVec2(96.0f, 96.0f);
 
             // Select texture *pair* and render
-            SDL_Texture* static_bg = t->adv_bg;
-            AnimatedTexture* anim_bg = t->adv_bg_anim;
+            SDL_Texture *static_bg = t->adv_bg;
+            AnimatedTexture *anim_bg = t->adv_bg_anim;
 
             if (item->done) {
                 static_bg = t->adv_bg_done;
@@ -4144,7 +4143,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 anim_bg = t->adv_bg_half_done_anim;
             }
 
-            SDL_Texture* texture_to_draw = static_bg;
+            SDL_Texture *texture_to_draw = static_bg;
             if (anim_bg && anim_bg->frame_count > 0) {
                 // Standard GIF Frame Selection Logic
                 if (anim_bg->delays && anim_bg->total_duration > 0) {
@@ -4561,8 +4560,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             ImVec2 bg_size = ImVec2(96.0f, 96.0f);
 
             // Select texture *pair* and render
-            SDL_Texture* static_bg = t->adv_bg;
-            AnimatedTexture* anim_bg = t->adv_bg_anim;
+            SDL_Texture *static_bg = t->adv_bg;
+            AnimatedTexture *anim_bg = t->adv_bg_anim;
 
             if (goal->current_stage >= goal->stage_count - 1) {
                 static_bg = t->adv_bg_done;
@@ -4572,7 +4571,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                 anim_bg = t->adv_bg_half_done_anim;
             }
 
-            SDL_Texture* texture_to_draw = static_bg;
+            SDL_Texture *texture_to_draw = static_bg;
             if (anim_bg && anim_bg->frame_count > 0) {
                 // --- Standard GIF Frame Selection Logic ---
                 if (anim_bg->delays && anim_bg->total_duration > 0) {
@@ -4809,12 +4808,6 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
     // --- Info Bar ---
 
-    // TODO: Remove?
-    // // --- Set Font Scale for Info Bar ---
-    // if (t->tracker_font && t->tracker_font->LegacySize > 0.0f) {
-    //     ImGui::SetWindowFontScale(settings->tracker_ui_font_size / t->tracker_font->LegacySize);
-    // }
-
     // Set the background color to match the tracker, with slight opacity.
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4((float) settings->tracker_bg_color.r / 255.f,
                                                     (float) settings->tracker_bg_color.g / 255.f,
@@ -4872,11 +4865,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                  formatted_time);
     } else {
         // This is the original info string for when the run is in progress.
-        char formatted_category[128];
         char formatted_update_time[64];
-        format_category_string(settings->category, formatted_category, sizeof(formatted_category));
-        char formatted_flag[128];
-        format_category_string(settings->optional_flag, formatted_flag, sizeof(formatted_flag));
         const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
         float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
         format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time));
@@ -4886,9 +4875,10 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         bool show_prog_percent = (t->template_data->total_progress_steps > 0);
 
         // Start with the world name and run details
-        snprintf(info_buffer, sizeof(info_buffer), "%s  |  %s - %s%s%s",
-                 t->world_name, settings->display_version_str, formatted_category,
-                 *settings->optional_flag ? " - " : "", formatted_flag);
+        snprintf(info_buffer, sizeof(info_buffer), "%s  |  %s - %s",
+                         t->world_name,
+                         settings->display_version_str,
+                         settings->category_display_name);
 
         // Conditionally add the progress part
         if (show_adv_counter && show_prog_percent) {
@@ -5713,15 +5703,8 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
     if (!t || !t->template_data || !settings) return;
 
     char title_buffer[512];
-    char formatted_category[128];
     char formatted_time[64];
 
-    // Format the category and optional flag strings
-    format_category_string(settings->category, formatted_category, sizeof(formatted_category));
-
-    // Optional flag gets formatted as well
-    char formatted_flag[128];
-    format_category_string(settings->optional_flag, formatted_flag, sizeof(formatted_flag));
     format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
 
     // Displaying Ach or Adv depending on the version
@@ -5747,9 +5730,11 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
     }
 
     snprintf(title_buffer, sizeof(title_buffer),
-             "  Advancely  %s    |    %s    -    %s    -    %s%s%s%s    |    %s IGT",
-             ADVANCELY_VERSION, t->world_name, settings->display_version_str, formatted_category,
-             *settings->optional_flag ? "    -    " : "", formatted_flag, progress_chunk, formatted_time);
+             "  Advancely  %s    |    %s    -    %s    -    %s%s    |    %s IGT",
+             ADVANCELY_VERSION, t->world_name,
+             settings->display_version_str,
+             settings->category_display_name,
+             progress_chunk, formatted_time);
 
     SDL_SetWindowTitle(t->window, title_buffer);
 }
@@ -5798,11 +5783,6 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
     // Also load the current game version used
     MC_Version version = settings_get_version_from_string(settings->version_str);
 
-    char formatted_category[128];
-    format_category_string(settings->category, formatted_category, sizeof(formatted_category));
-    char formatted_flag[128];
-    format_category_string(settings->optional_flag, formatted_flag, sizeof(formatted_flag));
-
     // Format the time to DD:HH:MM:SS.MS
     char formatted_time[128];
     format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
@@ -5814,12 +5794,9 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
 
     // When category isn't empty
     if (settings->category[0] != '\0') {
-        log_message(LOG_INFO, " Category:   %s\n", formatted_category);
+        log_message(LOG_INFO, " Category:   %s\n", settings->category_display_name);
     }
-    // When flag isn't empty
-    if (settings->optional_flag[0] != '\0') {
-        log_message(LOG_INFO, " Flag:       %s\n", formatted_flag);
-    }
+
     log_message(LOG_INFO, " Play Time:  %s\n", formatted_time);
     log_message(LOG_INFO, "============================================================\n");
 
