@@ -299,6 +299,14 @@ void settings_set_defaults(AppSettings *settings) {
     settings->text_color = DEFAULT_TEXT_COLOR;
     settings->overlay_text_color = DEFAULT_OVERLAY_TEXT_COLOR;
 
+    // Background textures
+    strncpy(settings->adv_bg_path, DEFAULT_ADV_BG_PATH, sizeof(settings->adv_bg_path) - 1);
+    settings->adv_bg_path[sizeof(settings->adv_bg_path) - 1] = '\0';
+    strncpy(settings->adv_bg_half_done_path, DEFAULT_ADV_BG_HALF_DONE_PATH, sizeof(settings->adv_bg_half_done_path) - 1);
+    settings->adv_bg_half_done_path[sizeof(settings->adv_bg_half_done_path) - 1] = '\0';
+    strncpy(settings->adv_bg_done_path, DEFAULT_ADV_BG_DONE_PATH, sizeof(settings->adv_bg_done_path) - 1);
+    settings->adv_bg_done_path[sizeof(settings->adv_bg_done_path) - 1] = '\0';
+
     // UI Theme Colors
     settings->ui_text_color = DEFAULT_UI_TEXT_COLOR;
     settings->ui_window_bg_color = DEFAULT_UI_WINDOW_BG_COLOR;
@@ -669,6 +677,37 @@ bool settings_load(AppSettings *settings) {
                        &DEFAULT_OVERLAY_TEXT_COLOR))
             defaults_were_used = true;
 
+        // --- Load Background Paths ---
+        const cJSON *bg_path_json = cJSON_GetObjectItem(visual_settings, "adv_bg_path");
+        if (bg_path_json && cJSON_IsString(bg_path_json)) {
+            strncpy(settings->adv_bg_path, bg_path_json->valuestring, sizeof(settings->adv_bg_path) - 1);
+            settings->adv_bg_path[sizeof(settings->adv_bg_path) - 1] = '\0';
+        } else {
+            strncpy(settings->adv_bg_path, DEFAULT_ADV_BG_PATH, sizeof(settings->adv_bg_path) - 1);
+            settings->adv_bg_path[sizeof(settings->adv_bg_path) - 1] = '\0';
+            defaults_were_used = true;
+        }
+
+        const cJSON *bg_half_path_json = cJSON_GetObjectItem(visual_settings, "adv_bg_half_done_path");
+        if (bg_half_path_json && cJSON_IsString(bg_half_path_json)) {
+            strncpy(settings->adv_bg_half_done_path, bg_half_path_json->valuestring, sizeof(settings->adv_bg_half_done_path) - 1);
+            settings->adv_bg_half_done_path[sizeof(settings->adv_bg_half_done_path) - 1] = '\0';
+        } else {
+            strncpy(settings->adv_bg_half_done_path, DEFAULT_ADV_BG_HALF_DONE_PATH, sizeof(settings->adv_bg_half_done_path) - 1);
+            settings->adv_bg_half_done_path[sizeof(settings->adv_bg_half_done_path) - 1] = '\0';
+            defaults_were_used = true;
+        }
+
+        const cJSON *bg_done_path_json = cJSON_GetObjectItem(visual_settings, "adv_bg_done_path");
+        if (bg_done_path_json && cJSON_IsString(bg_done_path_json)) {
+            strncpy(settings->adv_bg_done_path, bg_done_path_json->valuestring, sizeof(settings->adv_bg_done_path) - 1);
+            settings->adv_bg_done_path[sizeof(settings->adv_bg_done_path) - 1] = '\0';
+        } else {
+            strncpy(settings->adv_bg_done_path, DEFAULT_ADV_BG_DONE_PATH, sizeof(settings->adv_bg_done_path) - 1);
+            settings->adv_bg_done_path[sizeof(settings->adv_bg_done_path) - 1] = '\0';
+            defaults_were_used = true;
+        }
+
         const cJSON *row1_spacing_json = cJSON_GetObjectItem(visual_settings, "overlay_row1_spacing");
         if (row1_spacing_json && cJSON_IsNumber(row1_spacing_json)) {
             settings->overlay_row1_spacing = (float)row1_spacing_json->valuedouble;
@@ -716,6 +755,14 @@ bool settings_load(AppSettings *settings) {
     } else {
         defaults_were_used = true;
         settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING; // Ensure default if visuals section missing
+
+        // --- Ensure defaults if visuals missing ---
+        strncpy(settings->adv_bg_path, DEFAULT_ADV_BG_PATH, sizeof(settings->adv_bg_path) - 1);
+        settings->adv_bg_path[sizeof(settings->adv_bg_path) - 1] = '\0';
+        strncpy(settings->adv_bg_half_done_path, DEFAULT_ADV_BG_HALF_DONE_PATH, sizeof(settings->adv_bg_half_done_path) - 1);
+        settings->adv_bg_half_done_path[sizeof(settings->adv_bg_half_done_path) - 1] = '\0';
+        strncpy(settings->adv_bg_done_path, DEFAULT_ADV_BG_DONE_PATH, sizeof(settings->adv_bg_done_path) - 1);
+        settings->adv_bg_done_path[sizeof(settings->adv_bg_done_path) - 1] = '\0';
     }
 
     // Parse hotkeys
@@ -883,6 +930,14 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         save_color(visuals_obj, "overlay_bg_color", &settings->overlay_bg_color);
         save_color(visuals_obj, "text_color", &settings->text_color);
         save_color(visuals_obj, "overlay_text_color", &settings->overlay_text_color);
+
+        // --- Save Background Paths ---
+        cJSON_DeleteItemFromObject(visuals_obj, "adv_bg_path");
+        cJSON_AddItemToObject(visuals_obj, "adv_bg_path", cJSON_CreateString(settings->adv_bg_path));
+        cJSON_DeleteItemFromObject(visuals_obj, "adv_bg_half_done_path");
+        cJSON_AddItemToObject(visuals_obj, "adv_bg_half_done_path", cJSON_CreateString(settings->adv_bg_half_done_path));
+        cJSON_DeleteItemFromObject(visuals_obj, "adv_bg_done_path");
+        cJSON_AddItemToObject(visuals_obj, "adv_bg_done_path", cJSON_CreateString(settings->adv_bg_done_path));
 
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_spacing");
         cJSON_AddItemToObject(visuals_obj, "overlay_row1_spacing", cJSON_CreateNumber(settings->overlay_row1_spacing));

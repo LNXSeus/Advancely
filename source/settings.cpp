@@ -1161,6 +1161,59 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         }
     }
 
+    // --- Background Texture Settings ---
+    ImGui::SeparatorText("Background Textures");
+
+    // Helper lambda for Browse button and text display
+    auto RenderBackgroundSetting = [&
+            ](const char *label, char *path_buffer, size_t buffer_size, const char *setting_id) {
+        ImGui::Text("%s:", label);
+        ImGui::SameLine();
+        ImGui::TextWrapped("%s", path_buffer); // Display current path, wrapped
+
+        ImGui::SameLine(ImGui::GetWindowWidth() - 80); // Align button to the right
+        char button_label[64];
+        snprintf(button_label, sizeof(button_label), "Browse##%s", setting_id);
+        if (ImGui::Button(button_label)) {
+            char selected_file[MAX_PATH_LENGTH];
+            if (open_gui_texture_dialog(selected_file, sizeof(selected_file))) {
+                strncpy(path_buffer, selected_file, buffer_size - 1);
+                path_buffer[buffer_size - 1] = '\0';
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[512];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Select the background texture for %s items.\n"
+                     "Textures should ideally be square (e.g., 24x24 pixels - scaled to 96x96 pixels).\n"
+                     "Must be a .png or .gif file located inside the resources/gui folder.", label);
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+    };
+
+    RenderBackgroundSetting("Default", temp_settings.adv_bg_path, sizeof(temp_settings.adv_bg_path),
+                            "DefaultBg");
+    RenderBackgroundSetting("Half-Done", temp_settings.adv_bg_half_done_path,
+                            sizeof(temp_settings.adv_bg_half_done_path), "HalfDoneBg");
+    RenderBackgroundSetting("Done", temp_settings.adv_bg_done_path, sizeof(temp_settings.adv_bg_done_path),
+                            "DoneBg");
+
+    // Duplicate Texture Warning
+    bool duplicate_warning = false;
+    if (strcmp(temp_settings.adv_bg_path, temp_settings.adv_bg_half_done_path) == 0 && temp_settings.adv_bg_path[0] !=
+        '\0') duplicate_warning = true;
+    if (strcmp(temp_settings.adv_bg_path, temp_settings.adv_bg_done_path) == 0 && temp_settings.adv_bg_path[0] != '\0')
+        duplicate_warning = true;
+    if (strcmp(temp_settings.adv_bg_half_done_path, temp_settings.adv_bg_done_path) == 0 && temp_settings.
+        adv_bg_half_done_path[0] != '\0') duplicate_warning = true;
+
+    if (duplicate_warning) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.8f, 0.0f, 1.0f)); // Yellow text
+        ImGui::TextWrapped(
+            "Warning: Using the same texture for multiple states makes it harder to distinguish completion status.");
+        ImGui::PopStyleColor();
+    }
+
     // --- UI Theme Colors Section ---
     ImGui::SeparatorText("UI Theme Colors");
     // ImGuiTreeNodeFlags_None makes it closed by default

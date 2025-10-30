@@ -242,7 +242,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings);
  * @brief Reloads settings, frees all old template data, and loads a new template.
  *
  * This function is called at runtime when settings have changed to allow for
- * switching advancement templates or languages without restarting the application.
+ * switching advancement templates, languages or background textures without
+ * restarting the application.
  *
  * @param t A pointer to the Tracker struct.
  * @param settings A pointer to the application settings to use for re-initialization.

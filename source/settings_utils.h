@@ -83,6 +83,9 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_OVERLAY_FONT "Minecraft.ttf"
 #define DEFAULT_UI_FONT "Roboto-Regular.ttf"
 #define DEFAULT_UI_FONT_SIZE 16.0f
+#define DEFAULT_ADV_BG_PATH "advancement_background.png"
+#define DEFAULT_ADV_BG_HALF_DONE_PATH "advancement_background_half_done.png"
+#define DEFAULT_ADV_BG_DONE_PATH "advancement_background_done.png"
 
 #define DEFAULT_OVERLAY_FONT_SIZE 24.0f // This is fixed currently
 
@@ -198,6 +201,11 @@ struct AppSettings {
     ColorRGBA overlay_bg_color; // Background color for the overlay window.
     ColorRGBA text_color; // Global text color for UI elements.
     ColorRGBA overlay_text_color; // Text color for the overlay window.
+
+    // --- Background Texture Paths ---
+    char adv_bg_path[MAX_PATH_LENGTH];          // Relative path in resources/gui/
+    char adv_bg_half_done_path[MAX_PATH_LENGTH]; // Relative path in resources/gui/
+    char adv_bg_done_path[MAX_PATH_LENGTH];     // Relative path in resources/gui/
 
     // --- UI Theme Colors (collapsible section) ---
     ColorRGBA ui_text_color; // Text color for the UI elements.

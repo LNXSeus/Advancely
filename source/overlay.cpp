@@ -236,20 +236,41 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
         return false;
     }
 
-    // Load global background textures using the overlay's renderer
-    char adv_bg_path[MAX_PATH_LENGTH];
-    snprintf(adv_bg_path, sizeof(adv_bg_path), "%s/gui/advancement_background.png", get_resources_path());
-    o->adv_bg = load_texture_with_scale_mode(o->renderer, adv_bg_path, SDL_SCALEMODE_NEAREST);
+    // Load global background textures using settings and cache
+    char full_path[MAX_PATH_LENGTH]; // Buffer for constructing full path
 
-    snprintf(adv_bg_path, sizeof(adv_bg_path), "%s/gui/advancement_background_half_done.png", get_resources_path());
-    o->adv_bg_half_done = load_texture_with_scale_mode(o->renderer, adv_bg_path, SDL_SCALEMODE_NEAREST);
+    snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), settings->adv_bg_path);
+    o->adv_bg = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                       &o->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
 
-    snprintf(adv_bg_path, sizeof(adv_bg_path), "%s/gui/advancement_background_done.png", get_resources_path());
-    o->adv_bg_done = load_texture_with_scale_mode(o->renderer, adv_bg_path, SDL_SCALEMODE_NEAREST);
+    snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), settings->adv_bg_half_done_path);
+    o->adv_bg_half_done = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                                 &o->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+
+    snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), settings->adv_bg_done_path);
+    o->adv_bg_done = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                            &o->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+
     if (!o->adv_bg || !o->adv_bg_half_done || !o->adv_bg_done) {
-        log_message(LOG_ERROR, "[OVERLAY] Failed to load advancement background textures.\n");
-        overlay_free(overlay, settings);
-        return false;
+        log_message(
+            LOG_ERROR, "[OVERLAY] Failed to load one or more advancement background textures specified in settings.\n");
+        // Attempt to load defaults as a fallback
+        log_message(LOG_INFO, "[OVERLAY] Attempting to load default background textures...\n");
+        snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), DEFAULT_ADV_BG_PATH);
+        o->adv_bg = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                           &o->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+        snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), DEFAULT_ADV_BG_HALF_DONE_PATH);
+        o->adv_bg_half_done = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                                     &o->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+        snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), DEFAULT_ADV_BG_DONE_PATH);
+        o->adv_bg_done = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                                &o->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+
+        if (!o->adv_bg || !o->adv_bg_half_done || !o->adv_bg_done) {
+            log_message(LOG_ERROR, "[OVERLAY] CRITICAL: Failed to load default background textures as fallback.\n");
+            overlay_free(overlay, settings);
+            return false; // Critical failure if defaults also fail
+        }
     }
 
     // Make font HiDPI aware by loading it at a base point size (e.g., 24).
@@ -491,56 +512,58 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
 
     // --- Row 2 Update Logic (Dynamic Width) ---
     if (!row2_items.empty()) {
-         // VALIDATE INDEX FIRST (remains the same)
-         if (static_cast<size_t>(o->start_index_row2) >= row2_items.size()) {
-             o->start_index_row2 = 0;
-         }
+        // VALIDATE INDEX FIRST (remains the same)
+        if (static_cast<size_t>(o->start_index_row2) >= row2_items.size()) {
+            o->start_index_row2 = 0;
+        }
 
-         // Count visible items
-         size_t visible_item_count = 0;
-         for (const auto &item : row2_items) {
-              if (!is_display_item_done(item, settings)) {
-                   visible_item_count++;
-              }
-         }
+        // Count visible items
+        size_t visible_item_count = 0;
+        for (const auto &item: row2_items) {
+            if (!is_display_item_done(item, settings)) {
+                visible_item_count++;
+            }
+        }
 
-         // Only run animation logic if there are visible items
-         if (visible_item_count > 0) {
-             // --- USE STORED WIDTH ---
-             const float item_full_width = o->calculated_row2_item_width; // Use width calculated in previous render
-             // --- END USE STORED WIDTH ---
+        // Only run animation logic if there are visible items
+        if (visible_item_count > 0) {
+            // --- USE STORED WIDTH ---
+            const float item_full_width = o->calculated_row2_item_width; // Use width calculated in previous render
+            // --- END USE STORED WIDTH ---
 
-             o->scroll_offset_row2 += scroll_delta; // Use the same scroll_delta for consistency
-             // --- Floor calculation and index update logic remains the same ---
-             int items_scrolled = floor(fabs(o->scroll_offset_row2) / item_full_width);
-             if (items_scrolled > 0) {
-                 o->scroll_offset_row2 = fmod(o->scroll_offset_row2, item_full_width);
-                 if (scroll_delta > 0) { // Moving RTL
-                     for (int i = 0; i < items_scrolled; ++i) {
-                         size_t loop_guard = 0;
-                         do {
-                             o->start_index_row2 = (o->start_index_row2 + 1) % row2_items.size();
-                             loop_guard++;
-                         } while (is_display_item_done(row2_items[o->start_index_row2], settings) && loop_guard <
-                                  row2_items.size() * 2);
-                     }
-                 } else { // Moving LTR
-                     for (int i = 0; i < items_scrolled; ++i) {
-                         size_t loop_guard = 0;
-                         do {
-                             o->start_index_row2 = (o->start_index_row2 - 1 + row2_items.size()) % row2_items.size();
-                             loop_guard++;
-                         } while (is_display_item_done(row2_items[o->start_index_row2], settings) && loop_guard <
-                                  row2_items.size() * 2);
-                     }
-                 }
-             }
-         } else {
-             // If no items are visible, reset scroll offset to prevent drift
-             o->scroll_offset_row2 = 0;
-         }
+            o->scroll_offset_row2 += scroll_delta; // Use the same scroll_delta for consistency
+            // --- Floor calculation and index update logic remains the same ---
+            int items_scrolled = floor(fabs(o->scroll_offset_row2) / item_full_width);
+            if (items_scrolled > 0) {
+                o->scroll_offset_row2 = fmod(o->scroll_offset_row2, item_full_width);
+                if (scroll_delta > 0) {
+                    // Moving RTL
+                    for (int i = 0; i < items_scrolled; ++i) {
+                        size_t loop_guard = 0;
+                        do {
+                            o->start_index_row2 = (o->start_index_row2 + 1) % row2_items.size();
+                            loop_guard++;
+                        } while (is_display_item_done(row2_items[o->start_index_row2], settings) && loop_guard <
+                                 row2_items.size() * 2);
+                    }
+                } else {
+                    // Moving LTR
+                    for (int i = 0; i < items_scrolled; ++i) {
+                        size_t loop_guard = 0;
+                        do {
+                            o->start_index_row2 = (o->start_index_row2 - 1 + row2_items.size()) % row2_items.size();
+                            loop_guard++;
+                        } while (is_display_item_done(row2_items[o->start_index_row2], settings) && loop_guard <
+                                 row2_items.size() * 2);
+                    }
+                }
+            }
+        } else {
+            // If no items are visible, reset scroll offset to prevent drift
+            o->scroll_offset_row2 = 0;
+        }
     } else {
-         o->scroll_offset_row2 = 0; // Also reset if the row is completely empty
+        o->scroll_offset_row2 = 0; // Also reset if the row is completely empty
     }
 
     // Row 3 doesn't disappear by default (only with setting)
@@ -726,7 +749,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
         if (!row1_items.empty()) {
             // Determine how many slots to draw based on screen width.
-            int items_to_draw = (item_full_width > 0) ? ceil((float) window_w / item_full_width) + 2 : 0; // Use dynamic width
+            int items_to_draw = (item_full_width > 0) ? ceil((float) window_w / item_full_width) + 2 : 0;
+            // Use dynamic width
             // Only draw as many items as are visible, but repeat them if needed to fill the screen (marquee effect).
 
             // Draw either enough slots to fill the screen OR only the visible items, whichever is smaller.
@@ -1531,10 +1555,6 @@ void overlay_free(Overlay **overlay, const AppSettings *settings) {
     (void) settings;
     if (overlay && *overlay) {
         Overlay *o = *overlay;
-
-        if (o->adv_bg) SDL_DestroyTexture(o->adv_bg);
-        if (o->adv_bg_half_done) SDL_DestroyTexture(o->adv_bg_half_done);
-        if (o->adv_bg_done) SDL_DestroyTexture(o->adv_bg_done);
 
         // Free the caches
         if (o->texture_cache) {

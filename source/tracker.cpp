@@ -302,6 +302,54 @@ static AnimatedTexture *load_animated_gif(SDL_Renderer *renderer, const char *pa
     return anim_texture;
 }
 
+/**
+ * @brief Reloads the global background textures based on current settings.
+ * Uses the texture cache for efficiency. Handles missing files by attempting defaults.
+ * @param t Tracker instance.
+ * @param settings Current application settings.
+ */
+static void tracker_reload_background_textures(Tracker *t, const AppSettings *settings) {
+    if (!t || !settings) return;
+
+    log_message(LOG_INFO, "[TRACKER] Reloading background textures...\n");
+    char full_path[MAX_PATH_LENGTH];
+
+    // No need to explicitly destroy old ones, cache handles replacement if path changes
+    // If paths are the same, cache returns the existing texture
+
+    snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), settings->adv_bg_path);
+    t->adv_bg = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+
+    snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), settings->adv_bg_half_done_path);
+    t->adv_bg_half_done = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+
+    snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), settings->adv_bg_done_path);
+    t->adv_bg_done = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+
+     // Fallback logic if any texture failed to load
+     if (!t->adv_bg || !t->adv_bg_half_done || !t->adv_bg_done) {
+         log_message(LOG_ERROR, "[TRACKER] Failed loading one or more custom background textures. Attempting defaults...\n");
+         // Try loading defaults only for the ones that failed
+         if (!t->adv_bg) {
+             snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), DEFAULT_ADV_BG_PATH);
+             t->adv_bg = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+         }
+         if (!t->adv_bg_half_done) {
+             snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), DEFAULT_ADV_BG_HALF_DONE_PATH);
+             t->adv_bg_half_done = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+         }
+         if (!t->adv_bg_done) {
+             snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), DEFAULT_ADV_BG_DONE_PATH);
+             t->adv_bg_done = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+         }
+         // Log error if defaults *still* fail (shouldn't happen unless defaults are missing)
+         if (!t->adv_bg || !t->adv_bg_half_done || !t->adv_bg_done) {
+             log_message(LOG_ERROR, "[TRACKER] CRITICAL: Failed to load default background textures during reload.\n");
+             // Maybe show an error message? For now, just log.
+         }
+     }
+}
+
 
 // FOR VERSION-SPECIFIC PARSERS
 
@@ -2330,20 +2378,32 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     // Load global background textures
     // It's fine that this is calling load_texture_with_scale_mode directly instead of tracker_get_texture
     // as this texture doesn't run risk of being loaded multiple times
-    char adv_bg_path[MAX_PATH_LENGTH];
-    snprintf(adv_bg_path, sizeof(adv_bg_path), "%s/gui/advancement_background.png", get_resources_path());
-    t->adv_bg = load_texture_with_scale_mode(t->renderer, adv_bg_path, SDL_SCALEMODE_NEAREST);
+    char full_path[MAX_PATH_LENGTH];
+    snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), settings->adv_bg_path);
+    t->adv_bg = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
 
-    snprintf(adv_bg_path, sizeof(adv_bg_path), "%s/gui/advancement_background_half_done.png", get_resources_path());
-    t->adv_bg_half_done = load_texture_with_scale_mode(t->renderer, adv_bg_path, SDL_SCALEMODE_NEAREST);
+    snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), settings->adv_bg_half_done_path);
+    t->adv_bg_half_done = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
 
-    snprintf(adv_bg_path, sizeof(adv_bg_path), "%s/gui/advancement_background_done.png", get_resources_path());
-    t->adv_bg_done = load_texture_with_scale_mode(t->renderer, adv_bg_path, SDL_SCALEMODE_NEAREST);
+    snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), settings->adv_bg_done_path);
+    t->adv_bg_done = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
 
     if (!t->adv_bg || !t->adv_bg_half_done || !t->adv_bg_done) {
-        log_message(LOG_ERROR, "[TRACKER] Failed to load advancement background textures.\n");
-        tracker_free(tracker, settings);
-        return false;
+        log_message(LOG_ERROR, "[TRACKER] Failed to load one or more advancement background textures specified in settings.\n");
+        // Attempt to load defaults as a fallback
+         log_message(LOG_INFO, "[TRACKER] Attempting to load default background textures...\n");
+         snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), DEFAULT_ADV_BG_PATH);
+         t->adv_bg = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+         snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), DEFAULT_ADV_BG_HALF_DONE_PATH);
+         t->adv_bg_half_done = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+         snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), DEFAULT_ADV_BG_DONE_PATH);
+         t->adv_bg_done = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+
+         if (!t->adv_bg || !t->adv_bg_half_done || !t->adv_bg_done) {
+              log_message(LOG_ERROR, "[TRACKER] CRITICAL: Failed to load default background textures as fallback.\n");
+              tracker_free(tracker, settings);
+              return false; // Critical failure if defaults also fail
+         }
     }
 
     // Allocate the main data container
@@ -5182,6 +5242,9 @@ void tracker_reinit_template(Tracker *t, AppSettings *settings) {
     // Update the paths from settings.json
     tracker_reinit_paths(t, settings);
 
+    // Reload background textures after paths are updated
+    tracker_reload_background_textures(t, settings);
+
     // Free all the old advancement, stat, etc. data
     if (t->template_data) {
         tracker_free_template_data(t->template_data);
@@ -5533,10 +5596,6 @@ void tracker_free(Tracker **tracker, const AppSettings *settings) {
         if (t->minecraft_font) {
             TTF_CloseFont(t->minecraft_font);
         }
-
-        if (t->adv_bg) SDL_DestroyTexture(t->adv_bg);
-        if (t->adv_bg_half_done) SDL_DestroyTexture(t->adv_bg_half_done);
-        if (t->adv_bg_done) SDL_DestroyTexture(t->adv_bg_done);
 
         if (t->template_data) {
             tracker_free_template_data(t->template_data);
