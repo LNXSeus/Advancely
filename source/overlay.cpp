@@ -635,7 +635,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 char formatted_flag[128];
                 format_category_string(settings->optional_flag, formatted_flag, sizeof(formatted_flag));
                 snprintf(temp_chunk, sizeof(temp_chunk), "%s - %s%s%s",
-                         settings->version_str,
+                         settings->display_version_str,
                          formatted_category,
                          *settings->optional_flag ? " - " : "",
                          formatted_flag);

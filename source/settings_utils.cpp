@@ -240,6 +240,10 @@ void settings_set_defaults(AppSettings *settings) {
     strncpy(settings->version_str, DEFAULT_VERSION, sizeof(settings->version_str) - 1);
     settings->version_str[sizeof(settings->version_str) - 1] = '\0';
 
+    // Default display version to the template version
+    strncpy(settings->display_version_str, DEFAULT_VERSION, sizeof(settings->display_version_str) - 1);
+    settings->display_version_str[sizeof(settings->display_version_str) - 1] = '\0';
+
     settings->path_mode = PATH_MODE_AUTO;
     settings->manual_saves_path[0] = '\0';
     strncpy(settings->category, DEFAULT_CATEGORY, sizeof(settings->category) - 1);
@@ -377,6 +381,17 @@ bool settings_load(AppSettings *settings) {
     } else {
         strncpy(settings->version_str, "1.16.1", sizeof(settings->version_str) - 1);
         settings->version_str[sizeof(settings->version_str) - 1] = '\0';
+        defaults_were_used = true;
+    }
+
+    const cJSON *display_version_json = cJSON_GetObjectItem(json, "display_version_str");
+    if (display_version_json && cJSON_IsString(display_version_json)) {
+        strncpy(settings->display_version_str, display_version_json->valuestring, sizeof(settings->display_version_str) - 1);
+        settings->display_version_str[sizeof(settings->display_version_str) - 1] = '\0';
+    } else {
+        // Default to the loaded template version if missing
+        strncpy(settings->display_version_str, settings->version_str, sizeof(settings->display_version_str) - 1);
+        settings->display_version_str[sizeof(settings->display_version_str) - 1] = '\0';
         defaults_were_used = true;
     }
 
@@ -827,6 +842,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(root, "manual_saves_path", cJSON_CreateString(settings->manual_saves_path));
         cJSON_DeleteItemFromObject(root, "version");
         cJSON_AddItemToObject(root, "version", cJSON_CreateString(settings->version_str));
+        cJSON_DeleteItemFromObject(root, "display_version_str");
+        cJSON_AddItemToObject(root, "display_version_str", cJSON_CreateString(settings->display_version_str));
         cJSON_DeleteItemFromObject(root, "category");
         cJSON_AddItemToObject(root, "category", cJSON_CreateString(settings->category));
         cJSON_DeleteItemFromObject(root, "optional_flag");

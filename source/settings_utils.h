@@ -142,7 +142,8 @@ extern const ColorRGBA DEFAULT_UI_CHECK_MARK_COLOR;
 // A Struct to hold all application settings in one place
 struct AppSettings {
     // --- Template Configuration ---
-    char version_str[64]; // The selected Minecraft version string, e.g., "1.16.1".
+    char version_str[64]; // The selected Minecraft version string, e.g., "1.21.6".
+    char display_version_str[64]; // The version string to display, e.g., "1.21.10". (same advancements)
     PathMode path_mode; // The mode for finding the saves path (auto or manual).
     char manual_saves_path[MAX_PATH_LENGTH]; // The user-defined path to the saves folder if path_mode is manual.
     char category[MAX_PATH_LENGTH]; // The speedrun or goal category, used to build the template file name.

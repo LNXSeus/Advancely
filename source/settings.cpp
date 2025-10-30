@@ -405,24 +405,30 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 #endif
     }
 
-    // Version dropdown
-    int current_version_idx = -1;
+    int current_template_version_idx = -1;
     for (int i = 0; i < VERSION_STRINGS_COUNT; i++) {
         if (strcmp(VERSION_STRINGS[i], temp_settings.version_str) == 0) {
-            current_version_idx = i;
+            current_template_version_idx = i;
             break;
         }
     }
-    if (ImGui::Combo("Version", &current_version_idx, version_display_c_strs.data(), version_display_c_strs.size())) {
-        if (current_version_idx >= 0) {
-            strncpy(temp_settings.version_str, VERSION_STRINGS[current_version_idx],
+    if (ImGui::Combo("Template Version", &current_template_version_idx, version_display_c_strs.data(),
+                     version_display_c_strs.size())) {
+        if (current_template_version_idx >= 0) {
+            strncpy(temp_settings.version_str, VERSION_STRINGS[current_template_version_idx],
                     sizeof(temp_settings.version_str) - 1);
             temp_settings.version_str[sizeof(temp_settings.version_str) - 1] = '\0';
+
+            // Always update the display version to match the template version for convenience
+            strncpy(temp_settings.display_version_str, temp_settings.version_str, sizeof(temp_settings.display_version_str) - 1);
+            temp_settings.display_version_str[sizeof(temp_settings.display_version_str) - 1] = '\0';
         }
     }
     if (ImGui::IsItemHovered()) {
         char version_tooltip_buffer[1024];
-        snprintf(version_tooltip_buffer, sizeof(version_tooltip_buffer), "Select the version of the template.\n"
+        snprintf(version_tooltip_buffer, sizeof(version_tooltip_buffer),
+                 "Select the functional version of the template.\n"
+                 "This determines which template file to load and how to parse game data.\n"
                  "The number in brackets shows how many templates are available for that version.\n"
                  "This doesn't necessarily have to be the exact version of your minecraft instance.\n"
                  "Click on '(Learn more)' on the right to see the version ranges that functionally equal.");
@@ -461,6 +467,31 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             log_message(LOG_ERROR, "[SETTINGS] Failed to fork process to open URL.\n");
         }
 #endif
+    }
+
+    // "Display Version" dropdown
+    int current_display_version_idx = -1;
+    for (int i = 0; i < VERSION_STRINGS_COUNT; i++) {
+        if (strcmp(VERSION_STRINGS[i], temp_settings.display_version_str) == 0) {
+            current_display_version_idx = i;
+            break;
+        }
+    }
+    // Use the *non-count* version strings for the display version dropdown
+    if (ImGui::Combo("Display Version", &current_display_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT)) {
+        if (current_display_version_idx >= 0) {
+            strncpy(temp_settings.display_version_str, VERSION_STRINGS[current_display_version_idx],
+                    sizeof(temp_settings.display_version_str) - 1);
+            temp_settings.display_version_str[sizeof(temp_settings.display_version_str) - 1] = '\0';
+        }
+    }
+    if (ImGui::IsItemHovered()) {
+        char display_version_tooltip_buffer[1024];
+        snprintf(display_version_tooltip_buffer, sizeof(display_version_tooltip_buffer),
+                 "Select the version to show on the tracker info bar and overlay.\n"
+                 "This is purely for display and does not affect which template is loaded.\n"
+                 "By default, this matches the 'Template Version'.");
+        ImGui::SetTooltip("%s", display_version_tooltip_buffer);
     }
 
     // Only show the StatsPerWorld checkbox for legacy versions
@@ -1201,11 +1232,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Duplicate Texture Warning
     bool duplicate_warning = false;
     if (strcmp(temp_settings.adv_bg_path, temp_settings.adv_bg_half_done_path) == 0 && temp_settings.adv_bg_path[0] !=
-        '\0') duplicate_warning = true;
+        '\0')
+        duplicate_warning = true;
     if (strcmp(temp_settings.adv_bg_path, temp_settings.adv_bg_done_path) == 0 && temp_settings.adv_bg_path[0] != '\0')
         duplicate_warning = true;
     if (strcmp(temp_settings.adv_bg_half_done_path, temp_settings.adv_bg_done_path) == 0 && temp_settings.
-        adv_bg_half_done_path[0] != '\0') duplicate_warning = true;
+        adv_bg_half_done_path[0] != '\0')
+        duplicate_warning = true;
 
     if (duplicate_warning) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.8f, 0.0f, 1.0f)); // Yellow text
@@ -1813,7 +1846,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "This does not modify your template files.\n\n"
                  "Defaults:\n"
                  "  - Path Mode: Auto-Detect Default Saves Path\n"
-                 "  - Version: %s\n"
+                 "  - Template/Display Version: %s\n"
                  "  - Category: %s\n"
                  "  - Optional Flag: %s\n"
                  "  - Language: Default\n"

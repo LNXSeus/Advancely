@@ -4887,7 +4887,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
         // Start with the world name and run details
         snprintf(info_buffer, sizeof(info_buffer), "%s  |  %s - %s%s%s",
-                 t->world_name, settings->version_str, formatted_category,
+                 t->world_name, settings->display_version_str, formatted_category,
                  *settings->optional_flag ? " - " : "", formatted_flag);
 
         // Conditionally add the progress part
@@ -5748,7 +5748,7 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
 
     snprintf(title_buffer, sizeof(title_buffer),
              "  Advancely  %s    |    %s    -    %s    -    %s%s%s%s    |    %s IGT",
-             ADVANCELY_VERSION, t->world_name, settings->version_str, formatted_category,
+             ADVANCELY_VERSION, t->world_name, settings->display_version_str, formatted_category,
              *settings->optional_flag ? "    -    " : "", formatted_flag, progress_chunk, formatted_time);
 
     SDL_SetWindowTitle(t->window, title_buffer);
@@ -5810,7 +5810,7 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
 
     log_message(LOG_INFO, "\n============================================================\n");
     log_message(LOG_INFO, " World:      %s\n", t->world_name);
-    log_message(LOG_INFO, " Version:    %s\n", settings->version_str);
+    log_message(LOG_INFO, " Version:    %s\n", settings->display_version_str);
 
     // When category isn't empty
     if (settings->category[0] != '\0') {
