@@ -289,7 +289,7 @@ Your custom template will appear separately in the template list and will not be
 The main window is an interactive canvas where all your tracked goals are displayed. You can freely zoom in and out to
 rearrange the items in view to suit your needs, making it easy to focus on what matters most for your current run. The
 order of the sections (advancements, recipes, multi-stage goals, ...) can be configured in
-the [settings window](https://github.com/LNXSeus/Advancely#The-Settings-Window).
+the [settings window](https://github.com/LNXSeus/Advancely#the-settings-window-esc).
 
 ### Navigating the Map
 
@@ -525,7 +525,7 @@ settings window, which can be opened at any time by pressing the `ESC` key.
 
 > You can find the default settings in the `resources/reference_files` folder as `settings.json` and
 `Default_Settings.png`. The `Help` button within
-> the [template editor](github.com/LNXSeus/Advancely#the-template-editor-esc--edit-templates) opens this folder.
+> the [template editor](https://github.com/LNXSeus/Advancely#the-template-editor-esc--edit-templates) opens this folder.
 ***
 
 ## Extensive Version Support
