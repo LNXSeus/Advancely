@@ -420,7 +420,7 @@ This is the heart of Advancely's customization. The in-app editor gives you comp
 share the rulesets or `templates` that the tracker uses. You can access it by opening the settings (`ESC`) and clicking
 the `Edit Templates` button.
 
-![Template_Editor](readme_assets/v0.9.286_Template_Editor.png)
+![Template_Editor](readme_assets/v0.9.449_Template_Editor.png)
 
 ### Template Management
 
@@ -511,7 +511,7 @@ settings window, which can be opened at any time by pressing the `ESC` key.
 | Setting Group         | Options & Features                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 |:----------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Path Settings**     | Choose how Advancely finds your saves. `Auto-Detect` finds the default Minecraft path. `Track Custom Saves Folder` lets you specify a manual path. `Auto-Track Active Instance` automatically finds and follows the instance you are playing from **Prism Launcher**, **MultiMC** etc.. The `Open Instances Folder` button helps you quickly navigate to your launcher's instance directory.                                                                        |
-| **Template Settings** | Select the `Version`, `Category`, `Optional Flag`, and `Language` to load a specific ruleset. You can also use the `Open Template Folder` button for quick access to the files on your disk.                                                                                                                                                                                                                                                                        |
+| **Template Settings** | Select the `Template Version` (functional version and folder template is saved in), `Display Version` (visual-only), `Category`, `Optional Flag`, and `Language` to load a specific ruleset. Changing the `Template Version` will automatically update the `Display Version` to match. You can also use the Open Template Folder button for quick access to the files on your disk.                                                                                 |
 | **General Settings**  | Toggle the stream `Overlay`, set the `Tracker FPS Limit`, keep the tracker `Always On Top`, and enable `Using StatsPerWorld Mod` compatibility for legacy Minecraft versions (1.0 - 1.6.4).                                                                                                                                                                                                                                                                         |
 | **Goal Visibility**   | Fine-tune which completed goals are displayed on the tracker with three modes: `Hide All Completed` (strictest), `Hide Template-Hidden Only`, or `Show All`. This setting also affects which items are counted in the section completion counters.                                                                                                                                                                                                                  |                                                                                                                                                                                                                                                                           |
 | **Visual Settings**   | Full RGBA color customization for the tracker `background` and `text`, as well as the overlay `background` and `text`. You can also adjust the `Overlay Width` with a pixel-perfect slider. Customize the `Default`, `Half-Done`, and `Done` background textures by selecting `.png` or `.gif` files from the `resources/gui` folder. Square textures are recommended, and using the same texture for multiple states will make completion harder to distinguish.   |
@@ -555,16 +555,21 @@ all April Fool's snapshots.
 
 > **These will get replaced through auto updates!**
 
-| Category           | Version(s)                                  | Optional Flag(s) | Languages           |
+The versions mentioned below are the functional `Template Versions` that the templates were created for. You may still
+choose a different `Display Version` within the same version range (e.g., `1.21.6` and `1.21.10` for `all_advancements`)
+to make it clear to your viewers (on the overlay and the progress texts) what exact subversion you're playing.
+This way templates don't need to be copied for each subversion.
+
+| Category           | Template Version(s)                         | Optional Flag(s) | Languages           |
 |--------------------|---------------------------------------------|------------------|---------------------|
 | `any%`             | 25w14craftmine                              |                  | Default             |
 | `AMI`              | 25w14craftmine                              |                  | Default             |
 | `all_advancements` | 1.16.1                                      |                  | Default, ger, zh_cn |
-| `all_advancements` | 1.21.8 - 1.21.11                            |                  | Default, ger, zh_cn |
-| `all_advancements` | 1.21.8 - 1.21.11                            | `_optimized`     | Default, ger, zh_cn |
+| `all_advancements` | 1.21.6, 1.21.11                             |                  | Default, ger, zh_cn |
+| `all_advancements` | 1.21.6, 1.21.11                             | `_optimized`     | Default, ger, zh_cn |
 | `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4 |                  | Default, ger        |
-| `miku%`            | 1.21.8 - 1.21.11                            |                  | Default             |
-| `all_trims`        | 1.21.8 - 1.21.11                            |                  | Default             |
+| `miku%`            | 1.21.6, 1.21.11                             |                  | Default             |
+| `all_trims`        | 1.21.6, 1.21.11                             |                  | Default             |
 | `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 25w14craftmine  | `1`              | Default             |
 
 _The `test1` templates are for you to learn and understand how templates work. These test templates include all the core

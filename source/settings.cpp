@@ -431,6 +431,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "This determines which template file to load and how to parse game data.\n"
                  "The number in brackets shows how many templates are available for that version.\n"
                  "This doesn't necessarily have to be the exact version of your minecraft instance.\n"
+                 "(E.g., Playing 1.21.6 (Template Version) all_advancements in 1.21.10 (Display Version).)\n"
+                 "This way templates don't need to be copied for each subversion.\n"
                  "Click on '(Learn more)' on the right to see the version ranges that functionally equal.");
         ImGui::SetTooltip("%s", version_tooltip_buffer);
     }
@@ -490,6 +492,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         snprintf(display_version_tooltip_buffer, sizeof(display_version_tooltip_buffer),
                  "Select the version to show on the tracker info bar and overlay.\n"
                  "This is purely for display and does not affect which template is loaded.\n"
+                 "(E.g., You select the 1.21.6 (Template Version) all_advancements template,\n"
+                 "but play on 1.21.10 (Display Version) that has the same advancements.)\n"
+                 "So no need to copy the same template for each subversion.\n"
                  "By default, this matches the 'Template Version'.");
         ImGui::SetTooltip("%s", display_version_tooltip_buffer);
     }

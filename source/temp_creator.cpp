@@ -1537,7 +1537,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // Version Selector
     ImGui::SetNextItemWidth(250); // Set a reasonable width for the combo box
     int original_version_idx = creator_version_idx; // UUse a temporary variable for the combo
-    if (ImGui::Combo("Version", &creator_version_idx, version_display_c_strs.data(), version_display_c_strs.size())) {
+    if (ImGui::Combo("Template Version", &creator_version_idx, version_display_c_strs.data(), version_display_c_strs.size())) {
         // This block runs when the user makes a new selection.
         // creator_version_idx now holds the NEW index the user clicked.
 
@@ -2206,10 +2206,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             // Construct detailed info string
             char template_info[512];
             if (selected.optional_flag[0] != '\0') {
-                snprintf(template_info, sizeof(template_info), "Version: %s\nCategory: %s\nFlag: %s",
+                snprintf(template_info, sizeof(template_info), "Template Version: %s\nCategory: %s\nFlag: %s",
                          creator_version_str, selected.category, selected.optional_flag);
             } else {
-                snprintf(template_info, sizeof(template_info), "Version: %s\nCategory: %s",
+                snprintf(template_info, sizeof(template_info), "Template Version: %s\nCategory: %s",
                          creator_version_str, selected.category);
             }
             ImGui::TextUnformatted(template_info);
@@ -6418,7 +6418,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::Text("Copying from: %s", selected.category);
         }
 
-        ImGui::Combo("New Version", &copy_template_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT);
+        ImGui::Combo("New Template Version", &copy_template_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT);
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[256];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select the destination version for the new template.\n"
@@ -6488,7 +6488,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         ImGui::Text("Please confirm or edit the details for the new template:");
 
-        ImGui::Combo("Version", &import_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT);
+        ImGui::Combo("Template Version", &import_version_idx, VERSION_STRINGS, VERSION_STRINGS_COUNT);
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[256];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select the destination version for the new template.\n"
