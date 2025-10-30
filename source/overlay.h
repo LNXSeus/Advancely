@@ -54,6 +54,9 @@ struct Overlay {
     SDL_Texture *adv_bg;
     SDL_Texture *adv_bg_half_done;
     SDL_Texture *adv_bg_done;
+    AnimatedTexture *adv_bg_anim;
+    AnimatedTexture *adv_bg_half_done_anim;
+    AnimatedTexture *adv_bg_done_anim;
 
     // Cahces for textures to improve performance
     TextureCacheEntry *texture_cache;

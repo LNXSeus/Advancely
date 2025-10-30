@@ -506,7 +506,7 @@ lists of game data to assist you in building the perfect template.
 The true power of Advancely lies in its deep customization. Every feature can be configured in real-time from the
 settings window, which can be opened at any time by pressing the `ESC` key.
 
-![Settings_Window](readme_assets/v0.9.443_Settings_Window.png)
+![Settings_Window](readme_assets/v0.9.446_Settings_Window.png)
 
 | Setting Group         | Options & Features                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 |:----------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|

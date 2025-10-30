@@ -75,6 +75,9 @@ struct Tracker {
     SDL_Texture *adv_bg; // Texture for the default advancement background.
     SDL_Texture *adv_bg_half_done; // Texture for partially completed advancement/stat backgrounds.
     SDL_Texture *adv_bg_done; // Texture for completed advancement/stat backgrounds.
+    AnimatedTexture *adv_bg_anim; // Animated texture for the default advancement background
+    AnimatedTexture *adv_bg_half_done_anim; // Animated texture for partially completed background
+    AnimatedTexture *adv_bg_done_anim; // Animated texture for completed background
 
     // --- UI & Camera ---
     ImVec2 camera_offset; // The current panning offset of the main view.

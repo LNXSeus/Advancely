@@ -17,7 +17,6 @@
 		"enable_overlay":	false,
 		"overlay_scroll_speed":	1,
 		"overlay_progress_text_align":	"left",
-		"overlay_row1_spacing":	8,
 		"overlay_row3_remove_completed":	false,
 		"overlay_stat_cycle_speed":	3,
 		"notes_use_roboto_font":	false,
@@ -154,7 +153,11 @@
 			"g":	150,
 			"b":	250,
 			"a":	255
-		}
+		},
+		"adv_bg_path":	"advancement_background.png",
+		"adv_bg_half_done_path":	"advancement_background_half_done.png",
+		"adv_bg_done_path":	"advancement_background_done.png",
+		"overlay_row1_spacing":	8
 	},
 	"path_mode":	"auto",
 	"manual_saves_path":	"",

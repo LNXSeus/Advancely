@@ -191,7 +191,7 @@ bool open_gui_texture_dialog(char *out_relative_path, size_t max_len) {
     const char *selected_path = tinyfd_openFileDialog(
         "Select Background Texture",
         native_start_path.c_str(), // Use native path for dialog
-        1,
+        2,
         filter_patterns,
         "Image Files (.png, .gif)",
         0

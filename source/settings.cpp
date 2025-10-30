@@ -1171,7 +1171,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SameLine();
         ImGui::TextWrapped("%s", path_buffer); // Display current path, wrapped
 
-        ImGui::SameLine(ImGui::GetWindowWidth() - 80); // Align button to the right
+        ImGui::SameLine(); // Align button to the right
         char button_label[64];
         snprintf(button_label, sizeof(button_label), "Browse##%s", setting_id);
         if (ImGui::Button(button_label)) {
@@ -1832,6 +1832,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Settings/UI Font: %s (%.1f pt)\n"
                  "  - Goal Visibility: Hide All Completed\n"
                  "  - Overlay Width: %dpx\n"
+                 "  - Default Background: %s\n"
+                 "  - Half-Done Background: %s\n"
+                 "  - Done Background: %s\n"
                  "  - Notes Use Settings Font: %s\n"
                  "  - Print Debug To Console: %s\n"
                  "  - Check For Updates: %s\n"
@@ -1859,6 +1862,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_UI_FONT,
                  DEFAULT_UI_FONT_SIZE,
                  OVERLAY_DEFAULT_WIDTH,
+                 DEFAULT_ADV_BG_PATH,
+                 DEFAULT_ADV_BG_HALF_DONE_PATH,
+                 DEFAULT_ADV_BG_DONE_PATH,
                  DEFAULT_NOTES_USE_ROBOTO ? "Enabled" : "Disabled",
                  DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled",
                  DEFAULT_CHECK_FOR_UPDATES ? "Enabled" : "Disabled",

@@ -79,7 +79,8 @@ const int NUM_SUPPORTERS = sizeof(SUPPORTERS) / sizeof(Supporter);
 typedef struct {
     const Supporter *supporter;
     const char *icon_path;
-    SDL_Texture *background;
+    SDL_Texture *background_static;
+    AnimatedTexture *background_anim;
 } SupporterRenderInfo;
 
 /**
@@ -239,38 +240,47 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     // Load global background textures using settings and cache
     char full_path[MAX_PATH_LENGTH]; // Buffer for constructing full path
 
-    snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), settings->adv_bg_path);
-    o->adv_bg = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
-                                       &o->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+    // Helper lambda to load one background
+    auto load_bg = [&](const char *setting_path, const char *default_path,
+                       SDL_Texture **tex_target, AnimatedTexture **anim_target) {
+        *tex_target = nullptr;
+        *anim_target = nullptr;
+        snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), setting_path);
 
-    snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), settings->adv_bg_half_done_path);
-    o->adv_bg_half_done = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+        if (strstr(full_path, ".gif")) {
+            *anim_target = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
+                                                           &o->anim_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+        } else {
+            *tex_target = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
                                                  &o->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
-
-    snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), settings->adv_bg_done_path);
-    o->adv_bg_done = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
-                                            &o->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
-
-    if (!o->adv_bg || !o->adv_bg_half_done || !o->adv_bg_done) {
-        log_message(
-            LOG_ERROR, "[OVERLAY] Failed to load one or more advancement background textures specified in settings.\n");
-        // Attempt to load defaults as a fallback
-        log_message(LOG_INFO, "[OVERLAY] Attempting to load default background textures...\n");
-        snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), DEFAULT_ADV_BG_PATH);
-        o->adv_bg = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
-                                           &o->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
-        snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), DEFAULT_ADV_BG_HALF_DONE_PATH);
-        o->adv_bg_half_done = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
-                                                     &o->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
-        snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), DEFAULT_ADV_BG_DONE_PATH);
-        o->adv_bg_done = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
-                                                &o->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
-
-        if (!o->adv_bg || !o->adv_bg_half_done || !o->adv_bg_done) {
-            log_message(LOG_ERROR, "[OVERLAY] CRITICAL: Failed to load default background textures as fallback.\n");
-            overlay_free(overlay, settings);
-            return false; // Critical failure if defaults also fail
         }
+
+        // Fallback if loading failed
+        if (!*tex_target && !*anim_target) {
+            log_message(LOG_ERROR, "[OVERLAY] Failed to load background: %s. Trying default...\n", setting_path);
+            snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), default_path);
+            if (strstr(full_path, ".gif")) {
+                *anim_target = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
+                                                               &o->anim_cache_capacity, full_path,
+                                                               SDL_SCALEMODE_NEAREST);
+            } else {
+                *tex_target = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                                     &o->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+            }
+        }
+    };
+
+    load_bg(settings->adv_bg_path, DEFAULT_ADV_BG_PATH, &o->adv_bg, &o->adv_bg_anim);
+    load_bg(settings->adv_bg_half_done_path, DEFAULT_ADV_BG_HALF_DONE_PATH, &o->adv_bg_half_done,
+            &o->adv_bg_half_done_anim);
+    load_bg(settings->adv_bg_done_path, DEFAULT_ADV_BG_DONE_PATH, &o->adv_bg_done, &o->adv_bg_done_anim);
+
+    if ((!o->adv_bg && !o->adv_bg_anim) ||
+        (!o->adv_bg_half_done && !o->adv_bg_half_done_anim) ||
+        (!o->adv_bg_done && !o->adv_bg_done_anim)) {
+        log_message(LOG_ERROR, "[OVERLAY] CRITICAL: Failed to load default background textures as fallback.\n");
+        overlay_free(overlay, settings);
+        return false; // Critical failure if defaults also fail
     }
 
     // Make font HiDPI aware by loading it at a base point size (e.g., 24).
@@ -877,18 +887,21 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
                 // 4. Assign background texture based on the supporter's rank.
                 if (i < top_third_count) {
-                    info.background = o->adv_bg_done;
+                    info.background_static = o->adv_bg_done;
+                    info.background_anim = o->adv_bg_done_anim;
                 } else if (i < middle_third_count) {
-                    info.background = o->adv_bg_half_done;
+                    info.background_static = o->adv_bg_half_done;
+                    info.background_anim = o->adv_bg_half_done_anim;
                 } else {
-                    info.background = o->adv_bg;
+                    info.background_static = o->adv_bg;
+                    info.background_anim = o->adv_bg_anim;
                 }
                 static_supporter_render_list.push_back(info);
             }
         }
 
         if (is_run_complete && NUM_SUPPORTERS > 0) {
-            // --- Completed Run: Render Supporter Showcase ---
+            // Completed Run: Render Supporter Showcase
             float max_text_width = 0.0f;
 
             // First pass: Prepare render info and calculate max width from the static list
@@ -920,9 +933,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     // Render background
                     float bg_x_offset = (cell_width - ITEM_WIDTH) / 2.0f;
                     SDL_FRect bg_rect = {current_x + bg_x_offset, ROW2_Y_POS, ITEM_WIDTH, ITEM_WIDTH};
-                    if (render_info.background)
-                        SDL_RenderTexture(o->renderer, render_info.background, nullptr,
-                                          &bg_rect);
+                    render_texture_with_alpha(o->renderer, render_info.background_static, render_info.background_anim,
+                                              &bg_rect, 255);
 
                     // Render icon
                     SDL_FRect icon_rect = {bg_rect.x + 16.0f, bg_rect.y + 16.0f, 64.0f, 64.0f};
@@ -978,6 +990,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             }
         } else {
             // --- Default Behavior: Render Advancements & Unlocks ---
+            SDL_Texture *static_bg = nullptr;
+            AnimatedTexture *anim_bg = nullptr;
+
             std::vector<OverlayDisplayItem> row2_items;
             for (int i = 0; i < t->template_data->advancement_count; ++i)
                 row2_items.push_back({
@@ -1074,7 +1089,6 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
 
                     // --- Render the item ---
-                    SDL_Texture *bg_texture = o->adv_bg;
                     std::string icon_path;
                     char name_buf[256] = {0}; // Renamed to avoid conflict
                     char progress_buf[256] = {0}; // Renamed and increased size
@@ -1082,8 +1096,15 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     switch (display_item.type) {
                         case OverlayDisplayItem::ADVANCEMENT: {
                             auto *adv = static_cast<TrackableCategory *>(display_item.item_ptr);
-                            if (adv->done) bg_texture = o->adv_bg_done;
-                            else if (adv->completed_criteria_count > 0) bg_texture = o->adv_bg_half_done;
+                            static_bg = o->adv_bg;
+                            anim_bg = o->adv_bg_anim;
+                            if (adv->done) {
+                                static_bg = o->adv_bg_done;
+                                anim_bg = o->adv_bg_done_anim;
+                            } else if (adv->completed_criteria_count > 0) {
+                                static_bg = o->adv_bg_half_done;
+                                anim_bg = o->adv_bg_half_done_anim;
+                            }
                             icon_path = adv->icon_path;
                             strncpy(name_buf, adv->display_name, sizeof(name_buf) - 1);
                             name_buf[sizeof(name_buf) - 1] = '\0';
@@ -1108,7 +1129,12 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         }
                         case OverlayDisplayItem::UNLOCK: {
                             auto *unlock = static_cast<TrackableItem *>(display_item.item_ptr);
-                            if (unlock->done) bg_texture = o->adv_bg_done;
+                            static_bg = o->adv_bg;
+                            anim_bg = o->adv_bg_anim;
+                            if (unlock->done) {
+                                static_bg = o->adv_bg_done;
+                                anim_bg = o->adv_bg_done_anim;
+                            }
                             icon_path = unlock->icon_path;
                             strncpy(name_buf, unlock->display_name, sizeof(name_buf) - 1);
                             name_buf[sizeof(name_buf) - 1] = '\0';
@@ -1120,7 +1146,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     // --- Make sure text positioning uses cell_width_row2 for centering ---
                     float bg_x_offset = (cell_width_row2 - ITEM_WIDTH) / 2.0f; // Center background within cell
                     SDL_FRect bg_rect = {x_pos + bg_x_offset, ROW2_Y_POS, ITEM_WIDTH, ITEM_WIDTH};
-                    if (bg_texture) SDL_RenderTexture(o->renderer, bg_texture, nullptr, &bg_rect);
+                    render_texture_with_alpha(o->renderer, static_bg, anim_bg, &bg_rect, 255);
 
                     SDL_FRect icon_rect = {bg_rect.x + 16.0f, bg_rect.y + 16.0f, 64.0f, 64.0f};
                     SDL_Texture *tex = nullptr;
@@ -1354,7 +1380,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     }
 
                     // --- Render the item ---
-                    SDL_Texture *bg_texture = o->adv_bg;
+                    SDL_Texture *static_bg = nullptr;
+                    AnimatedTexture *anim_bg = nullptr;
+
                     std::string icon_path;
                     char name_buf[256] = {0}; // Renamed
                     char progress_buf[256] = {0}; // Renamed and increased size
@@ -1362,19 +1390,16 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     switch (display_item.type) {
                         case OverlayDisplayItem::STAT: {
                             auto *stat = static_cast<TrackableCategory *>(display_item.item_ptr);
-                            // Check for completion first, then for the "half-done" state
+                            static_bg = o->adv_bg;
+                            anim_bg = o->adv_bg_anim;
                             if (stat->done) {
-                                bg_texture = o->adv_bg_done;
-                            }
-                            // A stat is "half-done" if:
-                            // 1. It's a complex category with at least one criterion met.
-                            // OR
-                            // 2. It's a simple category and its progress is greater than zero.
-                            else if ((!stat->is_single_stat_category && stat->completed_criteria_count > 0) ||
-                                     (stat->is_single_stat_category && stat->criteria_count > 0 && stat->criteria[0]->
-                                      progress > 0)) {
-                                bg_texture = o->adv_bg_half_done;
-                            }
+                                static_bg = o->adv_bg_done;
+                                anim_bg = o->adv_bg_done_anim;
+                            } else if ((!stat->is_single_stat_category && stat->completed_criteria_count > 0) ||
+                                     (stat->is_single_stat_category && stat->criteria_count > 0 && stat->criteria[0]->progress > 0)) {
+                                static_bg = o->adv_bg_half_done;
+                                anim_bg = o->adv_bg_half_done_anim;
+                                     }
                             icon_path = stat->icon_path;
 
                             if (stat->criteria_count > 1) {
@@ -1428,8 +1453,15 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         }
                         case OverlayDisplayItem::CUSTOM: {
                             auto *goal = static_cast<TrackableItem *>(display_item.item_ptr);
-                            if (goal->done) bg_texture = o->adv_bg_done;
-                            else if (goal->progress > 0) bg_texture = o->adv_bg_half_done;
+                            static_bg = o->adv_bg;
+                            anim_bg = o->adv_bg_anim;
+                            if (goal->done) {
+                                static_bg = o->adv_bg_done;
+                                anim_bg = o->adv_bg_done_anim;
+                            } else if (goal->progress > 0) {
+                                static_bg = o->adv_bg_half_done;
+                                anim_bg = o->adv_bg_half_done_anim;
+                            }
                             icon_path = goal->icon_path;
                             strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
                             name_buf[sizeof(name_buf) - 1] = '\0';
@@ -1442,8 +1474,15 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         }
                         case OverlayDisplayItem::MULTISTAGE: {
                             auto *goal = static_cast<MultiStageGoal *>(display_item.item_ptr);
-                            if (goal->current_stage >= goal->stage_count - 1) bg_texture = o->adv_bg_done;
-                            else if (goal->current_stage > 0) bg_texture = o->adv_bg_half_done;
+                            static_bg = o->adv_bg;
+                            anim_bg = o->adv_bg_anim;
+                            if (goal->current_stage >= goal->stage_count - 1) {
+                                static_bg = o->adv_bg_done;
+                                anim_bg = o->adv_bg_done_anim;
+                            } else if (goal->current_stage > 0) {
+                                static_bg = o->adv_bg_half_done;
+                                anim_bg = o->adv_bg_half_done_anim;
+                            }
                             icon_path = goal->icon_path;
                             strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
                             name_buf[sizeof(name_buf) - 1] = '\0';
@@ -1465,7 +1504,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     // --- Make sure text positioning uses cell_width_row3 for centering ---
                     float bg_x_offset = (cell_width_row3 - ITEM_WIDTH) / 2.0f; // Center background within cell
                     SDL_FRect bg_rect = {current_x + bg_x_offset, ROW3_Y_POS, ITEM_WIDTH, ITEM_WIDTH};
-                    if (bg_texture) SDL_RenderTexture(o->renderer, bg_texture, nullptr, &bg_rect);
+                    render_texture_with_alpha(o->renderer, static_bg, anim_bg, &bg_rect, 255);
 
                     SDL_FRect icon_rect = {bg_rect.x + 16.0f, bg_rect.y + 16.0f, 64.0f, 64.0f};
                     SDL_Texture *tex = nullptr;

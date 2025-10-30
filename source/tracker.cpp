@@ -314,40 +314,47 @@ static void tracker_reload_background_textures(Tracker *t, const AppSettings *se
     log_message(LOG_INFO, "[TRACKER] Reloading background textures...\n");
     char full_path[MAX_PATH_LENGTH];
 
-    // No need to explicitly destroy old ones, cache handles replacement if path changes
-    // If paths are the same, cache returns the existing texture
+    // Helper lambda to load one background
+    auto load_bg = [&](const char *setting_path, const char *default_path,
+                       SDL_Texture **tex_target, AnimatedTexture **anim_target) {
+        *tex_target = nullptr;
+        *anim_target = nullptr;
+        snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), setting_path);
 
-    snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), settings->adv_bg_path);
-    t->adv_bg = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+        if (strstr(full_path, ".gif")) {
+            *anim_target = get_animated_texture_from_cache(t->renderer, &t->anim_cache, &t->anim_cache_count,
+                                                           &t->anim_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+        } else {
+            *tex_target = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count,
+                                                 &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+        }
 
-    snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), settings->adv_bg_half_done_path);
-    t->adv_bg_half_done = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+        // Fallback if loading failed
+        if (!*tex_target && !*anim_target) {
+            log_message(LOG_ERROR, "[TRACKER] Failed to load background: %s. Trying default...\n", setting_path);
+            snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), default_path);
+            if (strstr(full_path, ".gif")) {
+                *anim_target = get_animated_texture_from_cache(t->renderer, &t->anim_cache, &t->anim_cache_count,
+                                                               &t->anim_cache_capacity, full_path,
+                                                               SDL_SCALEMODE_NEAREST);
+            } else {
+                *tex_target = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count,
+                                                     &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+            }
+        }
+    };
 
-    snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), settings->adv_bg_done_path);
-    t->adv_bg_done = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+    load_bg(settings->adv_bg_path, DEFAULT_ADV_BG_PATH, &t->adv_bg, &t->adv_bg_anim);
+    load_bg(settings->adv_bg_half_done_path, DEFAULT_ADV_BG_HALF_DONE_PATH, &t->adv_bg_half_done,
+            &t->adv_bg_half_done_anim);
+    load_bg(settings->adv_bg_done_path, DEFAULT_ADV_BG_DONE_PATH, &t->adv_bg_done, &t->adv_bg_done_anim);
 
-     // Fallback logic if any texture failed to load
-     if (!t->adv_bg || !t->adv_bg_half_done || !t->adv_bg_done) {
-         log_message(LOG_ERROR, "[TRACKER] Failed loading one or more custom background textures. Attempting defaults...\n");
-         // Try loading defaults only for the ones that failed
-         if (!t->adv_bg) {
-             snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), DEFAULT_ADV_BG_PATH);
-             t->adv_bg = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
-         }
-         if (!t->adv_bg_half_done) {
-             snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), DEFAULT_ADV_BG_HALF_DONE_PATH);
-             t->adv_bg_half_done = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
-         }
-         if (!t->adv_bg_done) {
-             snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), DEFAULT_ADV_BG_DONE_PATH);
-             t->adv_bg_done = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
-         }
-         // Log error if defaults *still* fail (shouldn't happen unless defaults are missing)
-         if (!t->adv_bg || !t->adv_bg_half_done || !t->adv_bg_done) {
-             log_message(LOG_ERROR, "[TRACKER] CRITICAL: Failed to load default background textures during reload.\n");
-             // Maybe show an error message? For now, just log.
-         }
-     }
+    if ((!t->adv_bg && !t->adv_bg_anim) ||
+        (!t->adv_bg_half_done && !t->adv_bg_half_done_anim) ||
+        (!t->adv_bg_done && !t->adv_bg_done_anim)) {
+        log_message(
+            LOG_ERROR, "[TRACKER] CRITICAL: Failed to load one or more default background textures during reload.\n");
+    }
 }
 
 
@@ -2376,34 +2383,15 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     }
 
     // Load global background textures
-    // It's fine that this is calling load_texture_with_scale_mode directly instead of tracker_get_texture
-    // as this texture doesn't run risk of being loaded multiple times
-    char full_path[MAX_PATH_LENGTH];
-    snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), settings->adv_bg_path);
-    t->adv_bg = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
+    tracker_reload_background_textures(t, settings);
 
-    snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), settings->adv_bg_half_done_path);
-    t->adv_bg_half_done = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
-
-    snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), settings->adv_bg_done_path);
-    t->adv_bg_done = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
-
-    if (!t->adv_bg || !t->adv_bg_half_done || !t->adv_bg_done) {
-        log_message(LOG_ERROR, "[TRACKER] Failed to load one or more advancement background textures specified in settings.\n");
-        // Attempt to load defaults as a fallback
-         log_message(LOG_INFO, "[TRACKER] Attempting to load default background textures...\n");
-         snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), DEFAULT_ADV_BG_PATH);
-         t->adv_bg = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
-         snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), DEFAULT_ADV_BG_HALF_DONE_PATH);
-         t->adv_bg_half_done = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
-         snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), DEFAULT_ADV_BG_DONE_PATH);
-         t->adv_bg_done = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count, &t->texture_cache_capacity, full_path, SDL_SCALEMODE_NEAREST);
-
-         if (!t->adv_bg || !t->adv_bg_half_done || !t->adv_bg_done) {
-              log_message(LOG_ERROR, "[TRACKER] CRITICAL: Failed to load default background textures as fallback.\n");
-              tracker_free(tracker, settings);
-              return false; // Critical failure if defaults also fail
-         }
+    // Check if loading (including fallbacks) failed for any background
+    if ((!t->adv_bg && !t->adv_bg_anim) ||
+        (!t->adv_bg_half_done && !t->adv_bg_half_done_anim) ||
+        (!t->adv_bg_done && !t->adv_bg_done_anim)) {
+        log_message(LOG_ERROR, "[TRACKER] CRITICAL: Failed to load default background textures as fallback.\n");
+        tracker_free(tracker, settings);
+        return false; // Critical failure if defaults also fail
     }
 
     // Allocate the main data container
@@ -3226,35 +3214,55 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             if (is_visible_on_screen) {
                 ImVec2 bg_size = ImVec2(96.0f, 96.0f);
 
-                // Determine background texture based on completion status
-                SDL_Texture *bg_texture_to_use = t->adv_bg; // Default
+                // Select texture *pair* and render
+                SDL_Texture *static_bg = t->adv_bg;
+                AnimatedTexture *anim_bg = t->adv_bg_anim;
+
                 if (is_considered_complete_render) {
-                    // Use the same completion logic as hiding
-                    bg_texture_to_use = t->adv_bg_done;
+                    static_bg = t->adv_bg_done;
+                    anim_bg = t->adv_bg_done_anim;
                 } else {
-                    // Check for partial progress
                     bool has_progress = false;
                     if (is_complex) {
                         has_progress = cat->completed_criteria_count > 0;
                     } else if (is_stat_section && cat->criteria_count == 1) {
-                        // Only check progress for single stats
                         has_progress = cat->criteria[0]->progress > 0;
-                    } // Simple advancements don't have partial progress state
-
+                    }
                     if (has_progress) {
-                        bg_texture_to_use = t->adv_bg_half_done;
+                        static_bg = t->adv_bg_half_done;
+                        anim_bg = t->adv_bg_half_done_anim;
                     }
                 }
 
+                // Now render the correct one
+                SDL_Texture *texture_to_draw = static_bg;
+                if (anim_bg && anim_bg->frame_count > 0) {
+                    // Standard GIF Frame Selection Logic
+                    if (anim_bg->delays && anim_bg->total_duration > 0) {
+                        Uint32 current_ticks = SDL_GetTicks();
+                        Uint32 elapsed_time = current_ticks % anim_bg->total_duration;
+                        int current_frame = 0;
+                        Uint32 time_sum = 0;
+                        for (int frame_idx = 0; frame_idx < anim_bg->frame_count; ++frame_idx) {
+                            time_sum += anim_bg->delays[frame_idx];
+                            if (elapsed_time < time_sum) {
+                                current_frame = frame_idx;
+                                break;
+                            }
+                        }
+                        texture_to_draw = anim_bg->frames[current_frame];
+                    } else {
+                        texture_to_draw = anim_bg->frames[0];
+                    }
+                }
 
                 // Render Background
-                if (bg_texture_to_use)
-                    draw_list->AddImage((void *) bg_texture_to_use, screen_pos,
+                if (texture_to_draw)
+                    draw_list->AddImage((void *) texture_to_draw, screen_pos,
                                         ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
                                                screen_pos.y + bg_size.y * t->zoom_level));
 
                 // Render Main Icon (Animated or Static)
-                SDL_Texture *texture_to_draw = nullptr;
                 // --- Start GIF Frame Selection Logic (Main Icon) ---
                 if (cat->anim_texture && cat->anim_texture->frame_count > 0) {
                     if (cat->anim_texture->delays && cat->anim_texture->total_duration > 0) {
@@ -3791,16 +3799,40 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         // --- Rendering Core Logic ---
         if (is_visible_on_screen) {
             ImVec2 bg_size = ImVec2(96.0f, 96.0f);
-            SDL_Texture *bg_texture = item->done ? t->adv_bg_done : t->adv_bg; // Background depends on completion
+
+            // Select texture *pair* and render
+            SDL_Texture* static_bg = item->done ? t->adv_bg_done : t->adv_bg;
+            AnimatedTexture* anim_bg = item->done ? t->adv_bg_done_anim : t->adv_bg_anim;
+
+            SDL_Texture* texture_to_draw = static_bg;
+            if (anim_bg && anim_bg->frame_count > 0) {
+
+                // Standard GIF Frame Selection Logic
+                if (anim_bg->delays && anim_bg->total_duration > 0) {
+                    Uint32 current_ticks = SDL_GetTicks();
+                    Uint32 elapsed_time = current_ticks % anim_bg->total_duration;
+                    int current_frame = 0;
+                    Uint32 time_sum = 0;
+                    for (int frame_idx = 0; frame_idx < anim_bg->frame_count; ++frame_idx) {
+                        time_sum += anim_bg->delays[frame_idx];
+                        if (elapsed_time < time_sum) {
+                            current_frame = frame_idx;
+                            break;
+                        }
+                    }
+                    texture_to_draw = anim_bg->frames[current_frame];
+                } else {
+                    texture_to_draw = anim_bg->frames[0];
+                }
+            }
 
             // Render Background
-            if (bg_texture)
-                draw_list->AddImage((void *) bg_texture, screen_pos,
+            if (texture_to_draw)
+                draw_list->AddImage((void *) texture_to_draw, screen_pos,
                                     ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
                                            screen_pos.y + bg_size.y * t->zoom_level));
 
             // Render Icon (Animated or Static)
-            SDL_Texture *texture_to_draw = nullptr;
             // --- Start GIF Frame Selection Logic ---
             if (item->anim_texture && item->anim_texture->frame_count > 0) {
                 if (item->anim_texture->delays && item->anim_texture->total_duration > 0) {
@@ -4099,25 +4131,47 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         // --- Rendering Core Logic ---
         if (is_visible_on_screen) {
             ImVec2 bg_size = ImVec2(96.0f, 96.0f);
-            SDL_Texture *bg_texture; // Determine background based on completion and progress
+
+            // Select texture *pair* and render
+            SDL_Texture* static_bg = t->adv_bg;
+            AnimatedTexture* anim_bg = t->adv_bg_anim;
 
             if (item->done) {
-                bg_texture = t->adv_bg_done;
+                static_bg = t->adv_bg_done;
+                anim_bg = t->adv_bg_done_anim;
             } else if ((item->goal > 0 || item->goal == -1) && item->progress > 0) {
-                // Check for partial progress on counters
-                bg_texture = t->adv_bg_half_done;
-            } else {
-                bg_texture = t->adv_bg; // Default or simple toggle incomplete
+                static_bg = t->adv_bg_half_done;
+                anim_bg = t->adv_bg_half_done_anim;
+            }
+
+            SDL_Texture* texture_to_draw = static_bg;
+            if (anim_bg && anim_bg->frame_count > 0) {
+                // Standard GIF Frame Selection Logic
+                if (anim_bg->delays && anim_bg->total_duration > 0) {
+                    Uint32 current_ticks = SDL_GetTicks();
+                    Uint32 elapsed_time = current_ticks % anim_bg->total_duration;
+                    int current_frame = 0;
+                    Uint32 time_sum = 0;
+                    for (int frame_idx = 0; frame_idx < anim_bg->frame_count; ++frame_idx) {
+                        time_sum += anim_bg->delays[frame_idx];
+                        if (elapsed_time < time_sum) {
+                            current_frame = frame_idx;
+                            break;
+                        }
+                    }
+                    texture_to_draw = anim_bg->frames[current_frame];
+                } else {
+                    texture_to_draw = anim_bg->frames[0];
+                }
             }
 
             // Render Background
-            if (bg_texture)
-                draw_list->AddImage((void *) bg_texture, screen_pos,
+            if (texture_to_draw)
+                draw_list->AddImage((void *) texture_to_draw, screen_pos,
                                     ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
                                            screen_pos.y + bg_size.y * t->zoom_level));
 
             // Render Icon (Animated or Static)
-            SDL_Texture *texture_to_draw = nullptr;
             // --- Start GIF Frame Selection Logic ---
             if (item->anim_texture && item->anim_texture->frame_count > 0) {
                 if (item->anim_texture->delays && item->anim_texture->total_duration > 0) {
@@ -4505,20 +4559,47 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         // --- Rendering Core Logic ---
         if (is_visible_on_screen) {
             ImVec2 bg_size = ImVec2(96.0f, 96.0f);
-            SDL_Texture *bg_texture; // Determine background based on stage progress
 
-            if (goal->current_stage >= goal->stage_count - 1) bg_texture = t->adv_bg_done; // Final stage reached
-            else if (goal->current_stage > 0) bg_texture = t->adv_bg_half_done; // Partially completed
-            else bg_texture = t->adv_bg; // Not started
+            // Select texture *pair* and render
+            SDL_Texture* static_bg = t->adv_bg;
+            AnimatedTexture* anim_bg = t->adv_bg_anim;
+
+            if (goal->current_stage >= goal->stage_count - 1) {
+                static_bg = t->adv_bg_done;
+                anim_bg = t->adv_bg_done_anim;
+            } else if (goal->current_stage > 0) {
+                static_bg = t->adv_bg_half_done;
+                anim_bg = t->adv_bg_half_done_anim;
+            }
+
+            SDL_Texture* texture_to_draw = static_bg;
+            if (anim_bg && anim_bg->frame_count > 0) {
+                // --- Standard GIF Frame Selection Logic ---
+                if (anim_bg->delays && anim_bg->total_duration > 0) {
+                    Uint32 current_ticks = SDL_GetTicks();
+                    Uint32 elapsed_time = current_ticks % anim_bg->total_duration;
+                    int current_frame = 0;
+                    Uint32 time_sum = 0;
+                    for (int frame_idx = 0; frame_idx < anim_bg->frame_count; ++frame_idx) {
+                        time_sum += anim_bg->delays[frame_idx];
+                        if (elapsed_time < time_sum) {
+                            current_frame = frame_idx;
+                            break;
+                        }
+                    }
+                    texture_to_draw = anim_bg->frames[current_frame];
+                } else {
+                    texture_to_draw = anim_bg->frames[0];
+                }
+            }
 
             // Render Background
-            if (bg_texture)
-                draw_list->AddImage((void *) bg_texture, screen_pos,
+            if (texture_to_draw)
+                draw_list->AddImage((void *) texture_to_draw, screen_pos,
                                     ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
                                            screen_pos.y + bg_size.y * t->zoom_level));
 
             // Render Icon (Animated or Static)
-            SDL_Texture *texture_to_draw = nullptr;
             // --- Start GIF Frame Selection Logic ---
             if (goal->anim_texture && goal->anim_texture->frame_count > 0) {
                 if (goal->anim_texture->delays && goal->anim_texture->total_duration > 0) {
@@ -4905,7 +4986,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     ImGui::SetWindowFontScale(scale_factor_controls); // Apply scale FIRST
 
     // --- Calculate control sizes AFTER setting the scale, using ImGui styles ---
-    ImGuiStyle& style = ImGui::GetStyle();
+    ImGuiStyle &style = ImGui::GetStyle();
     const float button_padding_x = style.ItemSpacing.x; // Use ImGui's item spacing
     const float frame_padding_x = style.FramePadding.x;
     // const float frame_padding_y = style.FramePadding.y;
@@ -4917,7 +4998,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // Calculate sizes for Checkboxes (Square + Spacing + Label + Padding)
     // Checkbox square is roughly frame_height wide.
     ImVec2 lock_text_size = ImGui::CalcTextSize("Lock Layout");
-    float lock_checkbox_width = frame_height + style.ItemInnerSpacing.x + lock_text_size.x + frame_padding_x * 0.5f; // Approx checkbox width calculation
+    float lock_checkbox_width = frame_height + style.ItemInnerSpacing.x + lock_text_size.x + frame_padding_x * 0.5f;
+    // Approx checkbox width calculation
 
     ImVec2 reset_text_size = ImGui::CalcTextSize("Reset Layout");
     float reset_checkbox_width = frame_height + style.ItemInnerSpacing.x + reset_text_size.x + frame_padding_x * 0.5f;
@@ -4937,7 +5019,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     float control_height = frame_height; // All controls should share the same height
 
     // --- Position the Controls window ---
-    ImVec2 controls_window_pos = ImVec2(io.DisplaySize.x - controls_total_width - style.WindowPadding.x, // Use window padding for edge spacing
+    ImVec2 controls_window_pos = ImVec2(io.DisplaySize.x - controls_total_width - style.WindowPadding.x,
+                                        // Use window padding for edge spacing
                                         io.DisplaySize.y - control_height - style.WindowPadding.y);
     ImVec2 controls_window_size = ImVec2(controls_total_width, control_height);
 
@@ -4945,7 +5028,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     ImGui::SetNextWindowSize(controls_window_size);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0)); // No internal padding needed for this wrapper
 
-    ImGui::Begin("Controls", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoMove);
+    ImGui::Begin("Controls", nullptr,
+                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoMove);
     ImGui::PopStyleVar();
 
     ImGui::SetWindowFontScale(scale_factor_controls);
