@@ -523,6 +523,9 @@ settings window, which can be opened at any time by pressing the `ESC` key.
 | **Debug Settings**    | Toggle `Print Debug To Console` for detailed status updates in your terminal or `advancely_log.txt`, `Auto-Check for Updates` on startup or `Restart Advancely` to perform a full automatic restart of Advancely, which is needed for some font settings to take effect.                                                                                                                                                                                            |
 | **Action Buttons**    | `Apply Settings` (Enter): Saves changes and triggers necessary reloads (like the overlay). `Revert Changes` (Ctrl/Cmd+Z): Discards unsaved modifications. `Reset To Defaults`: Resets most settings to their original values (preserves window geometry & hotkeys). `Restart Advancely`: Saves settings and performs a full application restart (required for ui/font/size changes). Default settings can also be found in the `resources/reference_files/` folder. |
 
+> You can find the default settings in the `resources/reference_files` folder as `settings.json` and
+`Default_Settings.png`. The `Help` button within
+> the [template editor](github.com/LNXSeus/Advancely#the-template-editor-esc--edit-templates) opens this folder.
 ***
 
 ## Extensive Version Support
