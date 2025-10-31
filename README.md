@@ -542,7 +542,7 @@ all April Fool's snapshots.
         * **Default (Snapshot Mode)**: For vanilla play, it reads the global stats file. When you load a new world, it
           takes a "snapshot" of your progress and tracks all new stats and achievements against that baseline,
           effectively simulating per-world stats.
-        * **StatsPerWorld Mod Support**: If you are using Legacy Fabric with
+        * **StatsPerWorld Mod Support**: If you are using [Legacy Fabric](https://legacyfabric.net) with
           the [StatsPerWorld Mod](https://github.com/RedLime/StatsPerWorld/releases), Advancely can be configured to
           read local `.dat` stat files directly, just like in modern versions. Playtime is tracked via the ID: `1100`.
     * **1.7.2 – 1.11.2 (Mid-Era)**: Reads achievements and stats from the per-world stats JSON file. Playtime is tracked
