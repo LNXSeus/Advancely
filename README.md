@@ -6,7 +6,7 @@
 
 # A highly customizable and interactive tool to track Minecraft progress beyond just Advancements.
 
-![Advancely_Tracker_Preview](readme_assets/Advancely-v0.9.313-Preview.gif)
+![Advancely_Tracker_Preview](readme_assets/Advancely-v0.9.455-Preview.gif)
 _This animation here is compressed. When you use the tracker the framerate will be higher and the resolution perfectly
 sharp._
 
