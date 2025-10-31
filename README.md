@@ -595,6 +595,8 @@ Make sure you use the `SourceHanSansCN-Normal.otf` font in all places (tracker, 
 * **No Coop Support**: Unfortunately this tracker doesn't fully support coop speedruns as it always updates based on the
   player file that has most recently been modified. This means Advancely doesn't `combine` progress of multiple
   players. (e.g., each player completes different advancements).
+* **Overlay Recording**: Especially on a Windows machine and OBS you must use Gamecapture to capture the overlay. A
+  window capture can cause weird issues.
 
 ***
 
