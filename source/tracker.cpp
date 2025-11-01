@@ -3547,8 +3547,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                 // Render Parent Checkbox for Stats (single or multi)
                 if (is_stat_section) {
-                    ImVec2 check_pos_parent = ImVec2(screen_pos.x + 70 * t->zoom_level,
-                                                     screen_pos.y + 5 * t->zoom_level); // Top-right corner
+                    ImVec2 check_pos_parent = ImVec2(screen_pos.x + 4 * t->zoom_level,
+                                                     screen_pos.y + 4 * t->zoom_level); // Top-left corner
                     ImRect checkbox_rect_parent(check_pos_parent,
                                                 ImVec2(check_pos_parent.x + 20 * t->zoom_level,
                                                        check_pos_parent.y + 20 * t->zoom_level));
@@ -4249,7 +4249,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             // Allow override for simple toggles (goal <= 0) OR infinite counters (goal == -1)
             bool can_be_overridden = (item->goal <= 0 || item->goal == -1);
             if (can_be_overridden) {
-                ImVec2 check_pos = ImVec2(screen_pos.x + 70 * t->zoom_level, screen_pos.y + 5 * t->zoom_level);
+                ImVec2 check_pos = ImVec2(screen_pos.x + 4 * t->zoom_level, screen_pos.y + 4 * t->zoom_level);
                 // Top-right corner
                 ImVec2 check_size = ImVec2(20 * t->zoom_level, 20 * t->zoom_level);
                 ImRect checkbox_rect(check_pos, ImVec2(check_pos.x + check_size.x, check_pos.y + check_size.y));
