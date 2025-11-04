@@ -70,7 +70,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Install dependencies (macOS)
-        run: /usr/local/bin/brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
+          # 1. Manually install the x86_64 version of Homebrew into /usr/local
+          #    This is required for cross-compiling on an ARM64 runner.
+          # 2. Use that Homebrew to install the x86_64 dependencies.
+        run: |
+          arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          /usr/local/bin/brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
       - name: Configure CMake (macOS)
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="/usr/local" -DCMAKE_OSX_DEPLOYMENT_TARGET="13.0" -DCMAKE_OSX_ARCHITECTURES="x86_64"
       - name: Build Project
@@ -208,7 +213,7 @@ jobs:
   # Job 4: Combine macOS builds into a universal package
   package_universal_macos:
     runs-on: macos-latest
-    needs: [build_macos_intel, build_macos_arm]
+    needs: [ build_macos_intel, build_macos_arm ]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -301,7 +306,7 @@ jobs:
   # Job 5: Test the Universal macOS package
   test_universal_macos:
     runs-on: macos-latest
-    needs: [package_universal_macos]
+    needs: [ package_universal_macos ]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
