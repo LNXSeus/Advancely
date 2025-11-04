@@ -6371,7 +6371,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
 
         // Also allow enter key ONLY WHEN the window is focused
-        if (ImGui::Button("Create Files") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(
+        if (ImGui::Button("Create Template") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(
                                                   ImGuiFocusedFlags_RootAndChildWindows))) {
             if (creator_version_idx >= 0) {
                 char error_msg[256] = "";
