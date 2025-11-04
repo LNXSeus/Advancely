@@ -148,7 +148,7 @@ your operating system. The `vX.X.X` is the Advancely version, that is also displ
 
 * **Windows:** `Advancely-vX.X.X-Windows.zip`
 * **Linux:** `Advancely-vX.X.X-Linux.zip`
-* **macOS:** `Advancely-vX.X.X-macOS-Universal.zip` for both Intel and Silicon Macs (oldest supported is macos-14).
+* **macOS:** `Advancely-vX.X.X-macOS-Universal.zip` for both Intel (down to macOS 13 Ventura) and Silicon Macs.
 
 ### 2. Installation & First-Time Run
 
