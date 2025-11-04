@@ -70,7 +70,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Install dependencies (macOS)
-        run: arch -x86_64 brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
+        run: /usr/local/bin/brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
       - name: Configure CMake (macOS)
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="/usr/local" -DCMAKE_OSX_DEPLOYMENT_TARGET="13.0" -DCMAKE_OSX_ARCHITECTURES="x86_64"
       - name: Build Project
