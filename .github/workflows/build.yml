@@ -65,7 +65,7 @@ jobs:
 
   # Job 2: Build, Test, and Bundle the macOS Intel (X64) version
   build_macos_intel:
-    runs-on: macos-13
+    runs-on: macos-14
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
