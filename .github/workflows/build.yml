@@ -82,17 +82,6 @@ jobs:
         run: cmake --build build --config Release
       - name: Install gtimeout (GNU Coreutils)
         run: brew install coreutils
-      - name: Run Executable Test (macOS Intel)
-        run: |
-          echo "Running executable for 5 seconds..."
-          gtimeout 5s ./build/Advancely.app/Contents/MacOS/Advancely --test-mode > output.txt 2>&1 || true
-          echo "Executable run finished. Contents of output.txt:"
-          cat output.txt
-      - name: Upload Test Output (macOS Intel)
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-output-v${{ env.PROJECT_VERSION }}-macOS-X64
-          path: output.txt
       - name: Bundle macOS Dependencies
         shell: bash
         run: |
@@ -133,6 +122,18 @@ jobs:
           done
           codesign --force --sign - "$LIBS_DEST_DIR"/lib*.dylib
           codesign --force --deep --sign - "$BUNDLE_PATH"
+      # Testing
+      - name: Run Executable Test (macOS Intel)
+        run: |
+          echo "Running executable for 5 seconds..."
+          gtimeout 10s ./build/Advancely.app/Contents/MacOS/Advancely --test-mode > output.txt 2>&1 || true
+          echo "Executable run finished. Contents of output.txt:"
+          cat output.txt
+      - name: Upload Test Output (macOS Intel)
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output-v${{ env.PROJECT_VERSION }}-macOS-X64
+          path: output.txt
       - name: Upload Intel App Bundle
         uses: actions/upload-artifact@v4
         with:
