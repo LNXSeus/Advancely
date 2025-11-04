@@ -99,7 +99,7 @@ jobs:
           BUNDLE_PATH="build/Advancely.app"
           EXE_PATH="$BUNDLE_PATH/Contents/MacOS/Advancely"
           LIBS_DEST_DIR="$BUNDLE_PATH/Contents/MacOS"
-          BREW_PREFIX=$(brew --prefix)
+          BREW_PREFIX="/usr/local" # Hardcode the Intel (x86_64) Homebrew prefix
           LIBS_TO_PROCESS=($(otool -L "$EXE_PATH" | grep "$BREW_PREFIX" | awk '{gsub(/:$/, ""); print $1}'))
           TEMP_DEPS_LIST=()
           i=0
