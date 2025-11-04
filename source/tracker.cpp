@@ -4910,10 +4910,10 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         ImGui::BeginTooltip();
         ImGui::PushTextWrapPos(ImGui::GetFontSize() * 40.0f);
 
-        ImGui::TextUnformatted("Overlay Text");
+        ImGui::TextUnformatted("Progress Text");
 
         ImGui::BulletText("World: Shows the current world name.");
-        ImGui::BulletText("Run Details: Displays the version, category, and flag.");
+        ImGui::BulletText("Run Details: Shows the Display Version & Display Category.");
         ImGui::BulletText("Progress: Shows the main adv/ach counter and overall percentage.");
         ImGui::BulletText("IGT: Displays the in-game time from the stats file (ticks).");
         ImGui::BulletText("Update Timer: Shows the time since the last game file update.");

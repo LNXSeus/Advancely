@@ -16,10 +16,6 @@ Special characters, accents (like `é`, `ü`, `ñ`), or symbols in the file path
 - **BAD Path:** `C:\Users\Jörg\Desktop\Spiele\Advancely\`
 - **GOOD Path:** `C:\Users\Joerg\Desktop\Games\Advancely\`
 
-Sure 👍 here’s your cleaned version with all the `[cite]` text removed, ready to copy exactly as-is:
-
----
-
 --------------------------------------------------
 --- For macOS Users ---
 --------------------------------------------------

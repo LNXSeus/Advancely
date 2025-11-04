@@ -773,6 +773,11 @@
 			"criteria":	{
 			}
 		},
+		"minecraft:adventure/spear_many_mobs":	{
+			"icon":	"items/iron_spear.png",
+			"criteria":	{
+			}
+		},
 		"minecraft:adventure/fall_from_world_height":	{
 			"icon":	"items/water_bucket_25w14craftmine.png",
 			"criteria":	{

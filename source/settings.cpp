@@ -726,7 +726,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         char flag_tooltip_buffer[1024];
         snprintf(flag_tooltip_buffer, sizeof(flag_tooltip_buffer),
                  "Choose between available optional flags for the selected version and category.\n"
-                 "The optional flag is used to differentiate between different versions of the same template.\n");
+                 "The optional flag is used to differentiate between different alterations of the same template.\n");
         ImGui::SetTooltip("%s", flag_tooltip_buffer);
     }
 
@@ -1080,7 +1080,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (ImGui::IsItemHovered()) {
             char overlay_text_run_tooltip_buffer[1024];
             snprintf(overlay_text_run_tooltip_buffer, sizeof(overlay_text_run_tooltip_buffer),
-                     "Shows the selected version, template category and optional flag.");
+                     "Shows the selected Template Version & Template Category.");
             ImGui::SetTooltip("%s", overlay_text_run_tooltip_buffer);
         }
         ImGui::SameLine();
@@ -1405,7 +1405,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                  "Select the font for the main tracker view.\n"
                  "This affects the goal display text, the top info bar,\n"
-                 "and the bottom control buttons.\n"
+                 "the bottom control buttons and the notes window.\n"
                  "Only choose fonts within the resources/fonts directory.\n\n"
                  "A restart is required to properly apply changes.");
         ImGui::SetTooltip("%s", tooltip_buffer);
@@ -1911,7 +1911,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Overlay FPS Limit: %d\n"
                  "  - Overlay Scroll Speed: %.2f\n"
                  "  - Row 1 Icon Spacing: %.1f px\n"
-                 "  - Sub-Stat Cycle Speed: %.1f s\n"
+                 "  - Sub-Stat Cycle Interval: %.1f s\n"
                  "  - Hide Completed Row 3 Goals: %s\n"
                  "  - Always On Top: %s\n"
                  "  - Tracker Font: %s (Main: %.1f pt, Sub: %.1f pt, UI: %.1f pt)\n"
