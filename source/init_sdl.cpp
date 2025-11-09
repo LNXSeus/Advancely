@@ -48,9 +48,9 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
     SDL_Surface *icon_surface = IMG_Load(icon_path);
     if (icon_surface) {
         SDL_SetWindowIcon(t->window, icon_surface);
-        SDL_DestroySurface(icon_surface);
         log_message(LOG_INFO, "[INIT SDL] Tracker window icon set to %s\n", icon_path);
         log_message(LOG_INFO, "[INIT SDL] Tracker window icon size: %dx%d\n", icon_surface->w, icon_surface->h);
+        SDL_DestroySurface(icon_surface); // Destroy surface after logging
     } else {
         log_message(LOG_ERROR, "[INIT SDL] Failed to load tracker window icon (asure path contains only standard English (ASCII) characters): %s\n", SDL_GetError());
     }

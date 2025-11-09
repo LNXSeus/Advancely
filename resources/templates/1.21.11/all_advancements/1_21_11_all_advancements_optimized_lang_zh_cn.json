@@ -280,6 +280,8 @@
   "advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:zombie_horse": "僵尸马",
   "advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:skeleton": "骷髅",
   "advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:husk": "尸壳",
+  "advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:parched":	"焦骸",
+  "advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:camel_husk":	"骆驼尸壳",
   "advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:drowned": "溺尸",
   "advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:zombie_nautilus": "僵尸鹦鹉螺",
   "advancement.minecraft.adventure.kill_all_mobs.criteria.minecraft:stray": "流浪者",

@@ -1302,8 +1302,20 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // --- UI Theme Colors Section ---
     ImGui::SeparatorText("UI Theme Colors");
+
+    // Store the open state from the TreeNodeEx call
+    bool node_open = ImGui::TreeNodeEx("Customize Interface Colors...", ImGuiTreeNodeFlags_None);
+
+    // Check for hover right after the TreeNodeEx call
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buffer[256];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Expand to customize the theme colors of the user interface.\n"
+                 "Requires restarting Advancely to apply.");
+        ImGui::SetTooltip("%s", tooltip_buffer);
+    }
+
     // ImGuiTreeNodeFlags_None makes it closed by default
-    if (ImGui::TreeNodeEx("Customize Interface Colors...", ImGuiTreeNodeFlags_None)) {
+    if (node_open) {
         ImGui::TextWrapped(
             "Adjust the colors for UI elements like windows, buttons, and text fields. Click 'Restart Advancely' afterwards.");
         ImGui::Spacing();
@@ -1339,7 +1351,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         UI_COLOR_PICKER("Button", ui_button_color, "Background color of buttons.");
         UI_COLOR_PICKER("Button Hovered", ui_button_hovered_color, "Background color of buttons when hovered.");
         UI_COLOR_PICKER("Button Active", ui_button_active_color, "Background color of buttons when clicked.");
-        UI_COLOR_PICKER("Header", ui_header_color, "Background color of collapsable headers (like this one).");
+        UI_COLOR_PICKER("Header", ui_header_color, "Background color of selected headers.");
         UI_COLOR_PICKER("Header Hovered", ui_header_hovered_color, "Background color of headers when hovered.");
         UI_COLOR_PICKER("Header Active", ui_header_active_color, "Background color of headers when active/open.");
         UI_COLOR_PICKER("Check Mark", ui_check_mark_color, "Color of the check mark inside checkboxes.");
@@ -1378,12 +1390,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         }
 
         ImGui::TreePop();
-    }
-    if (ImGui::IsItemHovered()) {
-        char tooltip_buffer[256];
-        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Expand to customize the theme colors of the user interface.\n"
-                 "Requires restarting Advancely to apply.");
-        ImGui::SetTooltip("%s", tooltip_buffer);
     }
     ImGui::Separator();
     ImGui::Spacing();
@@ -1596,7 +1602,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "IMPORTANT: This can spam the console with a large amount of text if your template files contain many entries.\n\n"
                  "This setting only affects the detailed report.\n"
                  "Progress on goals is only printed if the game sends an update.\n"
-                 "General status messages and errors are always printed to the console and saved to advancely_log.txt.\n"
+                 "General status messages and errors are always printed to the console and saved to advancely_log.txt\n"
+                 "and advancely_overlay_log.txt for the overlay.\n"
                  "The log is flushed after every message and reset on startup, making it ideal for diagnosing crashes.\n"
                  "Everything the application prints to a console (like MSYS2 MINGW64) can also be found in advancely_log.txt.");
         ImGui::SetTooltip("%s", debug_print_tooltip_buffer);

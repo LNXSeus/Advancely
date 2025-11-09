@@ -29,6 +29,7 @@
 // The new struct holds the size of the data and the data itself as a raw byte buffer.
 typedef struct {
     size_t data_size;
+    bool shutdown_requested; // To gracefully close the overlay process and finish its log file
     char buffer[SHARED_BUFFER_SIZE];
 } SharedData;
 

@@ -26,9 +26,11 @@ void log_set_settings(const AppSettings *settings) {
     g_app_settings = settings;
 }
 
-void log_init() {
+void log_init(bool is_overlay_process) {
+    const char *log_filename = is_overlay_process ? "advancely_overlay_log.txt" : "advancely_log.txt";
+
     // Open the log file in write mode to clear it on each startup
-    log_file = fopen("advancely_log.txt", "w");
+    log_file = fopen(log_filename, "w");
     if (log_file == nullptr) {
         fprintf(stderr, "CRITICAL: Failed to open log file advancely_log.txt\n");
         return;
@@ -38,7 +40,13 @@ void log_init() {
     const time_t now = time(nullptr);
     char time_buf[64];
     strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", localtime(&now));
-    fprintf(log_file, "Advancely Log - %s\n", time_buf);
+
+    // Choose the header based on the process type
+    const char* log_header = is_overlay_process ?
+                             "Advancely Overlay Log - %s\n" :
+                             "Advancely Log - %s\n";
+    fprintf(log_file, log_header, time_buf);
+
     fprintf(log_file, "========================================\n\n");
     fflush(log_file); // Ensure the header is written immediately
 }

@@ -567,7 +567,7 @@ int main(int argc, char *argv[]) {
 
     // TODO: DEBUG FOR AUTO-UPDATE TESTING -> SET FLAG AT THE TOP OF THE FILE
 #ifdef MANUAL_UPDATE_TEST
-    log_init(); // Init logger to see update messages
+    log_init(true); // Init logger to see update messages, also log overlay messages
     printf("[MANUAL TEST] Triggering apply_update()...\n");
     char exe_path[MAX_PATH_LENGTH];
     if (get_executable_path(exe_path, sizeof(exe_path))) {
@@ -667,7 +667,7 @@ int main(int argc, char *argv[]) {
 
     // If we are in overlay mode, run a separate, simplified main loop.
     if (is_overlay_mode) {
-        log_init(); // Each process needs its own log
+        log_init(true); // Each process needs its own log, advancely_overlay_log.txt
         log_message(LOG_INFO, "[OVERLAY PROCESS] Starting in overlay-only mode.\n");
 
         AppSettings settings;
@@ -776,6 +776,13 @@ int main(int argc, char *argv[]) {
                     if (sem_wait(overlay->mutex) == 0) {
 #endif
                     // --- Critical Section: We have the lock ---
+
+                    // If main process is shut down, shut down overlay
+                    if (overlay->p_shared_data->shutdown_requested) {
+                        is_running = false;
+                    }
+
+
                     if (overlay->p_shared_data->data_size > 0) {
                         // Define the same header struct to read the data.
                         typedef struct {
@@ -808,6 +815,13 @@ int main(int argc, char *argv[]) {
                     sem_post(overlay->mutex);
 #endif
                 }
+#ifdef _WIN32
+                else if (wait_result == WAIT_ABANDONED) {
+                    log_message(
+                        LOG_ERROR, "[OVERLAY IPC] Main tracker process terminated unexpectedly. Shutting down.\n");
+                    is_running = false;
+                }
+#endif
             }
 
 
@@ -850,7 +864,7 @@ int main(int argc, char *argv[]) {
     (void) argv;
 
     // Initialize the logger at the very beginning
-    log_init();
+    log_init(false); // Just the main log file
 
 
     // Check for write permissions in the current directory before doing anything else
@@ -1185,6 +1199,8 @@ int main(int argc, char *argv[]) {
         tracker->p_shared_data = (SharedData *) mmap(0, sizeof(SharedData), PROT_WRITE, MAP_SHARED, tracker->shm_fd, 0);
 #endif
 
+        // Initialize the shutdown flag
+        tracker->p_shared_data->shutdown_requested = false;
 
         // Initialize ImGUI
         IMGUI_CHECKVERSION();
@@ -1752,13 +1768,32 @@ int main(int argc, char *argv[]) {
     overlay_is_running = tracker && tracker->overlay_pid > 0;
 #endif
     if (overlay_is_running) {
-        log_message(LOG_INFO, "[MAIN] Terminating overlay process on exit.\n");
+        log_message(LOG_INFO, "[MAIN] Requesting overlay process to shut down...\n");
+
+        // 1. Set the shutdown flag using shared memory
+        if (tracker && tracker->p_shared_data) {
 #ifdef _WIN32
-        TerminateProcess(tracker->overlay_process_info.hProcess, 0);
+            DWORD wait_result = WaitForSingleObject(tracker->h_mutex, 1000); // Wait up to 1 sec
+            if (wait_result == WAIT_OBJECT_0) {
+#else
+                if (sem_wait(tracker->mutex) == 0) {
+#endif
+                tracker->p_shared_data->shutdown_requested = true;
+#ifdef _WIN32
+                ReleaseMutex(tracker->h_mutex);
+#else
+                sem_post(tracker->mutex);
+#endif
+            }
+        }
+
+        // 2. Wait for a moment for the process to close on its own
+#ifdef _WIN32
+        WaitForSingleObject(tracker->overlay_process_info.hProcess, 500); // Wait 0.5 sec
         CloseHandle(tracker->overlay_process_info.hProcess);
         CloseHandle(tracker->overlay_process_info.hThread);
 #else
-        kill(tracker->overlay_pid, SIGKILL);
+        sleep(1); // Give it 1 second to shut down
 #endif
     }
 

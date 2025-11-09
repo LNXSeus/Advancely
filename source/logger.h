@@ -31,9 +31,11 @@ void log_set_settings(const struct AppSettings *settings);
 
 /**
  * @brief Initializes the logging system.
- * Creates/overwrites advancely_log.txt and adds a timestamp.
+ * Creates/overwrites the log file and adds a timestamp.
+ * @param is_overlay_process If true, logs to "advancely_overlay_log.txt".
+ * If false, logs to "advancely_log.txt".
  */
-void log_init(void);
+void log_init(bool is_overlay_process);
 
 /**
  * @brief Logs a formatted message to the console and the log file.
