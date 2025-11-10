@@ -150,6 +150,43 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     static std::vector<const char *> version_display_c_strs;
     static bool version_counts_generated = false;
 
+    // Helper lambda to auto-select a language for the currently selected template
+    auto auto_select_language = [&]() {
+        DiscoveredTemplate *selected_template = nullptr;
+        for (int i = 0; i < discovered_template_count; ++i) {
+            if (strcmp(discovered_templates[i].category, temp_settings.category) == 0 &&
+                strcmp(discovered_templates[i].optional_flag, temp_settings.optional_flag) == 0) {
+                selected_template = &discovered_templates[i];
+                break;
+                }
+        }
+
+        if (selected_template) {
+            bool default_lang_found = false;
+            for (const auto &flag: selected_template->available_lang_flags) {
+                if (flag.empty()) { // ".empty()" is true for the default "" flag
+                    default_lang_found = true;
+                    break;
+                }
+            }
+
+            if (default_lang_found) {
+                // Prioritize default language
+                temp_settings.lang_flag[0] = '\0';
+            } else if (!selected_template->available_lang_flags.empty()) {
+                // If no default, pick the first available one
+                strncpy(temp_settings.lang_flag, selected_template->available_lang_flags[0].c_str(), sizeof(temp_settings.lang_flag) - 1);
+                temp_settings.lang_flag[sizeof(temp_settings.lang_flag) - 1] = '\0';
+            } else {
+                // No languages found (unlikely), set to default
+                temp_settings.lang_flag[0] = '\0';
+            }
+        } else {
+            // No matching template found, reset to default
+            temp_settings.lang_flag[0] = '\0';
+        }
+    };
+
     if (!version_counts_generated) {
         version_display_names.reserve(VERSION_STRINGS_COUNT);
         for (int i = 0; i < VERSION_STRINGS_COUNT; ++i) {
@@ -636,6 +673,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
         // Reformat display name AFTER validation/resets
         update_temp_display_category();
+
+        // Auto-select language based on new defaults
+        auto_select_language();
     }
 
 
@@ -672,6 +712,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             if (!flag_set) temp_settings.optional_flag[0] = '\0';
 
             update_temp_display_category(); // Update Display Category Name (in settings)
+
+            // Auto-select language based on new category/flag
+            auto_select_language();
         }
     }
 
@@ -719,6 +762,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             temp_settings.optional_flag[sizeof(temp_settings.optional_flag) - 1] = '\0';
 
             update_temp_display_category(); // Update Display Category Name (in settings)
+
+            // Auto-select language based on new flag
+            auto_select_language();
         }
     }
 
