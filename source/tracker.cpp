@@ -2023,7 +2023,7 @@ static void tracker_calculate_overall_progress(Tracker *t, MC_Version version, c
         completed_steps += t->template_data->multi_stage_goals[i]->current_stage;
     }
 
-    log_message(LOG_INFO, "Total steps: %d,\ncompleted steps: %d\n", total_steps, completed_steps);
+    log_message(LOG_INFO, "Total steps: %d, completed steps: %d\n", total_steps, completed_steps);
 
     // Store total steps
     t->template_data->total_progress_steps = total_steps;
@@ -5788,7 +5788,7 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
     format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
 
 
-    log_message(LOG_INFO, "\n============================================================\n");
+    log_message(LOG_INFO, "============================================================\n");
     log_message(LOG_INFO, " World:      %s\n", t->world_name);
     log_message(LOG_INFO, " Version:    %s\n", settings->display_version_str);
 
@@ -5806,7 +5806,7 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
         overall_progress_percentage >= 100.0f) {
         log_message(LOG_INFO, "\n                  *** RUN COMPLETE! ***\n\n");
         log_message(LOG_INFO, "                  Final Time: %s\n\n", formatted_time);
-        log_message(LOG_INFO, "============================================================\n\n");
+        log_message(LOG_INFO, "============================================================\n");
     } else {
         // Advancements or Achievements
         if (version >= MC_VERSION_1_12) {
@@ -6018,11 +6018,11 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
         // Print if advancements are more than zero or progress isn't empty
         if (t->template_data->advancement_goal_count > 0) {
             if (version >= MC_VERSION_1_12) {
-                log_message(LOG_INFO, "\n[Advancements] %d / %d completed\n",
+                log_message(LOG_INFO, "[Advancements] %d / %d completed\n",
                             t->template_data->advancements_completed_count,
                             t->template_data->advancement_goal_count); // Excluding recipes
             } else {
-                log_message(LOG_INFO, "\n[Achievements] %d / %d completed\n",
+                log_message(LOG_INFO, "[Achievements] %d / %d completed\n",
                             t->template_data->advancements_completed_count,
                             t->template_data->advancement_goal_count);
             }
@@ -6032,7 +6032,7 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
             log_message(LOG_INFO, "[Overall Progress] %.2f%%\n", t->template_data->overall_progress_percentage);
         }
 
-        log_message(LOG_INFO, "============================================================\n\n");
+        log_message(LOG_INFO, "============================================================\n");
     }
     // Force the output buffer to write to the console immediately
     fflush(stdout);

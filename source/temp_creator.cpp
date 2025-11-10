@@ -2060,14 +2060,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                              "Delete template:\nVersion: %s\nCategory: %s\nFlag: %s\n\n"
                              "This deletes the template, associated language files,\n"
                              "notes and snapshot file for global stats.\n"
-                             "Empty folders within the templates folder will also be deleted.",
+                             "Empty folders within the 'templates' folder will also be deleted.\n"
+                             "This action cannot be undone.",
                              creator_version_str, selected.category, selected.optional_flag);
                 } else {
                     // No snapshot mentioned
                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                              "Delete template:\nVersion: %s\nCategory: %s\nFlag: %s\n\n"
                              "This deletes the template, associated language files and notes.\n"
-                             "Empty folders within the templates folder will also be deleted.",
+                             "Empty folders within the 'templates' folder will also be deleted.\n"
+                             "This action cannot be undone.",
                              creator_version_str, selected.category, selected.optional_flag);
                 }
             } else {
@@ -2077,13 +2079,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Delete template:\nVersion: %s\nCategory: %s\n\n"
                              "This deletes the template, associated language files,\n"
                              "notes and snapshot file for global stats.\n"
-                             "Empty folders within the templates folder will also be deleted.",
+                             "Empty folders within the 'templates' folder will also be deleted.\n"
+                             "This action cannot be undone.",
                              creator_version_str, selected.category);
                 } else {
                     // No snapshot mentioned
                     snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Delete template:\nVersion: %s\nCategory: %s\n\n"
                              "This deletes the template, associated language files and notes.\n"
-                             "Empty folders within the templates folder will also be deleted.",
+                             "Empty folders within the 'templates' folder will also be deleted.\n"
+                             "This action cannot be undone.",
                              creator_version_str, selected.category);
                 }
             }
@@ -2591,8 +2595,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             } else { delete_action(); }
         }
         ImGui::EndDisabled();
-        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && !can_delete) {
-            ImGui::SetTooltip("%s", disabled_tooltip);
+
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            if (can_delete) {
+                // Tooltip for ENABLED state
+                char tooltip_buffer[256];
+                const auto& lang_to_delete = selected.available_lang_flags[selected_lang_index];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Delete the '%s' language file.\n"
+                         "This action cannot be undone.", lang_to_delete.c_str());
+                ImGui::SetTooltip("%s", tooltip_buffer);
+            } else {
+                // Tooltip for DISABLED state (original logic)
+                ImGui::SetTooltip("%s", disabled_tooltip);
+            }
         }
         ImGui::SameLine();
 

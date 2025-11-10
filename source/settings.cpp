@@ -1598,7 +1598,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         char debug_print_tooltip_buffer[1024];
         snprintf(debug_print_tooltip_buffer, sizeof(debug_print_tooltip_buffer),
                  "This toggles printing a detailed progress report to the console after every file update.\n"
-                 "Currently it also toggles an FPS counter for the overlay window.\n\n"
+                 "Currently it also toggles an FPS counter for the overlay window and debug window for the tracker.\n\n"
                  "IMPORTANT: This can spam the console with a large amount of text if your template files contain many entries.\n\n"
                  "This setting only affects the detailed report.\n"
                  "Progress on goals is only printed if the game sends an update.\n"
