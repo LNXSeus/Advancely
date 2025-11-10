@@ -1,0 +1,117 @@
+{
+	"advancements":	{
+		"minecraft:recipes/misc/vex_armor_trim_smithing_template":	{
+			"icon":	"items/vex_armor_trim_smithing_template_25w14craftmine.png",
+			"is_recipe":	true,
+			"criteria":	{
+			}
+		},
+		"minecraft:recipes/misc/snout_armor_trim_smithing_template":	{
+			"icon":	"items/snout_armor_trim_smithing_template_25w14craftmine.png",
+			"is_recipe":	true,
+			"criteria":	{
+			}
+		},
+		"minecraft:recipes/misc/rib_armor_trim_smithing_template":	{
+			"icon":	"items/rib_armor_trim_smithing_template_25w14craftmine.png",
+			"is_recipe":	true,
+			"criteria":	{
+			}
+		},
+		"minecraft:recipes/misc/sentry_armor_trim_smithing_template":	{
+			"icon":	"items/sentry_armor_trim_smithing_template_25w14craftmine.png",
+			"is_recipe":	true,
+			"criteria":	{
+			}
+		},
+		"minecraft:recipes/misc/wild_armor_trim_smithing_template":	{
+			"icon":	"items/wild_armor_trim_smithing_template_25w14craftmine.png",
+			"is_recipe":	true,
+			"criteria":	{
+			}
+		},
+		"minecraft:recipes/misc/spire_armor_trim_smithing_template":	{
+			"icon":	"items/spire_armor_trim_smithing_template_25w14craftmine.png",
+			"is_recipe":	true,
+			"criteria":	{
+			}
+		},
+		"minecraft:recipes/misc/eye_armor_trim_smithing_template":	{
+			"icon":	"items/eye_armor_trim_smithing_template_25w14craftmine.png",
+			"is_recipe":	true,
+			"criteria":	{
+			}
+		},
+		"minecraft:recipes/misc/silence_armor_trim_smithing_template":	{
+			"icon":	"items/silence_armor_trim_smithing_template_1.20.png",
+			"is_recipe":	true,
+			"criteria":	{
+			}
+		},
+		"minecraft:recipes/misc/ward_armor_trim_smithing_template":	{
+			"icon":	"items/ward_armor_trim_smithing_template_25w14craftmine.png",
+			"is_recipe":	true,
+			"criteria":	{
+			}
+		},
+		"minecraft:recipes/misc/flow_armor_trim_smithing_template":	{
+			"icon":	"items/flow_armor_trim_smithing_template_25w14craftmine.png",
+			"is_recipe":	true,
+			"criteria":	{
+			}
+		},
+		"minecraft:recipes/misc/bolt_armor_trim_smithing_template":	{
+			"icon":	"items/bolt_armor_trim_smithing_template_25w14craftmine.png",
+			"is_recipe":	true,
+			"criteria":	{
+			}
+		},
+		"minecraft:recipes/misc/dune_armor_trim_smithing_template":	{
+			"icon":	"items/dune_armor_trim_smithing_template_25w14craftmine.png",
+			"is_recipe":	true,
+			"criteria":	{
+			}
+		},
+		"minecraft:recipes/misc/coast_armor_trim_smithing_template":	{
+			"icon":	"items/coast_armor_trim_smithing_template_1.20.2.png",
+			"is_recipe":	true,
+			"criteria":	{
+			}
+		},
+		"minecraft:recipes/misc/tide_armor_trim_smithing_template":	{
+			"icon":	"items/tide_armor_trim_smithing_template_25w14craftmine.png",
+			"is_recipe":	true,
+			"criteria":	{
+			}
+		},
+		"minecraft:recipes/misc/wayfinder_armor_trim_smithing_template":	{
+			"icon":	"items/wayfinder_armor_trim_smithing_template_25w14craftmine.png",
+			"is_recipe":	true,
+			"criteria":	{
+			}
+		},
+		"minecraft:recipes/misc/host_armor_trim_smithing_template":	{
+			"icon":	"items/host_armor_trim_smithing_template_25w14craftmine.png",
+			"is_recipe":	true,
+			"criteria":	{
+			}
+		},
+		"minecraft:recipes/misc/raiser_armor_trim_smithing_template":	{
+			"icon":	"items/raiser_armor_trim_smithing_template_25w14craftmine.png",
+			"is_recipe":	true,
+			"criteria":	{
+			}
+		},
+		"minecraft:recipes/misc/shaper_armor_trim_smithing_template":	{
+			"icon":	"items/shaper_armor_trim_smithing_template_25w14craftmine.png",
+			"is_recipe":	true,
+			"criteria":	{
+			}
+		}
+	},
+	"stats":	{
+	},
+	"unlocks":	[],
+	"custom":	[],
+	"multi_stage_goals":	[]
+}
