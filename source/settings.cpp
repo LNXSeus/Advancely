@@ -52,10 +52,19 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->tracker_always_on_top != b->tracker_always_on_top ||
         a->goal_hiding_mode != b->goal_hiding_mode ||
         a->print_debug_status != b->print_debug_status ||
+
+        // Overlay settings
         a->overlay_scroll_speed != b->overlay_scroll_speed ||
         a->overlay_progress_text_align != b->overlay_progress_text_align ||
+        a->overlay_row1_spacing != b->overlay_row1_spacing ||
+        a->overlay_row2_custom_spacing_enabled != b->overlay_row2_custom_spacing_enabled ||
+        a->overlay_row2_custom_spacing != b->overlay_row2_custom_spacing ||
+        a->overlay_row3_custom_spacing_enabled != b->overlay_row3_custom_spacing_enabled ||
+        a->overlay_row3_custom_spacing != b->overlay_row3_custom_spacing ||
         a->overlay_row3_remove_completed != b->overlay_row3_remove_completed ||
         a->overlay_stat_cycle_speed != b->overlay_stat_cycle_speed ||
+
+
         a->notes_use_roboto_font != b->notes_use_roboto_font ||
         a->check_for_updates != b->check_for_updates ||
         a->show_welcome_on_startup != b->show_welcome_on_startup ||
@@ -1019,6 +1028,56 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
 
+        // --- Custom Row 2 Spacing ---
+        ImGui::Checkbox("Custom Row 2 Spacing", &temp_settings.overlay_row2_custom_spacing_enabled);
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[512];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Check this to override the dynamic width calculation for Row 2 items.\n"
+                     "This allows you to set a fixed, uniform width for all items in this row.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+
+        if (temp_settings.overlay_row2_custom_spacing_enabled) {
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
+            ImGui::DragFloat("Row 2 Item Width", &temp_settings.overlay_row2_custom_spacing, 1.0f, 96.0f, 512.0f, "%.0f px");
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buffer[512];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Sets the total horizontal width (in pixels) for each item in Row 2.\n"
+                         "WARNING: If this value is too small, item text will overlap.\n"
+                         "The item icon is %dpx wide. Default: %.0fpx.",
+                         96, DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING);
+                ImGui::SetTooltip("%s", tooltip_buffer);
+            }
+        }
+
+        // --- Custom Row 3 Spacing ---
+        ImGui::Checkbox("Custom Row 3 Spacing", &temp_settings.overlay_row3_custom_spacing_enabled);
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[512];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Check this to override the dynamic width calculation for Row 3 items.\n"
+                     "This allows you to set a fixed, uniform width for all items in this row.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+
+        if (temp_settings.overlay_row3_custom_spacing_enabled) {
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
+            ImGui::DragFloat("Row 3 Item Width", &temp_settings.overlay_row3_custom_spacing, 1.0f, 96.0f, 512.0f, "%.0f px");
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buffer[512];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Sets the total horizontal width (in pixels) for each item in Row 3.\n"
+                         "WARNING: If this value is too small, item text will overlap.\n"
+                         "The item icon is %dpx wide. Default: %.0fpx.",
+                         96, DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING);
+                ImGui::SetTooltip("%s", tooltip_buffer);
+            }
+        }
+
         ImGui::DragFloat("Sub-Stat Cycle Interval (s)", &temp_settings.overlay_stat_cycle_speed, 0.1f, 0.1f, 60.0f,
                          "%.3f s");
         if (ImGui::IsItemHovered()) {
@@ -1964,6 +2023,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Overlay FPS Limit: %d\n"
                  "  - Overlay Scroll Speed: %.2f\n"
                  "  - Row 1 Icon Spacing: %.1f px\n"
+                 "  - Custom Row 2 Spacing: %s (%.0f px)\n"
+                 "  - Custom Row 3 Spacing: %s (%.0f px)\n"
                  "  - Sub-Stat Cycle Interval: %.1f s\n"
                  "  - Hide Completed Row 3 Goals: %s\n"
                  "  - Always On Top: %s\n"
@@ -1992,6 +2053,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_OVERLAY_FPS,
                  DEFAULT_OVERLAY_SCROLL_SPEED,
                  DEFAULT_OVERLAY_ROW1_SPACING,
+                 DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED ? "Enabled" : "Disabled", DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING,
+                 DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED ? "Enabled" : "Disabled", DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING,
                  DEFAULT_OVERLAY_STAT_CYCLE_SPEED,
                  DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
                  DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",

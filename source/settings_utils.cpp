@@ -299,10 +299,17 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_scroll_speed = DEFAULT_OVERLAY_SCROLL_SPEED;
     settings->goal_hiding_mode = DEFAULT_GOAL_HIDING_MODE;
     settings->print_debug_status = DEFAULT_PRINT_DEBUG_STATUS;
+
+    // Overlay Defaults
     settings->overlay_progress_text_align = DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN;
     settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING;
+    settings->overlay_row2_custom_spacing_enabled = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED;
+    settings->overlay_row2_custom_spacing = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING;
+    settings->overlay_row3_custom_spacing_enabled = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED;
+    settings->overlay_row3_custom_spacing = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING;
     settings->overlay_row3_remove_completed = DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED;
     settings->overlay_stat_cycle_speed = DEFAULT_OVERLAY_STAT_CYCLE_SPEED;
+
     settings->notes_use_roboto_font = DEFAULT_NOTES_USE_ROBOTO;
     settings->per_world_notes = DEFAULT_PER_WORLD_NOTES;
     settings->check_for_updates = DEFAULT_CHECK_FOR_UPDATES;
@@ -772,6 +779,38 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
+        const cJSON *row2_custom_enabled = cJSON_GetObjectItem(visual_settings, "overlay_row2_custom_spacing_enabled");
+        if (row2_custom_enabled && cJSON_IsBool(row2_custom_enabled))
+            settings->overlay_row2_custom_spacing_enabled = cJSON_IsTrue(row2_custom_enabled);
+        else {
+            settings->overlay_row2_custom_spacing_enabled = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED;
+            defaults_were_used = true;
+        }
+
+        const cJSON *row2_custom_spacing = cJSON_GetObjectItem(visual_settings, "overlay_row2_custom_spacing");
+        if (row2_custom_spacing && cJSON_IsNumber(row2_custom_spacing))
+            settings->overlay_row2_custom_spacing = (float)row2_custom_spacing->valuedouble;
+        else {
+            settings->overlay_row2_custom_spacing = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING;
+            defaults_were_used = true;
+        }
+
+        const cJSON *row3_custom_enabled = cJSON_GetObjectItem(visual_settings, "overlay_row3_custom_spacing_enabled");
+        if (row3_custom_enabled && cJSON_IsBool(row3_custom_enabled))
+            settings->overlay_row3_custom_spacing_enabled = cJSON_IsTrue(row3_custom_enabled);
+        else {
+            settings->overlay_row3_custom_spacing_enabled = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED;
+            defaults_were_used = true;
+        }
+
+        const cJSON *row3_custom_spacing = cJSON_GetObjectItem(visual_settings, "overlay_row3_custom_spacing");
+        if (row3_custom_spacing && cJSON_IsNumber(row3_custom_spacing))
+            settings->overlay_row3_custom_spacing = (float)row3_custom_spacing->valuedouble;
+        else {
+            settings->overlay_row3_custom_spacing = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING;
+            defaults_were_used = true;
+        }
+
         // Load UI Theme Colors
         if (load_color(visual_settings, "ui_text_color", &settings->ui_text_color, &DEFAULT_UI_TEXT_COLOR))
             defaults_were_used = true;
@@ -811,6 +850,10 @@ bool settings_load(AppSettings *settings) {
     } else {
         defaults_were_used = true;
         settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING; // Ensure default if visuals section missing
+        settings->overlay_row2_custom_spacing_enabled = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED;
+        settings->overlay_row2_custom_spacing = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING;
+        settings->overlay_row3_custom_spacing_enabled = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED;
+        settings->overlay_row3_custom_spacing = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING;
 
         // --- Ensure defaults if visuals missing ---
         strncpy(settings->adv_bg_path, DEFAULT_ADV_BG_PATH, sizeof(settings->adv_bg_path) - 1);
@@ -1001,6 +1044,16 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
 
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_spacing");
         cJSON_AddItemToObject(visuals_obj, "overlay_row1_spacing", cJSON_CreateNumber(settings->overlay_row1_spacing));
+
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row2_custom_spacing_enabled");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row2_custom_spacing_enabled", cJSON_CreateBool(settings->overlay_row2_custom_spacing_enabled));
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row2_custom_spacing");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row2_custom_spacing", cJSON_CreateNumber(settings->overlay_row2_custom_spacing));
+
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row3_custom_spacing_enabled");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row3_custom_spacing_enabled", cJSON_CreateBool(settings->overlay_row3_custom_spacing_enabled));
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row3_custom_spacing");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row3_custom_spacing", cJSON_CreateNumber(settings->overlay_row3_custom_spacing));
 
         // UI Colors
         save_color(visuals_obj, "ui_text_color", &settings->ui_text_color);

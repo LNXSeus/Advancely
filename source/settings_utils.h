@@ -62,10 +62,17 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_OVERLAY_SCROLL_SPEED 1.0f
 #define DEFAULT_GOAL_HIDING_MODE HIDE_ALL_COMPLETED
 #define DEFAULT_PRINT_DEBUG_STATUS false
+
+// Overlay Settings
 #define DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN OVERLAY_PROGRESS_TEXT_ALIGN_LEFT
 #define DEFAULT_OVERLAY_ROW1_SPACING 8.0f // Default spacing in pixels between row 1 icons
+#define DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED false
+#define DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING 192.0f // 96px icon + more (took spacing from 1.16 AA template)
+#define DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED false
+#define DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING 256.0f // 96px icon + more (took spacing from 1.16 AA template)
 #define DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED false
 #define DEFAULT_OVERLAY_STAT_CYCLE_SPEED 3.0f // Default: cycle every 3 seconds
+
 #define DEFAULT_NOTES_USE_ROBOTO false // Default: use the standard Minecraft font for notes otherwise roboto
 #define DEFAULT_PER_WORLD_NOTES true // When true the notes are per world, otherwise per template
 #define DEFAULT_CHECK_FOR_UPDATES true
@@ -179,9 +186,14 @@ struct AppSettings {
     float overlay_scroll_speed; // The speed and direction of the scrolling animation in the overlay.
     GoalHidingMode goal_hiding_mode; // 3 Stages of hiding goals
     OverlayProgressTextAlignment overlay_progress_text_align; // Alignment for the progress text in the overlay.
-    float overlay_row1_spacing; // Horizontal spacing between icons in Row 1. Add this line!
+    float overlay_row1_spacing; // Horizontal spacing between icons in Row 1.
+    bool overlay_row2_custom_spacing_enabled; // If true, use custom spacing for row 2
+    float overlay_row2_custom_spacing;        // The custom spacing value for row 2
+    bool overlay_row3_custom_spacing_enabled; // If true, use custom spacing for row 3
+    float overlay_row3_custom_spacing;        // The custom spacing value for row 3
     bool overlay_row3_remove_completed; // If true, the third row will also hide completed goals as row 2 does.
     float overlay_stat_cycle_speed; // Time in seconds between cycling sub-stats on the overlay.
+
     bool notes_use_roboto_font; // If true, the notes window uses the Roboto font instead of the default.
     bool per_world_notes; // If true, notes are saved per world instead of per template
 
