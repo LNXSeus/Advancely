@@ -2870,177 +2870,190 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
     // --- Calculate Uniform Item Width (based on items that will be rendered) ---
     float uniform_item_width = 0.0f;
-    for (int i = 0; i < count; i++) {
-        TrackableCategory *cat = categories[i];
+    const float horizontal_spacing = 8.0f; // Define the default spacing
 
-        if (!cat) continue;
+    // Check if custom width is enabled for THIS section
+    TrackerSection section_id = is_stat_section ? SECTION_STATS : (strcmp(section_title, "Recipes") == 0 ? SECTION_RECIPES : SECTION_ADVANCEMENTS);
+    if (settings->tracker_section_custom_width_enabled[section_id]) {
+        // Use fixed width from settings
+        uniform_item_width = settings->tracker_section_custom_item_width[section_id];
+        // Ensure it's at least the icon width
+        if (uniform_item_width < 96.0f) uniform_item_width = 96.0f;
+    } else {
+        for (int i = 0; i < count; i++) {
+            TrackableCategory *cat = categories[i];
 
-        // Skip hidden legacy stats
-        if (is_stat_section && version <= MC_VERSION_1_6_4 && cat->criteria_count == 1 && cat->criteria[0]->goal == 0) {
-            continue;
-        }
+            if (!cat) continue;
 
-        // Parent Hiding Logic (for rendering visibility)
-        bool is_considered_complete_render = is_stat_section
-                                                 ? cat->done
-                                                 : ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (
-                                                        cat->criteria_count == 0 && cat->done));
+            // Skip hidden legacy stats
+            if (is_stat_section && version <= MC_VERSION_1_6_4 && cat->criteria_count == 1 && cat->criteria[0]->goal == 0) {
+                continue;
+            }
 
-        bool parent_should_hide_render = false;
-        switch (settings->goal_hiding_mode) {
-            case HIDE_ALL_COMPLETED:
-                parent_should_hide_render = cat->is_hidden || is_considered_complete_render;
-                break;
-            case HIDE_ONLY_TEMPLATE_HIDDEN:
-                parent_should_hide_render = cat->is_hidden;
-                break;
-            case SHOW_ALL:
-                parent_should_hide_render = false;
-                break;
-        }
-        if (parent_should_hide_render) continue;
+            // Parent Hiding Logic (for rendering visibility)
+            bool is_considered_complete_render = is_stat_section
+                                                     ? cat->done
+                                                     : ((cat->criteria_count > 0 && cat->all_template_criteria_met) || (
+                                                            cat->criteria_count == 0 && cat->done));
 
-        // Search Filter (for rendering visibility)
-        bool parent_matches = str_contains_insensitive(cat->display_name, t->search_buffer);
-        bool child_matches_render = false;
-        if (!parent_matches) {
-            for (int j = 0; j < cat->criteria_count; j++) {
-                TrackableItem *crit = cat->criteria[j];
-                if (!crit) continue;
-
-                // Apply the same hiding logic here as in the rendering pass
-                bool crit_should_hide_render = false;
-                switch (settings->goal_hiding_mode) {
-                    case HIDE_ALL_COMPLETED:
-                        crit_should_hide_render = crit->is_hidden || crit->done;
-                        break;
-                    case HIDE_ONLY_TEMPLATE_HIDDEN:
-                        crit_should_hide_render = crit->is_hidden;
-                        break;
-                    case SHOW_ALL:
-                        crit_should_hide_render = false;
-                        break;
-                }
-
-                // Now, check both hiding status AND the search term
-                if (!crit_should_hide_render && str_contains_insensitive(crit->display_name, t->search_buffer)) {
-                    child_matches_render = true;
+            bool parent_should_hide_render = false;
+            switch (settings->goal_hiding_mode) {
+                case HIDE_ALL_COMPLETED:
+                    parent_should_hide_render = cat->is_hidden || is_considered_complete_render;
                     break;
-                }
+                case HIDE_ONLY_TEMPLATE_HIDDEN:
+                    parent_should_hide_render = cat->is_hidden;
+                    break;
+                case SHOW_ALL:
+                    parent_should_hide_render = false;
+                    break;
             }
-        }
-        if (!parent_matches && !child_matches_render) continue; // Skip if neither parent nor child matches search
+            if (parent_should_hide_render) continue;
 
-        // --- Calculate width needed by this item ---
-        float required_width = 0.0f;
+            // Search Filter (for rendering visibility)
+            bool parent_matches = str_contains_insensitive(cat->display_name, t->search_buffer);
+            bool child_matches_render = false;
+            if (!parent_matches) {
+                for (int j = 0; j < cat->criteria_count; j++) {
+                    TrackableItem *crit = cat->criteria[j];
+                    if (!crit) continue;
 
-        // Determine if this is a simple stat category
-        bool is_simple_stat_category = is_stat_section && cat->is_single_stat_category;
-
-        // --- Calculate width needed for PARENT text (using main font size) ---
-        float parent_text_required_width = 0.0f;
-        SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
-        parent_text_required_width = fmax(parent_text_required_width, ImGui::CalcTextSize(cat->display_name).x);
-        RESET_FONT_SCALE();
-
-        // Calculate width for the progress text below the parent
-        char progress_text_width_calc[32] = "";
-        if (is_simple_stat_category && cat->criteria_count == 1) {
-            // Simple stat progress text calculation
-            TrackableItem *crit = cat->criteria[0];
-            if (crit->goal > 0) {
-                snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d / %d)", crit->progress,
-                         crit->goal);
-            } else if (crit->goal == -1) {
-                snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d)", crit->progress);
-            }
-        } else if (!is_simple_stat_category) {
-            // Complex stat or Advancement
-            if (cat->criteria_count > 0) {
-                snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d / %d)",
-                         cat->completed_criteria_count, cat->criteria_count);
-            }
-        }
-        // Scale for progress text width calculation
-        SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
-        float progress_text_actual_width = ImGui::CalcTextSize(progress_text_width_calc).x;
-        RESET_FONT_SCALE();
-        parent_text_required_width = fmaxf(parent_text_required_width, progress_text_actual_width);
-        // Ensure width accommodates progress text
-
-        float children_max_required_width = 0.0f;
-
-        // Check children widths ONLY for complex items
-        if (!is_simple_stat_category && cat->criteria_count > 0) {
-            for (int j = 0; j < cat->criteria_count; j++) {
-                TrackableItem *crit = cat->criteria[j];
-                // Child Hiding Logic (for width calculation)
-                bool crit_should_hide_width = false;
-                switch (settings->goal_hiding_mode) {
-                    case HIDE_ALL_COMPLETED:
-                        crit_should_hide_width = crit->is_hidden || crit->done;
-                        break;
-                    case HIDE_ONLY_TEMPLATE_HIDDEN:
-                        crit_should_hide_width = crit->is_hidden;
-                        break;
-                    case SHOW_ALL:
-                        crit_should_hide_width = false;
-                        break;
-                }
-
-                // Also check if this specific child matches search if parent didn't
-                bool crit_matches_search = parent_matches || (child_matches_render && str_contains_insensitive(
-                                                                  crit->display_name, t->search_buffer));
-
-                if (crit && !crit_should_hide_width && crit_matches_search) {
-                    // Use sub_font_size for calculations here
-                    float sub_font_size = settings->tracker_sub_font_size;
-                    ImGui::PushFont(t->tracker_font); // Assume tracker font needed for CalcTextSize
-                    ImGui::SetWindowFontScale(sub_font_size / t->tracker_font->LegacySize); // Scale to sub-size
-
-                    char crit_progress_text_width[32] = "";
-                    if (is_stat_section) {
-                        // Only calculate progress width for sub-stats
-                        if (crit->goal > 0) {
-                            snprintf(crit_progress_text_width, sizeof(crit_progress_text_width), "(%d / %d)",
-                                     crit->progress,
-                                     crit->goal);
-                        } else if (crit->goal == -1) {
-                            snprintf(crit_progress_text_width, sizeof(crit_progress_text_width), "(%d)",
-                                     crit->progress);
-                        }
+                    // Apply the same hiding logic here as in the rendering pass
+                    bool crit_should_hide_render = false;
+                    switch (settings->goal_hiding_mode) {
+                        case HIDE_ALL_COMPLETED:
+                            crit_should_hide_render = crit->is_hidden || crit->done;
+                            break;
+                        case HIDE_ONLY_TEMPLATE_HIDDEN:
+                            crit_should_hide_render = crit->is_hidden;
+                            break;
+                        case SHOW_ALL:
+                            crit_should_hide_render = false;
+                            break;
                     }
-                    float crit_text_width = ImGui::CalcTextSize(crit->display_name).x;
-                    float crit_progress_width = ImGui::CalcTextSize(crit_progress_text_width).x;
-                    float checkbox_width = (is_stat_section && cat->criteria_count > 1) ? (20 + 4) : 0;
-                    // Checkbox + padding
-                    float total_crit_width = 32 + 4 + checkbox_width + crit_text_width + (
-                                                 crit_progress_width > 0 ? 4 + crit_progress_width : 0);
-                    // Icon + padding + checkbox + text + progress
 
-                    // --- Pop font scaling ---
-                    ImGui::SetWindowFontScale(1.0f);
-                    ImGui::PopFont();
-
-                    children_max_required_width = fmaxf(children_max_required_width, total_crit_width);
+                    // Now, check both hiding status AND the search term
+                    if (!crit_should_hide_render && str_contains_insensitive(crit->display_name, t->search_buffer)) {
+                        child_matches_render = true;
+                        break;
+                    }
                 }
             }
-        }
-        // Determine final required width
-        // It's the maximum of the parent's text needs OR the children's needs
-        required_width = fmaxf(parent_text_required_width, children_max_required_width);
+            if (!parent_matches && !child_matches_render) continue; // Skip if neither parent nor child matches search
 
-        // Ensure minimum width accommodates the 96px background for all items
-        uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, required_width));
-        // Ensure minimum width for icon bg
+            // --- Calculate width needed by this item ---
+            float required_width = 0.0f;
+
+            // Determine if this is a simple stat category
+            bool is_simple_stat_category = is_stat_section && cat->is_single_stat_category;
+
+            // --- Calculate width needed for PARENT text (using main font size) ---
+            float parent_text_required_width = 0.0f;
+            SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
+            parent_text_required_width = fmax(parent_text_required_width, ImGui::CalcTextSize(cat->display_name).x);
+            RESET_FONT_SCALE();
+
+            // Calculate width for the progress text below the parent
+            char progress_text_width_calc[32] = "";
+            if (is_simple_stat_category && cat->criteria_count == 1) {
+                // Simple stat progress text calculation
+                TrackableItem *crit = cat->criteria[0];
+                if (crit->goal > 0) {
+                    snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d / %d)", crit->progress,
+                             crit->goal);
+                } else if (crit->goal == -1) {
+                    snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d)", crit->progress);
+                }
+            } else if (!is_simple_stat_category) {
+                // Complex stat or Advancement
+                if (cat->criteria_count > 0) {
+                    snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d / %d)",
+                             cat->completed_criteria_count, cat->criteria_count);
+                }
+            }
+            // Scale for progress text width calculation
+            SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
+            float progress_text_actual_width = ImGui::CalcTextSize(progress_text_width_calc).x;
+            RESET_FONT_SCALE();
+            parent_text_required_width = fmaxf(parent_text_required_width, progress_text_actual_width);
+            // Ensure width accommodates progress text
+
+            float children_max_required_width = 0.0f;
+
+            // Check children widths ONLY for complex items
+            if (!is_simple_stat_category && cat->criteria_count > 0) {
+                for (int j = 0; j < cat->criteria_count; j++) {
+                    TrackableItem *crit = cat->criteria[j];
+                    // Child Hiding Logic (for width calculation)
+                    bool crit_should_hide_width = false;
+                    switch (settings->goal_hiding_mode) {
+                        case HIDE_ALL_COMPLETED:
+                            crit_should_hide_width = crit->is_hidden || crit->done;
+                            break;
+                        case HIDE_ONLY_TEMPLATE_HIDDEN:
+                            crit_should_hide_width = crit->is_hidden;
+                            break;
+                        case SHOW_ALL:
+                            crit_should_hide_width = false;
+                            break;
+                    }
+
+                    // Also check if this specific child matches search if parent didn't
+                    bool crit_matches_search = parent_matches || (child_matches_render && str_contains_insensitive(
+                                                                      crit->display_name, t->search_buffer));
+
+                    if (crit && !crit_should_hide_width && crit_matches_search) {
+                        // Use sub_font_size for calculations here
+                        float sub_font_size = settings->tracker_sub_font_size;
+                        ImGui::PushFont(t->tracker_font); // Assume tracker font needed for CalcTextSize
+                        ImGui::SetWindowFontScale(sub_font_size / t->tracker_font->LegacySize); // Scale to sub-size
+
+                        char crit_progress_text_width[32] = "";
+                        if (is_stat_section) {
+                            // Only calculate progress width for sub-stats
+                            if (crit->goal > 0) {
+                                snprintf(crit_progress_text_width, sizeof(crit_progress_text_width), "(%d / %d)",
+                                         crit->progress,
+                                         crit->goal);
+                            } else if (crit->goal == -1) {
+                                snprintf(crit_progress_text_width, sizeof(crit_progress_text_width), "(%d)",
+                                         crit->progress);
+                            }
+                        }
+                        float crit_text_width = ImGui::CalcTextSize(crit->display_name).x;
+                        float crit_progress_width = ImGui::CalcTextSize(crit_progress_text_width).x;
+                        float checkbox_width = (is_stat_section && cat->criteria_count > 1) ? (20 + 4) : 0;
+                        // Checkbox + padding
+                        float total_crit_width = 32 + 4 + checkbox_width + crit_text_width + (
+                                                     crit_progress_width > 0 ? 4 + crit_progress_width : 0);
+                        // Icon + padding + checkbox + text + progress
+
+                        // --- Pop font scaling ---
+                        ImGui::SetWindowFontScale(1.0f);
+                        ImGui::PopFont();
+
+                        children_max_required_width = fmaxf(children_max_required_width, total_crit_width);
+                    }
+                }
+            }
+            // Determine final required width
+            // It's the maximum of the parent's text needs OR the children's needs
+            required_width = fmaxf(parent_text_required_width, children_max_required_width);
+
+            // Ensure minimum width accommodates the 96px background for all items
+            uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, required_width));
+            // Ensure minimum width for icon bg
+        }
+        // Add default spacing ONLY in dynamic mode +8 pixels
+        uniform_item_width += horizontal_spacing;
     }
     // --- End of Width Calculation ---
 
 
     float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
 
-    // Adjust vertical spacing or horizontal spacing -> need to do this for all render_*_section functions
-    const float horizontal_spacing = 8.0f, vertical_spacing = 16.0f;
+    // Adjust vertical spacing -> need to do this for all render_*_section functions
+    const float vertical_spacing = 16.0f;
 
     // complex_pass = false -> Render all advancements/stats with no criteria or sub-stats (simple items)
     // complex_pass = true -> Render all advancements/stats with criteria or sub-stats (complex items)
@@ -3602,7 +3615,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             } // End if (is_visible_on_screen)
 
             // --- Update Layout Position ---
-            current_x += uniform_item_width + horizontal_spacing;
+            current_x += uniform_item_width; // Use the final uniform_item_width directly
             row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
         } // End loop through categories for this pass
     }; // End of render_pass lambda
@@ -3710,42 +3723,54 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
     // --- Calculate Uniform Item Width (based on items that will be rendered) ---
     float uniform_item_width = 0.0f;
-    for (int i = 0; i < count; i++) {
-        TrackableItem *item = items[i];
-        if (!item) continue;
+    const float horizontal_spacing = 8.0f; // Define the default spacing
 
-        // Apply rendering hiding logic
-        bool should_hide_width = false;
-        switch (settings->goal_hiding_mode) {
-            case HIDE_ALL_COMPLETED:
-                should_hide_width = item->is_hidden || item->done;
-                break;
-            case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_width = item->is_hidden;
-                break;
-            case SHOW_ALL:
-                should_hide_width = false;
-                break;
+    // Check if custom width is enabled for THIS Section (Unlocks)
+    TrackerSection section_id = SECTION_UNLOCKS;
+    if (settings->tracker_section_custom_width_enabled[section_id]) {
+        // Use fixed width from settings
+        uniform_item_width = settings->tracker_section_custom_item_width[section_id];
+        if (uniform_item_width < 96.0f) uniform_item_width = 96.0f;
+    } else {
+        // Dynamic Width
+        for (int i = 0; i < count; i++) {
+            TrackableItem *item = items[i];
+            if (!item) continue;
+
+            // Apply rendering hiding logic
+            bool should_hide_width = false;
+            switch (settings->goal_hiding_mode) {
+                case HIDE_ALL_COMPLETED:
+                    should_hide_width = item->is_hidden || item->done;
+                    break;
+                case HIDE_ONLY_TEMPLATE_HIDDEN:
+                    should_hide_width = item->is_hidden;
+                    break;
+                case SHOW_ALL:
+                    should_hide_width = false;
+                    break;
+            }
+
+            // Apply search filter
+            bool matches_search_width = str_contains_insensitive(item->display_name, t->search_buffer);
+
+            // Only consider items that will actually be rendered for width calculation
+            if (!should_hide_width && matches_search_width) {
+                // Calculate width needed for text
+                SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize); // Use macro
+                RESET_FONT_SCALE(); // Reset scale
+
+                uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, ImGui::CalcTextSize(item->display_name).x));
+            }
         }
-
-        // Apply search filter
-        bool matches_search_width = str_contains_insensitive(item->display_name, t->search_buffer);
-
-        // Only consider items that will actually be rendered for width calculation
-        if (!should_hide_width && matches_search_width) {
-            // Calculate width needed for text
-            SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize); // Use macro
-            RESET_FONT_SCALE(); // Reset scale
-
-            uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, ImGui::CalcTextSize(item->display_name).x));
-        }
+        // Add default spacing ONLY in dynamic mode, 8 pixels
+        uniform_item_width += horizontal_spacing;
     }
 
     float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
 
-    // Adjust vertical spacing or horizontal spacing -> need to do this for all render_*_section functions
-    // Originally 32.0f and 48.0f
-    const float horizontal_spacing = 8.0f, vertical_spacing = 16.0f;
+    // Adjust vertical spacing -> need to do this for all render_*_section functions
+    const float vertical_spacing = 16.0f;
 
     // --- Rendering Loop ---
     for (int i = 0; i < count; i++) {
@@ -3894,7 +3919,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         }
 
         // --- Update Layout Position ---
-        current_x += uniform_item_width + horizontal_spacing;
+        current_x += uniform_item_width; // Use the final uniform_item_width directly
         row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
     }
     // --- End Rendering Loop ---
@@ -4008,60 +4033,73 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
     // --- Calculate Uniform Item Width (based on items that will be rendered) ---
     float uniform_item_width = 0.0f;
-    for (int i = 0; i < count; i++) {
-        TrackableItem *item = t->template_data->custom_goals[i];
-        if (!item) continue;
+    const float horizontal_spacing = 8.0f; // Define the default spacing
 
-        // Apply rendering hiding logic
-        bool should_hide_width = false;
-        switch (settings->goal_hiding_mode) {
-            case HIDE_ALL_COMPLETED:
-                should_hide_width = item->is_hidden || item->done;
-                break;
-            case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_width = item->is_hidden;
-                break;
-            case SHOW_ALL:
-                should_hide_width = false;
-                break;
-        }
+    // Check if custom width is enabled for THIS section (Custom)
+    TrackerSection section_id = SECTION_CUSTOM;
+    if (settings->tracker_section_custom_width_enabled[section_id]) {
+        // Use fixed width from settings
+        uniform_item_width = settings->tracker_section_custom_item_width[section_id];
+        if (uniform_item_width < 96.0f) uniform_item_width = 96.0f;
+    } else {
+        // Dynamic width
+        for (int i = 0; i < count; i++) {
+            TrackableItem *item = t->template_data->custom_goals[i];
+            if (!item) continue;
 
-        // Apply search filter
-        bool matches_search_width = str_contains_insensitive(item->display_name, t->search_buffer);
-
-        // Only consider items that will actually be rendered for width calculation
-        if (!should_hide_width && matches_search_width) {
-            // Calculate width needed for text + progress text if applicable
-            SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
-            float text_width = ImGui::CalcTextSize(item->display_name).x;
-            RESET_FONT_SCALE();
-
-            char progress_text_width_calc[32] = "";
-            if (item->goal > 0) {
-                snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d / %d)", item->progress,
-                         item->goal);
-            } else if (item->goal == -1 && !item->done) {
-                snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d)", item->progress);
+            // Apply rendering hiding logic
+            bool should_hide_width = false;
+            switch (settings->goal_hiding_mode) {
+                case HIDE_ALL_COMPLETED:
+                    should_hide_width = item->is_hidden || item->done;
+                    break;
+                case HIDE_ONLY_TEMPLATE_HIDDEN:
+                    should_hide_width = item->is_hidden;
+                    break;
+                case SHOW_ALL:
+                    should_hide_width = false;
+                    break;
             }
 
-            // Scale for progress text width calculation
-            SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
-            float progress_width = ImGui::CalcTextSize(progress_text_width_calc).x;
-            RESET_FONT_SCALE();
+            // Apply search filter
+            bool matches_search_width = str_contains_insensitive(item->display_name, t->search_buffer);
 
-            // The required width is the max of the main text width and the progress text width (as they are on separate lines)
-            float required_text_width = fmaxf(text_width, progress_width);
-            // Ensure minimum width accommodates the 96px background
-            uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, required_text_width));
+            // Only consider items that will actually be rendered for width calculation
+            if (!should_hide_width && matches_search_width) {
+                // Calculate width needed for text + progress text if applicable
+                SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
+                float text_width = ImGui::CalcTextSize(item->display_name).x;
+                RESET_FONT_SCALE();
+
+                char progress_text_width_calc[32] = "";
+                if (item->goal > 0) {
+                    snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d / %d)", item->progress,
+                             item->goal);
+                } else if (item->goal == -1 && !item->done) {
+                    snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d)", item->progress);
+                }
+
+                // Scale for progress text width calculation
+                SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
+                float progress_width = ImGui::CalcTextSize(progress_text_width_calc).x;
+                RESET_FONT_SCALE();
+
+                // The required width is the max of the main text width and the progress text width (as they are on separate lines)
+                float required_text_width = fmaxf(text_width, progress_width);
+                // Ensure minimum width accommodates the 96px background
+                uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, required_text_width));
+            }
         }
+        // Add default spacing ONLY in dynamic mode, 8 pixels
+        uniform_item_width += horizontal_spacing;
     }
     // --- End of Width Calculation ---
 
 
     float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
 
-    // Adjust vertical spacing or horizontal spacing
-    const float horizontal_spacing = 8.0f, vertical_spacing = 16.0f;
+    // Adjust vertical spacing
+    const float vertical_spacing = 16.0f;
 
 
     // --- Rendering Loop ---
@@ -4285,7 +4323,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         } // End if (is_visible_on_screen)
 
         // --- Update Layout Position ---
-        current_x += uniform_item_width + horizontal_spacing;
+        current_x += uniform_item_width; // Use the final uniform_item_width directly
         row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
     }
     // --- End Rendering Loop ---
@@ -4424,65 +4462,78 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
     // --- Calculate Uniform Item Width (based on items that will be rendered) ---
     float uniform_item_width = 0.0f;
-    for (int i = 0; i < count; i++) {
-        MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
-        if (!goal || goal->stage_count <= 0) continue;
+    const float horizontal_spacing = 8.0f; // Define the default spacing
 
-        bool is_done_width = (goal->current_stage >= goal->stage_count - 1);
+    // Check if custom width is enabled for THIS section (Multi-Stage)
+    TrackerSection section_id = SECTION_MULTISTAGE;
+    if (settings->tracker_section_custom_width_enabled[section_id]) {
+        // use fixed width from settings
+        uniform_item_width = settings->tracker_section_custom_item_width[section_id];
+        if (uniform_item_width < 96.0f) uniform_item_width = 96.0f;
+    } else {
+        // Dynamic width
+        for (int i = 0; i < count; i++) {
+            MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+            if (!goal || goal->stage_count <= 0) continue;
 
-        // Apply rendering hiding logic for width calculation
-        bool should_hide_width = false;
-        switch (settings->goal_hiding_mode) {
-            case HIDE_ALL_COMPLETED:
-                should_hide_width = goal->is_hidden || is_done_width;
-                break;
-            case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_width = goal->is_hidden;
-                break;
-            case SHOW_ALL:
-                should_hide_width = false;
-                break;
-        }
+            bool is_done_width = (goal->current_stage >= goal->stage_count - 1);
 
-        // Apply search filter for width calculation
-        SubGoal *active_stage_width = goal->stages[goal->current_stage];
-        bool name_matches_width = str_contains_insensitive(goal->display_name, t->search_buffer);
-        bool stage_matches_width = str_contains_insensitive(active_stage_width->display_text, t->search_buffer);
-
-        // Only consider items that will actually be rendered for width calculation
-        if (!should_hide_width && (name_matches_width || stage_matches_width)) {
-            // Calculate width needed for text (main name and current stage text)
-            SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
-            float name_width = ImGui::CalcTextSize(goal->display_name).x;
-            RESET_FONT_SCALE();
-
-            // Format stage text including progress if applicable
-            char stage_text_width_calc[256];
-            if (active_stage_width->type == SUBGOAL_STAT && active_stage_width->required_progress > 0) {
-                snprintf(stage_text_width_calc, sizeof(stage_text_width_calc), "%s (%d/%d)",
-                         active_stage_width->display_text,
-                         active_stage_width->current_stat_progress, active_stage_width->required_progress);
-            } else {
-                strncpy(stage_text_width_calc, active_stage_width->display_text, sizeof(stage_text_width_calc) - 1);
-                stage_text_width_calc[sizeof(stage_text_width_calc) - 1] = '\0';
+            // Apply rendering hiding logic for width calculation
+            bool should_hide_width = false;
+            switch (settings->goal_hiding_mode) {
+                case HIDE_ALL_COMPLETED:
+                    should_hide_width = goal->is_hidden || is_done_width;
+                    break;
+                case HIDE_ONLY_TEMPLATE_HIDDEN:
+                    should_hide_width = goal->is_hidden;
+                    break;
+                case SHOW_ALL:
+                    should_hide_width = false;
+                    break;
             }
-            // Scale for stage text width calculation
-            SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
-            float stage_width = ImGui::CalcTextSize(stage_text_width_calc).x;
-            RESET_FONT_SCALE();
 
-            // Required width is the max needed for either line
-            float required_text_width = fmaxf(name_width, stage_width);
-            // Ensure minimum width accommodates the 96px background
-            uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, required_text_width));
+            // Apply search filter for width calculation
+            SubGoal *active_stage_width = goal->stages[goal->current_stage];
+            bool name_matches_width = str_contains_insensitive(goal->display_name, t->search_buffer);
+            bool stage_matches_width = str_contains_insensitive(active_stage_width->display_text, t->search_buffer);
+
+            // Only consider items that will actually be rendered for width calculation
+            if (!should_hide_width && (name_matches_width || stage_matches_width)) {
+                // Calculate width needed for text (main name and current stage text)
+                SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
+                float name_width = ImGui::CalcTextSize(goal->display_name).x;
+                RESET_FONT_SCALE();
+
+                // Format stage text including progress if applicable
+                char stage_text_width_calc[256];
+                if (active_stage_width->type == SUBGOAL_STAT && active_stage_width->required_progress > 0) {
+                    snprintf(stage_text_width_calc, sizeof(stage_text_width_calc), "%s (%d/%d)",
+                             active_stage_width->display_text,
+                             active_stage_width->current_stat_progress, active_stage_width->required_progress);
+                } else {
+                    strncpy(stage_text_width_calc, active_stage_width->display_text, sizeof(stage_text_width_calc) - 1);
+                    stage_text_width_calc[sizeof(stage_text_width_calc) - 1] = '\0';
+                }
+                // Scale for stage text width calculation
+                SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
+                float stage_width = ImGui::CalcTextSize(stage_text_width_calc).x;
+                RESET_FONT_SCALE();
+
+                // Required width is the max needed for either line
+                float required_text_width = fmaxf(name_width, stage_width);
+                // Ensure minimum width accommodates the 96px background
+                uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, required_text_width));
+            }
         }
+        // Add default spacing ONLY in dynamic mode
+        uniform_item_width += horizontal_spacing;
     }
     // --- End of Width Calculation ---
 
 
     float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
-    // Adjust vertical spacing or horizontal spacing
-    const float horizontal_spacing = 8.0f, vertical_spacing = 16.0f;
+    // Adjust vertical spacing
+    const float vertical_spacing = 16.0f;
 
 
     // --- Rendering Loop ---
@@ -4673,7 +4724,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         } // End if (is_visible_on_screen)
 
         // --- Update Layout Position ---
-        current_x += uniform_item_width + horizontal_spacing;
+        current_x += uniform_item_width; // Use the final uniform_item_width directly
         row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
     }
     // --- End Rendering Loop ---

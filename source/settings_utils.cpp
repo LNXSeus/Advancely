@@ -310,6 +310,12 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_row3_remove_completed = DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED;
     settings->overlay_stat_cycle_speed = DEFAULT_OVERLAY_STAT_CYCLE_SPEED;
 
+    // Custom Tracker Spacing
+    for (int i = 0; i < SECTION_COUNT; i++) {
+        settings->tracker_section_custom_width_enabled[i] = DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED;
+        settings->tracker_section_custom_item_width[i] = DEFAULT_TRACKER_SECTION_ITEM_WIDTH;
+    }
+
     settings->notes_use_roboto_font = DEFAULT_NOTES_USE_ROBOTO;
     settings->per_world_notes = DEFAULT_PER_WORLD_NOTES;
     settings->check_for_updates = DEFAULT_CHECK_FOR_UPDATES;
@@ -811,6 +817,40 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
+
+        // --- Load Custom Tracker Spacing ---
+        const cJSON *tracker_custom_enabled_array = cJSON_GetObjectItem(visual_settings, "tracker_section_custom_width_enabled");
+        if (cJSON_IsArray(tracker_custom_enabled_array) && cJSON_GetArraySize(tracker_custom_enabled_array) == SECTION_COUNT) {
+            for (int i = 0; i < SECTION_COUNT; i++) {
+                cJSON *item = cJSON_GetArrayItem(tracker_custom_enabled_array, i);
+                settings->tracker_section_custom_width_enabled[i] = cJSON_IsTrue(item);
+            }
+        } else {
+            for (int i = 0; i < SECTION_COUNT; i++) {
+                settings->tracker_section_custom_width_enabled[i] = DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED;
+            }
+            defaults_were_used = true;
+        }
+
+        const cJSON *tracker_width_array = cJSON_GetObjectItem(visual_settings, "tracker_section_custom_item_width");
+        if (cJSON_IsArray(tracker_width_array) && cJSON_GetArraySize(tracker_width_array) == SECTION_COUNT) {
+            for (int i = 0; i < SECTION_COUNT; i++) {
+                cJSON *item = cJSON_GetArrayItem(tracker_width_array, i);
+                if (cJSON_IsNumber(item)) {
+                    settings->tracker_section_custom_item_width[i] = (float)item->valuedouble;
+                } else {
+                    settings->tracker_section_custom_item_width[i] = DEFAULT_TRACKER_SECTION_ITEM_WIDTH;
+                    defaults_were_used = true;
+                }
+            }
+        } else {
+            // If key is missing or wrong size, use default
+            for (int i = 0; i < SECTION_COUNT; i++) {
+                settings->tracker_section_custom_item_width[i] = DEFAULT_TRACKER_SECTION_ITEM_WIDTH;
+            }
+            defaults_were_used = true;
+        }
+
         // Load UI Theme Colors
         if (load_color(visual_settings, "ui_text_color", &settings->ui_text_color, &DEFAULT_UI_TEXT_COLOR))
             defaults_were_used = true;
@@ -854,6 +894,12 @@ bool settings_load(AppSettings *settings) {
         settings->overlay_row2_custom_spacing = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING;
         settings->overlay_row3_custom_spacing_enabled = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED;
         settings->overlay_row3_custom_spacing = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING;
+
+        // Custom Tracker Spacing Defaults
+        for (int i = 0; i < SECTION_COUNT; i++) {
+            settings->tracker_section_custom_width_enabled[i] = DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED;
+            settings->tracker_section_custom_item_width[i] = DEFAULT_TRACKER_SECTION_ITEM_WIDTH;
+        }
 
         // --- Ensure defaults if visuals missing ---
         strncpy(settings->adv_bg_path, DEFAULT_ADV_BG_PATH, sizeof(settings->adv_bg_path) - 1);
@@ -1054,6 +1100,21 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(visuals_obj, "overlay_row3_custom_spacing_enabled", cJSON_CreateBool(settings->overlay_row3_custom_spacing_enabled));
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row3_custom_spacing");
         cJSON_AddItemToObject(visuals_obj, "overlay_row3_custom_spacing", cJSON_CreateNumber(settings->overlay_row3_custom_spacing));
+
+        // --- Save Custom Tracker Spacing ---
+        cJSON_DeleteItemFromObject(visuals_obj, "tracker_section_custom_width_enabled");
+        // Manually create boolean array
+        cJSON *width_enabled_array = cJSON_CreateArray();
+        if (width_enabled_array) {
+            for (int i = 0; i < SECTION_COUNT; i++) {
+                cJSON_AddItemToArray(width_enabled_array, cJSON_CreateBool(settings->tracker_section_custom_width_enabled[i]));
+            }
+        }
+        cJSON_AddItemToObject(visuals_obj, "tracker_section_custom_width_enabled", width_enabled_array);
+
+        cJSON_DeleteItemFromObject(visuals_obj, "tracker_section_custom_item_width");
+        cJSON *width_array = cJSON_CreateFloatArray(settings->tracker_section_custom_item_width, SECTION_COUNT);
+        cJSON_AddItemToObject(visuals_obj, "tracker_section_custom_item_width", width_array);
 
         // UI Colors
         save_color(visuals_obj, "ui_text_color", &settings->ui_text_color);

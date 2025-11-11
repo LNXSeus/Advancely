@@ -73,6 +73,10 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED false
 #define DEFAULT_OVERLAY_STAT_CYCLE_SPEED 3.0f // Default: cycle every 3 seconds
 
+// Tracker Section Item Width
+#define DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED false // Default for *each* section's checkbox
+#define DEFAULT_TRACKER_SECTION_ITEM_WIDTH 128.0f // Default item width in pixels
+
 #define DEFAULT_NOTES_USE_ROBOTO false // Default: use the standard Minecraft font for notes otherwise roboto
 #define DEFAULT_PER_WORLD_NOTES true // When true the notes are per world, otherwise per template
 #define DEFAULT_CHECK_FOR_UPDATES true
@@ -193,6 +197,10 @@ struct AppSettings {
     float overlay_row3_custom_spacing;        // The custom spacing value for row 3
     bool overlay_row3_remove_completed; // If true, the third row will also hide completed goals as row 2 does.
     float overlay_stat_cycle_speed; // Time in seconds between cycling sub-stats on the overlay.
+
+    // --- Custom Tracker Spacing ---
+    bool tracker_section_custom_width_enabled[SECTION_COUNT]; // An array of bools, one for each section
+    float tracker_section_custom_item_width[SECTION_COUNT];   // An array of item widths, one for each section
 
     bool notes_use_roboto_font; // If true, the notes window uses the Roboto font instead of the default.
     bool per_world_notes; // If true, notes are saved per world instead of per template

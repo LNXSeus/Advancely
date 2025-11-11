@@ -102,6 +102,10 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         memcmp(&a->ui_header_active_color, &b->ui_header_active_color, sizeof(ColorRGBA)) != 0 ||
         memcmp(&a->ui_check_mark_color, &b->ui_check_mark_color, sizeof(ColorRGBA)) != 0 ||
 
+        memcmp(a->tracker_section_custom_width_enabled, b->tracker_section_custom_width_enabled,
+               sizeof(a->tracker_section_custom_width_enabled)) != 0 ||
+        memcmp(a->tracker_section_custom_item_width, b->tracker_section_custom_item_width,
+               sizeof(a->tracker_section_custom_item_width)) != 0 ||
         memcmp(a->section_order, b->section_order, sizeof(a->section_order)) != 0) {
         return true;
     }
@@ -167,13 +171,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 strcmp(discovered_templates[i].optional_flag, temp_settings.optional_flag) == 0) {
                 selected_template = &discovered_templates[i];
                 break;
-                }
+            }
         }
 
         if (selected_template) {
             bool default_lang_found = false;
             for (const auto &flag: selected_template->available_lang_flags) {
-                if (flag.empty()) { // ".empty()" is true for the default "" flag
+                if (flag.empty()) {
+                    // ".empty()" is true for the default "" flag
                     default_lang_found = true;
                     break;
                 }
@@ -184,7 +189,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 temp_settings.lang_flag[0] = '\0';
             } else if (!selected_template->available_lang_flags.empty()) {
                 // If no default, pick the first available one
-                strncpy(temp_settings.lang_flag, selected_template->available_lang_flags[0].c_str(), sizeof(temp_settings.lang_flag) - 1);
+                strncpy(temp_settings.lang_flag, selected_template->available_lang_flags[0].c_str(),
+                        sizeof(temp_settings.lang_flag) - 1);
                 temp_settings.lang_flag[sizeof(temp_settings.lang_flag) - 1] = '\0';
             } else {
                 // No languages found (unlikely), set to default
@@ -786,7 +792,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     // --- Category Display Name Text Input ---
-    ImGui::InputText("Display Category", temp_settings.category_display_name, sizeof(temp_settings.category_display_name));
+    ImGui::InputText("Display Category", temp_settings.category_display_name,
+                     sizeof(temp_settings.category_display_name));
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[512];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -1041,7 +1048,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (temp_settings.overlay_row2_custom_spacing_enabled) {
             ImGui::SameLine();
             ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
-            ImGui::DragFloat("Row 2 Item Width", &temp_settings.overlay_row2_custom_spacing, 1.0f, 96.0f, 512.0f, "%.0f px");
+            ImGui::DragFloat("Row 2 Item Width", &temp_settings.overlay_row2_custom_spacing, 1.0f, 96.0f, 2048.0f,
+                             "%.0f px");
             if (ImGui::IsItemHovered()) {
                 char tooltip_buffer[512];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -1066,7 +1074,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (temp_settings.overlay_row3_custom_spacing_enabled) {
             ImGui::SameLine();
             ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
-            ImGui::DragFloat("Row 3 Item Width", &temp_settings.overlay_row3_custom_spacing, 1.0f, 96.0f, 512.0f, "%.0f px");
+            ImGui::DragFloat("Row 3 Item Width", &temp_settings.overlay_row3_custom_spacing, 1.0f, 96.0f, 2048.0f,
+                             "%.0f px");
             if (ImGui::IsItemHovered()) {
                 char tooltip_buffer[512];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -1634,6 +1643,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SetTooltip("%s", section_order_tooltip_buffer);
     }
 
+
     // Create a temporary list of the indices of sections that should be visible for this version.
     std::vector<int> visible_section_indices;
     for (int i = 0; i < SECTION_COUNT; ++i) {
@@ -1642,6 +1652,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
         if (section_id == SECTION_UNLOCKS && selected_version != MC_VERSION_25W14CRAFTMINE) {
             is_visible = false; // Hide "Unlocks" if the version is not 25w14craftmine
+        }
+
+        if (section_id == SECTION_RECIPES && selected_version < MC_VERSION_1_12) {
+            is_visible = false; // Hide "Recipes" if the version is pre-1.12
         }
 
         if (is_visible) {
@@ -1692,6 +1706,68 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::EndDragDropTarget();
         }
     }
+
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    // --- Custom Tracker Section Width ---
+    ImGui::Text("Custom Section Item Width");
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buffer[512];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Enable and adjust the horizontal width (in pixels) for *each item* within a section.\n"
+                 "This overrides the dynamic width calculation. WARNING: Small values will cause text to overlap.\n"
+                 "Sections not available in the selected template version will be hidden.");
+        ImGui::SetTooltip("%s", tooltip_buffer);
+    }
+
+    ImGui::Indent();
+
+    // We use the already-calculated selected_version and its labels
+    for (int i = 0; i < SECTION_COUNT; ++i) {
+        TrackerSection section_id = (TrackerSection)i;
+        bool is_visible = true;
+        const char* label = TRACKER_SECTION_NAMES[i];
+        char checkbox_label[128];
+
+        if (section_id == SECTION_ADVANCEMENTS) {
+            label = advancements_label_plural_uppercase;
+        } else if (section_id == SECTION_RECIPES && selected_version < MC_VERSION_1_12) {
+            is_visible = false; // Hide Recipes for legacy/mid
+        } else if (section_id == SECTION_UNLOCKS && selected_version != MC_VERSION_25W14CRAFTMINE) {
+            is_visible = false; // Hide Unlocks for non-Craftmine
+        }
+
+        if (is_visible) {
+            snprintf(checkbox_label, sizeof(checkbox_label), "%s Width", label);
+            ImGui::Checkbox(checkbox_label, &temp_settings.tracker_section_custom_width_enabled[i]);
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buffer[512];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Check this to override the dynamic width calculation for items in the '%s' section.\n"
+                         "This allows you to set a fixed, uniform total width for all items in this row.",
+                         label);
+                ImGui::SetTooltip("%s", tooltip_buffer);
+            }
+
+            if (temp_settings.tracker_section_custom_width_enabled[i]) {
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
+                char slider_label[128];
+                snprintf(slider_label, sizeof(slider_label), "##%sWidthSlider", label);
+                ImGui::DragFloat(slider_label, &temp_settings.tracker_section_custom_item_width[i], 1.0f, 96.0f, 2048.0f, "%.0f px");
+                if (ImGui::IsItemHovered()) {
+                    char tooltip_buffer[512];
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "Item width for %s. WARNING: Text may overlap if too small.\n"
+                             "The item icon is %dpx wide. Default: %.0fpx",
+                             label, 96, DEFAULT_TRACKER_SECTION_ITEM_WIDTH);
+                    ImGui::SetTooltip("%s", tooltip_buffer);
+                }
+            }
+        }
+    }
+    ImGui::Unindent();
 
     ImGui::Separator();
     ImGui::Spacing();
@@ -2018,6 +2094,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Language: Default\n"
                  "  - StatsPerWorld Mod (Legacy): %s\n"
                  "  - Section Order: %s -> Recipes -> Unlocks -> Stats -> Custom -> Multi-Stage\n"
+                 "  - Custom Section Width: %s (%.0f px)\n"
                  "  - Enable Overlay: %s\n"
                  "  - Tracker FPS Limit: %d\n"
                  "  - Overlay FPS Limit: %d\n"
@@ -2048,13 +2125,16 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_DISPLAY_CATEGORY,
                  DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
                  advancements_label_plural_uppercase,
+                 DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED ? "Enabled" : "Disabled", DEFAULT_TRACKER_SECTION_ITEM_WIDTH,
                  DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
                  DEFAULT_FPS,
                  DEFAULT_OVERLAY_FPS,
                  DEFAULT_OVERLAY_SCROLL_SPEED,
                  DEFAULT_OVERLAY_ROW1_SPACING,
-                 DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED ? "Enabled" : "Disabled", DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING,
-                 DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED ? "Enabled" : "Disabled", DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING,
+                 DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED ? "Enabled" : "Disabled",
+                 DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING,
+                 DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED ? "Enabled" : "Disabled",
+                 DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING,
                  DEFAULT_OVERLAY_STAT_CYCLE_SPEED,
                  DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
                  DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",

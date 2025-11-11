@@ -157,7 +157,13 @@
 		"adv_bg_path":	"advancement_background.png",
 		"adv_bg_half_done_path":	"advancement_background_half_done.png",
 		"adv_bg_done_path":	"advancement_background_done.png",
-		"overlay_row1_spacing":	8
+		"overlay_row1_spacing":	8,
+		"overlay_row2_custom_spacing_enabled":	false,
+		"overlay_row2_custom_spacing":	192,
+		"overlay_row3_custom_spacing_enabled":	false,
+		"overlay_row3_custom_spacing":	256,
+		"tracker_section_custom_width_enabled":	[false, false, false, false, false, false],
+		"tracker_section_custom_item_width":	[128, 128, 128, 128, 128, 128]
 	},
 	"path_mode":	"auto",
 	"manual_saves_path":	"",
