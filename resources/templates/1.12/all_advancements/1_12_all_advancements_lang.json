@@ -167,5 +167,5 @@
 	"multi_stage_goal.ms_goal:beacon.stage.4":	"Craft Beacon",
 	"multi_stage_goal.ms_goal:beacon.stage.5":	"Place Beacon",
 	"multi_stage_goal.ms_goal:beacon.stage.6":	"Get 'Beaconator'",
-	"multi_stage_goal.ms_goal:beacon.stage.final":	"Final Stage"
+	"multi_stage_goal.ms_goal:beacon.stage.final":	"Beacon Done!"
 }

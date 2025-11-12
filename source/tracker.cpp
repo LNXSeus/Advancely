@@ -890,6 +890,79 @@ static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *p
 }
 
 /**
+ * @brief (Era 2/3: 1.7.2-1.12.2) Parses mid-era flat JSON stats files.
+ * Specifically used for 1.12-1.12.2 as it has modern advancements, but mid-era stats formats.
+ */
+static void tracker_update_stats_mid(Tracker *t, const cJSON *player_stats_json, const cJSON *settings_json) {
+    if (!player_stats_json) return;
+
+    // Stats logic with sub-stats
+    cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : nullptr;
+
+    t->template_data->stats_completed_count = 0;
+    t->template_data->stats_completed_criteria_count = 0;
+
+    for (int i = 0; i < t->template_data->stat_count; i++) {
+        // Iterate through stats
+        TrackableCategory *stat_cat = t->template_data->stats[i];
+        stat_cat->completed_criteria_count = 0;
+
+        cJSON *parent_override = override_obj ? cJSON_GetObjectItem(override_obj, stat_cat->root_name) : nullptr;
+        bool parent_forced_true = cJSON_IsBool(parent_override) && cJSON_IsTrue(parent_override);
+        stat_cat->is_manually_completed = parent_forced_true;
+
+        // Iterate through sub-stats
+        for (int j = 0; j < stat_cat->criteria_count; j++) {
+            TrackableItem *sub_stat = stat_cat->criteria[j];
+
+            cJSON *stat_entry = cJSON_GetObjectItem(player_stats_json, sub_stat->root_name);
+            sub_stat->progress = cJSON_IsNumber(stat_entry) ? stat_entry->valueint : 0;
+
+            // Determine natural completion
+            bool naturally_done = (sub_stat->goal > 0 && sub_stat->progress >= sub_stat->goal);
+
+            // Check for sub-stat override
+            cJSON *sub_override;
+            // If there are no sub-stats, use parent override (NO ".criteria." used for "regular" stats)
+            // Creates ONE criteria behind the scenes, even if template doesn't have "criteria" field
+            if (stat_cat->criteria_count == 1) {
+                sub_override = parent_override;
+            } else {
+                char sub_stat_key[512];
+                snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name,
+                         sub_stat->root_name);
+                sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : nullptr;
+            }
+
+            bool sub_forced_true = cJSON_IsBool(sub_override) && cJSON_IsTrue(sub_override);
+            sub_stat->is_manually_completed = sub_forced_true;
+
+
+            // Either naturally done OR manually overridden to be true  (itself or by parent)
+            sub_stat->done = naturally_done || sub_forced_true || parent_forced_true;
+
+            // Increment completed count
+            if (sub_stat->done) stat_cat->completed_criteria_count++;
+        }
+
+        bool all_children_done = (stat_cat->criteria_count > 0 && stat_cat->completed_criteria_count >= stat_cat->
+                                  criteria_count);
+
+        // Either all children done OR parent manually overridden to be true
+        stat_cat->done = all_children_done || parent_forced_true;
+
+        if (stat_cat->done) t->template_data->stats_completed_count++;
+        t->template_data->stats_completed_criteria_count += stat_cat->completed_criteria_count;
+    }
+
+    // Update mid-era playtime
+    cJSON *play_time_entry = cJSON_GetObjectItem(player_stats_json, "stat.playOneMinute");
+    if (cJSON_IsNumber(play_time_entry)) {
+        t->template_data->play_time_ticks = (long long) play_time_entry->valuedouble;
+    }
+}
+
+/**
  * @brief (Era 3: 1.12+) Updates advancement progress from modern JSON files.
  * It marks an advancement as completed if all of its criteria within the template are completed.
  * @param t Pointer to the tracker struct.
@@ -1854,8 +1927,8 @@ static void tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
                                 }
                             }
                         }
-                    } else if (version <= MC_VERSION_1_11_2) {
-                        // MID ERA: Parse directly from the flat JSON structure
+                    } else if (version <= MC_VERSION_1_12_2) {
+                        // MID ERA (and 1.12.x): Parse directly from the flat JSON structure
                         cJSON *stat_entry = cJSON_GetObjectItem(player_stats_json, stage_to_check->root_name);
                         if (cJSON_IsNumber(stat_entry)) {
                             current_progress = stat_entry->valueint;
@@ -2522,15 +2595,15 @@ void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
     if (version <= MC_VERSION_1_6_4) {
         // If StatsPerWorld mod is enabled, stats file is per-world, still using IDs
         tracker_update_stats_legacy(t, player_stats_json);
-    } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_12_2) {
-        // Mid-Era: 1.7.2 through 1.12.2
-        // This block handles modern advancements (1.12 - 1.12.2) AND mid-era stats (1.7.2 - 1.12.2)
-        if (version >= MC_VERSION_1_12) {
-            player_adv_json = (strlen(t->advancements_path) > 0) ? cJSON_from_file(t->advancements_path) : nullptr;
-            tracker_update_advancements_modern(t, player_adv_json); // 1.12 has modern advancements
-        }
-        // 1.7.2 - 1.12.2 all use the same flat stats file format
+    } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_11_2) {
+        // Mid-Era: 1.7.2 through 1.11.2
+        // This function handles both achievements and stats for this range.
         tracker_update_achievements_and_stats_mid(t, player_stats_json);
+    } else if (version >= MC_VERSION_1_12 && version <= MC_VERSION_1_12_2) {
+        // Hybrid Era: 1.12.x (Modern Advancements, Mid-era Stats)
+        player_adv_json = (strlen(t->advancements_path) > 0) ? cJSON_from_file(t->advancements_path) : nullptr;
+        tracker_update_advancements_modern(t, player_adv_json);
+        tracker_update_stats_mid(t, player_stats_json, settings_json); // Use the new stats-only function
     } else if (version >= MC_VERSION_1_13) {
         // Modern Era: 1.13+
         player_adv_json = (strlen(t->advancements_path) > 0) ? cJSON_from_file(t->advancements_path) : nullptr;
@@ -2879,7 +2952,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
     const float horizontal_spacing = 8.0f; // Define the default spacing
 
     // Check if custom width is enabled for THIS section
-    TrackerSection section_id = is_stat_section ? SECTION_STATS : (strcmp(section_title, "Recipes") == 0 ? SECTION_RECIPES : SECTION_ADVANCEMENTS);
+    TrackerSection section_id = is_stat_section
+                                    ? SECTION_STATS
+                                    : (strcmp(section_title, "Recipes") == 0 ? SECTION_RECIPES : SECTION_ADVANCEMENTS);
     if (settings->tracker_section_custom_width_enabled[section_id]) {
         // Use fixed width from settings
         uniform_item_width = settings->tracker_section_custom_item_width[section_id];
@@ -2892,7 +2967,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             if (!cat) continue;
 
             // Skip hidden legacy stats
-            if (is_stat_section && version <= MC_VERSION_1_6_4 && cat->criteria_count == 1 && cat->criteria[0]->goal == 0) {
+            if (is_stat_section && version <= MC_VERSION_1_6_4 && cat->criteria_count == 1 && cat->criteria[0]->goal ==
+                0) {
                 continue;
             }
 
@@ -4933,9 +5009,9 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
         // Start with the world name and run details
         snprintf(info_buffer, sizeof(info_buffer), "%s  |  %s - %s",
-                         t->world_name,
-                         settings->display_version_str,
-                         settings->category_display_name);
+                 t->world_name,
+                 settings->display_version_str,
+                 settings->category_display_name);
 
         // Conditionally add the progress part
         if (show_adv_counter && show_prog_percent) {
