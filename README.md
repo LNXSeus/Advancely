@@ -550,7 +550,7 @@ all April Fool's snapshots.
       via `stat.playOneMinute`.
     * **1.12 – 1.12.2 (Modern)**: Reads from separate, per-world advancements and stats files. Playtime is tracked via
       `stat.playOneMinute` as it's still the mid-era flat stats format.
-    * **1.13 – 1.16.5 (Modern)**: Reads from separate, per-world advancements and stats files. Playtime is tracked via
+    * **1.13 – 1.16.5 (Hybrid)**: Reads from separate, per-world modern advancements and mid-era stats files. Playtime is tracked via
       `minecraft:play_one_minute`.
     * **1.17+**: Same as above, but playtime is tracked via the renamed `minecraft:play_time` statistic.
     * **25w14craftmine**: Fully supports the unique advancements, stats, and unlocks files from this snapshot.
