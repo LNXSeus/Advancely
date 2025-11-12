@@ -937,7 +937,7 @@ int main(int argc, char *argv[]) {
                          "   Use the 'Copy Template' feature to create a separate version with a unique name or optional flag (e.g., '_custom'). Your copy will not be overwritten.\n\n"
                          "----------------------------------------------------------------\n"
                          "The update will KEEP your settings.json and _notes.txt files.\n"
-                         "It will REPLACE the main executable, libraries (.dll, .dylib, .so), and official files in the 'resources' folder (fonts, icons, templates, etc.).\n\n"
+                         "It will REPLACE the main executable, libraries (.dll, .dylib, .so), and official files in the 'resources' folder (fonts, icons, templates, reference_files, etc.).\n\n"
                          "Options:\n"
                          " - Update: Install the new version now.\n"
                          " - Templates: Open your local templates folder to make backups.\n"
@@ -948,7 +948,6 @@ int main(int argc, char *argv[]) {
                          "----------------------------------------------------------------\n"
                          "**DO NOT CLOSE ADVANCELY DURING THE UPDATE PROCESS!**",
                          ADVANCELY_VERSION, latest_version_str);
-
 
                 const SDL_MessageBoxButtonData buttons[] = {
                     {SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Update"},

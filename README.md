@@ -250,7 +250,7 @@ The updater is smart about which files it replaces to ensure your personal confi
 * ⚠️ **Files that WILL BE REPLACED:**
     * The main application executable (`Advancely.exe`, `Advancely.app`, etc.).
     * Core library files (`.dll`, `.so`).
-    * Official templates, fonts, icons, and GUI assets included with the release.
+    * Official templates, fonts, icons, reference_files, and GUI assets included with the release.
 
 ### Protecting Your Modified Official Templates
 
