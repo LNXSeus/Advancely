@@ -2469,8 +2469,6 @@ void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settin
 // Periodically recheck file changes
 void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
     (void) deltaTime;
-    // Use deltaTime for animations
-    // game logic goes here
 
     // Detect if the world has changed since the last update.
     if (t->template_data->last_known_world_name[0] == '\0' || // Handle first-time load
@@ -2524,9 +2522,17 @@ void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
     if (version <= MC_VERSION_1_6_4) {
         // If StatsPerWorld mod is enabled, stats file is per-world, still using IDs
         tracker_update_stats_legacy(t, player_stats_json);
-    } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_11_2) {
+    } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_12_2) {
+        // Mid-Era: 1.7.2 through 1.12.2
+        // This block handles modern advancements (1.12 - 1.12.2) AND mid-era stats (1.7.2 - 1.12.2)
+        if (version >= MC_VERSION_1_12) {
+            player_adv_json = (strlen(t->advancements_path) > 0) ? cJSON_from_file(t->advancements_path) : nullptr;
+            tracker_update_advancements_modern(t, player_adv_json); // 1.12 has modern advancements
+        }
+        // 1.7.2 - 1.12.2 all use the same flat stats file format
         tracker_update_achievements_and_stats_mid(t, player_stats_json);
-    } else if (version >= MC_VERSION_1_12) {
+    } else if (version >= MC_VERSION_1_13) {
+        // Modern Era: 1.13+
         player_adv_json = (strlen(t->advancements_path) > 0) ? cJSON_from_file(t->advancements_path) : nullptr;
         tracker_update_advancements_modern(t, player_adv_json);
 

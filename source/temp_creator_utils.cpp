@@ -61,7 +61,7 @@ bool parse_player_stats_for_import(const char* file_path, MC_Version version, st
                 }
             }
         }
-    } else if (version <= MC_VERSION_1_11_2) {
+    } else if (version <= MC_VERSION_1_12_2) { // Mid-era stats until 1.12.2
         // Mid-era flat json file
         cJSON* stat_entry = nullptr;
         cJSON_ArrayForEach(stat_entry, root) {
@@ -71,7 +71,7 @@ bool parse_player_stats_for_import(const char* file_path, MC_Version version, st
             }
         }
     } else {
-        // Modern nested json file
+        // Modern nested json file (1.13+)
         cJSON* stats_obj = cJSON_GetObjectItem(root, "stats");
         if (stats_obj) {
             cJSON* category_obj = nullptr;

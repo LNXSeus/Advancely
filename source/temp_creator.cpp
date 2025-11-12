@@ -1098,13 +1098,16 @@ static bool validate_and_save_template(const char *creator_version_str,
             for (const auto &crit: stat_cat.criteria) {
                 // Regular stats/sub-stats shouldn't have a target value of 0
                 if (!stat_cat.is_simple_stat && crit.goal == 0) {
-                    snprintf(status_message, 256, "Error: Sub-stat '%s' in category '%s' cannot have a Target Value of 0.", crit.root_name, stat_cat.root_name);
+                    snprintf(status_message, 256,
+                             "Error: Sub-stat '%s' in category '%s' cannot have a Target Value of 0.", crit.root_name,
+                             stat_cat.root_name);
                     validation_passed = false;
                     break; // Stop checking criteria for this category
                 }
                 // For simple stats that are NOT hidden legacy stats, check goal 0
                 else if (stat_cat.is_simple_stat && crit.goal == 0) {
-                    snprintf(status_message, 256, "Error: Stat '%s' cannot have a Target Value of 0.", stat_cat.root_name);
+                    snprintf(status_message, 256, "Error: Stat '%s' cannot have a Target Value of 0.",
+                             stat_cat.root_name);
                     validation_passed = false;
                     break; // Stop checking criteria (there's only one anyway)
                 }
@@ -1537,7 +1540,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // Version Selector
     ImGui::SetNextItemWidth(250); // Set a reasonable width for the combo box
     int original_version_idx = creator_version_idx; // UUse a temporary variable for the combo
-    if (ImGui::Combo("Template Version", &creator_version_idx, version_display_c_strs.data(), version_display_c_strs.size())) {
+    if (ImGui::Combo("Template Version", &creator_version_idx, version_display_c_strs.data(),
+                     version_display_c_strs.size())) {
         // This block runs when the user makes a new selection.
         // creator_version_idx now holds the NEW index the user clicked.
 
@@ -2397,11 +2401,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                          "It opens the global or local stats depending on your 'StatsPerWorld' setting.\n"
                          "Inside this folder you can find the '.dat' file which contains all of\n"
                          "your completed achievements and statistics.");
-            } else if (tracker_active_version <= MC_VERSION_1_11_2) {
+            } else if (tracker_active_version <= MC_VERSION_1_12_2) {
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "Opens the folder containing the stats file for the current world.\n\n"
-                         "Inside this folder you can find the '.json' file which contains all of\n"
-                         "your completed achievements and statistics.");
+                         "Opens the folder for the current world.\n\n"
+                         "Within this folder you can find:\n"
+                         " • The 'advancements' folder (for 1.12.x), containing a '.json' file\n"
+                         "   with your completed advancements and recipes.\n"
+                         " • The 'stats' folder, containing a '.json' file with your statistics\n"
+                         "   (and achievements for 1.7-1.11.2).");
             } else if (tracker_active_version == MC_VERSION_25W14CRAFTMINE) {
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Opens the folder for the current world.\n\n"
@@ -2411,7 +2418,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                          " • The 'stats' folder, containing a '.json' file with your statistics.\n"
                          " • The 'unlocks' folder, containing a '.json' file with your obtained unlocks.");
             } else {
-                // Modern versions
+                // Modern versions (1.13+)
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Opens the folder for the current world.\n\n"
                          "Within this folder you can find:\n"
@@ -2600,7 +2607,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (can_delete) {
                 // Tooltip for ENABLED state
                 char tooltip_buffer[256];
-                const auto& lang_to_delete = selected.available_lang_flags[selected_lang_index];
+                const auto &lang_to_delete = selected.available_lang_flags[selected_lang_index];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Delete the '%s' language file.\n"
                          "This action cannot be undone.", lang_to_delete.c_str());
@@ -3635,7 +3642,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "on the overlay if it's the last one remaining.\n"
                                      "This means it will still contribute to the horizontal spacing\n"
                                      "of the second row unless the advancement is hidden.\n"
-                                     "Visibility can be toggled in the main tracker settings.", advancements_label_singular_lower);
+                                     "Visibility can be toggled in the main tracker settings.",
+                                     advancements_label_singular_lower);
                             ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                         }
 
@@ -3826,13 +3834,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "Import stats directly from a global world's player stats/achievements .dat file.\n"
                                      "Cannot import already existing root names.");
                         }
-                    } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                        // Mid-era
+                    } else if (creator_selected_version <= MC_VERSION_1_12_2) {
+                        // Mid-era (1.7.2 - 1.12.2)
                         snprintf(tooltip, sizeof(tooltip),
-                                 "Import stats directly from a world's player stats/achievements .json file.\n"
+                                 "Import stats directly from a world's player stats .json file.\n"
+                                 "(Also contains achievements for 1.7.2 - 1.11.2).\n"
                                  "Cannot import already existing root names.");
                     } else {
-                        // Modern
+                        // Modern (1.13+)
                         snprintf(tooltip, sizeof(tooltip),
                                  "Import stats directly from a world's player stats .json file.\n"
                                  "Cannot import already existing root names.");
@@ -3869,10 +3878,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         strncpy(new_crit.root_name, "0", sizeof(new_crit.root_name) - 1);
                         new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
                         // Legacy stats are numeric IDs
-                    } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                        snprintf(new_crit.root_name, sizeof(new_crit.root_name), "stat.new_stat_%d", counter);
+                    } else if (creator_selected_version <= MC_VERSION_1_12_2) {
                         // Mid-era stats are prefixed
+                        snprintf(new_crit.root_name, sizeof(new_crit.root_name), "stat.new_stat_%d", counter);
                     } else {
+                        // Modern (1.13+)
                         snprintf(new_crit.root_name, sizeof(new_crit.root_name),
                                  "minecraft:custom/minecraft:new_stat_%d", counter); // Modern
                     }
@@ -3895,8 +3905,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  "Simple achievements (e.g., '5242880' - Taking Inventory) can also act as stats\n"
                                  "(e.g., How many time you've opened your inventory).\n\n"
                                  "Click the 'Help' button for more info.");
-                    } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                        // Mid-era
+                    } else if (creator_selected_version <= MC_VERSION_1_12_2) {
+                        // Mid-era (1.7.2 - 1.12.2)
                         snprintf(add_stat_tooltip_buffer, sizeof(add_stat_tooltip_buffer),
                                  "Add a new blank stat to this template.\n\n"
                                  "Statistics allow tracking of certain actions in form of numerical data.\n"
@@ -3905,7 +3915,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  "(e.g., Logs mined (any log type)).\n\n"
                                  "Click the 'Help' button for more info.");
                     } else {
-                        // Modern
+                        // Modern (1.13+)
                         snprintf(add_stat_tooltip_buffer, sizeof(add_stat_tooltip_buffer),
                                  "Add a new blank stat to this template.\n\n"
                                  "Statistics allow tracking of certain actions in form of numerical data.\n"
@@ -4313,12 +4323,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 // Legacy
                                 snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
                                          "The unique in-game ID for the stat to track, e.g., '16842813' (Furnace Crafted).");
-                            } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                                // Mid-era
+                            } else if (creator_selected_version <= MC_VERSION_1_12_2) {
+                                // Mid-era (1.7.2 - 1.12.2)
                                 snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
                                          "The unique in-game ID for the stat to track, e.g., 'stat.sprintOneCm'.");
                             } else {
-                                // Modern
+                                // Modern (1.13+)
                                 snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
                                          "The unique in-game ID for the stat to track, e.g., 'minecraft:mined/minecraft:diamond_ore'.");
                             }
@@ -4425,13 +4435,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                              "Import sub-stats directly from a global world's player stats/achievements .dat file.\n"
                                              "Cannot import already existing root names within this stat category.");
                                 }
-                            } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                                // Mid-era
+                            } else if (creator_selected_version <= MC_VERSION_1_12_2) {
+                                // Mid-era (1.7.2 - 1.12.2)
                                 snprintf(tooltip, sizeof(tooltip),
                                          "Import sub-stats directly from a world's player stats/achievements .json file.\n"
                                          "Cannot import already existing root names within this stat category.");
                             } else {
-                                // Modern
+                                // Modern(1.13+)
                                 snprintf(tooltip, sizeof(tooltip),
                                          "Import sub-stats directly from a world's player stats .json file.\n"
                                          "Cannot import already existing root names within this stat category.");
@@ -4522,12 +4532,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
                                              "The unique in-game ID for the stat to track,\n"
                                              "e.g., '1100' (Playtime in ticks), '16974109' (Gold Pickaxe Broken).");
-                                } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                                    // Mid-era
+                                } else if (creator_selected_version <= MC_VERSION_1_12_2) {
+                                    // Mid-era (1.7.2 - 1.12.2)
                                     snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
                                              "The unique in-game ID for the stat to track, e.g., 'stat.sprintOneCm'.");
                                 } else {
-                                    // Modern
+                                    // Modern(1.13+)
                                     snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
                                              "The unique in-game ID for the stat to track, e.g., 'minecraft:picked_up/minecraft:deepslate_emerald_ore'.");
                                 }
@@ -5371,6 +5381,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  "   (e.g., 'achievement.exploreAllBiomes').\n"
                                  " • Final: The mandatory last stage that completes the goal.\n\n"
                                  "Click the 'Help' button for more info.");
+                    } else if (creator_selected_version <= MC_VERSION_1_12_2) {
+                        // Modern with mid-era stats Version Tooltip
+                        snprintf(add_ms_goal_tooltip_buffer, sizeof(add_ms_goal_tooltip_buffer),
+                                 "Add a new multi-stage goal to this template.\n\n"
+                                 "Multi-Stage Goals get completed one stage at a time.\n"
+                                 "The 'Type' of each stage determines how it is completed:\n"
+                                 " • Stat: Root name (e.g., 'stat.mobKills') from the stats file.\n"
+                                 " • Advancement: Root name of an advancement (e.g., 'minecraft:husbandry/tame_an_animal')\n"
+                                 "   or recipe (e.g., 'minecraft:recipes/redstone/stone_button') from the advancements file.\n"
+                                 " • Criterion: A specific criterion (e.g., 'cave_spider')\n"
+                                 "   of a parent advancement (e.g., 'minecraft:adventure/kill_a_mob').\n"
+                                 " • Final: The mandatory last stage that completes the goal.\n\n"
+                                 "Click the 'Help' button for more info.");
                     } else if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
                         // 25w14craftmine Version Tooltip
                         snprintf(add_ms_goal_tooltip_buffer, sizeof(add_ms_goal_tooltip_buffer),
@@ -5378,7 +5401,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  "Multi-Stage Goals get completed one stage at a time.\n"
                                  "The 'Type' of each stage determines how it is completed:\n"
                                  " • Stat: Root name (e.g., 'minecraft:mined/minecraft:spawner') from the stats file.\n"
-                                 " • Advancement: Root name of an advancement (e.g., 'minecraft:end/levitate)\n"
+                                 " • Advancement: Root name of an advancement (e.g., 'minecraft:end/levitate')\n"
                                  "   or recipe (e.g., 'minecraft:recipes/redstone/tnt') from the advancements file.\n"
                                  " • Criterion: A specific criterion (e.g., 'minecraft:wither_boss')\n"
                                  "   of a parent advancement (e.g., 'minecraft:mines/all_special_mines_completed').\n"
@@ -5386,13 +5409,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  " • Final: The mandatory last stage that completes the goal.\n\n"
                                  "Click the 'Help' button for more info.");
                     } else {
-                        // Modern Versions (1.12+ excluding craftmine) Tooltip
+                        // Modern Versions (1.13+ excluding craftmine) Tooltip
                         snprintf(add_ms_goal_tooltip_buffer, sizeof(add_ms_goal_tooltip_buffer),
                                  "Add a new multi-stage goal to this template.\n\n"
                                  "Multi-Stage Goals get completed one stage at a time.\n"
                                  "The 'Type' of each stage determines how it is completed:\n"
                                  " • Stat: Root name (e.g., 'minecraft:killed/minecraft:blaze') from the stats file.\n"
-                                 " • Advancement: Root name of an advancement (e.g., 'minecraft:story/cure_zombie_villager)\n"
+                                 " • Advancement: Root name of an advancement (e.g., 'minecraft:story/cure_zombie_villager')\n"
                                  "   or recipe (e.g., 'minecraft:recipes/decorations/anvil') from the advancements file.\n"
                                  " • Criterion: A specific criterion (e.g., 'minecraft:spotted')\n"
                                  "   of a parent advancement (e.g., 'minecraft:husbandry/whole_pack').\n"
@@ -5768,9 +5791,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // Version-aware root name for the new stage's trigger
                         if (creator_selected_version <= MC_VERSION_1_6_4) {
                             strncpy(new_stage.root_name, "0", sizeof(new_stage.root_name) - 1);
-                        } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                        } else if (creator_selected_version <= MC_VERSION_1_12_2) {
+                            // Mid-era (1.7 -1.12.2)
                             strncpy(new_stage.root_name, "stat.cool", sizeof(new_stage.root_name) - 1);
                         } else {
+                            // Modern (1.13+)
                             strncpy(new_stage.root_name, "minecraft:custom/minecraft:new_stat",
                                     sizeof(new_stage.root_name) - 1);
                         }
@@ -5812,6 +5837,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      " • Criterion: Completes when a specific criterion (e.g., 'Deep Ocean')\n"
                                      "   of a parent achievement (e.g., 'achievement.exploreAllBiomes') is met.\n\n"
                                      "Click the 'Help' button for more info.");
+                        } else if (creator_selected_version <= MC_VERSION_1_12_2) {
+                            // Mid-era stats, modern advancements
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Adds a new step to this multi-stage goal.\n\n"
+                                     "Stages are completed sequentially. New stages are always added before the 'Final' stage.\n\n"
+                                     "Available Stage Types for this version:\n"
+                                     " • Stat: Completes when a stat (e.g., 'stat.useItem.minecraft.beacon'\n"
+                                     "   reaches the 'Target Value'.\n"
+                                     " • Advancement: Completes when an advancement (e.g., 'minecraft:story/root')\n"
+                                     "   or recipe (e.g., 'minecraft:recipes/tools/stone_shovel') is obtained.\n"
+                                     " • Criterion: Completes when a specific criterion (e.g., 'bred_mooshroom')\n"
+                                     "   of a parent advancement (e.g., 'minecraft:husbandry/bred_all_animals') is met.\n\n"
+                                     "Click the 'Help' button for more info.");
                         } else if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
                             // 25w14craftmine Version Tooltip
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -5827,7 +5865,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      " • Unlock: Completes when a specific player unlock (e.g., 'minecraft:jump_king_10') is obtained.\n\n"
                                      "Click the 'Help' button for more info.");
                         } else {
-                            // Modern Versions (1.12+ excluding craftmine) Tooltip
+                            // Modern Versions (1.13+ excluding craftmine) Tooltip
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                      "Adds a new step to this multi-stage goal.\n\n"
                                      "Stages are completed sequentially. New stages are always added before the 'Final' stage.\n\n"
@@ -6049,6 +6087,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                              "The root name of the stat (e.g., 'stat.craftItem.minecraft.stick')\n"
                                              "or achievement (e.g., 'achievement.ghast') or criterion (e.g., 'Extreme Hills+ M')\n"
                                              "that triggers this stage's completion.");
+                                } else if (creator_selected_version <= MC_VERSION_1_12_2) {
+                                    // Mid-era stats, but modern advancements
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "The root name of the stat (e.g., 'stat.sneakTime'),\n"
+                                             "advancement (e.g., 'minecraft:story/iron_tools')\n"
+                                             "or criterion (e.g., 'cookie') that triggers this stage's completion.");
                                 } else if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
                                     // craftmine stage types
                                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -6057,7 +6101,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                              "unlock (e.g., 'minecraft:fire_wand') or criterion (e.g., 'minecraft:runemaster')\n"
                                              "that triggers this stage's completion.");
                                 } else {
-                                    // modern stage types without craftmine
+                                    // modern stage types without craftmine (1.13+)
                                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                              "The root name of the stat (e.g., 'minecraft:used/minecraft:acacia_boat'),\n"
                                              "advancement (e.g., 'minecraft:adventure/trim_with_all_exclusive_armor_patterns')\n"
@@ -6095,6 +6139,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                 snprintf(start_path, sizeof(start_path), "%s/stats/", temp_parent_dir);
                                             }
                                         } else {
+                                            // Mid-era (1.7.2 - 1.12.2) AND Modern (1.13+)
                                             snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
                                                      t->world_name);
                                         }
@@ -6127,9 +6172,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                 snprintf(start_path, sizeof(start_path), "%s/stats/", temp_parent_dir);
                                             }
                                         } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                            // Mid-era (1.7.2 - 1.11.2)
                                             snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
                                                      t->world_name);
                                         } else {
+                                            // Criterion are 1.12+
                                             snprintf(start_path, sizeof(start_path), "%s/%s/advancements/",
                                                      t->saves_path, t->world_name);
                                         }
@@ -6191,6 +6238,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                      "Select a single stat or achievement from a\n"
                                                      "player's .json file to use as a trigger.");
                                         } else {
+                                            // mid-era stats and modern achievements (1.12+) and modern (1.13+)
                                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                                      "Select a single stat from a\n"
                                                      "player's .json file to use as a trigger.");
@@ -6224,13 +6272,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             // Only show target value for stat/achievements
                             if (stage.type == SUBGOAL_STAT) {
                                 if (ImGui::InputInt("Target Value", &stage.required_progress)) {
+                                    if (stage.required_progress < 1) {
+                                        stage.required_progress = 1; // Clamp to minimum of 1
+                                    }
                                     ms_goal_data_changed = true;
                                     save_message_type = MSG_NONE;
                                 }
                                 if (ImGui::IsItemHovered()) {
                                     char tooltip_buffer[256];
                                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                             "For 'Stat' type stages, this is the value the stat must reach to complete the stage.\n");
+                                             "For 'Stat' type stages, this is the value the stat must reach to complete the stage.\n"
+                                             "Must be 1 or greater.");
                                     ImGui::SetTooltip("%s", tooltip_buffer);
                                 }
                             }
@@ -6388,7 +6440,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         // Also allow enter key ONLY WHEN the window is focused
         if (ImGui::Button("Create Template") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused(
-                                                  ImGuiFocusedFlags_RootAndChildWindows))) {
+                                                     ImGuiFocusedFlags_RootAndChildWindows))) {
             if (creator_version_idx >= 0) {
                 char error_msg[256] = "";
 

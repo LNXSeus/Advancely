@@ -77,10 +77,11 @@ extern "C" {
     X(MC_VERSION_1_11, "1.11") \
     X(MC_VERSION_1_11_1, "1.11.1") \
     X(MC_VERSION_1_11_2, "1.11.2") \
-    /* Era 3: Modern Advancements/Stats (separate per-world JSONs), minecraft:play_one_minute is in ticks */ \
+    /* Era 3: Modern Advancements (separate per-world JSONs), stat.playOneMinute is in ticks */ \
     X(MC_VERSION_1_12, "1.12") \
     X(MC_VERSION_1_12_1, "1.12.1") \
     X(MC_VERSION_1_12_2, "1.12.2") \
+/* Era 3: Modern Stats(separate per-world JSONs), minecraft:play_one_minute is in ticks */ \
     X(MC_VERSION_1_13, "1.13") \
     X(MC_VERSION_1_13_1, "1.13.1") \
     X(MC_VERSION_1_13_2, "1.13.2") \
@@ -146,10 +147,10 @@ extern "C" {
 #endif
 
 typedef struct {
-    int frame_count;          // How many frames are in the animation
-    SDL_Texture **frames;     // An array of textures, one for each frame
-    int *delays;              // An array of delays (in ms) for each frame
-    Uint32 total_duration;    // The sum of all delays, for looping
+    int frame_count; // How many frames are in the animation
+    SDL_Texture **frames; // An array of textures, one for each frame
+    int *delays; // An array of delays (in ms) for each frame
+    Uint32 total_duration; // The sum of all delays, for looping
 } AnimatedTexture;
 
 // A generic struct for a sub-item, like and advancement's criterion or a stat
@@ -177,8 +178,8 @@ struct TrackableItem {
     bool is_hidden; // If true, this item is hidden unless "Remove Completed Goals" is off
 
     // Animation State
-    float alpha;                 // Current transparency (1.0f = opaque, 0.0f = transparent)
-    bool is_visible_on_overlay;  // Tracks if the item should be rendered
+    float alpha; // Current transparency (1.0f = opaque, 0.0f = transparent)
+    bool is_visible_on_overlay; // Tracks if the item should be rendered
 };
 
 
@@ -227,7 +228,7 @@ struct TrackableCategory {
 
 // --------- MULTI-STAGE LONG-TERM GOALS ---------
 
-enum SubGoalType{
+enum SubGoalType {
     SUBGOAL_STAT,
     SUBGOAL_ADVANCEMENT,
     SUBGOAL_UNLOCK, // Allows to also complete a stage based on a specific unlock
@@ -319,10 +320,10 @@ enum PathMode {
 };
 
 
-enum  MC_Version {
-    #define X(e, s) e,
+enum MC_Version {
+#define X(e, s) e,
     VERSION_LIST
-    #undef X
+#undef X
     MC_VERSION_COUNT, // Automatically corresponds to the number of versions
     MC_VERSION_UNKNOWN // For error handling
 };
