@@ -1725,9 +1725,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // We use the already-calculated selected_version and its labels
     for (int i = 0; i < SECTION_COUNT; ++i) {
-        TrackerSection section_id = (TrackerSection)i;
+        TrackerSection section_id = (TrackerSection) i;
         bool is_visible = true;
-        const char* label = TRACKER_SECTION_NAMES[i];
+        const char *label = TRACKER_SECTION_NAMES[i];
         char checkbox_label[128];
 
         if (section_id == SECTION_ADVANCEMENTS) {
@@ -1755,7 +1755,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
                 char slider_label[128];
                 snprintf(slider_label, sizeof(slider_label), "##%sWidthSlider", label);
-                ImGui::DragFloat(slider_label, &temp_settings.tracker_section_custom_item_width[i], 1.0f, 96.0f, 2048.0f, "%.0f px");
+                ImGui::DragFloat(slider_label, &temp_settings.tracker_section_custom_item_width[i], 1.0f, 96.0f,
+                                 2048.0f, "%.0f px");
                 if (ImGui::IsItemHovered()) {
                     char tooltip_buffer[512];
                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -2125,7 +2126,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_DISPLAY_CATEGORY,
                  DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
                  advancements_label_plural_uppercase,
-                 DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED ? "Enabled" : "Disabled", DEFAULT_TRACKER_SECTION_ITEM_WIDTH,
+                 DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED ? "Enabled" : "Disabled",
+                 DEFAULT_TRACKER_SECTION_ITEM_WIDTH,
                  DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
                  DEFAULT_FPS,
                  DEFAULT_OVERLAY_FPS,
@@ -2181,6 +2183,39 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                  "Saves all current settings and restarts the application.\n"
                  "This is required to apply changes to fonts within the tracker window.");
+        ImGui::SetTooltip("%s", tooltip_buffer);
+    }
+
+    ImGui::SameLine();
+
+    if (ImGui::Button("Support Advancely!")) {
+        const char *url = "https://streamlabs.com/lnxseus/tip";
+#ifdef _WIN32
+        char command[1024];
+        snprintf(command, sizeof(command), "start %s", url);
+        system(command);
+#else // macOS and Linux
+        pid_t pid = fork();
+        if (pid == 0) {  // Child process
+#if __APPLE__
+        char *args[] = {(char *) "open", (char *) url, nullptr};
+#else
+        char *args[] = {(char *) "xdg-open", (char *) url, nullptr};
+#endif
+        execvp(args[0], args);
+        _exit(127); // Exit if exec fails
+        } else if (pid < 0) {
+            log_message(LOG_ERROR, "[SETTINGS] Failed to fork process to open URL.\n");
+        }
+#endif
+    }
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buffer[512];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Support the development of Advancely! <3\n\n"
+                 "IMPORTANT: Please include the word 'Advancely' in your\n"
+                 "donation message to be immortalized on the overlay's\n"
+                 "supporter showcase after a completed run!");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
