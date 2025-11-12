@@ -279,8 +279,8 @@ bool apply_update(const char* main_executable_path) {
     fprintf(updater_script, "robocopy \"%s\\resources\\templates\" \".\\resources\\templates\" /E /IS /NFL /NDL\n", temp_dir);
     fprintf(updater_script, "robocopy \"%s\\resources\\fonts\" \".\\resources\\fonts\" /E /IS /NFL /NDL\n", temp_dir);
     fprintf(updater_script, "robocopy \"%s\\resources\\gui\" \".\\resources\\gui\" /E /IS /NFL /NDL\n", temp_dir);
-    fprintf(updater_script, "robocopy \"%s\\resources\\icons\" \".\\resources\\icons\" /E /IS /NFL /NDL\n", temp_dir);
     fprintf(updater_script, "robocopy \"%s\\resources\\reference_files\" \".\\resources\\reference_files\" /E /IS /NFL /NDL\n", temp_dir);
+    fprintf(updater_script, "robocopy \"%s\\resources\\icons\" \".\\resources\\icons\" /E /IS /NFL /NDL\n", temp_dir);
 
     fprintf(updater_script, "echo Cleaning up temporary files...\n");
     fprintf(updater_script, "rmdir /S /Q \"%s\"\n", temp_dir);
@@ -328,8 +328,8 @@ bool apply_update(const char* main_executable_path) {
     fprintf(updater_script, "rsync -av ./%s/resources/fonts/ ./resources/fonts/\n", temp_dir);
     fprintf(updater_script, "rsync -av ./%s/resources/gui/ ./resources/gui/\n", temp_dir);
     fprintf(updater_script, "rsync -av ./%s/resources/icons/ ./resources/icons/\n", temp_dir);
-    fprintf(updater_script, "rsync -av ./%s/resources/templates/ ./resources/templates/\n", temp_dir);
     fprintf(updater_script, "rsync -av ./%s/resources/reference_files/ ./resources/reference_files/\n", temp_dir);
+    fprintf(updater_script, "rsync -av ./%s/resources/templates/ ./resources/templates/\n", temp_dir);
 
     fprintf(updater_script, "echo \"Cleaning up temporary files...\"\n");
     fprintf(updater_script, "rm -rf ./%s\n", temp_dir);
