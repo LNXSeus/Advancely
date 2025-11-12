@@ -2033,8 +2033,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
     }
 
-    // Disable if nothing is selected or the selected template is in use or unsaved changes in editor
-    ImGui::BeginDisabled(selected_template_index == -1 || is_current_template || has_unsaved_changes_in_editor);
+    // Disable if nothing is selected or the selected template is in use or unsaved changes in editor or default
+    ImGui::BeginDisabled(selected_template_index == -1 || is_current_template || has_unsaved_changes_in_editor || is_default_template);
     if (ImGui::Button("Delete Template")) {
         if (selected_template_index != -1) {
             ImGui::OpenPopup("Delete Template?");
