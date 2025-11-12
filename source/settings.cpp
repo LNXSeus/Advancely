@@ -1010,6 +1010,22 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::SetTooltip("%s", overlay_fps_limit_tooltip_buffer);
         }
 
+        // Slider for overlay width
+        static int overlay_width;
+        overlay_width = temp_settings.overlay_window.w;
+        if (ImGui::DragInt("Overlay Width", &overlay_width, 10.0f, 200, 7680)) {
+            if (overlay_width > 0) {
+                // Basic validation
+                temp_settings.overlay_window.w = overlay_width;
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            char overlay_width_tooltip_buffer[1024];
+            snprintf(overlay_width_tooltip_buffer, sizeof(overlay_width_tooltip_buffer),
+                     "Adjusts the width of the overlay window.\nDefault: %dpx", OVERLAY_DEFAULT_WIDTH);
+            ImGui::SetTooltip("%s", overlay_width_tooltip_buffer);
+        }
+
         ImGui::DragFloat("Overlay Scroll Speed", &temp_settings.overlay_scroll_speed, 0.001f, -25.00f, 25.00f, "%.3f");
         if (ImGui::IsItemHovered()) {
             char overlay_scroll_speed_tooltip_buffer[1024];
@@ -1022,7 +1038,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::SetTooltip("%s", overlay_scroll_speed_tooltip_buffer);
         }
 
-        ImGui::DragFloat("Row 1 Icon Spacing", &temp_settings.overlay_row1_spacing, 1.0f, 0.0f, 256.0f, "%.0f px");
+        ImGui::DragFloat("Row 1 Icon Spacing", &temp_settings.overlay_row1_spacing, 1.0f, 0.0f, 7680.0f, "%.0f px");
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[256];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -1048,7 +1064,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (temp_settings.overlay_row2_custom_spacing_enabled) {
             ImGui::SameLine();
             ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
-            ImGui::DragFloat("Row 2 Item Width", &temp_settings.overlay_row2_custom_spacing, 1.0f, 96.0f, 2048.0f,
+            ImGui::DragFloat("Row 2 Item Width", &temp_settings.overlay_row2_custom_spacing, 1.0f, 96.0f, 7680.0f,
                              "%.0f px");
             if (ImGui::IsItemHovered()) {
                 char tooltip_buffer[512];
@@ -1074,7 +1090,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (temp_settings.overlay_row3_custom_spacing_enabled) {
             ImGui::SameLine();
             ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
-            ImGui::DragFloat("Row 3 Item Width", &temp_settings.overlay_row3_custom_spacing, 1.0f, 96.0f, 2048.0f,
+            ImGui::DragFloat("Row 3 Item Width", &temp_settings.overlay_row3_custom_spacing, 1.0f, 96.0f, 7680.0f,
                              "%.0f px");
             if (ImGui::IsItemHovered()) {
                 char tooltip_buffer[512];
@@ -1340,22 +1356,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             snprintf(tracker_bg_tooltip_buffer, sizeof(tracker_bg_tooltip_buffer),
                      "Configure the text color of the overlay window.");
             ImGui::SetTooltip("%s", tracker_bg_tooltip_buffer);
-        }
-
-        // Slider for overlay width
-        static int overlay_width;
-        overlay_width = temp_settings.overlay_window.w;
-        if (ImGui::DragInt("Overlay Width", &overlay_width, 10.0f, 200, 7680)) {
-            if (overlay_width > 0) {
-                // Basic validation
-                temp_settings.overlay_window.w = overlay_width;
-            }
-        }
-        if (ImGui::IsItemHovered()) {
-            char overlay_width_tooltip_buffer[1024];
-            snprintf(overlay_width_tooltip_buffer, sizeof(overlay_width_tooltip_buffer),
-                     "Adjusts the width of the overlay window.\nDefault: %dpx", OVERLAY_DEFAULT_WIDTH);
-            ImGui::SetTooltip("%s", overlay_width_tooltip_buffer);
         }
     }
 
