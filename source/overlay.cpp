@@ -630,9 +630,14 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             }
 
             if (settings->overlay_show_run_details) {
-                snprintf(temp_chunk, sizeof(temp_chunk), "%s - %s",
-                         settings->display_version_str,
-                         settings->category_display_name);
+                if (settings->category_display_name[0] != '\0') {
+                    snprintf(temp_chunk, sizeof(temp_chunk), "%s - %s", // Version - Category
+                             settings->display_version_str,
+                             settings->category_display_name);
+                } else {
+                    snprintf(temp_chunk, sizeof(temp_chunk), "%s", // Display Category Empty
+                             settings->display_version_str);
+                }
                 add_component(temp_chunk);
             }
 

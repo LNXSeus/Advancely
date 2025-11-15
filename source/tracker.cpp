@@ -3976,7 +3976,8 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                     scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
                 }
                 ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor); // Scaled size on screen
-                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level); // 16.0f to CENTER the icons
+                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
+                // 16.0f to CENTER the icons
                 // Top-left of 64x64 box on screen
                 ImVec2 icon_padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
                                              (target_box_size.y - scaled_size.y) * 0.5f); // Padding within the box
@@ -4328,7 +4329,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                     scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
                 }
                 ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor); // Scaled size on screen
-                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level); // 16.0f to CENTER the icons
+                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
+                // 16.0f to CENTER the icons
                 // Top-left of 64x64 box on screen
                 ImVec2 icon_padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
                                              (target_box_size.y - scaled_size.y) * 0.5f); // Padding within the box
@@ -4769,7 +4771,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                     scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
                 }
                 ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor); // Scaled size on screen
-                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level); // 16.0f to CENTER the icons
+                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
+                // 16.0f to CENTER the icons
                 // Top-left of 64x64 box on screen
                 ImVec2 icon_padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
                                              (target_box_size.y - scaled_size.y) * 0.5f); // Padding within the box
@@ -5008,10 +5011,16 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         bool show_prog_percent = (t->template_data->total_progress_steps > 0);
 
         // Start with the world name and run details
-        snprintf(info_buffer, sizeof(info_buffer), "%s  |  %s - %s",
-                 t->world_name,
-                 settings->display_version_str,
-                 settings->category_display_name);
+        if (settings->category_display_name[0] != '\0') {
+            snprintf(info_buffer, sizeof(info_buffer), "%s  |  %s - %s",
+                     t->world_name,
+                     settings->display_version_str,
+                     settings->category_display_name);
+        } else {
+            snprintf(info_buffer, sizeof(info_buffer), "%s  |  %s",
+                     t->world_name,
+                     settings->display_version_str);
+        }
 
         // Conditionally add the progress part
         if (show_adv_counter && show_prog_percent) {
@@ -5862,11 +5871,16 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
                  t->template_data->overall_progress_percentage);
     }
 
+    char category_chunk[MAX_PATH_LENGTH + 10] = "";
+    if (settings->category_display_name[0] != '\0') {
+        snprintf(category_chunk, sizeof(category_chunk), "    -    %s", settings->category_display_name);
+    }
+
     snprintf(title_buffer, sizeof(title_buffer),
-             "  Advancely  %s    |    %s    -    %s    -    %s%s    |    %s IGT",
+             "  Advancely  %s    |    %s    -    %s%s%s    |    %s IGT",
              ADVANCELY_VERSION, t->world_name,
              settings->display_version_str,
-             settings->category_display_name,
+             category_chunk, // This contains "    -    Category" or ""
              progress_chunk, formatted_time);
 
     SDL_SetWindowTitle(t->window, title_buffer);
@@ -5925,8 +5939,8 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
     log_message(LOG_INFO, " World:      %s\n", t->world_name);
     log_message(LOG_INFO, " Version:    %s\n", settings->display_version_str);
 
-    // When category isn't empty
-    if (settings->category[0] != '\0') {
+    // When category display name isn't empty
+    if (settings->category_display_name[0] != '\0') {
         log_message(LOG_INFO, " Category:   %s\n", settings->category_display_name);
     }
 
