@@ -154,6 +154,7 @@
 			"b":	250,
 			"a":	255
 		},
+		"tracker_vertical_spacing":	8,
 		"adv_bg_path":	"advancement_background.png",
 		"adv_bg_half_done_path":	"advancement_background_half_done.png",
 		"adv_bg_done_path":	"advancement_background_done.png",
