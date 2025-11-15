@@ -32,8 +32,6 @@ enum GoalHidingMode {
     SHOW_ALL // Shows hidden and completed
 };
 
-//
-
 // Enum to identify the tracker sections
 enum TrackerSection {
     SECTION_ADVANCEMENTS,
@@ -74,6 +72,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_OVERLAY_STAT_CYCLE_SPEED 3.0f // Default: cycle every 3 seconds
 
 // Tracker Section Item Width
+#define DEFAULT_TRACKER_VERTICAL_SPACING 8.0f // Default vertical spacing in pixels between goals globally
 #define DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED false // Default for *each* section's checkbox
 #define DEFAULT_TRACKER_SECTION_ITEM_WIDTH 128.0f // Default item width in pixels
 
@@ -199,8 +198,10 @@ struct AppSettings {
     float overlay_stat_cycle_speed; // Time in seconds between cycling sub-stats on the overlay.
 
     // --- Custom Tracker Spacing ---
+    float tracker_vertical_spacing; // Vertical spacing in pixels between goals globally
     bool tracker_section_custom_width_enabled[SECTION_COUNT]; // An array of bools, one for each section
     float tracker_section_custom_item_width[SECTION_COUNT];   // An array of item widths, one for each section
+
 
     bool notes_use_roboto_font; // If true, the notes window uses the Roboto font instead of the default.
     bool per_world_notes; // If true, notes are saved per world instead of per template

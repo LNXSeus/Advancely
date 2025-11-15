@@ -63,7 +63,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_row3_custom_spacing != b->overlay_row3_custom_spacing ||
         a->overlay_row3_remove_completed != b->overlay_row3_remove_completed ||
         a->overlay_stat_cycle_speed != b->overlay_stat_cycle_speed ||
-
+        a->tracker_vertical_spacing != b->tracker_vertical_spacing ||
 
         a->notes_use_roboto_font != b->notes_use_roboto_font ||
         a->check_for_updates != b->check_for_updates ||
@@ -1038,55 +1038,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::SetTooltip("%s", overlay_scroll_speed_tooltip_buffer);
         }
 
-        ImGui::DragFloat("Row 1 Icon Spacing", &temp_settings.overlay_row1_spacing, 1.0f, 0.0f, 7680.0f, "%.0f px");
-        if (ImGui::IsItemHovered()) {
-            char tooltip_buffer[256];
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Adjusts the horizontal gap (in pixels) between icons\n"
-                     "in the top row (Row 1) of the overlay.\n"
-                     "The horizontal spacing of the 2nd and 3rd row\n"
-                     "depends on the length of the display text.\n"
-                     "Default: %.0f px",
-                     DEFAULT_OVERLAY_ROW1_SPACING);
-            ImGui::SetTooltip("%s", tooltip_buffer);
-        }
-
-        // --- Custom Row 2 Spacing ---
-        ImGui::Checkbox("Custom Row 2 Spacing", &temp_settings.overlay_row2_custom_spacing_enabled);
-        if (ImGui::IsItemHovered()) {
-            char tooltip_buffer[512];
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Check this to override the dynamic width calculation for Row 2 items.\n"
-                     "This allows you to set a fixed, uniform width for all items in this row.");
-            ImGui::SetTooltip("%s", tooltip_buffer);
-        }
-
-        if (temp_settings.overlay_row2_custom_spacing_enabled) {
-            ImGui::SameLine();
-            ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
-            ImGui::DragFloat("Row 2 Item Width", &temp_settings.overlay_row2_custom_spacing, 1.0f, 96.0f, 7680.0f,
-                             "%.0f px");
-            if (ImGui::IsItemHovered()) {
-                char tooltip_buffer[512];
-                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "Sets the total horizontal width (in pixels) for each item in Row 2.\n"
-                         "WARNING: If this value is too small, item text will overlap.\n"
-                         "The item icon is %dpx wide. Default: %.0fpx.",
-                         96, DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING);
-                ImGui::SetTooltip("%s", tooltip_buffer);
-            }
-        }
-
-        // --- Custom Row 3 Spacing ---
-        ImGui::Checkbox("Custom Row 3 Spacing", &temp_settings.overlay_row3_custom_spacing_enabled);
-        if (ImGui::IsItemHovered()) {
-            char tooltip_buffer[512];
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Check this to override the dynamic width calculation for Row 3 items.\n"
-                     "This allows you to set a fixed, uniform width for all items in this row.");
-            ImGui::SetTooltip("%s", tooltip_buffer);
-        }
-
         if (temp_settings.overlay_row3_custom_spacing_enabled) {
             ImGui::SameLine();
             ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
@@ -1359,61 +1310,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         }
     }
 
-    // --- Background Texture Settings ---
-    ImGui::SeparatorText("Background Textures");
-
-    // Helper lambda for Browse button and text display
-    auto RenderBackgroundSetting = [&
-            ](const char *label, char *path_buffer, size_t buffer_size, const char *setting_id) {
-        ImGui::Text("%s:", label);
-        ImGui::SameLine();
-        ImGui::TextWrapped("%s", path_buffer); // Display current path, wrapped
-
-        ImGui::SameLine(); // Align button to the right
-        char button_label[64];
-        snprintf(button_label, sizeof(button_label), "Browse##%s", setting_id);
-        if (ImGui::Button(button_label)) {
-            char selected_file[MAX_PATH_LENGTH];
-            if (open_gui_texture_dialog(selected_file, sizeof(selected_file))) {
-                strncpy(path_buffer, selected_file, buffer_size - 1);
-                path_buffer[buffer_size - 1] = '\0';
-            }
-        }
-        if (ImGui::IsItemHovered()) {
-            char tooltip_buffer[512];
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Select the background texture for %s items.\n"
-                     "Textures should ideally be square (e.g., 24x24 pixels - scaled to 96x96 pixels).\n"
-                     "Must be a .png or .gif file located inside the resources/gui folder.", label);
-            ImGui::SetTooltip("%s", tooltip_buffer);
-        }
-    };
-
-    RenderBackgroundSetting("Default", temp_settings.adv_bg_path, sizeof(temp_settings.adv_bg_path),
-                            "DefaultBg");
-    RenderBackgroundSetting("Half-Done", temp_settings.adv_bg_half_done_path,
-                            sizeof(temp_settings.adv_bg_half_done_path), "HalfDoneBg");
-    RenderBackgroundSetting("Done", temp_settings.adv_bg_done_path, sizeof(temp_settings.adv_bg_done_path),
-                            "DoneBg");
-
-    // Duplicate Texture Warning
-    bool duplicate_warning = false;
-    if (strcmp(temp_settings.adv_bg_path, temp_settings.adv_bg_half_done_path) == 0 && temp_settings.adv_bg_path[0] !=
-        '\0')
-        duplicate_warning = true;
-    if (strcmp(temp_settings.adv_bg_path, temp_settings.adv_bg_done_path) == 0 && temp_settings.adv_bg_path[0] != '\0')
-        duplicate_warning = true;
-    if (strcmp(temp_settings.adv_bg_half_done_path, temp_settings.adv_bg_done_path) == 0 && temp_settings.
-        adv_bg_half_done_path[0] != '\0')
-        duplicate_warning = true;
-
-    if (duplicate_warning) {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.8f, 0.0f, 1.0f)); // Yellow text
-        ImGui::TextWrapped(
-            "Warning: Using the same texture for multiple states makes it harder to distinguish completion status.");
-        ImGui::PopStyleColor();
-    }
-
     // --- UI Theme Colors Section ---
     ImGui::SeparatorText("UI Theme Colors");
 
@@ -1505,8 +1401,61 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
         ImGui::TreePop();
     }
-    ImGui::Separator();
-    ImGui::Spacing();
+
+    // --- Background Texture Settings ---
+    ImGui::SeparatorText("Background Textures");
+
+    // Helper lambda for Browse button and text display
+    auto RenderBackgroundSetting = [&
+            ](const char *label, char *path_buffer, size_t buffer_size, const char *setting_id) {
+        ImGui::Text("%s:", label);
+        ImGui::SameLine();
+        ImGui::TextWrapped("%s", path_buffer); // Display current path, wrapped
+
+        ImGui::SameLine(); // Align button to the right
+        char button_label[64];
+        snprintf(button_label, sizeof(button_label), "Browse##%s", setting_id);
+        if (ImGui::Button(button_label)) {
+            char selected_file[MAX_PATH_LENGTH];
+            if (open_gui_texture_dialog(selected_file, sizeof(selected_file))) {
+                strncpy(path_buffer, selected_file, buffer_size - 1);
+                path_buffer[buffer_size - 1] = '\0';
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[512];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Select the background texture for %s items.\n"
+                     "Textures should ideally be square (e.g., 24x24 pixels - scaled to 96x96 pixels).\n"
+                     "Must be a .png or .gif file located inside the resources/gui folder.", label);
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+    };
+
+    RenderBackgroundSetting("Default", temp_settings.adv_bg_path, sizeof(temp_settings.adv_bg_path),
+                            "DefaultBg");
+    RenderBackgroundSetting("Half-Done", temp_settings.adv_bg_half_done_path,
+                            sizeof(temp_settings.adv_bg_half_done_path), "HalfDoneBg");
+    RenderBackgroundSetting("Done", temp_settings.adv_bg_done_path, sizeof(temp_settings.adv_bg_done_path),
+                            "DoneBg");
+
+    // Duplicate Texture Warning
+    bool duplicate_warning = false;
+    if (strcmp(temp_settings.adv_bg_path, temp_settings.adv_bg_half_done_path) == 0 && temp_settings.adv_bg_path[0] !=
+        '\0')
+        duplicate_warning = true;
+    if (strcmp(temp_settings.adv_bg_path, temp_settings.adv_bg_done_path) == 0 && temp_settings.adv_bg_path[0] != '\0')
+        duplicate_warning = true;
+    if (strcmp(temp_settings.adv_bg_half_done_path, temp_settings.adv_bg_done_path) == 0 && temp_settings.
+        adv_bg_half_done_path[0] != '\0')
+        duplicate_warning = true;
+
+    if (duplicate_warning) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.8f, 0.0f, 1.0f)); // Yellow text
+        ImGui::TextWrapped(
+            "Warning: Using the same texture for multiple states makes it harder to distinguish completion status.");
+        ImGui::PopStyleColor();
+    }
 
     ImGui::SeparatorText("Fonts");
 
@@ -1631,6 +1580,132 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                            "Click 'Restart Advancely' to properly apply these font/size changes.");
     }
 
+    // --- Spacing Settings ---
+    ImGui::SeparatorText("Tracker Spacing");
+
+    // --- Custom Tracker Section Width ---
+    ImGui::Text("Custom Section Item Width");
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buffer[512];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Enable and adjust the horizontal width (in pixels) for *each item* within a section.\n"
+                 "This overrides the dynamic width calculation. WARNING: Small values will cause text to overlap.\n"
+                 "Sections not available in the selected template version will be hidden.");
+        ImGui::SetTooltip("%s", tooltip_buffer);
+    }
+
+    ImGui::Indent();
+
+    // We use the already-calculated selected_version and its labels
+    for (int i = 0; i < SECTION_COUNT; ++i) {
+        TrackerSection section_id = (TrackerSection) i;
+        bool is_visible = true;
+        const char *label = TRACKER_SECTION_NAMES[i];
+        char checkbox_label[128];
+
+        if (section_id == SECTION_ADVANCEMENTS) {
+            label = advancements_label_plural_uppercase;
+        } else if (section_id == SECTION_RECIPES && selected_version < MC_VERSION_1_12) {
+            is_visible = false; // Hide Recipes for legacy/mid
+        } else if (section_id == SECTION_UNLOCKS && selected_version != MC_VERSION_25W14CRAFTMINE) {
+            is_visible = false; // Hide Unlocks for non-Craftmine
+        }
+
+        if (is_visible) {
+            snprintf(checkbox_label, sizeof(checkbox_label), "%s Width", label);
+            ImGui::Checkbox(checkbox_label, &temp_settings.tracker_section_custom_width_enabled[i]);
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buffer[512];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Check this to override the dynamic width calculation for items in the '%s' section.\n"
+                         "This allows you to set a fixed, uniform total width for all items in this row.",
+                         label);
+                ImGui::SetTooltip("%s", tooltip_buffer);
+            }
+
+            if (temp_settings.tracker_section_custom_width_enabled[i]) {
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
+                char slider_label[128];
+                snprintf(slider_label, sizeof(slider_label), "##%sWidthSlider", label);
+                ImGui::DragFloat(slider_label, &temp_settings.tracker_section_custom_item_width[i], 1.0f, 96.0f,
+                                 2048.0f, "%.0f px");
+                if (ImGui::IsItemHovered()) {
+                    char tooltip_buffer[512];
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "Item width for %s. WARNING: Text may overlap if too small.\n"
+                             "The item icon is %dpx wide. Default: %.0fpx",
+                             label, 96, DEFAULT_TRACKER_SECTION_ITEM_WIDTH);
+                    ImGui::SetTooltip("%s", tooltip_buffer);
+                }
+            }
+        }
+    }
+    ImGui::Unindent();
+
+    // --- Tracker Vertical Spacing ---
+    ImGui::DragFloat("Tracker Vertical Spacing", &temp_settings.tracker_vertical_spacing, 1.0f, 0.0f, 1024.0f,
+                     "%.0f px");
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buffer[256];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Adjusts the vertical gap (in pixels) between rows of items in the tracker window\n"
+                 "for all sections. Default: %.1f px",
+                 DEFAULT_TRACKER_VERTICAL_SPACING);
+        ImGui::SetTooltip("%s", tooltip_buffer);
+    }
+
+    ImGui::SeparatorText("Overlay Horizontal Spacing");
+
+    ImGui::DragFloat("Row 1 Icon Spacing", &temp_settings.overlay_row1_spacing, 1.0f, 0.0f, 7680.0f, "%.0f px");
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buffer[256];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Adjusts the horizontal gap (in pixels) between icons\n"
+                 "in the top row (Row 1) of the overlay.\n"
+                 "The horizontal spacing of the 2nd and 3rd row\n"
+                 "depends on the length of the display text.\n"
+                 "Default: %.0f px",
+                 DEFAULT_OVERLAY_ROW1_SPACING);
+        ImGui::SetTooltip("%s", tooltip_buffer);
+    }
+
+    // --- Custom Row 2 Spacing ---
+    ImGui::Checkbox("Custom Row 2 Spacing", &temp_settings.overlay_row2_custom_spacing_enabled);
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buffer[512];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Check this to override the dynamic width calculation for Row 2 items.\n"
+                 "This allows you to set a fixed, uniform width for all items in this row.");
+        ImGui::SetTooltip("%s", tooltip_buffer);
+    }
+
+    if (temp_settings.overlay_row2_custom_spacing_enabled) {
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
+        ImGui::DragFloat("Row 2 Item Width", &temp_settings.overlay_row2_custom_spacing, 1.0f, 96.0f, 7680.0f,
+                         "%.0f px");
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[512];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Sets the total horizontal width (in pixels) for each item in Row 2.\n"
+                     "WARNING: If this value is too small, item text will overlap.\n"
+                     "The item icon is %dpx wide. Default: %.0fpx.",
+                     96, DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING);
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+    }
+
+    // --- Custom Row 3 Spacing ---
+    ImGui::Checkbox("Custom Row 3 Spacing", &temp_settings.overlay_row3_custom_spacing_enabled);
+    if (ImGui::IsItemHovered()) {
+        char tooltip_buffer[512];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Check this to override the dynamic width calculation for Row 3 items.\n"
+                 "This allows you to set a fixed, uniform width for all items in this row.");
+        ImGui::SetTooltip("%s", tooltip_buffer);
+    }
+
     ImGui::Separator();
     ImGui::Spacing();
 
@@ -1706,69 +1781,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::EndDragDropTarget();
         }
     }
-
-    ImGui::Separator();
-    ImGui::Spacing();
-
-    // --- Custom Tracker Section Width ---
-    ImGui::Text("Custom Section Item Width");
-    if (ImGui::IsItemHovered()) {
-        char tooltip_buffer[512];
-        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                 "Enable and adjust the horizontal width (in pixels) for *each item* within a section.\n"
-                 "This overrides the dynamic width calculation. WARNING: Small values will cause text to overlap.\n"
-                 "Sections not available in the selected template version will be hidden.");
-        ImGui::SetTooltip("%s", tooltip_buffer);
-    }
-
-    ImGui::Indent();
-
-    // We use the already-calculated selected_version and its labels
-    for (int i = 0; i < SECTION_COUNT; ++i) {
-        TrackerSection section_id = (TrackerSection) i;
-        bool is_visible = true;
-        const char *label = TRACKER_SECTION_NAMES[i];
-        char checkbox_label[128];
-
-        if (section_id == SECTION_ADVANCEMENTS) {
-            label = advancements_label_plural_uppercase;
-        } else if (section_id == SECTION_RECIPES && selected_version < MC_VERSION_1_12) {
-            is_visible = false; // Hide Recipes for legacy/mid
-        } else if (section_id == SECTION_UNLOCKS && selected_version != MC_VERSION_25W14CRAFTMINE) {
-            is_visible = false; // Hide Unlocks for non-Craftmine
-        }
-
-        if (is_visible) {
-            snprintf(checkbox_label, sizeof(checkbox_label), "%s Width", label);
-            ImGui::Checkbox(checkbox_label, &temp_settings.tracker_section_custom_width_enabled[i]);
-            if (ImGui::IsItemHovered()) {
-                char tooltip_buffer[512];
-                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "Check this to override the dynamic width calculation for items in the '%s' section.\n"
-                         "This allows you to set a fixed, uniform total width for all items in this row.",
-                         label);
-                ImGui::SetTooltip("%s", tooltip_buffer);
-            }
-
-            if (temp_settings.tracker_section_custom_width_enabled[i]) {
-                ImGui::SameLine();
-                ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
-                char slider_label[128];
-                snprintf(slider_label, sizeof(slider_label), "##%sWidthSlider", label);
-                ImGui::DragFloat(slider_label, &temp_settings.tracker_section_custom_item_width[i], 1.0f, 96.0f,
-                                 2048.0f, "%.0f px");
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buffer[512];
-                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                             "Item width for %s. WARNING: Text may overlap if too small.\n"
-                             "The item icon is %dpx wide. Default: %.0fpx",
-                             label, 96, DEFAULT_TRACKER_SECTION_ITEM_WIDTH);
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
-            }
-        }
-    }
-    ImGui::Unindent();
 
     ImGui::Separator();
     ImGui::Spacing();
@@ -2115,6 +2127,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Half-Done Background: %s\n"
                  "  - Done Background: %s\n"
                  "  - Notes Use Settings Font: %s\n"
+                 "  - Tracker Vertical Spacing: %.1f px\n"
                  "  - Print Debug To Console: %s\n"
                  "  - Check For Updates: %s\n"
                  "  - Show Welcome on Startup: %s\n\n"
@@ -2152,6 +2165,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_ADV_BG_HALF_DONE_PATH,
                  DEFAULT_ADV_BG_DONE_PATH,
                  DEFAULT_NOTES_USE_ROBOTO ? "Enabled" : "Disabled",
+                 DEFAULT_TRACKER_VERTICAL_SPACING,
                  DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled",
                  DEFAULT_CHECK_FOR_UPDATES ? "Enabled" : "Disabled",
                  DEFAULT_SHOW_WELCOME_ON_STARTUP ? "Enabled" : "Disabled"

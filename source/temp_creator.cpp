@@ -6465,7 +6465,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char create_files_tooltip_buffer[256];
             snprintf(create_files_tooltip_buffer, sizeof(create_files_tooltip_buffer),
-                     "Create the template and language files on disk.\nYou can also press Enter.");
+                     "Create the template and language files on disk.\nYou can also press ENTER.");
             ImGui::SetTooltip("%s", create_files_tooltip_buffer);
         }
         // Display status/error message
@@ -6537,7 +6537,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char confirm_copy_tooltip_buffer[256];
             snprintf(confirm_copy_tooltip_buffer, sizeof(confirm_copy_tooltip_buffer),
-                     "Create a copy of the selected template with the new name.\nYou can also press Enter.");
+                     "Create a copy of the selected template with the new name.\nYou can also press ENTER.");
             ImGui::SetTooltip("%s", confirm_copy_tooltip_buffer);
         }
         // Display status/error message

@@ -242,7 +242,8 @@ PathMode settings_get_path_mode_from_string(const char *mode_str) {
  * @param out_buffer The buffer to write the formatted string into.
  * @param buffer_size The size of the output buffer.
  */
-static void generate_display_category_name(const char* category, const char* flag, char* out_buffer, size_t buffer_size) {
+static void generate_display_category_name(const char *category, const char *flag, char *out_buffer,
+                                           size_t buffer_size) {
     if (!out_buffer || buffer_size == 0) return;
 
     char formatted_category[MAX_PATH_LENGTH];
@@ -310,6 +311,8 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_row3_remove_completed = DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED;
     settings->overlay_stat_cycle_speed = DEFAULT_OVERLAY_STAT_CYCLE_SPEED;
 
+    settings->tracker_vertical_spacing = DEFAULT_TRACKER_VERTICAL_SPACING;
+
     // Custom Tracker Spacing
     for (int i = 0; i < SECTION_COUNT; i++) {
         settings->tracker_section_custom_width_enabled[i] = DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED;
@@ -349,7 +352,8 @@ void settings_set_defaults(AppSettings *settings) {
     // Background textures
     strncpy(settings->adv_bg_path, DEFAULT_ADV_BG_PATH, sizeof(settings->adv_bg_path) - 1);
     settings->adv_bg_path[sizeof(settings->adv_bg_path) - 1] = '\0';
-    strncpy(settings->adv_bg_half_done_path, DEFAULT_ADV_BG_HALF_DONE_PATH, sizeof(settings->adv_bg_half_done_path) - 1);
+    strncpy(settings->adv_bg_half_done_path, DEFAULT_ADV_BG_HALF_DONE_PATH,
+            sizeof(settings->adv_bg_half_done_path) - 1);
     settings->adv_bg_half_done_path[sizeof(settings->adv_bg_half_done_path) - 1] = '\0';
     strncpy(settings->adv_bg_done_path, DEFAULT_ADV_BG_DONE_PATH, sizeof(settings->adv_bg_done_path) - 1);
     settings->adv_bg_done_path[sizeof(settings->adv_bg_done_path) - 1] = '\0';
@@ -429,7 +433,8 @@ bool settings_load(AppSettings *settings) {
 
     const cJSON *display_version_json = cJSON_GetObjectItem(json, "display_version");
     if (display_version_json && cJSON_IsString(display_version_json)) {
-        strncpy(settings->display_version_str, display_version_json->valuestring, sizeof(settings->display_version_str) - 1);
+        strncpy(settings->display_version_str, display_version_json->valuestring,
+                sizeof(settings->display_version_str) - 1);
         settings->display_version_str[sizeof(settings->display_version_str) - 1] = '\0';
     } else {
         // Default to the loaded template version if missing
@@ -461,7 +466,8 @@ bool settings_load(AppSettings *settings) {
 
     const cJSON *category_display_json = cJSON_GetObjectItem(json, "category_display_name");
     if (category_display_json && cJSON_IsString(category_display_json)) {
-        strncpy(settings->category_display_name, category_display_json->valuestring, sizeof(settings->category_display_name) - 1);
+        strncpy(settings->category_display_name, category_display_json->valuestring,
+                sizeof(settings->category_display_name) - 1);
         settings->category_display_name[sizeof(settings->category_display_name) - 1] = '\0';
     } else {
         // If missing, generate it from the loaded category and flag
@@ -746,6 +752,14 @@ bool settings_load(AppSettings *settings) {
                        &DEFAULT_OVERLAY_TEXT_COLOR))
             defaults_were_used = true;
 
+        const cJSON *vertical_spacing_json = cJSON_GetObjectItem(visual_settings, "tracker_vertical_spacing");
+        if (vertical_spacing_json && cJSON_IsNumber(vertical_spacing_json)) {
+            settings->tracker_vertical_spacing = (float) vertical_spacing_json->valuedouble;
+        } else {
+            settings->tracker_vertical_spacing = DEFAULT_TRACKER_VERTICAL_SPACING;
+            defaults_were_used = true;
+        }
+
         // --- Load Background Paths ---
         const cJSON *bg_path_json = cJSON_GetObjectItem(visual_settings, "adv_bg_path");
         if (bg_path_json && cJSON_IsString(bg_path_json)) {
@@ -759,10 +773,12 @@ bool settings_load(AppSettings *settings) {
 
         const cJSON *bg_half_path_json = cJSON_GetObjectItem(visual_settings, "adv_bg_half_done_path");
         if (bg_half_path_json && cJSON_IsString(bg_half_path_json)) {
-            strncpy(settings->adv_bg_half_done_path, bg_half_path_json->valuestring, sizeof(settings->adv_bg_half_done_path) - 1);
+            strncpy(settings->adv_bg_half_done_path, bg_half_path_json->valuestring,
+                    sizeof(settings->adv_bg_half_done_path) - 1);
             settings->adv_bg_half_done_path[sizeof(settings->adv_bg_half_done_path) - 1] = '\0';
         } else {
-            strncpy(settings->adv_bg_half_done_path, DEFAULT_ADV_BG_HALF_DONE_PATH, sizeof(settings->adv_bg_half_done_path) - 1);
+            strncpy(settings->adv_bg_half_done_path, DEFAULT_ADV_BG_HALF_DONE_PATH,
+                    sizeof(settings->adv_bg_half_done_path) - 1);
             settings->adv_bg_half_done_path[sizeof(settings->adv_bg_half_done_path) - 1] = '\0';
             defaults_were_used = true;
         }
@@ -779,7 +795,7 @@ bool settings_load(AppSettings *settings) {
 
         const cJSON *row1_spacing_json = cJSON_GetObjectItem(visual_settings, "overlay_row1_spacing");
         if (row1_spacing_json && cJSON_IsNumber(row1_spacing_json)) {
-            settings->overlay_row1_spacing = (float)row1_spacing_json->valuedouble;
+            settings->overlay_row1_spacing = (float) row1_spacing_json->valuedouble;
         } else {
             settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING;
             defaults_were_used = true;
@@ -795,7 +811,7 @@ bool settings_load(AppSettings *settings) {
 
         const cJSON *row2_custom_spacing = cJSON_GetObjectItem(visual_settings, "overlay_row2_custom_spacing");
         if (row2_custom_spacing && cJSON_IsNumber(row2_custom_spacing))
-            settings->overlay_row2_custom_spacing = (float)row2_custom_spacing->valuedouble;
+            settings->overlay_row2_custom_spacing = (float) row2_custom_spacing->valuedouble;
         else {
             settings->overlay_row2_custom_spacing = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING;
             defaults_were_used = true;
@@ -811,7 +827,7 @@ bool settings_load(AppSettings *settings) {
 
         const cJSON *row3_custom_spacing = cJSON_GetObjectItem(visual_settings, "overlay_row3_custom_spacing");
         if (row3_custom_spacing && cJSON_IsNumber(row3_custom_spacing))
-            settings->overlay_row3_custom_spacing = (float)row3_custom_spacing->valuedouble;
+            settings->overlay_row3_custom_spacing = (float) row3_custom_spacing->valuedouble;
         else {
             settings->overlay_row3_custom_spacing = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING;
             defaults_were_used = true;
@@ -819,8 +835,10 @@ bool settings_load(AppSettings *settings) {
 
 
         // --- Load Custom Tracker Spacing ---
-        const cJSON *tracker_custom_enabled_array = cJSON_GetObjectItem(visual_settings, "tracker_section_custom_width_enabled");
-        if (cJSON_IsArray(tracker_custom_enabled_array) && cJSON_GetArraySize(tracker_custom_enabled_array) == SECTION_COUNT) {
+        const cJSON *tracker_custom_enabled_array = cJSON_GetObjectItem(
+            visual_settings, "tracker_section_custom_width_enabled");
+        if (cJSON_IsArray(tracker_custom_enabled_array) && cJSON_GetArraySize(tracker_custom_enabled_array) ==
+            SECTION_COUNT) {
             for (int i = 0; i < SECTION_COUNT; i++) {
                 cJSON *item = cJSON_GetArrayItem(tracker_custom_enabled_array, i);
                 settings->tracker_section_custom_width_enabled[i] = cJSON_IsTrue(item);
@@ -837,7 +855,7 @@ bool settings_load(AppSettings *settings) {
             for (int i = 0; i < SECTION_COUNT; i++) {
                 cJSON *item = cJSON_GetArrayItem(tracker_width_array, i);
                 if (cJSON_IsNumber(item)) {
-                    settings->tracker_section_custom_item_width[i] = (float)item->valuedouble;
+                    settings->tracker_section_custom_item_width[i] = (float) item->valuedouble;
                 } else {
                     settings->tracker_section_custom_item_width[i] = DEFAULT_TRACKER_SECTION_ITEM_WIDTH;
                     defaults_were_used = true;
@@ -895,6 +913,8 @@ bool settings_load(AppSettings *settings) {
         settings->overlay_row3_custom_spacing_enabled = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED;
         settings->overlay_row3_custom_spacing = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING;
 
+        settings->tracker_vertical_spacing = DEFAULT_TRACKER_VERTICAL_SPACING;
+
         // Custom Tracker Spacing Defaults
         for (int i = 0; i < SECTION_COUNT; i++) {
             settings->tracker_section_custom_width_enabled[i] = DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED;
@@ -904,7 +924,8 @@ bool settings_load(AppSettings *settings) {
         // --- Ensure defaults if visuals missing ---
         strncpy(settings->adv_bg_path, DEFAULT_ADV_BG_PATH, sizeof(settings->adv_bg_path) - 1);
         settings->adv_bg_path[sizeof(settings->adv_bg_path) - 1] = '\0';
-        strncpy(settings->adv_bg_half_done_path, DEFAULT_ADV_BG_HALF_DONE_PATH, sizeof(settings->adv_bg_half_done_path) - 1);
+        strncpy(settings->adv_bg_half_done_path, DEFAULT_ADV_BG_HALF_DONE_PATH,
+                sizeof(settings->adv_bg_half_done_path) - 1);
         settings->adv_bg_half_done_path[sizeof(settings->adv_bg_half_done_path) - 1] = '\0';
         strncpy(settings->adv_bg_done_path, DEFAULT_ADV_BG_DONE_PATH, sizeof(settings->adv_bg_done_path) - 1);
         settings->adv_bg_done_path[sizeof(settings->adv_bg_done_path) - 1] = '\0';
@@ -992,7 +1013,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(general_obj, "tracker_font_size");
         cJSON_AddItemToObject(general_obj, "tracker_font_size", cJSON_CreateNumber(settings->tracker_font_size));
         cJSON_DeleteItemFromObject(general_obj, "tracker_sub_font_size");
-        cJSON_AddItemToObject(general_obj, "tracker_sub_font_size", cJSON_CreateNumber(settings->tracker_sub_font_size));
+        cJSON_AddItemToObject(general_obj, "tracker_sub_font_size",
+                              cJSON_CreateNumber(settings->tracker_sub_font_size));
         cJSON_DeleteItemFromObject(general_obj, "tracker_ui_font_size");
         cJSON_AddItemToObject(general_obj, "tracker_ui_font_size", cJSON_CreateNumber(settings->tracker_ui_font_size));
         cJSON_DeleteItemFromObject(general_obj, "overlay_font_name");
@@ -1080,11 +1102,16 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         save_color(visuals_obj, "text_color", &settings->text_color);
         save_color(visuals_obj, "overlay_text_color", &settings->overlay_text_color);
 
+        cJSON_DeleteItemFromObject(visuals_obj, "tracker_vertical_spacing");
+        cJSON_AddItemToObject(visuals_obj, "tracker_vertical_spacing",
+                              cJSON_CreateNumber(settings->tracker_vertical_spacing));
+
         // --- Save Background Paths ---
         cJSON_DeleteItemFromObject(visuals_obj, "adv_bg_path");
         cJSON_AddItemToObject(visuals_obj, "adv_bg_path", cJSON_CreateString(settings->adv_bg_path));
         cJSON_DeleteItemFromObject(visuals_obj, "adv_bg_half_done_path");
-        cJSON_AddItemToObject(visuals_obj, "adv_bg_half_done_path", cJSON_CreateString(settings->adv_bg_half_done_path));
+        cJSON_AddItemToObject(visuals_obj, "adv_bg_half_done_path",
+                              cJSON_CreateString(settings->adv_bg_half_done_path));
         cJSON_DeleteItemFromObject(visuals_obj, "adv_bg_done_path");
         cJSON_AddItemToObject(visuals_obj, "adv_bg_done_path", cJSON_CreateString(settings->adv_bg_done_path));
 
@@ -1092,14 +1119,18 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(visuals_obj, "overlay_row1_spacing", cJSON_CreateNumber(settings->overlay_row1_spacing));
 
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row2_custom_spacing_enabled");
-        cJSON_AddItemToObject(visuals_obj, "overlay_row2_custom_spacing_enabled", cJSON_CreateBool(settings->overlay_row2_custom_spacing_enabled));
+        cJSON_AddItemToObject(visuals_obj, "overlay_row2_custom_spacing_enabled",
+                              cJSON_CreateBool(settings->overlay_row2_custom_spacing_enabled));
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row2_custom_spacing");
-        cJSON_AddItemToObject(visuals_obj, "overlay_row2_custom_spacing", cJSON_CreateNumber(settings->overlay_row2_custom_spacing));
+        cJSON_AddItemToObject(visuals_obj, "overlay_row2_custom_spacing",
+                              cJSON_CreateNumber(settings->overlay_row2_custom_spacing));
 
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row3_custom_spacing_enabled");
-        cJSON_AddItemToObject(visuals_obj, "overlay_row3_custom_spacing_enabled", cJSON_CreateBool(settings->overlay_row3_custom_spacing_enabled));
+        cJSON_AddItemToObject(visuals_obj, "overlay_row3_custom_spacing_enabled",
+                              cJSON_CreateBool(settings->overlay_row3_custom_spacing_enabled));
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row3_custom_spacing");
-        cJSON_AddItemToObject(visuals_obj, "overlay_row3_custom_spacing", cJSON_CreateNumber(settings->overlay_row3_custom_spacing));
+        cJSON_AddItemToObject(visuals_obj, "overlay_row3_custom_spacing",
+                              cJSON_CreateNumber(settings->overlay_row3_custom_spacing));
 
         // --- Save Custom Tracker Spacing ---
         cJSON_DeleteItemFromObject(visuals_obj, "tracker_section_custom_width_enabled");
@@ -1107,7 +1138,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON *width_enabled_array = cJSON_CreateArray();
         if (width_enabled_array) {
             for (int i = 0; i < SECTION_COUNT; i++) {
-                cJSON_AddItemToArray(width_enabled_array, cJSON_CreateBool(settings->tracker_section_custom_width_enabled[i]));
+                cJSON_AddItemToArray(width_enabled_array,
+                                     cJSON_CreateBool(settings->tracker_section_custom_width_enabled[i]));
             }
         }
         cJSON_AddItemToObject(visuals_obj, "tracker_section_custom_width_enabled", width_enabled_array);

@@ -3135,7 +3135,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
     float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
 
     // Adjust vertical spacing -> need to do this for all render_*_section functions
-    const float vertical_spacing = 16.0f;
+    const float vertical_spacing = settings->tracker_vertical_spacing; // Changed from 16.0f
 
     // complex_pass = false -> Render all advancements/stats with no criteria or sub-stats (simple items)
     // complex_pass = true -> Render all advancements/stats with criteria or sub-stats (complex items)
@@ -3395,7 +3395,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
                     }
                     ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor); // Scaled size on screen
-                    ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level,
+                    ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, // 16.0f to CENTER the icons
                                               screen_pos.y + 16.0f * t->zoom_level); // Top-left of 64x64 box on screen
                     ImVec2 icon_padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
                                                  (target_box_size.y - scaled_size.y) * 0.5f); // Padding within the box
@@ -3852,7 +3852,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
     float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
 
     // Adjust vertical spacing -> need to do this for all render_*_section functions
-    const float vertical_spacing = 16.0f;
+    const float vertical_spacing = settings->tracker_vertical_spacing; // Changed from 16.0f
 
     // --- Rendering Loop ---
     for (int i = 0; i < count; i++) {
@@ -3976,7 +3976,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                     scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
                 }
                 ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor); // Scaled size on screen
-                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
+                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level); // 16.0f to CENTER the icons
                 // Top-left of 64x64 box on screen
                 ImVec2 icon_padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
                                              (target_box_size.y - scaled_size.y) * 0.5f); // Padding within the box
@@ -4181,7 +4181,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
     float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
 
     // Adjust vertical spacing
-    const float vertical_spacing = 16.0f;
+    const float vertical_spacing = settings->tracker_vertical_spacing; // Changed from 16.0f
 
 
     // --- Rendering Loop ---
@@ -4328,7 +4328,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                     scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
                 }
                 ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor); // Scaled size on screen
-                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
+                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level); // 16.0f to CENTER the icons
                 // Top-left of 64x64 box on screen
                 ImVec2 icon_padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
                                              (target_box_size.y - scaled_size.y) * 0.5f); // Padding within the box
@@ -4615,7 +4615,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
     float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
     // Adjust vertical spacing
-    const float vertical_spacing = 16.0f;
+    const float vertical_spacing = settings->tracker_vertical_spacing; // Changed from 16.0f
 
 
     // --- Rendering Loop ---
@@ -4769,7 +4769,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                     scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
                 }
                 ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor); // Scaled size on screen
-                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
+                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level); // 16.0f to CENTER the icons
                 // Top-left of 64x64 box on screen
                 ImVec2 icon_padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
                                              (target_box_size.y - scaled_size.y) * 0.5f); // Padding within the box
