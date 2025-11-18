@@ -170,48 +170,34 @@ Your download contains the Advancely application (`.exe` on Windows, `.app` on m
 
 **macOS Instructions**
 
-Due to macOS security (Gatekeeper), you will need to perform a one-time bypass to authorize the application after
-downloading it.
+Due to macOS security (Gatekeeper), you will need to perform a one-time bypass to authorize the application.
 
-✔️ **First-Time Run Steps (Easy Method):**
+✔️ **Method 1: The Right-Click Trick**
 
-1. After downloading and unzipping, try to open `Advancely.app`. You will likely see an error saying Apple cannot check
-   it for malicious software. Click **OK**.
-2. Now, **right-click** (or Control-click) the `Advancely.app` file and select **Open** from the menu.
-3. A different warning will appear, but this time you will have an **Open** button. Click it.
-4. macOS will now remember that you trust this application. You only need to do this once and can open it normally by
-   double-clicking from now on.
+1. Move `Advancely.app` and the `resources` folder to your Applications folder or Desktop.
+2. **Right-click** (or Control-click) the `Advancely.app` file and select **Open** from the menu.
+3. A warning will appear allowing you to click **Open**. macOS will now remember that you trust this application.
 
-✔️ **Alternative Method (Terminal Authorization):**
+✔️ **Method 2: System Settings (If Method 1 fails)**
+If the app still refuses to open:
 
-1. Open the **Terminal** app.
-2. Type `xattr -cr ` (note the space at the end) but **do not** press Enter yet.
-3. Drag the `Advancely.app` file from Finder and drop it directly onto the Terminal window.
-4. The command should now look similar to this: `xattr -cr /path/to/your/Advancely.app`.
-5. Press **Enter**.
-6. You can now open `Advancely.app` normally. This command only needs to be run once.
+1. Open **System Settings** -> **Privacy & Security**.
+2. Scroll down to the **Security** section.
+3. Look for a message stating "Advancely was blocked...".
+4. Click **Open Anyway** and confirm with your password.
 
-✔️ **Running from the Terminal (for Debugging):**
-
-If you are having trouble opening the app or want to see live debug messages, you can run it directly from the Terminal.
+✔️ **Method 3: Terminal Authorization**
+If you still encounter issues, you can strip the quarantine tags manually:
 
 1. Open the **Terminal** app.
-2. Type `cd ` (with a space at the end).
-3. Drag the **folder** that contains `Advancely.app` and the `resources` folder onto the Terminal window, then press *
-   *Enter**.
-4. Run the executable with this command: `./Advancely.app/Contents/MacOS/Advancely`
-5. Any errors or log messages will now appear directly in your Terminal window.
-
-✔️ **Recommended Installation:**
-
-* For the best experience, move **both** `Advancely.app` and the `resources` folder into your main `/Applications`
-  folder.
-* You can then drag `Advancely.app` from the Applications folder to your Dock to create a shortcut.
+2. Type `xattr -cr ` (note the space at the end).
+3. Drag the `Advancely.app` file from Finder onto the Terminal window.
+4. Press **Enter**.
 
 **Windows & Linux Instructions**
 
-Your application folder contains the main executable, required library files (like `.dll` files on Windows and `.so`
-files on Linux), and the `resources` folder. The executable must always stay in the same folder as its supporting files.
+Your application folder contains the main executable, required library files, and the `resources` folder. The executable
+must always stay in the same folder as its supporting files.
 
 ✔️ **Correct Way to Run:**
 

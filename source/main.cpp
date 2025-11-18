@@ -549,6 +549,29 @@ int main(int argc, char *argv[]) {
     // Seed random number generator once at startup
     srand(time(nullptr));
 
+    // FIX for MACOS WORKING DIRECTORY if inside a .app bundle
+#if defined(__APPLE__)
+    char mac_exe_path[MAX_PATH_LENGTH];
+    if (get_executable_path(mac_exe_path, sizeof(mac_exe_path))) {
+        // Check if its running inside an app bundle
+        // Path typically looks like: /Path/To/Folder/Advancely.app/Contents/MacOS/Advancely
+        char *app_bundle_pos = strstr(mac_exe_path, ".app/");
+        if (app_bundle_pos) {
+            // Set the working directory to the app bundle's Resources folder
+            char base_dir[MAX_PATH_LENGTH];
+            if (get_parent_directory(mac_exe_path, base_dir, sizeof(base_dir), 4)) {
+                // Change working directory to the folder containing the .app and resources
+                if (chdir(base_dir) != 0) {
+                    log_message(LOG_ERROR, "[MAIN] Failed to change working directory to: %s\n", base_dir);
+                } else {
+                    // log_message not init yet, but printf works for console debug
+                    printf("[MAIN] macOS Bundle detected. Set CWD to: %s\n", base_dir);
+                }
+            }
+        }
+    }
+#endif
+
     // TODO: Handle proper quitting for github action runners 5s test
     // Add a simple test/version flag that can run without a GUI
     // This communicates with the build.yml file, where the gtimeout or timeout are
