@@ -66,8 +66,10 @@ extern "C" {
 #ifdef _WIN32
 #include <windows.h>
 #include <direct.h>
+#define GetCurrentDir _getcwd
 #else
 #include <unistd.h> // For fork, execv, kill
+#define GetCurrentDir getcwd
 #include <sys/types.h> // For pid_t
 #include <sys/wait.h> // For waitpid
 #include <signal.h> // For SIGKILL
@@ -893,9 +895,24 @@ int main(int argc, char *argv[]) {
     // Check for write permissions in the current directory before doing anything else
     FILE *write_test = fopen(".advancely-write-test", "w");
     if (write_test == nullptr) {
-        show_error_message("Permission Error",
-                           "Advancely does not have permission to write files in this folder.\nPlease move it to another location (e.g., your Desktop or Documents folder) and run it again.");
-        log_message(LOG_ERROR, "CRITICAL: Failed to get write permissions in the application directory. Exiting.\n");
+        // Get current working directory for the error message
+        char cwd[MAX_PATH_LENGTH];
+        if (GetCurrentDir(cwd, sizeof(cwd)) == nullptr) {
+            strncpy(cwd, "Unknown Directory", sizeof(cwd));
+        }
+
+        char error_msg[MAX_PATH_LENGTH + 512];
+        snprintf(error_msg, sizeof(error_msg),
+                 "Advancely does not have permission to write files in the current working directory:\n"
+                 "%s\n\n"
+                 "Please move the application to a user-writable location (e.g., Desktop or Documents) and run it again.",
+                 cwd);
+
+        // Initialize SDL video subsystem just to be able to show a message box if possible
+        if (!SDL_WasInit(SDL_INIT_VIDEO)) SDL_Init(SDL_INIT_VIDEO);
+
+        show_error_message("Permission Error", error_msg);
+        log_message(LOG_ERROR, "CRITICAL: Failed to get write permissions in directory: %s. Exiting.\n", cwd);
         log_close();
         return EXIT_FAILURE;
     }
@@ -927,6 +944,12 @@ int main(int argc, char *argv[]) {
 
     // Variable to hold the ID of our saves watcher
     dmon_watch_id saves_watcher_id = {0}; // Initialize to a known invalid state (id=0)
+
+    // Every process that creates a window must call SDL_Init first.
+    if (!SDL_Init(SDL_FLAGS)) {
+        log_message(LOG_ERROR, "[MAIN] Failed to init SDL: %s\n", SDL_GetError());
+        return 1;
+    }
 
     // Initialize SDL ttf
     if (!TTF_Init()) {
