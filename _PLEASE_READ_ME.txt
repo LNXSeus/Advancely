@@ -24,10 +24,13 @@ Your download contains the `Advancely.app` application and a `resources` folder.
 
 Due to macOS security (Gatekeeper), you must authorize the app before running it.
 
+⚠️ **CRITICAL: DO NOT RUN FROM DOWNLOADS FOLDER**
+If you run the app directly from Downloads, macOS will block it from saving settings (App Translocation).
+**YOU MUST MOVE THE APP** to your **Applications** folder or **Desktop** before running it.
+
 ✔️ **Method 1: The Right-Click Trick (Most Common)**
 
-1. Move `Advancely.app` and the `resources` folder to your **Applications** folder or **Desktop**.
-   (Do not run it directly from the Downloads folder if possible).
+1. **MOVE** `Advancely.app` and the `resources` folder to your **Applications** folder.
 2. **RIGHT-CLICK** (or Control+Click) `Advancely.app` and choose **"Open"**.
 3. A warning box will appear. Click the **"Open"** button.
 4. You only need to do this once.
@@ -48,12 +51,6 @@ If the above fail, run this command to remove the quarantine attribute:
 2. Type `xattr -cr ` (note the space at the end).
 3. Drag `Advancely.app` into the terminal window.
 4. Press Enter.
-
-✔️ **CORRECT WAY TO INSTALL:**
-Keep `Advancely.app` and the `resources` folder side-by-side in a folder of your choice (e.g., /Applications/Advancely/).
-
-❌ **INCORRECT WAY:**
-DO NOT separate the `Advancely.app` file from its `resources` folder.
 
 --------------------------------------------------
 --- For Windows & Linux Users ---

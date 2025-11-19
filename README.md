@@ -170,17 +170,25 @@ Your download contains the Advancely application (`.exe` on Windows, `.app` on m
 
 **macOS Instructions**
 
-Due to macOS security (Gatekeeper), you will need to perform a one-time bypass to authorize the application.
+Due to macOS security (Gatekeeper), you cannot run the app directly from the Downloads folder.
+
+> **⚠️ CRITICAL: Fix for "App Translocation" / Permission Errors**
+>
+> If you try to run Advancely directly from your **Downloads** folder, macOS will isolate it in a read-only temporary location (App Translocation).
+>
+> **You MUST move the app to fix this:**
+> 1. Drag `Advancely.app` AND the `resources` folder from Downloads to your **Applications** folder or **Desktop**.
+> 2. Run it from the new location.
+
+**Authorizing the App (First Run):**
 
 ✔️ **Method 1: The Right-Click Trick**
-
-1. Move `Advancely.app` and the `resources` folder to your Applications folder or Desktop.
-2. **Right-click** (or Control-click) the `Advancely.app` file and select **Open** from the menu.
-3. A warning will appear allowing you to click **Open**. macOS will now remember that you trust this application.
+1. After moving the app to your Applications folder or Desktop...
+2. **Right-click** (or Control-click) `Advancely.app` and select **Open** from the menu.
+3. A warning will appear. Click **Open**. macOS will now remember that you trust this application.
 
 ✔️ **Method 2: System Settings (If Method 1 fails)**
 If the app still refuses to open:
-
 1. Open **System Settings** -> **Privacy & Security**.
 2. Scroll down to the **Security** section.
 3. Look for a message stating "Advancely was blocked...".
@@ -188,7 +196,6 @@ If the app still refuses to open:
 
 ✔️ **Method 3: Terminal Authorization**
 If you still encounter issues, you can strip the quarantine tags manually:
-
 1. Open the **Terminal** app.
 2. Type `xattr -cr ` (note the space at the end).
 3. Drag the `Advancely.app` file from Finder onto the Terminal window.

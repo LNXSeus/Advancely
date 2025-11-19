@@ -551,22 +551,44 @@ int main(int argc, char *argv[]) {
     // Seed random number generator once at startup
     srand(time(nullptr));
 
-    // FIX for MACOS WORKING DIRECTORY if inside a .app bundle
+    // --- 1. MACOS BUNDLE & TRANSLOCATION FIX ---
 #if defined(__APPLE__)
     char mac_exe_path[MAX_PATH_LENGTH];
     if (get_executable_path(mac_exe_path, sizeof(mac_exe_path))) {
-        // Check if its running inside an app bundle
-        // Path typically looks like: /Path/To/Folder/Advancely.app/Contents/MacOS/Advancely
+        // --- DETECT APP TRANSLOCATION ---
+        // If this string appears, the app is running in a read-only sandbox
+        if (strstr(mac_exe_path, "AppTranslocation")) {
+            // Initialize SDL just for the message box
+            if (!SDL_Init(SDL_INIT_VIDEO)) {
+                printf("CRITICAL: App Translocation detected, but SDL_Init failed.\n");
+                return EXIT_FAILURE;
+            }
+
+            const char *title = "macOS Security Notice";
+            const char *message =
+                    "macOS is running Advancely from a temporary, read-only location "
+                    "(App Translocation).\n\n"
+                    "This happens when running an app directly from the Downloads folder.\n\n"
+                    "TO FIX THIS:\n"
+                    "1. Quit Advancely.\n"
+                    "2. Move 'Advancely.app' and the 'resources' folder to your 'Applications' "
+                    "folder or 'Desktop' using Finder.\n"
+                    "3. Run it from the new location.";
+
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, title, message, nullptr);
+            SDL_Quit();
+            return EXIT_FAILURE;
+        }
+
+        // Check if we are running inside an app bundle (Normal Logic)
         char *app_bundle_pos = strstr(mac_exe_path, ".app/");
         if (app_bundle_pos) {
-            // Set the working directory to the app bundle's Resources folder
+            // We need to go up 4 levels from executable to get the folder CONTAINING the .app
             char base_dir[MAX_PATH_LENGTH];
             if (get_parent_directory(mac_exe_path, base_dir, sizeof(base_dir), 4)) {
-                // Change working directory to the folder containing the .app and resources
                 if (chdir(base_dir) != 0) {
-                    log_message(LOG_ERROR, "[MAIN] Failed to change working directory to: %s\n", base_dir);
+                    printf("[MAIN] Failed to change directory to: %s\n", base_dir);
                 } else {
-                    // log_message not init yet, but printf works for console debug
                     printf("[MAIN] macOS Bundle detected. Set CWD to: %s\n", base_dir);
                 }
             }
