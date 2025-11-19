@@ -591,6 +591,12 @@ Make sure you use the `SourceHanSansCN-Normal.otf` font in all places (tracker, 
   players. (e.g., each player completes different advancements).
 * **Overlay Recording**: Especially on a Windows machine and OBS you must use Gamecapture to capture the overlay. A
   window capture can cause weird issues.
+* **PNG Image Compatibility**: On Linux and macOS, custom icons must be standard **8-bit per channel (32-bit RGBA)**
+  PNG files. Files with 16-bit depth, interlacing, or complex color profiles may fail to load (showing as pink squares
+  on the overlay within the first row or being invisible on the tracker). Checking the `advancely_log.txt` or
+  `advancely_overlay_log.txt` file will tell you about incompatible images.
+  To fix this, re-save the images in a standard format or use ImageMagick:
+  `magick mogrify -define png:format=png32 -interlace none -strip -depth 8 *.png`.
 
 ***
 

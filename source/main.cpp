@@ -948,7 +948,8 @@ int main(int argc, char *argv[]) {
     // Every process that creates a window must call SDL_Init first.
     if (!SDL_Init(SDL_FLAGS)) {
         log_message(LOG_ERROR, "[MAIN] Failed to init SDL: %s\n", SDL_GetError());
-        return 1;
+        log_close();
+        return EXIT_FAILURE;
     }
 
     // Initialize SDL ttf
