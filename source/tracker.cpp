@@ -4515,6 +4515,10 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
  */
 static void render_multistage_goals_section(Tracker *t, const AppSettings *settings, float &current_y,
                                             const char *section_title) {
+    // LOD Thresholds
+    const float LOD_TEXT_SUB_THRESHOLD = 0.60f;  // Hide Stage Text
+    const float LOD_TEXT_MAIN_THRESHOLD = 0.40f; // Hide Main Goal Name
+
     int count = t->template_data->multi_stage_goal_count;
 
     // --- Pre-computation and Filtering for Counters ---
@@ -4638,6 +4642,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
 
     // --- Calculate Uniform Item Width (based on items that will be rendered) ---
+    // IMPORTANT: Width calculation logic must remain consistent regardless of LOD.
     float uniform_item_width = 0.0f;
     const float horizontal_spacing = 8.0f; // Define the default spacing
 
@@ -4746,6 +4751,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
 
         // --- Item Height and Layout ---
+        // Must calculate exact height even if text is invisible to maintain layout
         char stage_text[256];
         if (active_stage_render->type == SUBGOAL_STAT && active_stage_render->required_progress > 0) {
             snprintf(stage_text, sizeof(stage_text), "%s (%d/%d)", active_stage_render->display_text,
@@ -4886,19 +4892,26 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
 
             // Draw Main Name (centered)
-            draw_list->AddText(nullptr, main_font_size * t->zoom_level,
-                               ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
-                                      text_y_pos), current_text_color,
-                               goal->display_name);
+            // LOD: Hide main name if zoomed out too far
+            if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
+                draw_list->AddText(nullptr, main_font_size * t->zoom_level,
+                                   ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
+                                          text_y_pos), current_text_color,
+                                   goal->display_name);
+            }
 
             // Draw Current Stage Text (uses sub_font_size)
             text_y_pos += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // Move Y down
-            draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
-                               ImVec2(
-                                   screen_pos.x + (bg_size.x * t->zoom_level - stage_text_size.x * t->zoom_level) *
-                                   0.5f,
-                                   text_y_pos), current_text_color,
-                               stage_text); // Use formatted stage text
+
+            // LOD: Hide stage text if zoomed out
+            if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
+                draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
+                                   ImVec2(
+                                       screen_pos.x + (bg_size.x * t->zoom_level - stage_text_size.x * t->zoom_level) *
+                                       0.5f,
+                                       text_y_pos), current_text_color,
+                                   stage_text); // Use formatted stage text
+            }
         } // End if (is_visible_on_screen)
 
         // --- Update Layout Position ---
@@ -4910,6 +4923,409 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
     // Update vertical position for the next section
     current_y += row_max_height;
 }
+
+// TODO: Remove
+// /**
+//  * @brief Renders the Multi-Stage Goals section.
+//  * Calculates and displays completion counters based on visibility settings.
+//  */
+// static void render_multistage_goals_section(Tracker *t, const AppSettings *settings, float &current_y,
+//                                             const char *section_title) {
+//     int count = t->template_data->multi_stage_goal_count;
+//
+//     // --- Pre-computation and Filtering for Counters ---
+//     int total_visible_count = 0; // Count of main multi-stage goals visible based on mode
+//     int completed_count = 0; // Count of completed main multi-stage goals visible based on mode
+//     int total_visible_sub_count = 0; // Count of *completable stages* across all relevant goals
+//     int completed_sub_count = 0; // Count of *completed stages* across all relevant goals
+//
+//     for (int i = 0; i < count; ++i) {
+//         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+//         if (!goal || goal->stage_count <= 0) continue; // Skip invalid goals
+//
+//         // Determine completion status of the main goal
+//         bool is_goal_considered_complete = (goal->current_stage >= goal->stage_count - 1);
+//
+//         // Determine visibility of the main goal based on hiding mode
+//         bool should_hide_based_on_mode = false;
+//         switch (settings->goal_hiding_mode) {
+//             case HIDE_ALL_COMPLETED:
+//                 should_hide_based_on_mode = goal->is_hidden || is_goal_considered_complete;
+//                 break;
+//             case HIDE_ONLY_TEMPLATE_HIDDEN:
+//                 should_hide_based_on_mode = goal->is_hidden;
+//                 break;
+//             case SHOW_ALL:
+//                 should_hide_based_on_mode = false;
+//                 break;
+//         }
+//
+//         // Apply Search Filter for counting (check main name AND active stage)
+//         SubGoal *active_stage_count = goal->stages[goal->current_stage];
+//         bool name_matches_search = str_contains_insensitive(goal->display_name, t->search_buffer);
+//         bool stage_matches_search = str_contains_insensitive(active_stage_count->display_text, t->search_buffer);
+//         bool goal_matches_search = name_matches_search || stage_matches_search;
+//
+//         // Skip entire goal if hidden by mode OR doesn't match search
+//         if (should_hide_based_on_mode || !goal_matches_search) continue;
+//
+//         // --- Count Main Item (Multi-Stage Goal) ---
+//         total_visible_count++;
+//         if (is_goal_considered_complete) {
+//             completed_count++;
+//         }
+//
+//         // --- Count Sub-Items (Stages) ---
+//         // Only count stages if the goal itself isn't template-hidden (already checked above)
+//         // and has more than one stage (meaning it has completable stages)
+//         if (goal->stage_count > 1) {
+//             // Iterate through *completable* stages (all except the last one)
+//             for (int j = 0; j < goal->stage_count - 1; ++j) {
+//                 // Determine if the *stage* is considered complete
+//                 bool is_stage_complete = (goal->current_stage > j);
+//
+//                 // Count this stage towards totals as the parent goal is visible
+//                 total_visible_sub_count++;
+//                 if (is_stage_complete) {
+//                     completed_sub_count++;
+//                 }
+//             }
+//         }
+//     }
+//     // --- End of Counter Calculation ---
+//
+//
+//     // --- Section Rendering ---
+//
+//     // Check if *anything* should be rendered based on search + hiding
+//     bool section_has_renderable_content = false;
+//     for (int i = 0; i < count; ++i) {
+//         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+//         if (!goal || goal->stage_count <= 0) continue;
+//
+//         bool is_done_render = (goal->current_stage >= goal->stage_count - 1);
+//
+//         // Apply rendering hiding logic
+//         bool should_hide_render = false;
+//         switch (settings->goal_hiding_mode) {
+//             case HIDE_ALL_COMPLETED:
+//                 should_hide_render = goal->is_hidden || is_done_render;
+//                 break;
+//             case HIDE_ONLY_TEMPLATE_HIDDEN:
+//                 should_hide_render = goal->is_hidden;
+//                 break;
+//             case SHOW_ALL:
+//                 should_hide_render = false;
+//                 break;
+//         }
+//
+//         // Apply search filter (check main name and current stage text)
+//         SubGoal *active_stage_render = goal->stages[goal->current_stage];
+//         bool name_matches_render = str_contains_insensitive(goal->display_name, t->search_buffer);
+//         bool stage_matches_render = str_contains_insensitive(active_stage_render->display_text, t->search_buffer);
+//
+//         // Combine hiding and search filter
+//         if (!should_hide_render && (name_matches_render || stage_matches_render)) {
+//             section_has_renderable_content = true;
+//             break; // Found at least one item to render
+//         }
+//     }
+//
+//     if (!section_has_renderable_content) return; // Hide section if no items match filters
+//
+//
+//     ImGuiIO &io = ImGui::GetIO();
+//
+//     // Use locked width if layout is locked
+//     float wrapping_width = t->layout_locked ? t->locked_layout_width : (io.DisplaySize.x / t->zoom_level);
+//
+//
+//     ImDrawList *draw_list = ImGui::GetWindowDrawList();
+//     ImU32 text_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
+//                                 settings->text_color.a);
+//     ImU32 text_color_faded = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
+//                                       ADVANCELY_FADED_ALPHA); // Faded text color
+//     float scale_factor; // Declare scale_factor here
+//
+//     // Call separator with calculated counts
+//     render_section_separator(t, settings, current_y, section_title, text_color,
+//                              completed_count, total_visible_count,
+//                              completed_sub_count, total_visible_sub_count); // Pass stage counts
+//
+//
+//     // --- Calculate Uniform Item Width (based on items that will be rendered) ---
+//     float uniform_item_width = 0.0f;
+//     const float horizontal_spacing = 8.0f; // Define the default spacing
+//
+//     // Check if custom width is enabled for THIS section (Multi-Stage)
+//     TrackerSection section_id = SECTION_MULTISTAGE;
+//     if (settings->tracker_section_custom_width_enabled[section_id]) {
+//         // use fixed width from settings
+//         uniform_item_width = settings->tracker_section_custom_item_width[section_id];
+//         if (uniform_item_width < 96.0f) uniform_item_width = 96.0f;
+//     } else {
+//         // Dynamic width
+//         for (int i = 0; i < count; i++) {
+//             MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+//             if (!goal || goal->stage_count <= 0) continue;
+//
+//             bool is_done_width = (goal->current_stage >= goal->stage_count - 1);
+//
+//             // Apply rendering hiding logic for width calculation
+//             bool should_hide_width = false;
+//             switch (settings->goal_hiding_mode) {
+//                 case HIDE_ALL_COMPLETED:
+//                     should_hide_width = goal->is_hidden || is_done_width;
+//                     break;
+//                 case HIDE_ONLY_TEMPLATE_HIDDEN:
+//                     should_hide_width = goal->is_hidden;
+//                     break;
+//                 case SHOW_ALL:
+//                     should_hide_width = false;
+//                     break;
+//             }
+//
+//             // Apply search filter for width calculation
+//             SubGoal *active_stage_width = goal->stages[goal->current_stage];
+//             bool name_matches_width = str_contains_insensitive(goal->display_name, t->search_buffer);
+//             bool stage_matches_width = str_contains_insensitive(active_stage_width->display_text, t->search_buffer);
+//
+//             // Only consider items that will actually be rendered for width calculation
+//             if (!should_hide_width && (name_matches_width || stage_matches_width)) {
+//                 // Calculate width needed for text (main name and current stage text)
+//                 SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
+//                 float name_width = ImGui::CalcTextSize(goal->display_name).x;
+//                 RESET_FONT_SCALE();
+//
+//                 // Format stage text including progress if applicable
+//                 char stage_text_width_calc[256];
+//                 if (active_stage_width->type == SUBGOAL_STAT && active_stage_width->required_progress > 0) {
+//                     snprintf(stage_text_width_calc, sizeof(stage_text_width_calc), "%s (%d/%d)",
+//                              active_stage_width->display_text,
+//                              active_stage_width->current_stat_progress, active_stage_width->required_progress);
+//                 } else {
+//                     strncpy(stage_text_width_calc, active_stage_width->display_text, sizeof(stage_text_width_calc) - 1);
+//                     stage_text_width_calc[sizeof(stage_text_width_calc) - 1] = '\0';
+//                 }
+//                 // Scale for stage text width calculation
+//                 SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
+//                 float stage_width = ImGui::CalcTextSize(stage_text_width_calc).x;
+//                 RESET_FONT_SCALE();
+//
+//                 // Required width is the max needed for either line
+//                 float required_text_width = fmaxf(name_width, stage_width);
+//                 // Ensure minimum width accommodates the 96px background
+//                 uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, required_text_width));
+//             }
+//         }
+//         // Add default spacing ONLY in dynamic mode
+//         uniform_item_width += horizontal_spacing;
+//     }
+//     // --- End of Width Calculation ---
+//
+//
+//     float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
+//     // Adjust vertical spacing
+//     const float vertical_spacing = settings->tracker_vertical_spacing; // Changed from 16.0f
+//
+//
+//     // --- Rendering Loop ---
+//     for (int i = 0; i < count; i++) {
+//         MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+//         if (!goal || goal->stage_count <= 0) continue;
+//
+//         bool is_done_render = (goal->current_stage >= goal->stage_count - 1);
+//
+//         // Apply rendering hiding logic
+//         bool should_hide_render = false;
+//         switch (settings->goal_hiding_mode) {
+//             case HIDE_ALL_COMPLETED:
+//                 should_hide_render = goal->is_hidden || is_done_render;
+//                 break;
+//             case HIDE_ONLY_TEMPLATE_HIDDEN:
+//                 should_hide_render = goal->is_hidden;
+//                 break;
+//             case SHOW_ALL:
+//                 should_hide_render = false;
+//                 break;
+//         }
+//
+//         // Apply search filter
+//         SubGoal *active_stage_render = goal->stages[goal->current_stage];
+//         bool name_matches_render = str_contains_insensitive(goal->display_name, t->search_buffer);
+//         bool stage_matches_render = str_contains_insensitive(active_stage_render->display_text, t->search_buffer);
+//
+//         // Skip rendering if hidden or doesn't match search
+//         if (should_hide_render || (!name_matches_render && !stage_matches_render)) {
+//             continue;
+//         }
+//
+//
+//         // --- Item Height and Layout ---
+//         char stage_text[256];
+//         if (active_stage_render->type == SUBGOAL_STAT && active_stage_render->required_progress > 0) {
+//             snprintf(stage_text, sizeof(stage_text), "%s (%d/%d)", active_stage_render->display_text,
+//                      active_stage_render->current_stat_progress, active_stage_render->required_progress);
+//         } else {
+//             strncpy(stage_text, active_stage_render->display_text, sizeof(stage_text) - 1);
+//             stage_text[sizeof(stage_text) - 1] = '\0';
+//         }
+//
+//         // Scale font to sub-size for stage text measurement
+//         SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
+//         ImVec2 text_size = ImGui::CalcTextSize(goal->display_name); // Uses main tracker_font_size
+//         RESET_FONT_SCALE();
+//
+//         // Scale font to sub-size for stage text measurement
+//         SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
+//         ImVec2 stage_text_size = ImGui::CalcTextSize(stage_text);
+//         RESET_FONT_SCALE();
+//
+//         // Calculate height: Icon bg + main name + stage text + padding
+//         float item_height = 96.0f + text_size.y + 4.0f + stage_text_size.y + 4.0f;
+//
+//         if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
+//             current_x = padding;
+//             current_y += row_max_height;
+//             row_max_height = 0.0f;
+//         }
+//
+//         ImVec2 screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
+//                                    (current_y * t->zoom_level) + t->camera_offset.y);
+//
+//         // --- Culling Logic ---
+//         ImVec2 item_size_on_screen = ImVec2(uniform_item_width * t->zoom_level, item_height * t->zoom_level);
+//         bool is_visible_on_screen = !(screen_pos.x > io.DisplaySize.x || (screen_pos.x + item_size_on_screen.x) < 0 ||
+//                                       screen_pos.y > io.DisplaySize.y || (screen_pos.y + item_size_on_screen.y) < 0);
+//
+//
+//         // --- Rendering Core Logic ---
+//         if (is_visible_on_screen) {
+//             ImVec2 bg_size = ImVec2(96.0f, 96.0f);
+//
+//             // Select texture *pair* and render
+//             SDL_Texture *static_bg = t->adv_bg;
+//             AnimatedTexture *anim_bg = t->adv_bg_anim;
+//
+//             if (goal->current_stage >= goal->stage_count - 1) {
+//                 static_bg = t->adv_bg_done;
+//                 anim_bg = t->adv_bg_done_anim;
+//             } else if (goal->current_stage > 0) {
+//                 static_bg = t->adv_bg_half_done;
+//                 anim_bg = t->adv_bg_half_done_anim;
+//             }
+//
+//             SDL_Texture *texture_to_draw = static_bg;
+//             if (anim_bg && anim_bg->frame_count > 0) {
+//                 // --- Standard GIF Frame Selection Logic ---
+//                 if (anim_bg->delays && anim_bg->total_duration > 0) {
+//                     Uint32 current_ticks = SDL_GetTicks();
+//                     Uint32 elapsed_time = current_ticks % anim_bg->total_duration;
+//                     int current_frame = 0;
+//                     Uint32 time_sum = 0;
+//                     for (int frame_idx = 0; frame_idx < anim_bg->frame_count; ++frame_idx) {
+//                         time_sum += anim_bg->delays[frame_idx];
+//                         if (elapsed_time < time_sum) {
+//                             current_frame = frame_idx;
+//                             break;
+//                         }
+//                     }
+//                     texture_to_draw = anim_bg->frames[current_frame];
+//                 } else {
+//                     texture_to_draw = anim_bg->frames[0];
+//                 }
+//             }
+//
+//             // Render Background
+//             if (texture_to_draw)
+//                 draw_list->AddImage((void *) texture_to_draw, screen_pos,
+//                                     ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
+//                                            screen_pos.y + bg_size.y * t->zoom_level));
+//
+//             // Render Icon (Animated or Static)
+//             // --- Start GIF Frame Selection Logic ---
+//             if (goal->anim_texture && goal->anim_texture->frame_count > 0) {
+//                 if (goal->anim_texture->delays && goal->anim_texture->total_duration > 0) {
+//                     Uint32 current_ticks = SDL_GetTicks();
+//                     Uint32 elapsed_time = current_ticks % goal->anim_texture->total_duration;
+//                     int current_frame = 0;
+//                     Uint32 time_sum = 0;
+//                     for (int frame_idx = 0; frame_idx < goal->anim_texture->frame_count; ++frame_idx) {
+//                         time_sum += goal->anim_texture->delays[frame_idx];
+//                         if (elapsed_time < time_sum) {
+//                             current_frame = frame_idx;
+//                             break;
+//                         }
+//                     }
+//                     texture_to_draw = goal->anim_texture->frames[current_frame];
+//                 } else {
+//                     // Fallback if no timing info
+//                     texture_to_draw = goal->anim_texture->frames[0];
+//                 }
+//             } else if (goal->texture) {
+//                 // Static texture
+//                 texture_to_draw = goal->texture;
+//             }
+//             // --- End GIF Frame Selection Logic ---
+//
+//             if (texture_to_draw) {
+//                 // --- Start Icon Scaling and Centering Logic (64x64 box) ---
+//                 float tex_w = 0.0f, tex_h = 0.0f;
+//                 SDL_GetTextureSize(texture_to_draw, &tex_w, &tex_h);
+//                 ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
+//                 // Target box size on screen
+//                 float scale_factor = 1.0f;
+//                 if (tex_w > 0 && tex_h > 0) {
+//                     // Avoid division by zero
+//                     scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
+//                 }
+//                 ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor); // Scaled size on screen
+//                 ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
+//                 // 16.0f to CENTER the icons
+//                 // Top-left of 64x64 box on screen
+//                 ImVec2 icon_padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
+//                                              (target_box_size.y - scaled_size.y) * 0.5f); // Padding within the box
+//                 ImVec2 p_min = ImVec2(box_p_min.x + icon_padding.x, box_p_min.y + icon_padding.y);
+//                 // Final top-left for drawing
+//                 ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
+//                 // Final bottom-right for drawing
+//                 draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
+//                 // --- End Icon Scaling and Centering Logic ---
+//             }
+//
+//             // Render Text (Main Name and Current Stage Text)
+//             float main_font_size = settings->tracker_font_size;
+//             float sub_font_size = settings->tracker_sub_font_size;
+//             ImU32 current_text_color = is_done_render ? text_color_faded : text_color; // Fade if done
+//
+//             // Calculate Y position for the first line of text
+//             float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
+//
+//             // Draw Main Name (centered)
+//             draw_list->AddText(nullptr, main_font_size * t->zoom_level,
+//                                ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
+//                                       text_y_pos), current_text_color,
+//                                goal->display_name);
+//
+//             // Draw Current Stage Text (uses sub_font_size)
+//             text_y_pos += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // Move Y down
+//             draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
+//                                ImVec2(
+//                                    screen_pos.x + (bg_size.x * t->zoom_level - stage_text_size.x * t->zoom_level) *
+//                                    0.5f,
+//                                    text_y_pos), current_text_color,
+//                                stage_text); // Use formatted stage text
+//         } // End if (is_visible_on_screen)
+//
+//         // --- Update Layout Position ---
+//         current_x += uniform_item_width; // Use the final uniform_item_width directly
+//         row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
+//     }
+//     // --- End Rendering Loop ---
+//
+//     // Update vertical position for the next section
+//     current_y += row_max_height;
+// }
 
 
 // Helper struct to pass necessary data to the ImGui callback
