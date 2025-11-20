@@ -3716,6 +3716,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
  */
 static void render_simple_item_section(Tracker *t, const AppSettings *settings, float &current_y, TrackableItem **items,
                                        int count, const char *section_title) {
+    // LOD Thresholds
+    const float LOD_TEXT_THRESHOLD = 0.5f; // Text disappears below 50% zoom
+
     // --- Pre-computation and Filtering for Counters ---
     int total_visible_count = 0;
     int completed_count = 0;
@@ -3724,7 +3727,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         TrackableItem *item = items[i];
         if (!item) continue;
 
-        // Determine completion status (simple boolean)
+        // Determine completion status (simple boolean 'done')
         bool is_item_considered_complete = item->done;
 
         // Determine visibility based on hiding mode
@@ -3803,7 +3806,9 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
     render_section_separator(t, settings, current_y, section_title, text_color,
                              completed_count, total_visible_count, -1, -1);
 
+
     // --- Calculate Uniform Item Width (based on items that will be rendered) ---
+    // This calculation remains the same regardless of zoom to maintain consistent spacing logic
     float uniform_item_width = 0.0f;
     const float horizontal_spacing = 8.0f; // Define the default spacing
 
@@ -3840,9 +3845,10 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
             if (!should_hide_width && matches_search_width) {
                 // Calculate width needed for text
                 SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize); // Use macro
+                ImVec2 text_size_calc = ImGui::CalcTextSize(item->display_name);
                 RESET_FONT_SCALE(); // Reset scale
 
-                uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, ImGui::CalcTextSize(item->display_name).x));
+                uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, text_size_calc.x));
             }
         }
         // Add default spacing ONLY in dynamic mode, 8 pixels
@@ -3851,7 +3857,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
     float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
 
-    // Adjust vertical spacing -> need to do this for all render_*_section functions
+    // Adjust vertical spacing
     const float vertical_spacing = settings->tracker_vertical_spacing; // Changed from 16.0f
 
     // --- Rendering Loop ---
@@ -3883,9 +3889,15 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
 
         // --- Item Height and Layout ---
+        // IMPORTANT: These calculations MUST run every frame regardless of zoom
+        // to ensure the grid layout remains stable even when text is hidden.
+
+        // Scale font to sub-size for text measurement
         SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize); // Use macro for CalcTextSize
         ImVec2 text_size = ImGui::CalcTextSize(item->display_name);
         RESET_FONT_SCALE(); // Reset scale
+
+        // Calculate height: Icon bg + main text + padding
         float item_height = 96.0f + text_size.y + 4.0f;
 
         if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
@@ -3990,16 +4002,23 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
             }
 
             // Render Text
-            float main_text_size = settings->tracker_font_size;
-            ImU32 current_text_color = item->done ? text_color_faded : text_color; // Fade text if done
+            // LOD: Check if zoom level is sufficient for text
+            if (t->zoom_level > LOD_TEXT_THRESHOLD) {
+                float main_text_size = settings->tracker_font_size;
+                ImU32 current_text_color = item->done ? text_color_faded : text_color; // Fade text if done
 
-            // Center text below the icon background
-            draw_list->AddText(nullptr, main_text_size * t->zoom_level,
-                               ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
-                                      screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level)),
-                               current_text_color,
-                               item->display_name);
-        }
+                // Calculate Y position for the first line of text
+                float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
+
+                // Draw Main Name (centered)
+                draw_list->AddText(nullptr, main_text_size * t->zoom_level,
+                                   ImVec2(
+                                       screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
+                                       text_y_pos), current_text_color,
+                                   item->display_name);
+            }
+            // NO Checkboxes rendered here
+        } // End if (is_visible_on_screen)
 
         // --- Update Layout Position ---
         current_x += uniform_item_width; // Use the final uniform_item_width directly
