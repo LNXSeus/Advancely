@@ -4093,6 +4093,10 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
  */
 static void render_custom_goals_section(Tracker *t, const AppSettings *settings, float &current_y,
                                         const char *section_title) {
+    // LOD Thresholds
+    const float LOD_TEXT_SUB_THRESHOLD = 0.60f;  // Hide Progress Text
+    const float LOD_TEXT_MAIN_THRESHOLD = 0.40f; // Hide Main Name & Checkboxes
+
     int count = t->template_data->custom_goal_count;
 
     // --- Pre-computation and Filtering for Counters ---
@@ -4191,6 +4195,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
 
     // --- Calculate Uniform Item Width (based on items that will be rendered) ---
+    // IMPORTANT: Width calculation logic must remain consistent regardless of LOD.
     float uniform_item_width = 0.0f;
     const float horizontal_spacing = 8.0f; // Define the default spacing
 
@@ -4290,6 +4295,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
 
         // --- Item Height and Layout ---
+        // Must calculate exact height even if text is invisible to maintain layout
         char progress_text[32] = "";
         if (item->goal > 0) snprintf(progress_text, sizeof(progress_text), "(%d / %d)", item->progress, item->goal);
             // For infinite counters, only show progress if not manually overridden/done
@@ -4361,13 +4367,13 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 }
             }
 
-            // Render Background
+            // Render Background (Always Visible)
             if (texture_to_draw)
                 draw_list->AddImage((void *) texture_to_draw, screen_pos,
                                     ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
                                            screen_pos.y + bg_size.y * t->zoom_level));
 
-            // Render Icon (Animated or Static)
+            // Render Icon (Animated or Static) - Always Visible (Detailed)
             // --- Start GIF Frame Selection Logic ---
             if (item->anim_texture && item->anim_texture->frame_count > 0) {
                 if (item->anim_texture->delays && item->anim_texture->total_duration > 0) {
@@ -4427,26 +4433,37 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
 
             // Draw Main Name (centered)
-            draw_list->AddText(nullptr, main_font_size * t->zoom_level,
-                               ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
-                                      text_y_pos), current_text_color,
-                               item->display_name);
+            // LOD: Hide main text if zoomed out too far
+            if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
+                draw_list->AddText(nullptr, main_font_size * t->zoom_level,
+                                   ImVec2(
+                                       screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
+                                       text_y_pos), current_text_color,
+                                   item->display_name);
+            }
 
             // Draw Progress Text below main name (if applicable, centered)
             if (progress_text[0] != '\0') {
                 text_y_pos += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // Move Y down
-                draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
-                                   ImVec2(
-                                       screen_pos.x + (bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level)
-                                       * 0.5f,
-                                       text_y_pos), current_text_color,
-                                   progress_text);
+
+                // LOD: Hide progress text if zoomed out
+                if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
+                    draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
+                                       ImVec2(
+                                           screen_pos.x + (
+                                               bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level)
+                                           * 0.5f,
+                                           text_y_pos), current_text_color,
+                                       progress_text);
+                }
             }
 
             // --- Checkbox logic for manual override ---
             // Allow override for simple toggles (goal <= 0) OR infinite counters (goal == -1)
             bool can_be_overridden = (item->goal <= 0 || item->goal == -1);
-            if (can_be_overridden) {
+
+            // LOD: Hide Checkbox if zoomed out too far (tied to MAIN text)
+            if (can_be_overridden && t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
                 ImVec2 check_pos = ImVec2(screen_pos.x + 4 * t->zoom_level, screen_pos.y + 4 * t->zoom_level);
                 // Top-right corner
                 ImVec2 check_size = ImVec2(20 * t->zoom_level, 20 * t->zoom_level);
@@ -4479,7 +4496,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                     SDL_SetAtomicInt(&g_needs_update, 1); // Trigger data refresh
                     SDL_SetAtomicInt(&g_game_data_changed, 1); // Indicate change wasn't from game file
                 }
-            } // End if (can_be_overridden)
+            } // End if (can_be_overridden && visible)
         } // End if (is_visible_on_screen)
 
         // --- Update Layout Position ---
