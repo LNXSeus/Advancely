@@ -1714,7 +1714,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char section_order_tooltip_buffer[1024];
         snprintf(section_order_tooltip_buffer, sizeof(section_order_tooltip_buffer),
-                 "Drag and drop to reorder the sections in the main tracker window.");
+                 "Drag and drop to reorder the sections in the main tracker window.\n"
+                 "Drop items between others to insert them at that position.");
         ImGui::SetTooltip("%s", section_order_tooltip_buffer);
     }
 
@@ -1738,12 +1739,15 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         }
     }
 
-    // Now, loop through only the visible sections to render them.
-    for (size_t n = 0; n < visible_section_indices.size(); ++n) {
+    // State variables for the reorder operation
+    int section_dnd_source_vis_index = -1;
+    int section_dnd_target_vis_index = -1;
+
+    for (size_t n = 0; n < visible_section_indices.size(); n++) {
         int original_array_index = visible_section_indices[n];
         int item_type_id = temp_settings.section_order[original_array_index];
 
-        // Determine the correct display name (Advancements vs. Achievements)
+        // Determine display name (same as before)
         const char *item_name;
         if (item_type_id == SECTION_ADVANCEMENTS) {
             item_name = (selected_version <= MC_VERSION_1_11_2) ? "Achievements" : "Advancements";
@@ -1751,34 +1755,82 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             item_name = TRACKER_SECTION_NAMES[item_type_id];
         }
 
+        ImGui::PushID(n);
+
+        // Top Drop Zone, using small invis button as a gap
+        ImGui::InvisibleButton("drop_target_top", ImVec2(-1, 4.0f));
+        if (ImGui::BeginDragDropTarget()) {
+            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("DND_SECTION_ORDER")) {
+                section_dnd_source_vis_index = *(const int *) payload->Data;
+                section_dnd_target_vis_index = (int) n;
+            }
+            ImGui::EndDragDropTarget();
+        }
+
+        // Selectable Item (Drag Source)
         ImGui::Selectable(item_name);
 
-        // Drag Source: The payload is the index 'n' from our visible list.
         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
             ImGui::SetDragDropPayload("DND_SECTION_ORDER", &n, sizeof(int));
             ImGui::Text("Reorder %s", item_name);
             ImGui::EndDragDropSource();
         }
 
-        // Drop Target
-        if (ImGui::BeginDragDropTarget()) {
-            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("DND_SECTION_ORDER")) {
-                IM_ASSERT(payload->DataSize == sizeof(int));
-                int source_visible_index = *(const int *) payload->Data;
-                int target_visible_index = n;
+        ImGui::PopID();
+    }
 
-                // Map the visible list indices back to their original positions in the full section_order array.
-                int source_original_index = visible_section_indices[source_visible_index];
-                int target_original_index = visible_section_indices[target_visible_index];
+    // Final Drop Zone (Bottom of the list)
+    ImGui::InvisibleButton("drop_target_bottom", ImVec2(-1, 4.0f)); // Same-sized target at the end
+    if (ImGui::BeginDragDropTarget()) {
+        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("DND_SECTION_ORDER")) {
+            section_dnd_source_vis_index = *(const int *) payload->Data;
+            section_dnd_target_vis_index = (int) visible_section_indices.size();
+        }
+        ImGui::EndDragDropTarget();
+    }
 
-                // Swap the items in the actual temp_settings.section_order array.
-                int temp = temp_settings.section_order[target_original_index];
-                temp_settings.section_order[target_original_index] = temp_settings.section_order[source_original_index];
-                temp_settings.section_order[source_original_index] = temp;
+    // --- Perform Reorder Logic ---
+    if (section_dnd_source_vis_index != -1 && section_dnd_target_vis_index != -1 && section_dnd_source_vis_index !=
+        section_dnd_target_vis_index) {
+        // Convert visible indices back to the full 'setion_order' array manipulation
+        // We need to perform the move on the underlying array, but respecting the order of visible items
 
-                // The list will correctly re-render on the next frame.
-            }
-            ImGui::EndDragDropTarget();
+        // Extract the full list of actual Section IDs in their current order
+        std::vector<int> current_order_list;
+        for (int i = 0; i < SECTION_COUNT; ++i) current_order_list.push_back(temp_settings.section_order[i]);
+
+        // Identify the item ID moving and the item ID it is moving before
+        // The visible list tells us the current sequence.
+        int moving_item_id = temp_settings.section_order[visible_section_indices[section_dnd_source_vis_index]];
+
+        // Find where this item currently is in the full list
+        auto source_it = std::find(current_order_list.begin(), current_order_list.end(), moving_item_id);
+
+        // Remove it from the full list temporarily
+        if (source_it != current_order_list.end()) {
+            current_order_list.erase(source_it);
+        }
+
+        // If target is end of visible list, append after the last visible item
+        // Otherwise, insert before the target visible item
+        std::vector<int>::iterator insert_pos;
+
+        if (section_dnd_target_vis_index >= (int) visible_section_indices.size()) {
+            // Insert after the last visible item found in the full list
+            int last_visible_id = temp_settings.section_order[visible_section_indices.back()];
+            auto last_it = std::find(current_order_list.begin(), current_order_list.end(), last_visible_id);
+            insert_pos = (last_it == current_order_list.end()) ? current_order_list.end() : last_it + 1;
+        } else {
+            // Insert before the specific target item
+            int target_item_id = temp_settings.section_order[visible_section_indices[section_dnd_target_vis_index]];
+            insert_pos = std::find(current_order_list.begin(), current_order_list.end(), target_item_id);
+        }
+
+        // Re-insert and update settings
+        current_order_list.insert(insert_pos, moving_item_id);
+
+        for (int i = 0; i < SECTION_COUNT; ++i) {
+            temp_settings.section_order[i] = current_order_list[i];
         }
     }
 

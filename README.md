@@ -642,7 +642,7 @@ release and you'll be added here:_
 
 * Windows: ethansplace98, Yumeko, zurtletif, 3emis, MoreTrident, PhoenixAUS_, metal_silver1234, 36_Official,
   TheDogmaster28
-* macOS: Slackow, TheDogmaster28, ethansplace98
+* macOS: Slackow, TheDogmaster28, ethansplace98, DesktopFolder, Zesskyo
 * Linux: DesktopFolder, ShadowFlower64, me_nx
 
 ***

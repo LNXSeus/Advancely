@@ -565,15 +565,18 @@ int main(int argc, char *argv[]) {
             }
 
             const char *title = "macOS Security Notice";
-            const char *message =
-                    "macOS is running Advancely from a temporary, read-only location "
-                    "(App Translocation).\n\n"
-                    "This happens when running an app directly from the Downloads folder.\n\n"
-                    "TO FIX THIS:\n"
-                    "1. Quit Advancely.\n"
-                    "2. Move 'Advancely.app' and the 'resources' folder to your 'Applications' "
-                    "folder or 'Desktop' using Finder.\n"
-                    "3. Run it from the new location.";
+            char message[2048]; // Allocated buffer for dynamic message
+
+            snprintf(message, sizeof(message),
+                     "macOS is running Advancely from a temporary, read-only location (App Translocation).\n\n"
+                     "Current Location:\n%s\n\n"
+                     "This happens when running an app directly from the Downloads folder.\n\n"
+                     "TO FIX THIS:\n"
+                     "1. Quit Advancely.\n"
+                     "2. Move 'Advancely.app' and the 'resources' folder to your 'Applications' "
+                     "folder or 'Desktop' using Finder.\n"
+                     "3. Run it from the new location.",
+                     mac_exe_path);
 
             SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, title, message, nullptr);
             SDL_Quit();
@@ -723,13 +726,6 @@ int main(int argc, char *argv[]) {
 
         // Force SDL to use the reliable software renderer instead of hardware drivers.
         // SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
-
-
-        // Every process that creates a window must call SDL_Init first.
-        if (!SDL_Init(SDL_FLAGS)) {
-            log_message(LOG_ERROR, "[OVERLAY PROCESS] Failed to init SDL: %s\n", SDL_GetError());
-            return 1;
-        }
 
         if (!TTF_Init()) {
             log_message(LOG_ERROR, "[OVERLAY PROCESS] Failed to init TTF: %s\n", SDL_GetError());
