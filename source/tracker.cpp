@@ -2741,6 +2741,8 @@ static void render_section_separator(Tracker *t, const AppSettings *settings, fl
  * This function handles the uniform grid layout and the two-pass rendering for simple vs. complex items.
  * It distinguishes between advancements and stats with the bool flag and manages all the checkbox logic,
  * communicating with the settings.json file. It also calculates and displays completion counters.
+ *
+ * Implements LOD (Level of Detail) to hide text and simplify icons when zoomed out.
  * @param t The tracker instance.
  * @param settings The app settings.
  * @param current_y The current y position in the world.
@@ -2753,6 +2755,16 @@ static void render_section_separator(Tracker *t, const AppSettings *settings, fl
 static void render_trackable_category_section(Tracker *t, const AppSettings *settings, float &current_y,
                                               TrackableCategory **categories, int count, const char *section_title,
                                               bool is_stat_section, MC_Version version) {
+
+    // --- LOD THRESHOLDS ---
+    // 1. Zoom < 0.60: Hide Sub-Item Text & Progress Text
+    const float LOD_TEXT_SUB_THRESHOLD = 0.60f;
+    // 2. Zoom < 0.40: Hide Main Item Text, Parent Checkboxes & Sub-Item Checkboxes
+    const float LOD_TEXT_MAIN_THRESHOLD = 0.40f;
+    // 3. Zoom < 0.25: Simplify Sub-Item Icons to Squares
+    const float LOD_ICON_DETAIL_THRESHOLD = 0.25f;
+
+
     // --- Pre-computation and Filtering for Counters ---
     int total_visible_count = 0;
     int completed_count = 0;
@@ -2948,6 +2960,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
 
     // --- Calculate Uniform Item Width (based on items that will be rendered) ---
+    // IMPORTANT: Width calculation logic must remain consistent regardless of LOD.
+    // It calculates based on "what would be shown" to prevent layout jumps.
     float uniform_item_width = 0.0f;
     const float horizontal_spacing = 8.0f; // Define the default spacing
 
@@ -3205,6 +3219,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
 
             // --- Item Height Calculation ---
+            // Must calculate exact height even if text is invisible to maintain layout
             char snapshot_text[8] = "";
             if (!is_stat_section && version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy) {
                 if (cat->done && !cat->done_in_snapshot) { strcpy(snapshot_text, "(New)"); } else if (cat->done) {
@@ -3351,13 +3366,13 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     }
                 }
 
-                // Render Background
+                // Render Background (Always Visible)
                 if (texture_to_draw)
                     draw_list->AddImage((void *) texture_to_draw, screen_pos,
                                         ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
                                                screen_pos.y + bg_size.y * t->zoom_level));
 
-                // Render Main Icon (Animated or Static)
+                // Render Main Icon (Animated or Static) - Always Visible
                 // --- Start GIF Frame Selection Logic (Main Icon) ---
                 if (cat->anim_texture && cat->anim_texture->frame_count > 0) {
                     if (cat->anim_texture->delays && cat->anim_texture->total_duration > 0) {
@@ -3413,30 +3428,45 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 float main_font_size = settings->tracker_font_size;
                 float sub_font_size = settings->tracker_sub_font_size; // Max 32 to prevent shifting downwards
 
-                // Main Name
-                draw_list->AddText(nullptr, main_font_size * t->zoom_level,
-                                   ImVec2(
-                                       screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
-                                       current_text_y), text_color, cat->display_name);
+                // LOD: Only render Main Text if zoom is sufficient
+                if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
+                    // Main Name
+                    draw_list->AddText(nullptr, main_font_size * t->zoom_level,
+                                       ImVec2(
+                                           screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) *
+                                           0.5f,
+                                           current_text_y), text_color, cat->display_name);
+                }
+                // ADVANCE LAYOUT EVEN IF NOT RENDERED
                 current_text_y += text_size.y * t->zoom_level + 4.0f * t->zoom_level;
 
                 // Snapshot Text (if applicable)
                 if (snapshot_text[0] != '\0') {
-                    draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
-                                       ImVec2(
-                                           screen_pos.x + (
-                                               bg_size.x * t->zoom_level - snapshot_text_size.x * t->zoom_level) * 0.5f,
-                                           current_text_y), text_color_faded, snapshot_text); // Use faded color
+                    // LOD: Tie snapshot text to main text visibility
+                    if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
+                        draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
+                                           ImVec2(
+                                               screen_pos.x + (
+                                                   bg_size.x * t->zoom_level - snapshot_text_size.x * t->zoom_level) *
+                                               0.5f,
+                                               current_text_y), text_color_faded, snapshot_text); // Use faded color
+                    }
+                    // ADVANCE LAYOUT EVEN IF NOT RENDERED
                     current_text_y += snapshot_text_size.y * t->zoom_level + 4.0f * t->zoom_level;
                 }
 
                 // Progress Text (if applicable)
                 if (progress_text[0] != '\0') {
-                    draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
-                                       ImVec2(
-                                           screen_pos.x + (
-                                               bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level) * 0.5f,
-                                           current_text_y), text_color, progress_text);
+                    // LOD: Tie progress text to SUB text visibility (as requested)
+                    if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
+                        draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
+                                           ImVec2(
+                                               screen_pos.x + (
+                                                   bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level) *
+                                               0.5f,
+                                               current_text_y), text_color, progress_text);
+                    }
+                    // ADVANCE LAYOUT EVEN IF NOT RENDERED
                     current_text_y += progress_text_size.y * t->zoom_level + 4.0f * t->zoom_level;
                     // Add padding even after last text line before criteria
                 }
@@ -3482,66 +3512,82 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                              camera_offset.y);
                         float current_element_x_screen = crit_base_pos_screen.x;
 
-                        // Render Child Icon (Animated or Static)
-                        SDL_Texture *crit_texture_to_draw = nullptr;
-                        // --- Start GIF Frame Selection Logic (Child Icon) ---
-                        if (crit->anim_texture && crit->anim_texture->frame_count > 0) {
-                            if (crit->anim_texture->delays && crit->anim_texture->total_duration > 0) {
-                                Uint32 current_ticks = SDL_GetTicks();
-                                Uint32 elapsed_time = current_ticks % crit->anim_texture->total_duration;
-                                int current_frame = 0;
-                                Uint32 time_sum = 0;
-                                for (int frame_idx = 0; frame_idx < crit->anim_texture->frame_count; ++frame_idx) {
-                                    time_sum += crit->anim_texture->delays[frame_idx];
-                                    if (elapsed_time < time_sum) {
-                                        current_frame = frame_idx;
-                                        break;
+                        // LOD for Sub-Item Icon
+                        if (t->zoom_level > LOD_ICON_DETAIL_THRESHOLD) {
+                            // RENDER ACTUAL ICON
+                            SDL_Texture *crit_texture_to_draw = nullptr;
+                            // --- Start GIF Frame Selection Logic (Child Icon) ---
+                            if (crit->anim_texture && crit->anim_texture->frame_count > 0) {
+                                if (crit->anim_texture->delays && crit->anim_texture->total_duration > 0) {
+                                    Uint32 current_ticks = SDL_GetTicks();
+                                    Uint32 elapsed_time = current_ticks % crit->anim_texture->total_duration;
+                                    int current_frame = 0;
+                                    Uint32 time_sum = 0;
+                                    for (int frame_idx = 0; frame_idx < crit->anim_texture->frame_count; ++frame_idx) {
+                                        time_sum += crit->anim_texture->delays[frame_idx];
+                                        if (elapsed_time < time_sum) {
+                                            current_frame = frame_idx;
+                                            break;
+                                        }
                                     }
+                                    crit_texture_to_draw = crit->anim_texture->frames[current_frame];
+                                } else {
+                                    // Fallback if no timing info
+                                    crit_texture_to_draw = crit->anim_texture->frames[0];
                                 }
-                                crit_texture_to_draw = crit->anim_texture->frames[current_frame];
-                            } else {
-                                // Fallback if no timing info
-                                crit_texture_to_draw = crit->anim_texture->frames[0];
+                            } else if (crit->texture) {
+                                // Static texture
+                                crit_texture_to_draw = crit->texture;
                             }
-                        } else if (crit->texture) {
-                            // Static texture
-                            crit_texture_to_draw = crit->texture;
-                        }
-                        // --- End GIF Frame Selection Logic (Child Icon) ---
+                            // --- End GIF Frame Selection Logic (Child Icon) ---
 
 
-                        if (crit_texture_to_draw) {
-                            // --- Start Icon Scaling and Centering Logic (Child Icon 32x32 box) ---
-                            float tex_w = 0.0f, tex_h = 0.0f;
-                            SDL_GetTextureSize(crit_texture_to_draw, &tex_w, &tex_h);
-                            ImVec2 target_box_size = ImVec2(32.0f * t->zoom_level, 32.0f * t->zoom_level);
-                            // Target box size on screen
-                            float scale_factor = 1.0f;
-                            if (tex_w > 0 && tex_h > 0) {
-                                // Avoid division by zero
-                                scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
+                            if (crit_texture_to_draw) {
+                                // --- Start Icon Scaling and Centering Logic (Child Icon 32x32 box) ---
+                                float tex_w = 0.0f, tex_h = 0.0f;
+                                SDL_GetTextureSize(crit_texture_to_draw, &tex_w, &tex_h);
+                                ImVec2 target_box_size = ImVec2(32.0f * t->zoom_level, 32.0f * t->zoom_level);
+                                // Target box size on screen
+                                float scale_factor = 1.0f;
+                                if (tex_w > 0 && tex_h > 0) {
+                                    // Avoid division by zero
+                                    scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
+                                }
+                                ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
+                                // Scaled size on screen
+                                // Padding is calculated relative to the 32x32 box, no offset needed here
+                                ImVec2 icon_padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
+                                                             (target_box_size.y - scaled_size.y) * 0.5f);
+                                ImVec2 p_min = ImVec2(crit_base_pos_screen.x + icon_padding.x,
+                                                      crit_base_pos_screen.y + icon_padding.y);
+                                // Final top-left for drawing
+                                ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
+                                // Final bottom-right for drawing
+                                ImU32 icon_tint = crit->done ? icon_tint_faded : IM_COL32_WHITE; // Apply fade if done
+                                draw_list->AddImage((void *) crit_texture_to_draw, p_min, p_max, ImVec2(0, 0),
+                                                    ImVec2(1, 1),
+                                                    icon_tint);
+                                // --- End Icon Scaling and Centering Logic (Child Icon) ---
                             }
-                            ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
-                            // Scaled size on screen
-                            // Padding is calculated relative to the 32x32 box, no offset needed here
-                            ImVec2 icon_padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
-                                                         (target_box_size.y - scaled_size.y) * 0.5f);
-                            ImVec2 p_min = ImVec2(crit_base_pos_screen.x + icon_padding.x,
-                                                  crit_base_pos_screen.y + icon_padding.y);
-                            // Final top-left for drawing
-                            ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
-                            // Final bottom-right for drawing
-                            ImU32 icon_tint = crit->done ? icon_tint_faded : IM_COL32_WHITE; // Apply fade if done
-                            draw_list->AddImage((void *) crit_texture_to_draw, p_min, p_max, ImVec2(0, 0), ImVec2(1, 1),
-                                                icon_tint);
-                            // --- End Icon Scaling and Centering Logic (Child Icon) ---
+                        } else {
+                            // RENDER SIMPLIFIED SQUARE (Average Color Placeholder)
+                            // Since we don't have the exact average color calculated, use a generic color
+                            // A faded text color works well to represent "something is here"
+                            ImU32 avg_placeholder_color = IM_COL32(settings->text_color.r, settings->text_color.g,
+                                                                   settings->text_color.b, 100);
+                            // 32x32 box size
+                            ImVec2 p_min = crit_base_pos_screen;
+                            ImVec2 p_max = ImVec2(p_min.x + 32.0f * t->zoom_level, p_min.y + 32.0f * t->zoom_level);
+                            draw_list->AddRectFilled(p_min, p_max, avg_placeholder_color);
                         }
+
                         current_element_x_screen += 32.0f * t->zoom_level + 4.0f * t->zoom_level;
                         // Icon width + padding
 
 
                         // Render Checkbox for Multi-Criteria Stats
-                        if (is_stat_section && cat->criteria_count > 1) {
+                        // LOD: Hide checkbox if zoomed out too far (tied to MAIN text threshold as requested)
+                        if (is_stat_section && cat->criteria_count > 1 && t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
                             ImVec2 check_pos = ImVec2(current_element_x_screen,
                                                       crit_base_pos_screen.y + 6 * t->zoom_level);
                             ImRect checkbox_rect(
@@ -3582,56 +3628,66 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                 SDL_SetAtomicInt(&g_needs_update, 1);
                                 SDL_SetAtomicInt(&g_game_data_changed, 1);
                             }
+                        }
+
+                        // ADVANCE LAYOUT EVEN IF CHECKBOX NOT RENDERED
+                        if (is_stat_section && cat->criteria_count > 1) {
                             current_element_x_screen += 20.0f * t->zoom_level + 4.0f * t->zoom_level;
                             // Checkbox width + padding
                         }
 
+
                         // Render Child Text and Progress
-                        ImU32 current_child_text_color = crit->done ? text_color_faded : text_color;
+                        // LOD: Check if zoom level is sufficient for sub-text
+                        if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
+                            ImU32 current_child_text_color = crit->done ? text_color_faded : text_color;
 
-                        // Calculate text height using the correct font scale
-                        float scale_factor = 1.0f;
-                        if (settings->tracker_font_size > 0.0f) {
-                            // Prevent division by zero
-                            scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
-                        }
-
-                        ImGui::PushFont(t->tracker_font); // Ensure we're scaling from the correct base font
-                        ImGui::SetWindowFontScale(scale_factor);
-
-                        // Calculate the height of the text. (Width is also needed for the X advance)
-                        ImVec2 child_text_size = ImGui::CalcTextSize(crit->display_name);
-
-                        ImGui::SetWindowFontScale(1.0f); // Restore scale
-                        ImGui::PopFont();
-
-                        // Calculate the vertically centered Y position
-                        // (BoxTop) + ( (BoxHeight - TextHeight) / 2 )
-                        // Both the box height AND the text height must be scaled by zoom.
-                        float text_y_pos = crit_base_pos_screen.y + (
-                                               (32.0f * t->zoom_level) - (child_text_size.y * t->zoom_level)) * 0.5f;
-
-                        // Draw the text
-                        ImVec2 child_text_pos = ImVec2(current_element_x_screen, text_y_pos);
-                        draw_list->AddText(nullptr, sub_font_size * t->zoom_level, child_text_pos,
-                                           current_child_text_color, crit->display_name);
-
-                        // Advance X position using the width we just calculated
-                        current_element_x_screen += (child_text_size.x * t->zoom_level) + (4.0f * t->zoom_level);
-
-                        char crit_progress_text[32] = "";
-                        if (is_stat_section) {
-                            if (crit->goal > 0) {
-                                snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d / %d)", crit->progress,
-                                         crit->goal);
-                            } else if (crit->goal == -1) {
-                                snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d)", crit->progress);
+                            // Calculate text height using the correct font scale
+                            float scale_factor = 1.0f;
+                            if (settings->tracker_font_size > 0.0f) {
+                                // Prevent division by zero
+                                scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
                             }
 
-                            if (crit_progress_text[0] != '\0') {
-                                ImVec2 crit_progress_pos = ImVec2(current_element_x_screen, text_y_pos);
-                                draw_list->AddText(nullptr, sub_font_size * t->zoom_level, crit_progress_pos,
-                                                   current_child_text_color, crit_progress_text);
+                            ImGui::PushFont(t->tracker_font); // Ensure we're scaling from the correct base font
+                            ImGui::SetWindowFontScale(scale_factor);
+
+                            // Calculate the height of the text. (Width is also needed for the X advance)
+                            ImVec2 child_text_size = ImGui::CalcTextSize(crit->display_name);
+
+                            ImGui::SetWindowFontScale(1.0f); // Restore scale
+                            ImGui::PopFont();
+
+                            // Calculate the vertically centered Y position
+                            // (BoxTop) + ( (BoxHeight - TextHeight) / 2 )
+                            // Both the box height AND the text height must be scaled by zoom.
+                            float text_y_pos = crit_base_pos_screen.y + (
+                                                   (32.0f * t->zoom_level) - (child_text_size.y * t->zoom_level)) *
+                                               0.5f;
+
+                            // Draw the text
+                            ImVec2 child_text_pos = ImVec2(current_element_x_screen, text_y_pos);
+                            draw_list->AddText(nullptr, sub_font_size * t->zoom_level, child_text_pos,
+                                               current_child_text_color, crit->display_name);
+
+                            // Advance X position using the width we just calculated
+                            current_element_x_screen += (child_text_size.x * t->zoom_level) + (4.0f * t->zoom_level);
+
+                            char crit_progress_text[32] = "";
+                            if (is_stat_section) {
+                                if (crit->goal > 0) {
+                                    snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d / %d)",
+                                             crit->progress,
+                                             crit->goal);
+                                } else if (crit->goal == -1) {
+                                    snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d)", crit->progress);
+                                }
+
+                                if (crit_progress_text[0] != '\0') {
+                                    ImVec2 crit_progress_pos = ImVec2(current_element_x_screen, text_y_pos);
+                                    draw_list->AddText(nullptr, sub_font_size * t->zoom_level, crit_progress_pos,
+                                                       current_child_text_color, crit_progress_text);
+                                }
                             }
                         }
 
@@ -3641,7 +3697,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
 
                 // Render Parent Checkbox for Stats (single or multi)
-                if (is_stat_section) {
+                // LOD: Hide parent checkbox if zoomed out too far (tied to main text threshold)
+                if (is_stat_section && t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
                     ImVec2 check_pos_parent = ImVec2(screen_pos.x + 4 * t->zoom_level,
                                                      screen_pos.y + 4 * t->zoom_level); // Top-left corner
                     ImRect checkbox_rect_parent(check_pos_parent,
