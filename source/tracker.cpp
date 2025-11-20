@@ -2737,7 +2737,7 @@ static void render_section_separator(Tracker *t, const AppSettings *settings, fl
 }
 
 /**
- * @brief Renders a section of items that are TrackableCategories (e.g., Advancements, Stats).
+ * @brief Renders a section of items that are TrackableCategories (e.g., Advancements, Recipes, Stats).
  * This function handles the uniform grid layout and the two-pass rendering for simple vs. complex items.
  * It distinguishes between advancements and stats with the bool flag and manages all the checkbox logic,
  * communicating with the settings.json file. It also calculates and displays completion counters.
@@ -2758,11 +2758,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
     // --- LOD THRESHOLDS ---
     // 1. Zoom < 0.60: Hide Sub-Item Text & Progress Text
-    const float LOD_TEXT_SUB_THRESHOLD = 0.60f;
+    const float LOD_TEXT_SUB_THRESHOLD = settings->lod_text_sub_threshold;
     // 2. Zoom < 0.40: Hide Main Item Text, Parent Checkboxes & Sub-Item Checkboxes
-    const float LOD_TEXT_MAIN_THRESHOLD = 0.40f;
+    const float LOD_TEXT_MAIN_THRESHOLD = settings->lod_text_main_threshold;
     // 3. Zoom < 0.25: Simplify Sub-Item Icons to Squares
-    const float LOD_ICON_DETAIL_THRESHOLD = 0.25f;
+    const float LOD_ICON_DETAIL_THRESHOLD = settings->lod_icon_detail_threshold;
 
 
     // --- Pre-computation and Filtering for Counters ---
@@ -4097,8 +4097,8 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 static void render_custom_goals_section(Tracker *t, const AppSettings *settings, float &current_y,
                                         const char *section_title) {
     // LOD Thresholds
-    const float LOD_TEXT_SUB_THRESHOLD = 0.60f;  // Hide Progress Text
-    const float LOD_TEXT_MAIN_THRESHOLD = 0.40f; // Hide Main Name & Checkboxes
+    const float LOD_TEXT_SUB_THRESHOLD = settings->lod_text_sub_threshold;  // Hide Progress Text
+    const float LOD_TEXT_MAIN_THRESHOLD = settings->lod_text_main_threshold; // Hide Main Name & Checkboxes
 
     int count = t->template_data->custom_goal_count;
 
@@ -4519,8 +4519,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 static void render_multistage_goals_section(Tracker *t, const AppSettings *settings, float &current_y,
                                             const char *section_title) {
     // LOD Thresholds
-    const float LOD_TEXT_SUB_THRESHOLD = 0.60f;  // Hide Stage Text
-    const float LOD_TEXT_MAIN_THRESHOLD = 0.40f; // Hide Main Goal Name
+    const float LOD_TEXT_SUB_THRESHOLD = settings->lod_text_sub_threshold;  // Hide Stage Text
+    const float LOD_TEXT_MAIN_THRESHOLD = settings->lod_text_main_threshold; // Hide Main Goal Name
 
     int count = t->template_data->multi_stage_goal_count;
 

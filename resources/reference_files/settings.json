@@ -154,6 +154,7 @@
 			"b":	250,
 			"a":	255
 		},
+		"tracker_vertical_spacing":	8,
 		"adv_bg_path":	"advancement_background.png",
 		"adv_bg_half_done_path":	"advancement_background_half_done.png",
 		"adv_bg_done_path":	"advancement_background_done.png",
@@ -163,7 +164,10 @@
 		"overlay_row3_custom_spacing_enabled":	false,
 		"overlay_row3_custom_spacing":	256,
 		"tracker_section_custom_width_enabled":	[false, false, false, false, false, false],
-		"tracker_section_custom_item_width":	[128, 128, 128, 128, 128, 128]
+		"tracker_section_custom_item_width":	[128, 128, 128, 128, 128, 128],
+		"lod_text_sub_threshold":	0.600000023841858,
+		"lod_text_main_threshold":	0.40000000596046448,
+		"lod_icon_detail_threshold":	0.25
 	},
 	"path_mode":	"auto",
 	"manual_saves_path":	"",

@@ -100,6 +100,11 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 
 #define DEFAULT_OVERLAY_FONT_SIZE 24.0f // This is fixed currently
 
+// LOD Defaults
+#define DEFAULT_LOD_TEXT_SUB_THRESHOLD 0.60f
+#define DEFAULT_LOD_TEXT_MAIN_THRESHOLD 0.40f
+#define DEFAULT_LOD_ICON_DETAIL_THRESHOLD 0.25f
+
 // Default window positions/sizes. -1 means centered or default size.
 #define DEFAULT_WINDOW_POS (-1)
 #define DEFAULT_WINDOW_SIZE (-1)
@@ -196,6 +201,11 @@ struct AppSettings {
     float overlay_row3_custom_spacing;        // The custom spacing value for row 3
     bool overlay_row3_remove_completed; // If true, the third row will also hide completed goals as row 2 does.
     float overlay_stat_cycle_speed; // Time in seconds between cycling sub-stats on the overlay.
+
+    // Level of Detail (LOD)
+    float lod_text_sub_threshold; // Zoom level below which sub-item text/progress is hidden
+    float lod_text_main_threshold; // Zoom level below which main item text/checkboxes are hidden
+    float lod_icon_detail_threshold; // Zoom level below which icons become simple squares
 
     // --- Custom Tracker Spacing ---
     float tracker_vertical_spacing; // Vertical spacing in pixels between goals globally

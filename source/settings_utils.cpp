@@ -373,6 +373,11 @@ void settings_set_defaults(AppSettings *settings) {
     settings->ui_header_active_color = DEFAULT_UI_HEADER_ACTIVE_COLOR;
     settings->ui_check_mark_color = DEFAULT_UI_CHECK_MARK_COLOR;
 
+    // LOD Defaults
+    settings->lod_text_sub_threshold = DEFAULT_LOD_TEXT_SUB_THRESHOLD;
+    settings->lod_text_main_threshold = DEFAULT_LOD_TEXT_MAIN_THRESHOLD;
+    settings->lod_icon_detail_threshold = DEFAULT_LOD_ICON_DETAIL_THRESHOLD;
+
     // Default Overlay Text Toggles
     settings->overlay_show_world = true;
     settings->overlay_show_run_details = true;
@@ -905,6 +910,31 @@ bool settings_load(AppSettings *settings) {
         if (load_color(visual_settings, "ui_check_mark_color", &settings->ui_check_mark_color,
                        &DEFAULT_UI_CHECK_MARK_COLOR))
             defaults_were_used = true;
+
+        // --- Load LOD Settings ---
+        const cJSON *lod_sub = cJSON_GetObjectItem(visual_settings, "lod_text_sub_threshold");
+        if (lod_sub && cJSON_IsNumber(lod_sub))
+            settings->lod_text_sub_threshold = (float) lod_sub->valuedouble;
+        else {
+            settings->lod_text_sub_threshold = DEFAULT_LOD_TEXT_SUB_THRESHOLD;
+            defaults_were_used = true;
+        }
+
+        const cJSON *lod_main = cJSON_GetObjectItem(visual_settings, "lod_text_main_threshold");
+        if (lod_main && cJSON_IsNumber(lod_main))
+            settings->lod_text_main_threshold = (float) lod_main->valuedouble;
+        else {
+            settings->lod_text_main_threshold = DEFAULT_LOD_TEXT_MAIN_THRESHOLD;
+            defaults_were_used = true;
+        }
+
+        const cJSON *lod_icon = cJSON_GetObjectItem(visual_settings, "lod_icon_detail_threshold");
+        if (lod_icon && cJSON_IsNumber(lod_icon))
+            settings->lod_icon_detail_threshold = (float) lod_icon->valuedouble;
+        else {
+            settings->lod_icon_detail_threshold = DEFAULT_LOD_ICON_DETAIL_THRESHOLD;
+            defaults_were_used = true;
+        }
     } else {
         defaults_were_used = true;
         settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING; // Ensure default if visuals section missing
@@ -914,6 +944,10 @@ bool settings_load(AppSettings *settings) {
         settings->overlay_row3_custom_spacing = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING;
 
         settings->tracker_vertical_spacing = DEFAULT_TRACKER_VERTICAL_SPACING;
+
+        settings->lod_text_sub_threshold = DEFAULT_LOD_TEXT_SUB_THRESHOLD;
+        settings->lod_text_main_threshold = DEFAULT_LOD_TEXT_MAIN_THRESHOLD;
+        settings->lod_icon_detail_threshold = DEFAULT_LOD_ICON_DETAIL_THRESHOLD;
 
         // Custom Tracker Spacing Defaults
         for (int i = 0; i < SECTION_COUNT; i++) {
@@ -1162,6 +1196,19 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         save_color(visuals_obj, "ui_header_hovered_color", &settings->ui_header_hovered_color);
         save_color(visuals_obj, "ui_header_active_color", &settings->ui_header_active_color);
         save_color(visuals_obj, "ui_check_mark_color", &settings->ui_check_mark_color);
+
+        // --- Save LOD Settings ---
+        cJSON_DeleteItemFromObject(visuals_obj, "lod_text_sub_threshold");
+        cJSON_AddItemToObject(visuals_obj, "lod_text_sub_threshold",
+                              cJSON_CreateNumber(settings->lod_text_sub_threshold));
+
+        cJSON_DeleteItemFromObject(visuals_obj, "lod_text_main_threshold");
+        cJSON_AddItemToObject(visuals_obj, "lod_text_main_threshold",
+                              cJSON_CreateNumber(settings->lod_text_main_threshold));
+
+        cJSON_DeleteItemFromObject(visuals_obj, "lod_icon_detail_threshold");
+        cJSON_AddItemToObject(visuals_obj, "lod_icon_detail_threshold",
+                              cJSON_CreateNumber(settings->lod_icon_detail_threshold));
     }
 
     // Update Custom Progress if provided

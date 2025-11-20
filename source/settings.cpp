@@ -65,6 +65,11 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_stat_cycle_speed != b->overlay_stat_cycle_speed ||
         a->tracker_vertical_spacing != b->tracker_vertical_spacing ||
 
+        // LOD Settings
+        a->lod_text_sub_threshold != b->lod_text_sub_threshold ||
+        a->lod_text_main_threshold != b->lod_text_main_threshold ||
+        a->lod_icon_detail_threshold != b->lod_icon_detail_threshold ||
+
         a->notes_use_roboto_font != b->notes_use_roboto_font ||
         a->check_for_updates != b->check_for_updates ||
         a->show_welcome_on_startup != b->show_welcome_on_startup ||
@@ -1580,6 +1585,46 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                            "Click 'Restart Advancely' to properly apply these font/size changes.");
     }
 
+    // --- Level of Detail Settings ---
+    ImGui::SeparatorText("Level of Detail (Zoom)");
+    ImGui::TextWrapped("Adjust at which zoom level elements disappear to declutter the view and improve performance. Higher values mean more zoom.");
+
+    ImGui::DragFloat("Hide Sub-Item Text At", &temp_settings.lod_text_sub_threshold, 0.001f, 0.05f, 10.0f, "%.3f");
+    if (ImGui::IsItemHovered()) {
+        char lod_sub_tooltip[1024];
+        snprintf(lod_sub_tooltip, sizeof(lod_sub_tooltip),
+                 "The zoom threshold below which sub-item text is hidden.\n"
+                 "Affects:\n"
+                 " - Names of Criteria, Sub-Stats, and Stages.\n"
+                 " - Progress Text like '(5/10)'.\n"
+                 "Default: %.3f", DEFAULT_LOD_TEXT_SUB_THRESHOLD);
+        ImGui::SetTooltip("%s", lod_sub_tooltip);
+    }
+
+    ImGui::DragFloat("Hide Main Text/Checkbox At", &temp_settings.lod_text_main_threshold, 0.001f, 0.05f, 10.0f, "%.3f");
+    if (ImGui::IsItemHovered()) {
+        char lod_main_tooltip[1024];
+        snprintf(lod_main_tooltip, sizeof(lod_main_tooltip),
+                 "The zoom threshold below which main item text and interactive elements are hidden.\n"
+                 "Affects:\n"
+                 " - Main Category Names (e.g., 'Monster Hunter').\n"
+                 " - Checkboxes for manual completion (Parent and Sub-Stat checkboxes).\n"
+                 "Default: %.3f", DEFAULT_LOD_TEXT_MAIN_THRESHOLD);
+        ImGui::SetTooltip("%s", lod_main_tooltip);
+    }
+
+    ImGui::DragFloat("Simplify Icons At", &temp_settings.lod_icon_detail_threshold, 0.001f, 0.05f, 10.0f, "%.3f");
+    if (ImGui::IsItemHovered()) {
+        char lod_icon_tooltip[1024];
+        snprintf(lod_icon_tooltip, sizeof(lod_icon_tooltip),
+                 "The zoom threshold below which sub-item icons are simplified.\n"
+                 "Affects:\n"
+                 " - Criteria and Sub-Stat icons turn into simple colored squares.\n"
+                 " - The squares use your chosen Text Color with low opacity to indicate presence.\n"
+                 "Default: %.3f", DEFAULT_LOD_ICON_DETAIL_THRESHOLD);
+        ImGui::SetTooltip("%s", lod_icon_tooltip);
+    }
+
     // --- Spacing Settings ---
     ImGui::SeparatorText("Tracker Spacing");
 
@@ -2145,7 +2190,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
     // TODO: Add default values always to this tooltip here
     if (ImGui::IsItemHovered()) {
-        char tooltip_buffer[2048];
+        char tooltip_buffer[3072];
 
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                  "Resets all settings (besides window size/position & hotkeys) in this window to their default values.\n"
@@ -2153,74 +2198,64 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "Defaults:\n"
                  "  - Path Mode: Auto-Detect Default Saves Path\n"
                  "  - Template/Display Version: %s\n"
-                 "  - Category: %s\n"
-                 "  - Optional Flag: %s\n"
-                 "  - Display Category: %s\n"
-                 "  - Language: Default\n"
                  "  - StatsPerWorld Mod (Legacy): %s\n"
-                 "  - Section Order: %s -> Recipes -> Unlocks -> Stats -> Custom -> Multi-Stage\n"
-                 "  - Custom Section Width: %s (%.0f px)\n"
+                 "  - Category: %s, Optional Flag: %s, Display Category: %s, Language: Default\n"
                  "  - Enable Overlay: %s\n"
-                 "  - Tracker FPS Limit: %d\n"
-                 "  - Overlay FPS Limit: %d\n"
+                 "  - FPS Limit: (Tracker: %d, Overlay: %d)\n"
+                 "  - Overlay Width: %dpx\n"
                  "  - Overlay Scroll Speed: %.2f\n"
-                 "  - Row 1 Icon Spacing: %.1f px\n"
-                 "  - Custom Row 2 Spacing: %s (%.0f px)\n"
-                 "  - Custom Row 3 Spacing: %s (%.0f px)\n"
                  "  - Sub-Stat Cycle Interval: %.1f s\n"
                  "  - Hide Completed Row 3 Goals: %s\n"
                  "  - Always On Top: %s\n"
-                 "  - Tracker Font: %s (Main: %.1f pt, Sub: %.1f pt, UI: %.1f pt)\n"
-                 "  - Overlay Font: %s\n"
-                 "  - Settings/UI Font: %s (%.1f pt)\n"
                  "  - Goal Visibility: Hide All Completed\n"
-                 "  - Overlay Width: %dpx\n"
+                 "  - Overlay Title Alignment: Left\n"
+                 "  - Overlay Text Sections: All Enabled\n"
+                 "  - Visual Colors: Default Dark Theme\n"
                  "  - Default Background: %s\n"
                  "  - Half-Done Background: %s\n"
                  "  - Done Background: %s\n"
-                 "  - Notes Use Settings Font: %s\n"
+                 "  - Fonts: Tracker: %s, Overlay: %s, UI: %s\n"
+                 "  - Font Sizes: Main: %.1f pt, Sub: %.1f pt, UI: %.1f pt\n"
+                 "  - Level of Detail: Sub-Text: %.2f, Main-Text: %.2f, Icons: %.2f\n"
+                 "  - Custom Section Width: %s (%.0f px)\n"
                  "  - Tracker Vertical Spacing: %.1f px\n"
+                 "  - Overlay Spacing: Row 1: %.1f px, (%s) Row 2: %.0f px, (%s) Row 3: %.0f px\n"
+                 "  - Section Order: %s -> Recipes -> Unlocks -> Stats -> Custom -> Multi-Stage\n"
                  "  - Print Debug To Console: %s\n"
                  "  - Check For Updates: %s\n"
-                 "  - Show Welcome on Startup: %s\n\n"
+                 "  - Show Welcome on Startup: %s\n"
+                 "  - Notes Use Settings Font: %s\n\n"
                  "More found in resources/reference_files/Default_Settings.png",
 
                  DEFAULT_VERSION,
-                 DEFAULT_CATEGORY,
-                 DEFAULT_OPTIONAL_FLAG,
-                 DEFAULT_DISPLAY_CATEGORY,
                  DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
-                 advancements_label_plural_uppercase,
+                 DEFAULT_CATEGORY, DEFAULT_OPTIONAL_FLAG, DEFAULT_DISPLAY_CATEGORY,
+                 DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
+                 DEFAULT_FPS, DEFAULT_OVERLAY_FPS,
+                 OVERLAY_DEFAULT_WIDTH,
+                 DEFAULT_OVERLAY_SCROLL_SPEED,
+                 DEFAULT_OVERLAY_STAT_CYCLE_SPEED,
+                 DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
+                 DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
+                 DEFAULT_ADV_BG_PATH,
+                 DEFAULT_ADV_BG_HALF_DONE_PATH,
+                 DEFAULT_ADV_BG_DONE_PATH,
+                 DEFAULT_TRACKER_FONT, DEFAULT_OVERLAY_FONT, DEFAULT_UI_FONT,
+                 DEFAULT_TRACKER_FONT_SIZE, DEFAULT_TRACKER_SUB_FONT_SIZE, DEFAULT_UI_FONT_SIZE,
+                 DEFAULT_LOD_TEXT_SUB_THRESHOLD, DEFAULT_LOD_TEXT_MAIN_THRESHOLD, DEFAULT_LOD_ICON_DETAIL_THRESHOLD,
                  DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED ? "Enabled" : "Disabled",
                  DEFAULT_TRACKER_SECTION_ITEM_WIDTH,
-                 DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
-                 DEFAULT_FPS,
-                 DEFAULT_OVERLAY_FPS,
-                 DEFAULT_OVERLAY_SCROLL_SPEED,
+                 DEFAULT_TRACKER_VERTICAL_SPACING,
                  DEFAULT_OVERLAY_ROW1_SPACING,
                  DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED ? "Enabled" : "Disabled",
                  DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING,
                  DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED ? "Enabled" : "Disabled",
                  DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING,
-                 DEFAULT_OVERLAY_STAT_CYCLE_SPEED,
-                 DEFAULT_OVERLAY_ROW3_REMOVE_COMPLETED ? "Enabled" : "Disabled",
-                 DEFAULT_TRACKER_ALWAYS_ON_TOP ? "Enabled" : "Disabled",
-                 DEFAULT_TRACKER_FONT,
-                 DEFAULT_TRACKER_FONT_SIZE,
-                 DEFAULT_TRACKER_SUB_FONT_SIZE,
-                 DEFAULT_TRACKER_UI_FONT_SIZE,
-                 DEFAULT_OVERLAY_FONT,
-                 DEFAULT_UI_FONT,
-                 DEFAULT_UI_FONT_SIZE,
-                 OVERLAY_DEFAULT_WIDTH,
-                 DEFAULT_ADV_BG_PATH,
-                 DEFAULT_ADV_BG_HALF_DONE_PATH,
-                 DEFAULT_ADV_BG_DONE_PATH,
-                 DEFAULT_NOTES_USE_ROBOTO ? "Enabled" : "Disabled",
-                 DEFAULT_TRACKER_VERTICAL_SPACING,
+                 advancements_label_plural_uppercase,
                  DEFAULT_PRINT_DEBUG_STATUS ? "Enabled" : "Disabled",
                  DEFAULT_CHECK_FOR_UPDATES ? "Enabled" : "Disabled",
-                 DEFAULT_SHOW_WELCOME_ON_STARTUP ? "Enabled" : "Disabled"
+                 DEFAULT_SHOW_WELCOME_ON_STARTUP ? "Enabled" : "Disabled",
+                 DEFAULT_NOTES_USE_ROBOTO ? "Enabled" : "Disabled"
         );
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
