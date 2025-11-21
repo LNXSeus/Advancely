@@ -90,7 +90,7 @@
 			}
 		},
 		"minecraft:nether/return_to_sender":	{
-			"icon":	"items/fireball_1.9.png",
+			"icon":	"items/fire_charge_25w14craftmine.png",
 			"criteria":	{
 			}
 		},
