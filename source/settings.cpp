@@ -1043,22 +1043,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::SetTooltip("%s", overlay_scroll_speed_tooltip_buffer);
         }
 
-        if (temp_settings.overlay_row3_custom_spacing_enabled) {
-            ImGui::SameLine();
-            ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
-            ImGui::DragFloat("Row 3 Item Width", &temp_settings.overlay_row3_custom_spacing, 1.0f, 96.0f, 7680.0f,
-                             "%.0f px");
-            if (ImGui::IsItemHovered()) {
-                char tooltip_buffer[512];
-                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "Sets the total horizontal width (in pixels) for each item in Row 3.\n"
-                         "WARNING: If this value is too small, item text will overlap.\n"
-                         "The item icon is %dpx wide. Default: %.0fpx.",
-                         96, DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING);
-                ImGui::SetTooltip("%s", tooltip_buffer);
-            }
-        }
-
         ImGui::DragFloat("Sub-Stat Cycle Interval (s)", &temp_settings.overlay_stat_cycle_speed, 0.1f, 0.1f, 60.0f,
                          "%.3f s");
         if (ImGui::IsItemHovered()) {
@@ -1749,6 +1733,22 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "Check this to override the dynamic width calculation for Row 3 items.\n"
                  "This allows you to set a fixed, uniform width for all items in this row.");
         ImGui::SetTooltip("%s", tooltip_buffer);
+    }
+
+    if (temp_settings.overlay_row3_custom_spacing_enabled) {
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
+        ImGui::DragFloat("Row 3 Item Width", &temp_settings.overlay_row3_custom_spacing, 1.0f, 96.0f, 7680.0f,
+                         "%.0f px");
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[512];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Sets the total horizontal width (in pixels) for each item in Row 3.\n"
+                     "WARNING: If this value is too small, item text will overlap.\n"
+                     "The item icon is %dpx wide. Default: %.0fpx.",
+                     96, DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING);
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
     }
 
     ImGui::Separator();
