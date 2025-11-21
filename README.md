@@ -68,9 +68,8 @@ Thank you for supporting the project!
   <em>This screenshot has the <code>Tracker Font Size</code> set to <code>24</code>.</em>
 </p>
 
-Advancely is a sophisticated, data-driven progress tracker (just like
-A[AATool](https://github.com/DarwinBaker/AATool)) - that works on Windows, Linux and macOS - designed for Minecraft
-speedrunners, completionists, and
+Advancely is a sophisticated, data-driven progress tracker (just like [AATool](https://github.com/DarwinBaker/AATool)) -
+that works on Windows, Linux and macOS - designed for Minecraft speedrunners, completionists, and
 content creators. Unlike other tools that only track vanilla advancements (e.g., AATool by Darwin Baker), Advancely can
 be configured to monitor virtually any goal imaginable. It operates in real-time by watching your singleplayer save
 files for changes, meaning your progress is always up-to-date without any manual intervention.
