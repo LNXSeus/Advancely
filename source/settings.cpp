@@ -180,6 +180,18 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         }
 
         if (selected_template) {
+            // Check if the currently set language is valid for this template
+            bool current_is_valid = false;
+            for (const auto &flag: selected_template->available_lang_flags) {
+                if (flag == temp_settings.lang_flag) {
+                    current_is_valid = true;
+                    break;
+                }
+            }
+
+            // If the current language is valid, keep it (fixes reset on startup)
+            if (current_is_valid) return;
+
             bool default_lang_found = false;
             for (const auto &flag: selected_template->available_lang_flags) {
                 if (flag.empty()) {
