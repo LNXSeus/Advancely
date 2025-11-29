@@ -581,6 +581,10 @@ lists of game data to assist you in building the perfect template.
 The true power of Advancely lies in its deep customization. Every feature can be configured in real-time from the
 settings window, which can be opened at any time by pressing the `ESC` key.
 
+_All the settings are then saved to `resources/config/settings.json`, meaning you can easily backup the `settings.json`
+file as it requires that exact naming, but make sure Advancely IS CLOSED while renaming the `settings.json` file. The
+settings file also saves the status on manual overrides of stats and custom goals, which get erased when switching templates._
+
 <p align="center">
   <img src="readme_assets/v0.9.496_Settings_Window_pt1.png"/>
     <br>

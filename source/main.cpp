@@ -1550,6 +1550,7 @@ int main(int argc, char *argv[]) {
             // Overlay Restart Logic (triggered ONLY by Apply button)
             if (SDL_SetAtomicInt(&g_apply_button_clicked, 0) == 1) {
                 log_message(LOG_INFO, "[MAIN] 'Apply Settings' clicked. Re-initializing overlay process.\n");
+
                 // First, check if an overlay process is currently running.
                 bool overlay_is_running = false;
 #ifdef _WIN32
@@ -1558,20 +1559,66 @@ int main(int argc, char *argv[]) {
                 overlay_is_running = tracker->overlay_pid > 0;
 #endif
 
-                // If an overlay is running, always terminate it to ensure settings are reapplied on restart.
+                // Graceful Shutdown Sequence
                 if (overlay_is_running) {
-                    log_message(LOG_INFO, "[MAIN] Terminating existing overlay process to apply new settings.\n");
+                    log_message(LOG_INFO, "[MAIN] Requesting graceful shutdown of overlay...\n");
+
+                    // 1. Request shutdown via Shared Memory
+                    if (tracker->p_shared_data) {
 #ifdef _WIN32
-                    TerminateProcess(tracker->overlay_process_info.hProcess, 0);
+                        WaitForSingleObject(tracker->h_mutex, 100);
+                        tracker->p_shared_data->shutdown_requested = true;
+                        ReleaseMutex(tracker->h_mutex);
+#else
+                        sem_wait(tracker->mutex);
+                        tracker->p_shared_data->shutdown_requested = true;
+                        sem_post(tracker->mutex);
+#endif
+                    }
+
+                    // 2. Wait for the process to exit cleanly (up to 500ms)
+#ifdef _WIN32
+                    DWORD wait_result = WaitForSingleObject(tracker->overlay_process_info.hProcess, 500);
+                    if (wait_result == WAIT_TIMEOUT) {
+                        log_message(LOG_INFO, "[MAIN] Overlay shutdown timed out. Forcing termination.\n");
+                        TerminateProcess(tracker->overlay_process_info.hProcess, 0);
+                    }
                     CloseHandle(tracker->overlay_process_info.hProcess);
                     CloseHandle(tracker->overlay_process_info.hThread);
                     memset(&tracker->overlay_process_info, 0, sizeof(tracker->overlay_process_info));
 #else
-                    kill(tracker->overlay_pid, SIGKILL);
+                    int status;
+                    int retries = 5;
+                    bool exited = false;
+                    while (retries-- > 0) {
+                        if (waitpid(tracker->overlay_pid, &status, WNOHANG) == tracker->overlay_pid) {
+                            exited = true;
+                            break;
+                        }
+                        usleep(100000); // Wait 100ms
+                    }
+
+                    if (!exited) {
+                        log_message(LOG_INFO, "[MAIN] Overlay shutdown timed out. Forcing termination.\n");
+                        kill(tracker->overlay_pid, SIGKILL);
+                        waitpid(tracker->overlay_pid, &status, 0); // Clean up zombie
+                    }
                     tracker->overlay_pid = 0;
 #endif
                 }
 
+                // Reset the shutdown flag so the NEW process doesn't immediately exit
+                if (tracker->p_shared_data) {
+#ifdef _WIN32
+                    WaitForSingleObject(tracker->h_mutex, 100);
+                    tracker->p_shared_data->shutdown_requested = false;
+                    ReleaseMutex(tracker->h_mutex);
+#else
+                    sem_wait(tracker->mutex);
+                    tracker->p_shared_data->shutdown_requested = false;
+                    sem_post(tracker->mutex);
+#endif
+                }
 
                 // Now, check if the NEW settings require the overlay to be enabled.
                 if (app_settings.enable_overlay) {

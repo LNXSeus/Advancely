@@ -310,7 +310,7 @@ bool apply_update(const char* main_executable_path) {
     fprintf(updater_script, "echo \"Applying update...\"\n");
 
 #if defined(__APPLE__)
-    // macOS: Replace the .app bundle, but merge the resources folder.
+    // macOS: Replace the .app bundle, but merge the "resources" folder.
     fprintf(updater_script, "rm -rf ./Advancely.app\n");
     fprintf(updater_script, "cp -R ./%s/Advancely.app ./\n", temp_dir);
     fprintf(updater_script, "cp ./%s/*.txt ./\n", temp_dir);
