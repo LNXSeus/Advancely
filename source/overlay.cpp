@@ -693,9 +693,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     float x_pos;
                     if (settings->overlay_scroll_speed > 0) {
                         // Positive Scroll (L->R): Anchor to the Right (End)
-                        // We calculate position relative to the END of the block so items 'upstream' shift.
-                        int inverse_index = visible_item_count - 1 - visible_item_index;
-                        x_pos = block_offset - (inverse_index * item_full_width);
+                        // This puts Index 0 on the Right (Leading), and Index N on the Left (Trailing).
+                        // This ensures Item 0 appears first.
+                        x_pos = block_offset - (visible_item_index * item_full_width);
                     } else {
                         // Negative Scroll (R->L): Anchor to the Left (Start) - Default Behavior
                         x_pos = block_offset + (visible_item_index * item_full_width);
@@ -1008,8 +1008,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                         float current_x;
                         if (settings->overlay_scroll_speed > 0) {
                             // Positive Scroll (L->R): Anchor to the Right
-                            int inverse_index = visible_item_count - 1 - visible_item_index;
-                            current_x = block_offset - (inverse_index * item_full_width_row2);
+                            current_x = block_offset - (visible_item_index * item_full_width_row2);
                         } else {
                             // Negative Scroll (R->L): Anchor to the Left
                             current_x = block_offset + (visible_item_index * item_full_width_row2);
@@ -1307,8 +1306,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     float current_x;
                     if (settings->overlay_scroll_speed > 0) {
                         // Positive Scroll (L->R): Anchor to the Right
-                        int inverse_index = visible_item_count - 1 - visible_item_index;
-                        current_x = block_offset - (inverse_index * item_full_width_row3);
+                        current_x = block_offset - (visible_item_index * item_full_width_row3);
                     } else {
                         // Negative Scroll (R->L): Anchor to the Left
                         current_x = block_offset + (visible_item_index * item_full_width_row3);
