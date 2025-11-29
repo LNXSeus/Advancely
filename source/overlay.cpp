@@ -466,114 +466,26 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
     // Speedup from holding SPACE is handled in overlay_events directly, mutliplying by deltatime
     float scroll_delta = -(base_scroll_speed * speed_multiplier * (*deltaTime));
 
-    // --- Row 1 Update Logic ---
+
+    // --- Row 1 Update Logic (Dynamic Width) ---
     if (!row1_items.empty()) {
-        // VALIDATE INDEX FIRST to prevent out-of-bounds access after a template reload.
-        if (static_cast<size_t>(o->start_index_row1) >= row1_items.size()) {
-            o->start_index_row1 = 0;
-        }
-
-        // Count visible items to prevent lag when the row is completed
-        size_t visible_item_count = 0;
-        for (const auto &item_pair: row1_items) {
-            // A criterion is only visible if it is not done AND its parent category is not hidden.
-            if (!item_pair.first->done && !item_pair.second->is_hidden) {
-                visible_item_count++;
-            }
-        }
-
-        if (visible_item_count > 0) {
-            const float item_full_width = 48.0f + settings->overlay_row1_spacing; // ROW1_ICON_SIZE + ROW1_SPACING
-            o->scroll_offset_row1 += scroll_delta;
-            int items_scrolled = floor(fabs(o->scroll_offset_row1) / item_full_width);
-            if (items_scrolled > 0) {
-                o->scroll_offset_row1 = fmod(o->scroll_offset_row1, item_full_width);
-                if (scroll_delta > 0) {
-                    for (int i = 0; i < items_scrolled; ++i) {
-                        size_t loop_guard = 0;
-                        do {
-                            // Only rendering item if it is not done AND its parent category is not hidden.
-                            o->start_index_row1 = (o->start_index_row1 + 1) % row1_items.size();
-                            loop_guard++;
-                        } while ((row1_items[o->start_index_row1].first->done || row1_items[o->start_index_row1].second
-                                  ->is_hidden || row1_items[o->start_index_row1].first->is_hidden) && loop_guard <
-                                 row1_items.size() * 2);
-                    }
-                } else {
-                    for (int i = 0; i < items_scrolled; ++i) {
-                        size_t loop_guard = 0;
-                        do {
-                            o->start_index_row1 = (o->start_index_row1 - 1 + row1_items.size()) % row1_items.size();
-                            loop_guard++;
-                        } while ((row1_items[o->start_index_row1].first->done || row1_items[o->start_index_row1].second
-                                  ->is_hidden || row1_items[o->start_index_row1].first->is_hidden) && loop_guard <
-                                 row1_items.size() * 2);
-                    }
-                }
-            }
-        } else {
-            // If no items are visible, reset scroll offset to prevent drift
-            o->scroll_offset_row1 = 0;
-        }
+        // scroll_delta is negative by default. Adding it makes the offset
+        // increasingly negative, which moves items from Right to Left.
+        // Do NOT reset the offset to 0. Let it accumulate.
+        // The render function handles the wrapping via fmod().
+        o->scroll_offset_row1 -= scroll_delta;
     } else {
-        // Reset if the row is completely empty
-        o->start_index_row1 = 0;
+        o->scroll_offset_row1 = 0;
     }
 
     // --- Row 2 Update Logic (Dynamic Width) ---
     if (!row2_items.empty()) {
-        // VALIDATE INDEX FIRST (remains the same)
-        if (static_cast<size_t>(o->start_index_row2) >= row2_items.size()) {
-            o->start_index_row2 = 0;
-        }
-
-        // Count visible items
-        size_t visible_item_count = 0;
-        for (const auto &item: row2_items) {
-            if (!is_display_item_done(item, settings)) {
-                visible_item_count++;
-            }
-        }
-
-        // Only run animation logic if there are visible items
-        if (visible_item_count > 0) {
-            // --- USE STORED WIDTH ---
-            const float item_full_width = o->calculated_row2_item_width; // Use width calculated in previous render
-            // --- END USE STORED WIDTH ---
-
-            o->scroll_offset_row2 += scroll_delta; // Use the same scroll_delta for consistency
-            // --- Floor calculation and index update logic remains the same ---
-            int items_scrolled = floor(fabs(o->scroll_offset_row2) / item_full_width);
-            if (items_scrolled > 0) {
-                o->scroll_offset_row2 = fmod(o->scroll_offset_row2, item_full_width);
-                if (scroll_delta > 0) {
-                    // Moving RTL
-                    for (int i = 0; i < items_scrolled; ++i) {
-                        size_t loop_guard = 0;
-                        do {
-                            o->start_index_row2 = (o->start_index_row2 + 1) % row2_items.size();
-                            loop_guard++;
-                        } while (is_display_item_done(row2_items[o->start_index_row2], settings) && loop_guard <
-                                 row2_items.size() * 2);
-                    }
-                } else {
-                    // Moving LTR
-                    for (int i = 0; i < items_scrolled; ++i) {
-                        size_t loop_guard = 0;
-                        do {
-                            o->start_index_row2 = (o->start_index_row2 - 1 + row2_items.size()) % row2_items.size();
-                            loop_guard++;
-                        } while (is_display_item_done(row2_items[o->start_index_row2], settings) && loop_guard <
-                                 row2_items.size() * 2);
-                    }
-                }
-            }
-        } else {
-            // If no items are visible, reset scroll offset to prevent drift
-            o->scroll_offset_row2 = 0;
-        }
+        // Unified Logic: Just accumulate the scroll delta.
+        // We no longer need to calculate widths or swap indices here.
+        // The Block-Based renderer handles the wrapping automatically.
+        o->scroll_offset_row2 -= scroll_delta;
     } else {
-        o->scroll_offset_row2 = 0; // Also reset if the row is completely empty
+        o->scroll_offset_row2 = 0;
     }
 
     // Row 3 doesn't disappear by default (only with setting)
@@ -726,12 +638,12 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
     // --- ROW 1: Criteria & Sub-stats Icons ---
     {
-        const float ROW1_Y_POS = 48.0f; // Initially 52
+        const float ROW1_Y_POS = 48.0f;
         const float ROW1_ICON_SIZE = 48.0f;
         const float ROW1_SHARED_ICON_SIZE = 30.0f;
         const float item_full_width = ROW1_ICON_SIZE + settings->overlay_row1_spacing;
 
-        // Gather items to determine the list we are animating
+        // Gather items
         std::vector<std::pair<TrackableItem *, TrackableCategory *> > row1_items;
         for (int i = 0; i < t->template_data->advancement_count; i++) {
             TrackableCategory *cat = t->template_data->advancements[i];
@@ -742,104 +654,98 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
         for (int i = 0; i < t->template_data->stat_count; i++) {
             TrackableCategory *cat = t->template_data->stats[i];
-
-            // If the stat category is a simple stat (defined without a "criteria" block in the template),
-            // do not add its auto-generated criterion to Row 1.
-            if (cat->is_single_stat_category) {
-                continue;
-            }
-
-            // For complex stats, add all of their defined criteria to Row 1.
+            if (cat->is_single_stat_category) continue;
             for (int j = 0; j < cat->criteria_count; j++) {
                 row1_items.push_back({cat->criteria[j], cat});
             }
         }
 
-
-        if (!row1_items.empty()) {
-            // Determine how many slots to draw based on screen width.
-            int items_to_draw = (item_full_width > 0) ? ceil((float) window_w / item_full_width) + 2 : 0;
-            // Use dynamic width
-            // Only draw as many items as are visible, but repeat them if needed to fill the screen (marquee effect).
-
-            // Draw either enough slots to fill the screen OR only the visible items, whichever is smaller.
-            // This prevents drawing empty, superfluous slots.
-
-            // int items_to_draw = std::min(geometric_slots_needed, (int)visible_item_count);
-            // int items_to_draw = geometric_slots_needed;
-            int current_item_idx = o->start_index_row1;
-
-
-            for (int k = 0; k < items_to_draw; k++) {
-                // -1.0f to offset rendering one icon width to the left (make it hidden)
-                float x_pos = ((k - 1.0f) * item_full_width) - o->scroll_offset_row1;
-
-                // Find the next visible item, skipping it if it's done OR its parent is hidden.
-                size_t loop_guard = 0;
-                while (row1_items[current_item_idx].first->done || row1_items[current_item_idx].second->is_hidden ||
-                       row1_items[current_item_idx].first->is_hidden) {
-                    current_item_idx = (current_item_idx + 1) % row1_items.size();
-                    loop_guard++;
-                    if (loop_guard > row1_items.size()) {
-                        goto end_row1_render; // All visible items are done/hidden
-                    }
-                }
-
-                TrackableItem *item_to_render = row1_items[current_item_idx].first;
-                TrackableCategory *parent = row1_items[current_item_idx].second;
-
-                SDL_FRect dest_rect = {x_pos, ROW1_Y_POS, ROW1_ICON_SIZE, ROW1_ICON_SIZE};
-                SDL_Texture *tex = nullptr;
-                AnimatedTexture *anim_tex = nullptr;
-                if (strstr(item_to_render->icon_path, ".gif")) {
-                    anim_tex = get_animated_texture_from_cache(
-                        o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity,
-                        item_to_render->icon_path, SDL_SCALEMODE_NEAREST);
-                } else {
-                    tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
-                                                 &o->texture_cache_capacity, item_to_render->icon_path,
-                                                 SDL_SCALEMODE_NEAREST);
-                }
-                render_texture_with_alpha(o->renderer, tex, anim_tex, &dest_rect, 255);
-
-                // Safeguard Check, if item has no texture
-                if (!tex && !anim_tex) {
-                    // This item has no valid texture, print a warning and draw a placeholder
-                    log_message(
-                        LOG_ERROR,
-                        "[Overlay Render WARNING] Item '%s' (index %d) has no texture. Check icon path in template.\n",
-                        item_to_render->root_name, current_item_idx);
-                    SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, 100); // Pink placeholder
-                    SDL_RenderFillRect(o->renderer, &dest_rect);
-                } else {
-                    render_texture_with_alpha(o->renderer, tex, anim_tex, &dest_rect, 255);
-                }
-
-                if (item_to_render->is_shared && parent) {
-                    SDL_Texture *parent_tex = nullptr;
-                    AnimatedTexture *parent_anim_tex = nullptr;
-                    if (strstr(parent->icon_path, ".gif")) {
-                        parent_anim_tex = get_animated_texture_from_cache(
-                            o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity,
-                            parent->icon_path, SDL_SCALEMODE_NEAREST);
-                    } else {
-                        parent_tex = get_texture_from_cache(o->renderer, &o->texture_cache,
-                                                            &o->texture_cache_count,
-                                                            &o->texture_cache_capacity, parent->icon_path,
-                                                            SDL_SCALEMODE_NEAREST);
-                    }
-
-                    SDL_FRect shared_dest_rect = {
-                        x_pos, ROW1_Y_POS, ROW1_SHARED_ICON_SIZE, ROW1_SHARED_ICON_SIZE
-                    };
-                    render_texture_with_alpha(o->renderer, parent_tex, parent_anim_tex, &shared_dest_rect, 255);
-                }
-
-                // Advance to the next item for the next screen slot
-                current_item_idx = (current_item_idx + 1) % row1_items.size();
+        // Count visible items
+        size_t visible_item_count = 0;
+        for (const auto &pair: row1_items) {
+            if (!pair.first->done && !pair.second->is_hidden && !pair.first->is_hidden) {
+                visible_item_count++;
             }
         }
-    end_row1_render:;
+
+        if (visible_item_count > 0 && item_full_width > 0) {
+            // --- Block-Based Rendering ---
+            float total_row_width = visible_item_count * item_full_width;
+
+            // fmod allows the infinite scrolling
+            float start_pos = fmod(o->scroll_offset_row1, total_row_width);
+
+            // Calculate blocks needed to cover screen + buffer
+            int blocks_to_draw = (int) ceil((float) window_w / total_row_width) + 2;
+
+            for (int block = -blocks_to_draw; block <= blocks_to_draw; ++block) {
+                float block_offset = start_pos + (block * total_row_width);
+                int visible_item_index = 0;
+
+                for (const auto &pair: row1_items) {
+                    TrackableItem *item_to_render = pair.first;
+                    TrackableCategory *parent = pair.second;
+
+                    // Skip hidden/done items
+                    if (item_to_render->done || parent->is_hidden || item_to_render->is_hidden) continue;
+
+                    // Calculate absolute position
+                    float x_pos = block_offset + (visible_item_index * item_full_width);
+
+                    // --- Simple Culling ---
+                    // Icons are uniform size, so simple culling is safe here
+                    if (x_pos + item_full_width < 0 || x_pos > window_w) {
+                        visible_item_index++;
+                        continue;
+                    }
+
+                    // --- Render Icon ---
+                    SDL_FRect dest_rect = {x_pos, ROW1_Y_POS, ROW1_ICON_SIZE, ROW1_ICON_SIZE};
+
+                    SDL_Texture *tex = nullptr;
+                    AnimatedTexture *anim_tex = nullptr;
+                    if (strstr(item_to_render->icon_path, ".gif")) {
+                        anim_tex = get_animated_texture_from_cache(
+                            o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity,
+                            item_to_render->icon_path, SDL_SCALEMODE_NEAREST);
+                    } else {
+                        tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                                     &o->texture_cache_capacity, item_to_render->icon_path,
+                                                     SDL_SCALEMODE_NEAREST);
+                    }
+
+                    if (!tex && !anim_tex) {
+                        SDL_SetRenderDrawColor(o->renderer, 255, 0, 255, 100);
+                        SDL_RenderFillRect(o->renderer, &dest_rect);
+                    } else {
+                        render_texture_with_alpha(o->renderer, tex, anim_tex, &dest_rect, 255);
+                    }
+
+                    // --- Render Shared Parent Icon Overlay ---
+                    if (item_to_render->is_shared && parent) {
+                        SDL_Texture *parent_tex = nullptr;
+                        AnimatedTexture *parent_anim_tex = nullptr;
+                        if (strstr(parent->icon_path, ".gif")) {
+                            parent_anim_tex = get_animated_texture_from_cache(
+                                o->renderer, &o->anim_cache, &o->anim_cache_count, &o->anim_cache_capacity,
+                                parent->icon_path, SDL_SCALEMODE_NEAREST);
+                        } else {
+                            parent_tex = get_texture_from_cache(o->renderer, &o->texture_cache,
+                                                                &o->texture_cache_count,
+                                                                &o->texture_cache_capacity, parent->icon_path,
+                                                                SDL_SCALEMODE_NEAREST);
+                        }
+
+                        SDL_FRect shared_dest_rect = {
+                            x_pos, ROW1_Y_POS, ROW1_SHARED_ICON_SIZE, ROW1_SHARED_ICON_SIZE
+                        };
+                        render_texture_with_alpha(o->renderer, parent_tex, parent_anim_tex, &shared_dest_rect, 255);
+                    }
+
+                    visible_item_index++;
+                }
+            }
+        }
     }
 
     // --- ROW 2: Advancements & Unlocks ---
@@ -1002,227 +908,209 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     t->template_data->unlocks[i], OverlayDisplayItem::UNLOCK
                 });
 
+            // --- 1. Calculate Max Text Width ---
             float max_text_width_row2 = 0.0f;
+            for (const auto &display_item: row2_items) {
+                // Skip template-hidden items
+                bool is_template_hidden = false;
+                if (display_item.type == OverlayDisplayItem::ADVANCEMENT)
+                    is_template_hidden = static_cast<TrackableCategory *>(display_item.item_ptr)->is_hidden;
+                else if (display_item.type == OverlayDisplayItem::UNLOCK)
+                    is_template_hidden = static_cast<TrackableItem *>(display_item.item_ptr)->is_hidden;
+                if (is_template_hidden) continue;
+
+                char name_buf[256] = {0};
+                char potential_progress_buf[64] = {0};
+                char longest_criterion_buf[256] = {0};
+                int w_name = 0, w_progress = 0, w_criterion = 0;
+
+                if (display_item.type == OverlayDisplayItem::ADVANCEMENT) {
+                    auto *adv = static_cast<TrackableCategory *>(display_item.item_ptr);
+                    strncpy(name_buf, adv->display_name, sizeof(name_buf) - 1);
+                    name_buf[sizeof(name_buf) - 1] = '\0';
+                    TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
+
+                    if (adv->criteria_count > 0) {
+                        snprintf(potential_progress_buf, sizeof(potential_progress_buf), "(%d / %d)",
+                                 adv->criteria_count, adv->criteria_count);
+                        TTF_MeasureString(o->font, potential_progress_buf, 0, 0, &w_progress, nullptr);
+
+                        for (int j = 0; j < adv->criteria_count; ++j) {
+                            if (adv->criteria[j] && strlen(adv->criteria[j]->display_name) > strlen(
+                                    longest_criterion_buf)) {
+                                strncpy(longest_criterion_buf, adv->criteria[j]->display_name,
+                                        sizeof(longest_criterion_buf) - 1);
+                                longest_criterion_buf[sizeof(longest_criterion_buf) - 1] = '\0';
+                            }
+                        }
+                        if (longest_criterion_buf[0] != '\0') {
+                            TTF_MeasureString(o->font, longest_criterion_buf, 0, 0, &w_criterion, nullptr);
+                        }
+                    }
+                } else if (display_item.type == OverlayDisplayItem::UNLOCK) {
+                    auto *unlock = static_cast<TrackableItem *>(display_item.item_ptr);
+                    strncpy(name_buf, unlock->display_name, sizeof(name_buf) - 1);
+                    name_buf[sizeof(name_buf) - 1] = '\0';
+                    TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
+                }
+                float item_max_text_width = fmaxf((float) w_name, fmaxf((float) w_progress, (float) w_criterion));
+                max_text_width_row2 = fmaxf(max_text_width_row2, item_max_text_width);
+            }
+
+            // --- 2. Apply Spacing Settings ---
             float cell_width_row2;
             float item_full_width_row2;
 
             if (settings->overlay_row2_custom_spacing_enabled) {
-                // Use fixed width from settings
                 item_full_width_row2 = settings->overlay_row2_custom_spacing;
-                // cell_width is the item width minus the standard spacing
                 cell_width_row2 = item_full_width_row2 - ITEM_SPACING;
             } else {
-                for (const auto &display_item: row2_items) {
-                    // Skip items hidden *in the template*
-                    bool is_template_hidden = false;
-                    if (display_item.type == OverlayDisplayItem::ADVANCEMENT) {
-                        is_template_hidden = static_cast<TrackableCategory *>(display_item.item_ptr)->is_hidden;
-                    } else if (display_item.type == OverlayDisplayItem::UNLOCK) {
-                        is_template_hidden = static_cast<TrackableItem *>(display_item.item_ptr)->is_hidden;
-                    }
-                    if (is_template_hidden) continue;
-
-                    char name_buf[256] = {0};
-                    char potential_progress_buf[64] = {0}; // For (X / Y)
-                    char longest_criterion_buf[256] = {0}; // For last criterion name
-
-                    int w_name = 0, w_progress = 0, w_criterion = 0;
-
-                    if (display_item.type == OverlayDisplayItem::ADVANCEMENT) {
-                        auto *adv = static_cast<TrackableCategory *>(display_item.item_ptr);
-                        strncpy(name_buf, adv->display_name, sizeof(name_buf) - 1);
-                        name_buf[sizeof(name_buf) - 1] = '\0';
-                        TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
-
-                        if (adv->criteria_count > 0) {
-                            // Calculate width for "(X / Y)" format
-                            snprintf(potential_progress_buf, sizeof(potential_progress_buf), "(%d / %d)",
-                                     adv->criteria_count, adv->criteria_count); // Use max possible count for width
-                            TTF_MeasureString(o->font, potential_progress_buf, 0, 0, &w_progress, nullptr);
-
-                            // Find the longest criterion display name
-                            for (int j = 0; j < adv->criteria_count; ++j) {
-                                if (adv->criteria[j] && strlen(adv->criteria[j]->display_name) > strlen(
-                                        longest_criterion_buf)) {
-                                    strncpy(longest_criterion_buf, adv->criteria[j]->display_name,
-                                            sizeof(longest_criterion_buf) - 1);
-                                    longest_criterion_buf[sizeof(longest_criterion_buf) - 1] = '\0';
-                                }
-                            }
-                            if (longest_criterion_buf[0] != '\0') {
-                                TTF_MeasureString(o->font, longest_criterion_buf, 0, 0, &w_criterion, nullptr);
-                            }
-                        }
-                    } else if (display_item.type == OverlayDisplayItem::UNLOCK) {
-                        auto *unlock = static_cast<TrackableItem *>(display_item.item_ptr);
-                        strncpy(name_buf, unlock->display_name, sizeof(name_buf) - 1);
-                        name_buf[sizeof(name_buf) - 1] = '\0';
-                        TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
-                    }
-
-                    // Max width needed for this item (name vs progress vs criterion)
-                    float item_max_text_width = fmaxf((float) w_name, fmaxf((float) w_progress, (float) w_criterion));
-                    max_text_width_row2 = fmaxf(max_text_width_row2, item_max_text_width);
-                }
-
-                // Calculate final widths based on max text width found
                 cell_width_row2 = fmaxf(ITEM_WIDTH, max_text_width_row2);
                 item_full_width_row2 = cell_width_row2 + ITEM_SPACING;
             }
-
-            o->calculated_row2_item_width = item_full_width_row2; // Store for next update cycle
+            o->calculated_row2_item_width = item_full_width_row2;
 
             size_t visible_item_count = 0;
             for (const auto &item: row2_items) {
-                if (!is_display_item_done(item, settings)) {
-                    visible_item_count++;
-                }
+                if (!is_display_item_done(item, settings)) visible_item_count++;
             }
 
             if (visible_item_count > 0) {
-                // --- Use the calculated item_full_width_row2 for rendering ---
-                int items_to_draw = (item_full_width_row2 > 0) ? ceil((float) window_w / item_full_width_row2) + 2 : 0;
-                int current_item_idx = o->start_index_row2;
+                // --- 3. Block-Based Render Loop ---
+                float total_row_width = visible_item_count * item_full_width_row2;
 
+                // Use raw scroll offset (no negation) to match Row 1 and 3 direction
+                float start_pos = fmod(o->scroll_offset_row2, total_row_width);
 
-                for (int k = 0; k < items_to_draw; k++) {
-                    size_t loop_guard = 0;
-                    while (is_display_item_done(row2_items[current_item_idx], settings)) {
-                        current_item_idx = (current_item_idx + 1) % row2_items.size();
-                        loop_guard++;
-                        if (loop_guard > row2_items.size()) goto end_row2_render;
-                    }
+                // Calculate blocks to draw, adding buffer for wide text bleeding in
+                int blocks_to_draw = (total_row_width > 0) ? (int) ceil((float) window_w / total_row_width) + 2 : 0;
+                if (total_row_width > 0 && max_text_width_row2 > total_row_width) {
+                    blocks_to_draw += (int) ceilf(max_text_width_row2 / total_row_width);
+                }
 
-                    const auto &display_item = row2_items[current_item_idx];
-                    // --- POSITION CALCULATION USES NEW WIDTH ---
-                    float x_pos = ((k - 1) * item_full_width_row2) - o->scroll_offset_row2;
+                for (int block = -blocks_to_draw; block <= blocks_to_draw; ++block) {
+                    float block_offset = start_pos + (block * total_row_width);
+                    int visible_item_index = 0;
 
+                    for (const auto &display_item: row2_items) {
+                        if (is_display_item_done(display_item, settings)) continue;
 
-                    // --- Render the item ---
-                    std::string icon_path;
-                    char name_buf[256] = {0}; // Renamed to avoid conflict
-                    char progress_buf[256] = {0}; // Renamed and increased size
+                        float current_x = block_offset + (visible_item_index * item_full_width_row2);
 
-                    switch (display_item.type) {
-                        case OverlayDisplayItem::ADVANCEMENT: {
-                            auto *adv = static_cast<TrackableCategory *>(display_item.item_ptr);
-                            static_bg = o->adv_bg;
-                            anim_bg = o->adv_bg_anim;
-                            if (adv->done) {
-                                static_bg = o->adv_bg_done;
-                                anim_bg = o->adv_bg_done_anim;
-                            } else if (adv->completed_criteria_count > 0) {
-                                static_bg = o->adv_bg_half_done;
-                                anim_bg = o->adv_bg_half_done_anim;
-                            }
-                            icon_path = adv->icon_path;
-                            strncpy(name_buf, adv->display_name, sizeof(name_buf) - 1);
-                            name_buf[sizeof(name_buf) - 1] = '\0';
-                            // If one last adv criteria is remaining, show it instead of progress on criteria
-                            if (adv->criteria_count > 0 && adv->completed_criteria_count == adv->criteria_count - 1) {
-                                // Find the single incomplete criterion
-                                for (int j = 0; j < adv->criteria_count; ++j) {
-                                    if (!adv->criteria[j]->done) {
-                                        // Copy its display name into progress_buf
-                                        strncpy(progress_buf, adv->criteria[j]->display_name, sizeof(progress_buf) - 1);
-                                        progress_buf[sizeof(progress_buf) - 1] = '\0';
-                                        break;
+                        // --- Dynamic Culling ---
+                        float bg_x_offset = (cell_width_row2 - ITEM_WIDTH) / 2.0f;
+                        float icon_visual_x = current_x + bg_x_offset;
+                        float dynamic_cull_margin = max_text_width_row2 + 50.0f;
+
+                        if (icon_visual_x + ITEM_WIDTH + dynamic_cull_margin < 0 || icon_visual_x - dynamic_cull_margin
+                            > window_w) {
+                            visible_item_index++;
+                            continue;
+                        }
+
+                        // --- Render Logic ---
+                        std::string icon_path;
+                        char name_buf[256] = {0};
+                        char progress_buf[256] = {0};
+
+                        switch (display_item.type) {
+                            case OverlayDisplayItem::ADVANCEMENT: {
+                                auto *adv = static_cast<TrackableCategory *>(display_item.item_ptr);
+                                static_bg = o->adv_bg;
+                                anim_bg = o->adv_bg_anim;
+                                if (adv->done) {
+                                    static_bg = o->adv_bg_done;
+                                    anim_bg = o->adv_bg_done_anim;
+                                } else if (adv->completed_criteria_count > 0) {
+                                    static_bg = o->adv_bg_half_done;
+                                    anim_bg = o->adv_bg_half_done_anim;
+                                }
+                                icon_path = adv->icon_path;
+                                strncpy(name_buf, adv->display_name, sizeof(name_buf) - 1);
+                                name_buf[sizeof(name_buf) - 1] = '\0';
+
+                                if (adv->criteria_count > 0 && adv->completed_criteria_count == adv->criteria_count -
+                                    1) {
+                                    for (int j = 0; j < adv->criteria_count; ++j) {
+                                        if (!adv->criteria[j]->done) {
+                                            strncpy(progress_buf, adv->criteria[j]->display_name,
+                                                    sizeof(progress_buf) - 1);
+                                            progress_buf[sizeof(progress_buf) - 1] = '\0';
+                                            break;
+                                        }
                                     }
+                                } else if (adv->criteria_count > 0) {
+                                    snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
+                                             adv->completed_criteria_count,
+                                             adv->criteria_count);
+                                }
+                                break;
+                            }
+                            case OverlayDisplayItem::UNLOCK: {
+                                auto *unlock = static_cast<TrackableItem *>(display_item.item_ptr);
+                                static_bg = o->adv_bg;
+                                anim_bg = o->adv_bg_anim;
+                                if (unlock->done) {
+                                    static_bg = o->adv_bg_done;
+                                    anim_bg = o->adv_bg_done_anim;
+                                }
+                                icon_path = unlock->icon_path;
+                                strncpy(name_buf, unlock->display_name, sizeof(name_buf) - 1);
+                                name_buf[sizeof(name_buf) - 1] = '\0';
+                                break;
+                            }
+                            default: break;
+                        }
+
+                        SDL_FRect bg_rect = {current_x + bg_x_offset, ROW2_Y_POS, ITEM_WIDTH, ITEM_WIDTH};
+                        render_texture_with_alpha(o->renderer, static_bg, anim_bg, &bg_rect, 255);
+
+                        SDL_FRect icon_rect = {bg_rect.x + 16.0f, bg_rect.y + 16.0f, 64.0f, 64.0f};
+                        SDL_Texture *tex = nullptr;
+                        AnimatedTexture *anim_tex = nullptr;
+                        if (!icon_path.empty() && strstr(icon_path.c_str(), ".gif")) {
+                            anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache,
+                                                                       &o->anim_cache_count,
+                                                                       &o->anim_cache_capacity, icon_path.c_str(),
+                                                                       SDL_SCALEMODE_NEAREST);
+                        } else if (!icon_path.empty()) {
+                            tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
+                                                         &o->texture_cache_capacity, icon_path.c_str(),
+                                                         SDL_SCALEMODE_NEAREST);
+                        }
+                        render_texture_with_alpha(o->renderer, tex, anim_tex, &icon_rect, 255);
+
+                        SDL_Texture *name_texture = get_text_texture_from_cache(o, name_buf, text_color);
+                        if (name_texture) {
+                            float w, h;
+                            SDL_GetTextureSize(name_texture, &w, &h);
+                            float text_x = current_x + (cell_width_row2 - w) / 2.0f;
+                            SDL_FRect dest_rect = {text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET, w, h};
+                            SDL_RenderTexture(o->renderer, name_texture, nullptr, &dest_rect);
+
+                            if (progress_buf[0] != '\0') {
+                                SDL_Texture *progress_texture =
+                                        get_text_texture_from_cache(o, progress_buf, text_color);
+                                if (progress_texture) {
+                                    float pw, ph;
+                                    SDL_GetTextureSize(progress_texture, &pw, &ph);
+                                    float p_text_x = current_x + (cell_width_row2 - pw) / 2.0f;
+                                    SDL_FRect p_dest_rect = {
+                                        p_text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + h, pw, ph
+                                    };
+                                    SDL_RenderTexture(o->renderer, progress_texture, nullptr, &p_dest_rect);
                                 }
                             }
-                            // Fallback if it's not the last remaining criteria
-                            else if (adv->criteria_count > 0) {
-                                snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)", adv->completed_criteria_count,
-                                         adv->criteria_count);
-                            }
-                            break;
                         }
-                        case OverlayDisplayItem::UNLOCK: {
-                            auto *unlock = static_cast<TrackableItem *>(display_item.item_ptr);
-                            static_bg = o->adv_bg;
-                            anim_bg = o->adv_bg_anim;
-                            if (unlock->done) {
-                                static_bg = o->adv_bg_done;
-                                anim_bg = o->adv_bg_done_anim;
-                            }
-                            icon_path = unlock->icon_path;
-                            strncpy(name_buf, unlock->display_name, sizeof(name_buf) - 1);
-                            name_buf[sizeof(name_buf) - 1] = '\0';
-                            break;
-                        }
-                        default: break;
+
+                        visible_item_index++;
                     }
-
-                    // --- Make sure text positioning uses cell_width_row2 for centering ---
-                    float bg_x_offset = (cell_width_row2 - ITEM_WIDTH) / 2.0f; // Center background within cell
-                    SDL_FRect bg_rect = {x_pos + bg_x_offset, ROW2_Y_POS, ITEM_WIDTH, ITEM_WIDTH};
-                    render_texture_with_alpha(o->renderer, static_bg, anim_bg, &bg_rect, 255);
-
-                    SDL_FRect icon_rect = {bg_rect.x + 16.0f, bg_rect.y + 16.0f, 64.0f, 64.0f};
-                    SDL_Texture *tex = nullptr;
-                    AnimatedTexture *anim_tex = nullptr;
-                    if (!icon_path.empty() && strstr(icon_path.c_str(), ".gif")) {
-                        anim_tex = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
-                                                                   &o->anim_cache_capacity, icon_path.c_str(),
-                                                                   SDL_SCALEMODE_NEAREST);
-                    } else if (!icon_path.empty()) {
-                        tex = get_texture_from_cache(o->renderer, &o->texture_cache, &o->texture_cache_count,
-                                                     &o->texture_cache_capacity, icon_path.c_str(),
-                                                     SDL_SCALEMODE_NEAREST);
-                    }
-                    render_texture_with_alpha(o->renderer, tex, anim_tex, &icon_rect, 255);
-
-
-                    // Text rendering now uses cell_width_row2 for centering
-                    SDL_Texture *name_texture = get_text_texture_from_cache(o, name_buf, text_color);
-                    // Use name_buf calculated earlier
-                    if (name_texture) {
-                        float w, h;
-                        SDL_GetTextureSize(name_texture, &w, &h);
-                        float text_x = x_pos + (cell_width_row2 - w) / 2.0f; // Center using cell_width_row2
-                        SDL_FRect dest_rect = {text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET, w, h};
-                        SDL_RenderTexture(o->renderer, name_texture, nullptr, &dest_rect);
-
-                        // Get the *current* progress text for display (might be criterion name)
-                        char current_progress_buf[256] = {0}; // Use the buffer populated earlier
-                        if (display_item.type == OverlayDisplayItem::ADVANCEMENT) {
-                            auto *adv = static_cast<TrackableCategory *>(display_item.item_ptr);
-                            if (adv->criteria_count > 0 && adv->completed_criteria_count == adv->criteria_count - 1) {
-                                for (int j = 0; j < adv->criteria_count; ++j) {
-                                    if (!adv->criteria[j]->done) {
-                                        strncpy(current_progress_buf, adv->criteria[j]->display_name,
-                                                sizeof(current_progress_buf) - 1);
-                                        current_progress_buf[sizeof(current_progress_buf) - 1] = '\0';
-                                        break;
-                                    }
-                                }
-                            } else if (adv->criteria_count > 0) {
-                                snprintf(current_progress_buf, sizeof(current_progress_buf), "(%d / %d)",
-                                         adv->completed_criteria_count, adv->criteria_count);
-                            }
-                        } // Unlocks don't have progress text
-
-                        if (current_progress_buf[0] != '\0') {
-                            SDL_Texture *progress_texture = get_text_texture_from_cache(
-                                o, current_progress_buf, text_color);
-                            if (progress_texture) {
-                                float pw, ph;
-                                SDL_GetTextureSize(progress_texture, &pw, &ph);
-                                float p_text_x = x_pos + (cell_width_row2 - pw) / 2.0f; // Center using cell_width_row2
-                                SDL_FRect p_dest_rect = {p_text_x, ROW2_Y_POS + ITEM_WIDTH + TEXT_Y_OFFSET + h, pw, ph};
-                                SDL_RenderTexture(o->renderer, progress_texture, nullptr, &p_dest_rect);
-                            }
-                        }
-                    }
-                    // This is the correct place to advance to the next item for the next screen slot.
-                    current_item_idx = (current_item_idx + 1) % row2_items.size();
-                } // End for k items_to_draw
-            } // End if visible_item_count > 0
+                }
+            }
         }
 
         // Update the state for the next frame
         run_was_complete_last_frame = is_run_complete;
-    end_row2_render:; // Corrected goto label name
     }
 
     // --- ROW 3: Stats & Goals ---
@@ -1253,6 +1141,115 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             });
 
         float max_text_width_row3 = 0.0f;
+
+        // Calculate max text width for row 3
+        for (const auto &display_item: row3_items) {
+            // Skip items hidden *in the template*
+            bool is_template_hidden = false;
+            if (display_item.type == OverlayDisplayItem::STAT) {
+                TrackableCategory *stat_cat = static_cast<TrackableCategory *>(display_item.item_ptr);
+                // Skip hidden legacy helper stats during width calculation
+                if (version <= MC_VERSION_1_6_4 && stat_cat->is_single_stat_category && stat_cat->criteria_count > 0
+                    &&
+                    stat_cat->criteria[0]->goal <= 0 && stat_cat->icon_path[0] == '\0') {
+                    continue;
+                }
+                is_template_hidden = stat_cat->is_hidden;
+            } else if (display_item.type == OverlayDisplayItem::CUSTOM) {
+                is_template_hidden = static_cast<TrackableItem *>(display_item.item_ptr)->is_hidden;
+            } else if (display_item.type == OverlayDisplayItem::MULTISTAGE) {
+                is_template_hidden = static_cast<MultiStageGoal *>(display_item.item_ptr)->is_hidden;
+            }
+            if (is_template_hidden) continue;
+
+            char name_buf[256] = {0};
+            char longest_progress_buf[256] = {0}; // To store the potentially longest progress/stage text
+            int w_name = 0, w_progress = 0;
+
+            switch (display_item.type) {
+                case OverlayDisplayItem::STAT: {
+                    auto *stat = static_cast<TrackableCategory *>(display_item.item_ptr);
+                    strncpy(name_buf, stat->display_name, sizeof(name_buf) - 1);
+                    name_buf[sizeof(name_buf) - 1] = '\0';
+                    TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
+
+                    if (stat->criteria_count > 1) {
+                        // Multi-stat
+                        // Find longest sub-stat line (e.g., "1. Name (X / Y)")
+                        for (int j = 0; j < stat->criteria_count; ++j) {
+                            TrackableItem *crit = stat->criteria[j];
+                            char temp_sub_stat_buf[256] = {0};
+                            if (crit->goal > 0) {
+                                snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s (%d / %d)", j + 1,
+                                         crit->display_name, crit->goal, crit->goal); // Use max progress for width
+                            } else if (crit->goal == -1) {
+                                snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s (999)", j + 1,
+                                         crit->display_name); // Assume 3 digits for width
+                            }
+                            if (strlen(temp_sub_stat_buf) > strlen(longest_progress_buf)) {
+                                strcpy(longest_progress_buf, temp_sub_stat_buf);
+                            }
+                        }
+                    } else if (stat->criteria_count == 1) {
+                        // Simple stat
+                        TrackableItem *crit = stat->criteria[0];
+                        if (crit->goal > 0) {
+                            snprintf(longest_progress_buf, sizeof(longest_progress_buf), "(%d / %d)", crit->goal,
+                                     crit->goal); // Use max progress
+                        } else if (crit->goal == -1) {
+                            snprintf(longest_progress_buf, sizeof(longest_progress_buf), "(999)");
+                            // Assume 3 digits
+                        }
+                    }
+                    break;
+                }
+                case OverlayDisplayItem::CUSTOM: {
+                    auto *goal = static_cast<TrackableItem *>(display_item.item_ptr);
+                    strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
+                    name_buf[sizeof(name_buf) - 1] = '\0';
+                    TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
+                    if (goal->goal > 0) {
+                        snprintf(longest_progress_buf, sizeof(longest_progress_buf), "(%d / %d)", goal->goal,
+                                 goal->goal);
+                    } else if (goal->goal == -1) {
+                        snprintf(longest_progress_buf, sizeof(longest_progress_buf), "(999)");
+                    }
+                    break;
+                }
+                case OverlayDisplayItem::MULTISTAGE: {
+                    auto *goal = static_cast<MultiStageGoal *>(display_item.item_ptr);
+                    strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
+                    name_buf[sizeof(name_buf) - 1] = '\0';
+                    TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
+                    // Find longest stage text
+                    for (int j = 0; j < goal->stage_count; ++j) {
+                        SubGoal *stage = goal->stages[j];
+                        char temp_stage_buf[256];
+                        if (stage->type == SUBGOAL_STAT && stage->required_progress > 0) {
+                            snprintf(temp_stage_buf, sizeof(temp_stage_buf), "%s (%d/%d)", stage->display_text,
+                                     stage->required_progress, stage->required_progress);
+                        } else {
+                            strncpy(temp_stage_buf, stage->display_text, sizeof(temp_stage_buf) - 1);
+                            temp_stage_buf[sizeof(temp_stage_buf) - 1] = '\0';
+                        }
+                        if (strlen(temp_stage_buf) > strlen(longest_progress_buf)) {
+                            strcpy(longest_progress_buf, temp_stage_buf);
+                        }
+                    }
+                    break;
+                }
+                default: break;
+            }
+
+            if (longest_progress_buf[0] != '\0') {
+                TTF_MeasureString(o->font, longest_progress_buf, 0, 0, &w_progress, nullptr);
+            }
+
+            float item_max_text_width = fmaxf((float) w_name, (float) w_progress);
+            max_text_width_row3 = fmaxf(max_text_width_row3, item_max_text_width);
+        }
+
+        // Apply spacing settings
         float cell_width_row3;
         float item_full_width_row3;
 
@@ -1261,112 +1258,6 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             item_full_width_row3 = settings->overlay_row3_custom_spacing;
             cell_width_row3 = item_full_width_row3 - ITEM_SPACING;
         } else {
-            for (const auto &display_item: row3_items) {
-                // Skip items hidden *in the template*
-                bool is_template_hidden = false;
-                if (display_item.type == OverlayDisplayItem::STAT) {
-                    TrackableCategory *stat_cat = static_cast<TrackableCategory *>(display_item.item_ptr);
-                    // Skip hidden legacy helper stats during width calculation
-                    if (version <= MC_VERSION_1_6_4 && stat_cat->is_single_stat_category && stat_cat->criteria_count > 0
-                        &&
-                        stat_cat->criteria[0]->goal <= 0 && stat_cat->icon_path[0] == '\0') {
-                        continue;
-                    }
-                    is_template_hidden = stat_cat->is_hidden;
-                } else if (display_item.type == OverlayDisplayItem::CUSTOM) {
-                    is_template_hidden = static_cast<TrackableItem *>(display_item.item_ptr)->is_hidden;
-                } else if (display_item.type == OverlayDisplayItem::MULTISTAGE) {
-                    is_template_hidden = static_cast<MultiStageGoal *>(display_item.item_ptr)->is_hidden;
-                }
-                if (is_template_hidden) continue;
-
-                char name_buf[256] = {0};
-                char longest_progress_buf[256] = {0}; // To store the potentially longest progress/stage text
-                int w_name = 0, w_progress = 0;
-
-                switch (display_item.type) {
-                    case OverlayDisplayItem::STAT: {
-                        auto *stat = static_cast<TrackableCategory *>(display_item.item_ptr);
-                        strncpy(name_buf, stat->display_name, sizeof(name_buf) - 1);
-                        name_buf[sizeof(name_buf) - 1] = '\0';
-                        TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
-
-                        if (stat->criteria_count > 1) {
-                            // Multi-stat
-                            // Find longest sub-stat line (e.g., "1. Name (X / Y)")
-                            for (int j = 0; j < stat->criteria_count; ++j) {
-                                TrackableItem *crit = stat->criteria[j];
-                                char temp_sub_stat_buf[256] = {0};
-                                if (crit->goal > 0) {
-                                    snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s (%d / %d)", j + 1,
-                                             crit->display_name, crit->goal, crit->goal); // Use max progress for width
-                                } else if (crit->goal == -1) {
-                                    snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s (999)", j + 1,
-                                             crit->display_name); // Assume 3 digits for width
-                                }
-                                if (strlen(temp_sub_stat_buf) > strlen(longest_progress_buf)) {
-                                    strcpy(longest_progress_buf, temp_sub_stat_buf);
-                                }
-                            }
-                        } else if (stat->criteria_count == 1) {
-                            // Simple stat
-                            TrackableItem *crit = stat->criteria[0];
-                            if (crit->goal > 0) {
-                                snprintf(longest_progress_buf, sizeof(longest_progress_buf), "(%d / %d)", crit->goal,
-                                         crit->goal); // Use max progress
-                            } else if (crit->goal == -1) {
-                                snprintf(longest_progress_buf, sizeof(longest_progress_buf), "(999)");
-                                // Assume 3 digits
-                            }
-                        }
-                        break;
-                    }
-                    case OverlayDisplayItem::CUSTOM: {
-                        auto *goal = static_cast<TrackableItem *>(display_item.item_ptr);
-                        strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
-                        name_buf[sizeof(name_buf) - 1] = '\0';
-                        TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
-                        if (goal->goal > 0) {
-                            snprintf(longest_progress_buf, sizeof(longest_progress_buf), "(%d / %d)", goal->goal,
-                                     goal->goal);
-                        } else if (goal->goal == -1) {
-                            snprintf(longest_progress_buf, sizeof(longest_progress_buf), "(999)");
-                        }
-                        break;
-                    }
-                    case OverlayDisplayItem::MULTISTAGE: {
-                        auto *goal = static_cast<MultiStageGoal *>(display_item.item_ptr);
-                        strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
-                        name_buf[sizeof(name_buf) - 1] = '\0';
-                        TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
-                        // Find longest stage text
-                        for (int j = 0; j < goal->stage_count; ++j) {
-                            SubGoal *stage = goal->stages[j];
-                            char temp_stage_buf[256];
-                            if (stage->type == SUBGOAL_STAT && stage->required_progress > 0) {
-                                snprintf(temp_stage_buf, sizeof(temp_stage_buf), "%s (%d/%d)", stage->display_text,
-                                         stage->required_progress, stage->required_progress);
-                            } else {
-                                strncpy(temp_stage_buf, stage->display_text, sizeof(temp_stage_buf) - 1);
-                                temp_stage_buf[sizeof(temp_stage_buf) - 1] = '\0';
-                            }
-                            if (strlen(temp_stage_buf) > strlen(longest_progress_buf)) {
-                                strcpy(longest_progress_buf, temp_stage_buf);
-                            }
-                        }
-                        break;
-                    }
-                    default: break;
-                }
-
-                if (longest_progress_buf[0] != '\0') {
-                    TTF_MeasureString(o->font, longest_progress_buf, 0, 0, &w_progress, nullptr);
-                }
-
-                float item_max_text_width = fmaxf((float) w_name, (float) w_progress);
-                max_text_width_row3 = fmaxf(max_text_width_row3, item_max_text_width);
-            }
-
             cell_width_row3 = fmaxf(ITEM_WIDTH, max_text_width_row3);
             item_full_width_row3 = cell_width_row3 + ITEM_SPACING;
         }
@@ -1396,7 +1287,18 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
                     // --- POSITION CALCULATION USES NEW WIDTH ---
                     float current_x = block_offset + (visible_item_index * item_full_width_row3);
-                    if (current_x + item_full_width_row3 < 0 || current_x > window_w) {
+
+                    // Strict Culling based on Icon Visibility
+                    // Calculate where the 96px icon background will sit
+                    float bg_x_offset = (cell_width_row3 - ITEM_WIDTH) / 2.0f;
+                    float icon_visual_x = current_x + bg_x_offset;
+
+                    // Use the calculated max text width as the safety margin
+                    float dynamic_cull_margin = max_text_width_row3 + 50.0f;
+
+                    // Check if the item is completely off-screen
+                    if (icon_visual_x + ITEM_WIDTH + dynamic_cull_margin < 0 || icon_visual_x - dynamic_cull_margin >
+                        window_w) {
                         visible_item_index++;
                         continue;
                     }
@@ -1525,7 +1427,6 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     }
 
                     // --- Make sure text positioning uses cell_width_row3 for centering ---
-                    float bg_x_offset = (cell_width_row3 - ITEM_WIDTH) / 2.0f; // Center background within cell
                     SDL_FRect bg_rect = {current_x + bg_x_offset, ROW3_Y_POS, ITEM_WIDTH, ITEM_WIDTH};
                     render_texture_with_alpha(o->renderer, static_bg, anim_bg, &bg_rect, 255);
 
