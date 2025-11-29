@@ -690,7 +690,16 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     if (item_to_render->done || parent->is_hidden || item_to_render->is_hidden) continue;
 
                     // Calculate absolute position
-                    float x_pos = block_offset + (visible_item_index * item_full_width);
+                    float x_pos;
+                    if (settings->overlay_scroll_speed > 0) {
+                        // Positive Scroll (L->R): Anchor to the Right (End)
+                        // We calculate position relative to the END of the block so items 'upstream' shift.
+                        int inverse_index = visible_item_count - 1 - visible_item_index;
+                        x_pos = block_offset - (inverse_index * item_full_width);
+                    } else {
+                        // Negative Scroll (R->L): Anchor to the Left (Start) - Default Behavior
+                        x_pos = block_offset + (visible_item_index * item_full_width);
+                    }
 
                     // --- Simple Culling ---
                     // Icons are uniform size, so simple culling is safe here
@@ -995,7 +1004,16 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     for (const auto &display_item: row2_items) {
                         if (is_display_item_done(display_item, settings)) continue;
 
-                        float current_x = block_offset + (visible_item_index * item_full_width_row2);
+                        // --- Directional Gap Filling ---
+                        float current_x;
+                        if (settings->overlay_scroll_speed > 0) {
+                            // Positive Scroll (L->R): Anchor to the Right
+                            int inverse_index = visible_item_count - 1 - visible_item_index;
+                            current_x = block_offset - (inverse_index * item_full_width_row2);
+                        } else {
+                            // Negative Scroll (R->L): Anchor to the Left
+                            current_x = block_offset + (visible_item_index * item_full_width_row2);
+                        }
 
                         // --- Dynamic Culling ---
                         float bg_x_offset = (cell_width_row2 - ITEM_WIDTH) / 2.0f;
@@ -1285,8 +1303,16 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 for (const auto &display_item: row3_items) {
                     if (is_display_item_done(display_item, settings)) continue; // Skip currently invisible
 
-                    // --- POSITION CALCULATION USES NEW WIDTH ---
-                    float current_x = block_offset + (visible_item_index * item_full_width_row3);
+                    // --- Directional Gap Filling ---
+                    float current_x;
+                    if (settings->overlay_scroll_speed > 0) {
+                        // Positive Scroll (L->R): Anchor to the Right
+                        int inverse_index = visible_item_count - 1 - visible_item_index;
+                        current_x = block_offset - (inverse_index * item_full_width_row3);
+                    } else {
+                        // Negative Scroll (R->L): Anchor to the Left
+                        current_x = block_offset + (visible_item_index * item_full_width_row3);
+                    }
 
                     // Strict Culling based on Icon Visibility
                     // Calculate where the 96px icon background will sit
