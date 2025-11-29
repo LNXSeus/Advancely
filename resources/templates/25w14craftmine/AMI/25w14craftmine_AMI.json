@@ -50,11 +50,6 @@
 			"criteria":	{
 			}
 		},
-		"minecraft:feats/crystal":	{
-			"icon":	"blocks/Large_Amethyst_Bud_(U)_JE1 (1).png",
-			"criteria":	{
-			}
-		},
 		"minecraft:unlocks/root":	{
 			"icon":	"items/experience_bottle_3d_shareware_v1.34.png",
 			"criteria":	{
@@ -93,7 +88,19 @@
 			"target":	-1
 		}
 	},
-	"unlocks":	[],
+	"unlocks":	[{
+			"root_name":	"minecraft:dirt_destroyer_2",
+			"icon":	"blocks/Dirt.png"
+		}, {
+			"root_name":	"minecraft:rockets",
+			"icon":	"items/firework_rocket_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:lucky_pick",
+			"icon":	"items/diamond_pickaxe_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:crafting_efficiency",
+			"icon":	"blocks/Composter_JE1.png"
+		}],
 	"custom":	[{
 			"root_name":	"surface_world",
 			"icon":	"items/surface_world_25w14craftmine.png"
