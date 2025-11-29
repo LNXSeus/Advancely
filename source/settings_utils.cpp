@@ -304,6 +304,7 @@ void settings_set_defaults(AppSettings *settings) {
     // Overlay Defaults
     settings->overlay_progress_text_align = DEFAULT_OVERLAY_PROGRESS_TEXT_ALIGN;
     settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING;
+    settings->overlay_row1_shared_icon_size = DEFAULT_OVERLAY_ROW1_SHARED_ICON_SIZE;
     settings->overlay_row2_custom_spacing_enabled = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED;
     settings->overlay_row2_custom_spacing = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING;
     settings->overlay_row3_custom_spacing_enabled = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED;
@@ -806,6 +807,14 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
+        const cJSON *row1_shared_json = cJSON_GetObjectItem(visual_settings, "overlay_row1_shared_icon_size");
+        if (row1_shared_json && cJSON_IsNumber(row1_shared_json)) {
+            settings->overlay_row1_shared_icon_size = (float) row1_shared_json->valuedouble;
+        } else {
+            settings->overlay_row1_shared_icon_size = DEFAULT_OVERLAY_ROW1_SHARED_ICON_SIZE;
+            defaults_were_used = true;
+        }
+
         const cJSON *row2_custom_enabled = cJSON_GetObjectItem(visual_settings, "overlay_row2_custom_spacing_enabled");
         if (row2_custom_enabled && cJSON_IsBool(row2_custom_enabled))
             settings->overlay_row2_custom_spacing_enabled = cJSON_IsTrue(row2_custom_enabled);
@@ -938,6 +947,7 @@ bool settings_load(AppSettings *settings) {
     } else {
         defaults_were_used = true;
         settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING; // Ensure default if visuals section missing
+        settings->overlay_row1_shared_icon_size = DEFAULT_OVERLAY_ROW1_SHARED_ICON_SIZE;
         settings->overlay_row2_custom_spacing_enabled = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING_ENABLED;
         settings->overlay_row2_custom_spacing = DEFAULT_OVERLAY_ROW2_CUSTOM_SPACING;
         settings->overlay_row3_custom_spacing_enabled = DEFAULT_OVERLAY_ROW3_CUSTOM_SPACING_ENABLED;
@@ -1151,6 +1161,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
 
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_spacing");
         cJSON_AddItemToObject(visuals_obj, "overlay_row1_spacing", cJSON_CreateNumber(settings->overlay_row1_spacing));
+        cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_shared_icon_size");
+        cJSON_AddItemToObject(visuals_obj, "overlay_row1_shared_icon_size", cJSON_CreateNumber(settings->overlay_row1_shared_icon_size));
 
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row2_custom_spacing_enabled");
         cJSON_AddItemToObject(visuals_obj, "overlay_row2_custom_spacing_enabled",

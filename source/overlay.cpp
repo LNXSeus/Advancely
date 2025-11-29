@@ -640,7 +640,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
     {
         const float ROW1_Y_POS = 48.0f;
         const float ROW1_ICON_SIZE = 48.0f;
-        const float ROW1_SHARED_ICON_SIZE = 30.0f;
+        const float ROW1_SHARED_ICON_SIZE = settings->overlay_row1_shared_icon_size; // Originally 30.0f
         const float item_full_width = ROW1_ICON_SIZE + settings->overlay_row1_spacing;
 
         // Gather items

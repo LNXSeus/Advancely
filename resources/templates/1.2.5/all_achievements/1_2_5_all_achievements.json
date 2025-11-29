@@ -27,7 +27,7 @@
     },
     "5242885": {
       "icon": "items/iron_ingot_1.0.png",
-      "hidden": true,
+      "hidden": false,
       "criteria": {}
     },
     "5242886": {

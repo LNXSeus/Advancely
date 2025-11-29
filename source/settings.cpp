@@ -1712,6 +1712,18 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
 
+        ImGui::DragFloat("Row 1 Shared Icon Size", &temp_settings.overlay_row1_shared_icon_size, 1.0f, 0.0f, 48.0f, "%.0f px");
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Adjusts the size of the 'Parent Icon' overlay that appears when\n"
+                     "multiple items share the same icon in Row 1.\n"
+                     "Set to 0 to disable the shared icon overlay entirely.\n"
+                     "Default: %.0f px",
+                     DEFAULT_OVERLAY_ROW1_SHARED_ICON_SIZE);
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+
         // --- Custom Row 2 Spacing ---
         ImGui::Checkbox("Custom Row 2 Spacing", &temp_settings.overlay_row2_custom_spacing_enabled);
         if (ImGui::IsItemHovered()) {
