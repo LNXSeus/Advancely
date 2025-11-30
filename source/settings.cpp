@@ -57,6 +57,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_scroll_speed != b->overlay_scroll_speed ||
         a->overlay_progress_text_align != b->overlay_progress_text_align ||
         a->overlay_row1_spacing != b->overlay_row1_spacing ||
+        a->overlay_row1_shared_icon_size != b->overlay_row1_shared_icon_size ||
         a->overlay_row2_custom_spacing_enabled != b->overlay_row2_custom_spacing_enabled ||
         a->overlay_row2_custom_spacing != b->overlay_row2_custom_spacing ||
         a->overlay_row3_custom_spacing_enabled != b->overlay_row3_custom_spacing_enabled ||
