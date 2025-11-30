@@ -52,7 +52,8 @@ const char *SUPPORTER_ICONS[] = {
     "emotes/luvv-4x.png",
     "emotes/poggSpin-4x_unoptimized.gif",
     "emotes/peepoLove-4x.png",
-    "emotes/catHeart-4x_unoptimized.gif"
+    "emotes/catHeart-4x_unoptimized.gif",
+    "emotes/doorLove-4x.gif"
 };
 const int NUM_SUPPORTER_ICONS = sizeof(SUPPORTER_ICONS) / sizeof(char *);
 
