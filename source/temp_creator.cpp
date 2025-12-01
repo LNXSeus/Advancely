@@ -6447,8 +6447,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (validate_and_create_template(creator_version_str, new_template_category, new_template_flag,
                                                  error_msg,
                                                  sizeof(error_msg))) {
-                    snprintf(status_message, sizeof(status_message), "Success! Template '%s' created.",
-                             new_template_category);
                     show_create_new_view = false;
                     // Force a rescan by clearing the last scanned version
                     SDL_SetAtomicInt(&g_templates_changed, 1); // Signal change
@@ -6523,8 +6521,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (copy_template_files(creator_version_str, selected.category, selected.optional_flag,
                                         dest_version, copy_template_category, copy_template_flag,
                                         error_msg, sizeof(error_msg))) {
-                    snprintf(status_message, sizeof(status_message), "Success! Template copied to '%s'.",
-                             copy_template_category);
+                    status_message[0] = '\0'; // Ensure status message is clear
                     show_copy_view = false;
                     SDL_SetAtomicInt(&g_templates_changed, 1); // Signal change
                     last_scanned_version[0] = '\0'; // Force rescan
