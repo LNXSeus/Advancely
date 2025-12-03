@@ -148,18 +148,27 @@ static void tracker_update_notes_path(Tracker *t, const AppSettings *settings) {
 // NON STATIC FUNCTION -------------------------------------------------------------------
 
 bool str_contains_insensitive(const char *haystack, const char *needle) {
-    if (!needle || *needle == '\0') return true; // An empty search query matches everything
+    if (!needle || *needle == '\0') return true;
     if (!haystack) return false;
 
-    std::string haystack_lower = haystack;
-    std::transform(haystack_lower.begin(), haystack_lower.end(), haystack_lower.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+    // Optimized: No memory allocation
+    const char *h = haystack;
+    const char *n_start = needle;
 
-    std::string needle_lower = needle;
-    std::transform(needle_lower.begin(), needle_lower.end(), needle_lower.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+    while (*h) {
+        const char *h_iter = h;
+        const char *n_iter = n_start;
 
-    return haystack_lower.find(needle_lower) != std::string::npos;
+        while (*h_iter && *n_iter &&
+              (tolower((unsigned char)*h_iter) == tolower((unsigned char)*n_iter))) {
+            h_iter++;
+            n_iter++;
+              }
+
+        if (*n_iter == '\0') return true; // Found match
+        h++;
+    }
+    return false;
 }
 
 // END OF NON STATIC FUNCTION -------------------------------------------------------------------
