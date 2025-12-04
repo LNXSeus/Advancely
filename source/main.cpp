@@ -386,6 +386,9 @@ static void global_watch_callback(dmon_watch_id watch_id, dmon_action action, co
 
     // We only care about file modifications to existing files
     if (action == DMON_ACTION_MODIFY) {
+        // --- TODO: Debug Print ---
+        log_message(LOG_INFO, "[DEBUG - DMON - MAIN] Global Watcher triggered by file: %s\n", filepath);
+        // ----------------
         const char *ext = strrchr(filepath, '.'); // Locate last '.' in string
         if (ext && ((strcmp(ext, ".json") == 0) || (strcmp(ext, ".dat") == 0))) {
             // A game file was modified. Atomically update the timestamp and flags.
@@ -408,6 +411,9 @@ static void settings_watch_callback(dmon_watch_id watch_id, dmon_action action, 
     // AppSettings *settings = (AppSettings *) user;
 
     if (action == DMON_ACTION_MODIFY) {
+        // --- TODO: Debug Print ---
+        log_message(LOG_INFO, "[DEBUG - DMON - MAIN] Settings Watcher triggered by file: %s\n", filepath);
+        // ----------------
         if (strcmp(filepath, "settings.json") == 0) {
             log_message(LOG_INFO, "[DMON - MAIN] settings.json modified. Triggering update.\n");
 
@@ -1725,8 +1731,11 @@ int main(int argc, char *argv[]) {
 
 
             // Check if dmon (or manual update through custom goal) has requested an update
-            // Atomically check if the flag is 1
-            if (SDL_GetAtomicInt(&g_needs_update) == 1) {
+            // Use SDL_SetAtomicInt to check AND reset the flag atomically.
+            if (SDL_SetAtomicInt(&g_needs_update, 0) == 1) {
+                // --- TODO: Debug Print ---
+                log_message(LOG_INFO, "[DEBUG - MAIN] g_needs_update was 1. Triggering full tracker update.\n");
+                // ----------------
                 MC_Version version = settings_get_version_from_string(app_settings.version_str);
                 find_player_data_files(
                     tracker->saves_path,

@@ -35,11 +35,13 @@ extern "C" {
 typedef struct {
     char path[MAX_PATH_LENGTH]; // The path to the texture file
     SDL_Texture *texture; // The SDL_Texture object
+    uint64_t file_hash; // Cache the hash to prevent reading disk during template re-init
 } TextureCacheEntry;
 
 typedef struct {
     char path[MAX_PATH_LENGTH]; // The path to the texture file
     AnimatedTexture *anim; // The SDL_Texture object
+    uint64_t file_hash; // Cache the hash to prevent reading disk
 } AnimatedTextureCacheEntry;
 
 struct Tracker {

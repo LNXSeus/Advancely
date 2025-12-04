@@ -58,15 +58,15 @@ static void tracker_update_notes_path(Tracker *t, const AppSettings *settings) {
     if (settings->per_world_notes) {
         // Per World Mode
         if (t->world_name[0] == '\0' || t->saves_path[0] == '\0') {
-            t->notes_path[0] = '\0'; // Cannot determine püath if world/saves path is unknown
+            t->notes_path[0] = '\0';
             return;
         }
 
-        // Create a unique identifier for the world from the saves path and world name
+        // Create a unique identifier for the world
         char full_world_path[MAX_PATH_LENGTH * 2];
         snprintf(full_world_path, sizeof(full_world_path), "%s/%s", t->saves_path, t->world_name);
 
-        // Hash the full path to create a safe filename
+        // Hash the full path
         unsigned long world_hash = hash_string(full_world_path);
         snprintf(t->notes_path, MAX_PATH_LENGTH, "%s/%lu.txt", get_notes_dir_path(), world_hash);
 
@@ -85,18 +85,29 @@ static void tracker_update_notes_path(Tracker *t, const AppSettings *settings) {
             }
         }
 
+        bool save_needed = false; // Default to FALSE to prevent loops
+        double current_time = (double)time(0);
+
         if (entry_to_update) {
-            // World exists, update its timestamp
-            cJSON_ReplaceItemInObject(entry_to_update, "last_used", cJSON_CreateNumber((double) time(0)));
+            // World exists. Check timestamp before writing!
+            cJSON *last_used_item = cJSON_GetObjectItem(entry_to_update, "last_used");
+            double last_time = cJSON_IsNumber(last_used_item) ? last_used_item->valuedouble : 0;
+
+            // Only write if more than 5 seconds have passed.
+            if ((current_time - last_time) > 5.0) {
+                cJSON_ReplaceItemInObject(entry_to_update, "last_used", cJSON_CreateNumber(current_time));
+                save_needed = true;
+            }
         } else {
-            // new world, add a new entry
+            // New world, add a new entry (Always save new entries)
             cJSON *new_entry = cJSON_CreateObject();
             cJSON_AddNumberToObject(new_entry, "hash", (double) world_hash);
             cJSON_AddStringToObject(new_entry, "path", full_world_path);
             cJSON_AddNumberToObject(new_entry, "last_used", (double) time(0));
             cJSON_AddItemToArray(manifest, new_entry);
+            save_needed = true;
 
-            // Check if we need to prune old notes (LRU - least recently used)
+            // Check if we need to prune old notes (LRU)
             if (cJSON_GetArraySize(manifest) > MAX_WORLD_NOTES) {
                 cJSON *oldest_entry = nullptr;
                 double oldest_time = -1;
@@ -114,11 +125,9 @@ static void tracker_update_notes_path(Tracker *t, const AppSettings *settings) {
                 }
 
                 if (oldest_entry && oldest_index != -1) {
-                    unsigned long hash_to_delete = (unsigned long) cJSON_GetObjectItem(oldest_entry, "hash")->
-                            valuedouble;
+                    unsigned long hash_to_delete = (unsigned long) cJSON_GetObjectItem(oldest_entry, "hash")->valuedouble;
                     char path_to_delete[MAX_PATH_LENGTH];
-                    snprintf(path_to_delete, sizeof(path_to_delete), "%s/%lu.txt", get_notes_dir_path(),
-                             hash_to_delete);
+                    snprintf(path_to_delete, sizeof(path_to_delete), "%s/%lu.txt", get_notes_dir_path(), hash_to_delete);
                     if (remove(path_to_delete) == 0) {
                         log_message(LOG_INFO, "[NOTES] Pruned old notes file: %s\n", path_to_delete);
                     }
@@ -127,18 +136,20 @@ static void tracker_update_notes_path(Tracker *t, const AppSettings *settings) {
             }
         }
 
-        // Save the updated manifest
-        FILE *manifest_file = fopen(get_notes_manifest_path(), "w");
-        if (manifest_file) {
-            char *manifest_str = cJSON_Print(manifest);
-            fputs(manifest_str, manifest_file);
-            fclose(manifest_file);
-            free(manifest_str);
+        // Save the updated manifest ONLY if necessary
+        if (save_needed) {
+            FILE *manifest_file = fopen(get_notes_manifest_path(), "w");
+            if (manifest_file) {
+                char *manifest_str = cJSON_Print(manifest);
+                fputs(manifest_str, manifest_file);
+                fclose(manifest_file);
+                free(manifest_str);
+            }
         }
         cJSON_Delete(manifest);
     } else {
         // Per template mode
-        construct_template_paths((AppSettings *) settings); // This will update the template paths
+        construct_template_paths((AppSettings *) settings);
         strncpy(t->notes_path, settings->notes_path, MAX_PATH_LENGTH - 1);
         t->notes_path[MAX_PATH_LENGTH - 1] = '\0';
     }
@@ -1376,6 +1387,11 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
 static uint64_t compute_file_hash(const char *path) {
     if (!path || path[0] == '\0') return 0;
 
+    // --- TODO: DEBUG PRINT ---
+    // If you see this spamming in the console, your cache is being reset repeatedly.
+    log_message(LOG_INFO, "[DEBUG - TRACKER - FILE HASHING] Reading file from disk: %s\n", path);
+    // ----------------------------
+
     FILE *f = fopen(path, "rb");
     if (!f) return 0; // If file can't be read, treat as unique/empty
 
@@ -1399,8 +1415,32 @@ typedef struct {
     int count;
 } IconHashCounter;
 
+/**
+ * @brief Helper to find a hash in the texture cache (Static or Animated) or compute it if missing.
+ */
+static uint64_t get_image_hash_optimized(Tracker *t, const char *path) {
+    if (!path || path[0] == '\0') return 0;
+
+    // 1. Try to find it in the STATIC cache first (Fast RAM lookup)
+    for (int i = 0; i < t->texture_cache_count; i++) {
+        if (strcmp(t->texture_cache[i].path, path) == 0) {
+            return t->texture_cache[i].file_hash;
+        }
+    }
+
+    // 2. Try to find it in the ANIMATED cache (Fast RAM lookup)
+    for (int i = 0; i < t->anim_cache_count; i++) {
+        if (strcmp(t->anim_cache[i].path, path) == 0) {
+            return t->anim_cache[i].file_hash;
+        }
+    }
+
+    // 3. If not in any cache, read from disk (Slow, but should rarely happen now)
+    return compute_file_hash(path);
+}
+
 // Helper function to process and count all sub-items from a list of categories based on image HASH
-static int count_all_icon_hashes(IconHashCounter **counts, int capacity, int current_unique_count,
+static int count_all_icon_hashes(Tracker *t, IconHashCounter **counts, int capacity, int current_unique_count,
                                 TrackableCategory **categories, int cat_count) {
     if (!categories) return current_unique_count;
 
@@ -1414,7 +1454,7 @@ static int count_all_icon_hashes(IconHashCounter **counts, int capacity, int cur
 
             // Only calculate the hash if we haven't done it yet (Lazy Loading)
             if (crit->icon_hash == 0) {
-                crit->icon_hash = compute_file_hash(crit->icon_path);
+                crit->icon_hash = get_image_hash_optimized(t, crit->icon_path);
             }
 
             if (crit->icon_hash == 0) continue;
@@ -1482,13 +1522,13 @@ static void tracker_detect_shared_icons(Tracker *t, const AppSettings *settings)
 
     int unique_count = 0;
 
-    // 1. Count occurrences of every unique image hash
-    unique_count = count_all_icon_hashes(&counts, total_criteria, unique_count, t->template_data->advancements,
+    // 1. Count occurrences (Pass 't' to use the cache)
+    unique_count = count_all_icon_hashes(t, &counts, total_criteria, unique_count, t->template_data->advancements,
                                         t->template_data->advancement_count);
-    unique_count = count_all_icon_hashes(&counts, total_criteria, unique_count, t->template_data->stats,
+    unique_count = count_all_icon_hashes(t, &counts, total_criteria, unique_count, t->template_data->stats,
                                         t->template_data->stat_count);
 
-    // 2. Flag items that use a hash with a count > 1
+    // 2. Flag items
     flag_shared_icons_by_hash(counts, unique_count, t->template_data->advancements, t->template_data->advancement_count);
     flag_shared_icons_by_hash(counts, unique_count, t->template_data->stats, t->template_data->stat_count);
 
@@ -2342,10 +2382,14 @@ SDL_Texture *get_texture_from_cache(SDL_Renderer *renderer, TextureCacheEntry **
     }
 
     // Add to cache
-    strncpy((*cache)[*cache_count].path, path, MAX_PATH_LENGTH - 1);
-    (*cache)[*cache_count].path[MAX_PATH_LENGTH - 1] = '\0'; // Ensure null-termination
+    TextureCacheEntry *entry = &(*cache)[*cache_count];
+    strncpy(entry->path, path, MAX_PATH_LENGTH - 1);
+    entry->path[MAX_PATH_LENGTH - 1] = '\0'; // Ensure null-termination
+    entry->texture = new_texture;
 
-    (*cache)[*cache_count].texture = new_texture;
+    // OPTIMIZATION: Compute the hash now and store it, so we don't have to read the disk later
+    entry->file_hash = compute_file_hash(path);
+
     (*cache_count)++;
 
     return new_texture;
@@ -2398,10 +2442,14 @@ AnimatedTexture *get_animated_texture_from_cache(SDL_Renderer *renderer, Animate
     }
 
     // Add to cache
-    strncpy((*cache)[*cache_count].path, path, MAX_PATH_LENGTH - 1);
-    (*cache)[*cache_count].path[MAX_PATH_LENGTH - 1] = '\0'; // Ensure null-termination
+    AnimatedTextureCacheEntry *entry = &(*cache)[*cache_count];
+    strncpy(entry->path, path, MAX_PATH_LENGTH - 1);
+    entry->path[MAX_PATH_LENGTH - 1] = '\0'; // Ensure null-termination
+    entry->anim = new_anim;
 
-    (*cache)[*cache_count].anim = new_anim;
+    // OPTIMIZATION: Compute hash on load
+    entry->file_hash = compute_file_hash(path);
+
     (*cache_count)++;
 
     return new_anim;
@@ -5654,6 +5702,24 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings) {
     }
 }
 
+// --- Helper for compare ---
+static bool json_objects_differ(cJSON *obj1, cJSON *obj2) {
+    if (obj1 == obj2) return false;
+    if (!obj1 || !obj2) return true; // One exists, the other doesn't
+
+    char *s1 = cJSON_PrintUnformatted(obj1);
+    char *s2 = cJSON_PrintUnformatted(obj2);
+
+    bool diff = true;
+    if (s1 && s2) {
+        diff = (strcmp(s1, s2) != 0);
+    }
+
+    if (s1) free(s1);
+    if (s2) free(s2);
+    return diff;
+}
+
 bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     log_message(LOG_INFO, "[TRACKER] Loading advancement template from: %s\n", t->advancement_template_path);
 
@@ -5793,6 +5859,8 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     cJSON *settings_root = cJSON_from_file(get_settings_file_path());
     if (!settings_root) settings_root = cJSON_CreateObject();
 
+    bool save_needed = false; // FLAG: Only write to disk if data ACTUALLY changed
+
     // Sync custom_progress
     cJSON *old_custom_progress = cJSON_GetObjectItem(settings_root, "custom_progress");
     cJSON *new_custom_progress = cJSON_CreateObject();
@@ -5808,7 +5876,14 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
             else cJSON_AddBoolToObject(new_custom_progress, item->root_name, false);
         }
     }
-    cJSON_ReplaceItemInObject(settings_root, "custom_progress", new_custom_progress);
+
+    // Compare before replacing
+    if (json_objects_differ(old_custom_progress, new_custom_progress)) {
+        cJSON_ReplaceItemInObject(settings_root, "custom_progress", new_custom_progress);
+        save_needed = true;
+    } else {
+        cJSON_Delete(new_custom_progress); // Clean up unused new object
+    }
 
     // Sync stat_progress_override
     cJSON *old_stat_override = cJSON_GetObjectItem(settings_root, "stat_progress_override");
@@ -5841,7 +5916,14 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
             }
         }
     }
-    cJSON_ReplaceItemInObject(settings_root, "stat_progress_override", new_stat_override);
+
+    // Compare before replacing
+    if (json_objects_differ(old_stat_override, new_stat_override)) {
+        cJSON_ReplaceItemInObject(settings_root, "stat_progress_override", new_stat_override);
+        save_needed = true;
+    } else {
+        cJSON_Delete(new_stat_override);
+    }
 
     // Sync hotkeys based on their order in the list, not by name
     cJSON *old_hotkeys_array = cJSON_GetObjectItem(settings_root, "hotkeys");
@@ -5879,8 +5961,17 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
             counter_index++; // Move to the next counter index
         }
     }
-    cJSON_ReplaceItemInObject(settings_root, "hotkeys", new_hotkeys_array);
 
+    // Compare before replacing
+    if (json_objects_differ(old_hotkeys_array, new_hotkeys_array)) {
+        cJSON_ReplaceItemInObject(settings_root, "hotkeys", new_hotkeys_array);
+        save_needed = true;
+    } else {
+        cJSON_Delete(new_hotkeys_array);
+    }
+
+    if (save_needed) {
+    log_message(LOG_INFO, "[TRACKER] Updating settings.json with new template data...\n");
     // Write the synchronized settings back to the file
     FILE *file = fopen(get_settings_file_path(), "w");
     if (file) {
@@ -5889,6 +5980,10 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
         fclose(file);
         free(json_str);
         json_str = nullptr;
+    }
+    } else {
+        // TODO: Debug
+        log_message(LOG_INFO, "[TRACKER] Settings.json is up to date. Skipping write.\n");
     }
     cJSON_Delete(settings_root);
 
