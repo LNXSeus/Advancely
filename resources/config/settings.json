@@ -168,7 +168,9 @@
 		"tracker_section_custom_item_width":	[128, 128, 128, 128, 128, 128],
 		"lod_text_sub_threshold":	0.600000023841858,
 		"lod_text_main_threshold":	0.40000000596046448,
-		"lod_icon_detail_threshold":	0.25
+		"lod_icon_detail_threshold":	0.25,
+		"scrollable_list_threshold":	16,
+		"tracker_list_scroll_speed":	36
 	},
 	"path_mode":	"auto",
 	"manual_saves_path":	"",

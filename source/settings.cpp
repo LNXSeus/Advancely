@@ -72,6 +72,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->lod_icon_detail_threshold != b->lod_icon_detail_threshold ||
 
         a->scrollable_list_threshold != b->scrollable_list_threshold ||
+        a->tracker_list_scroll_speed != b->tracker_list_scroll_speed ||
 
         a->notes_use_roboto_font != b->notes_use_roboto_font ||
         a->check_for_updates != b->check_for_updates ||
@@ -1586,13 +1587,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // --- Level of Detail Settings ---
     ImGui::SeparatorText("Level of Detail (Zoom)");
-    ImGui::TextWrapped("Adjust at which zoom level elements disappear to declutter the view and improve performance. Higher values mean more zoom.");
 
     ImGui::DragFloat("Hide Sub-Item Text At", &temp_settings.lod_text_sub_threshold, 0.001f, 0.05f, 10.0f, "%.3f");
     if (ImGui::IsItemHovered()) {
         char lod_sub_tooltip[1024];
         snprintf(lod_sub_tooltip, sizeof(lod_sub_tooltip),
                  "The zoom threshold below which sub-item text is hidden.\n"
+                 "Higher values are more zoomed in.\n"
                  "Affects:\n"
                  " - Names of Criteria, Sub-Stats, and Stages.\n"
                  " - Progress Text like '(5/10)'.\n"
@@ -1605,6 +1606,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         char lod_main_tooltip[1024];
         snprintf(lod_main_tooltip, sizeof(lod_main_tooltip),
                  "The zoom threshold below which main item text and interactive elements are hidden.\n"
+                 "Higher values are more zoomed in.\n"
                  "Affects:\n"
                  " - Main Category Names (e.g., 'Monster Hunter').\n"
                  " - Checkboxes for manual completion (Parent and Sub-Stat checkboxes).\n"
@@ -1617,12 +1619,16 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         char lod_icon_tooltip[1024];
         snprintf(lod_icon_tooltip, sizeof(lod_icon_tooltip),
                  "The zoom threshold below which sub-item icons are simplified.\n"
+                 "Higher values are more zoomed in.\n"
                  "Affects:\n"
                  " - Criteria and Sub-Stat icons turn into simple colored squares.\n"
                  " - The squares use your chosen Text Color with low opacity to indicate presence.\n"
+                 " - The scroll bar on the side of scrolling lists.\n"
                  "Default: %.3f", DEFAULT_LOD_ICON_DETAIL_THRESHOLD);
         ImGui::SetTooltip("%s", lod_icon_tooltip);
     }
+
+    ImGui::SeparatorText("List Behavior");
 
     // Slider for Scroll Threshold
     ImGui::DragInt("Scrollable List Threshold", &temp_settings.scrollable_list_threshold, 1.0f, 1, 2048);

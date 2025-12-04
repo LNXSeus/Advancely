@@ -3881,68 +3881,94 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     if (use_scrolling_list) {
                         draw_list->PopClipRect();
 
-                        if (total_content_height_logical > visible_height_logical && t->zoom_level > settings->
-                            lod_icon_detail_threshold) {
-                            // Recalculate visual sizes (Screen Space)
+                        // Only draw if needed (and LOD allows)
+                        if (total_content_height_logical > visible_height_logical && t->zoom_level > settings->lod_icon_detail_threshold) {
+
+                            // 1. Calculate Visual Dimensions (Screen Space)
                             float total_content_height_screen = total_content_height_logical * t->zoom_level;
                             float visible_height_screen = visible_height_logical * t->zoom_level;
 
-                            // Dimensions
                             float bar_width = 6.0f * t->zoom_level;
                             float bar_padding_right = 4.0f * t->zoom_level;
-                            float bar_x = screen_pos.x + (uniform_item_width * t->zoom_level) - bar_width -
-                                          bar_padding_right;
+                            float bar_x = screen_pos.x + (uniform_item_width * t->zoom_level) - bar_width - bar_padding_right;
                             float bar_top_y = (sub_item_y_offset_world * t->zoom_level) + t->camera_offset.y;
-                            float bar_bottom_y = bar_top_y + visible_height_screen;
 
-                            // Define Hit Rect for Dragging (The whole track)
-                            ImVec2 track_min = ImVec2(bar_x - 2.0f, bar_top_y); // Add small padding for easier grabbing
-                            ImVec2 track_max = ImVec2(bar_x + bar_width + 2.0f, bar_bottom_y);
+                            // Calculate Handle Height
+                            float handle_height_screen = visible_height_screen * (visible_height_screen / total_content_height_screen);
+                            if (handle_height_screen < 10.0f * t->zoom_level) handle_height_screen = 10.0f * t->zoom_level;
 
-                            // Handle Dragging Logic
-                            if (ImGui::IsMouseHoveringRect(track_min, track_max)) {
-                                t->is_hovering_scrollable_list = true; // Also block zoom when hovering bar
+                            float available_scroll_track = visible_height_screen - handle_height_screen;
 
-                                if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-                                    // Calculate new scroll position based on mouse Y relative to track top
-                                    float mouse_relative_y = io.MousePos.y - bar_top_y;
-                                    float click_ratio = mouse_relative_y / visible_height_screen;
+                            // 2. Interaction (Invisible Button)
+                            // We place an invisible button over the ENTIRE scrollbar track to handle dragging robustly.
+                            // SetCursorScreenPos tells ImGui where to place the next widget (our InvisibleButton).
+                            ImGui::SetCursorScreenPos(ImVec2(bar_x - 2.0f * t->zoom_level, bar_top_y)); // Add padding for easier grabbing
+                            ImGui::PushID(cat); // Ensure Unique ID per category
 
-                                    // Simple approximation: Map mouse position directly to scroll %
-                                    cat->scroll_y = click_ratio * max_scroll_logical;
+                            // Button covers the whole track height
+                            ImGui::InvisibleButton("##scrollbar", ImVec2(bar_width + 4.0f * t->zoom_level, visible_height_screen));
+
+                            bool is_active = ImGui::IsItemActive(); // Held down
+                            bool is_hovered = ImGui::IsItemHovered(); // Hovered
+
+                            if (is_active) {
+                                t->is_hovering_scrollable_list = true; // Block main map zoom while dragging
+
+                                // Calculate ratio: How many logical pixels of content = 1 screen pixel of track movement?
+                                // Max Scroll (Logical) / Track Space (Screen)
+                                float max_scroll_logical = total_content_height_logical - visible_height_logical;
+
+                                if (available_scroll_track > 0.1f) {
+                                    float pixels_to_logical_scale = max_scroll_logical / available_scroll_track;
+
+                                    // Apply Delta: This ensures smooth dragging relative to mouse movement
+                                    cat->scroll_y += io.MouseDelta.y * pixels_to_logical_scale;
                                 }
+                            } else if (is_hovered) {
+                                t->is_hovering_scrollable_list = true; // Block zoom if just hovering bar
                             }
 
-                            // Colors using user settings
-                            ImU32 track_color = IM_COL32(settings->text_color.r, settings->text_color.g,
-                                                         settings->text_color.b, 30);
-                            ImU32 handle_color = IM_COL32(settings->text_color.r, settings->text_color.g,
-                                                          settings->text_color.b, ADVANCELY_FADED_ALPHA);
+                            ImGui::PopID();
 
-                            // Draw Track
+                            // 3. Clamp Scroll (Ensure we stay in bounds after drag)
+                            float max_scroll_logical = total_content_height_logical - visible_height_logical;
+                            if (cat->scroll_y < 0.0f) cat->scroll_y = 0.0f;
+                            if (cat->scroll_y > max_scroll_logical) cat->scroll_y = max_scroll_logical;
+
+                            // 4. Draw Visuals
+                            // Recalculate handle Y position based on the clamped scroll
+                            float scroll_ratio = (max_scroll_logical > 0) ? (cat->scroll_y / max_scroll_logical) : 0.0f;
+                            float handle_y = bar_top_y + (scroll_ratio * available_scroll_track);
+
+                            // Colors based on State
+                            ImU32 track_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b, 30); // Faint track
+                            ImU32 handle_color;
+
+                            if (is_active) {
+                                // Active (Dragging): High opacity
+                                handle_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b, 200);
+                            } else if (is_hovered) {
+                                // Hovered: Medium opacity
+                                handle_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b, 150);
+                            } else {
+                                // Default: User-defined faded alpha (usually 100)
+                                handle_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b, ADVANCELY_FADED_ALPHA);
+                            }
+
+                            // Draw Track Background
                             draw_list->AddRectFilled(
                                 ImVec2(bar_x, bar_top_y),
-                                ImVec2(bar_x + bar_width, bar_bottom_y),
+                                ImVec2(bar_x + bar_width, bar_top_y + visible_height_screen),
                                 track_color,
                                 4.0f * t->zoom_level // Rounded
                             );
-
-                            // Calculate Handle Height & Position
-                            float handle_height_screen =
-                                    visible_height_screen * (visible_height_screen / total_content_height_screen);
-                            if (handle_height_screen < 10.0f * t->zoom_level)
-                                handle_height_screen = 10.0f * t->zoom_level;
-
-                            float available_scroll_track = visible_height_screen - handle_height_screen;
-                            float scroll_ratio = cat->scroll_y / max_scroll_logical;
-                            float handle_y = bar_top_y + (scroll_ratio * available_scroll_track);
 
                             // Draw Handle
                             draw_list->AddRectFilled(
                                 ImVec2(bar_x, handle_y),
                                 ImVec2(bar_x + bar_width, handle_y + handle_height_screen),
                                 handle_color,
-                                4.0f * t->zoom_level // Rounded
+                                4.0f * t->zoom_level
                             );
                         }
                     }

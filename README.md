@@ -2,7 +2,7 @@
   <img src="readme_assets/Advancely_Logo.png" alt="Advancely_Logo.png">
 </p>
 
-# [**DOWNLOAD ADVANCELY NOW\! (Windows, Linux & macOS)**](https://github.com/LNXSeus/Advancely/releases)
+# [⬇️ **DOWNLOAD ADVANCELY NOW\! (Windows, Linux & macOS)** ⬇️](https://github.com/LNXSeus/Advancely/releases)
 
 ***
 
@@ -116,6 +116,8 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
   more [here](https://github.com/LNXSeus/Advancely#the-settings-window-esc).
 * **Interactive Map View**: The main tracker window is an interactive map where you can pan by holding `Right-Click` or
   `Middle-Click`, zoom with the `Mouse Wheel`, and lock the layout in place by pressing `SPACE`.
+* **Scrollable Lists**: Goals containing large numbers of sub-items (like "All Animals Bred" or complex stats) are
+  automatically converted into scrollable lists to save screen space.
 * **Comprehensive Real-Time Tracking**: Advancely operates in real-time by watching your singleplayer save files for
   changes. It can monitor a wide range of data types, including:
     * **Advancements & Recipes**: Tracks completion status and individual criteria for any advancement or recipe from
@@ -178,6 +180,9 @@ being displayed at once.
     * **Tracker Window**: Utilizes **Dear ImGui** for a responsive, interactive, and highly customizable interface.
     * **Stream Overlay**: Bypasses UI libraries entirely to use **raw SDL3 hardware acceleration**. This ensures
       perfectly smooth 60fps+ animations with virtually zero overhead.
+* **Virtual Scrollable Lists**: Templates with thousands of criteria (e.g. "All Items") are automatically converted into
+  virtualized scrollable lists. This keeps the layout compact and ensures rendering remains performant regardless of
+  list size.
 * **Smart Culling**: The tracker features a robust culling system. It only processes and renders items that are
   currently visible within the window. You can have a template with thousands of goals, but if you are zoomed in on just
   ten of them, only those ten are drawn.
@@ -356,6 +361,8 @@ You can manipulate the view using several intuitive controls:
 
 * **Pan**: Hold `Right-Click` or `Middle-Click` and drag to move the entire map of goals.
 * **Zoom**: Use the `Mouse Wheel` to zoom in and out, allowing you to see an overview or focus on specific details.
+* **Scroll Lists**: When hovering over a goal with many sub-items, the `Mouse Wheel` will scroll the list contents
+  instead of zooming the map. You can also left-click and drag the scrollbar.
 * **Lock Layout**: Press the `SPACE` key to lock the grid layout. This prevents goals from rearranging when you resize
   the window, giving you precise control over how many items appear in each row.
 * **Reset Layout**: Click the "Reset Layout" button in the bottom-right corner to instantly reset the pan and zoom to
@@ -477,6 +484,9 @@ Nearly every aspect of the overlay can be tailored to your liking from the setti
 * **Visibility**: Choose whether to hide completed goals from Row 3, and toggle the visibility of each section of the
   top info bar (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`).
 * **Alignment**: The main progress text at the top of the overlay can be aligned to the `Left`, `Center`, or `Right`.
+* **Spacing**: You can fully adjust the `spacing` between each row to either be dynamic based on the longest text width
+within that row or be fully fixed. When two items within the first row share the same texture (based on hashing) their
+parent icon will be overlaid to distinguish them further. The `size` of this overlaid icon can also be configured.
 
 </details>
 
@@ -587,9 +597,9 @@ settings file also saves the status on manual overrides of stats and custom goal
 templates._
 
 <p align="center">
-  <img src="readme_assets/v0.9.511_Settings_Window_pt1.png"/>
+  <img src="readme_assets/v0.9.522_Settings_Window_pt1.png"/>
     <br>
-  <img src="readme_assets/v0.9.511_Settings_Window_pt2.png"/>
+  <img src="readme_assets/v0.9.522_Settings_Window_pt2.png"/>
 </p>
 
 <details>
@@ -608,6 +618,7 @@ templates._
 | **Font Settings**              | Independently set the font for the **Tracker** (split into `Main` (includes notes window), `Sub` (Criteria/Sub-Goals) & `UI` (Progress Window & Bottom Controls)), **Overlay**, and **UI (Settings/Notes)**. Both `.ttf` and `.otf` font files are supported. _Note: Changes to Tracker and UI fonts/sizes may require an application restart. Modifying the `settings.json` file directly allows for higher font sizes, but may cause overlaps._                                                                                                                                                                                                   |
 | **Overlay Settings**           | Set the `Overlay FPS Limit` independently from the tracker. Configure the `Overlay Scroll Speed` (negative values reverse the direction) and set the `Sub-Stat Cycle Interval` for multi-stat animations. You can also align the top progress text (`Left`, `Center`, or `Right`) and toggle visibility for each section of the info bar (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`).                                                                                                                                                                                                                                               |
 | **Level of Detail (Zoom)**     | Adjust the zoom thresholds at which elements disappear to declutter the view and improve performance. You can independently configure when to `Hide Sub-Item Text` (criteria names, progress text), `Hide Main Text/Checkbox` (category names, manual checkboxes), and `Simplify Icons` (turning sub-item icons into simple colored squares). Higher values mean you must be zoomed in further to see the details.                                                                                                                                                                                                                                  |
+| **List Behavior**              | Control how long lists of criteria/sub-stats are handled. Set the `Scrollable List Threshold` to determine when a list becomes a scrollable box (saving vertical space), and adjust the `List Scroll Speed` for mouse wheel navigation.                                                                                                                                                                                                                                                                                                                                                                                                             |
 | **Tracker Spacing**            | Adjust the `Tracker Vertical Spacing` (in pixels) between rows of items. You can also enable `Custom Section Item Width` to adjust the horizontal width (in pixels) for *each item* within a specific section (e.g., set "Advancements" to 150px, "Stats" to 200px), overriding the dynamic width calculation. _Warning: Small values may cause text to overlap._                                                                                                                                                                                                                                                                                   |
 | **Overlay Horizontal Spacing** | Configure the horizontal spacing (in pixels) for overlay items. You can set the gap for `Row 1 Icon Spacing`, adjust the `Row 1 Shared Icon Size`, or enable `Custom Row 2 Spacing` / `Custom Row 3 Spacing` to set a fixed, uniform item width for those rows.                                                                                                                                                                                                                                                                                                                                                                                     |
 | **Section Order**              | Drag and drop the section names (`Advancements`, `Stats`, `Unlocks`, etc.) to reorder how they appear in the main tracker window.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
