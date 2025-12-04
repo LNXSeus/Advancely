@@ -8,6 +8,7 @@
 //
 
 #include <cstdio>
+#include <map>
 #include <string>
 #include <algorithm>
 #include <cctype>
@@ -5874,6 +5875,30 @@ void tracker_reinit_template(Tracker *t, AppSettings *settings) {
 
     log_message(LOG_INFO, "[TRACKER] Re-initializing template...\n");
 
+    // --- BACKUP SCROLL STATE ---
+    // We use a map to store the scroll_y value keyed by the category's root_name.
+    // This ensures we restore the correct scroll position to the correct category
+    // even if the order changes or items are added/removed.
+    std::map<std::string, float> scroll_backup;
+
+    if (t->template_data) {
+        // Backup Advancements
+        if (t->template_data->advancements) {
+            for (int i = 0; i < t->template_data->advancement_count; i++) {
+                if (t->template_data->advancements[i] && t->template_data->advancements[i]->scroll_y > 0.0f) {
+                    scroll_backup[t->template_data->advancements[i]->root_name] = t->template_data->advancements[i]->scroll_y;
+                }
+            }
+        }
+        // Backup Stats
+        if (t->template_data->stats) {
+            for (int i = 0; i < t->template_data->stat_count; i++) {
+                if (t->template_data->stats[i] && t->template_data->stats[i]->scroll_y > 0.0f) {
+                    scroll_backup[t->template_data->stats[i]->root_name] = t->template_data->stats[i]->scroll_y;
+                }
+            }
+        }
+    }
 
     // Update the paths from settings.json
     tracker_reinit_paths(t, settings);
@@ -5890,6 +5915,32 @@ void tracker_reinit_template(Tracker *t, AppSettings *settings) {
     }
     // Load and parse data from the new template files
     tracker_load_and_parse_data(t, settings);
+
+    // --- RESTORE SCROLL STATE ---
+    if (t->template_data && !scroll_backup.empty()) {
+        // Restore Advancements
+        if (t->template_data->advancements) {
+            for (int i = 0; i < t->template_data->advancement_count; i++) {
+                if (t->template_data->advancements[i]) {
+                    auto it = scroll_backup.find(t->template_data->advancements[i]->root_name);
+                    if (it != scroll_backup.end()) {
+                        t->template_data->advancements[i]->scroll_y = it->second;
+                    }
+                }
+            }
+        }
+        // Restore Stats
+        if (t->template_data->stats) {
+            for (int i = 0; i < t->template_data->stat_count; i++) {
+                if (t->template_data->stats[i]) {
+                    auto it = scroll_backup.find(t->template_data->stats[i]->root_name);
+                    if (it != scroll_backup.end()) {
+                        t->template_data->stats[i]->scroll_y = it->second;
+                    }
+                }
+            }
+        }
+    }
 }
 
 void tracker_reinit_paths(Tracker *t, const AppSettings *settings) {

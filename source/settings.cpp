@@ -1636,7 +1636,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     // List Scroll Speed Slider
-    ImGui::DragFloat("List Scroll Speed", &temp_settings.tracker_list_scroll_speed, 1.0f, 1.0f, 512.0f, "%.0f px");
+    ImGui::DragFloat("List Scroll Speed", &temp_settings.tracker_list_scroll_speed, 1.0f, 1.0f, 1024.0f, "%.0f px");
     if (ImGui::IsItemHovered()) {
         char speed_tooltip[1024];
         snprintf(speed_tooltip, sizeof(speed_tooltip),
@@ -2267,6 +2267,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Fonts: Tracker: %s, Overlay: %s, UI: %s\n"
                  "  - Font Sizes: Main: %.1f pt, Sub: %.1f pt, UI: %.1f pt\n"
                  "  - Level of Detail: Sub-Text: %.2f, Main-Text: %.2f, Icons: %.2f\n"
+                 "  - Scrollable List Threshold: %d; List Scroll Speed: %.0f px\n"
                  "  - Custom Section Width: %s (%.0f px)\n"
                  "  - Tracker Vertical Spacing: %.1f px\n"
                  "  - Overlay Spacing: Row 1: %.1f px, (%s) Row 2: %.0f px, (%s) Row 3: %.0f px\n"
@@ -2293,6 +2294,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_TRACKER_FONT, DEFAULT_OVERLAY_FONT, DEFAULT_UI_FONT,
                  DEFAULT_TRACKER_FONT_SIZE, DEFAULT_TRACKER_SUB_FONT_SIZE, DEFAULT_UI_FONT_SIZE,
                  DEFAULT_LOD_TEXT_SUB_THRESHOLD, DEFAULT_LOD_TEXT_MAIN_THRESHOLD, DEFAULT_LOD_ICON_DETAIL_THRESHOLD,
+                 DEFAULT_SCROLLABLE_LIST_THRESHOLD, DEFAULT_TRACKER_LIST_SCROLL_SPEED,
                  DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED ? "Enabled" : "Disabled",
                  DEFAULT_TRACKER_SECTION_ITEM_WIDTH,
                  DEFAULT_TRACKER_VERTICAL_SPACING,
