@@ -55,7 +55,7 @@ const char* get_notes_manifest_path();
 #define TRACKER_TITLE "Advancely"
 
 // This is the version that gets compared with the latest release tag on GitHub
-#define ADVANCELY_VERSION "v0.9.516" // vMAJOR.MINOR.PATCH // Update this always, SAME FORMAT ON RELEASE TAG!
+#define ADVANCELY_VERSION "v0.9.517" // vMAJOR.MINOR.PATCH // Update this always, SAME FORMAT ON RELEASE TAG!
 #define ADVANCELY_ICON_PATH "/gui/Advancely_Logo_NoText.png" // Starting from /gui folder
 #define ADVANCELY_LOGO_PATH "/gui/Advancely_Logo.png" // Starting from /gui folder
 #define ADVANCELY_LOGO_SIZE 512.0f // Logo size on startup message window or update successful window
@@ -65,7 +65,6 @@ const char* get_notes_manifest_path();
 // Framewise delay for GIFs if they have no timing information
 // Used in load_animated_gif() function in tracker.cpp
 #define DEFAULT_GIF_DELAY_MS 100 // (10 frames per second)
-
 
 #define OVERLAY_TITLE "Advancely Overlay"
 #define OVERLAY_FIXED_HEIGHT 420

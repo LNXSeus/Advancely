@@ -1372,42 +1372,64 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
     }
 }
 
-// Helper for counting
-typedef struct {
-    char icon_path[256];
-    int count;
-} IconPathCounter;
+// FNV-1a 64-bit hashing algorithm to hash file contents
+static uint64_t compute_file_hash(const char *path) {
+    if (!path || path[0] == '\0') return 0;
 
-// helper function to process and count all sub-items from a list of categories, simple stats are excluded
-static int count_all_icon_paths(IconPathCounter **counts, int capacity, int current_unique_count,
+    FILE *f = fopen(path, "rb");
+    if (!f) return 0; // If file can't be read, treat as unique/empty
+
+    uint64_t hash = 0xcbf29ce484222325ULL;
+    int c;
+
+    // Read file byte by byte (sufficient for small icons)
+    // For larger files, a buffer approach would be faster, but icons are tiny.
+    while ((c = fgetc(f)) != EOF) {
+        hash ^= (unsigned char)c;
+        hash *= 0x100000001b3ULL;
+    }
+
+    fclose(f);
+    return hash;
+}
+
+// Helper for counting based on Hash instead of Path
+typedef struct {
+    uint64_t hash;
+    int count;
+} IconHashCounter;
+
+// Helper function to process and count all sub-items from a list of categories based on image HASH
+static int count_all_icon_hashes(IconHashCounter **counts, int capacity, int current_unique_count,
                                 TrackableCategory **categories, int cat_count) {
     if (!categories) return current_unique_count;
 
     for (int i = 0; i < cat_count; i++) {
-        // Skip simple stat categories, as their criteria are not rendered individually on the overlay
-        if (categories[i]->is_single_stat_category) {
-            continue;
-        }
+        if (categories[i]->is_single_stat_category) continue;
+
         for (int j = 0; j < categories[i]->criteria_count; j++) {
             TrackableItem *crit = categories[i]->criteria[j];
-            // Only count items that have a valid icon path AND ARE NOT HIDDEN
-            if (crit->is_hidden || crit->icon_path[0] == '\0') {
-                continue;
+
+            if (crit->is_hidden || crit->icon_path[0] == '\0') continue;
+
+            // Only calculate the hash if we haven't done it yet (Lazy Loading)
+            if (crit->icon_hash == 0) {
+                crit->icon_hash = compute_file_hash(crit->icon_path);
             }
+
+            if (crit->icon_hash == 0) continue;
 
             bool found = false;
             for (int k = 0; k < current_unique_count; k++) {
-                if (strcmp((*counts)[k].icon_path, crit->icon_path) == 0) {
+                if ((*counts)[k].hash == crit->icon_hash) {
                     (*counts)[k].count++;
                     found = true;
                     break;
                 }
             }
 
-            // If the criterion is not found in the counts array, add it
             if (!found && current_unique_count < capacity) {
-                strncpy((*counts)[current_unique_count].icon_path, crit->icon_path, 255);
-                (*counts)[current_unique_count].icon_path[255] = '\0';
+                (*counts)[current_unique_count].hash = crit->icon_hash;
                 (*counts)[current_unique_count].count = 1;
                 current_unique_count++;
             }
@@ -1416,28 +1438,23 @@ static int count_all_icon_paths(IconPathCounter **counts, int capacity, int curr
     return current_unique_count;
 }
 
-// Helper function to flag the items that are shared, simple stats are excluded
-static void flag_shared_icons(IconPathCounter *counts, int unique_count, TrackableCategory **categories,
+// Helper function to flag the items (With Caching)
+static void flag_shared_icons_by_hash(IconHashCounter *counts, int unique_count, TrackableCategory **categories,
                               int cat_count) {
     if (!categories) return;
 
     for (int i = 0; i < cat_count; i++) {
-        // Skip simple stat categories, as their criteria are not rendered individually on the overlay
-        if (categories[i]->is_single_stat_category) {
-            continue;
-        }
+        if (categories[i]->is_single_stat_category) continue;
+
         for (int j = 0; j < categories[i]->criteria_count; j++) {
             TrackableItem *crit = categories[i]->criteria[j];
-            crit->is_shared = false; // Reset first
+            crit->is_shared = false;
 
-            // A hidden criterion cannot be part of a shared group
-            if (crit->is_hidden || crit->icon_path[0] == '\0') {
-                continue;
-            }
+            if (crit->is_hidden || crit->icon_path[0] == '\0' || crit->icon_hash == 0) continue;
 
             for (int k = 0; k < unique_count; k++) {
-                // If the criterion's icon path is found in the list and is used more than once
-                if (strcmp(counts[k].icon_path, crit->icon_path) == 0 && counts[k].count > 1) {
+                // Compare RAM integers instead of reading files
+                if (counts[k].hash == crit->icon_hash && counts[k].count > 1) {
                     crit->is_shared = true;
                     break;
                 }
@@ -1447,12 +1464,11 @@ static void flag_shared_icons(IconPathCounter *counts, int unique_count, Trackab
 }
 
 /**
- * @brief Detects criteria that share the same icon path across multiple advancements or stats and flags them.
+ * @brief Detects criteria that share the same image content (Hash) across multiple advancements or stats.
  *
- * This function iterates through all parsed advancements or stats and their criteria to identify
- * criteria that have the same icon_path. If a criterion's icon is found in more than one
- * place, its 'is_shared' flag is set to true. This allows the rendering
- * logic to visually distinguish them.
+ * This function iterates through all parsed advancements or stats and their criteria.
+ * It computes a hash of the image file. If distinct criteria point to images with
+ * identical binary content (even if file paths differ), 'is_shared' is set to true.
  *
  * @param t The Tracker struct.
  */
@@ -1461,22 +1477,26 @@ static void tracker_detect_shared_icons(Tracker *t, const AppSettings *settings)
     int total_criteria = t->template_data->total_criteria_count + t->template_data->stat_total_criteria_count;
     if (total_criteria == 0) return;
 
-    IconPathCounter *counts = (IconPathCounter *) calloc(total_criteria, sizeof(IconPathCounter));
+    IconHashCounter *counts = (IconHashCounter *) calloc(total_criteria, sizeof(IconHashCounter));
     if (!counts) return;
 
     int unique_count = 0;
-    unique_count = count_all_icon_paths(&counts, total_criteria, unique_count, t->template_data->advancements,
+
+    // 1. Count occurrences of every unique image hash
+    unique_count = count_all_icon_hashes(&counts, total_criteria, unique_count, t->template_data->advancements,
                                         t->template_data->advancement_count);
-    unique_count = count_all_icon_paths(&counts, total_criteria, unique_count, t->template_data->stats,
+    unique_count = count_all_icon_hashes(&counts, total_criteria, unique_count, t->template_data->stats,
                                         t->template_data->stat_count);
 
-    flag_shared_icons(counts, unique_count, t->template_data->advancements, t->template_data->advancement_count);
-    flag_shared_icons(counts, unique_count, t->template_data->stats, t->template_data->stat_count);
+    // 2. Flag items that use a hash with a count > 1
+    flag_shared_icons_by_hash(counts, unique_count, t->template_data->advancements, t->template_data->advancement_count);
+    flag_shared_icons_by_hash(counts, unique_count, t->template_data->stats, t->template_data->stat_count);
 
     free(counts);
     counts = nullptr;
-    log_message(LOG_INFO, "[TRACKER] Shared icon detection complete.\n");
+    log_message(LOG_INFO, "[TRACKER] Shared icon detection (Hash-based) complete.\n");
 }
+
 
 /**
  * @brief Parses a cJSON array of simple trackable items (like unlocks or custom goals) into an array of TrackableItem structs.
@@ -3160,11 +3180,6 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
     // Adjust vertical spacing -> need to do this for all render_*_section functions
     const float vertical_spacing = settings->tracker_vertical_spacing; // Changed from 16.0f
 
-    // Pre-calculate line heights once per frame (Optimization)
-    // Assuming single-line text, the height is simply the font size.
-    const float main_text_line_height = settings->tracker_font_size;
-    const float sub_text_line_height = settings->tracker_sub_font_size;
-
     // complex_pass = false -> Render all advancements/stats with no criteria or sub-stats (simple items)
     // complex_pass = true -> Render all advancements/stats with criteria or sub-stats (complex items)
     auto render_pass = [&](bool complex_pass) {
@@ -3232,63 +3247,84 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             // Skip if neither parent nor any child matches search
 
 
-            // --- Item Height Calculation (OPTIMIZED: Math only, no ImGui calls) ---
-
-            // 1. Snapshot Text check
-            bool has_snapshot_text = false;
+            // --- Item Height Calculation ---
+            // Must calculate exact height even if text is invisible to maintain layout
+            char snapshot_text[8] = "";
             if (!is_stat_section && version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy) {
-                if (cat->done) has_snapshot_text = true;
+                if (cat->done && !cat->done_in_snapshot) { strcpy(snapshot_text, "(New)"); } else if (cat->done) {
+                    strcpy(snapshot_text, "(Old)");
+                }
             }
 
-            // 2. Progress Text check
-            bool has_progress_text = false;
+            char progress_text[32] = "";
             if (is_stat_section) {
                 if (is_complex) {
-                    has_progress_text = true; // Multi-stat always has counter
+                    // Multi-stat
+                    snprintf(progress_text, sizeof(progress_text), "(%d / %d)", cat->completed_criteria_count,
+                             cat->criteria_count);
                 } else if (cat->criteria_count == 1) {
                     // Single-stat
                     TrackableItem *crit = cat->criteria[0];
-                    if (crit->goal > 0 || crit->goal == -1) has_progress_text = true;
+                    if (crit->goal > 0) {
+                        snprintf(progress_text, sizeof(progress_text), "(%d / %d)", crit->progress, crit->goal);
+                    } else if (crit->goal == -1) {
+                        snprintf(progress_text, sizeof(progress_text), "(%d)", crit->progress);
+                    }
                 }
             } else {
                 // Advancement
-                if (cat->criteria_count > 0) has_progress_text = true;
+                if (cat->criteria_count > 0) {
+                    snprintf(progress_text, sizeof(progress_text), "(%d / %d)", cat->completed_criteria_count,
+                             cat->criteria_count);
+                }
             }
 
-            int visible_criteria_render_count = 0;
+
+            // Calculate text sizes with correct font scaling
+            SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
+            ImVec2 text_size = ImGui::CalcTextSize(cat->display_name); // Uses main tracker_font_size
+            RESET_FONT_SCALE();
+
+            // Scale font to sub-size for progress/snapshot text measurement
+            SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
+            ImVec2 progress_text_size = ImGui::CalcTextSize(progress_text);
+            ImVec2 snapshot_text_size = ImGui::CalcTextSize(snapshot_text);
+            RESET_FONT_SCALE();
+
+            int visible_criteria_render_count = 0; // How many criteria *will be rendered* for height calc
 
             if (is_complex) {
                 if (parent_matches) {
-                    // Count children based on logic
+                    // If parent matches, count all children that pass the standard hide filter for rendering.
                     for (int j = 0; j < cat->criteria_count; j++) {
                         TrackableItem *crit = cat->criteria[j];
                         if (!crit) continue;
 
                         bool should_hide_crit_render = false;
                         switch (settings->goal_hiding_mode) {
-                            case HIDE_ALL_COMPLETED: should_hide_crit_render = crit->is_hidden || crit->done; break;
-                            case HIDE_ONLY_TEMPLATE_HIDDEN: should_hide_crit_render = crit->is_hidden; break;
-                            case SHOW_ALL: should_hide_crit_render = false; break;
+                            case HIDE_ALL_COMPLETED: should_hide_crit_render = crit->is_hidden || crit->done;
+                                break;
+                            case HIDE_ONLY_TEMPLATE_HIDDEN: should_hide_crit_render = crit->is_hidden;
+                                break;
+                            case SHOW_ALL: should_hide_crit_render = false;
+                                break;
                         }
-                        if (!should_hide_crit_render) visible_criteria_render_count++;
+                        if (!should_hide_crit_render) {
+                            // Count if it passes the hiding filter
+                            visible_criteria_render_count++;
+                        }
                     }
                 } else {
+                    // If only children match, the count is the size of our pre-filtered list.
                     visible_criteria_render_count = matching_children.size();
                 }
             }
 
-            // --- ESTIMATED HEIGHT CALCULATION ---
-            // Base icon + Main text + Padding
-            float item_height = 96.0f + main_text_line_height + 4.0f;
-
-            if (has_snapshot_text) {
-                item_height += sub_text_line_height + 4.0f;
-            }
-
-            if (has_progress_text) {
-                item_height += sub_text_line_height + 4.0f;
-            }
-
+            // Calculate height: Base icon + main text + snapshot text (if any) + progress text (if any) + space for each visible child + padding
+            float item_height = 96.0f; // Base icon background size
+            item_height += text_size.y + 4.0f; // Main display name + padding
+            if (snapshot_text[0] != '\0') item_height += snapshot_text_size.y + 4.0f; // Snapshot text + padding
+            if (progress_text[0] != '\0') item_height += progress_text_size.y + 4.0f; // Progress text + padding
             if (visible_criteria_render_count > 0) {
                 item_height += 12.0f; // Initial padding before criteria list
                 item_height += (float) visible_criteria_render_count * 36.0f; // Height for each criterion row
@@ -3313,41 +3349,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                           0);
 
 
-            // --- Rendering Core Logic (Only if visible) ---
+            // --- Rendering Core Logic ---
             if (is_visible_on_screen) {
-
-                // --- Text String Construction (Only needed if visible) ---
-                char snapshot_text[8] = "";
-                if (has_snapshot_text) {
-                    if (cat->done && !cat->done_in_snapshot) { strcpy(snapshot_text, "(New)"); }
-                    else if (cat->done) { strcpy(snapshot_text, "(Old)"); }
-                }
-
-                char progress_text[32] = "";
-                if (has_progress_text) {
-                    if (is_stat_section) {
-                        if (is_complex) {
-                            snprintf(progress_text, sizeof(progress_text), "(%d / %d)", cat->completed_criteria_count, cat->criteria_count);
-                        } else if (cat->criteria_count == 1) {
-                            TrackableItem *crit = cat->criteria[0];
-                            if (crit->goal > 0) snprintf(progress_text, sizeof(progress_text), "(%d / %d)", crit->progress, crit->goal);
-                            else if (crit->goal == -1) snprintf(progress_text, sizeof(progress_text), "(%d)", crit->progress);
-                        }
-                    } else {
-                        snprintf(progress_text, sizeof(progress_text), "(%d / %d)", cat->completed_criteria_count, cat->criteria_count);
-                    }
-                }
-
-                // Get Text Sizes for Centering (Only if visible)
-                SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
-                ImVec2 text_size = ImGui::CalcTextSize(cat->display_name);
-                RESET_FONT_SCALE();
-
-                SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
-                ImVec2 progress_text_size = ImGui::CalcTextSize(progress_text);
-                ImVec2 snapshot_text_size = ImGui::CalcTextSize(snapshot_text);
-                RESET_FONT_SCALE();
-
                 ImVec2 bg_size = ImVec2(96.0f, 96.0f);
 
                 // Select texture *pair* and render
@@ -3470,7 +3473,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 current_text_y += text_size.y * t->zoom_level + 4.0f * t->zoom_level;
 
                 // Snapshot Text (if applicable)
-                if (has_snapshot_text) {
+                if (snapshot_text[0] != '\0') {
                     // LOD: Tie snapshot text to main text visibility
                     if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
                         draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
@@ -3485,7 +3488,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 }
 
                 // Progress Text (if applicable)
-                if (has_progress_text) {
+                if (progress_text[0] != '\0') {
                     // LOD: Tie progress text to SUB text visibility (as requested)
                     if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
                         draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
@@ -3788,6 +3791,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         } // End loop through categories for this pass
     }; // End of render_pass lambda
 
+
     // Execute render passes
     render_pass(false); // Render simple items first
     render_pass(true); // Render complex items second
@@ -3803,10 +3807,6 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                                        int count, const char *section_title) {
     // LOD Thresholds
     const float LOD_TEXT_THRESHOLD = 0.5f; // Text disappears below 50% zoom
-
-    // Pre-calculate line heights once per frame (Optimization)
-    const float main_text_line_height = settings->tracker_font_size;
-    const float sub_text_line_height = settings->tracker_sub_font_size;
 
     // --- Pre-computation and Filtering for Counters ---
     int total_visible_count = 0;
@@ -3977,25 +3977,17 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         }
 
 
-        // --- Item Height and Layout (OPTIMIZED) ---
-        // Construct progress text to determine if it exists, without calculating size yet
-        char progress_text[32] = "";
-        bool has_progress_text = false;
-        if (item->goal > 0) {
-            snprintf(progress_text, sizeof(progress_text), "(%d / %d)", item->progress, item->goal);
-            has_progress_text = true;
-        }
-        // For infinite counters, only show progress if not manually overridden/done
-        else if (item->goal == -1 && !item->done) {
-            snprintf(progress_text, sizeof(progress_text), "(%d)", item->progress);
-            has_progress_text = true;
-        }
+        // --- Item Height and Layout ---
+        // IMPORTANT: These calculations MUST run every frame regardless of zoom
+        // to ensure the grid layout remains stable even when text is hidden.
 
-        // Calculate height using Math: Icon bg (96) + main text height + padding (4) + [progress text height + padding (4)]
-        float item_height = 96.0f + main_text_line_height + 4.0f;
-        if (has_progress_text) {
-            item_height += sub_text_line_height + 4.0f;
-        }
+        // Scale font to sub-size for text measurement
+        SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize); // Use macro for CalcTextSize
+        ImVec2 text_size = ImGui::CalcTextSize(item->display_name);
+        RESET_FONT_SCALE(); // Reset scale
+
+        // Calculate height: Icon bg + main text + padding
+        float item_height = 96.0f + text_size.y + 4.0f;
 
         if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
             current_x = padding;
@@ -4014,19 +4006,6 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
         // --- Rendering Core Logic ---
         if (is_visible_on_screen) {
-
-            // --- Calculate Text Sizes for Centering (Only if visible) ---
-            SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
-            ImVec2 text_size = ImGui::CalcTextSize(item->display_name);
-            RESET_FONT_SCALE();
-
-            ImVec2 progress_text_size = ImVec2(0,0);
-            if (has_progress_text) {
-                SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
-                progress_text_size = ImGui::CalcTextSize(progress_text);
-                RESET_FONT_SCALE();
-            }
-
             ImVec2 bg_size = ImVec2(96.0f, 96.0f);
 
             // Select texture *pair* and render
@@ -4115,7 +4094,6 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
             // LOD: Check if zoom level is sufficient for text
             if (t->zoom_level > LOD_TEXT_THRESHOLD) {
                 float main_text_size = settings->tracker_font_size;
-                float sub_font_size = settings->tracker_sub_font_size;
                 ImU32 current_text_color = item->done ? text_color_faded : text_color; // Fade text if done
 
                 // Calculate Y position for the first line of text
@@ -4127,19 +4105,6 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                                        screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
                                        text_y_pos), current_text_color,
                                    item->display_name);
-
-                if (has_progress_text) {
-                    text_y_pos += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // Move Y down
-
-                    // LOD for progress text
-                    if (t->zoom_level > LOD_TEXT_THRESHOLD) { // Using same threshold for now, could be separate
-                        draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
-                                           ImVec2(
-                                               screen_pos.x + (bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level) * 0.5f,
-                                               text_y_pos), current_text_color,
-                                           progress_text);
-                    }
-                }
             }
             // NO Checkboxes rendered here
         } // End if (is_visible_on_screen)
@@ -4163,10 +4128,6 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
     // LOD Thresholds
     const float LOD_TEXT_SUB_THRESHOLD = settings->lod_text_sub_threshold;  // Hide Progress Text
     const float LOD_TEXT_MAIN_THRESHOLD = settings->lod_text_main_threshold; // Hide Main Name & Checkboxes
-
-    // Pre-calculate line heights once per frame (Optimization)
-    const float main_text_line_height = settings->tracker_font_size;
-    const float sub_text_line_height = settings->tracker_sub_font_size;
 
     int count = t->template_data->custom_goal_count;
 
@@ -4365,23 +4326,26 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         }
 
 
-        // --- Item Height and Layout (OPTIMIZED) ---
-        // Construct progress text string to determine if it exists
+        // --- Item Height and Layout ---
+        // Must calculate exact height even if text is invisible to maintain layout
         char progress_text[32] = "";
-        bool has_progress_text = false;
-        if (item->goal > 0) {
-            snprintf(progress_text, sizeof(progress_text), "(%d / %d)", item->progress, item->goal);
-            has_progress_text = true;
-        } else if (item->goal == -1 && !item->done) {
+        if (item->goal > 0) snprintf(progress_text, sizeof(progress_text), "(%d / %d)", item->progress, item->goal);
+            // For infinite counters, only show progress if not manually overridden/done
+        else if (item->goal == -1 && !item->done)
             snprintf(progress_text, sizeof(progress_text), "(%d)", item->progress);
-            has_progress_text = true;
-        }
 
-        // Calculate height using Math: Icon bg (96) + main text height + padding (4) + [progress text height + padding (4)]
-        float item_height = 96.0f + main_text_line_height + 4.0f;
-        if (has_progress_text) {
-            item_height += sub_text_line_height + 4.0f;
-        }
+        // Scale font to sub-size for progress text measurement
+        SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
+        ImVec2 text_size = ImGui::CalcTextSize(item->display_name); // Uses main tracker_font_size
+        RESET_FONT_SCALE();
+
+        // Scale font to sub-size for progress text measurement
+        SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
+        ImVec2 progress_text_size = ImGui::CalcTextSize(progress_text);
+        RESET_FONT_SCALE();
+
+        // Calculate height: Icon bg + main text + progress text (if any) + padding
+        float item_height = 96.0f + text_size.y + 4.0f + (progress_text[0] != '\0' ? progress_text_size.y + 4.0f : 0);
 
         if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
             current_x = padding;
@@ -4400,19 +4364,6 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
         // --- Rendering Core Logic ---
         if (is_visible_on_screen) {
-
-            // --- Calculate Text Sizes for Centering (Only if visible) ---
-            SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
-            ImVec2 text_size = ImGui::CalcTextSize(item->display_name);
-            RESET_FONT_SCALE();
-
-            ImVec2 progress_text_size = ImVec2(0,0);
-            if (has_progress_text) {
-                SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
-                progress_text_size = ImGui::CalcTextSize(progress_text);
-                RESET_FONT_SCALE();
-            }
-
             ImVec2 bg_size = ImVec2(96.0f, 96.0f);
 
             // Select texture *pair* and render
@@ -4524,7 +4475,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             }
 
             // Draw Progress Text below main name (if applicable, centered)
-            if (has_progress_text) {
+            if (progress_text[0] != '\0') {
                 text_y_pos += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // Move Y down
 
                 // LOD: Hide progress text if zoomed out
@@ -4599,10 +4550,6 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
     // LOD Thresholds
     const float LOD_TEXT_SUB_THRESHOLD = settings->lod_text_sub_threshold;  // Hide Stage Text
     const float LOD_TEXT_MAIN_THRESHOLD = settings->lod_text_main_threshold; // Hide Main Goal Name
-
-    // Pre-calculate line heights once per frame (Optimization)
-    const float main_text_line_height = settings->tracker_font_size;
-    const float sub_text_line_height = settings->tracker_sub_font_size;
 
     int count = t->template_data->multi_stage_goal_count;
 
@@ -4835,10 +4782,29 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         }
 
 
-        // --- Item Height and Layout (OPTIMIZED) ---
-        // Calculate height using Math: Icon bg (96) + main name height + padding (4) + stage text height + padding (4)
-        // Multi-Stage goals always have both lines of text
-        float item_height = 96.0f + main_text_line_height + 4.0f + sub_text_line_height + 4.0f;
+        // --- Item Height and Layout ---
+        // Must calculate exact height even if text is invisible to maintain layout
+        char stage_text[256];
+        if (active_stage_render->type == SUBGOAL_STAT && active_stage_render->required_progress > 0) {
+            snprintf(stage_text, sizeof(stage_text), "%s (%d/%d)", active_stage_render->display_text,
+                     active_stage_render->current_stat_progress, active_stage_render->required_progress);
+        } else {
+            strncpy(stage_text, active_stage_render->display_text, sizeof(stage_text) - 1);
+            stage_text[sizeof(stage_text) - 1] = '\0';
+        }
+
+        // Scale font to sub-size for stage text measurement
+        SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
+        ImVec2 text_size = ImGui::CalcTextSize(goal->display_name); // Uses main tracker_font_size
+        RESET_FONT_SCALE();
+
+        // Scale font to sub-size for stage text measurement
+        SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
+        ImVec2 stage_text_size = ImGui::CalcTextSize(stage_text);
+        RESET_FONT_SCALE();
+
+        // Calculate height: Icon bg + main name + stage text + padding
+        float item_height = 96.0f + text_size.y + 4.0f + stage_text_size.y + 4.0f;
 
         if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
             current_x = padding;
@@ -4857,27 +4823,6 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
         // --- Rendering Core Logic ---
         if (is_visible_on_screen) {
-
-            // --- String Formatting and Text Sizing (Only if visible) ---
-            char stage_text[256];
-            if (active_stage_render->type == SUBGOAL_STAT && active_stage_render->required_progress > 0) {
-                snprintf(stage_text, sizeof(stage_text), "%s (%d/%d)", active_stage_render->display_text,
-                         active_stage_render->current_stat_progress, active_stage_render->required_progress);
-            } else {
-                strncpy(stage_text, active_stage_render->display_text, sizeof(stage_text) - 1);
-                stage_text[sizeof(stage_text) - 1] = '\0';
-            }
-
-            // Scale font to sub-size for stage text measurement
-            SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
-            ImVec2 text_size = ImGui::CalcTextSize(goal->display_name); // Uses main tracker_font_size
-            RESET_FONT_SCALE();
-
-            // Scale font to sub-size for stage text measurement
-            SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
-            ImVec2 stage_text_size = ImGui::CalcTextSize(stage_text);
-            RESET_FONT_SCALE();
-
             ImVec2 bg_size = ImVec2(96.0f, 96.0f);
 
             // Select texture *pair* and render

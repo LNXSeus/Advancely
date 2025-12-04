@@ -159,6 +159,9 @@ struct TrackableItem {
     char root_name[192]; // The unique ID, e.g., "minecraft:husbandry/balanced_diet"
     char display_name[192]; // The user-facing name, e.g., "A Balanced Diet"
     char icon_path[256]; // Relative path to the icon, e.g., "items/apple.png"
+
+    uint64_t icon_hash; // Cache for the image hash to prevent lag
+
     SDL_Texture *texture; // The loaded texture for the icon.
     AnimatedTexture *anim_texture; // To support .gif files
 
