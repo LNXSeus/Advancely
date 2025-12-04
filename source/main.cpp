@@ -1544,6 +1544,30 @@ int main(int argc, char *argv[]) {
 
             // Increment the time since the last update every frame
             tracker->time_since_last_update += deltaTime;
+            // Periodically check if the active instance has changed (every 2 seconds)
+            // This ensures that if the user switches to another open Minecraft instance,
+            // the tracker follows it automatically.
+            if (app_settings.path_mode == PATH_MODE_INSTANCE) {
+                static float time_since_instance_check = 0.0f;
+                time_since_instance_check += deltaTime;
+
+                if (time_since_instance_check > 2.0f) {
+                    time_since_instance_check = 0.0f;
+                    char detected_path[MAX_PATH_LENGTH];
+
+                    // Ask path_utils what the currently active instance is
+                    if (get_saves_path(detected_path, MAX_PATH_LENGTH, PATH_MODE_INSTANCE, nullptr)) {
+                        // If it differs from what we are currently watching
+                        if (strcmp(detected_path, tracker->saves_path) != 0) {
+                            log_message(LOG_INFO, "[MAIN] Active instance switch detected.\nOld: %s\nNew: %s\n", tracker->saves_path, detected_path);
+
+                            // Trigger the existing settings-changed workflow.
+                            // This safely de-inits dmon, re-inits paths, and reloads the template.
+                            SDL_SetAtomicInt(&g_settings_changed, 1);
+                        }
+                    }
+                }
+            }
 
 
             // TODO: Not passing an overlay right now
