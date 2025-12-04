@@ -20,6 +20,7 @@ extern "C" {
 // Avoid including the full header
 struct AppSettings;
 
+
 /**
  * @brief Renders the GUI for the settings window within the tracker window using ImGui.
  * The controls stay the same with escape key to open and close.

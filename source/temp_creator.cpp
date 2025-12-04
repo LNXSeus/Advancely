@@ -32,6 +32,38 @@
 #include <sys/wait.h>
 #endif
 
+// Robustly opens a URL or local folder using SDL, falling back to system commands if needed.
+/**
+ * @brief Robustly opens a URL or local folder using SDL, falling back to system commands if needed.
+ *
+ * @param target The URL or local folder path to open.
+ */
+static void open_content(const char *target) {
+    if (!target || target[0] == '\0') return;
+
+    // Try SDL's cross-platform function first (Handles HTTPS links perfectly)
+    if (SDL_OpenURL(target) == 0) {
+        return; // Success
+    }
+
+    // Fallback for local directories if SDL_OpenURL fails (common on macOS/Linux for file paths)
+#ifdef _WIN32
+    // Windows: ShellExecute handles paths and URLs
+    // (SDL_OpenURL usually maps to this anyway, but just in case)
+    ShellExecuteA(nullptr, "open", target, nullptr, nullptr, SW_SHOW);
+#elif defined(__APPLE__)
+    // macOS: The 'open' command is non-blocking and handles both URLs and Paths
+    char command[MAX_PATH_LENGTH + 16];
+    snprintf(command, sizeof(command), "open \"%s\"", target);
+    system(command);
+#else
+    // Linux: 'xdg-open' is the standard
+    char command[MAX_PATH_LENGTH + 16];
+    snprintf(command, sizeof(command), "xdg-open \"%s\"", target);
+    system(command);
+#endif
+}
+
 // Helper to check if a string ends with a specific suffix
 static bool ends_with(const char *str, const char *suffix) {
     if (!str || !suffix) {
@@ -2034,7 +2066,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     }
 
     // Disable if nothing is selected or the selected template is in use or unsaved changes in editor or default
-    ImGui::BeginDisabled(selected_template_index == -1 || is_current_template || has_unsaved_changes_in_editor || is_default_template);
+    ImGui::BeginDisabled(
+        selected_template_index == -1 || is_current_template || has_unsaved_changes_in_editor || is_default_template);
     if (ImGui::Button("Delete Template")) {
         if (selected_template_index != -1) {
             ImGui::OpenPopup("Delete Template?");
@@ -2364,24 +2397,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // Execute the system command to open the folder
         if (path_to_open[0] != '\0' && path_exists(path_to_open)) {
 #ifdef _WIN32
-            char command[MAX_PATH_LENGTH + 32];
             path_to_windows_native(path_to_open);
-            snprintf(command, sizeof(command), "explorer \"%s\"", path_to_open);
-            system(command);
-#else // macOS and Linux
-            pid_t pid = fork();
-            if (pid == 0) {  // Child process
-#if __APPLE__
-            char *args[] = {(char *) "open", path_to_open, nullptr};
-#else
-            char *args[] = {(char *) "xdg-open", path_to_open, nullptr};
 #endif
-            execvp(args[0], args);
-            _exit(127); // Exit if exec fails
-            } else if (pid < 0) {
-                log_message(LOG_ERROR, "[TEMP CREATOR] Failed to fork process to open folder.\n");
-            }
-#endif
+            open_content(path_to_open); // Clean replacement
         } else {
             log_message(LOG_ERROR, "[TEMP CREATOR] Could not open world folder, path does not exist: %s\n",
                         path_to_open);
@@ -2436,24 +2454,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         char reference_path[MAX_PATH_LENGTH];
         snprintf(reference_path, sizeof(reference_path), "%s/reference_files", get_resources_path());
 #ifdef _WIN32
-        char command[MAX_PATH_LENGTH + 32];
         path_to_windows_native(reference_path);
-        snprintf(command, sizeof(command), "explorer \"%s\"", reference_path);
-        system(command);
-#else // macOS and Linux
-        pid_t pid = fork();
-        if (pid == 0) {  // Child process
-#if __APPLE__
-        char *args[] = {(char *) "open", reference_path, nullptr};
-#else
-        char *args[] = {(char *) "xdg-open", reference_path, nullptr};
 #endif
-        execvp(args[0], args);
-        _exit(127); // Exit if exec fails
-        } else if (pid < 0) {
-            log_message(LOG_ERROR, "[TEMP CREATOR] Failed to fork process to open folder.\n");
-        }
-#endif
+        open_content(reference_path); // Clean replacement
     }
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[1024];

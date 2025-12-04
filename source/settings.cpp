@@ -132,6 +132,38 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
     return false;
 }
 
+// Robustly opens a URL or local folder using SDL, falling back to system commands if needed.
+/**
+ * @brief Robustly opens a URL or local folder using SDL, falling back to system commands if needed.
+ *
+ * @param target The URL or local folder path to open.
+ */
+static void open_content(const char *target) {
+    if (!target || target[0] == '\0') return;
+
+    // Try SDL's cross-platform function first (Handles HTTPS links perfectly)
+    if (SDL_OpenURL(target) == 0) {
+        return; // Success
+    }
+
+    // Fallback for local directories if SDL_OpenURL fails (common on macOS/Linux for file paths)
+#ifdef _WIN32
+    // Windows: ShellExecute handles paths and URLs
+    // (SDL_OpenURL usually maps to this anyway, but just in case)
+    ShellExecuteA(nullptr, "open", target, nullptr, nullptr, SW_SHOW);
+#elif defined(__APPLE__)
+    // macOS: The 'open' command is non-blocking and handles both URLs and Paths
+    char command[MAX_PATH_LENGTH + 16];
+    snprintf(command, sizeof(command), "open \"%s\"", target);
+    system(command);
+#else
+    // Linux: 'xdg-open' is the standard
+    char command[MAX_PATH_LENGTH + 16];
+    snprintf(command, sizeof(command), "xdg-open \"%s\"", target);
+    system(command);
+#endif
+}
+
 void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t,
                          ForceOpenReason *force_open_reason, bool *p_temp_creator_open) {
     // This static variable tracks the open state from the previous frame
@@ -397,30 +429,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         char instances_path[MAX_PATH_LENGTH];
         if (get_parent_directory(t->saves_path, instances_path, sizeof(instances_path), 3)) {
 #ifdef _WIN32
-            char command[MAX_PATH_LENGTH + 32];
             path_to_windows_native(instances_path);
-            snprintf(command, sizeof(command), "explorer \"%s\"", instances_path);
-            system(command);
-#else
-            // On POSIX systems (macOS, Linux), use fork() + execvp() for a more robust launch.
-            // This avoids shell environment issues that can affect system().
-            pid_t pid = fork();
-            if (pid == 0) {  // This is the child process
-            // execvp requires a null-terminated array of arguments.
-            // The path does not need to be quoted here.
-#if __APPLE__
-            char *args[] = {(char *) "open", instances_path, nullptr};
-#else
-            char *args[] = {(char *) "xdg-open", instances_path, nullptr};
 #endif
-            execvp(args[0], args);
-            // If execvp returns, it means an error occurred.
-            _exit(127);
-            } else if (pid < 0) {
-                log_message(LOG_ERROR, "[SETTINGS] Failed to fork process to open folder.\n");
-            }
-            // The parent process (Advancely) continues running here without waiting.
-#endif
+            open_content(instances_path); // Clean replacement
         }
     }
 
@@ -480,25 +491,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     if (ImGui::IsItemClicked()) {
-        const char *url = "https://github.com/LNXSeus/Advancely#Officially-Added-Templates";
-#ifdef _WIN32
-        char command[1024];
-        snprintf(command, sizeof(command), "start %s", url);
-        system(command);
-#else // macOS and Linux
-        pid_t pid = fork();
-        if (pid == 0) {  // Child process
-#if __APPLE__
-        char *args[] = {(char *) "open", (char *) url, nullptr};
-#else
-        char *args[] = {(char *) "xdg-open", (char *) url, nullptr};
-#endif
-        execvp(args[0], args);
-        _exit(127); // Exit if exec fails
-        } else if (pid < 0) {
-            log_message(LOG_ERROR, "[SETTINGS] Failed to fork process to open URL.\n");
-        }
-#endif
+        open_content("https://github.com/LNXSeus/Advancely#Officially-Added-Templates");
     }
 
     ImGui::SameLine();
@@ -516,25 +509,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     if (ImGui::IsItemClicked()) {
-        const char *url = "https://github.com/LNXSeus/Advancely#extensive-version-support";
-#ifdef _WIN32
-        char command[1024];
-        snprintf(command, sizeof(command), "start %s", url);
-        system(command);
-#else // macOS and Linux
-        pid_t pid = fork();
-        if (pid == 0) {  // Child process
-#if __APPLE__
-        char *args[] = {(char *) "open", (char *) url, nullptr};
-#else
-        char *args[] = {(char *) "xdg-open", (char *) url, nullptr};
-#endif
-        execvp(args[0], args);
-        _exit(127); // Exit if exec fails
-        } else if (pid < 0) {
-            log_message(LOG_ERROR, "[SETTINGS] Failed to fork process to open URL.\n");
-        }
-#endif
+        open_content("https://github.com/LNXSeus/Advancely#extensive-version-support");
     }
 
     int current_template_version_idx = -1;
@@ -885,24 +860,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         char templates_path[MAX_PATH_LENGTH];
         snprintf(templates_path, sizeof(templates_path), "%s/templates", get_resources_path());
 #ifdef _WIN32
-        char command[MAX_PATH_LENGTH + 32];
-        path_to_windows_native(templates_path); // Convert to backslashes for explorer
-        snprintf(command, sizeof(command), "explorer \"%s\"", templates_path);
-        system(command);
-#else // macOS and Linux
-        pid_t pid = fork();
-        if (pid == 0) {  // Child process
-#if __APPLE__
-        char *args[] = {(char *) "open", templates_path, nullptr};
-#else
-        char *args[] = {(char *) "xdg-open", templates_path, nullptr};
+        path_to_windows_native(templates_path);
 #endif
-        execvp(args[0], args);
-        _exit(127); // Exit if exec fails
-        } else if (pid < 0) {
-            log_message(LOG_ERROR, "[SETTINGS] Failed to fork process to open folder.\n");
-        }
-#endif
+        open_content(templates_path); // Clean replacement
     }
     if (ImGui::IsItemHovered()) {
         char open_templates_folder_tooltip_buffer[1024];
@@ -1601,7 +1561,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SetTooltip("%s", lod_sub_tooltip);
     }
 
-    ImGui::DragFloat("Hide Main Text/Checkbox At", &temp_settings.lod_text_main_threshold, 0.001f, 0.05f, 10.0f, "%.3f");
+    ImGui::DragFloat("Hide Main Text/Checkbox At", &temp_settings.lod_text_main_threshold, 0.001f, 0.05f, 10.0f,
+                     "%.3f");
     if (ImGui::IsItemHovered()) {
         char lod_main_tooltip[1024];
         snprintf(lod_main_tooltip, sizeof(lod_main_tooltip),
@@ -1742,7 +1703,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
 
-        ImGui::DragFloat("Row 1 Shared Icon Size", &temp_settings.overlay_row1_shared_icon_size, 1.0f, 0.0f, 48.0f, "%.0f px");
+        ImGui::DragFloat("Row 1 Shared Icon Size", &temp_settings.overlay_row1_shared_icon_size, 1.0f, 0.0f, 48.0f,
+                         "%.0f px");
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[256];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -2348,26 +2310,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::SameLine();
 
     if (ImGui::Button("Support Advancely!")) {
-        const char *url = "https://streamlabs.com/lnxseus/tip";
-#ifdef _WIN32
-        char command[1024];
-        snprintf(command, sizeof(command), "start %s", url);
-        system(command);
-#else // macOS and Linux
-        pid_t pid = fork();
-        if (pid == 0) {  // Child process
-#if __APPLE__
-        char *args[] = {(char *) "open", (char *) url, nullptr};
-#else
-        char *args[] = {(char *) "xdg-open", (char *) url, nullptr};
-#endif
-        execvp(args[0], args);
-        _exit(127); // Exit if exec fails
-        } else if (pid < 0) {
-            log_message(LOG_ERROR, "[SETTINGS] Failed to fork process to open URL.\n");
-        }
-#endif
+        open_content("https://streamlabs.com/lnxseus/tip");
     }
+
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[512];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),

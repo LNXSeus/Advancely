@@ -11,6 +11,7 @@
 #include <cstring>
 
 #include "settings_utils.h"
+
 #include "logger.h"
 #include "file_utils.h" // has the cJSON_from_file function
 #include "global_event_handler.h"
