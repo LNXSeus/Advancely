@@ -71,6 +71,8 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->lod_text_main_threshold != b->lod_text_main_threshold ||
         a->lod_icon_detail_threshold != b->lod_icon_detail_threshold ||
 
+        a->scrollable_list_threshold != b->scrollable_list_threshold ||
+
         a->notes_use_roboto_font != b->notes_use_roboto_font ||
         a->check_for_updates != b->check_for_updates ||
         a->show_welcome_on_startup != b->show_welcome_on_startup ||
@@ -1620,6 +1622,27 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  " - The squares use your chosen Text Color with low opacity to indicate presence.\n"
                  "Default: %.3f", DEFAULT_LOD_ICON_DETAIL_THRESHOLD);
         ImGui::SetTooltip("%s", lod_icon_tooltip);
+    }
+
+    // Slider for Scroll Threshold
+    ImGui::DragInt("Scrollable List Threshold", &temp_settings.scrollable_list_threshold, 1.0f, 1, 2048);
+    if (ImGui::IsItemHovered()) {
+        char scroll_tooltip[1024];
+        snprintf(scroll_tooltip, sizeof(scroll_tooltip),
+                 "The maximum number of criteria/sub-stats to show before turning the list into a scrollable box.\n"
+                 " Use the Scroll Wheel or left-click dragging the bar to scroll.\n"
+                 "Default: %d", DEFAULT_SCROLLABLE_LIST_THRESHOLD);
+        ImGui::SetTooltip("%s", scroll_tooltip);
+    }
+
+    // List Scroll Speed Slider
+    ImGui::DragFloat("List Scroll Speed", &temp_settings.tracker_list_scroll_speed, 1.0f, 1.0f, 512.0f, "%.0f px");
+    if (ImGui::IsItemHovered()) {
+        char speed_tooltip[1024];
+        snprintf(speed_tooltip, sizeof(speed_tooltip),
+                 "How many pixels the list scrolls per mouse wheel notch.\n"
+                 "Default: %.0f px", DEFAULT_TRACKER_LIST_SCROLL_SPEED);
+        ImGui::SetTooltip("%s", speed_tooltip);
     }
 
     // --- Spacing Settings ---

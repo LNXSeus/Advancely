@@ -379,6 +379,10 @@ void settings_set_defaults(AppSettings *settings) {
     settings->lod_text_main_threshold = DEFAULT_LOD_TEXT_MAIN_THRESHOLD;
     settings->lod_icon_detail_threshold = DEFAULT_LOD_ICON_DETAIL_THRESHOLD;
 
+    // Scrollable List
+    settings->scrollable_list_threshold = DEFAULT_SCROLLABLE_LIST_THRESHOLD;
+    settings->tracker_list_scroll_speed = DEFAULT_TRACKER_LIST_SCROLL_SPEED;
+
     // Default Overlay Text Toggles
     settings->overlay_show_world = true;
     settings->overlay_show_run_details = true;
@@ -944,6 +948,24 @@ bool settings_load(AppSettings *settings) {
             settings->lod_icon_detail_threshold = DEFAULT_LOD_ICON_DETAIL_THRESHOLD;
             defaults_were_used = true;
         }
+
+        const cJSON *scroll_thresh = cJSON_GetObjectItem(visual_settings, "scrollable_list_threshold");
+        if (scroll_thresh && cJSON_IsNumber(scroll_thresh))
+            settings->scrollable_list_threshold = scroll_thresh->valueint;
+        else {
+            settings->scrollable_list_threshold = DEFAULT_SCROLLABLE_LIST_THRESHOLD;
+            defaults_were_used = true;
+        }
+
+        // Load Scroll Speed
+        const cJSON *list_speed = cJSON_GetObjectItem(visual_settings, "tracker_list_scroll_speed");
+        if (list_speed && cJSON_IsNumber(list_speed))
+            settings->tracker_list_scroll_speed = (float)list_speed->valuedouble;
+        else {
+            settings->tracker_list_scroll_speed = DEFAULT_TRACKER_LIST_SCROLL_SPEED;
+            defaults_were_used = true;
+        }
+
     } else {
         defaults_were_used = true;
         settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING; // Ensure default if visuals section missing
@@ -958,6 +980,9 @@ bool settings_load(AppSettings *settings) {
         settings->lod_text_sub_threshold = DEFAULT_LOD_TEXT_SUB_THRESHOLD;
         settings->lod_text_main_threshold = DEFAULT_LOD_TEXT_MAIN_THRESHOLD;
         settings->lod_icon_detail_threshold = DEFAULT_LOD_ICON_DETAIL_THRESHOLD;
+
+        settings->scrollable_list_threshold = DEFAULT_SCROLLABLE_LIST_THRESHOLD;
+        settings->tracker_list_scroll_speed = DEFAULT_TRACKER_LIST_SCROLL_SPEED;
 
         // Custom Tracker Spacing Defaults
         for (int i = 0; i < SECTION_COUNT; i++) {
@@ -1221,6 +1246,14 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "lod_icon_detail_threshold");
         cJSON_AddItemToObject(visuals_obj, "lod_icon_detail_threshold",
                               cJSON_CreateNumber(settings->lod_icon_detail_threshold));
+
+        cJSON_DeleteItemFromObject(visuals_obj, "scrollable_list_threshold");
+        cJSON_AddItemToObject(visuals_obj, "scrollable_list_threshold",
+                              cJSON_CreateNumber(settings->scrollable_list_threshold));
+
+        cJSON_DeleteItemFromObject(visuals_obj, "tracker_list_scroll_speed");
+        cJSON_AddItemToObject(visuals_obj, "tracker_list_scroll_speed",
+                              cJSON_CreateNumber(settings->tracker_list_scroll_speed));
     }
 
     // Update Custom Progress if provided

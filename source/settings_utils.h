@@ -77,6 +77,9 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED false // Default for *each* section's checkbox
 #define DEFAULT_TRACKER_SECTION_ITEM_WIDTH 128.0f // Default item width in pixels
 
+#define DEFAULT_SCROLLABLE_LIST_THRESHOLD 16 // Items before scrolling kicks in // TODO: Figure out best value
+#define DEFAULT_TRACKER_LIST_SCROLL_SPEED 30.0f // Default pixels per scroll step
+
 #define DEFAULT_NOTES_USE_ROBOTO false // Default: use the standard Minecraft font for notes otherwise roboto
 #define DEFAULT_PER_WORLD_NOTES true // When true the notes are per world, otherwise per template
 #define DEFAULT_CHECK_FOR_UPDATES true
@@ -210,6 +213,8 @@ struct AppSettings {
     float lod_icon_detail_threshold; // Zoom level below which icons become simple squares
 
     // --- Custom Tracker Spacing ---
+    int scrollable_list_threshold; // Number of items before list becomes scrollable
+    float tracker_list_scroll_speed; // Configurable speed
     float tracker_vertical_spacing; // Vertical spacing in pixels between goals globally
     bool tracker_section_custom_width_enabled[SECTION_COUNT]; // An array of bools, one for each section
     float tracker_section_custom_item_width[SECTION_COUNT];   // An array of item widths, one for each section

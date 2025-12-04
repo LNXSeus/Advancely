@@ -227,6 +227,9 @@ struct TrackableCategory {
     // Animation State
     float alpha; // Current transparency (1.0f = opaque, 0.0f = transparent)
     bool is_visible_on_overlay; // Tracks if the category should be rendered
+
+    // Scroll state for long lists
+    float scroll_y;
 };
 
 

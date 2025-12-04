@@ -86,7 +86,7 @@ static void tracker_update_notes_path(Tracker *t, const AppSettings *settings) {
         }
 
         bool save_needed = false; // Default to FALSE to prevent loops
-        double current_time = (double)time(0);
+        double current_time = (double) time(0);
 
         if (entry_to_update) {
             // World exists. Check timestamp before writing!
@@ -125,9 +125,11 @@ static void tracker_update_notes_path(Tracker *t, const AppSettings *settings) {
                 }
 
                 if (oldest_entry && oldest_index != -1) {
-                    unsigned long hash_to_delete = (unsigned long) cJSON_GetObjectItem(oldest_entry, "hash")->valuedouble;
+                    unsigned long hash_to_delete = (unsigned long) cJSON_GetObjectItem(oldest_entry, "hash")->
+                            valuedouble;
                     char path_to_delete[MAX_PATH_LENGTH];
-                    snprintf(path_to_delete, sizeof(path_to_delete), "%s/%lu.txt", get_notes_dir_path(), hash_to_delete);
+                    snprintf(path_to_delete, sizeof(path_to_delete), "%s/%lu.txt", get_notes_dir_path(),
+                             hash_to_delete);
                     if (remove(path_to_delete) == 0) {
                         log_message(LOG_INFO, "[NOTES] Pruned old notes file: %s\n", path_to_delete);
                     }
@@ -171,10 +173,10 @@ bool str_contains_insensitive(const char *haystack, const char *needle) {
         const char *n_iter = n_start;
 
         while (*h_iter && *n_iter &&
-              (tolower((unsigned char)*h_iter) == tolower((unsigned char)*n_iter))) {
+               (tolower((unsigned char) *h_iter) == tolower((unsigned char) *n_iter))) {
             h_iter++;
             n_iter++;
-              }
+        }
 
         if (*n_iter == '\0') return true; // Found match
         h++;
@@ -1401,7 +1403,7 @@ static uint64_t compute_file_hash(const char *path) {
     // Read file byte by byte (sufficient for small icons)
     // For larger files, a buffer approach would be faster, but icons are tiny.
     while ((c = fgetc(f)) != EOF) {
-        hash ^= (unsigned char)c;
+        hash ^= (unsigned char) c;
         hash *= 0x100000001b3ULL;
     }
 
@@ -1441,7 +1443,7 @@ static uint64_t get_image_hash_optimized(Tracker *t, const char *path) {
 
 // Helper function to process and count all sub-items from a list of categories based on image HASH
 static int count_all_icon_hashes(Tracker *t, IconHashCounter **counts, int capacity, int current_unique_count,
-                                TrackableCategory **categories, int cat_count) {
+                                 TrackableCategory **categories, int cat_count) {
     if (!categories) return current_unique_count;
 
     for (int i = 0; i < cat_count; i++) {
@@ -1480,7 +1482,7 @@ static int count_all_icon_hashes(Tracker *t, IconHashCounter **counts, int capac
 
 // Helper function to flag the items (With Caching)
 static void flag_shared_icons_by_hash(IconHashCounter *counts, int unique_count, TrackableCategory **categories,
-                              int cat_count) {
+                                      int cat_count) {
     if (!categories) return;
 
     for (int i = 0; i < cat_count; i++) {
@@ -1524,12 +1526,13 @@ static void tracker_detect_shared_icons(Tracker *t, const AppSettings *settings)
 
     // 1. Count occurrences (Pass 't' to use the cache)
     unique_count = count_all_icon_hashes(t, &counts, total_criteria, unique_count, t->template_data->advancements,
-                                        t->template_data->advancement_count);
+                                         t->template_data->advancement_count);
     unique_count = count_all_icon_hashes(t, &counts, total_criteria, unique_count, t->template_data->stats,
-                                        t->template_data->stat_count);
+                                         t->template_data->stat_count);
 
     // 2. Flag items
-    flag_shared_icons_by_hash(counts, unique_count, t->template_data->advancements, t->template_data->advancement_count);
+    flag_shared_icons_by_hash(counts, unique_count, t->template_data->advancements,
+                              t->template_data->advancement_count);
     flag_shared_icons_by_hash(counts, unique_count, t->template_data->stats, t->template_data->stat_count);
 
     free(counts);
@@ -2829,26 +2832,9 @@ static void render_section_separator(Tracker *t, const AppSettings *settings, fl
  * @param is_stat_section True if the section is for stats, false if it's for advancements.
  * @param version The game version (MC_Version).
  */
-/**
- * @brief Renders a section of items that are TrackableCategories (e.g., Advancements, Recipes, Stats).
- * This function handles the uniform grid layout and the two-pass rendering for simple vs. complex items.
- * It distinguishes between advancements and stats with the bool flag and manages all the checkbox logic,
- * communicating with the settings.json file. It also calculates and displays completion counters.
- *
- * Implements LOD (Level of Detail) to hide text and simplify icons when zoomed out.
- * @param t The tracker instance.
- * @param settings The app settings.
- * @param current_y The current y position in the world.
- * @param categories The array of TrackableCategory pointers.
- * @param count The number of TrackableCategory pointers in the array.
- * @param section_title The title of the section.
- * @param is_stat_section True if the section is for stats, false if it's for advancements.
- * @param version The game version (MC_Version).
- */
 static void render_trackable_category_section(Tracker *t, const AppSettings *settings, float &current_y,
                                               TrackableCategory **categories, int count, const char *section_title,
                                               bool is_stat_section, MC_Version version) {
-
     // --- LOD THRESHOLDS ---
     // 1. Zoom < 0.60: Hide Sub-Item Text & Progress Text
     const float LOD_TEXT_SUB_THRESHOLD = settings->lod_text_sub_threshold;
@@ -3350,9 +3336,12 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                         bool should_hide_crit_render = false;
                         switch (settings->goal_hiding_mode) {
-                            case HIDE_ALL_COMPLETED: should_hide_crit_render = crit->is_hidden || crit->done; break;
-                            case HIDE_ONLY_TEMPLATE_HIDDEN: should_hide_crit_render = crit->is_hidden; break;
-                            case SHOW_ALL: should_hide_crit_render = false; break;
+                            case HIDE_ALL_COMPLETED: should_hide_crit_render = crit->is_hidden || crit->done;
+                                break;
+                            case HIDE_ONLY_TEMPLATE_HIDDEN: should_hide_crit_render = crit->is_hidden;
+                                break;
+                            case SHOW_ALL: should_hide_crit_render = false;
+                                break;
                         }
                         if (!should_hide_crit_render) visible_criteria_render_count++;
                     }
@@ -3373,9 +3362,24 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 item_height += sub_text_line_height + 4.0f;
             }
 
+            bool use_scrolling_list = false;
+            float single_criterion_height = 36.0f; // Height for each criterion row
+            float criteria_list_height = 0.0f; // The pixel height the list will take up
+
             if (visible_criteria_render_count > 0) {
                 item_height += 12.0f; // Initial padding before criteria list
-                item_height += (float) visible_criteria_render_count * 36.0f; // Height for each criterion row
+
+                // Check if we exceed the threshold defined in settings
+                if (is_complex && visible_criteria_render_count > settings->scrollable_list_threshold) {
+                    use_scrolling_list = true;
+                    // Fix the height to exactly N items
+                    criteria_list_height = (float) settings->scrollable_list_threshold * single_criterion_height;
+                } else {
+                    // Standard full height (expand to fit all items)
+                    criteria_list_height = (float) visible_criteria_render_count * single_criterion_height;
+                }
+
+                item_height += criteria_list_height;
             }
 
 
@@ -3399,26 +3403,32 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
             // --- Rendering Core Logic (Only if visible) ---
             if (is_visible_on_screen) {
-
                 // --- Text String Construction (Only needed if visible) ---
                 char snapshot_text[8] = "";
                 if (has_snapshot_text) {
-                    if (cat->done && !cat->done_in_snapshot) { strcpy(snapshot_text, "(New)"); }
-                    else if (cat->done) { strcpy(snapshot_text, "(Old)"); }
+                    if (cat->done && !cat->done_in_snapshot) { strcpy(snapshot_text, "(New)"); } else if (cat->done) {
+                        strcpy(snapshot_text, "(Old)");
+                    }
                 }
 
                 char progress_text[32] = "";
                 if (has_progress_text) {
                     if (is_stat_section) {
                         if (is_complex) {
-                            snprintf(progress_text, sizeof(progress_text), "(%d / %d)", cat->completed_criteria_count, cat->criteria_count);
+                            snprintf(progress_text, sizeof(progress_text), "(%d / %d)", cat->completed_criteria_count,
+                                     cat->criteria_count);
                         } else if (cat->criteria_count == 1) {
                             TrackableItem *crit = cat->criteria[0];
-                            if (crit->goal > 0) snprintf(progress_text, sizeof(progress_text), "(%d / %d)", crit->progress, crit->goal);
-                            else if (crit->goal == -1) snprintf(progress_text, sizeof(progress_text), "(%d)", crit->progress);
+                            if (crit->goal > 0)
+                                snprintf(progress_text, sizeof(progress_text), "(%d / %d)",
+                                         crit->progress, crit->goal);
+                            else if (crit->goal == -1)
+                                snprintf(progress_text, sizeof(progress_text), "(%d)",
+                                         crit->progress);
                         }
                     } else {
-                        snprintf(progress_text, sizeof(progress_text), "(%d / %d)", cat->completed_criteria_count, cat->criteria_count);
+                        snprintf(progress_text, sizeof(progress_text), "(%d / %d)", cat->completed_criteria_count,
+                                 cat->criteria_count);
                     }
                 }
 
@@ -3589,6 +3599,45 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     float sub_item_y_offset_world = current_y + (current_text_y - screen_pos.y) / t->zoom_level + 8.0f;
                     // Start below last text + padding
 
+                    // --- SCROLLING SETUP ---
+                    ImVec2 list_min_screen, list_max_screen;
+
+                    // Calculate logical (unzoomed) content heights
+                    float total_content_height_logical =
+                            (float) visible_criteria_render_count * single_criterion_height;
+                    float visible_height_logical = criteria_list_height;
+                    float max_scroll_logical = total_content_height_logical - visible_height_logical;
+                    if (max_scroll_logical < 0) max_scroll_logical = 0;
+
+                    if (use_scrolling_list) {
+                        // Calculate Screen Space Box for the list
+                        list_min_screen = ImVec2(
+                            screen_pos.x,
+                            (sub_item_y_offset_world * t->zoom_level) + t->camera_offset.y
+                        );
+                        list_max_screen = ImVec2(
+                            screen_pos.x + (uniform_item_width * t->zoom_level),
+                            list_min_screen.y + (criteria_list_height * t->zoom_level)
+                        );
+
+                        // Handle Mouse Wheel Input
+                        // Only consume wheel if hovering and list actually needs scrolling
+                        if (ImGui::IsMouseHoveringRect(list_min_screen, list_max_screen) && max_scroll_logical > 0) {
+                            t->is_hovering_scrollable_list = true; // Block main zoom
+
+                            if (io.MouseWheel != 0.0f) {
+                                // Use user-configured speed
+                                cat->scroll_y -= io.MouseWheel * settings->tracker_list_scroll_speed;
+                            }
+                        }
+
+                        // Clamp Scroll Position (Logical Pixels)
+                        if (cat->scroll_y < 0.0f) cat->scroll_y = 0.0f;
+                        if (cat->scroll_y > max_scroll_logical) cat->scroll_y = max_scroll_logical;
+
+                        // Push Clip Rect
+                        draw_list->PushClipRect(list_min_screen, list_max_screen, true);
+                    }
 
                     // Decide which list of children to iterate over based on search results
                     std::vector<TrackableItem *> children_to_render;
@@ -3606,9 +3655,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                 case SHOW_ALL: should_hide_crit_render = false;
                                     break;
                             }
-                            if (!should_hide_crit_render) {
-                                children_to_render.push_back(crit);
-                            }
+                            if (!should_hide_crit_render) children_to_render.push_back(crit);
                         }
                     } else {
                         // If only children matched, render only the ones from the matching list
@@ -3617,12 +3664,34 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
 
                     // Render each visible child
+                    int render_index = 0; // Needed for relative positioning
                     for (TrackableItem *crit: children_to_render) {
                         if (!crit) continue; // Should not happen, but safety check
 
+                        // Calculate base Y relative to start of list
+                        float relative_y = (float) render_index * single_criterion_height;
+
+                        // Calculate Screen Y
+                        float item_screen_y = ((sub_item_y_offset_world + relative_y) * t->zoom_level) + t->
+                                              camera_offset.y;
+
+                        // Apply Scroll Offset (screen space)
+                        if (use_scrolling_list) {
+                            item_screen_y -= (cat->scroll_y * t->zoom_level); // Zooming is applied here
+
+                            // INTERNAL CULLING: Skip items completely outside the scroll view
+                            float item_h_screen = single_criterion_height * t->zoom_level;
+                            // Allow a small buffer so partially visible items draw
+                            if (item_screen_y + item_h_screen < list_min_screen.y || item_screen_y > list_max_screen.
+                                y) {
+                                render_index++;
+                                continue;
+                            }
+                        }
+
+                        // Define position for icon/text logic
                         ImVec2 crit_base_pos_screen = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
-                                                             (sub_item_y_offset_world * t->zoom_level) + t->
-                                                             camera_offset.y);
+                                                             item_screen_y);
                         float current_element_x_screen = crit_base_pos_screen.x;
 
                         // LOD for Sub-Item Icon
@@ -3804,8 +3873,78 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             }
                         }
 
-                        sub_item_y_offset_world += 36.0f; // Move down for the next criterion
+                        render_index++;
                     } // End loop through children_to_render
+
+                    // --- DRAW SCROLLBAR & POP CLIP ---
+                    if (use_scrolling_list) {
+                        draw_list->PopClipRect();
+
+                        if (total_content_height_logical > visible_height_logical && t->zoom_level > settings->
+                            lod_icon_detail_threshold) {
+                            // Recalculate visual sizes (Screen Space)
+                            float total_content_height_screen = total_content_height_logical * t->zoom_level;
+                            float visible_height_screen = visible_height_logical * t->zoom_level;
+
+                            // Dimensions
+                            float bar_width = 6.0f * t->zoom_level;
+                            float bar_padding_right = 4.0f * t->zoom_level;
+                            float bar_x = screen_pos.x + (uniform_item_width * t->zoom_level) - bar_width -
+                                          bar_padding_right;
+                            float bar_top_y = (sub_item_y_offset_world * t->zoom_level) + t->camera_offset.y;
+                            float bar_bottom_y = bar_top_y + visible_height_screen;
+
+                            // Define Hit Rect for Dragging (The whole track)
+                            ImVec2 track_min = ImVec2(bar_x - 2.0f, bar_top_y); // Add small padding for easier grabbing
+                            ImVec2 track_max = ImVec2(bar_x + bar_width + 2.0f, bar_bottom_y);
+
+                            // Handle Dragging Logic
+                            if (ImGui::IsMouseHoveringRect(track_min, track_max)) {
+                                t->is_hovering_scrollable_list = true; // Also block zoom when hovering bar
+
+                                if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                                    // Calculate new scroll position based on mouse Y relative to track top
+                                    float mouse_relative_y = io.MousePos.y - bar_top_y;
+                                    float click_ratio = mouse_relative_y / visible_height_screen;
+
+                                    // Simple approximation: Map mouse position directly to scroll %
+                                    cat->scroll_y = click_ratio * max_scroll_logical;
+                                }
+                            }
+
+                            // Colors using user settings
+                            ImU32 track_color = IM_COL32(settings->text_color.r, settings->text_color.g,
+                                                         settings->text_color.b, 30);
+                            ImU32 handle_color = IM_COL32(settings->text_color.r, settings->text_color.g,
+                                                          settings->text_color.b, ADVANCELY_FADED_ALPHA);
+
+                            // Draw Track
+                            draw_list->AddRectFilled(
+                                ImVec2(bar_x, bar_top_y),
+                                ImVec2(bar_x + bar_width, bar_bottom_y),
+                                track_color,
+                                4.0f * t->zoom_level // Rounded
+                            );
+
+                            // Calculate Handle Height & Position
+                            float handle_height_screen =
+                                    visible_height_screen * (visible_height_screen / total_content_height_screen);
+                            if (handle_height_screen < 10.0f * t->zoom_level)
+                                handle_height_screen = 10.0f * t->zoom_level;
+
+                            float available_scroll_track = visible_height_screen - handle_height_screen;
+                            float scroll_ratio = cat->scroll_y / max_scroll_logical;
+                            float handle_y = bar_top_y + (scroll_ratio * available_scroll_track);
+
+                            // Draw Handle
+                            draw_list->AddRectFilled(
+                                ImVec2(bar_x, handle_y),
+                                ImVec2(bar_x + bar_width, handle_y + handle_height_screen),
+                                handle_color,
+                                4.0f * t->zoom_level // Rounded
+                            );
+                        }
+                    }
                 } // End if (is_complex && visible_criteria_render_count > 0)
 
 
@@ -4098,13 +4237,12 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
         // --- Rendering Core Logic ---
         if (is_visible_on_screen) {
-
             // --- Calculate Text Sizes for Centering (Only if visible) ---
             SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
             ImVec2 text_size = ImGui::CalcTextSize(item->display_name);
             RESET_FONT_SCALE();
 
-            ImVec2 progress_text_size = ImVec2(0,0);
+            ImVec2 progress_text_size = ImVec2(0, 0);
             if (has_progress_text) {
                 SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
                 progress_text_size = ImGui::CalcTextSize(progress_text);
@@ -4216,10 +4354,13 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                     text_y_pos += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // Move Y down
 
                     // LOD for progress text
-                    if (t->zoom_level > LOD_TEXT_THRESHOLD) { // Using same threshold for now, could be separate
+                    if (t->zoom_level > LOD_TEXT_THRESHOLD) {
+                        // Using same threshold for now, could be separate
                         draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                            ImVec2(
-                                               screen_pos.x + (bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level) * 0.5f,
+                                               screen_pos.x + (
+                                                   bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level) *
+                                               0.5f,
                                                text_y_pos), current_text_color,
                                            progress_text);
                     }
@@ -4245,7 +4386,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 static void render_custom_goals_section(Tracker *t, const AppSettings *settings, float &current_y,
                                         const char *section_title) {
     // LOD Thresholds
-    const float LOD_TEXT_SUB_THRESHOLD = settings->lod_text_sub_threshold;  // Hide Progress Text
+    const float LOD_TEXT_SUB_THRESHOLD = settings->lod_text_sub_threshold; // Hide Progress Text
     const float LOD_TEXT_MAIN_THRESHOLD = settings->lod_text_main_threshold; // Hide Main Name & Checkboxes
 
     // Pre-calculate line heights once per frame (Optimization)
@@ -4484,13 +4625,12 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
         // --- Rendering Core Logic ---
         if (is_visible_on_screen) {
-
             // --- Calculate Text Sizes for Centering (Only if visible) ---
             SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
             ImVec2 text_size = ImGui::CalcTextSize(item->display_name);
             RESET_FONT_SCALE();
 
-            ImVec2 progress_text_size = ImVec2(0,0);
+            ImVec2 progress_text_size = ImVec2(0, 0);
             if (has_progress_text) {
                 SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
                 progress_text_size = ImGui::CalcTextSize(progress_text);
@@ -4681,7 +4821,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 static void render_multistage_goals_section(Tracker *t, const AppSettings *settings, float &current_y,
                                             const char *section_title) {
     // LOD Thresholds
-    const float LOD_TEXT_SUB_THRESHOLD = settings->lod_text_sub_threshold;  // Hide Stage Text
+    const float LOD_TEXT_SUB_THRESHOLD = settings->lod_text_sub_threshold; // Hide Stage Text
     const float LOD_TEXT_MAIN_THRESHOLD = settings->lod_text_main_threshold; // Hide Main Goal Name
 
     // Pre-calculate line heights once per frame (Optimization)
@@ -4941,7 +5081,6 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
         // --- Rendering Core Logic ---
         if (is_visible_on_screen) {
-
             // --- String Formatting and Text Sizing (Only if visible) ---
             char stage_text[256];
             if (active_stage_render->type == SUBGOAL_STAT && active_stage_render->required_progress > 0) {
@@ -5066,8 +5205,9 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             // LOD: Hide main name if zoomed out too far
             if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
                 draw_list->AddText(nullptr, main_font_size * t->zoom_level,
-                                   ImVec2(screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
-                                          text_y_pos), current_text_color,
+                                   ImVec2(
+                                       screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
+                                       text_y_pos), current_text_color,
                                    goal->display_name);
             }
 
@@ -5138,24 +5278,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         ImGui::PushFont(t->tracker_font);
     }
 
-    // Pan and zoom logic
-    if (ImGui::IsWindowHovered()) {
-        if (io.MouseWheel != 0) {
-            ImVec2 mouse_pos_in_window = ImGui::GetMousePos();
-            ImVec2 mouse_pos_before_zoom = ImVec2((mouse_pos_in_window.x - t->camera_offset.x) / t->zoom_level,
-                                                  (mouse_pos_in_window.y - t->camera_offset.y) / t->zoom_level);
-            float old_zoom = t->zoom_level;
-            t->zoom_level += io.MouseWheel * 0.1f * t->zoom_level;
-            if (t->zoom_level < 0.1f) t->zoom_level = 0.1f; // Adjust max zoom out, originally 0.1f
-            if (t->zoom_level > 10.0f) t->zoom_level = 10.0f; // Adjust max zoom in
-            t->camera_offset.x += (mouse_pos_before_zoom.x * (old_zoom - t->zoom_level));
-            t->camera_offset.y += (mouse_pos_before_zoom.y * (old_zoom - t->zoom_level));
-        }
-        if (ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
-            t->camera_offset.x += io.MouseDelta.x;
-            t->camera_offset.y += io.MouseDelta.y;
-        }
-    }
+    // Reset the hover flag at the START of the frame, used for scrollable lists
+    t->is_hovering_scrollable_list = false;
 
     // This is the starting Y position for all rendering.
     // Each section will render itself and update this value for the next section.
@@ -5713,6 +5837,25 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         ImGui::End();
     }
 
+    // Pan and zoom logic (Moved to bottom to respect is_hovering_scrollable_list flag set during render)
+    if (ImGui::IsWindowHovered()) {
+        if (!t->is_hovering_scrollable_list && io.MouseWheel != 0) {
+            ImVec2 mouse_pos_in_window = ImGui::GetMousePos();
+            ImVec2 mouse_pos_before_zoom = ImVec2((mouse_pos_in_window.x - t->camera_offset.x) / t->zoom_level,
+                                                  (mouse_pos_in_window.y - t->camera_offset.y) / t->zoom_level);
+            float old_zoom = t->zoom_level;
+            t->zoom_level += io.MouseWheel * 0.1f * t->zoom_level;
+            if (t->zoom_level < 0.1f) t->zoom_level = 0.1f;
+            if (t->zoom_level > 10.0f) t->zoom_level = 10.0f;
+            t->camera_offset.x += (mouse_pos_before_zoom.x * (old_zoom - t->zoom_level));
+            t->camera_offset.y += (mouse_pos_before_zoom.y * (old_zoom - t->zoom_level));
+        }
+        if (ImGui::IsMouseDragging(ImGuiMouseButton_Right) || ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
+            t->camera_offset.x += io.MouseDelta.x;
+            t->camera_offset.y += io.MouseDelta.y;
+        }
+    }
+
     // Pop the font at the very end, so everything inside TrackerMap uses it.
     if (t->tracker_font) {
         ImGui::PopFont();
@@ -6062,16 +6205,16 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     }
 
     if (save_needed) {
-    log_message(LOG_INFO, "[TRACKER] Updating settings.json with new template data...\n");
-    // Write the synchronized settings back to the file
-    FILE *file = fopen(get_settings_file_path(), "w");
-    if (file) {
-        char *json_str = cJSON_Print(settings_root);
-        fputs(json_str, file);
-        fclose(file);
-        free(json_str);
-        json_str = nullptr;
-    }
+        log_message(LOG_INFO, "[TRACKER] Updating settings.json with new template data...\n");
+        // Write the synchronized settings back to the file
+        FILE *file = fopen(get_settings_file_path(), "w");
+        if (file) {
+            char *json_str = cJSON_Print(settings_root);
+            fputs(json_str, file);
+            fclose(file);
+            free(json_str);
+            json_str = nullptr;
+        }
     } else {
         // TODO: Debug
         log_message(LOG_INFO, "[TRACKER] Settings.json is up to date. Skipping write.\n");

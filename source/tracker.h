@@ -89,6 +89,7 @@ struct Tracker {
     float locked_layout_width; // The saved width of the layout when it was locked.
 
     // --- UI State Flags ---
+    bool is_hovering_scrollable_list; // Prevents main map zoom when scrolling a list
     bool notes_window_open; // Flag to control the visibility of the notes window.
     bool temp_creator_window_open; // Flag to control the visibility of the template creator window.
     bool is_temp_creator_focused;  // Flag to track if the template creator window has focus.
