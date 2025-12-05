@@ -971,7 +971,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     // This toggles the framerate of everything
-    ImGui::DragFloat("Tracker FPS Limit", &temp_settings.fps, 1.0f, 10.0f, 540.0f, "%.0f");
+    if (ImGui::DragFloat("Tracker FPS Limit", &temp_settings.fps, 1.0f, 10.0f, 540.0f, "%.0f")) {
+        if (temp_settings.fps < 10.0f) temp_settings.fps = 10.0f;
+        if (temp_settings.fps > 540.0f) temp_settings.fps = 540.0f;
+    }
     if (ImGui::IsItemHovered()) {
         char tracker_fps_limit_tooltip_buffer[1024];
         snprintf(tracker_fps_limit_tooltip_buffer, sizeof(tracker_fps_limit_tooltip_buffer),
@@ -982,7 +985,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // Conditionally display overlay related settings
     if (temp_settings.enable_overlay) {
-        ImGui::DragFloat("Overlay FPS Limit", &temp_settings.overlay_fps, 1.0f, 10.0f, 540.0f, "%.0f");
+        if (ImGui::DragFloat("Overlay FPS Limit", &temp_settings.overlay_fps, 1.0f, 10.0f, 540.0f, "%.0f")) {
+            if (temp_settings.overlay_fps < 10.0f) temp_settings.overlay_fps = 10.0f;
+            if (temp_settings.overlay_fps > 540.0f) temp_settings.overlay_fps = 540.0f;
+        }
         if (ImGui::IsItemHovered()) {
             char overlay_fps_limit_tooltip_buffer[1024];
             snprintf(overlay_fps_limit_tooltip_buffer, sizeof(overlay_fps_limit_tooltip_buffer),
@@ -995,10 +1001,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         static int overlay_width;
         overlay_width = temp_settings.overlay_window.w;
         if (ImGui::DragInt("Overlay Width", &overlay_width, 10.0f, 200, 7680)) {
-            if (overlay_width > 0) {
-                // Basic validation
-                temp_settings.overlay_window.w = overlay_width;
-            }
+            // Strict clamping for width
+            if (overlay_width < 200) overlay_width = 200;
+            if (overlay_width > 7680) overlay_width = 7680;
+            temp_settings.overlay_window.w = overlay_width;
         }
         if (ImGui::IsItemHovered()) {
             char overlay_width_tooltip_buffer[1024];
@@ -1007,7 +1013,11 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::SetTooltip("%s", overlay_width_tooltip_buffer);
         }
 
-        ImGui::DragFloat("Overlay Scroll Speed", &temp_settings.overlay_scroll_speed, 0.001f, -25.00f, 25.00f, "%.3f");
+        if (ImGui::DragFloat("Overlay Scroll Speed", &temp_settings.overlay_scroll_speed, 0.001f, -25.00f, 25.00f,
+                             "%.3f")) {
+            if (temp_settings.overlay_scroll_speed < -25.0f) temp_settings.overlay_scroll_speed = -25.0f;
+            if (temp_settings.overlay_scroll_speed > 25.0f) temp_settings.overlay_scroll_speed = 25.0f;
+        }
         if (ImGui::IsItemHovered()) {
             char overlay_scroll_speed_tooltip_buffer[1024];
             snprintf(overlay_scroll_speed_tooltip_buffer, sizeof(overlay_scroll_speed_tooltip_buffer),
@@ -1019,8 +1029,11 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::SetTooltip("%s", overlay_scroll_speed_tooltip_buffer);
         }
 
-        ImGui::DragFloat("Sub-Stat Cycle Interval (s)", &temp_settings.overlay_stat_cycle_speed, 0.1f, 0.1f, 60.0f,
-                         "%.3f s");
+        if (ImGui::DragFloat("Sub-Stat Cycle Interval (s)", &temp_settings.overlay_stat_cycle_speed, 0.1f, 0.1f, 60.0f,
+                             "%.3f s")) {
+            if (temp_settings.overlay_stat_cycle_speed < 0.1f) temp_settings.overlay_stat_cycle_speed = 0.1f;
+            if (temp_settings.overlay_stat_cycle_speed > 60.0f) temp_settings.overlay_stat_cycle_speed = 60.0f;
+        }
         if (ImGui::IsItemHovered()) {
             char substat_cycling_interval_tooltip_buffer[1024];
             snprintf(substat_cycling_interval_tooltip_buffer, sizeof(substat_cycling_interval_tooltip_buffer),
@@ -1445,7 +1458,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
     // Tracker Font Size
-    ImGui::DragFloat("Tracker Font Size", &temp_settings.tracker_font_size, 0.5f, 8.0f, 64.0f, "%.1f pt");
+    if (ImGui::DragFloat("Tracker Font Size", &temp_settings.tracker_font_size, 0.5f, 8.0f, 64.0f, "%.1f pt")) {
+        if (temp_settings.tracker_font_size < 8.0f) temp_settings.tracker_font_size = 8.0f;
+        if (temp_settings.tracker_font_size > 64.0f) temp_settings.tracker_font_size = 64.0f;
+    }
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[1024];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -1456,7 +1472,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     // Tracker Sub-Font Size
-    ImGui::DragFloat("Sub-Item Font Size", &temp_settings.tracker_sub_font_size, 0.5f, 8.0f, 32.0f, "%.1f pt");
+    if (ImGui::DragFloat("Sub-Item Font Size", &temp_settings.tracker_sub_font_size, 0.5f, 8.0f, 32.0f, "%.1f pt")) {
+        if (temp_settings.tracker_sub_font_size < 8.0f) temp_settings.tracker_sub_font_size = 8.0f;
+        if (temp_settings.tracker_sub_font_size > 32.0f) temp_settings.tracker_sub_font_size = 32.0f;
+    }
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[1024];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -1468,7 +1487,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     // Tracker UI-Font Size
-    ImGui::DragFloat("Tracker UI Font Size", &temp_settings.tracker_ui_font_size, 0.5f, 8.0f, 64.0f, "%.1f pt");
+    if (ImGui::DragFloat("Tracker UI Font Size", &temp_settings.tracker_ui_font_size, 0.5f, 8.0f, 64.0f, "%.1f pt")) {
+        if (temp_settings.tracker_ui_font_size < 8.0f) temp_settings.tracker_ui_font_size = 8.0f;
+        if (temp_settings.tracker_ui_font_size > 64.0f) temp_settings.tracker_ui_font_size = 64.0f;
+    }
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[1024];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -1518,7 +1540,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
     // UI Font Size
-    ImGui::DragFloat("Settings/UI Font Size", &temp_settings.ui_font_size, 0.5f, 8.0f, 64.0f, "%.1f pt");
+    if (ImGui::DragFloat("Settings/UI Font Size", &temp_settings.ui_font_size, 0.5f, 8.0f, 64.0f, "%.1f pt")) {
+        if (temp_settings.ui_font_size < 8.0f) temp_settings.ui_font_size = 8.0f;
+        if (temp_settings.ui_font_size > 64.0f) temp_settings.ui_font_size = 64.0f;
+    }
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[1024];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -1548,7 +1573,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // --- Level of Detail Settings ---
     ImGui::SeparatorText("Level of Detail (Zoom)");
 
-    ImGui::DragFloat("Hide Sub-Item Text At", &temp_settings.lod_text_sub_threshold, 0.001f, 0.05f, 10.0f, "%.3f");
+    if (ImGui::DragFloat("Hide Sub-Item Text At", &temp_settings.lod_text_sub_threshold, 0.001f, 0.05f, 10.0f, "%.3f")) {
+        if (temp_settings.lod_text_sub_threshold < 0.05f) temp_settings.lod_text_sub_threshold = 0.05f;
+        if (temp_settings.lod_text_sub_threshold > 10.0f) temp_settings.lod_text_sub_threshold = 10.0f;
+    }
     if (ImGui::IsItemHovered()) {
         char lod_sub_tooltip[1024];
         snprintf(lod_sub_tooltip, sizeof(lod_sub_tooltip),
@@ -1561,8 +1589,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SetTooltip("%s", lod_sub_tooltip);
     }
 
-    ImGui::DragFloat("Hide Main Text/Checkbox At", &temp_settings.lod_text_main_threshold, 0.001f, 0.05f, 10.0f,
-                     "%.3f");
+    if (ImGui::DragFloat("Hide Main Text/Checkbox At", &temp_settings.lod_text_main_threshold, 0.001f, 0.05f, 10.0f, "%.3f")) {
+        if (temp_settings.lod_text_main_threshold < 0.05f) temp_settings.lod_text_main_threshold = 0.05f;
+        if (temp_settings.lod_text_main_threshold > 10.0f) temp_settings.lod_text_main_threshold = 10.0f;
+    }
     if (ImGui::IsItemHovered()) {
         char lod_main_tooltip[1024];
         snprintf(lod_main_tooltip, sizeof(lod_main_tooltip),
@@ -1575,7 +1605,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SetTooltip("%s", lod_main_tooltip);
     }
 
-    ImGui::DragFloat("Simplify Icons At", &temp_settings.lod_icon_detail_threshold, 0.001f, 0.05f, 10.0f, "%.3f");
+    if (ImGui::DragFloat("Simplify Icons At", &temp_settings.lod_icon_detail_threshold, 0.001f, 0.05f, 10.0f, "%.3f")) {
+        if (temp_settings.lod_icon_detail_threshold < 0.05f) temp_settings.lod_icon_detail_threshold = 0.05f;
+        if (temp_settings.lod_icon_detail_threshold > 10.0f) temp_settings.lod_icon_detail_threshold = 10.0f;
+    }
     if (ImGui::IsItemHovered()) {
         char lod_icon_tooltip[1024];
         snprintf(lod_icon_tooltip, sizeof(lod_icon_tooltip),
@@ -1592,7 +1625,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::SeparatorText("List Behavior");
 
     // Slider for Scroll Threshold
-    ImGui::DragInt("Scrollable List Threshold", &temp_settings.scrollable_list_threshold, 1.0f, 1, 2048);
+    if (ImGui::DragInt("Scrollable List Threshold", &temp_settings.scrollable_list_threshold, 1.0f, 1, 2048)) {
+        if (temp_settings.scrollable_list_threshold < 1) temp_settings.scrollable_list_threshold = 1;
+        if (temp_settings.scrollable_list_threshold > 2048) temp_settings.scrollable_list_threshold = 2048;
+    }
     if (ImGui::IsItemHovered()) {
         char scroll_tooltip[1024];
         snprintf(scroll_tooltip, sizeof(scroll_tooltip),
@@ -1603,7 +1639,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     // List Scroll Speed Slider
-    ImGui::DragFloat("List Scroll Speed", &temp_settings.tracker_list_scroll_speed, 1.0f, 1.0f, 1024.0f, "%.0f px");
+    if (ImGui::DragFloat("List Scroll Speed", &temp_settings.tracker_list_scroll_speed, 1.0f, 1.0f, 1024.0f, "%.0f px")) {
+        if (temp_settings.tracker_list_scroll_speed < 1.0f) temp_settings.tracker_list_scroll_speed = 1.0f;
+        if (temp_settings.tracker_list_scroll_speed > 1024.0f) temp_settings.tracker_list_scroll_speed = 1024.0f;
+    }
     if (ImGui::IsItemHovered()) {
         char speed_tooltip[1024];
         snprintf(speed_tooltip, sizeof(speed_tooltip),
@@ -1660,8 +1699,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
                 char slider_label[128];
                 snprintf(slider_label, sizeof(slider_label), "##%sWidthSlider", label);
-                ImGui::DragFloat(slider_label, &temp_settings.tracker_section_custom_item_width[i], 1.0f, 96.0f,
-                                 2048.0f, "%.0f px");
+                if (ImGui::DragFloat(slider_label, &temp_settings.tracker_section_custom_item_width[i], 1.0f, 96.0f, 2048.0f, "%.0f px")) {
+                    if (temp_settings.tracker_section_custom_item_width[i] < 96.0f) temp_settings.tracker_section_custom_item_width[i] = 96.0f;
+                    if (temp_settings.tracker_section_custom_item_width[i] > 2048.0f) temp_settings.tracker_section_custom_item_width[i] = 2048.0f;
+                }
                 if (ImGui::IsItemHovered()) {
                     char tooltip_buffer[512];
                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -1676,8 +1717,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::Unindent();
 
     // --- Tracker Vertical Spacing ---
-    ImGui::DragFloat("Tracker Vertical Spacing", &temp_settings.tracker_vertical_spacing, 1.0f, 0.0f, 1024.0f,
-                     "%.0f px");
+    if (ImGui::DragFloat("Tracker Vertical Spacing", &temp_settings.tracker_vertical_spacing, 1.0f, 0.0f, 1024.0f, "%.0f px")) {
+        if (temp_settings.tracker_vertical_spacing < 0.0f) temp_settings.tracker_vertical_spacing = 0.0f;
+        if (temp_settings.tracker_vertical_spacing > 1024.0f) temp_settings.tracker_vertical_spacing = 1024.0f;
+    }
     if (ImGui::IsItemHovered()) {
         char tooltip_buffer[256];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -1690,7 +1733,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (temp_settings.enable_overlay) {
         ImGui::SeparatorText("Overlay Horizontal Spacing");
 
-        ImGui::DragFloat("Row 1 Icon Spacing", &temp_settings.overlay_row1_spacing, 1.0f, 0.0f, 7680.0f, "%.0f px");
+        if (ImGui::DragFloat("Row 1 Icon Spacing", &temp_settings.overlay_row1_spacing, 1.0f, 0.0f, 7680.0f, "%.0f px")) {
+            if (temp_settings.overlay_row1_spacing < 0.0f) temp_settings.overlay_row1_spacing = 0.0f;
+            if (temp_settings.overlay_row1_spacing > 7680.0f) temp_settings.overlay_row1_spacing = 7680.0f;
+        }
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[256];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -1703,8 +1749,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
 
-        ImGui::DragFloat("Row 1 Shared Icon Size", &temp_settings.overlay_row1_shared_icon_size, 1.0f, 0.0f, 48.0f,
-                         "%.0f px");
+        if (ImGui::DragFloat("Row 1 Shared Icon Size", &temp_settings.overlay_row1_shared_icon_size, 1.0f, 0.0f, 48.0f, "%.0f px")) {
+            if (temp_settings.overlay_row1_shared_icon_size < 0.0f) temp_settings.overlay_row1_shared_icon_size = 0.0f;
+            if (temp_settings.overlay_row1_shared_icon_size > 48.0f) temp_settings.overlay_row1_shared_icon_size = 48.0f;
+        }
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[256];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -1729,8 +1777,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (temp_settings.overlay_row2_custom_spacing_enabled) {
             ImGui::SameLine();
             ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
-            ImGui::DragFloat("Row 2 Item Width", &temp_settings.overlay_row2_custom_spacing, 1.0f, 96.0f, 7680.0f,
-                             "%.0f px");
+            if (ImGui::DragFloat("Row 2 Item Width", &temp_settings.overlay_row2_custom_spacing, 1.0f, 96.0f, 7680.0f, "%.0f px")) {
+                if (temp_settings.overlay_row2_custom_spacing < 96.0f) temp_settings.overlay_row2_custom_spacing = 96.0f;
+                if (temp_settings.overlay_row2_custom_spacing > 7680.0f) temp_settings.overlay_row2_custom_spacing = 7680.0f;
+            }
             if (ImGui::IsItemHovered()) {
                 char tooltip_buffer[512];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
@@ -1755,8 +1805,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (temp_settings.overlay_row3_custom_spacing_enabled) {
             ImGui::SameLine();
             ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
-            ImGui::DragFloat("Row 3 Item Width", &temp_settings.overlay_row3_custom_spacing, 1.0f, 96.0f, 7680.0f,
-                             "%.0f px");
+            if (ImGui::DragFloat("Row 3 Item Width", &temp_settings.overlay_row3_custom_spacing, 1.0f, 96.0f, 7680.0f, "%.0f px")) {
+                if (temp_settings.overlay_row3_custom_spacing < 96.0f) temp_settings.overlay_row3_custom_spacing = 96.0f;
+                if (temp_settings.overlay_row3_custom_spacing > 7680.0f) temp_settings.overlay_row3_custom_spacing = 7680.0f;
+            }
             if (ImGui::IsItemHovered()) {
                 char tooltip_buffer[512];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
