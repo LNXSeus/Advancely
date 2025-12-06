@@ -272,7 +272,7 @@ void settings_set_defaults(AppSettings *settings) {
     strncpy(settings->display_version_str, DEFAULT_VERSION, sizeof(settings->display_version_str) - 1);
     settings->display_version_str[sizeof(settings->display_version_str) - 1] = '\0';
 
-    settings->path_mode = PATH_MODE_AUTO;
+    settings->path_mode = PATH_MODE_INSTANCE;
     settings->manual_saves_path[0] = '\0';
     strncpy(settings->category, DEFAULT_CATEGORY, sizeof(settings->category) - 1);
     settings->category[sizeof(settings->category) - 1] = '\0';
@@ -417,7 +417,7 @@ bool settings_load(AppSettings *settings) {
         settings->path_mode = settings_get_path_mode_from_string(
             path_mode_json->valuestring);
     else {
-        settings->path_mode = PATH_MODE_AUTO;
+        settings->path_mode = PATH_MODE_INSTANCE; // Default to instance mode
         defaults_were_used = true;
     }
 

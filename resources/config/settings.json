@@ -172,7 +172,7 @@
 		"scrollable_list_threshold":	16,
 		"tracker_list_scroll_speed":	36
 	},
-	"path_mode":	"auto",
+	"path_mode":	"instance",
 	"manual_saves_path":	"",
 	"version":	"1.16.1",
 	"display_version": "1.16.1",

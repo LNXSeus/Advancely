@@ -695,9 +695,11 @@ _The `test1` templates are for you to learn and understand how templates work. T
 functionalities of all goal types. The `Default` language is the standard english template (`_lang.json`). Any
 non-default languages are appended after `lang_`._
 
-Credits for the `zh_cn` (chinese) translation of the `all_advancements` templates go to @towardstars and @yumekotism on
-dc.
-Make sure you use the `SourceHanSansCN-Normal.otf` font in all places (tracker, overlay and UI).
+Credits to creators of templates):
+- @towardstars and @yumekotism on dc: `zh_cn` translations for `all_advancements` templates. _Make sure you use the `SourceHanSansCN-Normal.otf` font in all places (tracker, overlay and UI)._
+- [MoreTrident](https://www.twitch.tv/moretrident): `all_trims` template.
+
+_(Submit your template through the [official discord](https://discord.gg/TyNgXDz)._
 </details>
 
 ***

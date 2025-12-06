@@ -2266,7 +2266,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "Resets all settings (besides window size/position & hotkeys) in this window to their default values.\n"
                  "This does not modify your template files.\n\n"
                  "Defaults:\n"
-                 "  - Path Mode: Auto-Detect Default Saves Path\n"
+                 "  - Path Mode: Track Active Instance\n"
                  "  - Template/Display Version: %s\n"
                  "  - StatsPerWorld Mod (Legacy): %s\n"
                  "  - Category: %s, Optional Flag: %s, Display Category: %s, Language: Default\n"

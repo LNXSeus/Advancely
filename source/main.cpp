@@ -1112,11 +1112,11 @@ int main(int argc, char *argv[]) {
                     }
 
                     // User clicked "Install Update"
-                    show_error_message("Downloading Update",
+                    show_error_message("Step 1/3: Downloading Update",
                                        "Downloading the latest version,\nplease wait after clicking \"OK\"...");
 
                     if (download_update_zip(download_url)) {
-                        show_error_message("Download Complete",
+                        show_error_message("Step 2/3: Download Complete",
                                            "Update downloaded.\nExtracting files after clicking \"OK\"...");
 
                         mz_zip_archive zip_archive;
@@ -1167,7 +1167,7 @@ int main(int argc, char *argv[]) {
                             // Now that files are extracted, apply the update
                             char exe_path[MAX_PATH_LENGTH];
                             if (get_executable_path(exe_path, sizeof(exe_path))) {
-                                show_error_message("Update Ready",
+                                show_error_message("Step 3/3: Update Ready",
                                                    "Advancely will now close to apply the update and then restart automatically.\nClick \"OK\" to continue.");
                                 if (apply_update(exe_path)) {
                                     // The updater script has been launched.
@@ -1559,7 +1559,8 @@ int main(int argc, char *argv[]) {
                     if (get_saves_path(detected_path, MAX_PATH_LENGTH, PATH_MODE_INSTANCE, nullptr)) {
                         // If it differs from what we are currently watching
                         if (strcmp(detected_path, tracker->saves_path) != 0) {
-                            log_message(LOG_INFO, "[MAIN] Active instance switch detected.\nOld: %s\nNew: %s\n", tracker->saves_path, detected_path);
+                            log_message(LOG_INFO, "[MAIN] Active instance switch detected.\nOld: %s\nNew: %s\n",
+                                        tracker->saves_path, detected_path);
 
                             // Trigger the existing settings-changed workflow.
                             // This safely de-inits dmon, re-inits paths, and reloads the template.
