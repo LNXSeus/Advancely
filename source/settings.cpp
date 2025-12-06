@@ -370,7 +370,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char default_saves_path_tooltip_buffer[1024];
         snprintf(default_saves_path_tooltip_buffer, sizeof(default_saves_path_tooltip_buffer),
-                 "Automatically finds the default Minecraft saves path for your OS.\n"
+                 "Automatically finds the default Minecraft (-Launcher) saves path for your OS.\n"
                  "Windows: %%APPDATA%%\\.minecraft\\saves\n"
                  "Linux: ~/.minecraft/saves\n"
                  "macOS: ~/Library/Application Support/minecraft/saves");
