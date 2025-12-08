@@ -34,13 +34,13 @@ Love using Advancely? You can have your name immortalized in the tracker!
 
 **Supporters:**
 
-* zurtleTif: $20
-* ethansplace98: $30
 * Totorewa: $31
+* ethansplace98: $30
+* zurtleTif: $20
 
 Simply [**donate here**](https://streamlabs.com/lnxseus/tip) and include the word "**Advancely**" in your donation
-message. Your name will be added to the official supporter showcase that appears on the stream overlay when anyone
-completes a run.
+message. **With the next release** your name will be added to the official supporter showcase that appears on the stream
+overlay when anyone completes a run.
 
 Thank you for supporting the project!
 
@@ -485,8 +485,8 @@ Nearly every aspect of the overlay can be tailored to your liking from the setti
   top info bar (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`).
 * **Alignment**: The main progress text at the top of the overlay can be aligned to the `Left`, `Center`, or `Right`.
 * **Spacing**: You can fully adjust the `spacing` between each row to either be dynamic based on the longest text width
-within that row or be fully fixed. When two items within the first row share the same texture (based on hashing) their
-parent icon will be overlaid to distinguish them further. The `size` of this overlaid icon can also be configured.
+  within that row or be fully fixed. When two items within the first row share the same texture (based on hashing) their
+  parent icon will be overlaid to distinguish them further. The `size` of this overlaid icon can also be configured.
 
 </details>
 
@@ -696,7 +696,9 @@ functionalities of all goal types. The `Default` language is the standard englis
 non-default languages are appended after `lang_`._
 
 Credits to creators of templates):
-- @towardstars and @yumekotism on dc: `zh_cn` translations for `all_advancements` templates. _Make sure you use the `SourceHanSansCN-Normal.otf` font in all places (tracker, overlay and UI)._
+
+- @towardstars and @yumekotism on dc: `zh_cn` translations for `all_advancements` templates. _Make sure you use
+  the `SourceHanSansCN-Normal.otf` font in all places (tracker, overlay and UI)._
 - [MoreTrident](https://www.twitch.tv/moretrident): `all_trims` template.
 
 _(Submit your template through the [official discord](https://discord.gg/TyNgXDz)._
