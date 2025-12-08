@@ -461,6 +461,33 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
             t->template_data->unlocks[i], OverlayDisplayItem::UNLOCK
         });
 
+    // Add forced items to Row 2 (custom goals, ms goals, and stats can be forced using "in_2nd_row")
+    for (int i = 0; i < t->template_data->stat_count; i++) {
+        TrackableCategory *cat = t->template_data->stats[i];
+        if (cat->in_2nd_row) {
+            // Skip hidden helper stats even if forced (shouldn't happen but safe to check)
+            if (cat->is_single_stat_category && cat->criteria_count > 0 && cat->criteria[0]->goal <= 0 &&
+                cat->icon_path[0] == '\0') {
+                continue;
+            }
+            row2_items.push_back({cat, OverlayDisplayItem::STAT});
+        }
+    }
+    for (int i = 0; i < t->template_data->custom_goal_count; i++) {
+        TrackableItem *item = t->template_data->custom_goals[i];
+        if (item->in_2nd_row) {
+            // Add to row 2
+            row2_items.push_back({item, OverlayDisplayItem::CUSTOM});
+        }
+    }
+    for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
+        MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+        if (goal->in_2nd_row) {
+            // Add to row 2
+            row2_items.push_back({goal, OverlayDisplayItem::MULTISTAGE});
+        }
+    }
+
     // --- Update Animation State ---
     const float base_scroll_speed = 60.0f;
     float speed_multiplier = settings->overlay_scroll_speed;
@@ -758,7 +785,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         }
     }
 
-    // --- ROW 2: Advancements & Unlocks ---
+    // --- ROW 2: Advancements & Unlocks (AND forced items) ---
     // ROW 2 ALSO SHOWS SUPPORTERS WHEN RUN IS COMPLETED
     {
         const float ROW2_Y_POS = 108.0f;
@@ -904,6 +931,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 }
             }
         } else {
+            // If run ISN'T complete
             // --- Default Behavior: Render Advancements & Unlocks ---
             SDL_Texture *static_bg = nullptr;
             AnimatedTexture *anim_bg = nullptr;
@@ -918,6 +946,30 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     t->template_data->unlocks[i], OverlayDisplayItem::UNLOCK
                 });
 
+            // Add forced items to Row 2
+            for (int i = 0; i < t->template_data->stat_count; i++) {
+                TrackableCategory *cat = t->template_data->stats[i];
+                if (cat->in_2nd_row) {
+                    if (cat->is_single_stat_category && cat->criteria_count > 0 && cat->criteria[0]->goal <= 0 &&
+                        cat->icon_path[0] == '\0') {
+                        continue;
+                    }
+                    row2_items.push_back({cat, OverlayDisplayItem::STAT});
+                }
+            }
+            for (int i = 0; i < t->template_data->custom_goal_count; i++) {
+                TrackableItem *item = t->template_data->custom_goals[i];
+                if (item->in_2nd_row) {
+                    row2_items.push_back({item, OverlayDisplayItem::CUSTOM});
+                }
+            }
+            for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
+                MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+                if (goal->in_2nd_row) {
+                    row2_items.push_back({goal, OverlayDisplayItem::MULTISTAGE});
+                }
+            }
+
             // --- 1. Calculate Max Text Width ---
             float max_text_width_row2 = 0.0f;
             for (const auto &display_item: row2_items) {
@@ -927,6 +979,14 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     is_template_hidden = static_cast<TrackableCategory *>(display_item.item_ptr)->is_hidden;
                 else if (display_item.type == OverlayDisplayItem::UNLOCK)
                     is_template_hidden = static_cast<TrackableItem *>(display_item.item_ptr)->is_hidden;
+                    // Check hidden status for forced types
+                else if (display_item.type == OverlayDisplayItem::STAT)
+                    is_template_hidden = static_cast<TrackableCategory *>(display_item.item_ptr)->is_hidden;
+                else if (display_item.type == OverlayDisplayItem::CUSTOM)
+                    is_template_hidden = static_cast<TrackableItem *>(display_item.item_ptr)->is_hidden;
+                else if (display_item.type == OverlayDisplayItem::MULTISTAGE)
+                    is_template_hidden = static_cast<MultiStageGoal *>(display_item.item_ptr)->is_hidden;
+
                 if (is_template_hidden) continue;
 
                 char name_buf[256] = {0};
@@ -963,6 +1023,76 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     name_buf[sizeof(name_buf) - 1] = '\0';
                     TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
                 }
+
+                // Handle width calculation for forced items (same logic as Row 3)
+                else if (display_item.type == OverlayDisplayItem::STAT) {
+                    auto *stat = static_cast<TrackableCategory *>(display_item.item_ptr);
+                    strncpy(name_buf, stat->display_name, sizeof(name_buf) - 1);
+                    name_buf[sizeof(name_buf) - 1] = '\0';
+                    TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
+
+                    if (stat->criteria_count > 1) {
+                        for (int j = 0; j < stat->criteria_count; ++j) {
+                            TrackableItem *crit = stat->criteria[j];
+                            char temp_sub_stat_buf[256] = {0};
+                            if (crit->goal > 0) {
+                                snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s (%d / %d)", j + 1,
+                                         crit->display_name, crit->goal, crit->goal);
+                            } else if (crit->goal == -1) {
+                                snprintf(temp_sub_stat_buf, sizeof(temp_sub_stat_buf), "%d. %s (999)", j + 1,
+                                         crit->display_name);
+                            }
+                            if (strlen(temp_sub_stat_buf) > strlen(longest_criterion_buf)) {
+                                // Reuse longest_criterion_buf
+                                strcpy(longest_criterion_buf, temp_sub_stat_buf);
+                            }
+                        }
+                    } else if (stat->criteria_count == 1) {
+                        TrackableItem *crit = stat->criteria[0];
+                        if (crit->goal > 0) {
+                            snprintf(potential_progress_buf, sizeof(potential_progress_buf), "(%d / %d)", crit->goal,
+                                     crit->goal);
+                        } else if (crit->goal == -1) {
+                            snprintf(potential_progress_buf, sizeof(potential_progress_buf), "(999)");
+                        }
+                    }
+                } else if (display_item.type == OverlayDisplayItem::CUSTOM) {
+                    auto *goal = static_cast<TrackableItem *>(display_item.item_ptr);
+                    strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
+                    name_buf[sizeof(name_buf) - 1] = '\0';
+                    TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
+                    if (goal->goal > 0) {
+                        snprintf(potential_progress_buf, sizeof(potential_progress_buf), "(%d / %d)", goal->goal,
+                                 goal->goal);
+                    } else if (goal->goal == -1) {
+                        snprintf(potential_progress_buf, sizeof(potential_progress_buf), "(999)");
+                    }
+                } else if (display_item.type == OverlayDisplayItem::MULTISTAGE) {
+                    auto *goal = static_cast<MultiStageGoal *>(display_item.item_ptr);
+                    strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
+                    name_buf[sizeof(name_buf) - 1] = '\0';
+                    TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
+                    for (int j = 0; j < goal->stage_count; ++j) {
+                        SubGoal *stage = goal->stages[j];
+                        char temp_stage_buf[256];
+                        if (stage->type == SUBGOAL_STAT && stage->required_progress > 0) {
+                            snprintf(temp_stage_buf, sizeof(temp_stage_buf), "%s (%d/%d)", stage->display_text,
+                                     stage->required_progress, stage->required_progress);
+                        } else {
+                            strncpy(temp_stage_buf, stage->display_text, sizeof(temp_stage_buf) - 1);
+                            temp_stage_buf[sizeof(temp_stage_buf) - 1] = '\0';
+                        }
+                        if (strlen(temp_stage_buf) > strlen(longest_criterion_buf)) {
+                            strcpy(longest_criterion_buf, temp_stage_buf);
+                        }
+                    }
+                }
+
+                if (potential_progress_buf[0] != '\0') TTF_MeasureString(
+                    o->font, potential_progress_buf, 0, 0, &w_progress, nullptr);
+                if (longest_criterion_buf[0] != '\0') TTF_MeasureString(o->font, longest_criterion_buf, 0, 0,
+                                                                        &w_criterion, nullptr);
+
                 float item_max_text_width = fmaxf((float) w_name, fmaxf((float) w_progress, (float) w_criterion));
                 max_text_width_row2 = fmaxf(max_text_width_row2, item_max_text_width);
             }
@@ -1077,6 +1207,107 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 name_buf[sizeof(name_buf) - 1] = '\0';
                                 break;
                             }
+                            // Render logic for forced items (same as Row 3)
+                            case OverlayDisplayItem::STAT: {
+                                auto *stat = static_cast<TrackableCategory *>(display_item.item_ptr);
+                                static_bg = o->adv_bg;
+                                anim_bg = o->adv_bg_anim;
+                                if (stat->done) {
+                                    static_bg = o->adv_bg_done;
+                                    anim_bg = o->adv_bg_done_anim;
+                                } else if ((!stat->is_single_stat_category && stat->completed_criteria_count > 0) ||
+                                           (stat->is_single_stat_category && stat->criteria_count > 0 && stat->criteria[
+                                                0]->progress > 0)) {
+                                    static_bg = o->adv_bg_half_done;
+                                    anim_bg = o->adv_bg_half_done_anim;
+                                }
+                                icon_path = stat->icon_path;
+
+                                if (stat->criteria_count > 1) {
+                                    snprintf(name_buf, sizeof(name_buf), "%s (%d / %d)", stat->display_name,
+                                             stat->completed_criteria_count, stat->criteria_count);
+                                    // ... (Cycle logic for multi-stat) ...
+                                    std::vector<int> incomplete_indices;
+                                    for (int j = 0; j < stat->criteria_count; ++j) {
+                                        if (!stat->criteria[j]->done) incomplete_indices.push_back(j);
+                                    }
+                                    if (!incomplete_indices.empty()) {
+                                        int cycle_duration_ms = (int) (settings->overlay_stat_cycle_speed * 1000.0f);
+                                        if (cycle_duration_ms <= 0) cycle_duration_ms = 1000;
+                                        Uint32 current_ticks = SDL_GetTicks();
+                                        int num_incomplete = incomplete_indices.size();
+                                        int list_index_to_show = (current_ticks / cycle_duration_ms) % num_incomplete;
+                                        int original_crit_index = incomplete_indices[list_index_to_show];
+                                        TrackableItem *crit = stat->criteria[original_crit_index];
+                                        if (crit->goal > 0) {
+                                            snprintf(progress_buf, sizeof(progress_buf), "%d. %s (%d / %d)",
+                                                     original_crit_index + 1, crit->display_name, crit->progress,
+                                                     crit->goal);
+                                        } else if (crit->goal == -1) {
+                                            snprintf(progress_buf, sizeof(progress_buf), "%d. %s (%d)",
+                                                     original_crit_index + 1, crit->display_name, crit->progress);
+                                        }
+                                    }
+                                } else {
+                                    strncpy(name_buf, stat->display_name, sizeof(name_buf) - 1);
+                                    name_buf[sizeof(name_buf) - 1] = '\0';
+                                    if (stat->criteria_count == 1) {
+                                        TrackableItem *crit = stat->criteria[0];
+                                        if (crit->goal > 0) snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
+                                                                     crit->progress, crit->goal);
+                                        else if (crit->goal == -1) snprintf(
+                                            progress_buf, sizeof(progress_buf), "(%d)", crit->progress);
+                                    }
+                                }
+                                break;
+                            }
+                            case OverlayDisplayItem::CUSTOM: {
+                                auto *goal = static_cast<TrackableItem *>(display_item.item_ptr);
+                                static_bg = o->adv_bg;
+                                anim_bg = o->adv_bg_anim;
+                                if (goal->done) {
+                                    static_bg = o->adv_bg_done;
+                                    anim_bg = o->adv_bg_done_anim;
+                                } else if (goal->progress > 0) {
+                                    static_bg = o->adv_bg_half_done;
+                                    anim_bg = o->adv_bg_half_done_anim;
+                                }
+                                icon_path = goal->icon_path;
+                                strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
+                                name_buf[sizeof(name_buf) - 1] = '\0';
+                                if (goal->goal > 0) snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
+                                                             goal->progress, goal->goal);
+                                else if (goal->goal == -1 && !goal->done) snprintf(
+                                    progress_buf, sizeof(progress_buf), "(%d)", goal->progress);
+                                break;
+                            }
+                            case OverlayDisplayItem::MULTISTAGE: {
+                                auto *goal = static_cast<MultiStageGoal *>(display_item.item_ptr);
+                                static_bg = o->adv_bg;
+                                anim_bg = o->adv_bg_anim;
+                                if (goal->current_stage >= goal->stage_count - 1) {
+                                    static_bg = o->adv_bg_done;
+                                    anim_bg = o->adv_bg_done_anim;
+                                } else if (goal->current_stage > 0) {
+                                    static_bg = o->adv_bg_half_done;
+                                    anim_bg = o->adv_bg_half_done_anim;
+                                }
+                                icon_path = goal->icon_path;
+                                strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
+                                name_buf[sizeof(name_buf) - 1] = '\0';
+                                if (goal->current_stage < goal->stage_count) {
+                                    SubGoal *active_stage = goal->stages[goal->current_stage];
+                                    if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress > 0) {
+                                        snprintf(progress_buf, sizeof(progress_buf), "%s (%d/%d)",
+                                                 active_stage->display_text, active_stage->current_stat_progress,
+                                                 active_stage->required_progress);
+                                    } else {
+                                        snprintf(progress_buf, sizeof(progress_buf), "%s", active_stage->display_text);
+                                    }
+                                }
+                                break;
+                            }
+
                             default: break;
                         }
 
@@ -1131,7 +1362,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         run_was_complete_last_frame = is_run_complete;
     }
 
-    // --- ROW 3: Stats & Goals ---
+    // --- ROW 3: Stats & Goals (excluding forced items with "in_2nd_row" flag) ---
     {
         const float ROW3_Y_POS = 260.0f; // Configure height of row, more pushes down
         const float ITEM_WIDTH = 96.0f; // Minimum width based on icon bg
@@ -1142,6 +1373,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         std::vector<OverlayDisplayItem> row3_items;
         for (int i = 0; i < t->template_data->stat_count; ++i) {
             TrackableCategory *stat_cat = t->template_data->stats[i];
+            if (stat_cat->in_2nd_row) continue; // SKIP if forced to Row 2 ("in_2nd_row")
             // Skip hidden helper stats that are not meant to be displayed
             if (stat_cat->is_single_stat_category && stat_cat->criteria_count > 0 && stat_cat->criteria[0]->goal <= 0 &&
                 stat_cat->icon_path[0] == '\0') {
@@ -1149,14 +1381,18 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             }
             row3_items.push_back({stat_cat, OverlayDisplayItem::STAT});
         }
-        for (int i = 0; i < t->template_data->custom_goal_count; ++i)
+        for (int i = 0; i < t->template_data->custom_goal_count; ++i) {
+            if (t->template_data->custom_goals[i]->in_2nd_row) continue; // SKIP if forced to Row 2 ("in_2nd_row")
             row3_items.push_back({
                 t->template_data->custom_goals[i], OverlayDisplayItem::CUSTOM
             });
-        for (int i = 0; i < t->template_data->multi_stage_goal_count; ++i)
+        }
+        for (int i = 0; i < t->template_data->multi_stage_goal_count; ++i) {
+            if (t->template_data->multi_stage_goals[i]->in_2nd_row) continue; // SKIP if forced to Row 2 ("in_2nd_row")
             row3_items.push_back({
                 t->template_data->multi_stage_goals[i], OverlayDisplayItem::MULTISTAGE
             });
+        }
 
         float max_text_width_row3 = 0.0f;
 
