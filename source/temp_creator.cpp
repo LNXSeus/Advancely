@@ -96,6 +96,7 @@ struct EditorTrackableItem {
     char icon_path[256];
     int goal;
     bool is_hidden;
+    bool in_2nd_row;
 };
 
 // A struct to hold a category (like an advancement) and its criteria
@@ -104,6 +105,7 @@ struct EditorTrackableCategory {
     char display_name[192];
     char icon_path[256];
     bool is_hidden;
+    bool in_2nd_row;
     bool is_recipe; // UI flag to distinguish recipes from advancements -> count towards progress percentage instead
     bool is_simple_stat; // UI flag to distinguish simple vs complex stats
     std::vector<EditorTrackableItem> criteria; // Criteria then are trackable items
@@ -124,6 +126,7 @@ struct EditorMultiStageGoal {
     char display_name[192]; // From lang file
     char icon_path[256];
     bool is_hidden;
+    bool in_2nd_row;
     std::vector<EditorSubGoal> stages;
 };
 
@@ -141,7 +144,8 @@ static bool are_editor_items_different(const EditorTrackableItem &a, const Edito
            strcmp(a.display_name, b.display_name) != 0 ||
            strcmp(a.icon_path, b.icon_path) != 0 ||
            a.goal != b.goal ||
-           a.is_hidden != b.is_hidden;
+           a.is_hidden != b.is_hidden ||
+           a.in_2nd_row != b.in_2nd_row;
 }
 
 // Helper function to compare two EditorTrackableCategory structs
@@ -150,6 +154,7 @@ static bool are_editor_categories_different(const EditorTrackableCategory &a, co
         strcmp(a.display_name, b.display_name) != 0 ||
         strcmp(a.icon_path, b.icon_path) != 0 ||
         a.is_hidden != b.is_hidden ||
+        a.in_2nd_row != b.in_2nd_row ||
         a.is_recipe != b.is_recipe ||
         a.is_simple_stat != b.is_simple_stat ||
         a.criteria.size() != b.criteria.size()) {
@@ -178,6 +183,7 @@ static bool are_editor_multi_stage_goals_different(const EditorMultiStageGoal &a
         strcmp(a.display_name, b.display_name) != 0 ||
         strcmp(a.icon_path, b.icon_path) != 0 ||
         a.is_hidden != b.is_hidden ||
+        a.in_2nd_row != b.in_2nd_row ||
         a.stages.size() != b.stages.size()) {
         return true;
     }
@@ -446,6 +452,7 @@ static void parse_editor_trackable_items(cJSON *json_array, std::vector<EditorTr
         cJSON *icon = cJSON_GetObjectItem(item_json, "icon");
         cJSON *target = cJSON_GetObjectItem(item_json, "target");
         cJSON *hidden = cJSON_GetObjectItem(item_json, "hidden");
+        cJSON *in_2nd_row = cJSON_GetObjectItem(item_json, "in_2nd_row");
 
         if (cJSON_IsString(root_name)) {
             strncpy(new_item.root_name, root_name->valuestring, sizeof(new_item.root_name) - 1);
@@ -457,6 +464,7 @@ static void parse_editor_trackable_items(cJSON *json_array, std::vector<EditorTr
         }
         if (cJSON_IsNumber(target)) new_item.goal = target->valueint;
         if (cJSON_IsBool(hidden)) new_item.is_hidden = cJSON_IsTrue(hidden);
+        if (cJSON_IsBool(in_2nd_row)) new_item.in_2nd_row = cJSON_IsTrue(in_2nd_row);
 
         // Load display_name from lang file
         char lang_key[256];
@@ -576,12 +584,14 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
         new_cat.root_name[sizeof(new_cat.root_name) - 1] = '\0';
         cJSON *icon = cJSON_GetObjectItem(category_json, "icon");
         cJSON *hidden = cJSON_GetObjectItem(category_json, "hidden");
+        cJSON *in_2nd_row = cJSON_GetObjectItem(category_json, "in_2nd_row");
 
         if (cJSON_IsString(icon)) {
             strncpy(new_cat.icon_path, icon->valuestring, sizeof(new_cat.icon_path) - 1);
             new_cat.icon_path[sizeof(new_cat.icon_path) - 1] = '\0';
         }
         if (cJSON_IsBool(hidden)) new_cat.is_hidden = cJSON_IsTrue(hidden);
+        if (cJSON_IsBool(in_2nd_row)) new_cat.in_2nd_row = cJSON_IsTrue(in_2nd_row); // Only for main stat not sub-stats
 
         // Language file
         char cat_lang_key[256];
@@ -669,6 +679,7 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
         cJSON *root_name = cJSON_GetObjectItem(goal_json, "root_name");
         cJSON *icon = cJSON_GetObjectItem(goal_json, "icon");
         cJSON *hidden = cJSON_GetObjectItem(goal_json, "hidden");
+        cJSON *in_2nd_row = cJSON_GetObjectItem(goal_json, "in_2nd_row");
 
         if (cJSON_IsString(root_name)) {
             strncpy(new_goal.root_name, root_name->valuestring, sizeof(new_goal.root_name) - 1);
@@ -679,6 +690,7 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
             new_goal.icon_path[sizeof(new_goal.icon_path) - 1] = '\0';
         }
         if (cJSON_IsBool(hidden)) new_goal.is_hidden = cJSON_IsTrue(hidden);
+        if (cJSON_IsBool(in_2nd_row)) new_goal.in_2nd_row = cJSON_IsTrue(in_2nd_row);
 
         // Language file
         char goal_lang_key[256];
@@ -815,6 +827,9 @@ static void serialize_editor_trackable_items(cJSON *parent, const char *key,
         if (item.is_hidden) {
             cJSON_AddBoolToObject(item_json, "hidden", item.is_hidden);
         }
+        if (item.in_2nd_row) {
+            cJSON_AddBoolToObject(item_json, "in_2nd_row", true);
+        }
         cJSON_AddItemToArray(array, item_json);
     }
     cJSON_AddItemToObject(parent, key, array);
@@ -861,6 +876,9 @@ static void serialize_editor_stats(cJSON *parent, const std::vector<EditorTracka
         if (cat.is_hidden) {
             cJSON_AddBoolToObject(cat_json, "hidden", cat.is_hidden);
         }
+        if (cat.in_2nd_row) {
+            cJSON_AddBoolToObject(cat_json, "in_2nd_row", true);
+        }
 
         if (cat.is_simple_stat && !cat.criteria.empty()) {
             const auto &crit = cat.criteria[0];
@@ -898,6 +916,9 @@ static void serialize_editor_multi_stage_goals(cJSON *parent, const std::vector<
         cJSON_AddStringToObject(goal_json, "icon", goal.icon_path);
         if (goal.is_hidden) {
             cJSON_AddBoolToObject(goal_json, "hidden", goal.is_hidden);
+        }
+        if (goal.in_2nd_row) {
+            cJSON_AddBoolToObject(goal_json, "in_2nd_row", true);
         }
 
         cJSON *stages_array = cJSON_CreateArray();
@@ -4262,6 +4283,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     ImGui::SameLine();
+                    if (ImGui::Checkbox("Row 2", &stat_cat.in_2nd_row)) {
+                        save_message_type = MSG_NONE;
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[256];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Force this stat category to display on the 2nd row of the overlay\n"
+                                 "(normally reserved for advancements/unlocks).");
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+
+                    ImGui::SameLine();
 
                     // Invert the logic for the checkbox to be more intuitive for the user
                     bool is_multi_stat = !stat_cat.is_simple_stat;
@@ -5189,6 +5223,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     ImGui::SameLine();
+                    if (ImGui::Checkbox("Row 2", &goal.in_2nd_row)) {
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[256];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Force this custom goal to display on the 2nd row of the overlay\n"
+                                 "(normally reserved for advancements/unlocks).");
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+
+                    ImGui::SameLine();
 
                     // "Copy" button for custom goals
                     if (ImGui::Button("Copy")) {
@@ -5741,6 +5787,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  "and hidden settings-based on the tracker.\n"
                                  "Visibility can be toggled in the main tracker settings");
                         ImGui::SetTooltip("%s", hidden_tooltip_buffer);
+                    }
+
+                    ImGui::SameLine();
+                    if (ImGui::Checkbox("Row 2", &goal.in_2nd_row)) {
+                        ms_goal_data_changed = true;
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[256];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Force this multi-stage goal to display on the 2nd row of the overlay\n"
+                                 "(normally reserved for advancements/unlocks).");
+                        ImGui::SetTooltip("%s", tooltip_buffer);
                     }
                     ImGui::Separator();
 

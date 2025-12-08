@@ -180,6 +180,7 @@ struct TrackableItem {
     bool is_shared;
     bool is_manually_completed; // Allow manually overriding sub-stats (NOT FOR ACHIEVEMENTS/ADVANCEMENTS)
     bool is_hidden; // If true, this item is hidden unless "Remove Completed Goals" is off
+    bool in_2nd_row; // Forces custom goals (or potentially stats) to the 2nd overlay row
 
     // Animation State
     float alpha; // Current transparency (1.0f = opaque, 0.0f = transparent)
@@ -210,6 +211,7 @@ struct TrackableCategory {
     bool done;
     bool is_manually_completed; // For manually overriding stats (as they have criteria now with sub-stats)
     bool is_hidden; // If true, this category is hidden unless "Remove Completed Goals" is off.
+    bool in_2nd_row; // Forces this stat category (does not apply to complex adv.) to 2nd row of overlay
     // To set an advancement/achievement to done when all the template criteria are met.
     // When game says advancement is done, then the advancement gets visually marked as done with the done background.
     // There could be a mistake in the template file, that an advancement has criteria that don't exist in the game,
@@ -269,6 +271,7 @@ struct MultiStageGoal {
     SubGoal **stages; // An array of the sub-goals
 
     bool is_hidden; // IF true, this goal is hidden unless "Remove Completed Goals" is off.
+    bool in_2nd_row; // Forces this MS Goal to the 2nd overlay row
 
     // Animation State
     float alpha; // Current transparency (1.0f = opaque, 0.0f = transparent)
