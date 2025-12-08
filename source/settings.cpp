@@ -1046,9 +1046,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (ImGui::IsItemHovered()) {
             char hide_completed_row_3_tooltip_buffer[1024];
             snprintf(hide_completed_row_3_tooltip_buffer, sizeof(hide_completed_row_3_tooltip_buffer),
-                     "If checked, all Goals (Stats, Custom Goals and Multi-Stage Goals) will disappear from Row 3 of the overlay.\n"
-                     "This is independent of the main 'Goal Visibility' setting.");
-
+                     "If checked, goals in Row 3 (Stats, Custom Goals, Multi-Stage) will disappear when completed.\n"
+                     "This is independent of the main 'Goal Visibility' setting.\n\n"
+                     "NOTE: Goals forced to Row 2 via the Template Editor will ALWAYS hide when completed,\n"
+                     "ignoring this setting.");
 
             ImGui::SetTooltip("%s", hide_completed_row_3_tooltip_buffer);
         }
@@ -1573,7 +1574,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // --- Level of Detail Settings ---
     ImGui::SeparatorText("Level of Detail (Zoom)");
 
-    if (ImGui::DragFloat("Hide Sub-Item Text At", &temp_settings.lod_text_sub_threshold, 0.001f, 0.05f, 10.0f, "%.3f")) {
+    if (ImGui::DragFloat("Hide Sub-Item Text At", &temp_settings.lod_text_sub_threshold, 0.001f, 0.05f, 10.0f,
+                         "%.3f")) {
         if (temp_settings.lod_text_sub_threshold < 0.05f) temp_settings.lod_text_sub_threshold = 0.05f;
         if (temp_settings.lod_text_sub_threshold > 10.0f) temp_settings.lod_text_sub_threshold = 10.0f;
     }
@@ -1589,7 +1591,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SetTooltip("%s", lod_sub_tooltip);
     }
 
-    if (ImGui::DragFloat("Hide Main Text/Checkbox At", &temp_settings.lod_text_main_threshold, 0.001f, 0.05f, 10.0f, "%.3f")) {
+    if (ImGui::DragFloat("Hide Main Text/Checkbox At", &temp_settings.lod_text_main_threshold, 0.001f, 0.05f, 10.0f,
+                         "%.3f")) {
         if (temp_settings.lod_text_main_threshold < 0.05f) temp_settings.lod_text_main_threshold = 0.05f;
         if (temp_settings.lod_text_main_threshold > 10.0f) temp_settings.lod_text_main_threshold = 10.0f;
     }
@@ -1639,7 +1642,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     // List Scroll Speed Slider
-    if (ImGui::DragFloat("List Scroll Speed", &temp_settings.tracker_list_scroll_speed, 1.0f, 1.0f, 1024.0f, "%.0f px")) {
+    if (ImGui::DragFloat("List Scroll Speed", &temp_settings.tracker_list_scroll_speed, 1.0f, 1.0f, 1024.0f,
+                         "%.0f px")) {
         if (temp_settings.tracker_list_scroll_speed < 1.0f) temp_settings.tracker_list_scroll_speed = 1.0f;
         if (temp_settings.tracker_list_scroll_speed > 1024.0f) temp_settings.tracker_list_scroll_speed = 1024.0f;
     }
@@ -1699,9 +1703,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
                 char slider_label[128];
                 snprintf(slider_label, sizeof(slider_label), "##%sWidthSlider", label);
-                if (ImGui::DragFloat(slider_label, &temp_settings.tracker_section_custom_item_width[i], 1.0f, 96.0f, 2048.0f, "%.0f px")) {
-                    if (temp_settings.tracker_section_custom_item_width[i] < 96.0f) temp_settings.tracker_section_custom_item_width[i] = 96.0f;
-                    if (temp_settings.tracker_section_custom_item_width[i] > 2048.0f) temp_settings.tracker_section_custom_item_width[i] = 2048.0f;
+                if (ImGui::DragFloat(slider_label, &temp_settings.tracker_section_custom_item_width[i], 1.0f, 96.0f,
+                                     2048.0f, "%.0f px")) {
+                    if (temp_settings.tracker_section_custom_item_width[i] < 96.0f)
+                        temp_settings.tracker_section_custom_item_width[i] = 96.0f;
+                    if (temp_settings.tracker_section_custom_item_width[i] > 2048.0f)
+                        temp_settings.tracker_section_custom_item_width[i] = 2048.0f;
                 }
                 if (ImGui::IsItemHovered()) {
                     char tooltip_buffer[512];
@@ -1717,7 +1724,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     ImGui::Unindent();
 
     // --- Tracker Vertical Spacing ---
-    if (ImGui::DragFloat("Tracker Vertical Spacing", &temp_settings.tracker_vertical_spacing, 1.0f, 0.0f, 1024.0f, "%.0f px")) {
+    if (ImGui::DragFloat("Tracker Vertical Spacing", &temp_settings.tracker_vertical_spacing, 1.0f, 0.0f, 1024.0f,
+                         "%.0f px")) {
         if (temp_settings.tracker_vertical_spacing < 0.0f) temp_settings.tracker_vertical_spacing = 0.0f;
         if (temp_settings.tracker_vertical_spacing > 1024.0f) temp_settings.tracker_vertical_spacing = 1024.0f;
     }
@@ -1733,7 +1741,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (temp_settings.enable_overlay) {
         ImGui::SeparatorText("Overlay Horizontal Spacing");
 
-        if (ImGui::DragFloat("Row 1 Icon Spacing", &temp_settings.overlay_row1_spacing, 1.0f, 0.0f, 7680.0f, "%.0f px")) {
+        if (ImGui::DragFloat("Row 1 Icon Spacing", &temp_settings.overlay_row1_spacing, 1.0f, 0.0f, 7680.0f,
+                             "%.0f px")) {
             if (temp_settings.overlay_row1_spacing < 0.0f) temp_settings.overlay_row1_spacing = 0.0f;
             if (temp_settings.overlay_row1_spacing > 7680.0f) temp_settings.overlay_row1_spacing = 7680.0f;
         }
@@ -1749,9 +1758,11 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
 
-        if (ImGui::DragFloat("Row 1 Shared Icon Size", &temp_settings.overlay_row1_shared_icon_size, 1.0f, 0.0f, 48.0f, "%.0f px")) {
+        if (ImGui::DragFloat("Row 1 Shared Icon Size", &temp_settings.overlay_row1_shared_icon_size, 1.0f, 0.0f, 48.0f,
+                             "%.0f px")) {
             if (temp_settings.overlay_row1_shared_icon_size < 0.0f) temp_settings.overlay_row1_shared_icon_size = 0.0f;
-            if (temp_settings.overlay_row1_shared_icon_size > 48.0f) temp_settings.overlay_row1_shared_icon_size = 48.0f;
+            if (temp_settings.overlay_row1_shared_icon_size > 48.0f)
+                temp_settings.overlay_row1_shared_icon_size = 48.0f;
         }
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[256];
@@ -1770,16 +1781,21 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             char tooltip_buffer[512];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                      "Check this to override the dynamic width calculation for Row 2 items.\n"
-                     "This allows you to set a fixed, uniform width for all items in this row.");
+                     "This allows you to set a fixed, uniform width for all items in this row.\n"
+                     "Applies to %s, Unlocks, and any Stats/Goals forced to Row 2.",
+                     advancements_label_plural_uppercase);
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
 
         if (temp_settings.overlay_row2_custom_spacing_enabled) {
             ImGui::SameLine();
             ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
-            if (ImGui::DragFloat("Row 2 Item Width", &temp_settings.overlay_row2_custom_spacing, 1.0f, 96.0f, 7680.0f, "%.0f px")) {
-                if (temp_settings.overlay_row2_custom_spacing < 96.0f) temp_settings.overlay_row2_custom_spacing = 96.0f;
-                if (temp_settings.overlay_row2_custom_spacing > 7680.0f) temp_settings.overlay_row2_custom_spacing = 7680.0f;
+            if (ImGui::DragFloat("Row 2 Item Width", &temp_settings.overlay_row2_custom_spacing, 1.0f, 96.0f, 7680.0f,
+                                 "%.0f px")) {
+                if (temp_settings.overlay_row2_custom_spacing < 96.0f)
+                    temp_settings.overlay_row2_custom_spacing = 96.0f;
+                if (temp_settings.overlay_row2_custom_spacing > 7680.0f)
+                    temp_settings.overlay_row2_custom_spacing = 7680.0f;
             }
             if (ImGui::IsItemHovered()) {
                 char tooltip_buffer[512];
@@ -1805,9 +1821,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (temp_settings.overlay_row3_custom_spacing_enabled) {
             ImGui::SameLine();
             ImGui::SetNextItemWidth(150.0f); // Give the slider a fixed width
-            if (ImGui::DragFloat("Row 3 Item Width", &temp_settings.overlay_row3_custom_spacing, 1.0f, 96.0f, 7680.0f, "%.0f px")) {
-                if (temp_settings.overlay_row3_custom_spacing < 96.0f) temp_settings.overlay_row3_custom_spacing = 96.0f;
-                if (temp_settings.overlay_row3_custom_spacing > 7680.0f) temp_settings.overlay_row3_custom_spacing = 7680.0f;
+            if (ImGui::DragFloat("Row 3 Item Width", &temp_settings.overlay_row3_custom_spacing, 1.0f, 96.0f, 7680.0f,
+                                 "%.0f px")) {
+                if (temp_settings.overlay_row3_custom_spacing < 96.0f)
+                    temp_settings.overlay_row3_custom_spacing = 96.0f;
+                if (temp_settings.overlay_row3_custom_spacing > 7680.0f)
+                    temp_settings.overlay_row3_custom_spacing = 7680.0f;
             }
             if (ImGui::IsItemHovered()) {
                 char tooltip_buffer[512];

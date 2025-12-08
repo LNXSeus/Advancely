@@ -349,22 +349,27 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
 static bool is_display_item_done(const OverlayDisplayItem &display_item, const AppSettings *settings) {
     // --- Step 1 & 2: Incorporate the "hidden" check from the new code ---
     bool is_hidden = false;
+    bool in_2nd_row = false; // Track if this item is forced to row 2
+
     switch (display_item.type) {
         case OverlayDisplayItem::ADVANCEMENT:
         case OverlayDisplayItem::STAT: {
             auto *cat = static_cast<TrackableCategory *>(display_item.item_ptr);
             is_hidden = cat->is_hidden;
+            in_2nd_row = cat->in_2nd_row;
             break;
         }
         case OverlayDisplayItem::UNLOCK:
         case OverlayDisplayItem::CUSTOM: {
             auto *item = static_cast<TrackableItem *>(display_item.item_ptr);
             is_hidden = item->is_hidden;
+            in_2nd_row = item->in_2nd_row;
             break;
         }
         case OverlayDisplayItem::MULTISTAGE: {
             auto *goal = static_cast<MultiStageGoal *>(display_item.item_ptr);
             is_hidden = goal->is_hidden;
+            in_2nd_row = goal->in_2nd_row;
             break;
         }
     }
@@ -382,8 +387,13 @@ static bool is_display_item_done(const OverlayDisplayItem &display_item, const A
         case OverlayDisplayItem::STAT:
         case OverlayDisplayItem::CUSTOM:
         case OverlayDisplayItem::MULTISTAGE:
-            // These types belong to Row 3
-            should_hide_when_done = settings->overlay_row3_remove_completed;
+            // If forced to Row 2, treat as "always hide" (like Advancements).
+            if (in_2nd_row) {
+                should_hide_when_done = true;
+            } else {
+                // Otherwise, respect the Row 3 setting.
+                should_hide_when_done = settings->overlay_row3_remove_completed;
+            }
             break;
 
         case OverlayDisplayItem::ADVANCEMENT:
@@ -1088,10 +1098,12 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     }
                 }
 
-                if (potential_progress_buf[0] != '\0') TTF_MeasureString(
-                    o->font, potential_progress_buf, 0, 0, &w_progress, nullptr);
-                if (longest_criterion_buf[0] != '\0') TTF_MeasureString(o->font, longest_criterion_buf, 0, 0,
-                                                                        &w_criterion, nullptr);
+                if (potential_progress_buf[0] != '\0')
+                    TTF_MeasureString(
+                        o->font, potential_progress_buf, 0, 0, &w_progress, nullptr);
+                if (longest_criterion_buf[0] != '\0')
+                    TTF_MeasureString(o->font, longest_criterion_buf, 0, 0,
+                                      &w_criterion, nullptr);
 
                 float item_max_text_width = fmaxf((float) w_name, fmaxf((float) w_progress, (float) w_criterion));
                 max_text_width_row2 = fmaxf(max_text_width_row2, item_max_text_width);
@@ -1253,10 +1265,12 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                     name_buf[sizeof(name_buf) - 1] = '\0';
                                     if (stat->criteria_count == 1) {
                                         TrackableItem *crit = stat->criteria[0];
-                                        if (crit->goal > 0) snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
-                                                                     crit->progress, crit->goal);
-                                        else if (crit->goal == -1) snprintf(
-                                            progress_buf, sizeof(progress_buf), "(%d)", crit->progress);
+                                        if (crit->goal > 0)
+                                            snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
+                                                     crit->progress, crit->goal);
+                                        else if (crit->goal == -1)
+                                            snprintf(
+                                                progress_buf, sizeof(progress_buf), "(%d)", crit->progress);
                                     }
                                 }
                                 break;
@@ -1275,10 +1289,12 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 icon_path = goal->icon_path;
                                 strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
                                 name_buf[sizeof(name_buf) - 1] = '\0';
-                                if (goal->goal > 0) snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
-                                                             goal->progress, goal->goal);
-                                else if (goal->goal == -1 && !goal->done) snprintf(
-                                    progress_buf, sizeof(progress_buf), "(%d)", goal->progress);
+                                if (goal->goal > 0)
+                                    snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
+                                             goal->progress, goal->goal);
+                                else if (goal->goal == -1 && !goal->done)
+                                    snprintf(
+                                        progress_buf, sizeof(progress_buf), "(%d)", goal->progress);
                                 break;
                             }
                             case OverlayDisplayItem::MULTISTAGE: {

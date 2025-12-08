@@ -468,8 +468,11 @@ The overlay is organized into three horizontally scrolling rows, each dedicated 
 
 * **Row 1 (Top)**: This row displays the icons of the smallest sub-tasks. It shows the individual criteria for
   advancements/recipes and the sub-stats for complex stat goals.
-* **Row 2 (Middle)**: This row shows the main parent goals, such as primary advancements, recipes, and unlocks.
-* **Row 3 (Bottom)**: This row is for all other goal types, including statistics, custom goals, and multi-stage goals.
+* **Row 2 (Middle)**: This row shows the main parent goals, such as primary advancements, recipes, and unlocks. **It can
+  also include Stats, Custom Goals, and Multi-Stage Goals if forced via the Template Editor.** Items in this row always
+  hide when completed.
+* **Row 3 (Bottom)**: This row is the standard location for all other goal types, including statistics, custom goals,
+  and multi-stage goals.
 
 ### Customization
 
@@ -481,7 +484,8 @@ Nearly every aspect of the overlay can be tailored to your liking from the setti
   up the animation by holding `SPACE` while the overlay window is focused.
 * **Stat Cycling**: For multi-stat goals, you can set the `Sub-Stat Cycle Interval` to control how frequently the
   overlay cycles through displaying each sub-stat.
-* **Visibility**: Choose whether to hide completed goals from Row 3, and toggle the visibility of each section of the
+* **Visibility**: Choose whether to hide completed goals from Row 3 (items in Row 1 & 2 always hide), and toggle the
+  visibility of each section of the
   top info bar (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`).
 * **Alignment**: The main progress text at the top of the overlay can be aligned to the `Left`, `Center`, or `Right`.
 * **Spacing**: You can fully adjust the `spacing` between each row to either be dynamic based on the longest text width
@@ -549,6 +553,8 @@ Opening a template reveals a tabbed interface where you can define every goal.
       reached).
     * **Multi-Stat Categories**: Group related stats under one parent icon. Each `Sub-Stat` has its own name, icon, and
       target, and will cycle on the stream overlay.
+    * **Row 2 Toggle**: You can check the "Row 2" box to force a stat category to appear in the middle row of the
+      overlay instead of the bottom row.
 * **Unlocks**: For the `25w14craftmine` snapshot, this tab allows you to track the completion of player unlocks like
   `minecraft:exploration`.
 * **Custom Goals & Counters**: Create goals for things that can't be automatically tracked. The "Target Goal" value
@@ -556,6 +562,7 @@ Opening a template reveals a tabbed interface where you can define every goal.
     * `0`: A simple on/off toggle (manual checklist item).
     * `>0`: A progress-based counter that completes when the target is reached.
     * `-1`: An infinite counter with no completion state.
+    * **Row 2 Toggle**: You can check the "Row 2" box to force a custom goal to appear in the middle row of the overlay.
 * **Multi-Stage Goals**: Design complex, sequential objectives. Each goal has a parent name and icon, and a list of
   `Stages`. Each stage is a smaller goal that must be completed in order. A stage's `Type` determines its trigger:
     * **Stat/Achievement**: Triggers when a specific stat reaches its target or an achievement is earned (read from the
@@ -565,6 +572,8 @@ Opening a template reveals a tabbed interface where you can define every goal.
       biome for "Adventuring Time").
     * **Unlock**: Triggers when a specific player unlock is obtained (read from the `unlocks` folder).
     * **Final**: The mandatory last stage that completes the entire multi-stage goal.
+    * **Row 2 Toggle**: You can check the "Row 2" box to force a multi-stage goal to appear in the middle row of the
+      overlay.
 
 ### Importing from Game Files
 
@@ -616,7 +625,7 @@ templates._
 | **UI Theme Colors**            | Customize the appearance of the interface (Settings, Editor, Notes windows). Adjust colors for `UI Text`, `Window Background`, `Frame Background` (and its hovered/active states), `Active Title Bar`, `Button` (and states), `Header` (collapsible sections), and `Check Mark`. _Note: Requires an application restart. _                                                                                                                                                                                                                                                                                                                          |
 | **Background Textures**        | Customize the `Default`, `Half-Done`, and `Done` background textures by selecting `.png` or `.gif` files from the `resources/gui` folder. Square textures are recommended, and using the same texture for multiple states will make completion harder to distinguish.                                                                                                                                                                                                                                                                                                                                                                               |
 | **Font Settings**              | Independently set the font for the **Tracker** (split into `Main` (includes notes window), `Sub` (Criteria/Sub-Goals) & `UI` (Progress Window & Bottom Controls)), **Overlay**, and **UI (Settings/Notes)**. Both `.ttf` and `.otf` font files are supported. _Note: Changes to Tracker and UI fonts/sizes may require an application restart. Modifying the `settings.json` file directly allows for higher font sizes, but may cause overlaps._                                                                                                                                                                                                   |
-| **Overlay Settings**           | Set the `Overlay FPS Limit` independently from the tracker. Configure the `Overlay Scroll Speed` (negative values reverse the direction) and set the `Sub-Stat Cycle Interval` for multi-stat animations. You can also align the top progress text (`Left`, `Center`, or `Right`) and toggle visibility for each section of the info bar (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`).                                                                                                                                                                                                                                               |
+| **Overlay Settings**           | Set the `Overlay FPS Limit` independently from the tracker. Configure the `Overlay Scroll Speed` (negative values reverse the direction) and set the `Sub-Stat Cycle Interval` for multi-stat animations. You can also align the top progress text (`Left`, `Center`, or `Right`) and toggle visibility for each section of the info bar (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`). You can also choose to `Hide Completed Row 3 Goals` (Stats/Custom/Multi-Stage), though items forced to Row 2 will always hide when done.                                                                                                      |
 | **Level of Detail (Zoom)**     | Adjust the zoom thresholds at which elements disappear to declutter the view and improve performance. You can independently configure when to `Hide Sub-Item Text` (criteria names, progress text), `Hide Main Text/Checkbox` (category names, manual checkboxes), and `Simplify Icons` (turning sub-item icons into simple colored squares). Higher values mean you must be zoomed in further to see the details.                                                                                                                                                                                                                                  |
 | **List Behavior**              | Control how long lists of criteria/sub-stats are handled. Set the `Scrollable List Threshold` to determine when a list becomes a scrollable box (saving vertical space), and adjust the `List Scroll Speed` for mouse wheel navigation.                                                                                                                                                                                                                                                                                                                                                                                                             |
 | **Tracker Spacing**            | Adjust the `Tracker Vertical Spacing` (in pixels) between rows of items. You can also enable `Custom Section Item Width` to adjust the horizontal width (in pixels) for *each item* within a specific section (e.g., set "Advancements" to 150px, "Stats" to 200px), overriding the dynamic width calculation. _Warning: Small values may cause text to overlap._                                                                                                                                                                                                                                                                                   |
@@ -624,7 +633,7 @@ templates._
 | **Section Order**              | Drag and drop the section names (`Advancements`, `Stats`, `Unlocks`, etc.) to reorder how they appear in the main tracker window.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | **Debug Settings**             | Toggle `Print Debug To Console` for detailed status updates in your terminal or `advancely_log.txt` and `advancely_overlay_log.txt` for the overlay, `Auto-Check for Updates` on startup or `Restart Advancely` to perform a full automatic restart of Advancely, which is needed for some font settings to take effect.                                                                                                                                                                                                                                                                                                                            |
 | **Hotkey Settings**            | This section appears if your template contains custom counters. Assign keyboard hotkeys to increment or decrement any counter (hotkeys only work when the tracker window is focused).                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| **Action Buttons**             | `Apply Settings` (Enter): Saves changes and triggers necessary reloads (like the overlay). `Revert Changes` (Ctrl/Cmd+Z): Discards unsaved modifications. `Reset To Defaults`: Resets most settings to their original values (preserves window geometry & hotkeys). `Restart Advancely`: Saves settings and performs a full application restart (required for ui/font/size changes). Default settings can also be found in the `resources/reference_files/` folder. Lastly the `Support Advancely!` button leads you straight to the Advancely [donation page](https://streamlabs.com/lnxseus/tip) (Important: Mention `Advancely` in tip message). |                                                                                                |
+| **Action Buttons**             | `Apply Settings` (Enter): Saves changes and triggers necessary reloads (like the overlay). `Revert Changes` (Ctrl/Cmd+Z): Discards unsaved modifications. `Reset To Defaults`: Resets most settings to their original values (preserves window geometry & hotkeys). `Restart Advancely`: Saves settings and performs a full application restart (required for ui/font/size changes). Default settings can also be found in the `resources/reference_files/` folder. Lastly the `Support Advancely!` button leads you straight to the Advancely [donation page](https://streamlabs.com/lnxseus/tip) (Important: Mention `Advancely` in tip message). |                                                                                                        
 
 > You can find the default settings in the `resources/reference_files` folder as `settings.json` and
 `Default_Settings.png`. The [Help](https://github.com/LNXSeus/Advancely#the-help-button) button within
