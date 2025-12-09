@@ -1494,6 +1494,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                       ? "Achievements"
                                                       : "Advancements";
 
+    // advancements/achievements
+    const char *advancements_label_plural_lower = (creator_selected_version <= MC_VERSION_1_11_2)
+                                                      ? "achievements"
+                                                      : "advancements";
+
     // advancement/achievement
     const char *advancements_label_singular_lower = (creator_selected_version <= MC_VERSION_1_11_2)
                                                         ? "achievement"
@@ -4289,9 +4294,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::SameLine();
                     if (ImGui::IsItemHovered()) {
                         char tooltip_buffer[256];
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Force this stat category to display on the 2nd row of the overlay\n"
-                                 "(normally reserved for advancements/unlocks).");
+                        if (creator_selected_version != MC_VERSION_25W14CRAFTMINE) {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Force this stat category to display on the 2nd row of the overlay\n"
+                                     "(normally reserved for %s).", advancements_label_plural_lower);
+                        } else {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Force this stat category to display on the 2nd row of the overlay\n"
+                                     "(normally reserved for %s/unlocks).", advancements_label_plural_lower);
+                        }
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
 
@@ -4637,7 +4648,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
                                          "If checked, this sub-stat will be fully hidden on the overlay\n"
                                          "and hidden settings-based on the tracker.\n"
-                                         "Visibility can be toggled in the main tracker settings");
+                                         "Visibility can be toggled in the main tracker settings.\n\n"
+                                         "NOTE: Hidden sub-stats are also excluded from the cycle rotation\n"
+                                         "on the overlay.");
                                 ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                             }
 
@@ -5228,9 +5241,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     if (ImGui::IsItemHovered()) {
                         char tooltip_buffer[256];
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Force this custom goal to display on the 2nd row of the overlay\n"
-                                 "(normally reserved for advancements/unlocks).");
+                        if (creator_selected_version != MC_VERSION_25W14CRAFTMINE) {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Force this stat category to display on the 2nd row of the overlay\n"
+                                     "(normally reserved for %s).", advancements_label_plural_lower);
+                        } else {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Force this stat category to display on the 2nd row of the overlay\n"
+                                     "(normally reserved for %s/unlocks).", advancements_label_plural_lower);
+                        }
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
 
@@ -5783,11 +5802,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::IsItemHovered()) {
                         char hidden_tooltip_buffer[512];
                         snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
-                                 "If checked, this sub-stat will be fully hidden on the overlay\n"
+                                 "If checked, this multi-stage goal will be fully hidden on the overlay\n"
                                  "and hidden settings-based on the tracker.\n"
-                                 "Visibility can be toggled in the main tracker settings.\n\n"
-                                 "NOTE: Hidden sub-stats are also excluded from the cycle rotation\n"
-                                 "on the overlay.");
+                                 "Visibility can be toggled in the main tracker settings");
                         ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                     }
 
@@ -5798,9 +5815,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     if (ImGui::IsItemHovered()) {
                         char tooltip_buffer[256];
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Force this multi-stage goal to display on the 2nd row of the overlay\n"
-                                 "(normally reserved for advancements/unlocks).");
+                        if (creator_selected_version != MC_VERSION_25W14CRAFTMINE) {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Force this stat category to display on the 2nd row of the overlay\n"
+                                     "(normally reserved for %s).", advancements_label_plural_lower);
+                        } else {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Force this stat category to display on the 2nd row of the overlay\n"
+                                     "(normally reserved for %s/unlocks).", advancements_label_plural_lower);
+                        }
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
                     ImGui::Separator();

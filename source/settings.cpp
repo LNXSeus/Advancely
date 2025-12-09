@@ -893,7 +893,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     ImGui::Checkbox("Enable Overlay", &temp_settings.enable_overlay);
     if (ImGui::IsItemHovered()) {
-        char enable_overlay_tooltip_buffer[1024];
+        char enable_overlay_tooltip_buffer[2048];
         if (selected_version <= MC_VERSION_1_6_4) {
             // Legacy
             snprintf(enable_overlay_tooltip_buffer, sizeof(enable_overlay_tooltip_buffer),
@@ -901,8 +901,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                      "Overlay Layout:\n"
                      " • Row 1: Sub-stats of complex stats (if not template hidden).\n"
                      "   (If two visible items share an icon, the parent's icon is overlaid.)\n"
-                     " • Row 2: Main %s.\n" // Main achievements
-                     " • Row 3: Stats, custom goals, and multi-stage goals.\n\n"
+                     " • Row 2: Main %s (Default).\n"
+                     " • Row 3: Stats, custom goals, and multi-stage goals (Default).\n"
+                     "   (Goals can be forced from Row 3 to Row 2 in the Template Editor.)\n\n"
                      "Tips:\n"
                      " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
                      " • A negative scroll speed animates items from right to left.\n"
@@ -919,8 +920,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                      "Overlay Layout:\n"
                      " • Row 1: %s criteria and sub-stats of complex stats (if not template hidden).\n"
                      "   (If two visible items share an icon, the parent's icon is overlaid.)\n"
-                     " • Row 2: Main %s.\n"
-                     " • Row 3: Stats, custom goals, and multi-stage goals.\n\n"
+                     " • Row 2: Main %s (Default).\n"
+                     " • Row 3: Stats, custom goals, and multi-stage goals (Default).\n"
+                     "   (Goals can be forced from Row 3 to Row 2 in the Template Editor.)\n\n"
                      "Tips:\n"
                      " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
                      " • A negative scroll speed animates items from right to left.\n"
@@ -937,8 +939,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                      "Overlay Layout:\n"
                      " • Row 1: %s criteria and sub-stats of complex stats (if not template hidden).\n"
                      "   (If two visible items share an icon, the parent's icon is overlaid.)\n"
-                     " • Row 2: Main %s, recipes and unlocks.\n"
-                     " • Row 3: Stats, custom goals, and multi-stage goals.\n\n"
+                     " • Row 2: Main %s, recipes and unlocks (Default).\n"
+                     " • Row 3: Stats, custom goals, and multi-stage goals (Default).\n"
+                     "   (Goals can be forced from Row 3 to Row 2 in the Template Editor.)\n\n"
                      "Tips:\n"
                      " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
                      " • A negative scroll speed animates items from right to left.\n"
@@ -955,8 +958,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                      "Overlay Layout:\n"
                      " • Row 1: %s criteria and sub-stats of complex stats.\n"
                      "   (If two items share an icon, the parent's icon is overlaid.)\n"
-                     " • Row 2: Main %s and recipes.\n"
-                     " • Row 3: Stats, custom goals, and multi-stage goals.\n\n"
+                     " • Row 2: Main %s and recipes (Default).\n"
+                     " • Row 3: Stats, custom goals, and multi-stage goals (Default).\n"
+                     "   (Goals can be forced from Row 3 to Row 2 in the Template Editor.)\n\n"
                      "Tips:\n"
                      " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
                      " • A negative scroll speed animates items from right to left.\n"
