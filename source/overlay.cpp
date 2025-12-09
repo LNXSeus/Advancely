@@ -1235,13 +1235,16 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 }
                                 icon_path = stat->icon_path;
 
-                                if (stat->criteria_count > 1) {
+                                if (!stat->is_single_stat_category) { // If complex stat it cycles (even if just one sub-stat)
+                                    // Multi-stat / Complex Stat Logic
                                     snprintf(name_buf, sizeof(name_buf), "%s (%d / %d)", stat->display_name,
                                              stat->completed_criteria_count, stat->criteria_count);
-                                    // ... (Cycle logic for multi-stat) ...
+                                    // Cycle logic for multi-stat
                                     std::vector<int> incomplete_indices;
                                     for (int j = 0; j < stat->criteria_count; ++j) {
-                                        if (!stat->criteria[j]->done) incomplete_indices.push_back(j);
+                                        if (!stat->criteria[j]->done && !stat->criteria[j]->is_hidden) {
+                                            incomplete_indices.push_back(j);
+                                        }
                                     }
                                     if (!incomplete_indices.empty()) {
                                         int cycle_duration_ms = (int) (settings->overlay_stat_cycle_speed * 1000.0f);
@@ -1604,14 +1607,14 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             }
                             icon_path = stat->icon_path;
 
-                            if (stat->criteria_count > 1) {
-                                // Multi-stat
+                            if (!stat->is_single_stat_category) { // If it's a complext stat (even if just one sub-stat)
+                                // Multi-stat / Complex stat logic
                                 snprintf(name_buf, sizeof(name_buf), "%s (%d / %d)", stat->display_name,
                                          stat->completed_criteria_count, stat->criteria_count);
 
                                 std::vector<int> incomplete_indices;
                                 for (int j = 0; j < stat->criteria_count; ++j) {
-                                    if (!stat->criteria[j]->done) {
+                                    if (!stat->criteria[j]->done && !stat->criteria[j]->is_hidden) {
                                         incomplete_indices.push_back(j);
                                     }
                                 }

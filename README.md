@@ -483,9 +483,8 @@ Nearly every aspect of the overlay can be tailored to your liking from the setti
 * **Animation**: Set the `Overlay FPS Limit` and toggle the `Speed Up Animation` option. You can also temporarily speed
   up the animation by holding `SPACE` while the overlay window is focused.
 * **Stat Cycling**: For multi-stat goals, you can set the `Sub-Stat Cycle Interval` to control how frequently the
-  overlay cycles through displaying each sub-stat.
-* **Visibility**: Choose whether to hide completed goals from Row 3 (items in Row 1 & 2 always hide), and toggle the
-  visibility of each section of the
+  overlay cycles through displaying each sub-stat. **Note:** Sub-stats marked as "Hidden" in the template will be skipped during this cycle.
+* **Visibility**: Choose whether to hide completed goals from Row 3 (items in Row 1 & 2 always hide), and toggle the visibility of each section of the
   top info bar (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`).
 * **Alignment**: The main progress text at the top of the overlay can be aligned to the `Left`, `Center`, or `Right`.
 * **Spacing**: You can fully adjust the `spacing` between each row to either be dynamic based on the longest text width
