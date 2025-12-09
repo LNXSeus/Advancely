@@ -373,7 +373,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "Automatically finds the default Minecraft (-Launcher) saves path for your OS.\n"
                  "Windows: %%APPDATA%%\\.minecraft\\saves\n"
                  "Linux: ~/.minecraft/saves\n"
-                 "macOS: ~/Library/Application Support/minecraft/saves");
+                 "macOS: ~/Library/Application Support/minecraft/saves\n"
+                 "This is Path Mode: %d", PATH_MODE_AUTO);
         ImGui::SetTooltip("%s", default_saves_path_tooltip_buffer);
     }
 
@@ -383,7 +384,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char tooltip[512];
         snprintf(tooltip, sizeof(tooltip), "Manually specify the path to your '.minecraft/saves' folder.\n"
-                 "Useful for custom launchers or non-standard installations.");
+                 "Useful for custom launchers or non-standard installations.\n"
+                 "This is Path Mode: %d", PATH_MODE_MANUAL);
         ImGui::SetTooltip("%s", tooltip);
     }
 
@@ -395,13 +397,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             char manual_saves_path_tooltip_buffer[1024];
             snprintf(manual_saves_path_tooltip_buffer, sizeof(manual_saves_path_tooltip_buffer),
                      "Enter the full path to your saves folder.\n"
-                     "You can paste it in directly. Forward or backward slashes are fine.");
+                     "You can paste it in directly. Forward or backward slashes are fine.\n");
             ImGui::SetTooltip("%s", manual_saves_path_tooltip_buffer);
         }
         if (show_invalid_manual_path_error) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f)); // Red text
             ImGui::TextWrapped(
-                "The specified path is invalid or does not exist. Please provide a valid path to your '.minecraft/saves' folder.");
+                "The specified path is invalid or does not exist. Please provide a valid path to your '.minecraft/saves' folder.\n");
             ImGui::PopStyleColor();
         }
         ImGui::Unindent();
@@ -413,7 +415,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char tooltip[512];
         snprintf(tooltip, sizeof(tooltip), "Automatically detect and track the active Minecraft instance\n"
-                 "launched from MultiMC or Prism Launcher.");
+                 "launched from MultiMC or Prism Launcher even switching between\n"
+                 "multiple running instances.\n"
+                 "Using this setting, but having minecraft closed my cause strange behavior."
+                 "This is Path Mode: %d", PATH_MODE_INSTANCE);
         ImGui::SetTooltip("%s", tooltip);
     }
 
@@ -2289,7 +2294,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "Resets all settings (besides window size/position & hotkeys) in this window to their default values.\n"
                  "This does not modify your template files.\n\n"
                  "Defaults:\n"
-                 "  - Path Mode: Track Active Instance\n"
+                 "  - Path Mode: %d\n"
                  "  - Template/Display Version: %s\n"
                  "  - StatsPerWorld Mod (Legacy): %s\n"
                  "  - Category: %s, Optional Flag: %s, Display Category: %s, Language: Default\n"
@@ -2321,6 +2326,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Notes Use Settings Font: %s\n\n"
                  "More found in resources/reference_files/Default_Settings.png",
 
+                 DEFAULT_PATH_MODE,
                  DEFAULT_VERSION,
                  DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
                  DEFAULT_CATEGORY, DEFAULT_OPTIONAL_FLAG, DEFAULT_DISPLAY_CATEGORY,

@@ -54,6 +54,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 // DEFAULT values
 #define DEFAULT_ENABLE_OVERLAY false // Stream overlay will be off by default
 #define DEFAULT_USING_STATS_PER_WORLD_LEGACY true
+#define DEFAULT_PATH_MODE PATH_MODE_AUTO
 #define DEFAULT_FPS 60
 #define DEFAULT_OVERLAY_FPS 60
 #define DEFAULT_TRACKER_ALWAYS_ON_TOP true
