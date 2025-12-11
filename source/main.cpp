@@ -1864,6 +1864,14 @@ int main(int argc, char *argv[]) {
                 }
             }
 
+            // --- Update Title Bar Timer ---
+            // Refresh the window title every 0.1s to update the "Upd:" timer, very light-weight operation
+            static float title_update_timer = 0.0f;
+            title_update_timer += deltaTime;
+            if (title_update_timer >= 0.1f) {
+                tracker_update_title(tracker, &app_settings);
+                title_update_timer = 0.0f;
+            }
             // IMGUI RENDERING
             ImGui_ImplSDLRenderer3_NewFrame();
             ImGui_ImplSDL3_NewFrame();

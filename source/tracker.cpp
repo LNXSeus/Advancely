@@ -6411,8 +6411,13 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
 
     char title_buffer[512];
     char formatted_time[64];
+    char formatted_update_time[64];
 
     format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
+
+    // Format the time since last update (snapped to 5s intervals like the overlay)
+    float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
+    format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time));
 
     // Displaying Ach or Adv depending on the version
     // Get version from string
@@ -6442,11 +6447,11 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
     }
 
     snprintf(title_buffer, sizeof(title_buffer),
-             "  Advancely  %s    |    %s    -    %s%s%s    |    %s IGT",
+             "  Advancely  %s    |    %s    -    %s%s%s    |    %s IGT    |    Upd: %s",
              ADVANCELY_VERSION, t->world_name,
              settings->display_version_str,
              category_chunk, // This contains "    -    Category" or ""
-             progress_chunk, formatted_time);
+             progress_chunk, formatted_time, formatted_update_time);
 
     SDL_SetWindowTitle(t->window, title_buffer);
 }
