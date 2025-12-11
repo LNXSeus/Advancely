@@ -571,7 +571,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             char formatted_time[64];
             format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
             snprintf(info_buffer, sizeof(info_buffer),
-                     "*** RUN COMPLETE! *** | Final Time: %s | Donate (mentioning 'Advancely') to be featured!",
+                     "*** RUN COMPLETED! *** | Final Time: %s | Donate (mentioning 'Advancely') to be featured!",
                      formatted_time);
         } else {
             // Conditionally build the progress string section by section

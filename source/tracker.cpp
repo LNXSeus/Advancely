@@ -5437,7 +5437,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
     if (is_run_complete) {
         snprintf(info_buffer, sizeof(info_buffer),
-                 "*** RUN COMPLETE! *** |   Final Time: %s",
+                 "*** RUN COMPLETED! *** |   Final Time: %s",
                  formatted_time);
     } else {
         // This is the original info string for when the run is in progress.
@@ -5759,13 +5759,16 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         snprintf(notes_tooltip_buffer, sizeof(notes_tooltip_buffer),
                  "Notes Window\n"
                  "--------------------------------\n"
-                 "Toggles a persistent text editor for keeping notes. The system has two modes, configurable inside the window:\n\n"
-                 " - Per-World (Default): Notes are saved for each world individually. The last 32 worlds are remembered.\n"
+                 "Toggles a persistent text editor for keeping notes.\n"
+                 "The system has two modes, configurable inside the window:\n\n"
+                 " - Per-World (Default): Notes are saved for each world individually.\n"
+                 "   The last 32 worlds are remembered.\n"
                  " - Per-Template: Notes are shared for the currently loaded template permanently.\n\n"
                  "--------------------------------\n"
                  "The window's size and position are remembered across sessions.\n"
                  "Anything you type is immediately saved.\n"
-                 "Hotkeys are disabled while typing in the notes window. The maximum note size is 64KB.");
+                 "Hotkeys are disabled while typing in the notes window.\n"
+                 "The maximum note size is 64KB.");
         ImGui::SetTooltip("%s", notes_tooltip_buffer);
     }
 
@@ -6508,7 +6511,7 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
     // Check if the run is completed, check both advancement and overall progress
     if (t->template_data->advancements_completed_count >= t->template_data->advancement_count && t->template_data->
         overall_progress_percentage >= 100.0f) {
-        log_message(LOG_INFO, "\n                  *** RUN COMPLETE! ***\n\n");
+        log_message(LOG_INFO, "\n                  *** RUN COMPLETED! ***\n\n");
         log_message(LOG_INFO, "                  Final Time: %s\n\n", formatted_time);
         log_message(LOG_INFO, "============================================================\n");
     } else {
