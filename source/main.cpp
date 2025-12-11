@@ -101,6 +101,12 @@ static bool show_welcome_window = false; // For rendering the welcome window on 
 static char release_url_buffer[256] = {0};
 static SDL_Texture *g_logo_texture = nullptr; // Loading the advancely logo
 
+// Define the header structure globally so it can be used in both the full update and the continuous update blocks
+typedef struct {
+    char world_name[MAX_PATH_LENGTH];
+    float time_since_last_update;
+} OverlayIPCHeader;
+
 #ifdef _WIN32
 // Warning the user with a popup window if file path contains non-ascii characters
 // Especially a problem on windows
@@ -834,28 +840,28 @@ int main(int argc, char *argv[]) {
 
                     if (overlay->p_shared_data->data_size > 0) {
                         // Define the same header struct to read the data.
-                        typedef struct {
-                            char world_name[MAX_PATH_LENGTH];
-                            float time_since_last_update;
-                        } OverlayIPCHeader;
-
                         OverlayIPCHeader header;
                         char *buffer_head = overlay->p_shared_data->buffer;
 
                         // 1. Read the header from the start of the buffer.
                         memcpy(&header, buffer_head, sizeof(OverlayIPCHeader));
-                        buffer_head += sizeof(OverlayIPCHeader); // Move pointer past the header.
+                        // buffer_head += sizeof(OverlayIPCHeader); // Move pointer past the header. // TODO: Remove?
 
                         // 2. Update the proxy tracker with the live data from the header.
                         strncpy(proxy_tracker.world_name, header.world_name, MAX_PATH_LENGTH - 1);
                         proxy_tracker.world_name[MAX_PATH_LENGTH - 1] = '\0';
                         proxy_tracker.time_since_last_update = header.time_since_last_update;
 
-                        // 3. Free the template data from the PREVIOUS frame.
-                        free_deserialized_data(&live_template_data);
+                        // Only deserialize the heavy template data if it's actually there (size > header)
+                        if (overlay->p_shared_data->data_size > sizeof(OverlayIPCHeader)) {
+                            buffer_head += sizeof(OverlayIPCHeader); // Move pointer past the header.
 
-                        // 4. Deserialize the main template data, which starts AFTER the header.
-                        deserialize_template_data(buffer_head, &live_template_data);
+                            // 3. Free the template data from the PREVIOUS frame.
+                            free_deserialized_data(&live_template_data);
+
+                            // 4. Deserialize the main template data, which starts AFTER the header.
+                            deserialize_template_data(buffer_head, &live_template_data);
+                        }
                     }
                     // --- End of Critical Section ---
 #ifdef _WIN32
@@ -1781,6 +1787,17 @@ int main(int argc, char *argv[]) {
                 // Update TITLE of the tracker window with some info, similar to the debug print
                 tracker_update_title(tracker, &app_settings);
 
+                // Check if the update was triggered by a game file change or hotkey press of counter
+                // Reset the timer BEFORE writing to IPC so the overlay gets "0s" instead of the old time.
+                if (SDL_SetAtomicInt(&g_game_data_changed, 0) == 1) {
+                    // Reset the timer as the update has happened
+                    tracker->time_since_last_update = 0.0f;
+
+                    // REDUCE SPAM, only print when update was triggered by game file change
+                    // Print debug status (individual prints use log_message function)
+                    tracker_print_debug_status(tracker, &app_settings);
+                }
+
                 // --- DATA WRITING TO COMMUNICATE WITH OVERLAY ---
                 if (tracker->p_shared_data) {
 #ifdef _WIN32
@@ -1790,12 +1807,6 @@ int main(int argc, char *argv[]) {
                         if (sem_wait(tracker->mutex) == 0) {
 #endif
                         // --- Critical Section: We have the lock ---
-
-                        // Define a header struct to hold extra IPC data.
-                        typedef struct {
-                            char world_name[MAX_PATH_LENGTH];
-                            float time_since_last_update;
-                        } OverlayIPCHeader;
 
                         OverlayIPCHeader header;
                         strncpy(header.world_name, tracker->world_name, MAX_PATH_LENGTH - 1);
@@ -1823,16 +1834,33 @@ int main(int argc, char *argv[]) {
 #endif
                     }
                 }
+            }
 
-                // Check if the update was triggered by a game file change or hotkey press of counter
-                if (SDL_SetAtomicInt(&g_game_data_changed, 0) == 1) {
-                    // Reset the timer as the update has happened
-                    tracker->time_since_last_update = 0.0f;
+            // Continuous Update - Update the time in shared memory every frame so the overlay timer ticks
+            else if (tracker->p_shared_data) {
+#ifdef _WIN32
+                if (WaitForSingleObject(tracker->h_mutex, 5) == WAIT_OBJECT_0) {
+#else
+                if (sem_wait(tracker->mutex) == 0) {
+#endif
+                    // Update ONLY the header part of shared memory to keep the timer in sync
+                    OverlayIPCHeader header;
+                    strncpy(header.world_name, tracker->world_name, MAX_PATH_LENGTH - 1);
+                    header.world_name[MAX_PATH_LENGTH - 1] = '\0';
+                    header.time_since_last_update = tracker->time_since_last_update;
 
-                    // REDUCE SPAM, only print when update was triggered by game file change
-                    // Print debug status (individual prints use log_message function)
-                    // log_message function prints based on print_debug_status setting
-                    tracker_print_debug_status(tracker, &app_settings);
+                    // Write header at the start of buffer
+                    memcpy(tracker->p_shared_data->buffer, &header, sizeof(OverlayIPCHeader));
+
+                    // Do NOT change data_size here if we aren't writing the full payload,
+                    // or ensure data_size reflects valid data.
+                    // Since we aren't overwriting the template data part of the buffer, it remains valid.
+
+#ifdef _WIN32
+                    ReleaseMutex(tracker->h_mutex);
+#else
+                    sem_post(tracker->mutex);
+#endif
                 }
             }
 
