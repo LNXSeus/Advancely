@@ -4281,7 +4281,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::IsItemHovered()) {
                         char hidden_tooltip_buffer[256];
                         snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
-                                 "If checked, this stat will be fully hidden on the overlay\n"
+                                 "If checked, this stat (and all sub-stats) will be fully hidden on the overlay\n"
                                  "and hidden settings-based on the tracker.\n"
                                  "Visibility can be toggled in the main tracker settings");
                         ImGui::SetTooltip("%s", hidden_tooltip_buffer);

@@ -1451,6 +1451,9 @@ static int count_all_icon_hashes(Tracker *t, IconHashCounter **counts, int capac
     for (int i = 0; i < cat_count; i++) {
         if (categories[i]->is_single_stat_category) continue;
 
+        // If the parent category is hidden, children should not contribute to shared count (not visible)
+        if (categories[i]->is_hidden) continue;
+
         for (int j = 0; j < categories[i]->criteria_count; j++) {
             TrackableItem *crit = categories[i]->criteria[j];
 
@@ -1489,6 +1492,9 @@ static void flag_shared_icons_by_hash(IconHashCounter *counts, int unique_count,
 
     for (int i = 0; i < cat_count; i++) {
         if (categories[i]->is_single_stat_category) continue;
+
+        // Skip processing hidden parents here as well, children are also hidden
+        if (categories[i]->is_hidden) continue;
 
         for (int j = 0; j < categories[i]->criteria_count; j++) {
             TrackableItem *crit = categories[i]->criteria[j];
@@ -2624,8 +2630,7 @@ void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settin
 }
 
 // Periodically recheck file changes
-void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings) {
-    (void) deltaTime;
+void tracker_update(Tracker *t, const AppSettings *settings) {
 
     // Detect if the world has changed since the last update.
     if (t->template_data->last_known_world_name[0] == '\0' || // Handle first-time load

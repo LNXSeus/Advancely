@@ -212,10 +212,9 @@ void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settin
  * In the future, it could be used for animations or periodic data refreshing.
  *
  * @param t A pointer to the Tracker struct.
- * @param deltaTime A pointer to the frame's delta time, for future use in animations.
  * @param settings A pointer to the loaded application settings.
  */
-void tracker_update(Tracker *t, float *deltaTime, const AppSettings *settings);
+void tracker_update(Tracker *t, const AppSettings *settings);
 
 /**
  * @brief Renders the tracker window's contents.
