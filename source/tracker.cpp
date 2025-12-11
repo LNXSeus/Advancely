@@ -5408,8 +5408,17 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     }
     ImGui::PushStyleColor(ImGuiCol_Text, title_text_color);
 
+    // Enforce minimum width for the title bar
+    const char *info_window_title = "Info | ESC: Settings | Pan: RMB/MMB Drag | Zoom: Wheel | Click: LMB | Move Win: LMB Drag";
+    ImVec2 title_size = ImGui::CalcTextSize(info_window_title);
+    // Add padding (WindowPadding * 2 + extra for safety/frame borders)
+    float min_info_width = title_size.x + (ImGui::GetStyle().WindowPadding.x * 2.0f) + 40.0f;
+
+    // Constraint: Minimum width = title width, Maximum width = unlimited
+    ImGui::SetNextWindowSizeConstraints(ImVec2(min_info_width, 0.0f), ImVec2(FLT_MAX, FLT_MAX));
+
     // This Begin() call draws the window frame and title bar using the styles we just pushed.
-    ImGui::Begin("Info | ESC: Settings | Pan: RMB/MMB Drag | Zoom: Wheel | Click: LMB | Move Win: LMB Drag", nullptr,
+    ImGui::Begin(info_window_title, nullptr,
                  ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing);
 
     // --- Set Font Scale for Info Bar CONTENT ---
