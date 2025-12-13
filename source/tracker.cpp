@@ -5421,7 +5421,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     ImGui::Begin(info_window_title, nullptr,
                  ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing);
 
-    // --- Set Font Scale for Info Bar CONTENT ---
+    // Set Font Scale for Info Bar CONTENT
     float scale_factor_info = 1.0f; // Declare local scale factor
     if (t->tracker_font && t->tracker_font->LegacySize > 0.0f) {
         scale_factor_info = settings->tracker_ui_font_size / t->tracker_font->LegacySize;

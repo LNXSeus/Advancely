@@ -207,7 +207,7 @@
       "criteria": {}
     },
     "minecraft:nether/get_wither_skull": {
-      "icon": "blocks/Wither_Skeleton_Skull_(S)_JE2.png",
+      "icon": "blocks/Wither_Skeleton_Skull.png",
       "hidden": false,
       "criteria": {}
     },
@@ -222,7 +222,7 @@
       "criteria": {}
     },
     "minecraft:end/kill_dragon": {
-      "icon": "blocks/Dragon_Head_(S)_JE1.png",
+      "icon": "blocks/Dragon_Head.png",
       "hidden": false,
       "criteria": {}
     },
@@ -1017,7 +1017,7 @@
       "target": -1
     },
     "stat:wither_skeletons_killed": {
-      "icon": "blocks/Wither_Skeleton_Skull_(S)_JE2.png",
+      "icon": "blocks/Wither_Skeleton_Skull.png",
       "hidden": false,
       "root_name": "minecraft:killed/minecraft:wither_skeleton",
       "target": -1

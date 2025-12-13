@@ -408,7 +408,7 @@
       "criteria": {}
     },
     "minecraft:end/kill_dragon": {
-      "icon": "blocks/Dragon_Head_(S)_JE1.png",
+      "icon": "blocks/Dragon_Head.png",
       "hidden": false,
       "criteria": {}
     },
@@ -993,7 +993,7 @@
       "criteria": {}
     },
     "minecraft:nether/get_wither_skull": {
-      "icon": "blocks/Wither_Skeleton_Skull_(S)_JE2.png",
+      "icon": "blocks/Wither_Skeleton_Skull.png",
       "hidden": false,
       "criteria": {}
     },
