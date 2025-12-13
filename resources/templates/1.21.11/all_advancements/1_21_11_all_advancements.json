@@ -734,7 +734,7 @@
 			}
 		},
 		"minecraft:adventure/spear_many_mobs":	{
-			"icon":	"items/iron_spear.png",
+			"icon":	"items/iron_spear_1.21.11.png",
 			"criteria":	{
 			}
 		},
