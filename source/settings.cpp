@@ -44,6 +44,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         strcmp(a->category, b->category) != 0 ||
         strcmp(a->optional_flag, b->optional_flag) != 0 ||
         strcmp(a->category_display_name, b->category_display_name) != 0 ||
+        a->lock_category_display_name != b->lock_category_display_name ||
         strcmp(a->lang_flag, b->lang_flag) != 0 ||
         a->enable_overlay != b->enable_overlay ||
         a->using_stats_per_world_legacy != b->using_stats_per_world_legacy ||
@@ -298,6 +299,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // Helper Lmbda to auto-fill display category
     auto update_temp_display_category = [&]() {
+        // If Display name is locked
+        if (temp_settings.lock_category_display_name) return;
+
         char formatted_category[MAX_PATH_LENGTH];
         format_category_string(temp_settings.category, formatted_category, sizeof(formatted_category));
         // Use provided function
@@ -793,15 +797,49 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     // --- Category Display Name Text Input ---
+
+    // Calculate the standard width used by other items (like the Combos above)
+    float standard_width = ImGui::CalcItemWidth();
+    // float spacing = ImGui::GetStyle().ItemSpacing.x;
+
+    // Calculate the width of the "Lock" checkbox so we can subtract it
+    // Checkbox Width = Box Square (FrameHeight) + Text Gap (ItemInnerSpacing) + Text Width ("Lock")
+    // float lock_checkbox_width = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x + ImGui::CalcTextSize("Lock").x;
+
+    // Set the input field width to fill the remaining space
+    ImGui::SetNextItemWidth(standard_width);
+
+    // Disable input if locked
+    if (temp_settings.lock_category_display_name) ImGui::BeginDisabled();
+
+
     ImGui::InputText("Display Category", temp_settings.category_display_name,
-                     sizeof(temp_settings.category_display_name));
-    if (ImGui::IsItemHovered()) {
+                         sizeof(temp_settings.category_display_name));
+
+    if (temp_settings.lock_category_display_name) ImGui::EndDisabled(); // End disabled if locked
+
+
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         char tooltip_buffer[512];
-        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+        if (temp_settings.lock_category_display_name) {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                "Display Name is currently locked.\n"
+                "Uncheck the box to edit or auto-update.");
+        } else {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                  "This is the name used for display on the tracker, overlay, and in debug logs.\n"
                  "It is automatically formatted from the Category and Optional Flag,\n"
                  "but you can override it with any custom text here.");
+        }
         ImGui::SetTooltip("%s", tooltip_buffer);
+    }
+
+    // The Lock Checkbox
+    ImGui::SameLine();
+    // The Lock Checkbox
+    ImGui::Checkbox("Lock", &temp_settings.lock_category_display_name);
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Prevent the Display Name from changing automatically when switching templates.");
     }
 
     // --- LANGUAGE DROPDOWN ---
@@ -2298,7 +2336,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Path Mode: %d\n"
                  "  - Template/Display Version: %s\n"
                  "  - StatsPerWorld Mod (Legacy): %s\n"
-                 "  - Category: %s, Optional Flag: %s, Display Category: %s, Language: Default\n"
+                 "  - Category: %s, Optional Flag: %s, Display Category: %s (lock: %s), Language: Default\n"
                  "  - Enable Overlay: %s\n"
                  "  - FPS Limit: (Tracker: %d, Overlay: %d)\n"
                  "  - Overlay Width: %dpx\n"
@@ -2331,6 +2369,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_VERSION,
                  DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
                  DEFAULT_CATEGORY, DEFAULT_OPTIONAL_FLAG, DEFAULT_DISPLAY_CATEGORY,
+                 DEFAULT_LOCK_CATEGORY_DISPLAY_NAME ? "Enabled" : "Disabled",
                  DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
                  DEFAULT_FPS, DEFAULT_OVERLAY_FPS,
                  OVERLAY_DEFAULT_WIDTH,

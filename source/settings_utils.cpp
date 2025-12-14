@@ -325,6 +325,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->per_world_notes = DEFAULT_PER_WORLD_NOTES;
     settings->check_for_updates = DEFAULT_CHECK_FOR_UPDATES;
     settings->show_welcome_on_startup = DEFAULT_SHOW_WELCOME_ON_STARTUP;
+    settings->lock_category_display_name = DEFAULT_LOCK_CATEGORY_DISPLAY_NAME;
 
     strncpy(settings->tracker_font_name, DEFAULT_TRACKER_FONT, sizeof(settings->tracker_font_name) - 1);
     settings->tracker_font_name[sizeof(settings->tracker_font_name) - 1] = '\0';
@@ -486,6 +487,15 @@ bool settings_load(AppSettings *settings) {
                                        settings->category_display_name, sizeof(settings->category_display_name));
         defaults_were_used = true;
     }
+
+    const cJSON *lock_display_json = cJSON_GetObjectItem(json, "lock_category_display_name");
+    if (lock_display_json && cJSON_IsBool(lock_display_json)) {
+        settings->lock_category_display_name = cJSON_IsTrue(lock_display_json);
+    } else {
+        settings->lock_category_display_name = DEFAULT_LOCK_CATEGORY_DISPLAY_NAME;
+        defaults_were_used = true;
+    }
+
 
     const cJSON *lang_flag_json = cJSON_GetObjectItem(json, "lang_flag");
     if (lang_flag_json && cJSON_IsString(lang_flag_json)) {
@@ -1071,6 +1081,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(root, "optional_flag", cJSON_CreateString(settings->optional_flag));
         cJSON_DeleteItemFromObject(root, "category_display_name");
         cJSON_AddItemToObject(root, "category_display_name", cJSON_CreateString(settings->category_display_name));
+        cJSON_DeleteItemFromObject(root, "lock_category_display_name");
+        cJSON_AddItemToObject(root, "lock_category_display_name", cJSON_CreateBool(settings->lock_category_display_name));
         cJSON_DeleteItemFromObject(root, "lang_flag");
         cJSON_AddItemToObject(root, "lang_flag", cJSON_CreateString(settings->lang_flag));
 

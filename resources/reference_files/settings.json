@@ -179,6 +179,7 @@
 	"category":	"all_advancements",
 	"optional_flag":	"",
 	"category_display_name": "All Advancements",
+	"lock_category_display_name": false,
 	"lang_flag":	"",
 	"hotkeys":	[]
 }
