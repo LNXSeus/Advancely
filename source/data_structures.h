@@ -256,6 +256,11 @@ struct SubGoal {
     char root_name[192]; // The target, e.g., "minecraft:trident" or "minecraft:adventure/very_very_frightening"
     int required_progress; // The value to reach, e.g., 1
     int current_stat_progress; // Current value of stat within multi-stage goal
+
+    char icon_path[256];
+    SDL_Texture *texture;
+    AnimatedTexture *anim_texture;
+    uint64_t icon_hash;
 };
 
 // Represents a complete multi-stage goal
@@ -265,6 +270,8 @@ struct MultiStageGoal {
     char icon_path[256]; // The icon for the entire goal
     SDL_Texture *texture; // The loaded icon texture
     AnimatedTexture *anim_texture; // To support .gif files
+
+    bool use_stage_icons; // Flag to toggle per-stage icons
 
     int current_stage; // Index of the currently active sub-goal
     int stage_count; // How many stages there are

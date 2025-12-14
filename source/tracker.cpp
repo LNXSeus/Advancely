@@ -1737,6 +1737,8 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
             }
         }
 
+        // Parse use_stage_icons flag
+        new_goal->use_stage_icons = cJSON_IsTrue(cJSON_GetObjectItem(goal_item_json, "use_stage_icons"));
 
         // "multi_stage_goal.<root_name>.display_name"
         // Look up display name from lang file
@@ -1778,6 +1780,8 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
                 cJSON *parent_adv = cJSON_GetObjectItem(stage_item_json, "parent_advancement");
                 cJSON *root = cJSON_GetObjectItem(stage_item_json, "root_name");
                 cJSON *target_val = cJSON_GetObjectItem(stage_item_json, "target");
+
+
 
                 if (cJSON_IsString(text)) {
                     strncpy(new_stage->display_text, text->valuestring, sizeof(new_stage->display_text) - 1);
@@ -1824,6 +1828,27 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
                     else if (strcmp(type->valuestring, "unlock") == 0) new_stage->type = SUBGOAL_UNLOCK;
                     else if (strcmp(type->valuestring, "criterion") == 0) new_stage->type = SUBGOAL_CRITERION;
                     else new_stage->type = SUBGOAL_MANUAL; // "final" maps to manual/unused
+                }
+
+                // Parse Per-Stage Icon if enabled
+                if (new_goal->use_stage_icons) {
+                    cJSON *stage_icon = cJSON_GetObjectItem(stage_item_json, "icon");
+                    if (cJSON_IsString(stage_icon)) {
+                        char full_icon_path[sizeof(new_stage->icon_path)];
+                        snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_resources_path(), stage_icon->valuestring);
+                        strncpy(new_stage->icon_path, full_icon_path, sizeof(new_stage->icon_path) - 1);
+                        new_stage->icon_path[sizeof(new_stage->icon_path) - 1] = '\0';
+
+                        if (strstr(full_icon_path, ".gif")) {
+                            new_stage->anim_texture = get_animated_texture_from_cache(
+                                t->renderer, &t->anim_cache, &t->anim_cache_count, &t->anim_cache_capacity, new_stage->icon_path,
+                                SDL_SCALEMODE_NEAREST);
+                        } else {
+                            new_stage->texture = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count,
+                                                                       &t->texture_cache_capacity, new_stage->icon_path,
+                                                                       SDL_SCALEMODE_NEAREST);
+                        }
+                    }
                 }
                 // Add the stage to the goal
                 new_goal->stages[j++] = new_stage;
@@ -5188,27 +5213,45 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
             // Render Icon (Animated or Static)
             // --- Start GIF Frame Selection Logic ---
-            if (goal->anim_texture && goal->anim_texture->frame_count > 0) {
-                if (goal->anim_texture->delays && goal->anim_texture->total_duration > 0) {
+
+            // Determine which texture source to use
+            AnimatedTexture* anim_src = goal->anim_texture;
+            SDL_Texture* static_src = goal->texture;
+
+            if (goal->use_stage_icons && goal->stage_count > 0) {
+                // Use the icon of the current stage
+                int stage_idx = goal->current_stage;
+                // Safety clamp (though current_stage should rarely exceed bounds)
+                if (stage_idx >= goal->stage_count) stage_idx = goal->stage_count - 1;
+
+                // If flag is set, stage icon takes precedence
+                if (goal->stages[stage_idx]->anim_texture || goal->stages[stage_idx]->texture) {
+                    anim_src = goal->stages[stage_idx]->anim_texture;
+                    static_src = goal->stages[stage_idx]->texture;
+                }
+            }
+
+            if (anim_src && anim_src->frame_count > 0) {
+                if (anim_src->delays && anim_src->total_duration > 0) {
                     Uint32 current_ticks = SDL_GetTicks();
-                    Uint32 elapsed_time = current_ticks % goal->anim_texture->total_duration;
+                    Uint32 elapsed_time = current_ticks % anim_src->total_duration;
                     int current_frame = 0;
                     Uint32 time_sum = 0;
-                    for (int frame_idx = 0; frame_idx < goal->anim_texture->frame_count; ++frame_idx) {
-                        time_sum += goal->anim_texture->delays[frame_idx];
+                    for (int frame_idx = 0; frame_idx < anim_src->frame_count; ++frame_idx) {
+                        time_sum += anim_src->delays[frame_idx];
                         if (elapsed_time < time_sum) {
                             current_frame = frame_idx;
                             break;
                         }
                     }
-                    texture_to_draw = goal->anim_texture->frames[current_frame];
+                    texture_to_draw = anim_src->frames[current_frame];
                 } else {
                     // Fallback if no timing info
-                    texture_to_draw = goal->anim_texture->frames[0];
+                    texture_to_draw = anim_src->frames[0];
                 }
-            } else if (goal->texture) {
+            } else if (static_src) {
                 // Static texture
-                texture_to_draw = goal->texture;
+                texture_to_draw = static_src;
             }
             // --- End GIF Frame Selection Logic ---
 

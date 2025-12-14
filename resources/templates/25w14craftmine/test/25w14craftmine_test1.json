@@ -46,7 +46,7 @@
 			"icon":	"items/wither_spawn_egg_25w14craftmine.png",
 			"criteria":	{
 				"completed_event":	{
-					"icon":	"blocks/Wither_Skeleton_Skull_(S)_JE2.png"
+					"icon":	"blocks/Wither_Skeleton_Skull.png"
 				}
 			}
 		},

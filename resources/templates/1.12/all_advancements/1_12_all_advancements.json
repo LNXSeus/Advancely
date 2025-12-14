@@ -605,38 +605,46 @@
 	"multi_stage_goals":	[{
 			"root_name":	"ms_goal:beacon",
 			"icon":	"blocks/Beacon_JE6_BE2.png",
+			"use_stage_icons":	true,
 			"stages":	[{
 					"stage_id":	"1",
+					"icon":	"blocks/Wither_Skeleton_Skull.png",
 					"type":	"stat",
 					"root_name":	"stat.pickup.minecraft.skull",
 					"target":	3
 				}, {
 					"stage_id":	"2",
+					"icon":	"monsters/wither.png",
 					"type":	"advancement",
 					"root_name":	"minecraft:nether/summon_wither",
 					"target":	1
 				}, {
 					"stage_id":	"3",
+					"icon":	"items/nether_star_1.0.png",
 					"type":	"stat",
 					"root_name":	"stat.pickup.minecraft.nether_star",
 					"target":	1
 				}, {
 					"stage_id":	"4",
+					"icon":	"blocks/Beacon_JE6_BE2.png",
 					"type":	"stat",
 					"root_name":	"stat.craftItem.minecraft.beacon",
 					"target":	1
 				}, {
 					"stage_id":	"5",
+					"icon":	"blocks/Beacon_JE6_BE2.png",
 					"type":	"stat",
 					"root_name":	"stat.useItem.minecraft.beacon",
 					"target":	1
 				}, {
 					"stage_id":	"6",
+					"icon":	"blocks/Beacon_JE6_BE2.png",
 					"type":	"advancement",
 					"root_name":	"minecraft:nether/create_full_beacon",
 					"target":	1
 				}, {
 					"stage_id":	"final",
+					"icon":	"blocks/Beacon_JE6_BE2.png",
 					"type":	"final",
 					"root_name":	""
 				}]

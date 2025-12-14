@@ -1320,6 +1320,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 icon_path = goal->icon_path;
                                 strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
                                 name_buf[sizeof(name_buf) - 1] = '\0';
+
                                 if (goal->current_stage < goal->stage_count) {
                                     SubGoal *active_stage = goal->stages[goal->current_stage];
                                     if (active_stage->type == SUBGOAL_STAT && active_stage->required_progress > 0) {
@@ -1387,7 +1388,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         run_was_complete_last_frame = is_run_complete;
     }
 
-    // --- ROW 3: Stats & Goals (excluding forced items with "in_2nd_row" flag) ---
+    // --- ROW 3: Stats & Goals ---
+    // (excluding forced items with "in_2nd_row" flag)
     {
         const float ROW3_Y_POS = 260.0f; // Configure height of row, more pushes down
         const float ITEM_WIDTH = 96.0f; // Minimum width based on icon bg
@@ -1501,6 +1503,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 }
                 case OverlayDisplayItem::MULTISTAGE: {
                     auto *goal = static_cast<MultiStageGoal *>(display_item.item_ptr);
+
                     strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
                     name_buf[sizeof(name_buf) - 1] = '\0';
                     TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
@@ -1699,7 +1702,16 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 static_bg = o->adv_bg_half_done;
                                 anim_bg = o->adv_bg_half_done_anim;
                             }
-                            icon_path = goal->icon_path;
+
+                            // Icons per stage logic
+                            if (goal->use_stage_icons && goal->stage_count > 0) {
+                                int idx = goal->current_stage;
+                                if (idx >= goal->stage_count) idx = goal->stage_count - 1;
+                                icon_path = goal->stages[idx]->icon_path;
+                            } else {
+                                icon_path = goal->icon_path;
+                            }
+
                             strncpy(name_buf, goal->display_name, sizeof(name_buf) - 1);
                             name_buf[sizeof(name_buf) - 1] = '\0';
                             if (goal->current_stage < goal->stage_count) {

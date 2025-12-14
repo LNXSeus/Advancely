@@ -119,6 +119,7 @@ struct EditorSubGoal {
     char parent_advancement[192];
     char root_name[192];
     int required_progress;
+    char icon_path[256]; // Icon path for each stage
 };
 
 struct EditorMultiStageGoal {
@@ -127,6 +128,7 @@ struct EditorMultiStageGoal {
     char icon_path[256];
     bool is_hidden;
     bool in_2nd_row;
+    bool use_stage_icons;
     std::vector<EditorSubGoal> stages;
 };
 
@@ -175,7 +177,8 @@ static bool are_editor_sub_goals_different(const EditorSubGoal &a, const EditorS
            a.type != b.type ||
            strcmp(a.parent_advancement, b.parent_advancement) != 0 ||
            strcmp(a.root_name, b.root_name) != 0 ||
-           a.required_progress != b.required_progress;
+           a.required_progress != b.required_progress ||
+           strcmp(a.icon_path, b.icon_path) != 0;
 }
 
 static bool are_editor_multi_stage_goals_different(const EditorMultiStageGoal &a, const EditorMultiStageGoal &b) {
@@ -184,6 +187,7 @@ static bool are_editor_multi_stage_goals_different(const EditorMultiStageGoal &a
         strcmp(a.icon_path, b.icon_path) != 0 ||
         a.is_hidden != b.is_hidden ||
         a.in_2nd_row != b.in_2nd_row ||
+        a.use_stage_icons != b.use_stage_icons ||
         a.stages.size() != b.stages.size()) {
         return true;
     }
@@ -374,6 +378,24 @@ static bool validate_ms_goal_icon_paths(const std::vector<EditorMultiStageGoal> 
             snprintf(error_message_buffer, 256, "Error: Icon file not found for goal '%s': '%s'", goal.root_name,
                      goal.icon_path);
             return false;
+        }
+
+        // Validate Stage Icons if enabled
+        if (goal.use_stage_icons) {
+            for (const auto& stage : goal.stages) {
+                if (stage.icon_path[0] == '\0') {
+                    snprintf(error_message_buffer, 256, "Error: Stage '%s' in goal '%s' is missing an icon path.",
+                             stage.stage_id, goal.root_name);
+                    return false;
+                }
+
+                snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_resources_path(), stage.icon_path);
+                if (!path_exists(full_path)) {
+                    snprintf(error_message_buffer, 256, "Error: Icon file not found for stage '%s': '%s'",
+                             stage.stage_id, stage.icon_path);
+                    return false;
+                }
+            }
         }
     }
     return true;
@@ -680,6 +702,7 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
         cJSON *icon = cJSON_GetObjectItem(goal_json, "icon");
         cJSON *hidden = cJSON_GetObjectItem(goal_json, "hidden");
         cJSON *in_2nd_row = cJSON_GetObjectItem(goal_json, "in_2nd_row");
+        cJSON *use_stage_icons = cJSON_GetObjectItem(goal_json, "use_stage_icons");
 
         if (cJSON_IsString(root_name)) {
             strncpy(new_goal.root_name, root_name->valuestring, sizeof(new_goal.root_name) - 1);
@@ -691,6 +714,7 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
         }
         if (cJSON_IsBool(hidden)) new_goal.is_hidden = cJSON_IsTrue(hidden);
         if (cJSON_IsBool(in_2nd_row)) new_goal.in_2nd_row = cJSON_IsTrue(in_2nd_row);
+        if (cJSON_IsBool(use_stage_icons)) new_goal.use_stage_icons = cJSON_IsTrue(use_stage_icons);
 
         // Language file
         char goal_lang_key[256];
@@ -730,6 +754,13 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
                     new_stage.root_name[sizeof(new_stage.root_name) - 1] = '\0';
                 }
                 if (cJSON_IsNumber(target)) new_stage.required_progress = target->valueint;
+
+                // Per-stage icon file if used
+                cJSON *stage_icon = cJSON_GetObjectItem(stage_json, "icon");
+                if (cJSON_IsString(stage_icon)) {
+                    strncpy(new_stage.icon_path, stage_icon->valuestring, sizeof(new_stage.icon_path) - 1);
+                    new_stage.icon_path[sizeof(new_stage.icon_path) - 1] = '\0';
+                }
 
                 // Language file
                 char stage_lang_key[512];
@@ -920,11 +951,20 @@ static void serialize_editor_multi_stage_goals(cJSON *parent, const std::vector<
         if (goal.in_2nd_row) {
             cJSON_AddBoolToObject(goal_json, "in_2nd_row", true);
         }
+        // Use icons per-stage
+        if (goal.use_stage_icons) {
+            cJSON_AddBoolToObject(goal_json, "use_stage_icons", true);
+        }
 
         cJSON *stages_array = cJSON_CreateArray();
         for (const auto &stage: goal.stages) {
             cJSON *stage_json = cJSON_CreateObject();
             cJSON_AddStringToObject(stage_json, "stage_id", stage.stage_id);
+
+            // Write Stage Icon if enabled and present
+            if (goal.use_stage_icons && stage.icon_path[0] != '\0') {
+                cJSON_AddStringToObject(stage_json, "icon", stage.icon_path);
+            }
 
             const char *type_str = "manual";
             switch (stage.type) {
@@ -5520,11 +5560,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             char target_val_str[32];
                             snprintf(target_val_str, sizeof(target_val_str), "%d", stage.required_progress);
 
-                            if (str_contains_insensitive(stage.display_text, tc_search_buffer) ||
-                                str_contains_insensitive(stage.stage_id, tc_search_buffer) ||
-                                str_contains_insensitive(stage.root_name, tc_search_buffer) ||
-                                str_contains_insensitive(stage.parent_advancement, tc_search_buffer) ||
-                                strstr(target_val_str, tc_search_buffer) != nullptr) {
+                            // Check standard fields
+                            bool standard_match = str_contains_insensitive(stage.display_text, tc_search_buffer) ||
+                                                  str_contains_insensitive(stage.stage_id, tc_search_buffer) ||
+                                                  str_contains_insensitive(stage.root_name, tc_search_buffer) ||
+                                                  str_contains_insensitive(stage.parent_advancement, tc_search_buffer) ||
+                                                  strstr(target_val_str, tc_search_buffer) != nullptr;
+
+                            // Check stage icon path IF enabled, so it works with search
+                            bool icon_match = false;
+                            if (goal.use_stage_icons) {
+                                icon_match = str_contains_insensitive(stage.icon_path, tc_search_buffer);
+                            }
+
+                            if (standard_match || icon_match) {
                                 stage_match = true;
                                 break;
                             }
@@ -5826,8 +5875,35 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
-                    ImGui::Separator();
+                    ImGui::SameLine();
+                    if (ImGui::Checkbox("Per-Stage Icons", &goal.use_stage_icons)) {
+                        ms_goal_data_changed = true;
+                        save_message_type = MSG_NONE;
 
+                        // Pre-fill stage icons with main goal icon to avoid errors
+                        if (goal.use_stage_icons) {
+                            for (auto &stage : goal.stages) {
+                                // Only pre-fill if currently empty to preserve previous edits if toggled off/on
+                                if (stage.icon_path[0] == '\0') {
+                                    if (goal.icon_path[0] != '\0') {
+                                        strncpy(stage.icon_path, goal.icon_path, sizeof(stage.icon_path) - 1);
+                                    } else {
+                                        // Fallback just in case main icon is also empty
+                                        strncpy(stage.icon_path, "blocks/placeholder.png", sizeof(stage.icon_path) - 1);
+                                    }
+                                    stage.icon_path[sizeof(stage.icon_path) - 1] = '\0';
+                                }
+                            }
+                        }
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip[256];
+                        snprintf(tooltip, sizeof(tooltip), "Enable unique icons for every stage.\n"
+                                 "If unchecked, the main goal icon is used for all stages.");
+                        ImGui::SetTooltip("%s", tooltip);
+                    }
+
+                    ImGui::Separator();
                     ImGui::Text("Stages");
 
                     // --- Counter for the stages list ---
@@ -5981,11 +6057,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (is_details_search_active) {
                             char target_val_str[32];
                             snprintf(target_val_str, sizeof(target_val_str), "%d", stage.required_progress);
-                            if (!str_contains_insensitive(stage.display_text, tc_search_buffer) &&
-                                !str_contains_insensitive(stage.stage_id, tc_search_buffer) &&
-                                !str_contains_insensitive(stage.root_name, tc_search_buffer) &&
-                                !str_contains_insensitive(stage.parent_advancement, tc_search_buffer) &&
-                                (stage.required_progress == 0 || strstr(target_val_str, tc_search_buffer) == nullptr)) {
+
+                            // Check standard fields
+                            bool standard_match = str_contains_insensitive(stage.display_text, tc_search_buffer) ||
+                                                  str_contains_insensitive(stage.stage_id, tc_search_buffer) ||
+                                                  str_contains_insensitive(stage.root_name, tc_search_buffer) ||
+                                                  str_contains_insensitive(stage.parent_advancement, tc_search_buffer) ||
+                                                  (stage.required_progress != 0 && strstr(target_val_str, tc_search_buffer) != nullptr);
+
+                            // Check stage icon path IF enabled
+                            bool icon_match = false;
+                            if (goal.use_stage_icons) {
+                                icon_match = str_contains_insensitive(stage.icon_path, tc_search_buffer);
+                            }
+
+                            // If neither matches, skip this stage
+                            if (!standard_match && !icon_match) {
                                 continue;
                             }
                         }
@@ -6029,6 +6116,36 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "The text that appears on the tracker/overlay for this stage.\n"
                                      "For the 'Final' stage, put something like 'Stages Done!'.");
                             ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        // Conditional Icon Input per stage if enabled
+                        if (goal.use_stage_icons) {
+                            if (ImGui::InputText("Stage Icon", stage.icon_path, sizeof(stage.icon_path))) {
+                                ms_goal_data_changed = true;
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char icon_path_tooltip_buffer[256];
+                                snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                         "Path to the icon file for this specific stage,\n"
+                                         "relative to the 'resources/icons' directory.");
+                                ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Button("Browse##StageIcon")) {
+                                char new_path[MAX_PATH_LENGTH];
+                                if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                    strncpy(stage.icon_path, new_path, sizeof(stage.icon_path) - 1);
+                                    stage.icon_path[sizeof(stage.icon_path) - 1] = '\0';
+                                    ms_goal_data_changed = true;
+                                    save_message_type = MSG_NONE;
+                                }
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char icon_path_tooltip_buffer[128];
+                                snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                         "The icon must be inside the 'resources/icons' folder!");
+                                ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
+                            }
                         }
                         // --- Version-Aware Type Dropdown ---
                         const char *current_type_name = "Unknown";
@@ -6450,6 +6567,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_stage.stage_id[sizeof(new_stage.stage_id) - 1] = '\0';
                         strncpy(new_stage.display_text, source_stage.display_text, sizeof(new_stage.display_text));
                         new_stage.display_text[sizeof(new_stage.display_text) - 1] = '\0';
+                        strncpy(new_stage.icon_path, source_stage.icon_path, sizeof(new_stage.icon_path));
+                        new_stage.icon_path[sizeof(new_stage.icon_path) - 1] = '\0';
                         strncpy(new_stage.parent_advancement, source_stage.parent_advancement,
                                 sizeof(new_stage.parent_advancement));
                         new_stage.parent_advancement[sizeof(new_stage.parent_advancement) - 1] = '\0';

@@ -16,7 +16,7 @@
 			}
 		},
 		"minecraft:feats/ender_dragon":	{
-			"icon":	"blocks/Dragon_Head_(S)_JE1.png",
+			"icon":	"blocks/Dragon_Head.png",
 			"criteria":	{
 			}
 		}
@@ -30,7 +30,7 @@
 	"custom":	[],
 	"multi_stage_goals":	[{
 			"root_name":	"any%",
-			"icon":	"blocks/Dragon_Head_(S)_JE1.png",
+			"icon":	"blocks/Dragon_Head.png",
 			"stages":	[{
 					"stage_id":	"1",
 					"type":	"advancement",
