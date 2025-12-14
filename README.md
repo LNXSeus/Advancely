@@ -134,7 +134,8 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
           supported. Hotkeys only work when the tracker window is in focus.
     * **Multi-Stage Goals**: Create long-term objectives that combine several smaller steps. A single goal can require
       you to first complete a stat, then an unlock, then a specific **advancement criterion** (e.g., visiting a specific
-      biome), and finally an entire advancement in sequence.
+      biome), and finally an entire advancement in sequence. You can assign **unique icons to each stage** to visualize
+      progression.
 * **Section Completion Counters**: Each section header displays dynamic counters showing completed items versus the
   total visible items for that section, respecting both the current Goal Visibility setting and any active search
   filter.
@@ -483,8 +484,10 @@ Nearly every aspect of the overlay can be tailored to your liking from the setti
 * **Animation**: Set the `Overlay FPS Limit` and toggle the `Speed Up Animation` option. You can also temporarily speed
   up the animation by holding `SPACE` while the overlay window is focused.
 * **Stat Cycling**: For multi-stat goals, you can set the `Sub-Stat Cycle Interval` to control how frequently the
-  overlay cycles through displaying each sub-stat. **Note:** Sub-stats marked as "Hidden" in the template will be skipped during this cycle.
-* **Visibility**: Choose whether to hide completed goals from Row 3 (items in Row 1 & 2 always hide), and toggle the visibility of each section of the
+  overlay cycles through displaying each sub-stat. **Note:** Sub-stats marked as "Hidden" in the template will be
+  skipped during this cycle.
+* **Visibility**: Choose whether to hide completed goals from Row 3 (items in Row 1 & 2 always hide), and toggle the
+  visibility of each section of the
   top info bar (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`).
 * **Alignment**: The main progress text at the top of the overlay can be aligned to the `Left`, `Center`, or `Right`.
 * **Spacing**: You can fully adjust the `spacing` between each row to either be dynamic based on the longest text width
@@ -563,7 +566,8 @@ Opening a template reveals a tabbed interface where you can define every goal.
     * `-1`: An infinite counter with no completion state.
     * **Row 2 Toggle**: You can check the "Row 2" box to force a custom goal to appear in the middle row of the overlay.
 * **Multi-Stage Goals**: Design complex, sequential objectives. Each goal has a parent name and icon, and a list of
-  `Stages`. Each stage is a smaller goal that must be completed in order. A stage's `Type` determines its trigger:
+  `Stages`. You can toggle **Per-Stage Icons** to assign a specific image to every individual step. Each stage is a
+  smaller goal that must be completed in order. A stage's `Type` determines its trigger:
     * **Stat/Achievement**: Triggers when a specific stat reaches its target or an achievement is earned (read from the
       `stats` folder).
     * **Advancement**: Triggers when a specific advancement or recipe is earned (read from the `advancements` folder).
