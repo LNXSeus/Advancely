@@ -1240,8 +1240,8 @@ void handle_export_language(const char *version, const char *category, const cha
 #ifdef _WIN32
     char command[MAX_PATH_LENGTH + 64];
     path_to_windows_native(lang_path);
-    snprintf(command, sizeof(command), "explorer /select,\"%s\"", lang_path);
-    system(command);
+    snprintf(command, sizeof(command), "/select,\"%s\"", lang_path);
+    ShellExecuteA(nullptr, "open", "explorer", command, nullptr, SW_SHOW);
 #else // macOS and Linux
     pid_t pid = fork();
     if (pid == 0) { // Child process
