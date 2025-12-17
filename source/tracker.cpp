@@ -2539,11 +2539,11 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     t->stats_path[0] = '\0';
     t->snapshot_path[0] = '\0';
 
-    // Initialize camera and zoom
-    t->camera_offset = ImVec2(0.0f, 0.0f);
-    t->zoom_level = 1.0f;
-    t->layout_locked = false;
-    t->locked_layout_width = 0.0f;
+    // Initialize camera and zoom from settings.json
+    t->camera_offset = ImVec2(settings->view_pan_x, settings->view_pan_y);
+    t->zoom_level = (settings->view_zoom > 0.1f) ? settings->view_zoom : 1.0f;
+    t->layout_locked = settings->view_locked;
+    t->locked_layout_width = (settings->view_locked_width > 0.0f) ? settings->view_locked_width : 0.0f;
 
     // Initialize time since last update
     t->time_since_last_update = 0.0f;
@@ -6397,11 +6397,22 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
 }
 
 
-void tracker_free(Tracker **tracker, const AppSettings *settings) {
-    (void) settings;
+void tracker_free(Tracker **tracker, AppSettings *settings) {
 
     if (tracker && *tracker) {
         Tracker *t = *tracker;
+
+        // Save view state to settings and write to disk before destroying data
+        if (settings) {
+            settings->view_pan_x = t->camera_offset.x;
+            settings->view_pan_y = t->camera_offset.y;
+            settings->view_zoom = t->zoom_level;
+            settings->view_locked = t->layout_locked;
+            settings->view_locked_width = t->locked_layout_width;
+
+            // Save settings immediately
+            settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
+        }
 
         // Free all textures in the cache
         if (t->texture_cache) {

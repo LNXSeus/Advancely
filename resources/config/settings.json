@@ -181,5 +181,12 @@
 	"category_display_name": "All Advancements",
 	"lock_category_display_name": false,
 	"lang_flag":	"",
-	"hotkeys":	[]
+	"hotkeys":	[],
+	"view_state":	{
+		"pan_x":	0,
+		"pan_y":	0,
+		"zoom":	1,
+		"locked":	false,
+		"locked_width":	0
+	}
 }

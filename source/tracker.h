@@ -292,11 +292,12 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings);
  * and window, and deallocating all dynamically
  * allocated memory for template data, including advancements, stats, unlocks,
  * (NOT custom, as that is saved in settings.json), multi-stage goals and their sub-items.
+ * Also saves the state of the tracker map and lock state before freeing the tracker.
  *
  * @param tracker A pointer to the Tracker struct pointer to be freed.
- * @param settings A pointer to the application settings.
+ * @param settings A pointer to the application settings (modified to save view state of TrackerMap).
  */
-void tracker_free(Tracker **tracker, const AppSettings *settings);
+void tracker_free(Tracker **tracker, AppSettings *settings);
 
 /**
  * @brief Updates the tracker window's title with dynamic information.

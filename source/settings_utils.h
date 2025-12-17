@@ -111,6 +111,13 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_LOD_TEXT_MAIN_THRESHOLD 0.40f
 #define DEFAULT_LOD_ICON_DETAIL_THRESHOLD 0.25f
 
+// TrackerMap Defaults
+#define DEFAULT_TRACKER_VIEW_PAN_X 0.0f
+#define DEFAULT_TRACKER_VIEW_PAN_Y 0.0f
+#define DEFAULT_TRACKER_VIEW_ZOOM 1.0f
+#define DEFAULT_TRACKER_VIEW_LOCKED false
+#define DEFAULT_TRACKER_VIEW_LOCKED_WIDTH 0.0f
+
 // Default window positions/sizes. -1 means centered or default size.
 #define DEFAULT_WINDOW_POS (-1)
 #define DEFAULT_WINDOW_SIZE (-1)
@@ -265,6 +272,13 @@ struct AppSettings {
     ColorRGBA ui_header_hovered_color; // Background color of headers when hovered
     ColorRGBA ui_header_active_color; // background color of headers when active/open
     ColorRGBA ui_check_mark_color; // Color of the checkmark inside checkboxes
+
+    // --- View State (Pan, Zoom, Layout) ---
+    float view_pan_x;
+    float view_pan_y;
+    float view_zoom;
+    bool view_locked;
+    float view_locked_width;
 
     // --- Overlay Text Sections ---
     bool overlay_show_world; // If true, the world name is shown in the overlay.

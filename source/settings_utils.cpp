@@ -385,6 +385,13 @@ void settings_set_defaults(AppSettings *settings) {
     settings->scrollable_list_threshold = DEFAULT_SCROLLABLE_LIST_THRESHOLD;
     settings->tracker_list_scroll_speed = DEFAULT_TRACKER_LIST_SCROLL_SPEED;
 
+    // View State Defaults
+    settings->view_pan_x = DEFAULT_TRACKER_VIEW_PAN_X;
+    settings->view_pan_y = DEFAULT_TRACKER_VIEW_PAN_Y;
+    settings->view_zoom = DEFAULT_TRACKER_VIEW_ZOOM;
+    settings->view_locked = DEFAULT_TRACKER_VIEW_LOCKED;
+    settings->view_locked_width = DEFAULT_TRACKER_VIEW_LOCKED_WIDTH;
+
     // Default Overlay Text Toggles
     settings->overlay_show_world = true;
     settings->overlay_show_run_details = true;
@@ -1037,6 +1044,25 @@ bool settings_load(AppSettings *settings) {
         }
     }
 
+    // Load View State
+    const cJSON *view_state_json = cJSON_GetObjectItem(json, "view_state");
+    if (view_state_json) {
+        cJSON *pan_x = cJSON_GetObjectItem(view_state_json, "pan_x");
+        if (cJSON_IsNumber(pan_x)) settings->view_pan_x = (float)pan_x->valuedouble;
+
+        cJSON *pan_y = cJSON_GetObjectItem(view_state_json, "pan_y");
+        if (cJSON_IsNumber(pan_y)) settings->view_pan_y = (float)pan_y->valuedouble;
+
+        cJSON *zoom = cJSON_GetObjectItem(view_state_json, "zoom");
+        if (cJSON_IsNumber(zoom)) settings->view_zoom = (float)zoom->valuedouble;
+
+        cJSON *locked = cJSON_GetObjectItem(view_state_json, "locked");
+        if (cJSON_IsBool(locked)) settings->view_locked = cJSON_IsTrue(locked);
+
+        cJSON *locked_width = cJSON_GetObjectItem(view_state_json, "locked_width");
+        if (cJSON_IsNumber(locked_width)) settings->view_locked_width = (float)locked_width->valuedouble;
+    }
+
     cJSON_Delete(json);
     construct_template_paths(settings);
     log_message(LOG_INFO, "[SETTINGS UTILS] Settings loaded successfully!\n");
@@ -1340,6 +1366,18 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         }
     }
     cJSON_AddItemToObject(root, "hotkeys", hotkeys_array);
+
+    // Save View State
+    cJSON *view_state_obj = cJSON_CreateObject();
+    cJSON_AddNumberToObject(view_state_obj, "pan_x", settings->view_pan_x);
+    cJSON_AddNumberToObject(view_state_obj, "pan_y", settings->view_pan_y);
+    cJSON_AddNumberToObject(view_state_obj, "zoom", settings->view_zoom);
+    cJSON_AddBoolToObject(view_state_obj, "locked", settings->view_locked);
+    cJSON_AddNumberToObject(view_state_obj, "locked_width", settings->view_locked_width);
+
+    // Safely replace or add view_state
+    cJSON_DeleteItemFromObject(root, "view_state");
+    cJSON_AddItemToObject(root, "view_state", view_state_obj);
 
     // Write the modified JSON object to the file
     FILE *file = fopen(get_settings_file_path(), "w");
