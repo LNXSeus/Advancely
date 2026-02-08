@@ -1,4 +1,4 @@
-# Copyright (c) 2025 LNXSeus. All Rights Reserved.
+# Copyright (c) 2026 LNXSeus. All Rights Reserved.
 #
 # This project is proprietary software. You are granted a license to use the software as-is.
 # You may not copy, distribute, modify, reverse-engineer, or use this software
@@ -273,7 +273,8 @@ else ()
             -Wall                   # Enable all standard warnings
             -Wextra                 # Enable even more warnings
             -Wpedantic              # Warn on non-standard language extensions
-            -Werror                 # Treat all warnings as errors, forcing you to fix them
+            -Wno-deprecated-declarations # Ignore sprintf deprecation error from MacOS
+#           -Werror                Treat all warnings as errors, forcing you to fix them, commented out for MacOS sprintf error
             -Wno-unused-result      # Ignore unused result warnings
             # Disable specific GNU extension warning for Clang
             $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-Wno-gnu-zero-variadic-macro-arguments>

@@ -2208,12 +2208,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     if (ImGui::Button("Import Template")) {
         auto import_action = [&]() {
 #ifdef __APPLE__
-            const char *filter_patterns[1] = {"zip"};
+    const char *filter_patterns[2] = {"*.zip", "public.zip-archive"};
+    const char *open_path = tinyfd_openFileDialog("Import Template From Zip", "", 2, filter_patterns, "Template ZIP Archive", 0);
 #else
-            const char *filter_patterns[1] = {"*.zip"};
+    const char *filter_patterns[1] = {"*.zip"};
+    const char *open_path = tinyfd_openFileDialog("Import Template From Zip", "", 1, filter_patterns, "Template ZIP Archive", 0);
 #endif
-            const char *open_path = tinyfd_openFileDialog("Import Template From Zip", "", 1, filter_patterns,
-                                                          "Template ZIP Archive", 0);
             if (open_path) {
                 char version[64], category[MAX_PATH_LENGTH], flag[MAX_PATH_LENGTH];
                 if (get_info_from_zip(open_path, version, category, flag, status_message, sizeof(status_message))) {
@@ -2695,12 +2695,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::BeginDisabled(has_unsaved_changes_in_editor);
         if (ImGui::Button("Import Language")) {
 #ifdef __APPLE__
-            const char *filter_patterns[1] = {"json"};
+    const char *filter_patterns[2] = {"*.json", "public.json"};
+    const char *open_path = tinyfd_openFileDialog("Import Language File", "", 2, filter_patterns, "JSON files", 0);
 #else
-            const char *filter_patterns[1] = {"*.json"};
+    const char *filter_patterns[1] = {"*.json"};
+    const char *open_path = tinyfd_openFileDialog("Import Language File", "", 1, filter_patterns, "JSON files", 0);
 #endif
-            const char *open_path = tinyfd_openFileDialog("Import Language File", "",
-                                                          1, filter_patterns, "JSON files", 0);
             if (open_path) {
                 strncpy(import_lang_source_path, open_path, sizeof(import_lang_source_path) - 1);
                 import_lang_source_path[sizeof(import_lang_source_path) - 1] = '\0';
@@ -2967,11 +2967,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // --- Version-aware file filters ---
 #ifdef __APPLE__
-                    const char *json_filter[1] = {"json"};
-                    const char *dat_filter[1] = {"dat"};
+                    const char *json_filter[2] = {"*.json", "public.json"};
+                    const char *dat_filter[2] = {"*.dat", "public.data"};
+                    int filter_count = 2;
 #else
                     const char *json_filter[1] = {"*.json"};
                     const char *dat_filter[1] = {"*.dat"};
+                    int filter_count = 1;
 #endif
                     const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
                                                        ? dat_filter
@@ -2982,7 +2984,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     const char *dialog_title = (creator_selected_version < MC_VERSION_1_12)
                                                    ? "Select Player Stats File"
                                                    : "Select Player Advancements File";
-                    const char *selection = tinyfd_openFileDialog(dialog_title, start_path, 1,
+                    const char *selection = tinyfd_openFileDialog(dialog_title, start_path, filter_count,
                                                                   selected_filter, filter_desc, 0);
 
                     if (selection) {
@@ -3528,16 +3530,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          t->world_name);
                             }
 #ifdef __APPLE__
-                            const char *json_filter[1] = {"json"};
+                            const char *json_filter[2] = {"*.json", "public.json"};
+                            int filter_count = 2;
 #else
                             const char *json_filter[1] = {"*.json"};
+                            int filter_count = 1;
 #endif
                             const char *dialog_title = (creator_selected_version < MC_VERSION_1_12)
                                                            ? "Select Player Stats File"
                                                            : "Select Player Advancements File";
-
                             const char *selection = tinyfd_openFileDialog(
-                                dialog_title, start_path, 1, json_filter, "JSON files", 0);
+                                dialog_title, start_path, filter_count, json_filter, "JSON files", 0);
 
                             if (selection) {
                                 import_error_message[0] = '\0';
@@ -3881,20 +3884,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // --- Version-aware file filters ---
 #ifdef __APPLE__
-                    const char *json_filter[1] = {"json"};
-                    const char *dat_filter[1] = {"dat"};
+                    const char *json_filter[2] = {"*.json", "public.json"};
+                    const char *dat_filter[2] = {"*.dat", "public.data"};
+                    int filter_count = 2;
 #else
                     const char *json_filter[1] = {"*.json"};
                     const char *dat_filter[1] = {"*.dat"};
+                    int filter_count = 1;
 #endif
+
                     const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
                                                        ? dat_filter
                                                        : json_filter;
                     const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
                                                   ? "DAT files"
                                                   : "JSON files";
-
-                    const char *selection = tinyfd_openFileDialog("Select Player Stats File", start_path, 1,
+                    const char *selection = tinyfd_openFileDialog("Select Player Stats File", start_path, filter_count,
                                                                   selected_filter, filter_desc, 0);
 
                     if (selection) {
@@ -4509,20 +4514,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
                             }
 #ifdef __APPLE__
-                            const char *json_filter[1] = {"json"};
-                            const char *dat_filter[1] = {"dat"};
+                    const char *json_filter[2] = {"*.json", "public.json"};
+                    const char *dat_filter[2] = {"*.dat", "public.data"};
+                    int filter_count = 2;
 #else
-                            const char *json_filter[1] = {"*.json"};
-                            const char *dat_filter[1] = {"*.dat"};
+                    const char *json_filter[1] = {"*.json"};
+                    const char *dat_filter[1] = {"*.dat"};
+                    int filter_count = 1;
 #endif
-                            const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
-                                                               ? dat_filter
-                                                               : json_filter;
-                            const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
-                                                          ? "DAT files"
-                                                          : "JSON files";
-                            const char *selection = tinyfd_openFileDialog(
-                                "Select Player Stats File", start_path, 1, selected_filter, filter_desc, 0);
+                    const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
+                                                       ? dat_filter
+                                                       : json_filter;
+                    const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
+                                                  ? "DAT files"
+                                                  : "JSON files";
+                    const char *selection = tinyfd_openFileDialog(
+                        "Select Player Stats File", start_path, filter_count, selected_filter, filter_desc, 0);
                             if (selection) {
                                 import_error_message[0] = '\0';
                                 if (parse_player_stats_for_import(selection, creator_selected_version, importable_stats,
@@ -4839,12 +4846,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         snprintf(start_path, sizeof(start_path), "%s/%s/unlocks/", t->saves_path, t->world_name);
 
 #ifdef __APPLE__
-                        const char *filter_patterns[1] = {"json"};
+    const char *filter_patterns[2] = {"*.json", "public.json"};
+    const char *selection = tinyfd_openFileDialog("Select Player Unlocks File", start_path, 2, filter_patterns, "JSON files", 0);
 #else
-                        const char *filter_patterns[1] = {"*.json"};
+    const char *filter_patterns[1] = {"*.json"};
+    const char *selection = tinyfd_openFileDialog("Select Player Unlocks File", start_path, 1, filter_patterns, "JSON files", 0);
 #endif
-                        const char *selection = tinyfd_openFileDialog("Select Player Unlocks File", start_path, 1,
-                                                                      filter_patterns, "JSON files", 0);
 
                         if (selection) {
                             import_error_message[0] = '\0';
@@ -6379,17 +6386,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                      t->world_name);
                                         }
 #ifdef __APPLE__
-                                        const char *json_filter[] = {"json"};
-                                        const char *dat_filter[] = {"dat"};
+    const char *json_filter[2] = {"*.json", "public.json"};
+    const char *dat_filter[2] = {"*.dat", "public.data"};
+    int filter_count = 2;
 #else
-                                        const char *json_filter[] = {"*.json"};
-                                        const char *dat_filter[] = {"*.dat"};
+    const char *json_filter[1] = {"*.json"};
+    const char *dat_filter[1] = {"*.dat"};
+    int filter_count = 1;
 #endif
-                                        selection = tinyfd_openFileDialog(
-                                            "Select Player Stats File", start_path, 1,
-                                            (creator_selected_version <= MC_VERSION_1_6_4) ? dat_filter : json_filter,
-                                            (creator_selected_version <= MC_VERSION_1_6_4) ? "DAT files" : "JSON files",
-                                            0);
+
+    selection = tinyfd_openFileDialog(
+        "Select Player Stats File", 
+        start_path, 
+        filter_count,
+        (creator_selected_version <= MC_VERSION_1_6_4) ? dat_filter : json_filter,
+        (creator_selected_version <= MC_VERSION_1_6_4) ? "DAT files" : "JSON files",
+        0);
                                         if (selection && parse_player_stats_for_import(
                                                 selection, creator_selected_version, importable_stats,
                                                 import_error_message, sizeof(import_error_message))) {
@@ -6421,17 +6433,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                      t->saves_path, t->world_name);
                                         }
 #ifdef __APPLE__
-                                        const char *json_filter[] = {"json"};
-                                        const char *dat_filter[] = {"dat"};
+    const char *json_filter[2] = {"*.json", "public.json"};
+    const char *dat_filter[2] = {"*.dat", "public.data"};
+    int filter_count = 2;
 #else
-                                        const char *json_filter[] = {"*.json"};
-                                        const char *dat_filter[] = {"*.dat"};
+    const char *json_filter[1] = {"*.json"};
+    const char *dat_filter[1] = {"*.dat"};
+    int filter_count = 1;
 #endif
-                                        selection = tinyfd_openFileDialog(
-                                            "Select Player File", start_path, 1,
-                                            (creator_selected_version <= MC_VERSION_1_6_4) ? dat_filter : json_filter,
-                                            (creator_selected_version <= MC_VERSION_1_6_4) ? "DAT files" : "JSON files",
-                                            0);
+    selection = tinyfd_openFileDialog(
+        "Select Player File",
+        start_path, 
+        filter_count,
+        (creator_selected_version <= MC_VERSION_1_6_4) ? dat_filter : json_filter,
+        (creator_selected_version <= MC_VERSION_1_6_4) ? "DAT files" : "JSON files",
+        0);
                                         if (selection && parse_player_advancements_for_import(
                                                 selection, creator_selected_version, importable_advancements,
                                                 import_error_message, sizeof(import_error_message))) {
@@ -6445,17 +6461,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         }
                                         break;
                                     }
-                                    case SUBGOAL_UNLOCK: {
+case SUBGOAL_UNLOCK: {
                                         snprintf(start_path, sizeof(start_path), "%s/%s/unlocks/", t->saves_path,
                                                  t->world_name);
 #ifdef __APPLE__
-                                        const char *filter_patterns[1] = {"json"};
+                                        const char *filter_patterns[2] = {"*.json", "public.json"};
+                                        const char *selection = tinyfd_openFileDialog("Select Player Unlocks File", start_path, 2, filter_patterns, "JSON files", 0);
 #else
                                         const char *filter_patterns[1] = {"*.json"};
+                                        const char *selection = tinyfd_openFileDialog("Select Player Unlocks File", start_path, 1, filter_patterns, "JSON files",0);
 #endif
-                                        selection = tinyfd_openFileDialog(
-                                            "Select Player Unlocks File", start_path, 1, filter_patterns, "JSON files",
-                                            0);
                                         if (selection && parse_player_unlocks_for_import(
                                                 selection, importable_unlocks, import_error_message,
                                                 sizeof(import_error_message))) {
