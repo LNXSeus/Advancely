@@ -93,6 +93,9 @@ SDL_AtomicInt g_templates_changed;
 // Change the global flag from a bool to our new enum.
 ForceOpenReason g_force_open_reason = FORCE_OPEN_NONE;
 
+// --- Command Line Globals for Linux packaging, --settings-file <path> and --disable-updater ---
+static char g_custom_settings_path[MAX_PATH_LENGTH] = "";
+static bool g_disable_updater = false;
 
 static bool g_show_release_notes_on_startup = false;
 // After auto-installing update it shows link to github release notes
@@ -534,6 +537,10 @@ const char *get_resources_path() {
 }
 
 const char *get_settings_file_path() {
+    // Check for custom path from CLI first
+    if (g_custom_settings_path[0] != '\0') {
+        return g_custom_settings_path;
+    }
     static char path[MAX_PATH_LENGTH] = "";
     if (path[0] == '\0') {
         // It calls the function above to get the base path and builds its own path.
@@ -615,17 +622,39 @@ int main(int argc, char *argv[]) {
     // Add a simple test/version flag that can run without a GUI
     // This communicates with the build.yml file, where the gtimeout or timeout are
     bool is_test_mode = false;
-    if (argc > 1) {
-        if (strcmp(argv[1], "--version") == 0) {
+    bool is_overlay_mode = false;
+
+    // MODIFIED: Robust Argument Parsing Loop
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--version") == 0) { // Prints version string
             printf("Advancely version: %s\n", ADVANCELY_VERSION);
-            return 0; // Exit immediately for --version
+            return 0; // Exit Advancely
         }
-        if (strcmp(argv[1], "--test-mode") == 0) {
+        else if (strcmp(argv[i], "--test-mode") == 0) {
             is_test_mode = true;
-            // We no longer exit here, allowing the app to launch
+        }
+        else if (strcmp(argv[i], "--updated") == 0) { // For updated popup
+            g_show_release_notes_on_startup = true;
+            log_message(LOG_INFO, "[DEBUG] --updated flag DETECTED.\n");
+        }
+        else if (strcmp(argv[i], "--overlay") == 0) { // Only running overlay
+            is_overlay_mode = true;
+        }
+        else if (strcmp(argv[i], "--disable-updater") == 0) { // Temporarily disables updater
+            g_disable_updater = true;
+            printf("[CLI] Auto-updater disabled via command line.\n");
+        }
+        else if (strcmp(argv[i], "--settings-file") == 0) { // custom settings file path
+            if (i + 1 < argc) {
+                strncpy(g_custom_settings_path, argv[i + 1], MAX_PATH_LENGTH - 1);
+                g_custom_settings_path[MAX_PATH_LENGTH - 1] = '\0';
+                i++; // Skip the next argument as we consumed it
+                printf("[CLI] Using custom settings file: %s\n", g_custom_settings_path);
+            } else {
+                fprintf(stderr, "[CLI] Error: --settings-file requires a path argument.\n");
+            }
         }
     }
-
 
     // TODO: DEBUG FOR AUTO-UPDATE TESTING -> SET FLAG AT THE TOP OF THE FILE
 #ifdef MANUAL_UPDATE_TEST
@@ -672,16 +701,6 @@ int main(int argc, char *argv[]) {
     }
 #endif
 
-
-    // Check for --updated flag on startup
-    if (argc > 1 && strcmp(argv[1], "--updated") == 0) {
-        // The --update flag gets passed from the apply_update() function
-        // through the update.bat script on restart
-        g_show_release_notes_on_startup = true;
-        // DEBUG PRINT 1: Confirm the flag was detected.
-        log_message(LOG_ERROR, "[DEBUG] --updated flag DETECTED. g_show_release_notes_on_startup is true.\n");
-    }
-
     bool should_exit_after_update_check = false; // To signal exit after updating
 
     // Post-update logic
@@ -719,12 +738,6 @@ int main(int argc, char *argv[]) {
         // Whether it succeeded or not, delete the flag file and unset the global flag
         remove("update_url.txt");
         g_show_release_notes_on_startup = false;
-    }
-
-    bool is_overlay_mode = false;
-    if (argc > 1 && strcmp(argv[1], "--overlay") == 0) {
-        // Additional command line "--overlay"
-        is_overlay_mode = true;
     }
 
     // If we are in overlay mode, run a separate, simplified main loop.
@@ -954,7 +967,7 @@ int main(int argc, char *argv[]) {
     bool dmon_initialized = false; // Make sure dmon is initialized
 
     // Load settings ONCE at the start and check if file was incomplete to use default values
-    // settings_load() returns true if the file was incomplete and used default values
+    // Note: This calls get_settings_file_path(), which now respects the CLI override.
     AppSettings app_settings;
 
     if (settings_load(&app_settings)) {
@@ -991,7 +1004,7 @@ int main(int argc, char *argv[]) {
 
     if (tracker_new(&tracker, &app_settings)) {
         // Check for updates on startup
-        if (app_settings.check_for_updates) {
+        if (app_settings.check_for_updates && !g_disable_updater) { // checking for command line argument --disable-updater
             bool was_always_on_top = app_settings.tracker_always_on_top;
             if (was_always_on_top) {
                 SDL_SetWindowAlwaysOnTop(tracker->window, false);
@@ -1410,12 +1423,35 @@ int main(int argc, char *argv[]) {
         SDL_SetAtomicInt(&g_apply_button_clicked, 0);
         SDL_SetAtomicInt(&g_templates_changed, 0);
 
-        // HARDCODED SETTINGS DIRECTORY
-        log_message(LOG_INFO, "[DMON - MAIN] Watching config directory: resources/config/\n");
-
+        // HARDCODED SETTINGS DIRECTORY WATCHER
+        // We only watch the default config directory if we are NOT using a custom file.
+        // If using a custom file, dmon might not be able to watch it if it's outside the project structure easily,
+        // or we need to derive the directory from the custom path.
         char dmon_config_path[MAX_PATH_LENGTH];
-        snprintf(dmon_config_path, sizeof(dmon_config_path), "%s%s", get_resources_path(), "/config/");
-        dmon_watch(dmon_config_path, settings_watch_callback, 0, nullptr);
+        if (g_custom_settings_path[0] == '\0') {
+            log_message(LOG_INFO, "[DMON - MAIN] Watching config directory: resources/config/\n");
+            snprintf(dmon_config_path, sizeof(dmon_config_path), "%s%s", get_resources_path(), "/config/");
+            dmon_watch(dmon_config_path, settings_watch_callback, 0, nullptr);
+        } else {
+            // Extract the directory from the custom settings path
+            char custom_dir[MAX_PATH_LENGTH];
+            strncpy(custom_dir, g_custom_settings_path, MAX_PATH_LENGTH - 1);
+            custom_dir[MAX_PATH_LENGTH - 1] = '\0';
+
+            // Find the last separator to isolate the directory
+            char *last_sep = strrchr(custom_dir, '/');
+            if (!last_sep) last_sep = strrchr(custom_dir, '\\');
+
+            if (last_sep) {
+                *last_sep = '\0'; // Null-terminate to get the directory path
+                log_message(LOG_INFO, "[DMON - MAIN] Watching custom config directory: %s\n", custom_dir);
+                dmon_watch(custom_dir, settings_watch_callback, 0, nullptr);
+            } else {
+                // If no separator, the file is in the current working directory
+                log_message(LOG_INFO, "[DMON - MAIN] Custom settings path has no directory separator. Watching current directory.\n");
+                dmon_watch(".", settings_watch_callback, 0, nullptr);
+            }
+        }
 
 
         // Watch saves directory and store the watcher ID, ONLY if the path is valid

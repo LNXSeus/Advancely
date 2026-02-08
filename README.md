@@ -818,6 +818,21 @@ the copyright holder.
 
 ***
 
+## Command Line Arguments
+
+Advancely supports several command-line arguments to customize its behavior. These are particularly useful for package maintainers or advanced users who want to override default behaviors.
+
+| Argument | Description |
+| :--- | :--- |
+| `--settings-file <path>` | Specifies a custom absolute or relative path for the `settings.json` configuration file. Useful for system-wide installations where config should reside in `~/.config/` or similar. |
+| `--disable-updater` | Disables the automatic update check on startup. **Recommended for package maintainers** (e.g., AUR, RPM, DEB) to prevent the app from modifying itself. |
+| `--version` | Prints the current version of Advancely to the console and exits. |
+| `--overlay` | Launches the application in "Overlay Mode". **Note:** This is primarily used internally by the main process to spawn the overlay window. |
+| `--test-mode` | Enables test mode for debugging and development purposes. |
+| `--updated` | **Internal Flag:** Signals to the application that it has just been updated, triggering the release notes popup. |
+
+***
+
 ## Credits
 
 <details>
