@@ -803,7 +803,7 @@ _DMON_PRIVATE void _dmon_watch_recursive(const char* dirname, int fd, uint32_t m
 {
     struct dirent* entry;
     DIR* dir = opendir(dirname);
-    DMON_ASSERT(dir);
+    if (!dir) return;
 
     char watchdir[DMON_MAX_PATH];
 
@@ -870,7 +870,7 @@ _DMON_PRIVATE void _dmon_gather_recursive(dmon__watch_state* watch, const char* 
 {
     struct dirent* entry;
     DIR* dir = opendir(dirname);
-    DMON_ASSERT(dir);
+    if (!dir) return;
 
     char newdir[DMON_MAX_PATH];
     while ((entry = readdir(dir)) != NULL) {
@@ -1024,7 +1024,9 @@ _DMON_PRIVATE void _dmon_inotify_process_events(void)
                     uint32_t mask = IN_MOVED_TO | IN_CREATE | IN_MOVED_FROM | IN_DELETE | IN_MODIFY;
                     int wd = inotify_add_watch(watch->fd, watchdir, mask);
                     _DMON_UNUSED(wd);
-                    DMON_ASSERT(wd != -1);
+                    if (wd < 0) {
+                      continue;
+                    }
 
                     dmon__watch_subdir subdir;
                     _dmon_strcpy(subdir.rootdir, sizeof(subdir.rootdir), watchdir);
