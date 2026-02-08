@@ -565,8 +565,12 @@ void find_player_data_files(
         WIN32_FIND_DATAA find_file_data;
         HANDLE h_find_file;
 
+        // Determine subdirectories based on version (26.1+ structure change)
+        const char *stats_subdir = (version >= MC_VERSION_26_1) ? "players/stats" : "stats";
+        const char *adv_subdir = (version >= MC_VERSION_26_1) ? "players/advancements" : "advancements";
+
         // Find stats file
-        snprintf(temp_path, max_len, "%s/%s/stats", saves_path, latest_world_name);
+        snprintf(temp_path, max_len, "%s/%s/%s", saves_path, latest_world_name, stats_subdir);
         snprintf(sub_search_path, sizeof(sub_search_path), "%s/*.json", temp_path);
         h_find_file = FindFirstFileA(sub_search_path, &find_file_data);
         if (h_find_file != INVALID_HANDLE_VALUE) {
@@ -579,7 +583,7 @@ void find_player_data_files(
 
         // Find advancements/unlocks for modern eras
         if (version >= MC_VERSION_1_12) {
-            snprintf(temp_path, max_len, "%s/%s/advancements", saves_path, latest_world_name);
+            snprintf(temp_path, max_len, "%s/%s/%s", saves_path, latest_world_name, adv_subdir);
             snprintf(sub_search_path, sizeof(sub_search_path), "%s/*.json", temp_path);
             h_find_file = FindFirstFileA(sub_search_path, &find_file_data);
             if (h_find_file != INVALID_HANDLE_VALUE) {
@@ -709,8 +713,12 @@ void find_player_data_files(
         char folder_path[MAX_PATH_LENGTH];
         DIR *dir;
 
+        // Determine subdirectories based on version (26.1+ structure change)
+        const char *stats_subdir = (version >= MC_VERSION_26_1) ? "players/stats" : "stats";
+        const char *adv_subdir = (version >= MC_VERSION_26_1) ? "players/advancements" : "advancements";
+
         // Find stats file
-        snprintf(folder_path, sizeof(folder_path), "%s/%s/stats", saves_path, latest_world_name);
+        snprintf(folder_path, sizeof(folder_path), "%s/%s/%s", saves_path, latest_world_name, stats_subdir);
         dir = opendir(folder_path);
         if (dir) {
             while ((entry = readdir(dir)) != nullptr) {
@@ -727,7 +735,7 @@ void find_player_data_files(
 
         // Find advancements/unlocks for modern era
         if (version >= MC_VERSION_1_12) {
-            snprintf(folder_path, sizeof(folder_path), "%s/%s/advancements", saves_path, latest_world_name);
+            snprintf(folder_path, sizeof(folder_path), "%s/%s/%s", saves_path, latest_world_name, adv_subdir);
             dir = opendir(folder_path);
             if (dir) {
                 while ((entry = readdir(dir)) != nullptr) {

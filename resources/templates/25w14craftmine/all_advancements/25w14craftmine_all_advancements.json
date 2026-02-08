@@ -1,0 +1,2596 @@
+{
+	"advancements":	{
+		"minecraft:story/root":	{
+			"icon":	"blocks/Grass_Block_JE7_BE6.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:story/mine_stone":	{
+			"icon":	"items/wooden_pickaxe_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:story/upgrade_tools":	{
+			"icon":	"items/stone_pickaxe_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:story/smelt_iron":	{
+			"icon":	"items/iron_ingot_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:story/obtain_armor":	{
+			"icon":	"items/iron_chestplate_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:story/deflect_arrow":	{
+			"icon":	"items/Shield_JE2_BE1.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:story/follow_exit_eye":	{
+			"icon":	"items/exit_eye_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:story/iron_tools":	{
+			"icon":	"items/iron_pickaxe_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:story/mine_diamond":	{
+			"icon":	"items/diamond_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:story/shiny_gear":	{
+			"icon":	"items/diamond_chestplate_1.20.2.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/enter_a_mine":	{
+			"icon":	"blocks/Mine_Crafter_unoptimized.gif",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/get_mine_ingredient":	{
+			"icon":	"items/mine_ingredient_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/cash_in_mine_ingredient":	{
+			"icon":	"items/gold_ingot_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/player_failed_level":	{
+			"icon":	"items/grave_advancement_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/level_completed":	{
+			"icon":	"items/mine_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/mine_crafter_upgraded":	{
+			"icon":	"items/experience_bottle_3d_shareware_v1.34.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/all_mine_ingredients":	{
+			"icon":	"items/netherite_pickaxe_1.20.2.png",
+			"criteria":	{
+				"minecraft:surface_world":	{
+					"icon":	"items/surface_world_25w14craftmine.png"
+				},
+				"minecraft:floating_islands_world":	{
+					"icon":	"items/floating_islands_world_25w14craftmine.png"
+				},
+				"minecraft:amplified":	{
+					"icon":	"items/amplified_25w14craftmine.png"
+				},
+				"minecraft:cave_world":	{
+					"icon":	"items/cave_world_25w14craftmine.png"
+				},
+				"minecraft:shattered_blocks_world":	{
+					"icon":	"items/shattered_blocks_25w14craftmine.png"
+				},
+				"minecraft:grid_world":	{
+					"icon":	"items/grid_world_25w14craftmine.png"
+				},
+				"minecraft:dark_cave_world":	{
+					"icon":	"items/dark_cave_world_25w14craftmine.png"
+				},
+				"minecraft:surface_exits":	{
+					"icon":	"items/surface_exits_25w14craftmine.png"
+				},
+				"minecraft:cave_exits":	{
+					"icon":	"items/cave_exits_25w14craftmine.png"
+				},
+				"minecraft:rare_surface_exits":	{
+					"icon":	"items/rare_surface_exits_25w14craftmine.png"
+				},
+				"minecraft:sheep":	{
+					"icon":	"items/sheep_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:cows":	{
+					"icon":	"items/cow_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:pigs":	{
+					"icon":	"items/pig_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:chickens":	{
+					"icon":	"items/chicken_spawn_egg_1.21.5.png"
+				},
+				"minecraft:frogs":	{
+					"icon":	"items/frog_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:foxes":	{
+					"icon":	"items/fox_spawn_egg_1.21.5.png"
+				},
+				"minecraft:goats":	{
+					"icon":	"items/goat_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:ocelots":	{
+					"icon":	"items/ocelot_spawn_egg_1.21.5.png"
+				},
+				"minecraft:axolotls":	{
+					"icon":	"items/axolotl_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:armadillos":	{
+					"icon":	"items/armadillo_spawn_egg_1.21.5.png"
+				},
+				"minecraft:mooshrooms":	{
+					"icon":	"items/mooshroom_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:pandas":	{
+					"icon":	"items/panda_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:parrots":	{
+					"icon":	"items/parrot_spawn_egg_1.21.5.png"
+				},
+				"minecraft:rabbits":	{
+					"icon":	"items/rabbit_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:sniffers":	{
+					"icon":	"items/sniffer_spawn_egg_1.21.5.png"
+				},
+				"minecraft:striders":	{
+					"icon":	"items/strider_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:zombies":	{
+					"icon":	"items/zombie_spawn_egg_1.21.5.png"
+				},
+				"minecraft:skeletons":	{
+					"icon":	"items/skeleton_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:spiders":	{
+					"icon":	"items/spider_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:cave_spiders":	{
+					"icon":	"items/cave_spider_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:creepers":	{
+					"icon":	"items/creeper_spawn_egg_1.21.5.png"
+				},
+				"minecraft:slimes":	{
+					"icon":	"items/slime_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:endermen":	{
+					"icon":	"items/enderman_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:witches":	{
+					"icon":	"items/witch_spawn_egg_1.21.5.png"
+				},
+				"minecraft:magma_cubes":	{
+					"icon":	"items/magma_cube_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:blazes":	{
+					"icon":	"items/blaze_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:breezes":	{
+					"icon":	"items/breeze_spawn_egg_1.21.5.png"
+				},
+				"minecraft:pillagers":	{
+					"icon":	"items/pillager_spawn_egg_1.21.5.png"
+				},
+				"minecraft:vindicators":	{
+					"icon":	"items/vindicator_spawn_egg_1.21.5.png"
+				},
+				"minecraft:evokers":	{
+					"icon":	"items/evoker_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:ravagers":	{
+					"icon":	"items/ravager_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:illusioners":	{
+					"icon":	"items/illusioners_25w14craftmine.png"
+				},
+				"minecraft:guardians":	{
+					"icon":	"items/guardian_spawn_egg_1.21.5.png"
+				},
+				"minecraft:endermites":	{
+					"icon":	"items/endermite_spawn_egg_1.21.5.png"
+				},
+				"minecraft:shulkers":	{
+					"icon":	"items/shulker_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:ghasts":	{
+					"icon":	"items/ghast_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:zombified_piglins":	{
+					"icon":	"items/zombified_piglin_spawn_egg_1.21.5.png"
+				},
+				"minecraft:piglins":	{
+					"icon":	"items/piglin_spawn_egg_1.21.5.png"
+				},
+				"minecraft:wither_skeletons":	{
+					"icon":	"items/wither_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:bees":	{
+					"icon":	"items/bee_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:hoglins":	{
+					"icon":	"items/hoglin_spawn_egg_1.21.5.png"
+				},
+				"minecraft:zoglins":	{
+					"icon":	"items/zoglin_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:base_stone":	{
+					"icon":	"blocks/Stone_JE8.png"
+				},
+				"minecraft:base_blackstone":	{
+					"icon":	"blocks/Blackstone_JE3_BE2.png"
+				},
+				"minecraft:base_diorite":	{
+					"icon":	"blocks/Diorite.png"
+				},
+				"minecraft:base_andesite":	{
+					"icon":	"blocks/Andesite.png"
+				},
+				"minecraft:base_granite":	{
+					"icon":	"blocks/Granite.png"
+				},
+				"minecraft:base_tuff":	{
+					"icon":	"blocks/Tuff.png"
+				},
+				"minecraft:base_deepslate":	{
+					"icon":	"blocks/Deepslate.png"
+				},
+				"minecraft:base_end_stone":	{
+					"icon":	"blocks/End_Stone_JE3_BE2.png"
+				},
+				"minecraft:plains":	{
+					"icon":	"blocks/Grass_Block_JE7_BE6.png"
+				},
+				"minecraft:savannas":	{
+					"icon":	"blocks/Acacia_Sapling_JE7_BE2.png"
+				},
+				"minecraft:forests":	{
+					"icon":	"blocks/Oak_Sapling_JE14.png"
+				},
+				"minecraft:taigas":	{
+					"icon":	"blocks/Spruce_Sapling_JE7_BE2.png"
+				},
+				"minecraft:jungles":	{
+					"icon":	"blocks/Jungle_Sapling_JE7_BE2.png"
+				},
+				"minecraft:snowy":	{
+					"icon":	"items/snowball_25w14craftmine.png"
+				},
+				"minecraft:desert":	{
+					"icon":	"blocks/Sand_JE5_BE3.png"
+				},
+				"minecraft:badlands":	{
+					"icon":	"blocks/Gray_Terracotta_JE1_BE1.png"
+				},
+				"minecraft:swamps":	{
+					"icon":	"blocks/Mangrove_Roots_JE2.png"
+				},
+				"minecraft:dark_forests":	{
+					"icon":	"blocks/Creaking_Heart_JE2_BE2.png"
+				},
+				"minecraft:ice_spikes":	{
+					"icon":	"blocks/Packed_Ice_JE2_BE3.png"
+				},
+				"minecraft:mushroom_fields":	{
+					"icon":	"blocks/Red_Mushroom_JE9.png"
+				},
+				"minecraft:nether_barrens":	{
+					"icon":	"blocks/Netherrack_JE4_BE2.png"
+				},
+				"minecraft:nether_forests":	{
+					"icon":	"blocks/Warped_Fungus_JE1_BE1.png"
+				},
+				"minecraft:deep_dark":	{
+					"icon":	"blocks/Sculk_JE1_BE1_unoptimized.gif"
+				},
+				"minecraft:end":	{
+					"icon":	"blocks/End_Stone_JE3_BE2.png"
+				},
+				"minecraft:dry_land":	{
+					"icon":	"items/bucket_25w14craftmine.png"
+				},
+				"minecraft:water_world":	{
+					"icon":	"items/water_bucket_25w14craftmine.png"
+				},
+				"minecraft:ultrawarm":	{
+					"icon":	"items/lava_bucket_25w14craftmine.png"
+				},
+				"minecraft:icy":	{
+					"icon":	"blocks/Blue_Ice_JE3_BE2.png"
+				},
+				"minecraft:bouncy":	{
+					"icon":	"blocks/Slime_Block_JE2_BE3.png"
+				},
+				"minecraft:one_hp":	{
+					"icon":	"items/Water_Bottle_JE2_BE2.png"
+				},
+				"minecraft:wednesday_frogs":	{
+					"icon":	"items/frog_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:universal_anger":	{
+					"icon":	"items/rotten_flesh_25w14craftmine.png"
+				},
+				"minecraft:eternal_night":	{
+					"icon":	"items/blue_dye_1.20.2.png"
+				},
+				"minecraft:eternal_rain":	{
+					"icon":	"items/black_dye_25w14craftmine.png"
+				},
+				"minecraft:eternal_lightning":	{
+					"icon":	"items/yellow_dye_25w14craftmine.png"
+				},
+				"minecraft:insomniacs":	{
+					"icon":	"items/phantom_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:no_drops":	{
+					"icon":	"blocks/Dirt.png"
+				},
+				"minecraft:explosive_traps":	{
+					"icon":	"blocks/TNT_JE3_BE2.png"
+				},
+				"minecraft:fish_out_of_water":	{
+					"icon":	"items/tropical_fish_25w14craftmine.png"
+				},
+				"minecraft:soul_link":	{
+					"icon":	"items/lead_25w14craftmine.png"
+				},
+				"minecraft:warden_boss_fight":	{
+					"icon":	"items/warden_spawn_egg_1.21.5.png"
+				}
+			}
+		},
+		"minecraft:mines/complete_water_world_level":	{
+			"icon":	"items/water_bucket_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/complete_water_cave_level":	{
+			"icon":	"items/pufferfish_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/complete_deluge_level":	{
+			"icon":	"items/Leather_Cap_(item)_JE4_BE3.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/mine_revisitor_activated":	{
+			"icon":	"blocks/Mine_Revisitor_unoptimized.gif",
+			"criteria":	{
+			}
+		},
+		"minecraft:feats/root":	{
+			"icon":	"items/netherite_sword_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/eat_your_veggies":	{
+			"icon":	"items/poisonous_potato_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:feats/return_to_sender":	{
+			"icon":	"items/fire_charge_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:feats/angry_ghast":	{
+			"icon":	"items/ghast_tear_3d_shareware_v1.34.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:feats/wither_skeleton_skull":	{
+			"icon":	"blocks/Wither_Skeleton_Skull.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:feats/wither":	{
+			"icon":	"items/nether_star_3d_shareware_v1.34.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:feats/kuiper_world":	{
+			"icon":	"items/kuiper_world_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:feats/small_but_deadly":	{
+			"icon":	"items/silverfish_spawn_egg_1.21.5.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:feats/enderman":	{
+			"icon":	"items/ender_pearl_1.20.2.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/shimmering_key":	{
+			"icon":	"items/shimmering_key_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/special_mine_completed":	{
+			"icon":	"items/mine_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:mines/all_special_mines_completed":	{
+			"icon":	"blocks/Beacon_JE6_BE2.png",
+			"criteria":	{
+				"minecraft:kuiper_belt":	{
+					"icon":	"items/kuiper_world_25w14craftmine.png"
+				},
+				"minecraft:small_but_deadly_boss":	{
+					"icon":	"items/silverfish_spawn_egg_1.21.5.png"
+				},
+				"minecraft:raid":	{
+					"icon":	"blocks/Ominous_Banner_unoptimized.gif"
+				},
+				"minecraft:warden_boss":	{
+					"icon":	"items/warden_spawn_egg_1.21.5.png"
+				},
+				"minecraft:angry_ghast_boss":	{
+					"icon":	"items/ghast_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:spooky_scary_skeletons_boss":	{
+					"icon":	"items/skeleton_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:wither_boss":	{
+					"icon":	"items/wither_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:ender_dragon_boss":	{
+					"icon":	"items/ender_dragon_spawn_egg_25w14craftmine.png"
+				},
+				"minecraft:enderman_boss":	{
+					"icon":	"items/enderman_spawn_egg_25w14craftmine.png"
+				}
+			}
+		},
+		"minecraft:feats/crystal":	{
+			"icon":	"blocks/Amethyst_Cluster_(U)_JE1.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:feats/warden":	{
+			"icon":	"blocks/Sculk_Catalyst_JE1_BE1.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:feats/kill_pillager":	{
+			"icon":	"blocks/Ominous_Banner_unoptimized.gif",
+			"criteria":	{
+			}
+		},
+		"minecraft:feats/raid":	{
+			"icon":	"items/ominous_bottle_1.20.5.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:feats/kill_skeleton":	{
+			"icon":	"items/bone_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:feats/spooky_scary_skeletons":	{
+			"icon":	"blocks/Skeleton_Skull.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:feats/end_world":	{
+			"icon":	"items/end_crystal_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:feats/dragon_breath":	{
+			"icon":	"items/dragon_breath_3d_shareware_v1.34.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:feats/ender_dragon":	{
+			"icon":	"blocks/Dragon_Head.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:unlocks/root":	{
+			"icon":	"items/experience_bottle_3d_shareware_v1.34.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:unlocks/kaizen":	{
+			"icon":	"items/enchanted_book_3d_shareware_v1.34.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:unlocks/sigma_grindset":	{
+			"icon":	"blocks/Bookshelf_JE4_BE2.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:unlocks/all_exploration":	{
+			"icon":	"items/Leather_Boots_(item)_JE4_BE3.png",
+			"criteria":	{
+				"minecraft:exploration":	{
+					"icon":	"items/Leather_Boots_(item)_JE4_BE3.png"
+				},
+				"minecraft:ender_pearl_starter":	{
+					"icon":	"items/ender_pearl_1.20.2.png"
+				},
+				"minecraft:more_pearls":	{
+					"icon":	"items/ender_pearl_1.20.2.png"
+				},
+				"minecraft:more_more_pearls":	{
+					"icon":	"items/ender_pearl_1.20.2.png"
+				},
+				"minecraft:speed_1":	{
+					"icon":	"items/furnace_minecart_1.20.2.png"
+				},
+				"minecraft:amphibian":	{
+					"icon":	"items/salmon_25w14craftmine.png"
+				},
+				"minecraft:speed_2":	{
+					"icon":	"items/minecart_25w14craftmine.png"
+				},
+				"minecraft:speed_3":	{
+					"icon":	"items/chest_minecart_1.20.2.png"
+				},
+				"minecraft:shazboots":	{
+					"icon":	"items/copper_boots_1.21.9.png"
+				},
+				"minecraft:sneak_1":	{
+					"icon":	"items/apple_25w14craftmine.png"
+				},
+				"minecraft:sneak_2":	{
+					"icon":	"items/golden_apple_25w14craftmine.png"
+				},
+				"minecraft:movement_boost":	{
+					"icon":	"items/cookie_25w14craftmine.png"
+				},
+				"minecraft:pathfinder":	{
+					"icon":	"items/exit_eye_25w14craftmine.png"
+				},
+				"minecraft:lodestone_exits":	{
+					"icon":	"blocks/Lodestone_JE1_BE1.png"
+				},
+				"minecraft:starter_compass":	{
+					"icon":	"items/compass_16_25w14craftmine.png"
+				},
+				"minecraft:wing_guardian_lift_off_to_the_sky":	{
+					"icon":	"items/feather_25w14craftmine.png"
+				},
+				"minecraft:learning_1":	{
+					"icon":	"items/book_25w14craftmine.png"
+				},
+				"minecraft:learning_2":	{
+					"icon":	"items/book_25w14craftmine.png"
+				},
+				"minecraft:learning_3":	{
+					"icon":	"items/book_25w14craftmine.png"
+				},
+				"minecraft:learning_4":	{
+					"icon":	"items/book_25w14craftmine.png"
+				},
+				"minecraft:learning_5":	{
+					"icon":	"items/book_25w14craftmine.png"
+				},
+				"minecraft:learning_6":	{
+					"icon":	"items/book_25w14craftmine.png"
+				},
+				"minecraft:learning_7":	{
+					"icon":	"items/book_25w14craftmine.png"
+				},
+				"minecraft:learning_8":	{
+					"icon":	"items/book_25w14craftmine.png"
+				},
+				"minecraft:learning_9":	{
+					"icon":	"items/book_25w14craftmine.png"
+				},
+				"minecraft:learning_10":	{
+					"icon":	"items/book_25w14craftmine.png"
+				},
+				"minecraft:learning_11":	{
+					"icon":	"items/book_25w14craftmine.png"
+				},
+				"minecraft:learning_12":	{
+					"icon":	"items/book_25w14craftmine.png"
+				},
+				"minecraft:learning_13":	{
+					"icon":	"items/book_25w14craftmine.png"
+				},
+				"minecraft:learning_14":	{
+					"icon":	"items/book_25w14craftmine.png"
+				},
+				"minecraft:learning_15":	{
+					"icon":	"items/book_25w14craftmine.png"
+				},
+				"minecraft:learning_16":	{
+					"icon":	"items/book_25w14craftmine.png"
+				},
+				"minecraft:learning_17":	{
+					"icon":	"items/book_25w14craftmine.png"
+				},
+				"minecraft:learning_18":	{
+					"icon":	"items/book_25w14craftmine.png"
+				},
+				"minecraft:learning_19":	{
+					"icon":	"items/book_25w14craftmine.png"
+				},
+				"minecraft:learning_20":	{
+					"icon":	"items/book_25w14craftmine.png"
+				},
+				"minecraft:jump_king":	{
+					"icon":	"blocks/Slime_Block_JE2_BE3.png"
+				},
+				"minecraft:mega_jump":	{
+					"icon":	"items/iron_boots_25w14craftmine.png"
+				},
+				"minecraft:safe_falling":	{
+					"icon":	"items/feather_25w14craftmine.png"
+				},
+				"minecraft:jump_king_2":	{
+					"icon":	"blocks/Slime_Block_JE2_BE3.png"
+				},
+				"minecraft:jump_king_3":	{
+					"icon":	"blocks/Slime_Block_JE2_BE3.png"
+				},
+				"minecraft:jump_king_4":	{
+					"icon":	"blocks/Slime_Block_JE2_BE3.png"
+				},
+				"minecraft:jump_king_5":	{
+					"icon":	"blocks/Slime_Block_JE2_BE3.png"
+				},
+				"minecraft:jump_king_6":	{
+					"icon":	"blocks/Slime_Block_JE2_BE3.png"
+				},
+				"minecraft:jump_king_7":	{
+					"icon":	"blocks/Slime_Block_JE2_BE3.png"
+				},
+				"minecraft:jump_king_8":	{
+					"icon":	"blocks/Slime_Block_JE2_BE3.png"
+				},
+				"minecraft:jump_king_9":	{
+					"icon":	"blocks/Slime_Block_JE2_BE3.png"
+				},
+				"minecraft:jump_king_10":	{
+					"icon":	"blocks/Slime_Block_JE2_BE3.png"
+				},
+				"minecraft:elytra":	{
+					"icon":	"items/elytra_25w14craftmine.png"
+				},
+				"minecraft:rockets":	{
+					"icon":	"items/firework_rocket_25w14craftmine.png"
+				}
+			}
+		},
+		"minecraft:unlocks/free_sticks":	{
+			"icon":	"items/blaze_rod_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:unlocks/all_gatherer":	{
+			"icon":	"items/sweet_berries_25w14craftmine.png",
+			"criteria":	{
+				"minecraft:gatherer":	{
+					"icon":	"items/sweet_berries_25w14craftmine.png"
+				},
+				"minecraft:pickup_area_size":	{
+					"icon":	"items/fishing_rod_cast_25w14craftmine.png"
+				},
+				"minecraft:dirt_enjoyer_1":	{
+					"icon":	"blocks/Dirt.png"
+				},
+				"minecraft:apprentice_shoveler":	{
+					"icon":	"items/wooden_shovel_25w14craftmine.png"
+				},
+				"minecraft:journeyman_shoveler":	{
+					"icon":	"items/stone_shovel_25w14craftmine.png"
+				},
+				"minecraft:expert_shoveler":	{
+					"icon":	"items/iron_shovel_25w14craftmine.png"
+				},
+				"minecraft:master_shoveler":	{
+					"icon":	"items/diamond_shovel_20w14infinite.png"
+				},
+				"minecraft:dirt_enjoyer_2":	{
+					"icon":	"blocks/Dirt.png"
+				},
+				"minecraft:dirt_enjoyer_3":	{
+					"icon":	"blocks/Dirt.png"
+				},
+				"minecraft:dirt_destroyer_1":	{
+					"icon":	"blocks/Dirt.png"
+				},
+				"minecraft:dirt_destroyer_2":	{
+					"icon":	"blocks/Dirt.png"
+				},
+				"minecraft:dirt_connoisseur":	{
+					"icon":	"blocks/Dirt.png"
+				},
+				"minecraft:hunter":	{
+					"icon":	"items/porkchop_25w14craftmine.png"
+				},
+				"minecraft:campfire":	{
+					"icon":	"items/campfire_1.20.2.png"
+				},
+				"minecraft:you_are_the_campfire":	{
+					"icon":	"items/blaze_powder_25w14craftmine.png"
+				},
+				"minecraft:mining":	{
+					"icon":	"items/wooden_pickaxe_25w14craftmine.png"
+				},
+				"minecraft:sub_mining_efficiency":	{
+					"icon":	"items/water_mining_25w14craftmine.png"
+				},
+				"minecraft:mining_efficiency":	{
+					"icon":	"blocks/Iron_Ore_JE6_BE4.png"
+				},
+				"minecraft:mining_efficiency_2":	{
+					"icon":	"items/gold_nugget_3d_shareware_v1.34.png"
+				},
+				"minecraft:mining_efficiency_3":	{
+					"icon":	"items/gold_ingot_25w14craftmine.png"
+				},
+				"minecraft:starter_pick":	{
+					"icon":	"items/iron_pickaxe_25w14craftmine.png"
+				},
+				"minecraft:silky_pick":	{
+					"icon":	"items/golden_pickaxe_25w14craftmine.png"
+				},
+				"minecraft:ore_seeker_1":	{
+					"icon":	"blocks/Gold_Ore_JE7_BE4.png"
+				},
+				"minecraft:ore_seeker_2":	{
+					"icon":	"blocks/Diamond_Ore_JE5_BE5.png"
+				},
+				"minecraft:lucky_pick":	{
+					"icon":	"items/diamond_pickaxe_25w14craftmine.png"
+				},
+				"minecraft:rare_earth_specialist":	{
+					"icon":	"items/diamond_25w14craftmine.png"
+				},
+				"minecraft:fishing":	{
+					"icon":	"items/salmon_25w14craftmine.png"
+				},
+				"minecraft:fishing_rod":	{
+					"icon":	"items/fishing_rod_cast_25w14craftmine.png"
+				},
+				"minecraft:trident":	{
+					"icon":	"items/trident_1.13.png"
+				},
+				"minecraft:poseidon":	{
+					"icon":	"items/trident_1.13.png"
+				}
+			}
+		},
+		"minecraft:unlocks/in_it_together":	{
+			"icon":	"items/lead_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:unlocks/jump_king":	{
+			"icon":	"blocks/Slime_Block_JE2_BE3.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:unlocks/all_combatant":	{
+			"icon":	"items/netherite_sword_25w14craftmine.png",
+			"criteria":	{
+				"minecraft:combatant":	{
+					"icon":	"items/netherite_sword_25w14craftmine.png"
+				},
+				"minecraft:sorcerer_supreme":	{
+					"icon":	"items/soul_campfire_25w14craftmine.png"
+				},
+				"minecraft:archer":	{
+					"icon":	"items/bow_25w14craftmine.png"
+				},
+				"minecraft:quiver":	{
+					"icon":	"items/arrow_25w14craftmine.png"
+				},
+				"minecraft:fletcher":	{
+					"icon":	"blocks/Fletching_Table_JE2_BE1.png"
+				},
+				"minecraft:arrowverse":	{
+					"icon":	"items/Arrow_of_Poison_JE3.png"
+				},
+				"minecraft:tracker":	{
+					"icon":	"items/spectral_arrow_3d_shareware_v1.34.png"
+				},
+				"minecraft:armaments":	{
+					"icon":	"items/iron_helmet_25w14craftmine.png"
+				},
+				"minecraft:decked_out":	{
+					"icon":	"items/Leather_Tunic_(item)_JE4_BE3.png"
+				},
+				"minecraft:full_metal":	{
+					"icon":	"items/iron_chestplate_25w14craftmine.png"
+				},
+				"minecraft:starter_apples":	{
+					"icon":	"items/apple_25w14craftmine.png"
+				},
+				"minecraft:more_starter_apples":	{
+					"icon":	"items/apple_25w14craftmine.png"
+				},
+				"minecraft:golden_starter_apples":	{
+					"icon":	"items/golden_apple_25w14craftmine.png"
+				},
+				"minecraft:starter_shield":	{
+					"icon":	"items/Shield_JE2_BE1.png"
+				},
+				"minecraft:shield_bash":	{
+					"icon":	"blocks/Skeleton_Skull.png"
+				},
+				"minecraft:fire_shield":	{
+					"icon":	"items/Water_Bottle_JE2_BE2.png"
+				},
+				"minecraft:crusher":	{
+					"icon":	"items/mace_25w14craftmine.png"
+				},
+				"minecraft:starter_sword":	{
+					"icon":	"items/wooden_sword_25w14craftmine.png"
+				},
+				"minecraft:starter_sword_iron":	{
+					"icon":	"items/iron_sword_25w14craftmine.png"
+				},
+				"minecraft:better_starter_sword":	{
+					"icon":	"items/diamond_sword_20w14infinite.png"
+				},
+				"minecraft:best_starter_sword":	{
+					"icon":	"items/netherite_sword_25w14craftmine.png"
+				},
+				"minecraft:chopper":	{
+					"icon":	"items/wooden_axe_25w14craftmine.png"
+				},
+				"minecraft:viking":	{
+					"icon":	"items/iron_axe_3d_shareware_v1.34.png"
+				},
+				"minecraft:berserker":	{
+					"icon":	"items/diamond_axe_25w14craftmine.png"
+				},
+				"minecraft:varangian":	{
+					"icon":	"items/netherite_axe_20w14infinite.png"
+				}
+			}
+		},
+		"minecraft:unlocks/all_school_of_hard_knocks":	{
+			"icon":	"blocks/Fletching_Table_JE2_BE1.png",
+			"criteria":	{
+				"minecraft:school_of_hard_knocks":	{
+					"icon":	"blocks/Fletching_Table_JE2_BE1.png"
+				},
+				"minecraft:school_of_actual_hard_knocks":	{
+					"icon":	"items/gold_nugget_3d_shareware_v1.34.png"
+				},
+				"minecraft:rewrite_in_rust":	{
+					"icon":	"items/chain_25w14craftmine.png"
+				},
+				"minecraft:extra_firepower":	{
+					"icon":	"items/flint_and_steel_25w14craftmine.png"
+				},
+				"minecraft:proper_walking_pace":	{
+					"icon":	"items/iron_boots_25w14craftmine.png"
+				},
+				"minecraft:thorns_plus_plus":	{
+					"icon":	"items/diamond_chestplate_20w14infinite.png"
+				}
+			}
+		},
+		"minecraft:unlocks/how_do_i_unlock_that":	{
+			"icon":	"items/poisonous_potato_25w14craftmine.png",
+			"criteria":	{
+			}
+		},
+		"minecraft:unlocks/all_crafting":	{
+			"icon":	"blocks/Crafting_Table_JE4_BE3.png",
+			"criteria":	{
+				"minecraft:crafting":	{
+					"icon":	"blocks/Crafting_Table_JE4_BE3.png"
+				},
+				"minecraft:smelter_1":	{
+					"icon":	"blocks/Furnace_(S)_JE4.png"
+				},
+				"minecraft:smelter_2":	{
+					"icon":	"blocks/Blast_Furnace_(S)_JE1.png"
+				},
+				"minecraft:smelt_value_1":	{
+					"icon":	"items/gold_ingot_25w14craftmine.png"
+				},
+				"minecraft:smelt_value_2":	{
+					"icon":	"items/netherite_ingot_25w14craftmine.png"
+				},
+				"minecraft:inventory_slots_1":	{
+					"icon":	"blocks/Chest_(S)_JE2.png"
+				},
+				"minecraft:inventory_slots_2":	{
+					"icon":	"blocks/Chest_(S)_JE2.png"
+				},
+				"minecraft:inventory_slots_3":	{
+					"icon":	"blocks/Chest_(S)_JE2.png"
+				},
+				"minecraft:bundle_of_fortune":	{
+					"icon":	"items/bundle_25w14craftmine.png"
+				},
+				"minecraft:enchanting":	{
+					"icon":	"blocks/Enchanting_Table_JE4_BE2.png"
+				},
+				"minecraft:magic_starter_kit":	{
+					"icon":	"items/lapis_lazuli_25w14craftmine.png"
+				},
+				"minecraft:magic_master_kit":	{
+					"icon":	"items/Enchanted_Book_unoptimized.gif"
+				},
+				"minecraft:runemaster":	{
+					"icon":	"blocks/Bookshelf_JE4_BE2.png"
+				},
+				"minecraft:fire_wand":	{
+					"icon":	"items/blaze_rod_25w14craftmine.png"
+				},
+				"minecraft:dragon_fire":	{
+					"icon":	"items/dragon_breath_3d_shareware_v1.34.png"
+				},
+				"minecraft:wind_wand":	{
+					"icon":	"items/breeze_rod_25w14craftmine.png"
+				},
+				"minecraft:teleportation_wand":	{
+					"icon":	"items/Debug_Stick_unoptimized.gif"
+				},
+				"minecraft:efficient_enchanting":	{
+					"icon":	"items/knowledge_book_25w14craftmine.png"
+				},
+				"minecraft:alchemy":	{
+					"icon":	"items/brewing_stand_1.20.2.png"
+				},
+				"minecraft:mise_en_place":	{
+					"icon":	"items/glass_bottle_3d_shareware_v1.34.png"
+				},
+				"minecraft:allez_cuisine":	{
+					"icon":	"items/spider_eye_3d_shareware_v1.34.png"
+				},
+				"minecraft:mass_production":	{
+					"icon":	"items/experience_bottle_3d_shareware_v1.34.png"
+				},
+				"minecraft:inventory_crafting":	{
+					"icon":	"items/stick_25w14craftmine.png"
+				},
+				"minecraft:inventory_crafting_3x3":	{
+					"icon":	"items/hopper_25w14craftmine.png"
+				},
+				"minecraft:crafting_efficiency":	{
+					"icon":	"blocks/Composter_JE1.png"
+				},
+				"minecraft:starter_crafting":	{
+					"icon":	"blocks/Crafting_Table_JE4_BE3.png"
+				}
+			}
+		}
+	},
+	"stats":	{
+		"elytra":	{
+			"icon":	"items/elytra_25w14craftmine.png",
+			"root_name":	"minecraft:custom/minecraft:aviate_one_cm",
+			"target":	-1
+		},
+		"pigs_killed":	{
+			"icon":	"animals/pig.png",
+			"root_name":	"minecraft:killed/minecraft:pig",
+			"target":	-1
+		},
+		"wither_skele":	{
+			"icon":	"monsters/wither_skeleton.png",
+			"in_2nd_row":	true,
+			"root_name":	"minecraft:killed/minecraft:wither_skeleton",
+			"target":	-1
+		},
+		"iron_hoe":	{
+			"icon":	"items/iron_hoe_3d_shareware_v1.34.png",
+			"in_2nd_row":	true,
+			"root_name":	"minecraft:used/minecraft:iron_hoe",
+			"target":	-1
+		},
+		"stone_hoe":	{
+			"icon":	"items/stone_hoe_1.20.2.png",
+			"root_name":	"minecraft:used/minecraft:stone_hoe",
+			"target":	-1
+		},
+		"pois_potato":	{
+			"icon":	"items/poisonous_potato_25w14craftmine.png",
+			"root_name":	"minecraft:used/minecraft:poisonous_potato",
+			"target":	100
+		}
+	},
+	"unlocks":	[{
+			"root_name":	"minecraft:exploration",
+			"icon":	"items/Leather_Boots_(item)_JE4_BE3.png"
+		}, {
+			"root_name":	"minecraft:ender_pearl_starter",
+			"icon":	"items/ender_pearl_1.20.2.png"
+		}, {
+			"root_name":	"minecraft:more_pearls",
+			"icon":	"items/ender_pearl_1.20.2.png"
+		}, {
+			"root_name":	"minecraft:more_more_pearls",
+			"icon":	"items/ender_pearl_1.20.2.png"
+		}, {
+			"root_name":	"minecraft:speed_1",
+			"icon":	"items/furnace_minecart_1.20.2.png"
+		}, {
+			"root_name":	"minecraft:amphibian",
+			"icon":	"items/salmon_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:speed_2",
+			"icon":	"items/minecart_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:speed_3",
+			"icon":	"items/chest_minecart_1.20.2.png"
+		}, {
+			"root_name":	"minecraft:shazboots",
+			"icon":	"items/copper_boots_1.21.9.png"
+		}, {
+			"root_name":	"minecraft:sneak_1",
+			"icon":	"items/apple_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:sneak_2",
+			"icon":	"items/golden_apple_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:movement_boost",
+			"icon":	"items/cookie_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:pathfinder",
+			"icon":	"items/exit_eye_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:lodestone_exits",
+			"icon":	"blocks/Lodestone_JE1_BE1.png"
+		}, {
+			"root_name":	"minecraft:starter_compass",
+			"icon":	"items/compass_16_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:wing_guardian_lift_off_to_the_sky",
+			"icon":	"items/feather_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:learning_1",
+			"icon":	"items/book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:learning_2",
+			"icon":	"items/book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:learning_3",
+			"icon":	"items/book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:learning_4",
+			"icon":	"items/book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:learning_5",
+			"icon":	"items/book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:learning_6",
+			"icon":	"items/book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:learning_7",
+			"icon":	"items/book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:learning_8",
+			"icon":	"items/book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:learning_9",
+			"icon":	"items/book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:learning_10",
+			"icon":	"items/book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:learning_11",
+			"icon":	"items/book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:learning_12",
+			"icon":	"items/book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:learning_13",
+			"icon":	"items/book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:learning_14",
+			"icon":	"items/book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:learning_15",
+			"icon":	"items/book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:learning_16",
+			"icon":	"items/book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:learning_17",
+			"icon":	"items/book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:learning_18",
+			"icon":	"items/book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:learning_19",
+			"icon":	"items/book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:learning_20",
+			"icon":	"items/book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:jump_king",
+			"icon":	"blocks/Slime_Block_JE2_BE3.png"
+		}, {
+			"root_name":	"minecraft:mega_jump",
+			"icon":	"items/iron_boots_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:safe_falling",
+			"icon":	"items/feather_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:jump_king_2",
+			"icon":	"blocks/Slime_Block_JE2_BE3.png"
+		}, {
+			"root_name":	"minecraft:jump_king_3",
+			"icon":	"blocks/Slime_Block_JE2_BE3.png"
+		}, {
+			"root_name":	"minecraft:jump_king_4",
+			"icon":	"blocks/Slime_Block_JE2_BE3.png"
+		}, {
+			"root_name":	"minecraft:jump_king_5",
+			"icon":	"blocks/Slime_Block_JE2_BE3.png"
+		}, {
+			"root_name":	"minecraft:jump_king_6",
+			"icon":	"blocks/Slime_Block_JE2_BE3.png"
+		}, {
+			"root_name":	"minecraft:jump_king_7",
+			"icon":	"blocks/Slime_Block_JE2_BE3.png"
+		}, {
+			"root_name":	"minecraft:jump_king_8",
+			"icon":	"blocks/Slime_Block_JE2_BE3.png"
+		}, {
+			"root_name":	"minecraft:jump_king_9",
+			"icon":	"blocks/Slime_Block_JE2_BE3.png"
+		}, {
+			"root_name":	"minecraft:jump_king_10",
+			"icon":	"blocks/Slime_Block_JE2_BE3.png"
+		}, {
+			"root_name":	"minecraft:elytra",
+			"icon":	"items/elytra_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:rockets",
+			"icon":	"items/firework_rocket_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:crafting",
+			"icon":	"blocks/Crafting_Table_JE4_BE3.png"
+		}, {
+			"root_name":	"minecraft:smelter_1",
+			"icon":	"blocks/Furnace_(S)_JE4.png"
+		}, {
+			"root_name":	"minecraft:smelter_2",
+			"icon":	"blocks/Blast_Furnace_(S)_JE1.png"
+		}, {
+			"root_name":	"minecraft:smelt_value_1",
+			"icon":	"items/gold_ingot_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:smelt_value_2",
+			"icon":	"items/netherite_ingot_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:inventory_slots_1",
+			"icon":	"blocks/Chest_(S)_JE2.png"
+		}, {
+			"root_name":	"minecraft:inventory_slots_2",
+			"icon":	"blocks/Chest_(S)_JE2.png"
+		}, {
+			"root_name":	"minecraft:inventory_slots_3",
+			"icon":	"blocks/Chest_(S)_JE2.png"
+		}, {
+			"root_name":	"minecraft:bundle_of_fortune",
+			"icon":	"items/bundle_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:enchanting",
+			"icon":	"blocks/Enchanting_Table_JE4_BE2.png"
+		}, {
+			"root_name":	"minecraft:magic_starter_kit",
+			"icon":	"items/lapis_lazuli_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:magic_master_kit",
+			"icon":	"items/Enchanted_Book_unoptimized.gif"
+		}, {
+			"root_name":	"minecraft:runemaster",
+			"icon":	"blocks/Bookshelf_JE4_BE2.png"
+		}, {
+			"root_name":	"minecraft:fire_wand",
+			"icon":	"items/blaze_rod_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:dragon_fire",
+			"icon":	"items/dragon_breath_1.20.2.png"
+		}, {
+			"root_name":	"minecraft:wind_wand",
+			"icon":	"items/breeze_rod_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:teleportation_wand",
+			"icon":	"items/Debug_Stick_unoptimized.gif"
+		}, {
+			"root_name":	"minecraft:efficient_enchanting",
+			"icon":	"items/knowledge_book_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:alchemy",
+			"icon":	"items/brewing_stand_1.20.2.png"
+		}, {
+			"root_name":	"minecraft:mise_en_place",
+			"icon":	"items/glass_bottle_3d_shareware_v1.34.png"
+		}, {
+			"root_name":	"minecraft:allez_cuisine",
+			"icon":	"items/spider_eye_3d_shareware_v1.34.png"
+		}, {
+			"root_name":	"minecraft:mass_production",
+			"icon":	"items/experience_bottle_3d_shareware_v1.34.png"
+		}, {
+			"root_name":	"minecraft:inventory_crafting",
+			"icon":	"items/stick_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:inventory_crafting_3x3",
+			"icon":	"items/hopper_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:crafting_efficiency",
+			"icon":	"blocks/Composter_JE1.png"
+		}, {
+			"root_name":	"minecraft:starter_crafting",
+			"icon":	"blocks/Crafting_Table_JE4_BE3.png"
+		}, {
+			"root_name":	"minecraft:gatherer",
+			"icon":	"items/sweet_berries_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:pickup_area_size",
+			"icon":	"items/fishing_rod_3d_shareware_v1.34.png"
+		}, {
+			"root_name":	"minecraft:dirt_enjoyer_1",
+			"icon":	"blocks/Dirt.png"
+		}, {
+			"root_name":	"minecraft:apprentice_shoveler",
+			"icon":	"items/wooden_shovel_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:journeyman_shoveler",
+			"icon":	"items/stone_shovel_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:expert_shoveler",
+			"icon":	"items/iron_shovel_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:master_shoveler",
+			"icon":	"items/diamond_shovel_20w14infinite.png"
+		}, {
+			"root_name":	"minecraft:dirt_enjoyer_2",
+			"icon":	"blocks/Dirt.png"
+		}, {
+			"root_name":	"minecraft:dirt_enjoyer_3",
+			"icon":	"blocks/Dirt.png"
+		}, {
+			"root_name":	"minecraft:dirt_destroyer_1",
+			"icon":	"blocks/Dirt.png"
+		}, {
+			"root_name":	"minecraft:dirt_destroyer_2",
+			"icon":	"blocks/Dirt.png"
+		}, {
+			"root_name":	"minecraft:dirt_connoisseur",
+			"icon":	"blocks/Dirt.png"
+		}, {
+			"root_name":	"minecraft:hunter",
+			"icon":	"items/porkchop_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:campfire",
+			"icon":	"items/campfire_1.20.2.png"
+		}, {
+			"root_name":	"minecraft:you_are_the_campfire",
+			"icon":	"items/blaze_powder_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:mining",
+			"icon":	"items/wooden_pickaxe_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:sub_mining_efficiency",
+			"icon":	"items/water_mining_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:mining_efficiency",
+			"icon":	"blocks/Iron_Ore_JE6_BE4.png"
+		}, {
+			"root_name":	"minecraft:mining_efficiency_2",
+			"icon":	"items/gold_nugget_3d_shareware_v1.34.png"
+		}, {
+			"root_name":	"minecraft:mining_efficiency_3",
+			"icon":	"items/gold_ingot_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:starter_pick",
+			"icon":	"items/iron_pickaxe_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:silky_pick",
+			"icon":	"items/golden_pickaxe_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:ore_seeker_1",
+			"icon":	"blocks/Gold_Ore_JE7_BE4.png"
+		}, {
+			"root_name":	"minecraft:ore_seeker_2",
+			"icon":	"blocks/Diamond_Ore_JE5_BE5.png"
+		}, {
+			"root_name":	"minecraft:lucky_pick",
+			"icon":	"items/diamond_pickaxe_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:rare_earth_specialist",
+			"icon":	"items/diamond_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:fishing",
+			"icon":	"items/salmon_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:fishing_rod",
+			"icon":	"items/fishing_rod_3d_shareware_v1.34.png"
+		}, {
+			"root_name":	"minecraft:trident",
+			"icon":	"items/trident_1.13.png"
+		}, {
+			"root_name":	"minecraft:poseidon",
+			"icon":	"items/trident_1.13.png"
+		}, {
+			"root_name":	"minecraft:combatant",
+			"icon":	"items/netherite_sword_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:sorcerer_supreme",
+			"icon":	"items/soul_campfire_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:archer",
+			"icon":	"items/bow_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:quiver",
+			"icon":	"items/arrow_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:fletcher",
+			"icon":	"blocks/Fletching_Table_JE2_BE1.png"
+		}, {
+			"root_name":	"minecraft:arrowverse",
+			"icon":	"items/Arrow_of_Poison_JE3.png"
+		}, {
+			"root_name":	"minecraft:tracker",
+			"icon":	"items/spectral_arrow_3d_shareware_v1.34.png"
+		}, {
+			"root_name":	"minecraft:armaments",
+			"icon":	"items/iron_helmet_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:decked_out",
+			"icon":	"items/Leather_Tunic_(item)_JE4_BE3.png"
+		}, {
+			"root_name":	"minecraft:full_metal",
+			"icon":	"items/iron_chestplate_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:starter_apples",
+			"icon":	"items/apple_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:more_starter_apples",
+			"icon":	"items/apple_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:golden_starter_apples",
+			"icon":	"items/golden_apple_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:starter_shield",
+			"icon":	"items/Shield_JE2_BE1.png"
+		}, {
+			"root_name":	"minecraft:shield_bash",
+			"icon":	"blocks/Skeleton_Skull.png"
+		}, {
+			"root_name":	"minecraft:fire_shield",
+			"icon":	"items/Water_Bottle_JE2_BE2.png"
+		}, {
+			"root_name":	"minecraft:crusher",
+			"icon":	"items/mace_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:starter_sword",
+			"icon":	"items/wooden_sword_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:starter_sword_iron",
+			"icon":	"items/iron_sword_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:better_starter_sword",
+			"icon":	"items/diamond_sword_20w14infinite.png"
+		}, {
+			"root_name":	"minecraft:best_starter_sword",
+			"icon":	"items/netherite_sword_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:chopper",
+			"icon":	"items/wooden_axe_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:viking",
+			"icon":	"items/iron_axe_3d_shareware_v1.34.png"
+		}, {
+			"root_name":	"minecraft:berserker",
+			"icon":	"items/diamond_axe_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:varangian",
+			"icon":	"items/netherite_axe_20w14infinite.png"
+		}, {
+			"root_name":	"minecraft:pets",
+			"icon":	"items/pets_icon_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:pet_chicken",
+			"icon":	"items/chicken_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"minecraft:pet_the_animal",
+			"icon":	"blocks/Decorated_Pot_(N)_JE2_BE2.png"
+		}, {
+			"root_name":	"minecraft:pet_armadillo",
+			"icon":	"items/armadillo_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"minecraft:pet_frog",
+			"icon":	"items/frog_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:pet_axolotl",
+			"icon":	"items/axolotl_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:pet_turtle",
+			"icon":	"items/turtle_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:pet_cow",
+			"icon":	"items/cow_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:pet_mooshroom",
+			"icon":	"items/mooshroom_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:pet_cat",
+			"icon":	"items/cat_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"minecraft:pet_fox",
+			"icon":	"items/fox_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"minecraft:pet_polar_bear",
+			"icon":	"items/polar_bear_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:pet_wolf",
+			"icon":	"items/wolf_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:pet_wolf_big",
+			"icon":	"items/potato_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:pet_wolf_armored",
+			"icon":	"items/wolf_armor_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:pet_wolf_sword",
+			"icon":	"items/netherite_sword_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:pet_bee",
+			"icon":	"items/bee_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:pet_slime",
+			"icon":	"items/slime_spawn_egg_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:pet_creeper",
+			"icon":	"items/creeper_spawn_egg_1.21.5.png"
+		}, {
+			"root_name":	"minecraft:school_of_hard_knocks",
+			"icon":	"blocks/Fletching_Table_JE2_BE1.png"
+		}, {
+			"root_name":	"minecraft:school_of_actual_hard_knocks",
+			"icon":	"items/gold_nugget_3d_shareware_v1.34.png"
+		}, {
+			"root_name":	"minecraft:rewrite_in_rust",
+			"icon":	"items/chain_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:extra_firepower",
+			"icon":	"items/flint_and_steel_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:proper_walking_pace",
+			"icon":	"items/iron_boots_25w14craftmine.png"
+		}, {
+			"root_name":	"minecraft:thorns_plus_plus",
+			"icon":	"items/diamond_chestplate_1.20.2.png"
+		}],
+	"custom":	[],
+	"multi_stage_goals":	[{
+			"root_name":	"starting_ingredients",
+			"icon":	"items/glass_bottle_3d_shareware_v1.34.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"use_boat",
+					"icon":	"items/pale_oak_boat_1.21.2.png",
+					"type":	"stat",
+					"root_name":	"minecraft:used/minecraft:pale_oak_boat",
+					"target":	1
+				}, {
+					"stage_id":	"damage",
+					"icon":	"items/heart_pottery_sherd_25w14craftmine.png",
+					"type":	"stat",
+					"root_name":	"minecraft:custom/minecraft:damage_taken",
+					"target":	19
+				}, {
+					"stage_id":	"mob_kill",
+					"icon":	"animals/pig.png",
+					"type":	"stat",
+					"root_name":	"minecraft:custom/minecraft:mob_kills",
+					"target":	1
+				}, {
+					"stage_id":	"complete_1hp",
+					"icon":	"items/glass_bottle_3d_shareware_v1.34.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:one_hp",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"items/glass_bottle_3d_shareware_v1.34.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"coal_dupe",
+			"icon":	"items/coal_1.20.2.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"inv_crafting",
+					"icon":	"items/stick_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:inventory_crafting",
+					"target":	1
+				}, {
+					"stage_id":	"crafting_table",
+					"icon":	"blocks/Crafting_Table_JE4_BE3.png",
+					"type":	"stat",
+					"root_name":	"minecraft:crafted/minecraft:crafting_table",
+					"target":	1
+				}, {
+					"stage_id":	"smelter",
+					"icon":	"blocks/Furnace_(S)_JE4.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:smelter_1",
+					"target":	1
+				}, {
+					"stage_id":	"artisan",
+					"icon":	"blocks/Composter_JE1.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:crafting_efficiency",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"items/coal_1.20.2.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"elytra",
+			"icon":	"items/elytra_25w14craftmine.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"elytra",
+					"icon":	"items/elytra_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:elytra",
+					"target":	1
+				}, {
+					"stage_id":	"rockets",
+					"icon":	"items/firework_rocket_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:rockets",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"items/elytra_25w14craftmine.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"crafting_stages",
+			"icon":	"blocks/Crafting_Table_JE4_BE3.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"furnace",
+					"icon":	"blocks/Furnace_(S)_JE4.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:smelter_1",
+					"target":	1
+				}, {
+					"stage_id":	"lapis",
+					"icon":	"items/lapis_lazuli_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:magic_starter_kit",
+					"target":	1
+				}, {
+					"stage_id":	"ingot",
+					"icon":	"items/netherite_ingot_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:smelt_value_2",
+					"target":	1
+				}, {
+					"stage_id":	"kit",
+					"icon":	"items/Enchanted_Book_unoptimized.gif",
+					"type":	"unlock",
+					"root_name":	"minecraft:magic_master_kit",
+					"target":	1
+				}, {
+					"stage_id":	"runemaster",
+					"icon":	"blocks/Bookshelf_JE4_BE2.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:runemaster",
+					"target":	1
+				}, {
+					"stage_id":	"enchanting",
+					"icon":	"items/knowledge_book_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:efficient_enchanting",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"blocks/Crafting_Table_JE4_BE3.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"gatherer_stages",
+			"icon":	"items/sweet_berries_25w14craftmine.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"wooden_shovel",
+					"icon":	"items/wooden_shovel_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:apprentice_shoveler",
+					"target":	1
+				}, {
+					"stage_id":	"campfire",
+					"icon":	"items/campfire_1.20.2.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:campfire",
+					"target":	1
+				}, {
+					"stage_id":	"iron_pick",
+					"icon":	"items/iron_pickaxe_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:starter_pick",
+					"target":	1
+				}, {
+					"stage_id":	"first_trident",
+					"icon":	"items/trident_1.13.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:trident",
+					"target":	1
+				}, {
+					"stage_id":	"stone_shovel",
+					"icon":	"items/stone_shovel_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:journeyman_shoveler",
+					"target":	1
+				}, {
+					"stage_id":	"second_dirt",
+					"icon":	"blocks/Dirt.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:dirt_enjoyer_2",
+					"target":	1
+				}, {
+					"stage_id":	"blaze_powder",
+					"icon":	"items/blaze_powder_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:you_are_the_campfire",
+					"target":	1
+				}, {
+					"stage_id":	"diamond_ore",
+					"icon":	"blocks/Diamond_Ore_JE5_BE5.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:ore_seeker_2",
+					"target":	1
+				}, {
+					"stage_id":	"diamond",
+					"icon":	"items/diamond_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:rare_earth_specialist",
+					"target":	1
+				}, {
+					"stage_id":	"second_trident",
+					"icon":	"items/trident_1.13.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:poseidon",
+					"target":	1
+				}, {
+					"stage_id":	"iron_shovel",
+					"icon":	"items/iron_shovel_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:expert_shoveler",
+					"target":	1
+				}, {
+					"stage_id":	"last_dirt",
+					"icon":	"blocks/Dirt.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:dirt_connoisseur",
+					"target":	1
+				}, {
+					"stage_id":	"diamond_shovel",
+					"icon":	"items/diamond_shovel_20w14infinite.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:master_shoveler",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"items/sweet_berries_25w14craftmine.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"combat_stages",
+			"icon":	"items/netherite_sword_25w14craftmine.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"arrow",
+					"icon":	"items/arrow_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:quiver",
+					"target":	1
+				}, {
+					"stage_id":	"leather_tunic",
+					"icon":	"items/Leather_Tunic_(item)_JE4_BE3.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:decked_out",
+					"target":	1
+				}, {
+					"stage_id":	"first_apple",
+					"icon":	"items/apple_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:starter_apples",
+					"target":	1
+				}, {
+					"stage_id":	"wooden_sword",
+					"icon":	"items/wooden_sword_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:starter_sword",
+					"target":	1
+				}, {
+					"stage_id":	"wooden_axe",
+					"icon":	"items/wooden_axe_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:chopper",
+					"target":	1
+				}, {
+					"stage_id":	"poisoned_arrow",
+					"icon":	"items/Arrow_of_Poison_JE3.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:arrowverse",
+					"target":	1
+				}, {
+					"stage_id":	"spectral",
+					"icon":	"items/spectral_arrow_3d_shareware_v1.34.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:tracker",
+					"target":	1
+				}, {
+					"stage_id":	"iron_chest",
+					"icon":	"items/iron_chestplate_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:full_metal",
+					"target":	1
+				}, {
+					"stage_id":	"second_apple",
+					"icon":	"items/apple_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:more_starter_apples",
+					"target":	1
+				}, {
+					"stage_id":	"iron_sword",
+					"icon":	"items/iron_sword_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:starter_sword_iron",
+					"target":	1
+				}, {
+					"stage_id":	"iron_axe",
+					"icon":	"items/iron_axe_3d_shareware_v1.34.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:viking",
+					"target":	1
+				}, {
+					"stage_id":	"golden_apple",
+					"icon":	"items/golden_apple_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:golden_starter_apples",
+					"target":	1
+				}, {
+					"stage_id":	"diamond_sword",
+					"icon":	"items/diamond_sword_20w14infinite.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:better_starter_sword",
+					"target":	1
+				}, {
+					"stage_id":	"diamond_axe",
+					"icon":	"items/diamond_axe_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:berserker",
+					"target":	1
+				}, {
+					"stage_id":	"neth_sword",
+					"icon":	"items/netherite_sword_25w14craftmine.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:best_starter_sword",
+					"target":	1
+				}, {
+					"stage_id":	"neth_axe",
+					"icon":	"items/netherite_axe_20w14infinite.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:varangian",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"items/netherite_sword_25w14craftmine.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"effectless",
+			"icon":	"items/structure_void_25w14craftmine.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"lodestone",
+					"icon":	"blocks/Lodestone_JE1_BE1.png",
+					"type":	"stat",
+					"root_name":	"minecraft:used/minecraft:lodestone",
+					"target":	1
+				}, {
+					"stage_id":	"traded",
+					"icon":	"items/villager_spawn_egg_25w14craftmine.png",
+					"type":	"stat",
+					"root_name":	"minecraft:custom/minecraft:traded_with_villager",
+					"target":	60
+				}, {
+					"stage_id":	"bucket",
+					"icon":	"items/bucket_25w14craftmine.png",
+					"type":	"stat",
+					"root_name":	"minecraft:crafted/minecraft:bucket",
+					"target":	1
+				}, {
+					"stage_id":	"lava",
+					"icon":	"items/lava_bucket_25w14craftmine.png",
+					"type":	"stat",
+					"root_name":	"minecraft:picked_up/minecraft:lava_bucket",
+					"target":	1
+				}, {
+					"stage_id":	"e_chest_1",
+					"icon":	"blocks/Ender_Chest.png",
+					"type":	"stat",
+					"root_name":	"minecraft:crafted/minecraft:ender_chest",
+					"target":	1
+				}, {
+					"stage_id":	"place_e_chest_1",
+					"icon":	"blocks/Ender_Chest.png",
+					"type":	"stat",
+					"root_name":	"minecraft:used/minecraft:ender_chest",
+					"target":	1
+				}, {
+					"stage_id":	"death",
+					"icon":	"items/grave_advancement_25w14craftmine.png",
+					"type":	"advancement",
+					"root_name":	"minecraft:mines/player_failed_level",
+					"target":	1
+				}, {
+					"stage_id":	"e_chest_2",
+					"icon":	"blocks/Ender_Chest.png",
+					"type":	"stat",
+					"root_name":	"minecraft:crafted/minecraft:ender_chest",
+					"target":	2
+				}, {
+					"stage_id":	"place_e_chest_2",
+					"icon":	"blocks/Ender_Chest.png",
+					"type":	"stat",
+					"root_name":	"minecraft:used/minecraft:ender_chest",
+					"target":	2
+				}, {
+					"stage_id":	"illusioner",
+					"icon":	"items/mine_25w14craftmine.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:illusioners",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"items/structure_void_25w14craftmine.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"ice_spikes",
+			"icon":	"blocks/Packed_Ice_JE2_BE3.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"snowy_mine",
+					"icon":	"items/snowball_25w14craftmine.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:snowy",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"blocks/Packed_Ice_JE2_BE3.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"deep_water",
+			"icon":	"items/water_bucket_25w14craftmine.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"dry_land",
+					"icon":	"items/bucket_25w14craftmine.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:dry_land",
+					"target":	1
+				}, {
+					"stage_id":	"water_world",
+					"icon":	"items/water_bucket_25w14craftmine.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:water_world",
+					"target":	1
+				}, {
+					"stage_id":	"water_adv",
+					"icon":	"items/water_bucket_25w14craftmine.png",
+					"type":	"advancement",
+					"root_name":	"minecraft:mines/complete_water_world_level",
+					"target":	1
+				}, {
+					"stage_id":	"cave_water_adv",
+					"icon":	"items/cave_world_25w14craftmine.png",
+					"type":	"advancement",
+					"root_name":	"minecraft:mines/complete_water_cave_level",
+					"target":	1
+				}, {
+					"stage_id":	"leather_cap",
+					"icon":	"items/black_dye_25w14craftmine.png",
+					"type":	"advancement",
+					"root_name":	"minecraft:mines/complete_deluge_level",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"items/water_bucket_25w14craftmine.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"forests",
+			"icon":	"blocks/Oak_Sapling_JE14.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"savanna",
+					"icon":	"blocks/Acacia_Sapling_JE7_BE2.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:savannas",
+					"target":	1
+				}, {
+					"stage_id":	"forest",
+					"icon":	"blocks/Oak_Sapling_JE14.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:forests",
+					"target":	1
+				}, {
+					"stage_id":	"taiga",
+					"icon":	"blocks/Spruce_Sapling_JE7_BE2.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:taigas",
+					"target":	1
+				}, {
+					"stage_id":	"jungle",
+					"icon":	"blocks/Jungle_Sapling_JE7_BE2.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:jungles",
+					"target":	1
+				}, {
+					"stage_id":	"dark_forest",
+					"icon":	"blocks/Dark_Oak_Sapling_JE7_BE2.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:dark_forests",
+					"target":	1
+				}, {
+					"stage_id":	"nether_forest",
+					"icon":	"blocks/Warped_Fungus_JE1_BE1.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:nether_forests",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"blocks/Oak_Sapling_JE14.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"hoglin",
+			"icon":	"monsters/hoglin.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"kill_pig",
+					"icon":	"animals/pig.png",
+					"type":	"stat",
+					"root_name":	"minecraft:killed/minecraft:pig",
+					"target":	1
+				}, {
+					"stage_id":	"hoglin",
+					"icon":	"monsters/hoglin.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:hoglins",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"monsters/hoglin.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"piglin",
+			"icon":	"monsters/piglin.png",
+			"stages":	[{
+					"stage_id":	"piglin",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:piglins",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"zoglin",
+			"icon":	"monsters/zoglin.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"pig",
+					"icon":	"animals/pig.png",
+					"type":	"stat",
+					"root_name":	"minecraft:killed/minecraft:pig",
+					"target":	1
+				}, {
+					"stage_id":	"zoglin",
+					"icon":	"monsters/zoglin.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:zoglins",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"monsters/zoglin.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"ziglin",
+			"icon":	"monsters/zombified_piglin.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"kill_zombie",
+					"icon":	"monsters/zombie.png",
+					"type":	"stat",
+					"root_name":	"minecraft:killed/minecraft:zombie",
+					"target":	1
+				}, {
+					"stage_id":	"ziglin",
+					"icon":	"monsters/zombified_piglin.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:zombified_piglins",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"monsters/zombified_piglin.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"strider",
+			"icon":	"animals/strider.png",
+			"stages":	[{
+					"stage_id":	"strider",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:striders",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"cave_spider",
+			"icon":	"monsters/cave_spider.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"kill_spider",
+					"icon":	"monsters/spider.png",
+					"type":	"stat",
+					"root_name":	"minecraft:killed/minecraft:spider",
+					"target":	1
+				}, {
+					"stage_id":	"spider",
+					"icon":	"monsters/spider.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:spiders",
+					"target":	1
+				}, {
+					"stage_id":	"cave_spider",
+					"icon":	"monsters/cave_spider.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:cave_spiders",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"monsters/cave_spider.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"witch",
+			"icon":	"monsters/witch.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"zombie",
+					"icon":	"monsters/zombie.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:zombies",
+					"target":	1
+				}, {
+					"stage_id":	"skeleton",
+					"icon":	"monsters/skeleton.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:skeletons",
+					"target":	1
+				}, {
+					"stage_id":	"creeper",
+					"icon":	"monsters/creeper.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:creepers",
+					"target":	1
+				}, {
+					"stage_id":	"spider",
+					"icon":	"monsters/spider.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:spiders",
+					"target":	1
+				}, {
+					"stage_id":	"witch",
+					"icon":	"monsters/witch.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:witches",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"monsters/witch.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"enderman",
+			"icon":	"monsters/enderman.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"zombie",
+					"icon":	"monsters/zombie.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:zombies",
+					"target":	1
+				}, {
+					"stage_id":	"skeleton",
+					"icon":	"monsters/skeleton.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:skeletons",
+					"target":	1
+				}, {
+					"stage_id":	"creeper",
+					"icon":	"monsters/creeper.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:creepers",
+					"target":	1
+				}, {
+					"stage_id":	"spider",
+					"icon":	"monsters/spider.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:spiders",
+					"target":	1
+				}, {
+					"stage_id":	"enderman",
+					"icon":	"monsters/enderman.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:endermen",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"monsters/enderman.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"illagers",
+			"icon":	"items/illusioners_25w14craftmine.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"place_lode",
+					"icon":	"blocks/Lodestone_JE1_BE1.png",
+					"type":	"stat",
+					"root_name":	"minecraft:used/minecraft:lodestone",
+					"target":	1
+				}, {
+					"stage_id":	"trade",
+					"icon":	"items/villager_spawn_egg_25w14craftmine.png",
+					"type":	"stat",
+					"root_name":	"minecraft:custom/minecraft:traded_with_villager",
+					"target":	60
+				}, {
+					"stage_id":	"pillager",
+					"icon":	"monsters/pillager.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:pillagers",
+					"target":	1
+				}, {
+					"stage_id":	"vindicator",
+					"icon":	"monsters/vindicator.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:vindicators",
+					"target":	1
+				}, {
+					"stage_id":	"evoker",
+					"icon":	"monsters/evoker.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:evokers",
+					"target":	1
+				}, {
+					"stage_id":	"ravager",
+					"icon":	"monsters/ravager.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:ravagers",
+					"target":	1
+				}, {
+					"stage_id":	"illusioner",
+					"icon":	"items/illusioners_25w14craftmine.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:illusioners",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"items/illusioners_25w14craftmine.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"shulkers",
+			"icon":	"monsters/shulker.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"endstone",
+					"icon":	"blocks/End_Stone_JE3_BE2.png",
+					"type":	"stat",
+					"root_name":	"minecraft:mined/minecraft:end_stone",
+					"target":	1
+				}, {
+					"stage_id":	"endermite",
+					"icon":	"monsters/endermite.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:endermites",
+					"target":	1
+				}, {
+					"stage_id":	"kill_endermite",
+					"icon":	"monsters/endermite.png",
+					"type":	"stat",
+					"root_name":	"minecraft:killed/minecraft:endermite",
+					"target":	1
+				}, {
+					"stage_id":	"shulker",
+					"icon":	"monsters/shulker.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:shulkers",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"monsters/shulker.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"soul_link",
+			"icon":	"items/lead_25w14craftmine.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"1hp",
+					"icon":	"items/glass_bottle_3d_shareware_v1.34.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:one_hp",
+					"target":	1
+				}, {
+					"stage_id":	"in_it_adv",
+					"icon":	"items/lead_25w14craftmine.png",
+					"type":	"advancement",
+					"root_name":	"minecraft:unlocks/in_it_together",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"items/lead_25w14craftmine.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"eternal_lightning",
+			"icon":	"items/yellow_dye_25w14craftmine.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"enderman_event",
+					"icon":	"monsters/enderman.png",
+					"type":	"advancement",
+					"root_name":	"minecraft:feats/enderman",
+					"target":	1
+				}, {
+					"stage_id":	"night",
+					"icon":	"items/blue_dye_1.20.2.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:eternal_night",
+					"target":	1
+				}, {
+					"stage_id":	"rain",
+					"icon":	"items/black_dye_25w14craftmine.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:eternal_rain",
+					"target":	1
+				}, {
+					"stage_id":	"lightning",
+					"icon":	"items/yellow_dye_25w14craftmine.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:eternal_lightning",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"items/yellow_dye_25w14craftmine.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"kuiper_boss",
+			"icon":	"items/kuiper_world_25w14craftmine.png",
+			"stages":	[{
+					"stage_id":	"kuiper_adv",
+					"type":	"advancement",
+					"root_name":	"minecraft:feats/kuiper_world",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"silverfish_boss",
+			"icon":	"monsters/silverfish.png",
+			"stages":	[{
+					"stage_id":	"silverfish_adv",
+					"type":	"advancement",
+					"root_name":	"minecraft:feats/small_but_deadly",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"enderman_boss",
+			"icon":	"monsters/enderman.png",
+			"stages":	[{
+					"stage_id":	"enderman_adv",
+					"type":	"advancement",
+					"root_name":	"minecraft:feats/enderman",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"dragon_boss",
+			"icon":	"blocks/Dragon_Head.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"blaze",
+					"icon":	"items/blaze_spawn_egg_25w14craftmine.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:blazes",
+					"target":	1
+				}, {
+					"stage_id":	"end",
+					"icon":	"blocks/End_Stone_JE3_BE2.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:end",
+					"target":	1
+				}, {
+					"stage_id":	"dragon",
+					"icon":	"items/end_crystal_25w14craftmine.png",
+					"type":	"advancement",
+					"root_name":	"minecraft:feats/end_world",
+					"target":	1
+				}, {
+					"stage_id":	"bottles",
+					"icon":	"items/glass_bottle_3d_shareware_v1.34.png",
+					"type":	"unlock",
+					"root_name":	"minecraft:mise_en_place",
+					"target":	1
+				}, {
+					"stage_id":	"mint",
+					"icon":	"items/dragon_breath_1.20.2.png",
+					"type":	"advancement",
+					"root_name":	"minecraft:feats/dragon_breath",
+					"target":	1
+				}, {
+					"stage_id":	"kill_dragon",
+					"icon":	"blocks/Dragon_Head.png",
+					"type":	"advancement",
+					"root_name":	"minecraft:feats/ender_dragon",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"blocks/Dragon_Head.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"wither_boss",
+			"icon":	"monsters/wither.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"get_skull",
+					"icon":	"blocks/Wither_Skeleton_Skull.png",
+					"type":	"advancement",
+					"root_name":	"minecraft:feats/wither_skeleton_skull",
+					"target":	1
+				}, {
+					"stage_id":	"wither_boss_adv",
+					"icon":	"monsters/wither.png",
+					"type":	"advancement",
+					"root_name":	"minecraft:feats/wither",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"monsters/wither.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"warden_boss",
+			"icon":	"items/warden_spawn_egg_1.21.5.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"amethyst",
+					"icon":	"blocks/Amethyst_Cluster_(U)_JE1.png",
+					"type":	"advancement",
+					"root_name":	"minecraft:feats/crystal",
+					"target":	1
+				}, {
+					"stage_id":	"warden",
+					"icon":	"items/warden_spawn_egg_1.21.5.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:warden_boss_fight",
+					"target":	1
+				}, {
+					"stage_id":	"warden_adv",
+					"icon":	"items/warden_spawn_egg_1.21.5.png",
+					"type":	"advancement",
+					"root_name":	"minecraft:feats/warden",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"items/warden_spawn_egg_1.21.5.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"raid_boss",
+			"icon":	"blocks/Ominous_Banner_unoptimized.gif",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"kill_pillager",
+					"icon":	"monsters/pillager.png",
+					"type":	"stat",
+					"root_name":	"minecraft:killed/minecraft:pillager",
+					"target":	1
+				}, {
+					"stage_id":	"raid_adv",
+					"icon":	"blocks/Ominous_Banner_unoptimized.gif",
+					"type":	"advancement",
+					"root_name":	"minecraft:feats/raid",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"blocks/Ominous_Banner_unoptimized.gif",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"skeleton_boss",
+			"icon":	"items/skeleton_spawn_egg_25w14craftmine.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"kill_skeleton",
+					"icon":	"monsters/skeleton.png",
+					"type":	"stat",
+					"root_name":	"minecraft:killed/minecraft:skeleton",
+					"target":	1
+				}, {
+					"stage_id":	"skeleton_boss_adv",
+					"icon":	"items/skeleton_spawn_egg_25w14craftmine.png",
+					"type":	"advancement",
+					"root_name":	"minecraft:feats/spooky_scary_skeletons",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"items/skeleton_spawn_egg_25w14craftmine.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}, {
+			"root_name":	"ghast_boss",
+			"icon":	"items/ghast_spawn_egg_25w14craftmine.png",
+			"use_stage_icons":	true,
+			"stages":	[{
+					"stage_id":	"bone_block",
+					"icon":	"blocks/Bone_Block_(UD)_JE2_BE2.png",
+					"type":	"stat",
+					"root_name":	"minecraft:mined/minecraft:bone_block",
+					"target":	1
+				}, {
+					"stage_id":	"ghast_crit",
+					"icon":	"monsters/ghast.png",
+					"type":	"criterion",
+					"parent_advancement":	"minecraft:mines/all_mine_ingredients",
+					"root_name":	"minecraft:ghasts",
+					"target":	1
+				}, {
+					"stage_id":	"return_to_sender",
+					"icon":	"items/fire_charge_25w14craftmine.png",
+					"type":	"advancement",
+					"root_name":	"minecraft:feats/return_to_sender",
+					"target":	1
+				}, {
+					"stage_id":	"ghast_boss_killed",
+					"icon":	"items/ghast_tear_3d_shareware_v1.34.png",
+					"type":	"advancement",
+					"root_name":	"minecraft:feats/angry_ghast",
+					"target":	1
+				}, {
+					"stage_id":	"final",
+					"icon":	"items/ghast_spawn_egg_25w14craftmine.png",
+					"type":	"final",
+					"root_name":	""
+				}]
+		}]
+}

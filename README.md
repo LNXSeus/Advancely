@@ -682,8 +682,10 @@ all April Fool's snapshots.
   `stat.playOneMinute` as it's still the mid-era flat stats format.
 * **1.13 – 1.16.5 (Modern)**: Reads from separate, per-world advancements and stats files. Playtime is tracked via
   `minecraft:play_one_minute`.
-* **1.17+**: Same as above, but playtime is tracked via the renamed `minecraft:play_time` statistic.
+* **1.17-1.21.11**: Same as above, but playtime is tracked via the renamed `minecraft:play_time` statistic.
 * **25w14craftmine**: Fully supports the unique advancements, stats, and unlocks files from this snapshot.
+* **26.1+**: Players' advancements and statistic files are now within the `players/advancements` and `players/stats`
+  folders.
 
 </details>
 
@@ -707,7 +709,7 @@ This way templates don't need to be copied for each subversion.
 | `any%`             | 25w14craftmine                              |                  | Default             |
 | `AMI`              | 25w14craftmine                              |                  | Default             |
 | `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4 |                  | Default, ger        |
-| `all_advancements` | 1.12                                        |                  | Default             |
+| `all_advancements` | 1.12, 25w14craftmine                        |                  | Default             |
 | `all_advancements` | 1.16.1, 1.21.3, 1.21.6, 1.21.11             |                  | Default, ger, zh_cn |
 | `all_advancements` | 1.21.3, 1.21.6, 1.21.11                     | `_optimized`     | Default, ger, zh_cn |
 | `miku%`            | 1.21                                        |                  | Default             |

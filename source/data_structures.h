@@ -135,7 +135,9 @@ extern "C" {
     X(MC_VERSION_1_21_9, "1.21.9") \
     X(MC_VERSION_1_21_10, "1.21.10") \
     X(MC_VERSION_1_21_11, "1.21.11") \
-    X(MC_VERSION_26_1, "26.1") // New versioning system that is year.big_release.minor_hotfix
+    /* year.big_release.minor_hotfix, `players/advancements` and `players/stats` */ \
+    X(MC_VERSION_26_1, "26.1") \
+    X(MC_VERSION_26_2, "26.2")
 
 #ifdef __cplusplus
 extern "C" {
