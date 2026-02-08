@@ -22,6 +22,12 @@
 
 ### Built for flexibility, Advancely supports everything from vanilla speedruns to modded adventures and datapacks through the creation of custom templates with a built-in template editor. It automatically detects changes in your latest singleplayer world, providing real-time progress updates.
 
+<p align="center">
+  <img src="readme_assets/Advancely-Thumbnail-Full-Res.png" alt="Advancely_Video.png">
+</p>
+
+# [Watch the full tutorial video here!](https://www.youtube.com/watch?v=Rxd1RJqg2WQ)
+
 ***
 
 ## Become a Supporter!
@@ -37,6 +43,7 @@ Love using Advancely? You can have your name immortalized in the tracker!
 * Totorewa: $31
 * ethansplace98: $30
 * zurtleTif: $20
+* Zesskyo: $10
 
 Simply [**donate here**](https://streamlabs.com/lnxseus/tip) and include the word "**Advancely**" in your donation
 message. **With the next release** your name will be added to the official supporter showcase that appears on the stream
@@ -52,10 +59,14 @@ Thank you for supporting the project!
 
 * [Support Advancely (be featured on the overlay by mentioning
   `Advancely` in your donation message)](https://streamlabs.com/lnxseus/tip)
+* [(affiliate link) amazon](https://amzn.to/4scdytw)
 * [My YouTube](https://www.youtube.com/@lnxs?sub_confirmation=1)
 * [My Twitch](https://www.twitch.tv/lnxseus)
 * [My Twitch Archive + Advancely Devlogs](https://www.youtube.com/@lnxsarchive/playlists?view=1&sort=lad&flow=grid&sub_confirmation=1)
 * [Official Advancely Discord w/ **Unofficial Releases**!](https://discord.gg/TyNgXDz)
+* [Tiktok](https://www.tiktok.com/@lnxseus)
+* [Instagram](https://www.instagram.com/lnxseus/)
+* [X/Twitter](https://x.com/lieinuxxseus)
 * [My GitHub](https://github.com/LNXSeus)
 
 ***
@@ -727,9 +738,11 @@ _(Submit your template through the [official discord](https://discord.gg/TyNgXDz
   language. Simply import your own `.ttf` or `.otf` file if needed (has to be within the `resources/fonts` folder).
 * **UI Language Support**: The UI language is hardcoded to english only the language files of display names can be
   changed.
-* **No Coop Support**: Unfortunately this tracker doesn't fully support coop speedruns as it always updates based on the
+* **No Coop/Server Support**: Unfortunately this tracker doesn't fully support coop speedruns as it always updates based
+  on the
   player file that has most recently been modified. This means Advancely doesn't `combine` progress of multiple
-  players. (e.g., each player completes different advancements).
+  players. (e.g., each player completes different advancements). If you're playing on a server then the required player
+  files are not saved locally so Advancely can't read them.
 * **Overlay Recording**: Especially on a Windows machine and OBS you must use Gamecapture to capture the overlay. A
   window capture can cause weird issues.
 * **PNG Image Compatibility**: On Linux and macOS, custom icons must be standard **8-bit per channel (32-bit RGBA)**
@@ -787,7 +800,7 @@ release and you'll be added here:_
 * Windows: ethansplace98, Yumeko, zurtletif, 3emis, MoreTrident, PhoenixAUS_, metal_silver1234, 36_Official,
   TheDogmaster28, Fangfang, Zesskyo, xiaojiangshi (Dilu)
 * macOS: Slackow, TheDogmaster28, ethansplace98, DesktopFolder, Zesskyo
-* Linux: DesktopFolder, ShadowFlower64, me_nx
+* Linux: DesktopFolder, ShadowFlower64, me_nx, TheDogmaster28
 
 </details>
 
