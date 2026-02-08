@@ -2207,7 +2207,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::BeginDisabled(has_unsaved_changes_in_editor);
     if (ImGui::Button("Import Template")) {
         auto import_action = [&]() {
+#ifdef __APPLE__
+            const char *filter_patterns[1] = {"zip"};
+#else
             const char *filter_patterns[1] = {"*.zip"};
+#endif
             const char *open_path = tinyfd_openFileDialog("Import Template From Zip", "", 1, filter_patterns,
                                                           "Template ZIP Archive", 0);
             if (open_path) {
@@ -2690,7 +2694,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         ImGui::BeginDisabled(has_unsaved_changes_in_editor);
         if (ImGui::Button("Import Language")) {
+#ifdef __APPLE__
+            const char *filter_patterns[1] = {"json"};
+#else
             const char *filter_patterns[1] = {"*.json"};
+#endif
             const char *open_path = tinyfd_openFileDialog("Import Language File", "",
                                                           1, filter_patterns, "JSON files", 0);
             if (open_path) {
@@ -2958,8 +2966,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     // --- Version-aware file filters ---
+#ifdef __APPLE__
+                    const char *json_filter[1] = {"json"};
+                    const char *dat_filter[1] = {"dat"};
+#else
                     const char *json_filter[1] = {"*.json"};
                     const char *dat_filter[1] = {"*.dat"};
+#endif
                     const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
                                                        ? dat_filter
                                                        : json_filter;
@@ -3514,7 +3527,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 snprintf(start_path, sizeof(start_path), "%s/%s/advancements/", t->saves_path,
                                          t->world_name);
                             }
+#ifdef __APPLE__
+                            const char *json_filter[1] = {"json"};
+#else
                             const char *json_filter[1] = {"*.json"};
+#endif
                             const char *dialog_title = (creator_selected_version < MC_VERSION_1_12)
                                                            ? "Select Player Stats File"
                                                            : "Select Player Advancements File";
@@ -3863,8 +3880,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     // --- Version-aware file filters ---
+#ifdef __APPLE__
+                    const char *json_filter[1] = {"json"};
+                    const char *dat_filter[1] = {"dat"};
+#else
                     const char *json_filter[1] = {"*.json"};
                     const char *dat_filter[1] = {"*.dat"};
+#endif
                     const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
                                                        ? dat_filter
                                                        : json_filter;
@@ -4486,8 +4508,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             } else {
                                 snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
                             }
+#ifdef __APPLE__
+                            const char *json_filter[1] = {"json"};
+                            const char *dat_filter[1] = {"dat"};
+#else
                             const char *json_filter[1] = {"*.json"};
                             const char *dat_filter[1] = {"*.dat"};
+#endif
                             const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
                                                                ? dat_filter
                                                                : json_filter;
@@ -4811,7 +4838,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         char start_path[MAX_PATH_LENGTH];
                         snprintf(start_path, sizeof(start_path), "%s/%s/unlocks/", t->saves_path, t->world_name);
 
+#ifdef __APPLE__
+                        const char *filter_patterns[1] = {"json"};
+#else
                         const char *filter_patterns[1] = {"*.json"};
+#endif
                         const char *selection = tinyfd_openFileDialog("Select Player Unlocks File", start_path, 1,
                                                                       filter_patterns, "JSON files", 0);
 
@@ -6347,8 +6378,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                             snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
                                                      t->world_name);
                                         }
+#ifdef __APPLE__
+                                        const char *json_filter[] = {"json"};
+                                        const char *dat_filter[] = {"dat"};
+#else
                                         const char *json_filter[] = {"*.json"};
                                         const char *dat_filter[] = {"*.dat"};
+#endif
                                         selection = tinyfd_openFileDialog(
                                             "Select Player Stats File", start_path, 1,
                                             (creator_selected_version <= MC_VERSION_1_6_4) ? dat_filter : json_filter,
@@ -6384,8 +6420,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                             snprintf(start_path, sizeof(start_path), "%s/%s/advancements/",
                                                      t->saves_path, t->world_name);
                                         }
+#ifdef __APPLE__
+                                        const char *json_filter[] = {"json"};
+                                        const char *dat_filter[] = {"dat"};
+#else
                                         const char *json_filter[] = {"*.json"};
                                         const char *dat_filter[] = {"*.dat"};
+#endif
                                         selection = tinyfd_openFileDialog(
                                             "Select Player File", start_path, 1,
                                             (creator_selected_version <= MC_VERSION_1_6_4) ? dat_filter : json_filter,
@@ -6407,7 +6448,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     case SUBGOAL_UNLOCK: {
                                         snprintf(start_path, sizeof(start_path), "%s/%s/unlocks/", t->saves_path,
                                                  t->world_name);
+#ifdef __APPLE__
+                                        const char *filter_patterns[1] = {"json"};
+#else
                                         const char *filter_patterns[1] = {"*.json"};
+#endif
                                         selection = tinyfd_openFileDialog(
                                             "Select Player Unlocks File", start_path, 1, filter_patterns, "JSON files",
                                             0);

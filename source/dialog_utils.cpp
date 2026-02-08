@@ -80,7 +80,11 @@ bool open_icon_file_dialog(char *out_relative_path, size_t max_len) {
     }
 #endif
 
+#ifdef __APPLE__
+    const char *filter_patterns[2] = {"png", "gif"};
+#else
     const char *filter_patterns[2] = {"*.png", "*.gif"};
+#endif
     const char *selected_path = tinyfd_openFileDialog(
         "Select an Icon - IMPORTANT: The icon must be inside the resources/icons folder!",
         start_path.c_str(),
@@ -131,8 +135,11 @@ bool open_font_file_dialog(char *out_filename, size_t max_len) {
         start_path = std::string(cwd) + "/resources/fonts/";
         normalize_path(start_path);
     }
-
+#ifdef __APPLE__
+    const char *filter_patterns[2] = {"ttf", "otf"};
+#else
     const char *filter_patterns[2] = {"*.ttf", "*.otf"};
+#endif
     const char *selected_path = tinyfd_openFileDialog(
         "Select Font File",
         start_path.c_str(),
@@ -187,7 +194,11 @@ bool open_gui_texture_dialog(char *out_relative_path, size_t max_len) {
     for (char &c: native_start_path) { if (c == '/') c = '\\'; }
 #endif
 
+#ifdef __APPLE__
+    const char *filter_patterns[2] = {"png", "gif"}; // Only allow PNG AND .GIF
+#else
     const char *filter_patterns[2] = {"*.png", "*.gif"}; // Only allow PNG AND .GIF
+#endif
     const char *selected_path = tinyfd_openFileDialog(
         "Select Background Texture",
         native_start_path.c_str(), // Use native path for dialog
