@@ -3,3 +3,4 @@
 cmake-build-*/ # slash at the end makes it a folder
 .idea/
 /git-filter-repo.py
+build/
