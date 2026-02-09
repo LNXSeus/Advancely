@@ -790,14 +790,35 @@ Suggest it in the [Official Advancely Discord](https://discord.gg/TyNgXDz) withi
 
 ***
 
+## Command Line Arguments
+
+<details>
+<summary><strong>View Command Line Arguments</strong></summary>
+<br>
+
+Advancely supports several command-line arguments to customize its behavior. These are particularly useful for package
+maintainers or advanced users who want to override default behaviors.
+
+| Argument                 | Description                                                                                                                                                                          |
+|:-------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `--settings-file <path>` | Specifies a custom absolute or relative path for the `settings.json` configuration file. Useful for system-wide installations where config should reside in `~/.config/` or similar. |
+| `--disable-updater`      | Disables the automatic update check on startup. **Recommended for package maintainers** (e.g., AUR, RPM, DEB) to prevent the app from modifying itself.                              |
+| `--version`              | Prints the current version of Advancely to the console and exits.                                                                                                                    |
+| `--overlay`              | Launches the application in "Overlay Mode". **Note:** This is primarily used internally by the main process to spawn the overlay window.                                             |
+| `--test-mode`            | Enables test mode for debugging and development purposes. This is mainly used by the github action runners to assure functionality and forcing termination after 5 seconds.          |
+| `--updated`              | **Internal Flag:** Signals to the application that it has just been updated, triggering the release notes popup.                                                                     |
+
+</details>
+
+***
+
 ## Beta Testers
 
 <details>
 <summary><strong>View Beta Testers</strong></summary>
 <br>
 
-Massive thanks to all the beta testers. _Message me on discord @lnxseus with proof of using Advancely before its full
-release and you'll be added here:_
+Massive thanks to all the beta testers who tested Advancely before its full release.
 
 * Windows: ethansplace98, Yumeko, zurtletif, 3emis, MoreTrident, PhoenixAUS_, metal_silver1234, 36_Official,
   TheDogmaster28, Fangfang, Zesskyo, xiaojiangshi (Dilu)
@@ -816,34 +837,18 @@ release and you'll be added here:_
 
 Massive thanks to all people involved in improving and shaping Advancely:
 
-* Oskar33: Initial inspiration to even start work on Advancely.
-* ethansplace98: Early interest in Advancely. Helped bringing ideas for early development. Advancely supporter.
-* Yumeko: Many feature suggestions, also mainly responsible for chinese translations of templates.
-* zurtleTif: Has used my tracker more than anyone else. Suggested features, provided background textures and is Advancelys first supporter.
+* **Oskar33**: Initial inspiration to even start work on Advancely.
+* **ethansplace98**: Early interest in Advancely. Helped bringing ideas for early development. Advancely supporter.
+* **Yumeko**: Many feature suggestions, also mainly responsible for chinese translations of templates.
+* **zurtleTif**: Has used my tracker more than anyone else. Suggested features, provided background textures and is Advancelys first supporter.
 * InFectDilu: Feature suggestions along with help on chinese translations, also provided custom background textures.
-* Slackow: Massive help with optimizing the macOS implementation and making the automatic instance detection possible.
-* DesktopFolder: Crucial macOS tester.
-* Zesskyo: Advancely supporter. Many feature suggestions. Important macOS tester.
-* me_nx: Help with Linux implementation.
-* amathew4538: Important contribution to fixing macOS imports and building.
+* **Slackow**: Massive help with optimizing the macOS implementation and making the automatic instance detection possible.
+* **DesktopFolder**: Crucial macOS tester.
+* **Zesskyo**: Advancely supporter. Many feature suggestions. Important macOS tester.
+* **me_nx**: Help with Linux implementation.
+* **amathew4538**: Important contribution to fixing macOS imports and building.
 
 </details>
-
-***
-
-## Command Line Arguments
-
-Advancely supports several command-line arguments to customize its behavior. These are particularly useful for package
-maintainers or advanced users who want to override default behaviors.
-
-| Argument                 | Description                                                                                                                                                                          |
-|:-------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `--settings-file <path>` | Specifies a custom absolute or relative path for the `settings.json` configuration file. Useful for system-wide installations where config should reside in `~/.config/` or similar. |
-| `--disable-updater`      | Disables the automatic update check on startup. **Recommended for package maintainers** (e.g., AUR, RPM, DEB) to prevent the app from modifying itself.                              |
-| `--version`              | Prints the current version of Advancely to the console and exits.                                                                                                                    |
-| `--overlay`              | Launches the application in "Overlay Mode". **Note:** This is primarily used internally by the main process to spawn the overlay window.                                             |
-| `--test-mode`            | Enables test mode for debugging and development purposes. This is mainly used by the github action runners to assure functionality and forcing termination after 5 seconds.          |
-| `--updated`              | **Internal Flag:** Signals to the application that it has just been updated, triggering the release notes popup.                                                                     |
 
 ***
 
