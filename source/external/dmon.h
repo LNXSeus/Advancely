@@ -304,6 +304,9 @@ _DMON_PRIVATE char* _dmon_strcpy(char* dst, int dst_sz, const char* src)
     DMON_ASSERT(dst);
     DMON_ASSERT(src);
 
+    // FIX: Prevent buffer overflow if size is invalid or exhausted
+    if (dst_sz <= 0) return dst;
+
     const int32_t len = (int32_t)strlen(src);
     const int32_t _max = dst_sz - 1;
     const int32_t num = (len < _max ? len : _max);
@@ -803,7 +806,7 @@ _DMON_PRIVATE void _dmon_watch_recursive(const char* dirname, int fd, uint32_t m
 {
     struct dirent* entry;
     DIR* dir = opendir(dirname);
-    DMON_ASSERT(dir);
+    if (!dir) return;
 
     char watchdir[DMON_MAX_PATH];
 
@@ -835,7 +838,10 @@ _DMON_PRIVATE void _dmon_watch_recursive(const char* dirname, int fd, uint32_t m
             }
             int wd = inotify_add_watch(fd, watchdir, mask);
             _DMON_UNUSED(wd);
-            DMON_ASSERT(wd != -1);
+            // FIX: If directory is gone (ENOENT), skip it instead of crashing
+            if (wd < 0) {
+                continue;
+            }
 
             dmon__watch_subdir subdir;
             _dmon_strcpy(subdir.rootdir, sizeof(subdir.rootdir), watchdir);
@@ -870,7 +876,7 @@ _DMON_PRIVATE void _dmon_gather_recursive(dmon__watch_state* watch, const char* 
 {
     struct dirent* entry;
     DIR* dir = opendir(dirname);
-    DMON_ASSERT(dir);
+    if (!dir) return;
 
     char newdir[DMON_MAX_PATH];
     while ((entry = readdir(dir)) != NULL) {
@@ -922,8 +928,11 @@ _DMON_PRIVATE void _dmon_inotify_process_events(void)
                     // remove trailing slash from both cases and test
                     int l1 = (int)strlen(ev->filepath);
                     int l2 = (int)strlen(check_ev->filepath);
-                    if (ev->filepath[l1-1] == '/')          ev->filepath[l1-1] = '\0';
-                    if (check_ev->filepath[l2-1] == '/')    check_ev->filepath[l2-1] = '\0';
+
+                    // FIX: Bounds check before accessing index -1
+                    if (l1 > 0 && ev->filepath[l1-1] == '/')          ev->filepath[l1-1] = '\0';
+                    if (l2 > 0 && check_ev->filepath[l2-1] == '/')    check_ev->filepath[l2-1] = '\0';
+
                     if (strcmp(ev->filepath, check_ev->filepath) == 0) {
                         ev->skip = true;
                         break;
