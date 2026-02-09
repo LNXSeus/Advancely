@@ -81,14 +81,16 @@ bool open_icon_file_dialog(char *out_relative_path, size_t max_len) {
 #endif
 
 #ifdef __APPLE__
-    const char *filter_patterns[2] = {"png", "gif"};
+    const char *filter_patterns[4] = {"*.png", "*.gif", "public.png", "com.compuserve.gif"};
+    int filter_count = 4;
 #else
     const char *filter_patterns[2] = {"*.png", "*.gif"};
+    int filter_count = 2;
 #endif
     const char *selected_path = tinyfd_openFileDialog(
         "Select an Icon - IMPORTANT: The icon must be inside the resources/icons folder!",
         start_path.c_str(),
-        2,
+        filter_count,
         filter_patterns,
         "Image Files (.png, .gif)",
         0
@@ -136,14 +138,16 @@ bool open_font_file_dialog(char *out_filename, size_t max_len) {
         normalize_path(start_path);
     }
 #ifdef __APPLE__
-    const char *filter_patterns[2] = {"ttf", "otf"};
+    const char *filter_patterns[4] = {"*.ttf", "*.otf", "public.truetype-ttf-font", "public.opentype-font"};
+    int filter_count = 4;
 #else
     const char *filter_patterns[2] = {"*.ttf", "*.otf"};
+    int filter_count = 2;
 #endif
     const char *selected_path = tinyfd_openFileDialog(
         "Select Font File",
         start_path.c_str(),
-        2,
+        filter_count,
         filter_patterns,
         "Font Files (.ttf, .otf)",
         0
@@ -195,14 +199,16 @@ bool open_gui_texture_dialog(char *out_relative_path, size_t max_len) {
 #endif
 
 #ifdef __APPLE__
-    const char *filter_patterns[2] = {"png", "gif"}; // Only allow PNG AND .GIF
+    const char *filter_patterns[4] = {"*.png", "*.gif", "public.png", "com.compuserve.gif"};
+    int filter_count = 4;
 #else
     const char *filter_patterns[2] = {"*.png", "*.gif"}; // Only allow PNG AND .GIF
+    int filter_count = 2;
 #endif
     const char *selected_path = tinyfd_openFileDialog(
         "Select Background Texture",
         native_start_path.c_str(), // Use native path for dialog
-        2,
+        filter_count,
         filter_patterns,
         "Image Files (.png, .gif)",
         0

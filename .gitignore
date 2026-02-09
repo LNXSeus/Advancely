@@ -1,5 +1,9 @@
 # ignore all .txt files
 # *.txt
-cmake-build-*/ # slash at the end makes it a folder
+cmake-build-*/
+# slash at the end makes it a folder
 .idea/
 /git-filter-repo.py
+.cache/
+build/
+.DS_Store
