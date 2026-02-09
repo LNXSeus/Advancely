@@ -841,14 +841,15 @@ Massive thanks to all people involved in improving and shaping Advancely:
 * **ethansplace98**: Early interest in Advancely. Helped bringing ideas for early development. Advancely supporter.
 * **Yumeko**: Many feature suggestions, also mainly responsible for chinese translations of templates.
 * **zurtleTif**: Has used my tracker more than anyone else. Suggested features, provided background textures and is Advancelys first supporter.
-* **InFectDilu**: Feature suggestions along with help on chinese translations, also provided custom background textures.
-* **Slackow**: Massive help with optimizing the macOS implementation and making the automatic instance detection possible.
-* **DesktopFolder**: Crucial macOS tester.
+* **[TowardStars](https://github.com/towardstars)**: Helped with Chinese translations.
+* **[InFectDilu](https://github.com/InFectDilu)**: Feature suggestions along with help on chinese translations, also provided custom background textures.
+* **[Slackow](https://github.com/Slackow)**: Massive help with optimizing the macOS implementation and making the automatic instance detection possible.
+* **[DesktopFolder](https://github.com/DesktopFolder)**: Crucial macOS tester.
 * **Zesskyo**: Advancely supporter. Many feature suggestions. Important macOS tester.
 * **me_nx**: Help with Linux implementation.
-* **@amathew4538**: Important contribution to fixing macOS imports and building.
-* **@R0dn3yS**: Helped fixing renaming issue for 1.16 all_advancements templates and crash on Linux w/ @nikander100.
-* **@nikander100**: Helped fixing Segmentation fault on Linux.
+* **[amathew4538](https://github.com/amathew4538)**: Important contribution to fixing macOS imports and building.
+* **[R0dn3yS](https://github.com/R0dn3yS)**: Helped fixing renaming issue for 1.16 all_advancements templates and crash on Linux w/ @nikander100.
+* **[nikander100](https://github.com/nikander100)**: Helped fixing Segmentation fault on Linux.
 
 </details>
 
