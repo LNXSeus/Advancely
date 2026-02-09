@@ -1,4 +1,4 @@
-// Copyright (c) 2025 LNXSeus. All Rights Reserved.
+// Copyright (c) 2026 LNXSeus. All Rights Reserved.
 //
 // This project is proprietary software. You are granted a license to use the software as-is.
 // You may not copy, distribute, modify, reverse-engineer, or use this software
@@ -4851,7 +4851,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         snprintf(start_path, sizeof(start_path), "%s/%s/unlocks/", t->saves_path, t->world_name);
 
 #ifdef __APPLE__
-                        onst char *filter_patterns[2] = {"*.json", "public.json"};
+                        const char *filter_patterns[2] = {"*.json", "public.json"};
                         int filter_count = 2;
 #else
                         const char *filter_patterns[1] = {"*.json"};

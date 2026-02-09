@@ -1,4 +1,4 @@
-// Copyright (c) 2025 LNXSeus. All Rights Reserved.
+// Copyright (c) 2026 LNXSeus. All Rights Reserved.
 //
 // This project is proprietary software. You are granted a license to use the software as-is.
 // You may not copy, distribute, modify, reverse-engineer, or use this software
@@ -55,7 +55,7 @@ const char* get_notes_manifest_path();
 #define TRACKER_TITLE "Advancely"
 
 // This is the version that gets compared with the latest release tag on GitHub
-#define ADVANCELY_VERSION "v1.0.6" // vMAJOR.MINOR.PATCH // Update this always, SAME FORMAT ON RELEASE TAG!
+#define ADVANCELY_VERSION "v1.0.8" // vMAJOR.MINOR.PATCH // Update this always, SAME FORMAT ON RELEASE TAG!
 #define ADVANCELY_ICON_PATH "/gui/Advancely_Logo_NoText.png" // Starting from /gui folder
 #define ADVANCELY_LOGO_PATH "/gui/Advancely_Logo.png" // Starting from /gui folder
 #define ADVANCELY_LOGO_SIZE 512.0f // Logo size on startup message window or update successful window
