@@ -3534,7 +3534,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          t->world_name);
                             }
 #ifdef __APPLE__
-                            const char *filter_patterns[2] = {"*.json", "public.json"};
+                            const char *json_filter[2] = {"*.json", "public.json"};
                             int filter_count = 2;
 #else
                             const char *json_filter[1] = {"*.json"};
