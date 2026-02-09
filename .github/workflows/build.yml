@@ -55,17 +55,6 @@ jobs:
           cp /usr/local/lib/libSDL3.so.0 release/
           cp /usr/local/lib/libSDL3_image.so.0 release/
           cp /usr/local/lib/libSDL3_ttf.so.0 release/
-          TEMPLATE_DIR="release/resources/templates/1.16.1"
-          if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
-            mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/all_advancements"
-          fi
-          LOWERCASE_DIR="$TEMPLATE_DIR/all_advancements"
-          if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements.json" ]; then
-            mv "$LOWERCASE_DIR/1_16_1_All_Advancements.json" "$LOWERCASE_DIR/1_16_1_all_advancements.json"
-          fi
-          if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" ]; then
-            mv "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" "$LOWERCASE_DIR/1_16_1_all_advancements_lang.json"
-          fi
       - name: Upload Linux Release Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -287,18 +276,6 @@ jobs:
         run: |
           cp -r resources release/
           cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
-          
-          TEMPLATE_DIR="release/resources/templates/1.16.1"
-          if [ -d "$TEMPLATE_DIR/All_Advancements" ]; then
-            mv "$TEMPLATE_DIR/All_Advancements" "$TEMPLATE_DIR/all_advancements"
-          fi
-          LOWERCASE_DIR="$TEMPLATE_DIR/all_advancements"
-          if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements.json" ]; then
-            mv "$LOWERCASE_DIR/1_16_1_All_Advancements.json" "$LOWERCASE_DIR/1_16_1_all_advancements.json"
-          fi
-          if [ -f "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" ]; then
-            mv "$LOWERCASE_DIR/1_16_1_All_Advancements_lang.json" "$LOWERCASE_DIR/1_16_1_all_advancements_lang.json"
-          fi
 
       # Manually zip it
       - name: Create Zip Archive
