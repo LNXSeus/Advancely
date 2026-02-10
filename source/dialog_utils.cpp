@@ -36,7 +36,7 @@ static void normalize_path(std::string &path) {
 // Gets the absolute path to the application's resources/icons directory
 static bool get_icons_start_path(std::string &out_path) {
     char icons_path[MAX_PATH_LENGTH];
-    snprintf(icons_path, sizeof(icons_path), "%s/icons/", get_resources_path());
+    snprintf(icons_path, sizeof(icons_path), "%s/icons/", get_application_dir());
     if (!path_exists(icons_path)) return false;
     out_path = icons_path;
     normalize_path(out_path); // normalize_path is still useful here
@@ -46,7 +46,7 @@ static bool get_icons_start_path(std::string &out_path) {
 // Gets the absolute path to the application's resources/gui directory
 static bool get_gui_start_path(std::string &out_path) {
     char gui_path[MAX_PATH_LENGTH];
-    snprintf(gui_path, sizeof(gui_path), "%s/gui/", get_resources_path());
+    snprintf(gui_path, sizeof(gui_path), "%s/gui/", get_application_dir());
     if (!path_exists(gui_path)) {
         log_message(LOG_ERROR, "[DIALOG UTILS] GUI texture directory not found at: %s\n", gui_path);
         return false;
@@ -121,7 +121,7 @@ bool open_icon_file_dialog(char *out_relative_path, size_t max_len) {
 // Gets the absolute path to the application's resources/fonts directory
 static bool get_fonts_start_path(std::string &out_path) {
     char fonts_path[MAX_PATH_LENGTH];
-    snprintf(fonts_path, sizeof(fonts_path), "%s/fonts/", get_resources_path());
+    snprintf(fonts_path, sizeof(fonts_path), "%s/fonts/", get_application_dir());
     if (!path_exists(fonts_path)) return false;
     out_path = fonts_path;
     normalize_path(out_path);
