@@ -210,6 +210,18 @@ being displayed at once.
 
 ## Getting Started
 
+## For supported Linux distros
+
+* **Arch Linux:**
+
+    Use your favorite AUR helper
+    ```
+    paru -S advancely-bin
+    ```
+
+
+## For all other installations
+
 ### 1. Downloading the Correct Version
 
 Go to the [**releases page**](https://github.com/LNXSeus/Advancely/releases) and download the `.zip` file that matches
@@ -807,6 +819,7 @@ maintainers or advanced users who want to override default behaviors.
 | `--overlay`              | Launches the application in "Overlay Mode". **Note:** This is primarily used internally by the main process to spawn the overlay window.                                             |
 | `--test-mode`            | Enables test mode for debugging and development purposes. This is mainly used by the github action runners to assure functionality and forcing termination after 5 seconds.          |
 | `--updated`              | **Internal Flag:** Signals to the application that it has just been updated, triggering the release notes popup.                                                                     |
+| `--use-home-dir`         | **Linux Only:** Makes the application use the users home directory for applicable files.
 
 </details>
 
