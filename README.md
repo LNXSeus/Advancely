@@ -216,7 +216,7 @@ being displayed at once.
 
     Use your favorite AUR helper
     ```
-    paru -S advancely-bin
+    paru -S advancely
     ```
 
 

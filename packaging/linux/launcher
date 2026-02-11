@@ -6,7 +6,7 @@ APPLICATION_DIRECTORY="/usr/share/advancely"
 
 touch "${ADVANCELY_CONFIG_DIRECTORY}/version"
 
-if [ ! -d "${ADVANCELY_CONFIG_DIRECTORY}" ] || ! cmp "${ADVANCELY_CONFIG_DIRECTORY}/version" "/usr/share/advancely/version"; then
+if [[ ! -d "${ADVANCELY_CONFIG_DIRECTORY}" ]] || ! cmp "${ADVANCELY_CONFIG_DIRECTORY}/version" "/usr/share/advancely/version"; then
   mkdir -p "${ADVANCELY_CONFIG_DIRECTORY}"
 
   cp -r "${APPLICATION_DIRECTORY}/resources/"{notes,templates} "${ADVANCELY_CONFIG_DIRECTORY}/"
