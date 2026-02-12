@@ -665,7 +665,7 @@ all April Fool's snapshots.
   in-game ticks (20 ticks per second).
 
 <details>
-<summary><strong>View Era-Specific Logic (1.0 - 1.17+)</strong></summary>
+<summary><strong>View Era-Specific Logic (1.0 - 26.1+)</strong></summary>
 <br>
 
 * **1.0 – 1.6.4 (Legacy)**: Advancely supports two modes for these versions:
@@ -709,7 +709,7 @@ This way templates don't need to be copied for each subversion.
 | `any%`             | 25w14craftmine                              |                  | Default             |
 | `AMI`              | 25w14craftmine                              |                  | Default             |
 | `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4 |                  | Default, ger        |
-| `all_advancements` | 1.12, 25w14craftmine                        |                  | Default             |
+| `all_advancements` | 1.12, 1.13, 25w14craftmine                  |                  | Default             |
 | `all_advancements` | 1.16.1, 1.21.3, 1.21.6, 1.21.11, 26.1       |                  | Default, ger, zh_cn |
 | `all_advancements` | 1.21.3, 1.21.6, 1.21.11, 26.1               | `_optimized`     | Default, ger, zh_cn |
 | `miku%`            | 1.21                                        |                  | Default             |
@@ -848,7 +848,7 @@ Massive thanks to all people involved in improving and shaping Advancely:
 * **Zesskyo**: Advancely supporter. Many feature suggestions. Important macOS tester.
 * **me_nx**: Help with Linux implementation.
 * **[amathew4538](https://github.com/amathew4538)**: Important contribution to fixing macOS imports and building.
-* **[R0dn3yS](https://github.com/R0dn3yS)**: Helped fixing renaming issue for 1.16 all_advancements templates and crash on Linux w/ @nikander100.
+* **[R0dn3yS](https://github.com/R0dn3yS)**: Helped fixing renaming issue for 1.16 all_advancements templates and crash on Linux w/ nikander100.
 * **[nikander100](https://github.com/nikander100)**: Helped fixing Segmentation fault on Linux.
 
 </details>
