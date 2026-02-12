@@ -45,6 +45,7 @@ typedef enum {
 void show_error_message(const char *title, const char *message);
 
 const char* get_resources_path();
+const char* get_application_dir();
 const char* get_settings_file_path();
 const char* get_notes_dir_path();
 const char* get_notes_manifest_path();
