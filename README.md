@@ -32,6 +32,8 @@
 
 ## Become a Supporter!
 
+> 📺 **Video Guide:** [Jump to Support Section (33:53)](https://youtu.be/Rxd1RJqg2WQ?t=33m53s)
+
 Love using Advancely? You can have your name immortalized in the tracker!
 
 <p align="center">
@@ -72,6 +74,8 @@ Thank you for supporting the project!
 ***
 
 ## What is Advancely?
+
+> 📺 **Video Guide:** [Intro (0:00)](https://youtu.be/Rxd1RJqg2WQ?t=0m00s) • [The Basics (1:50)](https://youtu.be/Rxd1RJqg2WQ?t=1m50s)
 
 <p align="center">
   <img src="readme_assets/Advancely_v0.9.413_Preview.png" alt="Advancely Preview v0.9.413">
@@ -218,8 +222,7 @@ being displayed at once.
     ```
     paru -S advancely
     ```
-
-
+    
 ## For all other installations
 
 ### 1. Downloading the Correct Version
@@ -232,6 +235,18 @@ your operating system. The `vX.X.X` is the Advancely version, that is also displ
 * **macOS:** `Advancely-vX.X.X-macOS-Universal.zip` for both Intel (down to macOS 13 Ventura) and Silicon Macs.
 
 ### 2. Installation & First-Time Run
+
+#### For supported Linux distros
+
+* **Arch Linux:**
+
+  Use your favorite AUR helper
+    ```
+    paru -S advancely
+    ```
+
+#### For all other installations
+
 
 To ensure the application works correctly, please follow the instructions for your operating system.
 
@@ -257,27 +272,27 @@ Due to macOS security (Gatekeeper), you cannot run the app directly from the Dow
 
 **Authorizing the App (First Run):**
 
-✔️ **Method 1: The Right-Click Trick**
-
-1. After moving the app to your Applications folder or Desktop...
-2. **Right-click** (or Control-click) `Advancely.app` and select **Open** from the menu.
-3. A warning will appear. Click **Open**. macOS will now remember that you trust this application.
-
-✔️ **Method 2: System Settings (If Method 1 fails)**
-If the app still refuses to open:
-
-1. Open **System Settings** -> **Privacy & Security**.
-2. Scroll down to the **Security** section.
-3. Look for a message stating "Advancely was blocked...".
-4. Click **Open Anyway** and confirm with your password.
-
-✔️ **Method 3: Terminal Authorization**
+✔️ **Method 1: Terminal Authorization**
 If you still encounter issues, you can strip the quarantine tags manually:
 
 1. Open the **Terminal** app.
 2. Type `xattr -cr ` (note the space at the end).
 3. Drag the `Advancely.app` file from Finder onto the Terminal window.
 4. Press **Enter**.
+
+✔️ **Method 2: The Right-Click Trick**
+
+1. After moving the app to your Applications folder or Desktop...
+2. **Right-click** (or Control-click) `Advancely.app` and select **Open** from the menu.
+3. A warning will appear. Click **Open**. macOS will now remember that you trust this application.
+
+✔️ **Method 3: System Settings (If Method 1 fails)**
+If the app still refuses to open:
+
+1. Open **System Settings** -> **Privacy & Security**.
+2. Scroll down to the **Security** section.
+3. Look for a message stating "Advancely was blocked...".
+4. Click **Open Anyway** and confirm with your password.
 
 </details>
 
@@ -308,6 +323,8 @@ some other custom launcher.
 ***
 
 ## Download Once, Update Forever
+
+> 📺 **Video Guide:** [Auto-Updates Explained (33:01)](https://youtu.be/Rxd1RJqg2WQ?t=33m01s)
 
 Advancely is designed to be easy to maintain. By default, **the tracker will automatically check for new versions on
 startup**. When an update is available, you will be notified with a prompt offering to download and install it for you.
@@ -366,6 +383,8 @@ Your custom template will appear separately in the template list and will not be
 
 ## The Tracker Window
 
+> 📺 **Video Guide:** [Main Tracker Overview (18:23)](https://youtu.be/Rxd1RJqg2WQ?t=18m23s) • [Controls & Navigation (6:22)](https://youtu.be/Rxd1RJqg2WQ?t=6m22s)
+
 <p align="center">
   <img src="readme_assets/v0.9.286_Tracker_Window.png" alt="Tracker_Window">
 </p>
@@ -373,7 +392,7 @@ Your custom template will appear separately in the template list and will not be
 The main window is an interactive canvas where all your tracked goals are displayed. You can freely zoom in and out to
 rearrange the items in view to suit your needs, making it easy to focus on what matters most for your current run. The
 order of the sections (advancements, recipes, multi-stage goals, ...) can be configured in
-the [settings window](https://github.com/LNXSeus/Advancely#the-settings-window-esc).
+the [settings window](#the-settings-window-esc).
 
 <details>
 <summary><strong>Controls & Features (Pan, Zoom, Search, Notes)</strong></summary>
@@ -457,6 +476,8 @@ allows you to switch to the UI font for improved readability.
 
 ## The Stream Overlay
 
+> 📺 **Video Guide:** [Overlay Setup & Customization (18:45)](https://youtu.be/Rxd1RJqg2WQ?t=18m45s) • [Overlay Progress (14:10)](https://youtu.be/Rxd1RJqg2WQ?t=14m10s)
+
 <p align="center">
   <img src="readme_assets/Advancely_Overlay_short.gif" alt="Advancely_Overlay_short.gif">
   <br>
@@ -522,6 +543,26 @@ Nearly every aspect of the overlay can be tailored to your liking from the setti
 ***
 
 ## The Template Editor (`ESC` ▶ Edit Templates)
+
+<details>
+<summary>📺 <strong>Video Guide: Template Editor Chapters (Click to View)</strong></summary>
+
+* [**6. Template Editor Overview** (19:58)](https://youtu.be/Rxd1RJqg2WQ?t=19m58s)
+* [6.1 Interface](https://youtu.be/Rxd1RJqg2WQ?t=20m14s)
+* [6.2 Creating Templates](https://youtu.be/Rxd1RJqg2WQ?t=20m56s)
+    * [6.2.1 New Template](https://youtu.be/Rxd1RJqg2WQ?t=21m06s)
+    * [6.2.2 Advancements](https://youtu.be/Rxd1RJqg2WQ?t=21m51s)
+    * [6.2.3 Stats](https://youtu.be/Rxd1RJqg2WQ?t=25m22s)
+    * [6.2.4 Custom Goals](https://youtu.be/Rxd1RJqg2WQ?t=27m03s)
+    * [6.2.5 Multi-Stage Goals](https://youtu.be/Rxd1RJqg2WQ?t=27m45s)
+    * [6.2.6 Unlocks](https://youtu.be/Rxd1RJqg2WQ?t=28m56s)
+* [6.3 Buttons](https://youtu.be/Rxd1RJqg2WQ?t=29m05s)
+* [6.4 Languages](https://youtu.be/Rxd1RJqg2WQ?t=29m53s)
+* [6.5 Search Bar](https://youtu.be/Rxd1RJqg2WQ?t=30m46s)
+* [6.6 Legacy Versions](https://youtu.be/Rxd1RJqg2WQ?t=31m23s)
+* [6.7 Testing](https://youtu.be/Rxd1RJqg2WQ?t=32m42s)
+
+</details>
 
 This is the heart of Advancely's customization. The in-app editor gives you complete control to define, modify, and
 share the rulesets or `templates` that the tracker uses. You can access it by opening the settings (`ESC`) and clicking
@@ -622,6 +663,20 @@ lists of game data to assist you in building the perfect template.
 ***
 
 ## The Settings Window (`ESC`)
+
+<details>
+<summary>📺 <strong>Video Guide: Settings Chapters (Click to View)</strong></summary>
+
+* [**3. Settings Overview** (7:36)](https://youtu.be/Rxd1RJqg2WQ?t=7m36s)
+* [3.1 Paths](https://youtu.be/Rxd1RJqg2WQ?t=8m21s) | [3.2 Templates](https://youtu.be/Rxd1RJqg2WQ?t=8m29s) | [3.3 General](https://youtu.be/Rxd1RJqg2WQ?t=12m03s)
+* [3.4 Goal Visibility](https://youtu.be/Rxd1RJqg2WQ?t=13m48s) | [3.5 Overlay Progress](https://youtu.be/Rxd1RJqg2WQ?t=14m10s)
+* [3.6 Visuals](https://youtu.be/Rxd1RJqg2WQ?t=14m27s) | [3.7 Colors](https://youtu.be/Rxd1RJqg2WQ?t=14m33s) | [3.8 Textures](https://youtu.be/Rxd1RJqg2WQ?t=15m10s)
+* [3.9 Fonts](https://youtu.be/Rxd1RJqg2WQ?t=15m18s) | [3.10 Level of Detail](https://youtu.be/Rxd1RJqg2WQ?t=15m53s)
+* [3.11 List Behavior](https://youtu.be/Rxd1RJqg2WQ?t=16m20s) | [3.12 Tracker Spacing](https://youtu.be/Rxd1RJqg2WQ?t=16m36s)
+* [3.13 Overlay Spacing](https://youtu.be/Rxd1RJqg2WQ?t=16m57s) | [3.14 Section Order](https://youtu.be/Rxd1RJqg2WQ?t=17m25s)
+* [3.15 Debugging](https://youtu.be/Rxd1RJqg2WQ?t=17m32s) | [3.16 Hotkeys](https://youtu.be/Rxd1RJqg2WQ?t=18m16s)
+
+</details>
 
 The true power of Advancely lies in its deep customization. Every feature can be configured in real-time from the
 settings window, which can be opened at any time by pressing the `ESC` key.
@@ -852,15 +907,19 @@ Massive thanks to all people involved in improving and shaping Advancely:
 * **Oskar33**: Initial inspiration to even start work on Advancely.
 * **ethansplace98**: Early interest in Advancely. Helped bringing ideas for early development. Advancely supporter.
 * **Yumeko**: Many feature suggestions, also mainly responsible for chinese translations of templates.
-* **zurtleTif**: Has used my tracker more than anyone else. Suggested features, provided background textures and is Advancelys first supporter.
+* **zurtleTif**: Has used my tracker more than anyone else. Suggested features, provided background textures and is
+  Advancelys first supporter.
 * **[TowardStars](https://github.com/towardstars)**: Helped with Chinese translations.
-* **[InFectDilu](https://github.com/InFectDilu)**: Feature suggestions along with help on chinese translations, also provided custom background textures.
-* **[Slackow](https://github.com/Slackow)**: Massive help with optimizing the macOS implementation and making the automatic instance detection possible.
+* **[InFectDilu](https://github.com/InFectDilu)**: Feature suggestions along with help on chinese translations, also
+  provided custom background textures.
+* **[Slackow](https://github.com/Slackow)**: Massive help with optimizing the macOS implementation and making the
+  automatic instance detection possible.
 * **[DesktopFolder](https://github.com/DesktopFolder)**: Crucial macOS tester.
 * **Zesskyo**: Advancely supporter. Many feature suggestions. Important macOS tester.
 * **me_nx**: Help with Linux implementation.
 * **[amathew4538](https://github.com/amathew4538)**: Important contribution to fixing macOS imports and building.
-* **[R0dn3yS](https://github.com/R0dn3yS)**: Helped fixing renaming issue for 1.16 all_advancements templates and crash on Linux w/ nikander100.
+* **[R0dn3yS](https://github.com/R0dn3yS)**: Helped fixing renaming issue for 1.16 all_advancements templates and crash
+  on Linux w/ nikander100.
 * **[nikander100](https://github.com/nikander100)**: Helped fixing Segmentation fault on Linux.
 
 </details>
