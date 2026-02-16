@@ -2,7 +2,7 @@
   <img src="readme_assets/Advancely_Logo.png" alt="Advancely_Logo.png">
 </p>
 
-# [⬇️ **DOWNLOAD ADVANCELY NOW\! (Windows, Linux & macOS)** ⬇️](https://github.com/LNXSeus/Advancely?tab=readme-ov-file#getting-started)
+# [⬇️ **DOWNLOAD ADVANCELY NOW\! (Windows, Linux & macOS)** ⬇️](#getting-started)
 
 ***
 
@@ -227,6 +227,18 @@ your operating system. The `vX.X.X` is the Advancely version, that is also displ
 
 ### 2. Installation & First-Time Run
 
+#### For supported Linux distros
+
+* **Arch Linux:**
+
+  Use your favorite AUR helper
+    ```
+    paru -S advancely
+    ```
+
+#### For all other installations
+
+
 To ensure the application works correctly, please follow the instructions for your operating system.
 
 > **✔️ Important: Use English-Only (ASCII) File Paths**
@@ -371,7 +383,7 @@ Your custom template will appear separately in the template list and will not be
 The main window is an interactive canvas where all your tracked goals are displayed. You can freely zoom in and out to
 rearrange the items in view to suit your needs, making it easy to focus on what matters most for your current run. The
 order of the sections (advancements, recipes, multi-stage goals, ...) can be configured in
-the [settings window](https://github.com/LNXSeus/Advancely#the-settings-window-esc).
+the [settings window](#the-settings-window-esc).
 
 <details>
 <summary><strong>Controls & Features (Pan, Zoom, Search, Notes)</strong></summary>
