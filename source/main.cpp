@@ -10,6 +10,10 @@
 #include <ctime>
 #include "path_utils.h"
 
+#ifdef __linux__
+#include <pwd.h>
+#endif
+
 // TODO: Add this line to enable the update test
 // Make update_temp folder in the same directory as the executable and put .zip file extracted in there
 // This flag needs to be enabled ONLY on the version before the update
@@ -93,9 +97,10 @@ SDL_AtomicInt g_templates_changed;
 // Change the global flag from a bool to our new enum.
 ForceOpenReason g_force_open_reason = FORCE_OPEN_NONE;
 
-// --- Command Line Globals for Linux packaging, --settings-file <path> and --disable-updater ---
+// --- Command Line Globals for Linux packaging, --settings-file <path>, --disable-updater and --use-home-dir ---
 static char g_custom_settings_path[MAX_PATH_LENGTH] = "";
 static bool g_disable_updater = false;
+static bool g_use_home_dir = false;
 
 static bool g_show_release_notes_on_startup = false;
 // After auto-installing update it shows link to github release notes
@@ -526,8 +531,28 @@ static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker 
 
 // ACCESSOR FUNCTIONS
 
-// This is the single source of truth for the resources path.
+// For some files we wan't to check if we need the Application directory or the users home directory.
 const char *get_resources_path() {
+  #if defined(__linux__)
+    if (g_use_home_dir) {
+        static char path[MAX_PATH_LENGTH] = "";
+        if (path[0] == '\0') {
+            const char *homedir;
+
+            if ((homedir = getenv("HOME")) == NULL) {
+                homedir = getpwuid(getuid())->pw_dir;
+            }
+            snprintf(path, sizeof(path), "%s/.local/share/advancely", homedir);
+        }
+        return path;
+    }
+    #endif
+
+    return get_application_dir();
+}
+
+// For Application files we want to get the Application directory.
+const char *get_application_dir() {
     static char path[MAX_PATH_LENGTH] = "";
     if (path[0] == '\0') {
         // This runs only ONCE, the very first time this function is called.
@@ -654,6 +679,12 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "[CLI] Error: --settings-file requires a path argument.\n");
             }
         }
+        #ifdef __linux__
+        else if (strcmp(argv[i], "--use-home-dir") == 0) { // Use the home directory for config files on Linux
+            g_use_home_dir = true;
+            printf("[CLI] Using home directory.\n");
+        }
+        #endif
     }
 
     // TODO: DEBUG FOR AUTO-UPDATE TESTING -> SET FLAG AT THE TOP OF THE FILE
@@ -1361,7 +1392,7 @@ int main(int argc, char *argv[]) {
 
         // Load the logo texture once at statup
         char logo_path[MAX_PATH_LENGTH];
-        snprintf(logo_path, sizeof(logo_path), "%s%s", get_resources_path(), ADVANCELY_LOGO_PATH);
+        snprintf(logo_path, sizeof(logo_path), "%s%s", get_application_dir(), ADVANCELY_LOGO_PATH);
         if (path_exists(logo_path)) {
             g_logo_texture = IMG_LoadTexture(tracker->renderer, logo_path);
             if (g_logo_texture == nullptr) {
@@ -1374,12 +1405,12 @@ int main(int argc, char *argv[]) {
         // 1. Load the UI Font (replaces Roboto).
         // The first font loaded becomes the default for ImGui. We also get a pointer to it.
         char ui_font_path[MAX_PATH_LENGTH];
-        snprintf(ui_font_path, sizeof(ui_font_path), "%s/fonts/%s", get_resources_path(), app_settings.ui_font_name);
+        snprintf(ui_font_path, sizeof(ui_font_path), "%s/fonts/%s", get_application_dir(), app_settings.ui_font_name);
         if (path_exists(ui_font_path)) {
             tracker->roboto_font = io.Fonts->AddFontFromFileTTF(ui_font_path, app_settings.ui_font_size);
         } else {
             // Fallback to default if user-selected font is not found
-            snprintf(ui_font_path, sizeof(ui_font_path), "%s/fonts/%s", get_resources_path(), DEFAULT_UI_FONT);
+            snprintf(ui_font_path, sizeof(ui_font_path), "%s/fonts/%s", get_application_dir(), DEFAULT_UI_FONT);
             tracker->roboto_font = io.Fonts->AddFontFromFileTTF(ui_font_path, DEFAULT_UI_FONT_SIZE);
             log_message(LOG_ERROR, "[MAIN] UI Font '%s' not found. Falling back to default.\n",
                         app_settings.ui_font_name);
@@ -1387,13 +1418,13 @@ int main(int argc, char *argv[]) {
 
         // 2. Load the Tracker Font (replaces Minecraft) as a secondary font.
         char tracker_font_path[MAX_PATH_LENGTH];
-        snprintf(tracker_font_path, sizeof(tracker_font_path), "%s/fonts/%s", get_resources_path(),
+        snprintf(tracker_font_path, sizeof(tracker_font_path), "%s/fonts/%s", get_application_dir(),
                  app_settings.tracker_font_name);
         if (path_exists(tracker_font_path)) {
             tracker->tracker_font = io.Fonts->AddFontFromFileTTF(tracker_font_path, app_settings.tracker_font_size);
         } else {
             // Fallback to default if user-selected font is not found
-            snprintf(tracker_font_path, sizeof(tracker_font_path), "%s/fonts/%s", get_resources_path(),
+            snprintf(tracker_font_path, sizeof(tracker_font_path), "%s/fonts/%s", get_application_dir(),
                      DEFAULT_TRACKER_FONT);
             tracker->tracker_font = io.Fonts->AddFontFromFileTTF(tracker_font_path, DEFAULT_TRACKER_FONT_SIZE);
             log_message(LOG_ERROR, "[MAIN] Tracker Font '%s' not found. Falling back to default.\n",
