@@ -12,9 +12,9 @@ name: Build and Package
 # This workflow runs on pushes and pull requests to the main branches.
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, linux ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, linux ]
 
 jobs:
   # Job 1: Build, Test, and Package the Linux version
