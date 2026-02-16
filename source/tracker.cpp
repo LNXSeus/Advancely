@@ -342,7 +342,7 @@ static void tracker_reload_background_textures(Tracker *t, const AppSettings *se
                        SDL_Texture **tex_target, AnimatedTexture **anim_target) {
         *tex_target = nullptr;
         *anim_target = nullptr;
-        snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), setting_path);
+        snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_application_dir(), setting_path);
 
         if (strstr(full_path, ".gif")) {
             *anim_target = get_animated_texture_from_cache(t->renderer, &t->anim_cache, &t->anim_cache_count,
@@ -355,7 +355,7 @@ static void tracker_reload_background_textures(Tracker *t, const AppSettings *se
         // Fallback if loading failed
         if (!*tex_target && !*anim_target) {
             log_message(LOG_ERROR, "[TRACKER] Failed to load background: %s. Trying default...\n", setting_path);
-            snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), default_path);
+            snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_application_dir(), default_path);
             if (strstr(full_path, ".gif")) {
                 *anim_target = get_animated_texture_from_cache(t->renderer, &t->anim_cache, &t->anim_cache_count,
                                                                &t->anim_cache_capacity, full_path,
@@ -1245,7 +1245,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
             char full_icon_path[sizeof(new_cat->icon_path)];
 
             // Put whatever is in "icon" into "resources/icons/"
-            snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_resources_path(), icon->valuestring);
+            snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_application_dir(), icon->valuestring);
             strncpy(new_cat->icon_path, full_icon_path, sizeof(new_cat->icon_path) - 1);
             new_cat->icon_path[sizeof(new_cat->icon_path) - 1] = '\0';
 
@@ -1318,7 +1318,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                         if (cJSON_IsString(crit_icon) && crit_icon->valuestring[0] != '\0') {
                             char full_crit_icon_path[sizeof(new_crit->icon_path)];
                             snprintf(full_crit_icon_path, sizeof(full_crit_icon_path), "%s/icons/%s",
-                                     get_resources_path(),
+                                     get_application_dir(),
                                      crit_icon->valuestring);
                             strncpy(new_crit->icon_path, full_crit_icon_path, sizeof(new_crit->icon_path) - 1);
                             new_crit->icon_path[sizeof(new_crit->icon_path) - 1] = '\0';
@@ -1628,7 +1628,7 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
             if (cJSON_IsString(icon)) {
                 // Append "icon" to "resources/icons/"
                 char full_icon_path[sizeof(new_item->icon_path)];
-                snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_resources_path(),
+                snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_application_dir(),
                          icon->valuestring);
                 strncpy(new_item->icon_path, full_icon_path, sizeof(new_item->icon_path) - 1);
                 new_item->icon_path[sizeof(new_item->icon_path) - 1] = '\0';
@@ -1722,7 +1722,7 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
         }
         if (cJSON_IsString(icon)) {
             char full_icon_path[sizeof(new_goal->icon_path)];
-            snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_resources_path(), icon->valuestring);
+            snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_application_dir(), icon->valuestring);
             strncpy(new_goal->icon_path, full_icon_path, sizeof(new_goal->icon_path) - 1);
             new_goal->icon_path[sizeof(new_goal->icon_path) - 1] = '\0';
 
@@ -1835,7 +1835,7 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
                     cJSON *stage_icon = cJSON_GetObjectItem(stage_item_json, "icon");
                     if (cJSON_IsString(stage_icon)) {
                         char full_icon_path[sizeof(new_stage->icon_path)];
-                        snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_resources_path(), stage_icon->valuestring);
+                        snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_application_dir(), stage_icon->valuestring);
                         strncpy(new_stage->icon_path, full_icon_path, sizeof(new_stage->icon_path) - 1);
                         new_stage->icon_path[sizeof(new_stage->icon_path) - 1] = '\0';
 
@@ -2559,7 +2559,7 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
 
     // Initialize SDL_ttf
     char font_path[MAX_PATH_LENGTH];
-    snprintf(font_path, sizeof(font_path), "%s/fonts/Minecraft.ttf", get_resources_path());
+    snprintf(font_path, sizeof(font_path), "%s/fonts/Minecraft.ttf", get_application_dir());
     t->minecraft_font = TTF_OpenFont(font_path, 24);
     if (!t->minecraft_font) {
         log_message(

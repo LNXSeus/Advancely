@@ -349,7 +349,7 @@ static bool validate_icon_paths(const std::vector<EditorTrackableItem> &items, c
         }
         // If path is non-empty
         char full_path[MAX_PATH_LENGTH];
-        snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_resources_path(), item.icon_path);
+        snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_application_dir(), item.icon_path);
         if (!path_exists(full_path)) {
             snprintf(error_message_buffer, 256, "Error: Icon file not found for '%s': '%s'", item.root_name,
                      item.icon_path);
@@ -373,7 +373,7 @@ static bool validate_ms_goal_icon_paths(const std::vector<EditorMultiStageGoal> 
 
         // When path is wrong
         char full_path[MAX_PATH_LENGTH];
-        snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_resources_path(), goal.icon_path);
+        snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_application_dir(), goal.icon_path);
         if (!path_exists(full_path)) {
             snprintf(error_message_buffer, 256, "Error: Icon file not found for goal '%s': '%s'", goal.root_name,
                      goal.icon_path);
@@ -389,7 +389,7 @@ static bool validate_ms_goal_icon_paths(const std::vector<EditorMultiStageGoal> 
                     return false;
                 }
 
-                snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_resources_path(), stage.icon_path);
+                snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_application_dir(), stage.icon_path);
                 if (!path_exists(full_path)) {
                     snprintf(error_message_buffer, 256, "Error: Icon file not found for stage '%s': '%s'",
                              stage.stage_id, stage.icon_path);
@@ -428,7 +428,7 @@ static bool validate_category_icon_paths(const std::vector<EditorTrackableCatego
         }
         // When path exists we validate correctness
         char full_path[MAX_PATH_LENGTH];
-        snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_resources_path(), cat.icon_path);
+        snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_application_dir(), cat.icon_path);
         if (!path_exists(full_path)) {
             snprintf(error_message_buffer, 256, "Error: Icon file not found for '%s': '%s'", cat.root_name,
                      cat.icon_path);
@@ -449,7 +449,7 @@ static bool validate_category_icon_paths(const std::vector<EditorTrackableCatego
             // check for incorrect path when it's not empty and complex stat
             if (crit.icon_path[0] != '\0') {
                 char full_path[MAX_PATH_LENGTH];
-                snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_resources_path(), crit.icon_path);
+                snprintf(full_path, sizeof(full_path), "%s/icons/%s", get_application_dir(), crit.icon_path);
                 if (!path_exists(full_path)) {
                     snprintf(error_message_buffer, 256, "Error: Icon file not found for criterion '%s': '%s'",
                              crit.root_name, crit.icon_path);
@@ -2524,7 +2524,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     if (ImGui::Button(help_text)) {
         char reference_path[MAX_PATH_LENGTH];
-        snprintf(reference_path, sizeof(reference_path), "%s/reference_files", get_resources_path());
+        snprintf(reference_path, sizeof(reference_path), "%s/reference_files", get_application_dir());
 #ifdef _WIN32
         path_to_windows_native(reference_path);
 #endif

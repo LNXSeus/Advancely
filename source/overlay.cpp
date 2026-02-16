@@ -242,7 +242,7 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
                        SDL_Texture **tex_target, AnimatedTexture **anim_target) {
         *tex_target = nullptr;
         *anim_target = nullptr;
-        snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), setting_path);
+        snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_application_dir(), setting_path);
 
         if (strstr(full_path, ".gif")) {
             *anim_target = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
@@ -255,7 +255,7 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
         // Fallback if loading failed
         if (!*tex_target && !*anim_target) {
             log_message(LOG_ERROR, "[OVERLAY] Failed to load background: %s. Trying default...\n", setting_path);
-            snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_resources_path(), default_path);
+            snprintf(full_path, sizeof(full_path), "%s/gui/%s", get_application_dir(), default_path);
             if (strstr(full_path, ".gif")) {
                 *anim_target = get_animated_texture_from_cache(o->renderer, &o->anim_cache, &o->anim_cache_count,
                                                                &o->anim_cache_capacity, full_path,
@@ -284,14 +284,14 @@ bool overlay_new(Overlay **overlay, const AppSettings *settings) {
     // SDL_ttf will automatically scale it correctly on any monitor at render time.
     const float base_font_size = DEFAULT_OVERLAY_FONT_SIZE;
     char overlay_font_path[1024];
-    snprintf(overlay_font_path, sizeof(overlay_font_path), "%s/fonts/%s", get_resources_path(),
+    snprintf(overlay_font_path, sizeof(overlay_font_path), "%s/fonts/%s", get_application_dir(),
              settings->overlay_font_name);
 
     if (!path_exists(overlay_font_path)) {
         log_message(
             LOG_ERROR, "[OVERLAY] Tracker/Overlay Font '%s' not found. Falling back to default Minecraft font.\n",
             settings->overlay_font_name);
-        snprintf(overlay_font_path, sizeof(overlay_font_path), "%s/fonts/Minecraft.ttf", get_resources_path());
+        snprintf(overlay_font_path, sizeof(overlay_font_path), "%s/fonts/Minecraft.ttf", get_application_dir());
     }
 
     o->font = TTF_OpenFont(overlay_font_path, base_font_size);
@@ -891,7 +891,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     SDL_Texture *tex = nullptr;
                     AnimatedTexture *anim_tex = nullptr;
                     char full_icon_path[MAX_PATH_LENGTH];
-                    snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_resources_path(),
+                    snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_application_dir(),
                              render_info.icon_path);
 
                     // Check the file extension to decide which cache function to use
