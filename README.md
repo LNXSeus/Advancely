@@ -2,7 +2,7 @@
   <img src="readme_assets/Advancely_Logo.png" alt="Advancely_Logo.png">
 </p>
 
-# [⬇️ **DOWNLOAD ADVANCELY NOW\! (Windows, Linux & macOS)** ⬇️](https://github.com/LNXSeus/Advancely#getting-started)
+# [⬇️ **DOWNLOAD ADVANCELY NOW\! (Windows, Linux & macOS)** ⬇️](https://github.com/LNXSeus/Advancely?tab=readme-ov-file#getting-started)
 
 ***
 
