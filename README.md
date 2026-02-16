@@ -2,7 +2,7 @@
   <img src="readme_assets/Advancely_Logo.png" alt="Advancely_Logo.png">
 </p>
 
-# [⬇️ **DOWNLOAD ADVANCELY NOW\! (Windows, Linux & macOS)** ⬇️](https://github.com/LNXSeus/Advancely/releases)
+# [⬇️ **DOWNLOAD ADVANCELY NOW\! (Windows, Linux & macOS)** ⬇️](#getting-started)
 
 ***
 
@@ -209,6 +209,18 @@ being displayed at once.
 ***
 
 ## Getting Started
+
+## For supported Linux distros
+
+* **Arch Linux:**
+
+    Use your favorite AUR helper
+    ```
+    paru -S advancely
+    ```
+
+
+## For all other installations
 
 ### 1. Downloading the Correct Version
 
