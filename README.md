@@ -222,8 +222,9 @@ Go to the [**releases page**](https://github.com/LNXSeus/Advancely/releases) and
 your operating system. The `vX.X.X` is the Advancely version, that is also displayed in the title of the main window.
 
 * **Windows:** `Advancely-vX.X.X-Windows.zip`
-* **Linux:** `Advancely-vX.X.X-Linux.zip`
-* **macOS:** `Advancely-vX.X.X-macOS-Universal.zip` for both Intel (down to macOS 13 Ventura) and Silicon Macs.
+* **Linux (Portable):** `Advancely-vX.X.X-Linux.zip` — The standalone executable (no installation required).
+* **Linux (Installers):** `Advancely-vX.X.X-Linux-Packages.zip` — Contains `.deb` (Debian/Ubuntu) and `.rpm` (Fedora/RHEL) files for a full system installation.
+* **macOS:** `Advancely-vX.X.X-macOS-Universal.zip` — For both Intel (down to macOS 13 Ventura) and Silicon Macs.
 
 ### 2. Installation & First-Time Run
 
