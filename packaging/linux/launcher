@@ -1,11 +1,18 @@
 #!/bin/bash
 
+# Define paths
 CONFIG_DIR="${HOME}/.local/share"
 ADVANCELY_CONFIG_DIRECTORY="${ADVANCELY_CONFIG_DIRECTORY-${CONFIG_DIR}/advancely}"
 APPLICATION_DIRECTORY="/usr/share/advancely"
+LIB_DIR="${APPLICATION_DIRECTORY}/lib"
 
 # telling the app where to find the SDL3 libraries
-export LD_LIBRARY_PATH="${APPLICATION_DIRECTORY}/lib:${LD_LIBRARY_PATH}"
+# Prepend lib dir. If LD_LIBRARY_PATH was empty, we don't add the trailing colon.
+if [ -z "$LD_LIBRARY_PATH" ]; then
+    export LD_LIBRARY_PATH="${LIB_DIR}"
+else
+    export LD_LIBRARY_PATH="${LIB_DIR}:${LD_LIBRARY_PATH}"
+fi
 
 touch "${ADVANCELY_CONFIG_DIRECTORY}/version"
 
@@ -18,4 +25,5 @@ if [ ! -d "${ADVANCELY_CONFIG_DIRECTORY}" ] || ! cmp "${ADVANCELY_CONFIG_DIRECTO
   cp "${APPLICATION_DIRECTORY}/version" "${ADVANCELY_CONFIG_DIRECTORY}/version"
 fi
 
+# Execute the binary using the modified environment
 /usr/share/advancely/Advancely --disable-updater --use-home-dir "$@"

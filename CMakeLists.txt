@@ -90,6 +90,17 @@ if (WIN32)
     )
 endif ()
 
+
+# --- RPATH CONFIGURATION ---
+if (UNIX AND NOT APPLE)
+    # Making sure it can find the libraries after running .deb or .rpm
+    # 1. Set RPATH to look in the ./lib folder relative to the executable
+    set(CMAKE_INSTALL_RPATH "$ORIGIN/lib")
+
+    # 2. Don't skip RPATH during the build phase
+    set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+endif()
+
 # --- 2. CREATE THE EXECUTABLE ---
 
 # Use the WIN32 keyword for graphical apps on Windows to hide the console.
