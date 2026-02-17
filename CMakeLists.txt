@@ -391,24 +391,6 @@ if (UNIX AND NOT APPLE)
     install(DIRECTORY resources/ DESTINATION share/advancely/resources)
     install(FILES "${CMAKE_BINARY_DIR}/version" DESTINATION share/advancely)
 
-    # Resolve the real paths, to get the ACTUAL files and install them as the generic name
-    file(REAL_PATH "/usr/local/lib/libSDL3.so.0" SDL3_REAL_PATH)
-    file(REAL_PATH "/usr/local/lib/libSDL3_image.so.0" SDL3_IMG_REAL_PATH)
-    file(REAL_PATH "/usr/local/lib/libSDL3_ttf.so.0" SDL3_TTF_REAL_PATH)
-
-    # Install the REAL files, but RENAME them back to what the app expects (.so.0)
-    install(FILES "${SDL3_REAL_PATH}"
-            DESTINATION share/advancely/lib
-            RENAME "libSDL3.so.0")
-
-    install(FILES "${SDL3_IMG_REAL_PATH}"
-            DESTINATION share/advancely/lib
-            RENAME "libSDL3_image.so.0")
-
-    install(FILES "${SDL3_TTF_REAL_PATH}"
-            DESTINATION share/advancely/lib
-            RENAME "libSDL3_ttf.so.0")
-
     # Desktop Integration
     install(FILES "packaging/linux/advancely.desktop" DESTINATION share/applications)
     install(FILES "packaging/linux/advancely.png"
@@ -437,11 +419,12 @@ if (UNIX AND NOT APPLE)
     set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS OFF) # Automatically find dependencies
     # Explicit dependencies if auto-detection fails (adjust names for Debian/Ubuntu)
-    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6, libcurl4, libfreetype6")
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6, libcurl4, libfreetype6" "libsdl3-0" "libsdl3-image0" "libsdl3-ttf0")
 
     # --- RPM (.rpm) CONFIG ---
     set(CPACK_RPM_PACKAGE_LICENSE "Proprietary")
     set(CPACK_RPM_PACKAGE_GROUP "Amusements/Games")
+    set(CPACK_RPM_PACKAGE_REQUIRES "curl, SDL3, SDL3_image, SDL3_ttf")
     set(CPACK_RPM_PACKAGE_AUTOREQPROV OFF) # Turn OFF auto-detection
 
     include(CPack)
