@@ -357,7 +357,7 @@ endif ()
 include(InstallRequiredSystemLibraries)
 
 # Define where to install the files
-if (WIN32 OR UNIX AND NOT APPLE)
+if (WIN32)
     # Rule to install the main executable and its runtime dlls
     install(TARGETS ${EXECUTABLE_NAME}
             DESTINATION bin
