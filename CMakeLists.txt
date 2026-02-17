@@ -345,7 +345,7 @@ if (UNIX AND NOT APPLE)
 
     # 5. Desktop Integration
     install(FILES "packaging/linux/advancely.desktop" DESTINATION share/applications)
-    install(FILES "resources/gui/Advancely_Logo_NoText_512_Linux.png"
+    install(FILES "packaging/linux/advancely.png"
             DESTINATION share/icons/hicolor/512x512/apps
             RENAME advancely.png
     )
