@@ -1,12 +1,12 @@
-# Creator: Rodney van den Velden <rodney@dfagaming.nl>
+# Maintainer: Rodney van den Velden <rodney@dfagaming.nl>
 
 pkgname=advancely
 pkgver=1.0.29
 pkgrel=1
 pkgdesc="A highly customizable and interactive tool to track Minecraft progress."
 arch=('x86_64')
-url="https://github.com/DFA-G/Advancely"
-license=('custom:Proprietary')
+url="https://github.com/LNXSeus/Advancely"
+license=('LicenseRef-Proprietary')
 depends=('sdl3' 'sdl3_image' 'sdl3_ttf' 'curl' 'hicolor-icon-theme')
 makedepends=('git' 'cmake')
 provides=('advancely')
@@ -16,14 +16,14 @@ source=("git+$url#tag=v${pkgver}")
 sha256sums=('SKIP')
 
 build() {
-  cd "Advancely"
+  cd "$srcdir/Advancely"
   cmake -B build -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr
   cmake --build build --config Release
 }
 
 package() {
-  cd "Advancely"
+  cd "$srcdir/Advancely"
   # This runs the "install" section of your CMakeLists.txt
   # It will install the binary to /usr/share/advancely
   # It will install the launcher to /usr/bin/advancely
