@@ -324,9 +324,30 @@ if (WIN32 OR UNIX AND NOT APPLE)
     )
 endif ()
 
+# --- LINUX INSTALLATION ---
 if (UNIX AND NOT APPLE)
-    # Rules for Linux desktop integration
+    # 1. Generate the 'version' file automatically from the project version
+    file(WRITE "${CMAKE_BINARY_DIR}/version" "${PROJECT_VERSION}")
+
+    # 2. Install the ACTUAL binary to /usr/share/advancely (not in PATH)
+    install(TARGETS ${EXECUTABLE_NAME} DESTINATION share/advancely)
+
+    # 3. Install the LAUNCHER script to /usr/bin and rename it to 'advancely'
+    #    (This assumes your launcher script is at packaging/linux/launcher)
+    install(PROGRAMS packaging/linux/launcher
+            DESTINATION bin
+            RENAME advancely
+    )
+
+    # 4. Install Resources and the Version file to /usr/share/advancely
+    install(DIRECTORY resources/ DESTINATION share/advancely/resources)
+    install(FILES "${CMAKE_BINARY_DIR}/version" DESTINATION share/advancely)
+
+    # 5. Desktop Integration
     install(FILES "packaging/linux/advancely.desktop" DESTINATION share/applications)
-    install(FILES "resources/gui/Advancely_Logo_NoText_512_Linux.png" DESTINATION share/icons/hicolor/512x512/apps RENAME advancely.png)
+    install(FILES "resources/gui/Advancely_Logo_NoText_512_Linux.png"
+            DESTINATION share/icons/hicolor/512x512/apps
+            RENAME advancely.png
+    )
     install(FILES "packaging/linux/dev.LNXSeus.Advancely.metainfo.xml" DESTINATION share/metainfo)
 endif ()

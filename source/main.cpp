@@ -100,7 +100,10 @@ ForceOpenReason g_force_open_reason = FORCE_OPEN_NONE;
 // --- Command Line Globals for Linux packaging, --settings-file <path>, --disable-updater and --use-home-dir ---
 static char g_custom_settings_path[MAX_PATH_LENGTH] = "";
 static bool g_disable_updater = false;
+
+#if defined(__linux__) // Linux only (--use-home-dir)
 static bool g_use_home_dir = false;
+#endif
 
 static bool g_show_release_notes_on_startup = false;
 // After auto-installing update it shows link to github release notes
