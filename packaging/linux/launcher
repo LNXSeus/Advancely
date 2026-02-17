@@ -4,6 +4,9 @@ CONFIG_DIR="${HOME}/.local/share"
 ADVANCELY_CONFIG_DIRECTORY="${ADVANCELY_CONFIG_DIRECTORY-${CONFIG_DIR}/advancely}"
 APPLICATION_DIRECTORY="/usr/share/advancely"
 
+# telling the app where to find the SDL3 libraries
+export LD_LIBRARY_PATH="${APPLICATION_DIRECTORY}/lib:${LD_LIBRARY_PATH}"
+
 touch "${ADVANCELY_CONFIG_DIRECTORY}/version"
 
 if [ ! -d "${ADVANCELY_CONFIG_DIRECTORY}" ] || ! cmp "${ADVANCELY_CONFIG_DIRECTORY}/version" "/usr/share/advancely/version"; then

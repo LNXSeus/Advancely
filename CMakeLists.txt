@@ -326,24 +326,33 @@ endif ()
 
 # --- LINUX INSTALLATION ---
 if (UNIX AND NOT APPLE)
-    # 1. Generate the 'version' file automatically from the project version
+    # Generate the 'version' file automatically from the project version
     file(WRITE "${CMAKE_BINARY_DIR}/version" "${PROJECT_VERSION}")
 
-    # 2. Install the ACTUAL binary to /usr/share/advancely (not in PATH)
+    # Install the ACTUAL binary to /usr/share/advancely (not in PATH)
     install(TARGETS ${EXECUTABLE_NAME} DESTINATION share/advancely)
 
-    # 3. Install the LAUNCHER script to /usr/bin and rename it to 'advancely'
+    # Install the Shared Libraries (SDL3, Image, TTF)
+    # Note: We use /usr/local/lib because that's where your build.yml installed them
+    install(FILES
+            "/usr/local/lib/libSDL3.so.0"
+            "/usr/local/lib/libSDL3_image.so.0"
+            "/usr/local/lib/libSDL3_ttf.so.0"
+            DESTINATION share/advancely/lib
+    )
+
+    # Install the LAUNCHER script to /usr/bin and rename it to 'advancely'
     #    (This assumes your launcher script is at packaging/linux/launcher)
     install(PROGRAMS packaging/linux/launcher
             DESTINATION bin
             RENAME advancely
     )
 
-    # 4. Install Resources and the Version file to /usr/share/advancely
+    # Install Resources and the Version file to /usr/share/advancely
     install(DIRECTORY resources/ DESTINATION share/advancely/resources)
     install(FILES "${CMAKE_BINARY_DIR}/version" DESTINATION share/advancely)
 
-    # 5. Desktop Integration
+    # Desktop Integration
     install(FILES "packaging/linux/advancely.desktop" DESTINATION share/applications)
     install(FILES "packaging/linux/advancely.png"
             DESTINATION share/icons/hicolor/512x512/apps
@@ -368,14 +377,14 @@ if (UNIX AND NOT APPLE)
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Rodney van den Velden")
     set(CPACK_DEBIAN_PACKAGE_SECTION "games")
     set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
-    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON) # Automatically find dependencies
+    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS OFF) # Automatically find dependencies
     # Explicit dependencies if auto-detection fails (adjust names for Debian/Ubuntu)
-    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6, libcurl4, libsdl3-0 (>= 3.0.0) | libsdl3")
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6, libcurl4, libfreetype6")
 
     # --- RPM (.rpm) CONFIG ---
     set(CPACK_RPM_PACKAGE_LICENSE "Proprietary")
     set(CPACK_RPM_PACKAGE_GROUP "Amusements/Games")
-    set(CPACK_RPM_PACKAGE_AUTOREQPROV ON) # Automatically find dependencies
+    set(CPACK_RPM_PACKAGE_AUTOREQPROV OFF) # Turn OFF auto-detection
 
     include(CPack)
 endif()
