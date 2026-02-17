@@ -12,6 +12,18 @@
   </description>
   <launchable type="desktop-id">advancely.desktop</launchable>
   <screenshots>
-    </screenshots>
+  </screenshots>
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
+
+  <releases>
+    <release version="1.0.26" date="2026-02-17">
+      <description>
+        <ul>
+          <li>Introduced native Linux system packages (.deb and .rpm).</li>
+          <li>Implemented XDG compliance: User data is now stored in ~/.local/share/advancely.</li>
+          <li>Fixed dependency issues by bundling SDL3 libraries.</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
 </component>

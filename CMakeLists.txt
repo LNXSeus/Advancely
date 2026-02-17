@@ -310,6 +310,46 @@ if (NOT WIN32)
 endif ()
 
 
+# --- AUTO-GENERATE LINUX METADATA (metainfo.xml) ---
+if (UNIX AND NOT APPLE)
+    set(METAINFO_SRC "${CMAKE_SOURCE_DIR}/packaging/linux/dev.LNXSeus.Advancely.metainfo.xml")
+    set(METAINFO_DST "${CMAKE_BINARY_DIR}/dev.LNXSeus.Advancely.metainfo.xml")
+
+    # Read the original file
+    file(READ "${METAINFO_SRC}" METAINFO_CONTENT)
+
+    # 1. Ensure the <releases> tag exists
+    string(FIND "${METAINFO_CONTENT}" "<releases>" RELEASES_INDEX)
+    if(RELEASES_INDEX EQUAL -1)
+        # If missing, add it before the closing </component> tag
+        string(REPLACE "</component>" "  <releases>\n  </releases>\n</component>" METAINFO_CONTENT "${METAINFO_CONTENT}")
+    endif()
+
+    # 2. Check if the CURRENT version is already in the file
+    string(FIND "${METAINFO_CONTENT}" "version=\"${PROJECT_VERSION}\"" VERSION_INDEX)
+
+    # 3. If version is missing, inject it automatically
+    if(VERSION_INDEX EQUAL -1)
+        string(TIMESTAMP CURRENT_DATE "%Y-%m-%d")
+        set(NEW_RELEASE_BLOCK
+                "    <release version=\"${PROJECT_VERSION}\" date=\"${CURRENT_DATE}\">
+      <description>
+        <ul>
+          <li>Update to version ${PROJECT_VERSION}</li>
+        </ul>
+      </description>
+    </release>")
+
+        # Prepend the new block right after <releases> so it appears at the top
+        string(REPLACE "<releases>" "<releases>\n${NEW_RELEASE_BLOCK}" METAINFO_CONTENT "${METAINFO_CONTENT}")
+        message(STATUS "Auto-injecting release info for version ${PROJECT_VERSION} into metainfo.xml")
+    endif()
+
+    # Write the modified content to the BUILD directory (don't touch source file)
+    file(WRITE "${METAINFO_DST}" "${METAINFO_CONTENT}")
+endif()
+
+
 # --- 7. INSTALLATION AND PACKAGING ---
 
 # This command ensures that CMake's install features are available.
@@ -374,7 +414,8 @@ if (UNIX AND NOT APPLE)
             DESTINATION share/icons/hicolor/512x512/apps
             RENAME advancely.png
     )
-    install(FILES "packaging/linux/dev.LNXSeus.Advancely.metainfo.xml" DESTINATION share/metainfo)
+    # Install the auto-generated file from the build directory
+    install(FILES "${CMAKE_BINARY_DIR}/dev.LNXSeus.Advancely.metainfo.xml" DESTINATION share/metainfo)
 endif ()
 
 # --- 8. CPACK PACKAGING (Generates .deb and .rpm) ---
