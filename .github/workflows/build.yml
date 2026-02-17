@@ -39,6 +39,9 @@ jobs:
       - name: Build Project
         run: cmake --build build --config Release
 
+      - name: Add version file
+        run: echo ${{ env.PROJECT_VERSION }} > build/version
+
       - name: Run Executable Test (Linux)
         run: |
           echo "Running executable for 5 seconds..."
