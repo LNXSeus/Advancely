@@ -24,6 +24,37 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # --- Auto-Update Files (PKGBUILD & metainfo.xml) with Version from main.h ---
+      - name: Update Linux Packaging Files
+        run: |
+          # 1. Extract Version from main.h
+          VERSION=$(grep '#define ADVANCELY_VERSION' source/main.h | sed -E 's/.*"v([0-9]+\.[0-9]+\.[0-9]+)".*/\1/')
+          echo "Detected Version: $VERSION"
+          
+          # 2. Update PKGBUILD (packaging/linux/PKGBUILD)
+          sed -i "s/^pkgver=.*/pkgver=$VERSION/" packaging/linux/PKGBUILD
+          sed -i "s/^pkgrel=.*/pkgrel=1/" packaging/linux/PKGBUILD
+          
+          # 3. Update Metainfo (packaging/linux/dev.LNXSeus.Advancely.metainfo.xml)
+          METAINFO="packaging/linux/dev.LNXSeus.Advancely.metainfo.xml"
+          DATE=$(date +%Y-%m-%d)
+          
+          # Inject new release block if it doesn't exist
+          if ! grep -q "version=\"$VERSION\"" "$METAINFO"; then
+            echo "Injecting release note for $VERSION..."
+            sed -i "/<releases>/a \\
+            <release version=\"$VERSION\" date=\"$DATE\">\\
+              <description>\\
+                <ul>\\
+                  <li>Update to version $VERSION</li>\\
+                </ul>\\
+              </description>\\
+            </release>" "$METAINFO"
+          fi
+          
+          # Verify file contents
+          head -n 20 "$METAINFO"
+
       - name: Install dependencies (Linux)
         run: |
           sudo apt-get update
