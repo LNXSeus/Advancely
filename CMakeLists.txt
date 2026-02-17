@@ -337,31 +337,36 @@ endif ()
 
 # --- LINUX INSTALLATION ---
 if (UNIX AND NOT APPLE)
-    # Generate the 'version' file automatically from the project version
+    # 1. Generate the 'version' file automatically
     file(WRITE "${CMAKE_BINARY_DIR}/version" "${PROJECT_VERSION}")
 
-    # Install the ACTUAL binary to /usr/share/advancely (not in PATH)
+    # 2. Install the ACTUAL binary
     install(TARGETS ${EXECUTABLE_NAME} DESTINATION share/advancely)
 
-    # Install the Shared Libraries (SDL3, Image, TTF)
-    # Note: We use /usr/local/lib because that's where your build.yml installed them
-    install(FILES
-            "/usr/local/lib/libSDL3.so.0"
-            "/usr/local/lib/libSDL3_image.so.0"
-            "/usr/local/lib/libSDL3_ttf.so.0"
-            DESTINATION share/advancely/lib
-    )
+    # 3. Install the LAUNCHER script
+    install(PROGRAMS packaging/linux/launcher DESTINATION bin RENAME advancely)
 
-    # Install the LAUNCHER script to /usr/bin and rename it to 'advancely'
-    #    (This assumes your launcher script is at packaging/linux/launcher)
-    install(PROGRAMS packaging/linux/launcher
-            DESTINATION bin
-            RENAME advancely
-    )
-
-    # Install Resources and the Version file to /usr/share/advancely
+    # 4. Install Resources and Version
     install(DIRECTORY resources/ DESTINATION share/advancely/resources)
     install(FILES "${CMAKE_BINARY_DIR}/version" DESTINATION share/advancely)
+
+    # Resolve the real paths, to get the ACTUAL files and install them as the generic name
+    file(REAL_PATH "/usr/local/lib/libSDL3.so.0" SDL3_REAL_PATH)
+    file(REAL_PATH "/usr/local/lib/libSDL3_image.so.0" SDL3_IMG_REAL_PATH)
+    file(REAL_PATH "/usr/local/lib/libSDL3_ttf.so.0" SDL3_TTF_REAL_PATH)
+
+    # Install the REAL files, but RENAME them back to what the app expects (.so.0)
+    install(FILES "${SDL3_REAL_PATH}"
+            DESTINATION share/advancely/lib
+            RENAME "libSDL3.so.0")
+
+    install(FILES "${SDL3_IMG_REAL_PATH}"
+            DESTINATION share/advancely/lib
+            RENAME "libSDL3_image.so.0")
+
+    install(FILES "${SDL3_TTF_REAL_PATH}"
+            DESTINATION share/advancely/lib
+            RENAME "libSDL3_ttf.so.0")
 
     # Desktop Integration
     install(FILES "packaging/linux/advancely.desktop" DESTINATION share/applications)
