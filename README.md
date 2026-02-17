@@ -214,16 +214,7 @@ being displayed at once.
 
 ## Getting Started
 
-## For supported Linux distros
-
-* **Arch Linux:**
-
-    Use your favorite AUR helper
-    ```
-    paru -S advancely
-    ```
-    
-## For all other installations
+> 📺 **Video Guide:** [How to Download (1:23)](https://youtu.be/Rxd1RJqg2WQ?t=1m23s)
 
 ### 1. Downloading the Correct Version
 

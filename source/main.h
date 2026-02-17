@@ -56,8 +56,8 @@ const char* get_notes_manifest_path();
 #define TRACKER_TITLE "Advancely"
 
 // This is the version that gets compared with the latest release tag on GitHub
-// TODO: Update dev.LNXSeus.Advancely.metainfo.xml` with version as well
-#define ADVANCELY_VERSION "v1.0.20" // vMAJOR.MINOR.PATCH // Update this always, SAME FORMAT ON RELEASE TAG!
+// TODO: Change version in PKGBUILD as well
+#define ADVANCELY_VERSION "v1.0.21" // vMAJOR.MINOR.PATCH // Update this always, SAME FORMAT ON RELEASE TAG!
 #define ADVANCELY_ICON_PATH "/gui/Advancely_Logo_NoText.png" // Starting from /gui folder
 #define ADVANCELY_LOGO_PATH "/gui/Advancely_Logo.png" // Starting from /gui folder
 #define ADVANCELY_LOGO_SIZE 512.0f // Logo size on startup message window or update successful window

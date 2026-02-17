@@ -1,0 +1,35 @@
+# Creator: Rodney van den Velden <rodney@dfagaming.nl>
+
+pkgname=advancely
+pkgver=1.0.21
+pkgrel=1
+pkgdesc="A highly customizable and interactive tool to track Minecraft progress."
+arch=('x86_64')
+url="https://github.com/DFA-G/Advancely"
+license=('custom:Proprietary')
+depends=('sdl3' 'sdl3_image' 'sdl3_ttf' 'curl' 'hicolor-icon-theme')
+makedepends=('git' 'cmake')
+provides=('advancely')
+conflicts=('advancely-bin' 'advancely-git')
+# We use the git repo directly so we have the packaging/linux files available locally
+source=("git+$url#tag=v${pkgver}")
+sha256sums=('SKIP')
+
+build() {
+  cd "Advancely"
+  cmake -B build -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr
+  cmake --build build --config Release
+}
+
+package() {
+  cd "Advancely"
+  # This runs the "install" section of your CMakeLists.txt
+  # It will install the binary to /usr/share/advancely
+  # It will install the launcher to /usr/bin/advancely
+  # It will generate the version file
+  DESTDIR="$pkgdir" cmake --install build
+
+  # Install the license file manually as Arch requires it in a specific spot
+  install -D -m 644 LICENSES.txt "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

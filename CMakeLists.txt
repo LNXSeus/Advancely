@@ -351,3 +351,31 @@ if (UNIX AND NOT APPLE)
     )
     install(FILES "packaging/linux/dev.LNXSeus.Advancely.metainfo.xml" DESTINATION share/metainfo)
 endif ()
+
+# --- 8. CPACK PACKAGING (Generates .deb and .rpm) ---
+if (UNIX AND NOT APPLE)
+    set(CPACK_PACKAGE_NAME "advancely")
+    set(CPACK_PACKAGE_VENDOR "LNXSeus")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A highly customizable Minecraft progress tracker.")
+    set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+    set(CPACK_PACKAGE_CONTACT "rodney@dfagaming.nl")
+    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSES.txt")
+
+    # Set the package types we want to generate
+    set(CPACK_GENERATOR "DEB;RPM")
+
+    # --- DEBIAN (.deb) CONFIG ---
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Rodney van den Velden")
+    set(CPACK_DEBIAN_PACKAGE_SECTION "games")
+    set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON) # Automatically find dependencies
+    # Explicit dependencies if auto-detection fails (adjust names for Debian/Ubuntu)
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6, libcurl4, libsdl3-0 (>= 3.0.0) | libsdl3")
+
+    # --- RPM (.rpm) CONFIG ---
+    set(CPACK_RPM_PACKAGE_LICENSE "Proprietary")
+    set(CPACK_RPM_PACKAGE_GROUP "Amusements/Games")
+    set(CPACK_RPM_PACKAGE_AUTOREQPROV ON) # Automatically find dependencies
+
+    include(CPack)
+endif()

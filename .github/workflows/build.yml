@@ -23,38 +23,70 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Install dependencies (Linux)
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake git libcurl4-openssl-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libwayland-dev libdecor-0-dev libxkbcommon-dev libfreetype6-dev libharfbuzz-dev libasound2-dev libxtst-dev
+          # Added 'rpm' here so CPack can generate Fedora packages
+          sudo apt-get install -y build-essential cmake git libcurl4-openssl-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libwayland-dev libdecor-0-dev libxkbcommon-dev libfreetype6-dev libharfbuzz-dev libasound2-dev libxtst-dev rpm
           git clone https://github.com/libsdl-org/SDL.git -b main && cd SDL && cmake -B build && cmake --build build && sudo cmake --install build && cd ..
           git clone https://github.com/libsdl-org/SDL_image.git -b main && cd SDL_image && cmake -B build && cmake --build build && sudo cmake --install build && cd ..
           git clone https://github.com/libsdl-org/SDL_ttf.git -b main && cd SDL_ttf && cmake -B build && cmake --build build && sudo cmake --install build && cd ..
+
       - name: Configure CMake (Linux)
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
       - name: Build Project
         run: cmake --build build --config Release
+
       - name: Run Executable Test (Linux)
         run: |
           echo "Running executable for 5 seconds..."
           timeout 5s ./build/Advancely --test-mode > output.txt 2>&1 || true
           echo "Executable run finished. Contents of output.txt:"
           cat output.txt
+
       - name: Upload Test Output (Linux)
         uses: actions/upload-artifact@v4
         with:
           name: test-output-v${{ env.PROJECT_VERSION }}-Linux
           path: output.txt
-      - name: Package Linux Artifact
+
+      # --- Generate System Packages (.deb / .rpm) ---
+      - name: Package System Installers (CPack)
+        run: |
+          cd build
+          cpack -G "DEB;RPM"
+          ls -l *.deb *.rpm # List files to verify generation
+          
+      # --- NEW: Upload Packages Separately ---
+      # This creates a NEW artifact (e.g., Advancely-v1.0.15-Linux-Packages.zip)
+      # It does NOT interfere with the auto-updater's artifact.
+      - name: Upload Linux Packages (.deb/.rpm)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Advancely-v${{ env.PROJECT_VERSION }}-Linux-Packages
+          path: |
+            build/*.deb
+            build/*.rpm
+
+      # --- Create Portable Zip (Legacy Support) ---
+      - name: Create Portable Zip
         shell: bash
         run: |
           mkdir release
           cp build/Advancely release/
           cp -r resources release/
           cp _PLEASE_READ_ME.txt LICENSES.txt README.md release/
+          # Copy dependencies for portable use
           cp /usr/local/lib/libSDL3.so.0 release/
           cp /usr/local/lib/libSDL3_image.so.0 release/
           cp /usr/local/lib/libSDL3_ttf.so.0 release/
+
+      # --- Upload Legacy Artifact ---
+      # This preserves the exact name 'Advancely-v...-Linux'
+      # GitHub Actions will zip the 'release' folder contents into it.
+      # auto-updater will find this exactly as before.
       - name: Upload Linux Release Artifact
         uses: actions/upload-artifact@v4
         with:
