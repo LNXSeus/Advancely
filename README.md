@@ -870,6 +870,7 @@ maintainers or advanced users who want to override default behaviors.
 |:-------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `--settings-file <path>` | Specifies a custom absolute or relative path for the `settings.json` configuration file. Useful for system-wide installations where config should reside in `~/.config/` or similar. |
 | `--disable-updater`      | Disables the automatic update check on startup. **Recommended for package maintainers** (e.g., AUR, RPM, DEB) to prevent the app from modifying itself.                              |
+| `--use-home-dir`         | **Linux ONLY:** So Advancely uses the users home directory for applicable files that need to be user-writable such as templates, notes and config. Used within the package manager.  |
 | `--version`              | Prints the current version of Advancely to the console and exits.                                                                                                                    |
 | `--overlay`              | Launches the application in "Overlay Mode". **Note:** This is primarily used internally by the main process to spawn the overlay window.                                             |
 | `--test-mode`            | Enables test mode for debugging and development purposes. This is mainly used by the github action runners to assure functionality and forcing termination after 5 seconds.          |
