@@ -31,9 +31,9 @@ jobs:
           VERSION=$(grep '#define ADVANCELY_VERSION' source/main.h | sed -E 's/.*"v([0-9]+\.[0-9]+\.[0-9]+)".*/\1/')
           echo "Detected Version: $VERSION"
           
-#          # 2. Update PKGBUILD (packaging/linux/PKGBUILD) - Should only be done for Releases
-#          sed -i "s/^pkgver=.*/pkgver=$VERSION/" packaging/linux/PKGBUILD
-#          sed -i "s/^pkgrel=.*/pkgrel=1/" packaging/linux/PKGBUILD
+          # 2. Update PKGBUILD (packaging/linux/PKGBUILD) - Should only be done for Releases
+          # sed -i "s/^pkgver=.*/pkgver=$VERSION/" packaging/linux/PKGBUILD
+          # sed -i "s/^pkgrel=.*/pkgrel=1/" packaging/linux/PKGBUILD
           
           # 3. Update Metainfo (packaging/linux/dev.LNXSeus.Advancely.metainfo.xml)
           METAINFO="packaging/linux/dev.LNXSeus.Advancely.metainfo.xml"
