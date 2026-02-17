@@ -4,15 +4,6 @@
 CONFIG_DIR="${HOME}/.local/share"
 ADVANCELY_CONFIG_DIRECTORY="${ADVANCELY_CONFIG_DIRECTORY-${CONFIG_DIR}/advancely}"
 APPLICATION_DIRECTORY="/usr/share/advancely"
-LIB_DIR="${APPLICATION_DIRECTORY}/lib"
-
-# telling the app where to find the SDL3 libraries
-# Prepend lib dir. If LD_LIBRARY_PATH was empty, we don't add the trailing colon.
-if [ -z "$LD_LIBRARY_PATH" ]; then
-    export LD_LIBRARY_PATH="${LIB_DIR}"
-else
-    export LD_LIBRARY_PATH="${LIB_DIR}:${LD_LIBRARY_PATH}"
-fi
 
 touch "${ADVANCELY_CONFIG_DIRECTORY}/version"
 
