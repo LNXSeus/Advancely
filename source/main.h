@@ -77,7 +77,6 @@ const char* get_notes_manifest_path();
 
 #define MAX_PATH_LENGTH 1024
 
-
 #ifdef __cplusplus
 }
 #endif
