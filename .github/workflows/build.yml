@@ -90,15 +90,19 @@ jobs:
           ls -l *.deb *.rpm # List files to verify generation
           
       # --- Upload Packages Separately ---
-      # This creates a NEW artifact (e.g., Advancely-v1.0.15-Linux-Packages.zip)
-      # It does NOT interfere with the auto-updater's artifact.
-      - name: Upload Linux Packages (.deb/.rpm)
+      # Upload the Debian (.deb) package
+      - name: Upload Linux Debian Package (.deb)
         uses: actions/upload-artifact@v4
         with:
-          name: Advancely-v${{ env.PROJECT_VERSION }}-Linux-Packages
-          path: |
-            build/*.deb
-            build/*.rpm
+          name: Advancely-v${{ env.PROJECT_VERSION }}-Linux-DEB
+          path: build/*.deb
+
+      # Upload the RPM (.rpm) package
+      - name: Upload Linux RPM Package (.rpm)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Advancely-v${{ env.PROJECT_VERSION }}-Linux-RPM
+          path: build/*.rpm
 
       # --- Create Portable Zip (Legacy Support) ---
       - name: Create Portable Zip
