@@ -1027,7 +1027,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         char tracker_fps_limit_tooltip_buffer[1024];
         snprintf(tracker_fps_limit_tooltip_buffer, sizeof(tracker_fps_limit_tooltip_buffer),
                  "Limits the frames per second of the tracker window. Default is 60 FPS.\n"
-                 "Higher values may result in higher GPU usage.");
+                 "Higher values may result in higher CPU usage.");
         ImGui::SetTooltip("%s", tracker_fps_limit_tooltip_buffer);
     }
 
@@ -1041,7 +1041,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             char overlay_fps_limit_tooltip_buffer[1024];
             snprintf(overlay_fps_limit_tooltip_buffer, sizeof(overlay_fps_limit_tooltip_buffer),
                      "Limits the frames per second of the overlay window. Default is 60 FPS.\n"
-                     "Higher values may result in higher GPU usage.");
+                     "Higher values may result in higher GPU/CPU usage.");
             ImGui::SetTooltip("%s", overlay_fps_limit_tooltip_buffer);
         }
 

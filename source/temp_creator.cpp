@@ -5740,7 +5740,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     const EditorMultiStageGoal *source_goal_ptr = goals_to_render[goal_to_copy_idx];
 
                     // Perform a manual, safe copy to prevent memory corruption.
-                    EditorMultiStageGoal new_goal;
+                    EditorMultiStageGoal new_goal = {};  // Zero-initialize to prevent garbage in unset fields
                     strncpy(new_goal.root_name, source_goal_ptr->root_name, sizeof(new_goal.root_name));
                     new_goal.root_name[sizeof(new_goal.root_name) - 1] = '\0';
                     strncpy(new_goal.display_name, source_goal_ptr->display_name, sizeof(new_goal.display_name));
@@ -5748,6 +5748,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     strncpy(new_goal.icon_path, source_goal_ptr->icon_path, sizeof(new_goal.icon_path));
                     new_goal.icon_path[sizeof(new_goal.icon_path) - 1] = '\0';
                     new_goal.is_hidden = source_goal_ptr->is_hidden;
+                    new_goal.in_2nd_row = source_goal_ptr->in_2nd_row;
+                    new_goal.use_stage_icons = source_goal_ptr->use_stage_icons;
                     new_goal.stages = source_goal_ptr->stages; // std::vector handles its own deep copy safely.
 
                     // Now, generate a unique name for the new copy
@@ -6641,6 +6643,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_stage.root_name[sizeof(new_stage.root_name) - 1] = '\0';
                         new_stage.type = source_stage.type;
                         new_stage.required_progress = source_stage.required_progress;
+
+                        // If the source was the Final (SUBGOAL_MANUAL) stage, the copy cannot also be Final
+                        // Reset it to SUBGOAL_STAT
+                        if (new_stage.type == SUBGOAL_MANUAL) {
+                            new_stage.type = SUBGOAL_STAT;
+                            new_stage.required_progress = 1; // sensible default for a stat stage
+                        }
 
                         char base_name[64];
                         strncpy(base_name, source_stage.stage_id, sizeof(base_name) - 1);
