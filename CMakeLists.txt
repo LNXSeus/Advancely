@@ -394,7 +394,7 @@ if (UNIX AND NOT APPLE)
     # Desktop Integration
     install(FILES "packaging/linux/advancely.desktop" DESTINATION share/applications)
     install(FILES "packaging/linux/advancely.png"
-            DESTINATION share/icons/hicolor/512x512/apps
+            DESTINATION share/pixmaps
             RENAME advancely.png
     )
     # Install the auto-generated file from the build directory
