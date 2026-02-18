@@ -426,6 +426,7 @@ if (UNIX AND NOT APPLE)
     set(CPACK_RPM_PACKAGE_GROUP "Amusements/Games")
     set(CPACK_RPM_PACKAGE_REQUIRES "curl, SDL3, SDL3_image, SDL3_ttf")
     set(CPACK_RPM_PACKAGE_AUTOREQPROV OFF) # Turn OFF auto-detection
+    set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-v${PROJECT_VERSION}-Linux") # include the "v" in the version
 
     include(CPack)
 endif()
