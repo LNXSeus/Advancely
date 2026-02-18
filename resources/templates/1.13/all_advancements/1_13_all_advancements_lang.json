@@ -185,7 +185,7 @@
 	"multi_stage_goal.ms_goal:hdwgh.stage.2":	"Craft Conduit",
 	"multi_stage_goal.ms_goal:hdwgh.stage.3":	"Place Conduit",
 	"multi_stage_goal.ms_goal:hdwgh.stage.4":	"Get HDWGH",
-	"multi_stage_goal.ms_goal:hdwgh.stage.final":	"final",
+	"multi_stage_goal.ms_goal:hdwgh.stage.final":	"HDWGH Done!",
 	"multi_stage_goal.ms_goal:thunder.display_name":	"Thunder",
 	"multi_stage_goal.ms_goal:thunder.stage.1":	"Obtain Trident",
 	"multi_stage_goal.ms_goal:thunder.stage.2":	"Get VVF",

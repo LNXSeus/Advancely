@@ -382,7 +382,7 @@ static bool validate_ms_goal_icon_paths(const std::vector<EditorMultiStageGoal> 
 
         // Validate Stage Icons if enabled
         if (goal.use_stage_icons) {
-            for (const auto& stage : goal.stages) {
+            for (const auto &stage: goal.stages) {
                 if (stage.icon_path[0] == '\0') {
                     snprintf(error_message_buffer, 256, "Error: Stage '%s' in goal '%s' is missing an icon path.",
                              stage.stage_id, goal.root_name);
@@ -1405,6 +1405,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static bool show_import_lang_popup = false;
     static char import_lang_source_path[MAX_PATH_LENGTH] = "";
     static char import_lang_flag_buffer[64] = "";
+    static bool import_lang_delete_after = false;
 
     // State for the editor view
     static bool editing_template = false;
@@ -1451,6 +1452,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // State for the Import Confirmation view
     static bool show_import_confirmation_view = false;
     static char import_zip_path[MAX_PATH_LENGTH] = "";
+    static bool import_zip_delete_after = false;
     static int import_version_idx = -1;
     static char import_category[MAX_PATH_LENGTH] = "";
     static char import_flag[MAX_PATH_LENGTH] = "";
@@ -2397,6 +2399,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 "Enter a flag for the new language (e.g., 'de', 'fr_ca').\nCannot be empty or contain special characters except for underscores, dots, and the %% sign.");
         }
 
+        // Deleting language file after import
+        ImGui::Checkbox("Delete source file after import", &import_lang_delete_after);
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 30.0f);
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "If checked, the source .json file will be deleted from disk after a successful import.\n"
+                     "Source: %s", import_lang_source_path);
+            ImGui::TextUnformatted(tooltip_buffer);
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
         if (popup_error_msg[0] != '\0') {
             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", popup_error_msg);
         }
@@ -2406,6 +2421,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (execute_import_language_file(creator_version_str, selected.category, selected.optional_flag,
                                              import_lang_source_path, import_lang_flag_buffer, popup_error_msg,
                                              sizeof(popup_error_msg))) {
+                // Delete after successful import
+                if (import_lang_delete_after) {
+                    remove(import_lang_source_path);
+                }
                 SDL_SetAtomicInt(&g_templates_changed, 1);
                 last_scanned_version[0] = '\0'; // Force rescan
                 ImGui::CloseCurrentPopup();
@@ -4857,7 +4876,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         const char *filter_patterns[1] = {"*.json"};
                         int filter_count = 1;
 #endif
-                        const char *selection = tinyfd_openFileDialog("Select Player Unlocks File", start_path, filter_count,
+                        const char *selection = tinyfd_openFileDialog("Select Player Unlocks File", start_path,
+                                                                      filter_count,
                                                                       filter_patterns, "JSON files", 0);
 
                         if (selection) {
@@ -5609,7 +5629,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             bool standard_match = str_contains_insensitive(stage.display_text, tc_search_buffer) ||
                                                   str_contains_insensitive(stage.stage_id, tc_search_buffer) ||
                                                   str_contains_insensitive(stage.root_name, tc_search_buffer) ||
-                                                  str_contains_insensitive(stage.parent_advancement, tc_search_buffer) ||
+                                                  str_contains_insensitive(stage.parent_advancement, tc_search_buffer)
+                                                  ||
                                                   strstr(target_val_str, tc_search_buffer) != nullptr;
 
                             // Check stage icon path IF enabled, so it works with search
@@ -5740,7 +5761,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     const EditorMultiStageGoal *source_goal_ptr = goals_to_render[goal_to_copy_idx];
 
                     // Perform a manual, safe copy to prevent memory corruption.
-                    EditorMultiStageGoal new_goal = {};  // Zero-initialize to prevent garbage in unset fields
+                    EditorMultiStageGoal new_goal = {}; // Zero-initialize to prevent garbage in unset fields
                     strncpy(new_goal.root_name, source_goal_ptr->root_name, sizeof(new_goal.root_name));
                     new_goal.root_name[sizeof(new_goal.root_name) - 1] = '\0';
                     strncpy(new_goal.display_name, source_goal_ptr->display_name, sizeof(new_goal.display_name));
@@ -5929,7 +5950,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         // Pre-fill stage icons with main goal icon to avoid errors
                         if (goal.use_stage_icons) {
-                            for (auto &stage : goal.stages) {
+                            for (auto &stage: goal.stages) {
                                 // Only pre-fill if currently empty to preserve previous edits if toggled off/on
                                 if (stage.icon_path[0] == '\0') {
                                     if (goal.icon_path[0] != '\0') {
@@ -6109,8 +6130,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             bool standard_match = str_contains_insensitive(stage.display_text, tc_search_buffer) ||
                                                   str_contains_insensitive(stage.stage_id, tc_search_buffer) ||
                                                   str_contains_insensitive(stage.root_name, tc_search_buffer) ||
-                                                  str_contains_insensitive(stage.parent_advancement, tc_search_buffer) ||
-                                                  (stage.required_progress != 0 && strstr(target_val_str, tc_search_buffer) != nullptr);
+                                                  str_contains_insensitive(stage.parent_advancement, tc_search_buffer)
+                                                  ||
+                                                  (stage.required_progress != 0 && strstr(
+                                                       target_val_str, tc_search_buffer) != nullptr);
 
                             // Check stage icon path IF enabled
                             bool icon_match = false;
@@ -6476,7 +6499,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         int filter_count = 1;
 #endif
                                         selection = tinyfd_openFileDialog(
-                                            "Select Player Unlocks File", start_path, filter_count, filter_patterns, "JSON files",
+                                            "Select Player Unlocks File", start_path, filter_count, filter_patterns,
+                                            "JSON files",
                                             0);
                                         if (selection && parse_player_unlocks_for_import(
                                                 selection, importable_unlocks, import_error_message,
@@ -6859,6 +6883,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         ImGui::Spacing();
 
+        // Deleting .zip after import
+        ImGui::Checkbox("Delete .zip after import", &import_zip_delete_after);
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 30.0f);
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "If checked, the source .zip file will be deleted from disk after a successful import.\n"
+                     "Source: %s", import_zip_path);
+            ImGui::TextUnformatted(tooltip_buffer);
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
+        ImGui::Spacing();
+
         if (ImGui::Button("Confirm Import") || (ImGui::IsKeyPressed(ImGuiKey_Enter) && ImGui::IsWindowFocused())) {
             if (import_version_idx != -1) {
                 const char *version_str = VERSION_STRINGS[import_version_idx];
@@ -6886,6 +6925,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                 status_message,
                                                 sizeof(status_message))) {
                         // SUCCESS!
+                        if (import_zip_delete_after) {
+                            remove(import_zip_path);
+                        }
                         snprintf(status_message, sizeof(status_message), "Template imported to version %s!",
                                  version_str);
                         show_import_confirmation_view = false;
