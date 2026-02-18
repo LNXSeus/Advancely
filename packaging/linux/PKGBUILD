@@ -7,8 +7,8 @@ pkgdesc="A highly customizable and interactive tool to track Minecraft progress.
 arch=('x86_64')
 url="https://github.com/LNXSeus/Advancely"
 license=('LicenseRef-Proprietary')
-depends=('sdl3' 'sdl3_image' 'sdl3_ttf' 'curl' 'hicolor-icon-theme')
-makedepends=('git' 'cmake')
+depends=(sdl3 sdl3_image sdl3_ttf curl)
+makedepends=(git cmake)
 provides=('advancely')
 conflicts=('advancely-bin' 'advancely-git')
 # We use the git repo directly so we have the packaging/linux files available locally
