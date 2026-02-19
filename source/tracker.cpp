@@ -1782,7 +1782,6 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
                 cJSON *target_val = cJSON_GetObjectItem(stage_item_json, "target");
 
 
-
                 if (cJSON_IsString(text)) {
                     strncpy(new_stage->display_text, text->valuestring, sizeof(new_stage->display_text) - 1);
                     new_stage->display_text[sizeof(new_stage->display_text) - 1] = '\0';
@@ -1835,18 +1834,22 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
                     cJSON *stage_icon = cJSON_GetObjectItem(stage_item_json, "icon");
                     if (cJSON_IsString(stage_icon)) {
                         char full_icon_path[sizeof(new_stage->icon_path)];
-                        snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_application_dir(), stage_icon->valuestring);
+                        snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_application_dir(),
+                                 stage_icon->valuestring);
                         strncpy(new_stage->icon_path, full_icon_path, sizeof(new_stage->icon_path) - 1);
                         new_stage->icon_path[sizeof(new_stage->icon_path) - 1] = '\0';
 
                         if (strstr(full_icon_path, ".gif")) {
                             new_stage->anim_texture = get_animated_texture_from_cache(
-                                t->renderer, &t->anim_cache, &t->anim_cache_count, &t->anim_cache_capacity, new_stage->icon_path,
+                                t->renderer, &t->anim_cache, &t->anim_cache_count, &t->anim_cache_capacity,
+                                new_stage->icon_path,
                                 SDL_SCALEMODE_NEAREST);
                         } else {
-                            new_stage->texture = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count,
-                                                                       &t->texture_cache_capacity, new_stage->icon_path,
-                                                                       SDL_SCALEMODE_NEAREST);
+                            new_stage->texture = get_texture_from_cache(t->renderer, &t->texture_cache,
+                                                                        &t->texture_cache_count,
+                                                                        &t->texture_cache_capacity,
+                                                                        new_stage->icon_path,
+                                                                        SDL_SCALEMODE_NEAREST);
                         }
                     }
                 }
@@ -2505,6 +2508,12 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
 
     Tracker *t = *tracker;
 
+    // Explicitly construct HermesRotator (calloc doesn't call its constructor)
+    new(&t->hermes_rotator) HermesRotator();
+    t->hermes_play_log = nullptr;
+    t->hermes_file_offset = 0;
+    t->hermes_active = false;
+
     // Initialize notes state
     t->notes_window_open = false;
     t->notes_buffer[0] = '\0';
@@ -2656,7 +2665,6 @@ void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settin
 
 // Periodically recheck file changes
 void tracker_update(Tracker *t, const AppSettings *settings) {
-
     // Detect if the world has changed since the last update.
     if (t->template_data->last_known_world_name[0] == '\0' || // Handle first-time load
         strcmp(t->world_name, t->template_data->last_known_world_name) != 0) {
@@ -5215,8 +5223,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             // --- Start GIF Frame Selection Logic ---
 
             // Determine which texture source to use
-            AnimatedTexture* anim_src = goal->anim_texture;
-            SDL_Texture* static_src = goal->texture;
+            AnimatedTexture *anim_src = goal->anim_texture;
+            SDL_Texture *static_src = goal->texture;
 
             if (goal->use_stage_icons && goal->stage_count > 0) {
                 // Use the icon of the current stage
@@ -5452,7 +5460,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     ImGui::PushStyleColor(ImGuiCol_Text, title_text_color);
 
     // Enforce minimum width for the title bar
-    const char *info_window_title = "Info | ESC: Settings | Pan: RMB/MMB Drag | Zoom: Wheel | Click: LMB | Move Win: LMB Drag";
+    const char *info_window_title =
+            "Info | ESC: Settings | Pan: RMB/MMB Drag | Zoom: Wheel | Click: LMB | Move Win: LMB Drag";
     ImVec2 title_size = ImGui::CalcTextSize(info_window_title);
     // Add padding (WindowPadding * 2 + extra for safety/frame borders)
     float min_info_width = title_size.x + (ImGui::GetStyle().WindowPadding.x * 2.0f) + 40.0f;
@@ -6074,6 +6083,29 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings) {
             t->stats_path,
             t->unlocks_path,
             MAX_PATH_LENGTH);
+
+        // Hermes Live-Update Detection ---
+        // Close any previously open handle first
+        if (t->hermes_play_log) {
+            fclose(t->hermes_play_log);
+            t->hermes_play_log = nullptr;
+            t->hermes_file_offset = 0;
+            t->hermes_active = false;
+        }
+
+        if (t->world_name[0] != '\0' && t->saves_path[0] != '\0') {
+            char hermes_log_path[MAX_PATH_LENGTH];
+            snprintf(hermes_log_path, sizeof(hermes_log_path),
+                     "%s/%s/hermes/restricted/play.log.enc", // Encrypted log file
+                     t->saves_path, t->world_name);
+            FILE *f = fopen(hermes_log_path, "rb");
+            if (f) {
+                t->hermes_play_log = f;
+                t->hermes_file_offset = 0; // start from beginning on new world, then it appends
+                t->hermes_active = true;
+                log_message(LOG_INFO, "[TRACKER - HERMES] Detected play.log.enc at: %s\n", hermes_log_path);
+            }
+        }
     } else {
         log_message(LOG_ERROR, "[TRACKER] CRITICAL: Failed to get saves path.\n");
 
@@ -6398,7 +6430,6 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
 
 
 void tracker_free(Tracker **tracker, AppSettings *settings) {
-
     if (tracker && *tracker) {
         Tracker *t = *tracker;
 
@@ -6458,6 +6489,12 @@ void tracker_free(Tracker **tracker, AppSettings *settings) {
             SDL_DestroyWindow(t->window);
             // We still have an address
             t->window = nullptr;
+        }
+
+        // Close Hermes log if open
+        if (t->hermes_play_log) {
+            fclose(t->hermes_play_log);
+            t->hermes_play_log = nullptr;
         }
 
         // tracker is heap allocated so free it

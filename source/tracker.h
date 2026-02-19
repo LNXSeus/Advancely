@@ -12,6 +12,7 @@
 
 #include "main.h"
 #include "data_structures.h"
+#include "hermes_rotator.h"
 #include "settings_utils.h" // For AppSettings
 
 #include "imgui.h"
@@ -119,6 +120,12 @@ struct Tracker {
     char unlocks_path[MAX_PATH_LENGTH]; // Full path to the player's unlocks .json file (if applicable).
     char stats_path[MAX_PATH_LENGTH]; // Full path to the player's stats file (.json or .dat) for the current world.
     char snapshot_path[MAX_PATH_LENGTH]; // Full path to the snapshot file for legacy stat tracking.
+
+    // Hermes live-update support
+    HermesRotator hermes_rotator;   // cipher tables, built once
+    FILE *hermes_play_log;          // file handle for the restricted play.log
+    long hermes_file_offset;        // how far we've already read
+    bool hermes_active;             // true if Hermes was detected for this world
 };
 
 /**
