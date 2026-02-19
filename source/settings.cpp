@@ -48,6 +48,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         strcmp(a->lang_flag, b->lang_flag) != 0 ||
         a->enable_overlay != b->enable_overlay ||
         a->using_stats_per_world_legacy != b->using_stats_per_world_legacy ||
+        a->using_hermes != b->using_hermes ||
         a->fps != b->fps ||
         a->overlay_fps != b->overlay_fps ||
         a->tracker_always_on_top != b->tracker_always_on_top ||
@@ -601,6 +602,56 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         }
     }
 
+    // Hermes Mod checkbox — available for all versions that support Fabric
+    ImGui::Checkbox("Using Hermes Mod", &temp_settings.using_hermes);
+    if (ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 38.0f);
+        ImGui::TextUnformatted("Hermes Mod (by DuncanRuns, for Fabric)");
+        ImGui::Separator();
+        if (selected_version <= MC_VERSION_1_6_4) {
+            // TODO: Whenever the mod gets released for 1.6.4 or lower
+            ImGui::TextWrapped(
+                "Hermes is a speedrun-legal Legacy Fabric mod that writes real-time game events to a "
+                "ciphered log file inside each world's folder. When enabled, Advancely reads this "
+                "log in addition to the normal game files, giving you near-instant updates "
+                "instead of waiting for the game to save.\n\n"
+                "How the two sources are combined:\n");
+        } else {
+            // TODO: Whenever the mod gets released for mid-era and other versions after 1.6.4
+            ImGui::TextWrapped(
+                "Hermes is a speedrun-legal Fabric mod that writes real-time game events to a "
+                "ciphered log file inside each world's folder. When enabled, Advancely reads this "
+                "log in addition to the normal game files, giving you near-instant updates "
+                "instead of waiting for the game to save.\n\n"
+                "How the two sources are combined:\n");
+        }
+        // Achievements/Advancements
+        if (selected_version <= MC_VERSION_1_11_2) {
+            ImGui::BulletText(
+                "Achievements: Hermes only provides gained achievements, so to ensure\n"
+                "  accuracy, Advancely will read the actual stats file and synchronize\n"
+                "  when the game actually saves.");
+        } else {
+            // modern versions
+            ImGui::BulletText(
+                "Advancements: Hermes only provides gained advancements/criteria, so to ensure\n"
+                "  accuracy, Advancely will read the actual advancements file and synchronize\n"
+                "  when the game actually saves.");
+        }
+        // Stats, version neutral
+        ImGui::BulletText(
+            "Stats: Hermes provides real-time values for the stats it tracks. Stats that\n"
+            "  Hermes intentionally omits (high-frequency ones like distance walked) are\n"
+            "  still read from the regular game files as usual. Stats are also synchronized\n"
+            "  when the game actually saves.");
+        ImGui::Spacing();
+        ImGui::TextDisabled("Requires Hermes to be installed and a world to be loaded.");
+        ImGui::TextDisabled("The mod's log is at: [World]/hermes/restricted/play.log.enc");
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
+
     // --- Version-dependent labels ---
     // Achievement/Advancement
     const char *advancement_label_uppercase = (selected_version <= MC_VERSION_1_11_2) ? "Achievement" : "Advancement";
@@ -814,7 +865,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
 
     ImGui::InputText("Display Category", temp_settings.category_display_name,
-                         sizeof(temp_settings.category_display_name));
+                     sizeof(temp_settings.category_display_name));
 
     if (temp_settings.lock_category_display_name) ImGui::EndDisabled(); // End disabled if locked
 
@@ -823,13 +874,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         char tooltip_buffer[512];
         if (temp_settings.lock_category_display_name) {
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                "Display Name is currently locked.\n"
-                "Uncheck the box to edit or auto-update.");
+                     "Display Name is currently locked.\n"
+                     "Uncheck the box to edit or auto-update.");
         } else {
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                 "This is the name used for display on the tracker, overlay, and in debug logs.\n"
-                 "It is automatically formatted from the Category and Optional Flag,\n"
-                 "but you can override it with any custom text here.");
+                     "This is the name used for display on the tracker, overlay, and in debug logs.\n"
+                     "It is automatically formatted from the Category and Optional Flag,\n"
+                     "but you can override it with any custom text here.");
         }
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
@@ -2336,6 +2387,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "  - Path Mode: %d\n"
                  "  - Template/Display Version: %s\n"
                  "  - StatsPerWorld Mod (Legacy): %s\n"
+                 "  - Hermes Mod: %s\n"
                  "  - Category: %s, Optional Flag: %s, Display Category: %s (lock: %s), Language: Default\n"
                  "  - Enable Overlay: %s\n"
                  "  - FPS Limit: (Tracker: %d, Overlay: %d)\n"
@@ -2368,6 +2420,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  DEFAULT_PATH_MODE,
                  DEFAULT_VERSION,
                  DEFAULT_USING_STATS_PER_WORLD_LEGACY ? "Enabled" : "Disabled",
+                 DEFAULT_USING_HERMES ? "Enabled" : "Disabled",
                  DEFAULT_CATEGORY, DEFAULT_OPTIONAL_FLAG, DEFAULT_DISPLAY_CATEGORY,
                  DEFAULT_LOCK_CATEGORY_DISPLAY_NAME ? "Enabled" : "Disabled",
                  DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",

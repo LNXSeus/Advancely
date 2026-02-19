@@ -563,6 +563,14 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
+        const cJSON *using_hermes = cJSON_GetObjectItem(general_settings, "using_hermes");
+        if (using_hermes && cJSON_IsBool(using_hermes))
+            settings->using_hermes = cJSON_IsTrue(using_hermes);
+        else {
+            settings->using_hermes = DEFAULT_USING_HERMES;
+            defaults_were_used = true;
+        }
+
         const cJSON *fps = cJSON_GetObjectItem(general_settings, "fps");
         if (fps && cJSON_IsNumber(fps) && fps->valueint != -1) settings->fps = fps->valueint;
         else {
@@ -1140,6 +1148,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(general_obj, "using_stats_per_world_legacy");
         cJSON_AddItemToObject(general_obj, "using_stats_per_world_legacy",
                               cJSON_CreateBool(settings->using_stats_per_world_legacy));
+        cJSON_DeleteItemFromObject(general_obj, "using_hermes");
+        cJSON_AddItemToObject(general_obj, "using_hermes", cJSON_CreateBool(settings->using_hermes));
         cJSON_DeleteItemFromObject(general_obj, "fps");
         cJSON_AddItemToObject(general_obj, "fps", cJSON_CreateNumber(settings->fps));
         cJSON_DeleteItemFromObject(general_obj, "overlay_fps");

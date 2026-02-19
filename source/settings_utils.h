@@ -54,6 +54,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 // DEFAULT values
 #define DEFAULT_ENABLE_OVERLAY false // Stream overlay will be off by default
 #define DEFAULT_USING_STATS_PER_WORLD_LEGACY true
+#define DEFAULT_USING_HERMES false
 #define DEFAULT_PATH_MODE PATH_MODE_AUTO
 #define DEFAULT_FPS 60
 #define DEFAULT_OVERLAY_FPS 60
@@ -198,6 +199,7 @@ struct AppSettings {
     bool enable_overlay; // If true, the overlay window is created and rendered.
     bool using_stats_per_world_legacy;
     // If true, legacy versions look for per-world .dat files (for StatsPerWorld mod).
+    bool using_hermes; // true if Hermes Mod integration is active
     float fps; // The target frames per second for the application loop.
     float overlay_fps; // The target frames per second for the overlay loop.
     bool tracker_always_on_top; // If true, the main tracker window stays above other windows.
