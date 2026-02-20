@@ -1284,7 +1284,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (ImGui::IsItemHovered()) {
             char overlay_text_timer_tooltip_buffer[1024];
             snprintf(overlay_text_timer_tooltip_buffer, sizeof(overlay_text_timer_tooltip_buffer),
-                     "Shows the time since the last game file update.");
+                     "Shows the time since the last game file update.\n"
+                     "When Hermes is active this timer only represents the time\n"
+                     "since the last full game-save sync from disk.");
             ImGui::SetTooltip("%s", overlay_text_timer_tooltip_buffer);
         }
 
@@ -1297,12 +1299,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::BeginTooltip();
 
         ImGui::BulletText(
-            "For sliders (like R, G, B), you can drag the label\nleft or right to quickly adjust the value.");
+            "For sliders (like R, G, B), you can drag the label\n"
+            "left or right to quickly adjust the value.");
         ImGui::BulletText("You can also click directly on any number to type in a precise value.");
 
         ImGui::BulletText("Click any color swatch to open a detailed color picker.");
         ImGui::BulletText(
-            "Inside the picker, you can right-click the large color preview\nto copy its value as a HEX code (e.g., #0D1117).");
+            "Inside the picker, you can right-click the large color preview\n"
+            "to copy its value as a HEX code (e.g., #0D1117).");
 
         ImGui::EndTooltip();
     }

@@ -1393,7 +1393,7 @@ static uint64_t compute_file_hash(const char *path) {
 
     // --- TODO: DEBUG PRINT ---
     // If you see this spamming in the console, your cache is being reset repeatedly.
-    log_message(LOG_INFO, "[DEBUG - TRACKER - FILE HASHING] Reading file from disk: %s\n", path);
+    // log_message(LOG_INFO, "[DEBUG - TRACKER - FILE HASHING] Reading file from disk: %s\n", path);
     // ----------------------------
 
     FILE *f = fopen(path, "rb");
@@ -2138,21 +2138,7 @@ static void tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
     }
 }
 
-
-/**
- * @brief Calculates the overall progress percentage based on all tracked items. Advancements are separately!!
- * Advancements with is_recipe set to true count towards the progress here. (modern versions)
- *
- * It first calculates the total number of "steps" (e.g., Recipes, criteria, sub-stats or stat if no sub-stats, unlocks,
- * custom goals, and multi-stage goals),
- * then the number of completed "steps", and finally calculates the overall progress percentage.
- *
- * @param t A pointer to the Tracker struct.
- * @param version The version of the game.
- * @param settings A pointer to the AppSettings struct.
- *
- */
-static void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const AppSettings *settings) {
+void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const AppSettings *settings) {
     (void) version;
     (void) settings;
     if (!t || !t->template_data) return; // || because we can't be sure if the template_data is initialized
@@ -2513,6 +2499,7 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     t->hermes_play_log = nullptr;
     t->hermes_file_offset = 0;
     t->hermes_active = false;
+    t->hermes_wants_ipc_flush = false;
 
     // Initialize notes state
     t->notes_window_open = false;
@@ -5546,7 +5533,10 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         }
 
         // Add the IGT and Update Timer
-        snprintf(temp_chunk, sizeof(temp_chunk), "  |  %s IGT  |  Upd: %s", formatted_time, formatted_update_time);
+        snprintf(temp_chunk, sizeof(temp_chunk), "  |  %s IGT  |  %s %s",
+                 formatted_time,
+                 settings->using_hermes ? "Synced:" : "Upd:",
+                 formatted_update_time);
         strncat(info_buffer, temp_chunk, sizeof(info_buffer) - strlen(info_buffer) - 1);
     }
 
@@ -6136,6 +6126,373 @@ static bool json_objects_differ(cJSON *obj1, cJSON *obj2) {
     return diff;
 }
 
+
+// =============================================================================
+//  HERMES MOD LIVE-UPDATE SUPPORT FUNCTIONS
+// =============================================================================
+
+/**
+ * Converts a modern Hermes stat key to category + item keys.
+ *
+ * Hermes format:  "minecraft.picked_up:minecraft.oak_log"
+ * Output:          h_cat  = "minecraft:picked_up"
+ *                  h_item = "minecraft:oak_log"
+ *
+ * These match TrackableItem::stat_category_key / stat_item_key, which are
+ * populated at load time by splitting root_name on '/'.
+ *
+ * Returns false if there is no ':' — indicating a legacy or mid-era key
+ * that must be compared directly against root_name instead.
+ */
+static bool hermes_parse_stat_key(const char *hermes_key,
+                                  char *h_cat, char *h_item,
+                                  size_t buf_size) {
+    const char *colon = strchr(hermes_key, ':');
+    if (!colon) return false;
+
+    size_t cat_len = (size_t) (colon - hermes_key);
+    if (cat_len == 0 || cat_len >= buf_size) return false;
+    strncpy(h_cat, hermes_key, cat_len);
+    h_cat[cat_len] = '\0';
+    char *dot = strchr(h_cat, '.');
+    if (dot) *dot = ':'; // "minecraft.picked_up" → "minecraft:picked_up"
+
+    const char *item_start = colon + 1;
+    if (*item_start == '\0') return false;
+    strncpy(h_item, item_start, buf_size - 1);
+    h_item[buf_size - 1] = '\0';
+    dot = strchr(h_item, '.');
+    if (dot) *dot = ':'; // "minecraft.oak_log" → "minecraft:oak_log"
+
+    return true;
+}
+
+
+/**
+ * Applies a single Hermes "stat" event to in-memory template data.
+ *
+ * Key format detection:
+ *   Modern  (≥1.13): has ':', parsed into category/item, matched via
+ *                    stat_category_key / stat_item_key on TrackableItem.
+ *   Mid-era / Legacy: no ':', matched by direct strcmp against root_name.
+ *
+ * After updating criteria, recalculates category-level completion counters.
+ * Also updates the active SUBGOAL_STAT stage in any multi-stage goal.
+ *
+ * Returns true if at least one in-memory value changed.
+ */
+static bool hermes_apply_stat_event(Tracker *t, const cJSON *data) {
+    cJSON *stat_key_json = cJSON_GetObjectItem(data, "stat");
+    cJSON *value_json = cJSON_GetObjectItem(data, "value");
+
+    if (!cJSON_IsString(stat_key_json) || !cJSON_IsNumber(value_json))
+        return false;
+
+    const char *hermes_key = stat_key_json->valuestring;
+    int new_value = (int) value_json->valuedouble;
+
+    char h_cat[192], h_item[192];
+    bool is_modern = hermes_parse_stat_key(hermes_key, h_cat, h_item, sizeof(h_cat));
+
+    bool changed = false;
+
+    // --- Stat categories / criteria ---
+    for (int i = 0; i < t->template_data->stat_count; i++) {
+        TrackableCategory *stat_cat = t->template_data->stats[i];
+        if (!stat_cat) continue;
+
+        bool cat_changed = false;
+
+        for (int j = 0; j < stat_cat->criteria_count; j++) {
+            TrackableItem *sub = stat_cat->criteria[j];
+            if (!sub) continue;
+
+            bool matches = false;
+            if (is_modern) {
+                if (sub->stat_category_key[0] == '\0') continue;
+                matches = (strcmp(sub->stat_category_key, h_cat) == 0 &&
+                           strcmp(sub->stat_item_key, h_item) == 0);
+            } else {
+                // Legacy: "5242881", mid-era: "stat.pickup.minecraft.gold_block"
+                // Both stored verbatim in root_name.
+                matches = (strcmp(sub->root_name, hermes_key) == 0);
+            }
+
+            if (!matches) continue;
+
+            // Hermes value is always the cumulative total -> overwrite directly.
+            sub->progress = new_value;
+
+            if (!sub->is_manually_completed) {
+                if (sub->goal > 0) sub->done = (sub->progress >= sub->goal);
+                else if (sub->goal == -1) sub->done = false; // infinite counter
+            }
+
+            cat_changed = true;
+            changed = true;
+        }
+
+        if (cat_changed) {
+            int completed = 0;
+            for (int j = 0; j < stat_cat->criteria_count; j++) {
+                if (stat_cat->criteria[j] && stat_cat->criteria[j]->done)
+                    completed++;
+            }
+            stat_cat->completed_criteria_count = completed;
+
+            if (!stat_cat->is_manually_completed) {
+                stat_cat->done = (stat_cat->criteria_count > 0 &&
+                                  completed >= stat_cat->criteria_count);
+            }
+        }
+    }
+
+    // --- Active SUBGOAL_STAT stage in multi-stage goals ---
+    for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
+        MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+        if (!goal) continue;
+        if (goal->current_stage >= goal->stage_count) continue;
+
+        SubGoal *stage = goal->stages[goal->current_stage];
+        if (!stage || stage->type != SUBGOAL_STAT) continue;
+
+        bool matches = false;
+        if (is_modern) {
+            // Modern template format: "minecraft:picked_up/minecraft:wither_skeleton_skull"
+            const char *slash = strchr(stage->root_name, '/');
+            if (!slash) continue;
+
+            char s_cat[192], s_item[192];
+            size_t cat_len = (size_t) (slash - stage->root_name);
+            if (cat_len == 0 || cat_len >= sizeof(s_cat)) continue;
+
+            strncpy(s_cat, stage->root_name, cat_len);
+            s_cat[cat_len] = '\0';
+            strncpy(s_item, slash + 1, sizeof(s_item) - 1);
+            s_item[sizeof(s_item) - 1] = '\0';
+
+            matches = (strcmp(s_cat, h_cat) == 0 &&
+                       strcmp(s_item, h_item) == 0);
+        } else {
+            // Legacy/mid-era: direct compare, e.g. "5242881" or "stat.pickup.minecraft.skull"
+            matches = (strcmp(stage->root_name, hermes_key) == 0);
+        }
+
+        if (!matches) continue;
+
+        stage->current_stat_progress = new_value;
+        changed = true;
+
+        if (stage->required_progress > 0 &&
+            stage->current_stat_progress >= stage->required_progress) {
+            if (goal->current_stage + 1 < goal->stage_count) {
+                goal->current_stage++;
+                log_message(LOG_INFO,
+                            "[TRACKER - HERMES] Multi-stage goal '%s' advanced to stage %d.\n",
+                            goal->root_name, goal->current_stage);
+            }
+        }
+    }
+
+    return changed;
+}
+
+
+/**
+ * Applies a single Hermes "advancement" event to in-memory template data.
+ *
+ * The Hermes event contains:
+ *   "id"            - the advancement/achievement root_name
+ *   "criterion_name"- the specific criterion that was earned
+ *   "completed"     - whether the entire advancement is now complete
+ *
+ * We mark the criterion done and, if completed == true, mark the whole
+ * category done and update the completion counter.
+ *
+ * We deliberately do NOT unmark anything here. Revocations (/advancement revoke)
+ * are not applied in-memory from Hermes — they self-correct on the next
+ * dmon-triggered game save when tracker_update() does a full re-read from disk.
+ *
+ * Returns true if at least one in-memory value changed.
+ */
+static bool hermes_apply_advancement_event(Tracker *t, const cJSON *data) {
+    cJSON *id_json = cJSON_GetObjectItem(data, "id");
+    cJSON *criterion_json = cJSON_GetObjectItem(data, "criterion_name");
+    cJSON *completed_json = cJSON_GetObjectItem(data, "completed");
+
+    if (!cJSON_IsString(id_json)) return false;
+
+    const char *adv_id = id_json->valuestring;
+    const char *criterion_name = cJSON_IsString(criterion_json) ? criterion_json->valuestring : nullptr;
+    bool adv_completed = cJSON_IsTrue(completed_json);
+
+    bool changed = false;
+
+    for (int i = 0; i < t->template_data->advancement_count; i++) {
+        TrackableCategory *adv = t->template_data->advancements[i];
+        if (!adv) continue;
+        if (strcmp(adv->root_name, adv_id) != 0) continue;
+
+        // Found the matching advancement/achievement.
+
+        // Mark the specific criterion done if one was reported and we have criteria.
+        if (criterion_name && adv->criteria_count > 0) {
+            for (int j = 0; j < adv->criteria_count; j++) {
+                TrackableItem *crit = adv->criteria[j];
+                if (!crit) continue;
+                if (strcmp(crit->root_name, criterion_name) != 0) continue;
+
+                if (!crit->done) {
+                    crit->done = true;
+                    adv->completed_criteria_count++;
+                    changed = true;
+                }
+                break;
+            }
+        }
+
+        // If Hermes says the whole advancement is now complete, mark it so.
+        if (adv_completed && !adv->done && !adv->is_manually_completed) {
+            adv->done = true;
+
+            // Only count non-recipe advancements toward the completion counter.
+            if (!adv->is_recipe) {
+                t->template_data->advancements_completed_count++;
+            }
+            changed = true;
+        }
+
+        // Mark all_template_criteria_met if every criterion is done.
+        if (adv->criteria_count > 0 &&
+            adv->completed_criteria_count >= adv->criteria_count) {
+            adv->all_template_criteria_met = true;
+        }
+
+        break; // root_name is unique, no need to keep searching.
+    }
+
+
+    // -----------------------------------------------------------------------
+    // Multi-stage goals: advance any active SUBGOAL_ADVANCEMENT or
+    // SUBGOAL_CRITERION stage that matches this event.
+    //
+    // SUBGOAL_ADVANCEMENT: stage->root_name is the advancement id.
+    //   Completes when Hermes reports that advancement as completed.
+    //
+    // SUBGOAL_CRITERION: stage->parent_advancement is the advancement id,
+    //   stage->root_name is the criterion name.
+    //   Completes when Hermes reports that specific criterion being earned.
+    //   Note: criterion events always arrive before the parent advancement
+    //   completion event, so we handle them here independently.
+    // -----------------------------------------------------------------------
+    for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
+        MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+        if (!goal) continue;
+        if (goal->current_stage >= goal->stage_count) continue;
+
+        SubGoal *stage = goal->stages[goal->current_stage];
+        if (!stage) continue;
+
+        bool stage_completed = false;
+
+        if (stage->type == SUBGOAL_ADVANCEMENT) {
+            // The stage root_name is the advancement id we are waiting for.
+            if (adv_completed && strcmp(stage->root_name, adv_id) == 0)
+                stage_completed = true;
+        } else if (stage->type == SUBGOAL_CRITERION && criterion_name) {
+            // Both the parent advancement and the specific criterion must match.
+            if (strcmp(stage->parent_advancement, adv_id) == 0 &&
+                strcmp(stage->root_name, criterion_name) == 0)
+                stage_completed = true;
+        }
+
+        if (stage_completed && goal->current_stage + 1 < goal->stage_count) {
+            goal->current_stage++;
+            changed = true;
+            log_message(LOG_INFO,
+                        "[TRACKER - HERMES] Multi-stage goal '%s' advanced to stage %d via advancement event.\n",
+                        goal->root_name, goal->current_stage);
+        }
+    }
+
+    return changed;
+}
+
+
+void tracker_recalculate_progress(Tracker *t, const AppSettings *settings) {
+    if (!t || !t->template_data) return;
+    MC_Version version = settings_get_version_from_string(settings->version_str);
+    tracker_calculate_overall_progress(t, version, settings);
+}
+
+
+void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
+    if (!settings->using_hermes || !t->hermes_active || !t->hermes_play_log)
+        return;
+
+    if (fseek(t->hermes_play_log, t->hermes_file_offset, SEEK_SET) != 0)
+        return;
+
+    char line_buf[8192];
+    bool any_changed = false;
+
+    while (fgets(line_buf, sizeof(line_buf), t->hermes_play_log)) {
+        size_t len = strlen(line_buf);
+        if (len == 0) continue;
+
+        // Incomplete line — Minecraft is still writing. Retry next frame.
+        if (line_buf[len - 1] != '\n') break;
+
+        // Commit read position past this complete line.
+        t->hermes_file_offset = ftell(t->hermes_play_log);
+
+        // Strip trailing CR/LF.
+        while (len > 0 && (line_buf[len - 1] == '\n' || line_buf[len - 1] == '\r'))
+            line_buf[--len] = '\0';
+        if (len == 0) continue;
+
+        // Decrypt.
+        std::string decrypted = t->hermes_rotator.decryptLine(std::string(line_buf, len));
+
+        cJSON *event = cJSON_ParseWithLength(decrypted.c_str(), decrypted.size());
+        if (!event) {
+            log_message(LOG_ERROR, "[TRACKER - HERMES] Failed to parse decrypted line (len=%zu)\n", len);
+            continue;
+        }
+
+        cJSON *type_json = cJSON_GetObjectItem(event, "type");
+        cJSON *data = cJSON_GetObjectItem(event, "data");
+
+        if (!cJSON_IsString(type_json) || !data) {
+            cJSON_Delete(event);
+            continue;
+        }
+
+        const char *type = type_json->valuestring;
+
+        if (strcmp(type, "stat") == 0) {
+            if (hermes_apply_stat_event(t, data))
+                any_changed = true;
+        } else if (strcmp(type, "advancement") == 0) {
+            if (hermes_apply_advancement_event(t, data))
+                any_changed = true;
+        }
+        // ALL OTHER EVENT TYPES ARE IGNORED!!! - Fully speedrun legal this way
+
+        cJSON_Delete(event);
+    }
+
+    if (any_changed) {
+        tracker_recalculate_progress(t, settings);
+        t->hermes_wants_ipc_flush = true;
+    }
+}
+
+// =============================================================================
+//  END OF HERMES MOD LIVE-UPDATE SUPPORT FUNCTIONS
+// =============================================================================
+
+
 bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     log_message(LOG_INFO, "[TRACKER] Loading advancement template from: %s\n", t->advancement_template_path);
 
@@ -6547,11 +6904,13 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
     }
 
     snprintf(title_buffer, sizeof(title_buffer),
-             "  Advancely  %s    |    %s    -    %s%s%s    |    %s IGT    |    Upd: %s",
+             "  Advancely  %s    |    %s    -    %s%s%s    |    %s IGT    |    %s %s",
              ADVANCELY_VERSION, t->world_name,
              settings->display_version_str,
-             category_chunk, // This contains "    -    Category" or ""
-             progress_chunk, formatted_time, formatted_update_time);
+             category_chunk,
+             progress_chunk, formatted_time,
+             settings->using_hermes ? "Synced:" : "Upd:",
+             formatted_update_time);
 
     SDL_SetWindowTitle(t->window, title_buffer);
 }

@@ -122,10 +122,11 @@ struct Tracker {
     char snapshot_path[MAX_PATH_LENGTH]; // Full path to the snapshot file for legacy stat tracking.
 
     // Hermes live-update support
-    HermesRotator hermes_rotator;   // cipher tables, built once
-    FILE *hermes_play_log;          // file handle for the restricted play.log
-    long hermes_file_offset;        // how far we've already read
-    bool hermes_active;             // true if Hermes was detected for this world
+    HermesRotator hermes_rotator;     // cipher tables, built once
+    FILE         *hermes_play_log;    // file handle for the restricted play.log.enc
+    long          hermes_file_offset; // how far we've already read
+    bool          hermes_active;      // true if Hermes was detected for this world
+    bool          hermes_wants_ipc_flush; // set when in-memory state changed; cleared by main loop after IPC write
 };
 
 /**
@@ -136,6 +137,22 @@ struct Tracker {
  * @return True if the needle is found in the haystack, false otherwise.
  */
 bool str_contains_insensitive(const char *haystack, const char *needle);
+
+
+/**
+ * @brief Calculates the overall progress percentage based on all tracked items. Advancements are separately!!
+ * Advancements with is_recipe set to true count towards the progress here. (modern versions)
+ *
+ * It first calculates the total number of "steps" (e.g., Recipes, criteria, sub-stats or stat if no sub-stats, unlocks,
+ * custom goals, and multi-stage goals),
+ * then the number of completed "steps", and finally calculates the overall progress percentage.
+ *
+ * @param t A pointer to the Tracker struct.
+ * @param version The version of the game.
+ * @param settings A pointer to the AppSettings struct.
+ *
+ */
+void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const AppSettings *settings);
 
 /**
  * @brief Loads an SDL_Texture from a file and sets its scale mode.
@@ -267,6 +284,7 @@ void tracker_reinit_template(Tracker *t, AppSettings *settings);
  *
  * This function is used to update the tracker's paths when the settings.json file
  * is changed at runtime, for example, to point to a new saves folder.
+ * The function integrates Hermes Mod support.
  *
  * @param t A pointer to the Tracker struct.
  * @param settings A pointer to the application settings to use for path finding.
@@ -344,6 +362,35 @@ void tracker_save_notes(const Tracker *t, const AppSettings *settings);
  * @param settings A pointer to the application settings.
  */
 void tracker_print_debug_status(Tracker *t, const AppSettings *settings);
+
+/**
+* @brief Polls the Hermes encrypted play.log.enc for new stat and advancement events.
+*
+* Called every frame. Reads only newly appended bytes since the last call.
+*
+* Both stat and advancement events are applied directly to in-memory state
+* (fast path). The game files on disk are NOT read. When the game eventually
+* saves, dmon fires a normal tracker_update() which re-reads from disk and
+* corrects/confirms all in-memory values.
+*
+* Sets t->hermes_wants_ipc_flush when any in-memory state changes, so the
+* overlay receives an IPC write this same frame.
+*
+* @param t        A pointer to the Tracker struct.
+* @param settings A pointer to the application settings.
+*/
+void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings);
+
+/**
+ * @brief Recalculates overall progress percentage from current in-memory state.
+ *
+ * Called after a Hermes fast-path update so the overlay sees an up-to-date
+ * percentage without a full disk re-read. Safe to call at any time.
+ *
+ * @param t        A pointer to the Tracker struct.
+ * @param settings A pointer to the application settings.
+ */
+void tracker_recalculate_progress(Tracker *t, const AppSettings *settings);
 
 #ifdef __cplusplus
 } // extern "C"

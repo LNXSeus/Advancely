@@ -948,7 +948,7 @@ files.*
 *This project uses [tiny file dialogs](https://sourceforge.net/projects/tinyfiledialogs) to open file dialogs.*
 *More information can be found in the LICENSES.txt file.*
 
-*Lots of assistance was provided by Gemini 2.5/3 Pro.*
+*Lots of assistance was provided by Gemini 2.5/3 Pro and Claude Sonnet 4.6.*
 *Massive thanks to Jannox78 for allowing me to use his MacBook Pro for testing.*
 *Minecraft item .png files downloaded from [Minecraft Asset Cloud](https://mcasset.cloud/1.0/) and block renders from
 the [Minecraft Wiki](https://www.minecraft.wiki) (downloaded by [Dogmaster](https://www.twitch.tv/thedogmaster28))*

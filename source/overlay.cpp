@@ -622,7 +622,11 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
                 format_time_since_update(last_update_time_5_seconds, formatted_update_time,
                                          sizeof(formatted_update_time));
-                snprintf(temp_chunk, sizeof(temp_chunk), "Upd: %s", formatted_update_time);
+                // When Hermes is active the label changes to "Synced:" to reflect that
+                // real-time updates are coming from Hermes and this timer only represents
+                // the time since the last full game-save sync from disk.
+                snprintf(temp_chunk, sizeof(temp_chunk), "%s %s",
+                         settings->using_hermes ? "Synced:" : "Upd:", formatted_update_time);
                 add_component(temp_chunk);
             }
         }

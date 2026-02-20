@@ -536,7 +536,7 @@ static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker 
 
 // For some files we wan't to check if we need the Application directory or the users home directory.
 const char *get_resources_path() {
-  #if defined(__linux__)
+#if defined(__linux__)
     if (g_use_home_dir) {
         static char path[MAX_PATH_LENGTH] = "";
         if (path[0] == '\0') {
@@ -549,7 +549,7 @@ const char *get_resources_path() {
         }
         return path;
     }
-    #endif
+#endif
 
     return get_application_dir();
 }
@@ -654,25 +654,25 @@ int main(int argc, char *argv[]) {
 
     // MODIFIED: Robust Argument Parsing Loop
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--version") == 0) { // Prints version string
+        if (strcmp(argv[i], "--version") == 0) {
+            // Prints version string
             printf("Advancely version: %s\n", ADVANCELY_VERSION);
             return 0; // Exit Advancely
-        }
-        else if (strcmp(argv[i], "--test-mode") == 0) {
+        } else if (strcmp(argv[i], "--test-mode") == 0) {
             is_test_mode = true;
-        }
-        else if (strcmp(argv[i], "--updated") == 0) { // For updated popup
+        } else if (strcmp(argv[i], "--updated") == 0) {
+            // For updated popup
             g_show_release_notes_on_startup = true;
             log_message(LOG_INFO, "[DEBUG] --updated flag DETECTED.\n");
-        }
-        else if (strcmp(argv[i], "--overlay") == 0) { // Only running overlay
+        } else if (strcmp(argv[i], "--overlay") == 0) {
+            // Only running overlay
             is_overlay_mode = true;
-        }
-        else if (strcmp(argv[i], "--disable-updater") == 0) { // Temporarily disables updater
+        } else if (strcmp(argv[i], "--disable-updater") == 0) {
+            // Temporarily disables updater
             g_disable_updater = true;
             printf("[CLI] Auto-updater disabled via command line.\n");
-        }
-        else if (strcmp(argv[i], "--settings-file") == 0) { // custom settings file path
+        } else if (strcmp(argv[i], "--settings-file") == 0) {
+            // custom settings file path
             if (i + 1 < argc) {
                 strncpy(g_custom_settings_path, argv[i + 1], MAX_PATH_LENGTH - 1);
                 g_custom_settings_path[MAX_PATH_LENGTH - 1] = '\0';
@@ -682,12 +682,13 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "[CLI] Error: --settings-file requires a path argument.\n");
             }
         }
-        #ifdef __linux__
-        else if (strcmp(argv[i], "--use-home-dir") == 0) { // Use the home directory for config files on Linux
+#ifdef __linux__
+        else if (strcmp(argv[i], "--use-home-dir") == 0) {
+            // Use the home directory for config files on Linux
             g_use_home_dir = true;
             printf("[CLI] Using home directory.\n");
         }
-        #endif
+#endif
     }
 
     // TODO: DEBUG FOR AUTO-UPDATE TESTING -> SET FLAG AT THE TOP OF THE FILE
@@ -1038,7 +1039,8 @@ int main(int argc, char *argv[]) {
 
     if (tracker_new(&tracker, &app_settings)) {
         // Check for updates on startup
-        if (app_settings.check_for_updates && !g_disable_updater) { // checking for command line argument --disable-updater
+        if (app_settings.check_for_updates && !g_disable_updater) {
+            // checking for command line argument --disable-updater
             bool was_always_on_top = app_settings.tracker_always_on_top;
             if (was_always_on_top) {
                 SDL_SetWindowAlwaysOnTop(tracker->window, false);
@@ -1482,7 +1484,9 @@ int main(int argc, char *argv[]) {
                 dmon_watch(custom_dir, settings_watch_callback, 0, nullptr);
             } else {
                 // If no separator, the file is in the current working directory
-                log_message(LOG_INFO, "[DMON - MAIN] Custom settings path has no directory separator. Watching current directory.\n");
+                log_message(
+                    LOG_INFO,
+                    "[DMON - MAIN] Custom settings path has no directory separator. Watching current directory.\n");
                 dmon_watch(".", settings_watch_callback, 0, nullptr);
             }
         }
@@ -1830,6 +1834,49 @@ int main(int argc, char *argv[]) {
                 tracker_load_notes(tracker, &app_settings);
             }
 
+            // ---- Hermes live-update poll ----------------------------------------
+            // Both stat and advancement events are applied directly to in-memory
+            // state - no disk reads. The game files are only read when the game
+            // saves and dmon fires a normal tracker_update(), which corrects and
+            // confirms everything.
+            if (app_settings.using_hermes && tracker->hermes_active) {
+                tracker_poll_hermes_log(tracker, &app_settings);
+
+                // If in-memory state changed and no full update is already pending,
+                // flush current state to the overlay via IPC this frame.
+                if (tracker->hermes_wants_ipc_flush &&
+                    SDL_GetAtomicInt(&g_needs_update) == 0) {
+                    tracker->hermes_wants_ipc_flush = false;
+
+                    tracker_update_title(tracker, &app_settings);
+
+                    if (tracker->p_shared_data) {
+#ifdef _WIN32
+                        DWORD wait_result = WaitForSingleObject(tracker->h_mutex, 50);
+                        if (wait_result == WAIT_OBJECT_0) {
+#else
+                            if (sem_wait(tracker->mutex) == 0) {
+#endif
+                            OverlayIPCHeader header;
+                            strncpy(header.world_name, tracker->world_name, MAX_PATH_LENGTH - 1);
+                            header.world_name[MAX_PATH_LENGTH - 1] = '\0';
+                            header.time_since_last_update = tracker->time_since_last_update;
+
+                            char *buffer_head = tracker->p_shared_data->buffer;
+                            memcpy(buffer_head, &header, sizeof(OverlayIPCHeader));
+                            buffer_head += sizeof(OverlayIPCHeader);
+                            size_t template_data_size = serialize_template_data(tracker->template_data, buffer_head);
+                            tracker->p_shared_data->data_size = sizeof(OverlayIPCHeader) + template_data_size;
+#ifdef _WIN32
+                            ReleaseMutex(tracker->h_mutex);
+#else
+                            sem_post(tracker->mutex);
+#endif
+                        }
+                    }
+                }
+            }
+
 
             // Check if dmon (or manual update through custom goal) has requested an update
             // Use SDL_SetAtomicInt to check AND reset the flag atomically.
@@ -1911,7 +1958,7 @@ int main(int argc, char *argv[]) {
 #ifdef _WIN32
                 if (WaitForSingleObject(tracker->h_mutex, 5) == WAIT_OBJECT_0) {
 #else
-                if (sem_wait(tracker->mutex) == 0) {
+                    if (sem_wait(tracker->mutex) == 0) {
 #endif
                     // Update ONLY the header part of shared memory to keep the timer in sync
                     OverlayIPCHeader header;
