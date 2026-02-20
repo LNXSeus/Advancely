@@ -483,9 +483,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::Button("Open Instances Folder")) {
         char instances_path[MAX_PATH_LENGTH];
 
-        // Go up 2 levels for the fixed world mode
-        int levels = (app_settings->path_mode == PATH_MODE_FIXED_WORLD) ? 2 : 3;
-        if (get_parent_directory(t->saves_path, instances_path, sizeof(instances_path), levels)) {
+        if (get_parent_directory(t->saves_path, instances_path, sizeof(instances_path), 3)) {
 #ifdef _WIN32
             path_to_windows_native(instances_path);
 #endif
