@@ -18,7 +18,9 @@
 
 ## This tracker supports an arbitrary number of advancements, recipes, custom statistics, unlocks, multi-stage goals, manual goals, and custom counters for over 100 Minecraft versions.
 
-## Advancely is fully speedrun legal based on the [Minecraft Speedrunning rules (A.3.10.a, A.11.1)](https://www.minecraftspeedrunning.com/public-resources/rules) by only reading from within the 'advancements', 'stats' and 'unlocks' (25w14craftmine) folders of a world that update when the game saves. With the **[Hermes Mod](https://github.com/DuncanRuns/Hermes)** tracker updates are instant and don't require pausing, allowed by the [Minecraft Speedrunning rules (A.8.14 and A.8.15)](https://www.minecraftspeedrunning.com/public-resources/rules).
+## Advancely is fully speedrun legal based on the [Minecraft Speedrunning rules (A.3.10.a, A.11.1)](https://www.minecraftspeedrunning.com/public-resources/rules) by only reading from within the 'advancements', 'stats' and 'unlocks' (25w14craftmine) folders of a world that update when the game saves. With the
+
+**[Hermes Mod](https://github.com/DuncanRuns/Hermes)** tracker updates are instant and don't require pausing, allowed by the [Minecraft Speedrunning rules (A.8.14 and A.8.15)](https://www.minecraftspeedrunning.com/public-resources/rules).
 
 ### Built for flexibility, Advancely supports everything from vanilla speedruns to modded adventures and datapacks through the creation of custom templates with a built-in template editor. It automatically detects changes in your latest singleplayer world, providing real-time progress updates.
 
@@ -269,12 +271,23 @@ your operating system. The `vX.X.X` is the Advancely version, that is also displ
 
 #### For supported Linux distros
 
-* **Arch Linux:**
+* **Arch Linux (AUR):**
 
-  Use your favorite AUR helper
-    ```
-    paru -S advancely
-    ```
+Three packages are available on the AUR — pick whichever suits you:
+
+| Package                                                           | Description                                                  |
+|-------------------------------------------------------------------|--------------------------------------------------------------|
+| [advancely](https://aur.archlinux.org/packages/advancely)         | Compiles from the latest release                             |
+| [advancely-bin](https://aur.archlinux.org/packages/advancely-bin) | Precompiled binary from the latest release (fastest install) |
+| [advancely-git](https://aur.archlinux.org/packages/advancely-git) | Compiles from the latest commit                              |
+
+Use your favorite AUR helper, e.g.:
+
+  ```
+  paru -S advancely-bin
+  ```
+
+_Massive thanks to @R0dn3yS!_
 
 #### For all other installations
 
