@@ -1633,6 +1633,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         status_message[0] = '\0';
     }
 
+    // Handle Ctrl+S / Cmd+S to save
+    if (t && t->is_temp_creator_focused && editing_template &&
+        !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup) &&
+        (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
+        ImGui::IsKeyPressed(ImGuiKey_S)) {
+        validate_and_save_template(creator_version_str, selected_template_info, selected_lang_flag,
+                                   current_template_data, saved_template_data, save_message_type,
+                                   status_message, app_settings);
+    }
+
     if (roboto_font) {
         ImGui::PushFont(roboto_font);
     }
@@ -2852,7 +2862,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char save_template_tooltip_buffer[1024];
             snprintf(save_template_tooltip_buffer, sizeof(save_template_tooltip_buffer),
-                     "Press ENTER to save the currently edited template into the .json files.\n"
+                     "Press ENTER or Ctrl+S / Cmd+S to save the currently edited template into the .json files.\n"
                      "Does not save on errors.");
             ImGui::SetTooltip("%s", save_template_tooltip_buffer);
         }

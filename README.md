@@ -87,7 +87,7 @@ Thank you for supporting the project!
 
 * [Support Advancely (be featured on the overlay by mentioning
   `Advancely` in your donation message)](https://streamlabs.com/lnxseus/tip)
-* [(affiliate link) amazon](https://amzn.to/4scdytw)
+* [(Affiliate Link) Amazon](https://amzn.to/4scdytw)
 * [My YouTube](https://www.youtube.com/@lnxs?sub_confirmation=1)
 * [My Twitch](https://www.twitch.tv/lnxseus)
 * [My Twitch Archive + Advancely Devlogs](https://www.youtube.com/@lnxsarchive/playlists?view=1&sort=lad&flow=grid&sub_confirmation=1)

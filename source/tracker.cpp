@@ -4089,7 +4089,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 static void render_simple_item_section(Tracker *t, const AppSettings *settings, float &current_y, TrackableItem **items,
                                        int count, const char *section_title) {
     // LOD Thresholds
-    const float LOD_TEXT_THRESHOLD = 0.5f; // Text disappears below 50% zoom
+    const float LOD_TEXT_MAIN_THRESHOLD = settings->lod_text_main_threshold; // Hide Main Name
+    const float LOD_TEXT_SUB_THRESHOLD  = settings->lod_text_sub_threshold;  // Hide Progress Text
 
     // Pre-calculate line heights once per frame (Optimization)
     const float main_text_line_height = settings->tracker_font_size;
@@ -4399,7 +4400,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
             // Render Text
             // LOD: Check if zoom level is sufficient for text
-            if (t->zoom_level > LOD_TEXT_THRESHOLD) {
+            if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
                 float main_text_size = settings->tracker_font_size;
                 float sub_font_size = settings->tracker_sub_font_size;
                 ImU32 current_text_color = item->done ? text_color_faded : text_color; // Fade text if done
@@ -4418,7 +4419,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                     text_y_pos += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // Move Y down
 
                     // LOD for progress text
-                    if (t->zoom_level > LOD_TEXT_THRESHOLD) {
+                    if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
                         // Using same threshold for now, could be separate
                         draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                            ImVec2(

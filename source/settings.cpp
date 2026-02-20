@@ -384,8 +384,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
 
-
-    if (ImGui::RadioButton("Auto-Track Active Instance", (int *) &temp_settings.path_mode, PATH_MODE_INSTANCE)) {}
+    if (ImGui::RadioButton("Auto-Track Active Instance", (int *) &temp_settings.path_mode, PATH_MODE_INSTANCE)) {
+    }
     if (ImGui::IsItemHovered()) {
         char tooltip[512];
         snprintf(tooltip, sizeof(tooltip),
@@ -396,7 +396,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SetTooltip("%s", tooltip);
     }
 
-    if (ImGui::RadioButton("Fixed World", (int *) &temp_settings.path_mode, PATH_MODE_FIXED_WORLD)) {}
+    if (ImGui::RadioButton("Fixed World", (int *) &temp_settings.path_mode, PATH_MODE_FIXED_WORLD)) {
+    }
     if (ImGui::IsItemHovered()) {
         char tooltip[512];
         snprintf(tooltip, sizeof(tooltip),
@@ -415,7 +416,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         if (ImGui::Button("Browse##fixed_world")) {
             // Use the manual_saves_path as a starting hint if set, otherwise nullptr
             const char *saves_hint = temp_settings.manual_saves_path[0] != '\0'
-                ? temp_settings.manual_saves_path : nullptr;
+                                         ? temp_settings.manual_saves_path
+                                         : nullptr;
             char picked[MAX_PATH_LENGTH];
             if (open_world_folder_dialog(picked, sizeof(picked), saves_hint)) {
                 strncpy(temp_settings.fixed_world_path, picked, MAX_PATH_LENGTH - 1);
@@ -424,7 +426,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         }
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Select the world folder inside your saves directory.\n"
-                              "e.g. /home/user/.minecraft/saves/MyWorld");
+                "e.g. /home/user/.minecraft/saves/MyWorld");
         }
         if (show_invalid_manual_path_error && temp_settings.path_mode == PATH_MODE_FIXED_WORLD) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
@@ -458,7 +460,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         }
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Select the path to your '.minecraft/saves' folder.\n"
-                              "You can also paste the path directly into the text field.");
+                "You can also paste the path directly into the text field.");
         }
         if (show_invalid_manual_path_error) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
@@ -2274,10 +2276,16 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::Spacing();
     }
 
-    // Apply the changes or pressing Enter key in the settings window when NO popup is shown
-    if (ImGui::Button("Apply Settings") || (ImGui::IsKeyPressed(ImGuiKey_Enter) &&
-                                            ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !
-                                            ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup))) {
+    const bool ctrl_s_pressed = !ImGui::IsAnyItemActive() &&
+                                (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
+                                ImGui::IsKeyPressed(ImGuiKey_S);
+    const bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) && !ImGui::IsAnyItemActive();
+    const bool window_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+    const bool no_popup_open = !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup);
+
+    // Apply the changes or pressing Enter or Ctrl/Cmd + S keys in the settings window when NO popup is shown
+    if (ImGui::Button("Apply Settings") ||
+        ((enter_pressed || ctrl_s_pressed) && window_focused && no_popup_open)) {
         // Reset message visibility on each new attempt
         show_applied_message = false;
         show_defaults_applied_message = false; // Reset the other message
@@ -2372,7 +2380,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char apply_button_tooltip_buffer[1024];
         snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
-                 "Apply any changes made in this window. You can also press 'ENTER' to apply.\n"
+                 "Apply any changes made in this window. You can also press 'ENTER' or 'Ctrl/Cmd + S' to apply.\n"
                  "Changes made to the overlay window will cause the overlay to restart,\n"
                  "which might lead to OBS not capturing the overlay anymore.\n"
                  "It will fail to apply if any warnings are shown.");
