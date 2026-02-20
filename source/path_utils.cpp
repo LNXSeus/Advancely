@@ -667,6 +667,7 @@ void find_player_data_files(
     out_unlocks_path[0] = '\0';
 
     char latest_world_name[MAX_PATH_LENGTH] = {0};
+    struct dirent *entry = nullptr;
 
     if (settings && settings->path_mode == PATH_MODE_FIXED_WORLD &&
         settings->fixed_world_path[0] != '\0') {
@@ -689,7 +690,6 @@ void find_player_data_files(
             log_message(LOG_ERROR, "[PATH UTILS] Cannot open saves directory: %s\n", saves_path);
             return;
         }
-        struct dirent *entry;
         time_t latest_time = 0;
         while ((entry = readdir(saves_dir)) != nullptr) {
             if (entry->d_type == DT_DIR &&
