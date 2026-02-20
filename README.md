@@ -287,7 +287,7 @@ Use your favorite AUR helper, e.g.:
   paru -S advancely-bin
   ```
 
-_Massive thanks to @R0dn3yS!_
+_Massive thanks to [R0dn3yS](https://github.com/R0dn3yS) for the AUR packages!_
 
 #### For all other installations
 
