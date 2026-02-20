@@ -30,6 +30,32 @@
 
 ***
 
+## Table of Contents
+
+- [Become a Supporter!](#become-a-supporter)
+- [Socials](#socials)
+- [What is Advancely?](#what-is-advancely)
+- [Core Features](#core-features)
+- [Performance & Optimization](#performance--optimization)
+- [Getting Started](#getting-started)
+- [Download Once, Update Forever](#download-once-update-forever)
+- [The Tracker Window](#the-tracker-window)
+- [The Stream Overlay](#the-stream-overlay)
+- [The Template Editor](#the-template-editor-esc--edit-templates)
+- [The Settings Window](#the-settings-window-esc)
+- [Extensive Version Support](#extensive-version-support)
+- [Officially Added Templates](#officially-added-templates)
+- [Known Limitations](#known-limitations)
+- [You have a feature idea?](#you-have-a-feature-idea)
+- [Running into Issues?](#running-into-issues)
+- [Command Line Arguments](#command-line-arguments)
+- [Beta Testers](#beta-testers)
+- [Contributors](#contributors)
+- [License](#license)
+- [Credits](#credits)
+
+***
+
 ## Become a Supporter!
 
 > 📺 **Video Guide:** [Jump to Support Section (33:53)](https://youtu.be/Rxd1RJqg2WQ?t=33m53s)
