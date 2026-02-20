@@ -648,55 +648,56 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         }
     }
 
-    // Hermes Mod checkbox — available for all versions that support Fabric
-    ImGui::Checkbox("Using Hermes Mod (Live Tracking)", &temp_settings.using_hermes);
-    if (ImGui::IsItemHovered()) {
-        ImGui::BeginTooltip();
-        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 38.0f);
-        ImGui::TextUnformatted("Hermes Mod (by DuncanRuns, for Fabric)");
-        ImGui::Separator();
-        if (selected_version <= MC_VERSION_1_6_4) {
-            // TODO: Whenever the mod gets released for 1.6.4 or lower
-            ImGui::TextWrapped(
-                "Hermes is a speedrun-legal Legacy Fabric mod that writes real-time game events to a "
-                "ciphered log file inside each world's folder. When enabled, Advancely reads this "
-                "log in addition to the normal game files, giving you near-instant updates "
-                "instead of waiting for the game to save.\n\n"
-                "How the two sources are combined:\n");
-        } else {
-            // TODO: Whenever the mod gets released for mid-era and other versions after 1.6.4
-            ImGui::TextWrapped(
-                "Hermes is a speedrun-legal Fabric mod that writes real-time game events to a "
-                "ciphered log file inside each world's folder. When enabled, Advancely reads this "
-                "log in addition to the normal game files, giving you near-instant updates "
-                "instead of waiting for the game to save.\n\n"
-                "How the two sources are combined:\n");
-        }
-        // Achievements/Advancements
-        if (selected_version <= MC_VERSION_1_11_2) {
-            ImGui::BulletText(
-                "Achievements: Hermes only provides gained achievements, so to ensure\n"
-                "  accuracy, Advancely will read the actual stats file and synchronize\n"
-                "  when the game actually saves.");
-        } else {
-            // modern versions
-            ImGui::BulletText(
-                "Advancements: Hermes only provides gained advancements/criteria, so to ensure\n"
-                "  accuracy, Advancely will read the actual advancements file and synchronize\n"
-                "  when the game actually saves.");
-        }
-        // Stats, version neutral
-        ImGui::BulletText(
-            "Stats: Hermes provides real-time values for the stats it tracks. Stats that\n"
-            "  Hermes intentionally omits (high-frequency ones like distance walked) are\n"
-            "  still read from the regular game files as usual. Stats are also synchronized\n"
-            "  when the game actually saves.");
-        ImGui::Spacing();
-        ImGui::TextDisabled("Requires Hermes to be installed and a world to be loaded.");
-        ImGui::TextDisabled("The mod's log is at: [World]/hermes/restricted/play.log.enc");
-        ImGui::PopTextWrapPos();
-        ImGui::EndTooltip();
-    }
+    // TODO: Enable Once Allowed
+    // // Hermes Mod checkbox — available for all versions that support Fabric
+    // ImGui::Checkbox("Using Hermes Mod (Live Tracking)", &temp_settings.using_hermes);
+    // if (ImGui::IsItemHovered()) {
+    //     ImGui::BeginTooltip();
+    //     ImGui::PushTextWrapPos(ImGui::GetFontSize() * 38.0f);
+    //     ImGui::TextUnformatted("Hermes Mod (by DuncanRuns, for Fabric)");
+    //     ImGui::Separator();
+    //     if (selected_version <= MC_VERSION_1_6_4) {
+    //         // TODO: Whenever the mod gets released for 1.6.4 or lower
+    //         ImGui::TextWrapped(
+    //             "Hermes is a speedrun-legal Legacy Fabric mod that writes real-time game events to a "
+    //             "ciphered log file inside each world's folder. When enabled, Advancely reads this "
+    //             "log in addition to the normal game files, giving you near-instant updates "
+    //             "instead of waiting for the game to save.\n\n"
+    //             "How the two sources are combined:\n");
+    //     } else {
+    //         // TODO: Whenever the mod gets released for mid-era and other versions after 1.6.4
+    //         ImGui::TextWrapped(
+    //             "Hermes is a speedrun-legal Fabric mod that writes real-time game events to a "
+    //             "ciphered log file inside each world's folder. When enabled, Advancely reads this "
+    //             "log in addition to the normal game files, giving you near-instant updates "
+    //             "instead of waiting for the game to save.\n\n"
+    //             "How the two sources are combined:\n");
+    //     }
+    //     // Achievements/Advancements
+    //     if (selected_version <= MC_VERSION_1_11_2) {
+    //         ImGui::BulletText(
+    //             "Achievements: Hermes only provides gained achievements, so to ensure\n"
+    //             "  accuracy, Advancely will read the actual stats file and synchronize\n"
+    //             "  when the game actually saves.");
+    //     } else {
+    //         // modern versions
+    //         ImGui::BulletText(
+    //             "Advancements: Hermes only provides gained advancements/criteria, so to ensure\n"
+    //             "  accuracy, Advancely will read the actual advancements file and synchronize\n"
+    //             "  when the game actually saves.");
+    //     }
+    //     // Stats, version neutral
+    //     ImGui::BulletText(
+    //         "Stats: Hermes provides real-time values for the stats it tracks. Stats that\n"
+    //         "  Hermes intentionally omits (high-frequency ones like distance walked) are\n"
+    //         "  still read from the regular game files as usual. Stats are also synchronized\n"
+    //         "  when the game actually saves.");
+    //     ImGui::Spacing();
+    //     ImGui::TextDisabled("Requires Hermes to be installed and a world to be loaded.");
+    //     ImGui::TextDisabled("The mod's log is at: [World]/hermes/restricted/play.log.enc");
+    //     ImGui::PopTextWrapPos();
+    //     ImGui::EndTooltip();
+    // }
 
     // --- Version-dependent labels ---
     // Achievement/Advancement
