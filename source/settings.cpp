@@ -396,7 +396,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::SetTooltip("%s", tooltip);
     }
 
-    if (ImGui::RadioButton("Fixed World", (int *) &temp_settings.path_mode, PATH_MODE_FIXED_WORLD)) {
+    if (ImGui::RadioButton("Track Fixed World", (int *) &temp_settings.path_mode, PATH_MODE_FIXED_WORLD)) {
     }
     if (ImGui::IsItemHovered()) {
         char tooltip[512];
