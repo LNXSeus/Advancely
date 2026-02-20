@@ -335,7 +335,8 @@ struct TemplateData {
 enum PathMode {
     PATH_MODE_AUTO, // Automatically detect the path from standard locations.
     PATH_MODE_MANUAL, // Use a user-provided path.
-    PATH_MODE_INSTANCE // Automatically track the active MultiMC/Prism instance
+    PATH_MODE_INSTANCE, // Automatically track the active MultiMC/Prism instance
+    PATH_MODE_FIXED_WORLD // Lock to one specific world folder; never changes
 };
 
 

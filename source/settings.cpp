@@ -39,6 +39,7 @@
 static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
     if (a->path_mode != b->path_mode ||
         strcmp(a->manual_saves_path, b->manual_saves_path) != 0 ||
+        strcmp(a->fixed_world_path, b->fixed_world_path) != 0 ||
         strcmp(a->version_str, b->version_str) != 0 ||
         strcmp(a->display_version_str, b->display_version_str) != 0 ||
         strcmp(a->category, b->category) != 0 ||
@@ -378,9 +379,59 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "Automatically finds the default Minecraft (-Launcher) saves path for your OS.\n"
                  "Windows: %%APPDATA%%\\.minecraft\\saves\n"
                  "Linux: ~/.minecraft/saves\n"
-                 "macOS: ~/Library/Application Support/minecraft/saves\n"
-                 "This is Path Mode: %d", PATH_MODE_AUTO);
+                 "macOS: ~/Library/Application Support/minecraft/saves\n");
         ImGui::SetTooltip("%s", default_saves_path_tooltip_buffer);
+    }
+
+
+
+    if (ImGui::RadioButton("Auto-Track Active Instance", (int *) &temp_settings.path_mode, PATH_MODE_INSTANCE)) {}
+    if (ImGui::IsItemHovered()) {
+        char tooltip[512];
+        snprintf(tooltip, sizeof(tooltip),
+                 "DEFAULT: Automatically detect and track the active Minecraft instance\n"
+                 "launched from MultiMC or Prism Launcher, even when switching between\n"
+                 "multiple running instances. The tracker always follows the most recently\n"
+                 "active world. Having Minecraft closed may cause 'No Worlds Found'.");
+        ImGui::SetTooltip("%s", tooltip);
+    }
+
+    if (ImGui::RadioButton("Fixed World", (int *) &temp_settings.path_mode, PATH_MODE_FIXED_WORLD)) {}
+    if (ImGui::IsItemHovered()) {
+        char tooltip[512];
+        snprintf(tooltip, sizeof(tooltip),
+                 "Lock the tracker to one specific world folder.\n"
+                 "Unlike other modes, the tracker stays on the chosen world\n"
+                 "regardless of which world you open next in Minecraft.\n"
+                 "Useful for long-form playthroughs, modded runs, or setups\n"
+                 "where you always want to track a specific save.");
+        ImGui::SetTooltip("%s", tooltip);
+    }
+
+    if (temp_settings.path_mode == PATH_MODE_FIXED_WORLD) {
+        ImGui::Indent();
+        ImGui::InputText("##fixed_world_path", temp_settings.fixed_world_path, MAX_PATH_LENGTH);
+        ImGui::SameLine();
+        if (ImGui::Button("Browse##fixed_world")) {
+            // Use the manual_saves_path as a starting hint if set, otherwise nullptr
+            const char *saves_hint = temp_settings.manual_saves_path[0] != '\0'
+                ? temp_settings.manual_saves_path : nullptr;
+            char picked[MAX_PATH_LENGTH];
+            if (open_world_folder_dialog(picked, sizeof(picked), saves_hint)) {
+                strncpy(temp_settings.fixed_world_path, picked, MAX_PATH_LENGTH - 1);
+                temp_settings.fixed_world_path[MAX_PATH_LENGTH - 1] = '\0';
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Select the world folder inside your saves directory.\n"
+                              "e.g. /home/user/.minecraft/saves/MyWorld");
+        }
+        if (show_invalid_manual_path_error && temp_settings.path_mode == PATH_MODE_FIXED_WORLD) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
+            ImGui::TextWrapped("The specified world folder is invalid or does not exist.");
+            ImGui::PopStyleColor();
+        }
+        ImGui::Unindent();
     }
 
     if (ImGui::RadioButton("Track Custom Saves Folder", (int *) &temp_settings.path_mode, PATH_MODE_MANUAL)) {
@@ -389,42 +440,34 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char tooltip[512];
         snprintf(tooltip, sizeof(tooltip), "Manually specify the path to your '.minecraft/saves' folder.\n"
-                 "Useful for custom launchers or non-standard installations.\n"
-                 "This is Path Mode: %d", PATH_MODE_MANUAL);
+                 "Useful for custom launchers or non-standard installations.");
         ImGui::SetTooltip("%s", tooltip);
     }
 
     // Conditionally show the manual path input only when its radio button is selected
     if (temp_settings.path_mode == PATH_MODE_MANUAL) {
         ImGui::Indent();
-        ImGui::InputText("Manual Saves Path", temp_settings.manual_saves_path, MAX_PATH_LENGTH);
+        ImGui::InputText("##manual_saves_path", temp_settings.manual_saves_path, MAX_PATH_LENGTH);
+        ImGui::SameLine();
+        if (ImGui::Button("Browse##saves")) {
+            char picked[MAX_PATH_LENGTH];
+            if (open_saves_folder_dialog(picked, sizeof(picked))) {
+                strncpy(temp_settings.manual_saves_path, picked, MAX_PATH_LENGTH - 1);
+                temp_settings.manual_saves_path[MAX_PATH_LENGTH - 1] = '\0';
+            }
+        }
         if (ImGui::IsItemHovered()) {
-            char manual_saves_path_tooltip_buffer[1024];
-            snprintf(manual_saves_path_tooltip_buffer, sizeof(manual_saves_path_tooltip_buffer),
-                     "Enter the full path to your saves folder.\n"
-                     "You can paste it in directly. Forward or backward slashes are fine.\n");
-            ImGui::SetTooltip("%s", manual_saves_path_tooltip_buffer);
+            ImGui::SetTooltip("Select the path to your '.minecraft/saves' folder.\n"
+                              "You can also paste the path directly into the text field.");
         }
         if (show_invalid_manual_path_error) {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f)); // Red text
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
             ImGui::TextWrapped(
-                "The specified path is invalid or does not exist. Please provide a valid path to your '.minecraft/saves' folder.\n");
+                "The specified path is invalid or does not exist.\n"
+                "Please provide a valid path to your '.minecraft/saves' folder.\n");
             ImGui::PopStyleColor();
         }
         ImGui::Unindent();
-    }
-
-    if (ImGui::RadioButton("Auto-Track Active Instance", (int *) &temp_settings.path_mode, PATH_MODE_INSTANCE)) {
-        // Action to take when this specific button is clicked (optional)
-    }
-    if (ImGui::IsItemHovered()) {
-        char tooltip[512];
-        snprintf(tooltip, sizeof(tooltip), "Automatically detect and track the active Minecraft instance\n"
-                 "launched from MultiMC or Prism Launcher even switching between\n"
-                 "multiple running instances.\n"
-                 "Using this setting, but having minecraft closed my cause strange behavior."
-                 "This is Path Mode: %d", PATH_MODE_INSTANCE);
-        ImGui::SetTooltip("%s", tooltip);
     }
 
     // Open Instances Folder Button
@@ -437,7 +480,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     if (ImGui::Button("Open Instances Folder")) {
         char instances_path[MAX_PATH_LENGTH];
-        if (get_parent_directory(t->saves_path, instances_path, sizeof(instances_path), 3)) {
+
+        // Go up 2 levels for the fixed world mode
+        int levels = (app_settings->path_mode == PATH_MODE_FIXED_WORLD) ? 2 : 3;
+        if (get_parent_directory(t->saves_path, instances_path, sizeof(instances_path), levels)) {
 #ifdef _WIN32
             path_to_windows_native(instances_path);
 #endif
@@ -603,7 +649,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     }
 
     // Hermes Mod checkbox — available for all versions that support Fabric
-    ImGui::Checkbox("Using Hermes Mod", &temp_settings.using_hermes);
+    ImGui::Checkbox("Using Hermes Mod (Live Tracking)", &temp_settings.using_hermes);
     if (ImGui::IsItemHovered()) {
         ImGui::BeginTooltip();
         ImGui::PushTextWrapPos(ImGui::GetFontSize() * 38.0f);
@@ -2265,17 +2311,24 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     show_invalid_manual_path_error = false;
                     settings_applied = true;
                 }
+            } else if (temp_settings.path_mode == PATH_MODE_FIXED_WORLD) {
+                if (strlen(temp_settings.fixed_world_path) == 0 || !path_exists(temp_settings.fixed_world_path)) {
+                    show_invalid_manual_path_error = true;
+                    if (force_open_reason) *force_open_reason = FORCE_OPEN_MANUAL_FAIL;
+                } else {
+                    show_invalid_manual_path_error = false;
+                    settings_applied = true;
+                }
             } else if (temp_settings.path_mode == PATH_MODE_AUTO) {
                 char auto_path_buffer[MAX_PATH_LENGTH];
                 if (!get_saves_path(auto_path_buffer, MAX_PATH_LENGTH, PATH_MODE_AUTO, nullptr)) {
-                    temp_settings.path_mode = PATH_MODE_MANUAL; // Revert UI to manual
+                    temp_settings.path_mode = PATH_MODE_MANUAL;
                     if (force_open_reason) *force_open_reason = FORCE_OPEN_AUTO_FAIL;
                 } else {
                     settings_applied = true;
                 }
             } else if (temp_settings.path_mode == PATH_MODE_INSTANCE) {
-                // Instance tracking is considered a valid selection even if no game is running.
-                // The tracker will simply report "No Worlds Found".
+                // This will always be valid -> No Worlds Found
                 settings_applied = true;
             }
 

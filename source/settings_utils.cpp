@@ -225,13 +225,10 @@ MC_Version settings_get_version_from_string(const char *version_str) {
 }
 
 PathMode settings_get_path_mode_from_string(const char *mode_str) {
-    if (mode_str && strcmp(mode_str, "manual") == 0) {
-        return PATH_MODE_MANUAL;
-    }
-    if (mode_str && strcmp(mode_str, "instance") == 0) {
-        return PATH_MODE_INSTANCE;
-    }
-    return PATH_MODE_AUTO; // Default to auto
+    if (mode_str && strcmp(mode_str, "manual") == 0) return PATH_MODE_MANUAL;
+    if (mode_str && strcmp(mode_str, "instance") == 0) return PATH_MODE_INSTANCE;
+    if (mode_str && strcmp(mode_str, "fixed_world") == 0) return PATH_MODE_FIXED_WORLD;
+    return PATH_MODE_AUTO;
 }
 
 /**
@@ -274,6 +271,7 @@ void settings_set_defaults(AppSettings *settings) {
 
     settings->path_mode = DEFAULT_PATH_MODE;
     settings->manual_saves_path[0] = '\0';
+    settings->fixed_world_path[0] = '\0';
     strncpy(settings->category, DEFAULT_CATEGORY, sizeof(settings->category) - 1);
     settings->category[sizeof(settings->category) - 1] = '\0';
 
@@ -436,6 +434,16 @@ bool settings_load(AppSettings *settings) {
         settings->manual_saves_path[sizeof(settings->manual_saves_path) - 1] = '\0';
     } else {
         settings->manual_saves_path[0] = '\0';
+        defaults_were_used = true;
+    }
+
+    const cJSON *fixed_world_path_json = cJSON_GetObjectItem(json, "fixed_world_path");
+    if (fixed_world_path_json && cJSON_IsString(fixed_world_path_json)) {
+        strncpy(settings->fixed_world_path, fixed_world_path_json->valuestring,
+                sizeof(settings->fixed_world_path) - 1);
+        settings->fixed_world_path[sizeof(settings->fixed_world_path) - 1] = '\0';
+    } else {
+        settings->fixed_world_path[0] = '\0';
         defaults_were_used = true;
     }
 
@@ -986,12 +994,11 @@ bool settings_load(AppSettings *settings) {
         // Load Scroll Speed
         const cJSON *list_speed = cJSON_GetObjectItem(visual_settings, "tracker_list_scroll_speed");
         if (list_speed && cJSON_IsNumber(list_speed))
-            settings->tracker_list_scroll_speed = (float)list_speed->valuedouble;
+            settings->tracker_list_scroll_speed = (float) list_speed->valuedouble;
         else {
             settings->tracker_list_scroll_speed = DEFAULT_TRACKER_LIST_SCROLL_SPEED;
             defaults_were_used = true;
         }
-
     } else {
         defaults_were_used = true;
         settings->overlay_row1_spacing = DEFAULT_OVERLAY_ROW1_SPACING; // Ensure default if visuals section missing
@@ -1056,19 +1063,19 @@ bool settings_load(AppSettings *settings) {
     const cJSON *view_state_json = cJSON_GetObjectItem(json, "view_state");
     if (view_state_json) {
         cJSON *pan_x = cJSON_GetObjectItem(view_state_json, "pan_x");
-        if (cJSON_IsNumber(pan_x)) settings->view_pan_x = (float)pan_x->valuedouble;
+        if (cJSON_IsNumber(pan_x)) settings->view_pan_x = (float) pan_x->valuedouble;
 
         cJSON *pan_y = cJSON_GetObjectItem(view_state_json, "pan_y");
-        if (cJSON_IsNumber(pan_y)) settings->view_pan_y = (float)pan_y->valuedouble;
+        if (cJSON_IsNumber(pan_y)) settings->view_pan_y = (float) pan_y->valuedouble;
 
         cJSON *zoom = cJSON_GetObjectItem(view_state_json, "zoom");
-        if (cJSON_IsNumber(zoom)) settings->view_zoom = (float)zoom->valuedouble;
+        if (cJSON_IsNumber(zoom)) settings->view_zoom = (float) zoom->valuedouble;
 
         cJSON *locked = cJSON_GetObjectItem(view_state_json, "locked");
         if (cJSON_IsBool(locked)) settings->view_locked = cJSON_IsTrue(locked);
 
         cJSON *locked_width = cJSON_GetObjectItem(view_state_json, "locked_width");
-        if (cJSON_IsNumber(locked_width)) settings->view_locked_width = (float)locked_width->valuedouble;
+        if (cJSON_IsNumber(locked_width)) settings->view_locked_width = (float) locked_width->valuedouble;
     }
 
     cJSON_Delete(json);
@@ -1097,14 +1104,19 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
                 break;
             case PATH_MODE_INSTANCE: mode_str = "instance";
                 break;
+            case PATH_MODE_FIXED_WORLD: mode_str = "fixed_world";
+                break;
             case PATH_MODE_AUTO:
             default: mode_str = "auto";
                 break;
         }
+
         // Insert that mode string into the settings.json file
         cJSON_AddItemToObject(root, "path_mode", cJSON_CreateString(mode_str));
         cJSON_DeleteItemFromObject(root, "manual_saves_path");
         cJSON_AddItemToObject(root, "manual_saves_path", cJSON_CreateString(settings->manual_saves_path));
+        cJSON_DeleteItemFromObject(root, "fixed_world_path");
+        cJSON_AddItemToObject(root, "fixed_world_path", cJSON_CreateString(settings->fixed_world_path));
         cJSON_DeleteItemFromObject(root, "version");
         cJSON_AddItemToObject(root, "version", cJSON_CreateString(settings->version_str));
         cJSON_DeleteItemFromObject(root, "display_version");
@@ -1116,7 +1128,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(root, "category_display_name");
         cJSON_AddItemToObject(root, "category_display_name", cJSON_CreateString(settings->category_display_name));
         cJSON_DeleteItemFromObject(root, "lock_category_display_name");
-        cJSON_AddItemToObject(root, "lock_category_display_name", cJSON_CreateBool(settings->lock_category_display_name));
+        cJSON_AddItemToObject(root, "lock_category_display_name",
+                              cJSON_CreateBool(settings->lock_category_display_name));
         cJSON_DeleteItemFromObject(root, "lang_flag");
         cJSON_AddItemToObject(root, "lang_flag", cJSON_CreateString(settings->lang_flag));
 
@@ -1236,7 +1249,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_spacing");
         cJSON_AddItemToObject(visuals_obj, "overlay_row1_spacing", cJSON_CreateNumber(settings->overlay_row1_spacing));
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row1_shared_icon_size");
-        cJSON_AddItemToObject(visuals_obj, "overlay_row1_shared_icon_size", cJSON_CreateNumber(settings->overlay_row1_shared_icon_size));
+        cJSON_AddItemToObject(visuals_obj, "overlay_row1_shared_icon_size",
+                              cJSON_CreateNumber(settings->overlay_row1_shared_icon_size));
 
         cJSON_DeleteItemFromObject(visuals_obj, "overlay_row2_custom_spacing_enabled");
         cJSON_AddItemToObject(visuals_obj, "overlay_row2_custom_spacing_enabled",

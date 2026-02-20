@@ -22,7 +22,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h> // Load with IMG_Load and get *SDL_Surface, SDL_SetWindowIcon (maybe for overlay idk) -> https://youtu.be/EP6EwVwfCiU?t=1200
 
-#include <SDL3_ttf/SDL_ttf.h> // TODO: Remove this later
+#include <SDL3_ttf/SDL_ttf.h>
 
 
 #include "imstb_truetype.h"

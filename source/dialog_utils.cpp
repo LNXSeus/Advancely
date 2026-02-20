@@ -239,3 +239,55 @@ bool open_gui_texture_dialog(char *out_relative_path, size_t max_len) {
                       1);
     return false;
 }
+
+bool open_saves_folder_dialog(char *out_path, size_t max_len) {
+    // Start the dialog in the current saves path if it exists, otherwise home dir.
+    const char *selected = tinyfd_selectFolderDialog(
+        "Select Minecraft Saves Folder",
+        nullptr  // NULL lets tinyfd start at a sensible default (home dir)
+    );
+
+    if (!selected) return false; // User cancelled
+
+    std::string result = selected;
+    normalize_path(result);
+
+    // Strip trailing slash for consistency
+    if (!result.empty() && result.back() == '/') result.pop_back();
+
+    strncpy(out_path, result.c_str(), max_len - 1);
+    out_path[max_len - 1] = '\0';
+    return true;
+}
+
+bool open_world_folder_dialog(char *out_path, size_t max_len, const char *saves_path) {
+    // Start inside the saves folder if provided and valid, so the user is
+    // already one click away from their world folders.
+    const char *start_dir = nullptr;
+    std::string start_dir_native;
+
+    if (saves_path && saves_path[0] != '\0' && path_exists(saves_path)) {
+        start_dir_native = saves_path;
+#ifdef _WIN32
+        for (char &c : start_dir_native) { if (c == '/') c = '\\'; }
+#endif
+        start_dir = start_dir_native.c_str();
+    }
+
+    const char *selected = tinyfd_selectFolderDialog(
+        "Select World Folder (must be inside your saves directory)",
+        start_dir
+    );
+
+    if (!selected) return false; // User cancelled
+
+    std::string result = selected;
+    normalize_path(result);
+
+    // Strip trailing slash for consistency
+    if (!result.empty() && result.back() == '/') result.pop_back();
+
+    strncpy(out_path, result.c_str(), max_len - 1);
+    out_path[max_len - 1] = '\0';
+    return true;
+}

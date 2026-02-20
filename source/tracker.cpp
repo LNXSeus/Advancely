@@ -6055,7 +6055,11 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings) {
 
     MC_Version version = settings_get_version_from_string(settings->version_str);
 
-    if (get_saves_path(t->saves_path, MAX_PATH_LENGTH, settings->path_mode, settings->manual_saves_path)) {
+    // Saves path should either be fixed_world_path or manual_saves_path
+    const char *path_arg = (settings->path_mode == PATH_MODE_FIXED_WORLD)
+                               ? settings->fixed_world_path
+                               : settings->manual_saves_path;
+    if (get_saves_path(t->saves_path, MAX_PATH_LENGTH, settings->path_mode, path_arg)) {
         log_message(LOG_INFO, "[TRACKER] Using saves path: %s\n", t->saves_path);
 
 

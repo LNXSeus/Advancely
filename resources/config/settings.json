@@ -2,13 +2,14 @@
 	"general":	{
 		"tracker_font_name":	"Minecraft.ttf",
 		"tracker_font_size":	16,
-		"tracker_sub_font_size": 14,
-		"tracker_ui_font_size": 16,
+		"tracker_sub_font_size":	14,
+		"tracker_ui_font_size":	16,
 		"overlay_font_name":	"Minecraft.ttf",
 		"ui_font_name":	"Roboto-Regular.ttf",
 		"ui_font_size":	16,
 		"section_order":	[0, 1, 2, 3, 4, 5],
 		"using_stats_per_world_legacy":	true,
+		"using_hermes":	false,
 		"fps":	60,
 		"overlay_fps":	60,
 		"always_on_top":	true,
@@ -30,12 +31,6 @@
 		"overlay_show_update_timer":	true
 	},
 	"stat_progress_override":	{
-		"stat:gold_blocks_picked_up":	false,
-		"stat:drowneds_killed":	false,
-		"stat:wither_skeletons_killed":	false,
-		"stat:tnt_picked_up":	false,
-		"stat:debris_picked_up":	false,
-		"stat:bee_nests_picked_up":	false
 	},
 	"custom_progress":	{
 	},
@@ -172,14 +167,15 @@
 		"scrollable_list_threshold":	16,
 		"tracker_list_scroll_speed":	36
 	},
-	"path_mode":	"auto",
+	"path_mode":	"instance",
 	"manual_saves_path":	"",
+	"fixed_world_path":	"",
 	"version":	"1.16.1",
-	"display_version": "1.16.1",
+	"display_version":	"1.16.1",
 	"category":	"all_advancements",
 	"optional_flag":	"",
-	"category_display_name": "All Advancements",
-	"lock_category_display_name": false,
+	"category_display_name":	"All Advancements",
+	"lock_category_display_name":	false,
 	"lang_flag":	"",
 	"hotkeys":	[],
 	"view_state":	{

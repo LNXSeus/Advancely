@@ -392,6 +392,7 @@ void show_error_message(const char *title, const char *message) {
  * @brief Callback function for dmon file watcher.
  * This function is called by dmon in a separate thread whenever a file event occurs.
  * It sets a global flag (g_needs_update) to true if a file is modified.
+ * If the world path is fixed it will only signal an update if that world is modified.
  */
 static void global_watch_callback(dmon_watch_id watch_id, dmon_action action, const char *rootdir, const char *filepath,
                                   const char *oldfilepath, void *user) {
@@ -399,16 +400,35 @@ static void global_watch_callback(dmon_watch_id watch_id, dmon_action action, co
     (void) watch_id;
     (void) rootdir;
     (void) oldfilepath;
-    (void) user;
 
-    // We only care about file modifications to existing files
     if (action == DMON_ACTION_MODIFY) {
-        // --- TODO: Debug Print ---
         log_message(LOG_INFO, "[DEBUG - DMON - MAIN] Global Watcher triggered by file: %s\n", filepath);
-        // ----------------
-        const char *ext = strrchr(filepath, '.'); // Locate last '.' in string
+
+        const char *ext = strrchr(filepath, '.');
         if (ext && ((strcmp(ext, ".json") == 0) || (strcmp(ext, ".dat") == 0))) {
-            // A game file was modified. Atomically update the timestamp and flags.
+            // In fixed world mode, only react to changes inside the locked world's folder.
+            // filepath is relative to saves_path, e.g. "MyWorld/stats/uuid.json".
+            // Ignore events from any other world folder.
+            if (user) {
+                const AppSettings *settings = (const AppSettings *) user;
+                if (settings->path_mode == PATH_MODE_FIXED_WORLD &&
+                    settings->fixed_world_path[0] != '\0') {
+                    // Extract just the world name (last path component of fixed_world_path)
+                    const char *world_name = strrchr(settings->fixed_world_path, '/');
+                    if (!world_name) world_name = strrchr(settings->fixed_world_path, '\\');
+                    world_name = world_name ? world_name + 1 : settings->fixed_world_path;
+
+                    // Check that filepath starts with "WorldName/"
+                    size_t name_len = strlen(world_name);
+                    if (name_len == 0 ||
+                        strncmp(filepath, world_name, name_len) != 0 ||
+                        (filepath[name_len] != '/' && filepath[name_len] != '\\')) {
+                        // This change is from a different world — ignore it entirely.
+                        return;
+                    }
+                }
+            }
+
             SDL_SetAtomicInt(&g_needs_update, 1);
             SDL_SetAtomicInt(&g_game_data_changed, 1);
         }
@@ -527,6 +547,40 @@ static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker 
     }
 
     ImGui::End();
+}
+
+
+/**
+ * @brief Checks if a window rect (from saved settings) is visible on any current display.
+ * Returns false if the window is entirely off-screen, meaning its position needs resetting.
+ */
+static bool is_window_on_screen(int x, int y, int w, int h) {
+    // Default/unset positions — SDL will center these itself, always fine.
+    if (x == DEFAULT_WINDOW_POS || y == DEFAULT_WINDOW_POS) return true;
+    // Use a minimum visible area: at least 64x32 px of the title bar must be on-screen.
+    const int MIN_VISIBLE_W = 64;
+    const int MIN_VISIBLE_H = 32;
+    SDL_Rect window_rect = {x, y, (w > 0 ? w : MIN_VISIBLE_W), (h > 0 ? h : MIN_VISIBLE_H)};
+
+    int display_count = 0;
+    SDL_DisplayID *displays = SDL_GetDisplays(&display_count);
+    if (!displays || display_count == 0) return true; // Can't check — assume fine.
+
+    bool visible = false;
+    for (int i = 0; i < display_count; i++) {
+        SDL_Rect bounds;
+        if (SDL_GetDisplayBounds(displays[i], &bounds)) {
+            // Check if at least MIN_VISIBLE_W x MIN_VISIBLE_H pixels of the top-left area overlap.
+            SDL_Rect check = {window_rect.x, window_rect.y, MIN_VISIBLE_W, MIN_VISIBLE_H};
+            SDL_Rect intersection;
+            if (SDL_GetRectIntersection(&check, &bounds, &intersection)) {
+                visible = true;
+                break;
+            }
+        }
+    }
+    SDL_free(displays);
+    return visible;
 }
 
 // ------------------------------------ END OF STATIC FUNCTIONS ------------------------------------
@@ -1036,6 +1090,40 @@ int main(int argc, char *argv[]) {
         log_close();
         return EXIT_FAILURE;
     }
+
+    // --- Out-of-bounds window position check ---
+    // If a saved window position is off all current displays (e.g. after a
+    // monitor was disconnected), reset it and warn the user.
+    bool tracker_oob = !is_window_on_screen(
+        app_settings.tracker_window.x, app_settings.tracker_window.y,
+        app_settings.tracker_window.w, app_settings.tracker_window.h);
+    bool overlay_oob = !is_window_on_screen(
+        app_settings.overlay_window.x, app_settings.overlay_window.y,
+        app_settings.overlay_window.w, app_settings.overlay_window.h);
+
+    if (tracker_oob || overlay_oob) {
+        char oob_msg[512];
+        snprintf(oob_msg, sizeof(oob_msg),
+                 "%s%s%sWindow position(s) have been reset to the center of your screen.",
+                 tracker_oob ? "Tracker window is off-screen.\n" : "",
+                 overlay_oob ? "Overlay window is off-screen.\n" : "",
+                 (tracker_oob || overlay_oob) ? "\n" : "");
+        show_error_message("Window Out of Bounds", oob_msg);
+
+        if (tracker_oob) {
+            app_settings.tracker_window.x = DEFAULT_WINDOW_POS;
+            app_settings.tracker_window.y = DEFAULT_WINDOW_POS;
+        }
+        if (overlay_oob) {
+            app_settings.overlay_window.x = DEFAULT_WINDOW_POS;
+            app_settings.overlay_window.y = DEFAULT_WINDOW_POS;
+        }
+        // Persist the reset immediately so it survives a crash during init
+        settings_save(&app_settings, nullptr, SAVE_CONTEXT_TRACKER_GEOM);
+        if (overlay_oob)
+            settings_save(&app_settings, nullptr, SAVE_CONTEXT_OVERLAY_GEOM);
+    }
+    // --- End out-of-bounds check ---
 
     if (tracker_new(&tracker, &app_settings)) {
         // Check for updates on startup
@@ -1805,7 +1893,8 @@ int main(int argc, char *argv[]) {
 
                         saves_watcher_id = dmon_watch(tracker->saves_path, global_watch_callback,
                                                       DMON_WATCHFLAGS_RECURSIVE,
-                                                      nullptr);
+                                                      &app_settings);
+                        // Appsettings needed as userdata for fixed world mode
                     }
                 }
 

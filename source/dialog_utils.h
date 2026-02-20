@@ -25,4 +25,23 @@ bool open_font_file_dialog(char* out_filename, size_t max_len);
  */
 bool open_gui_texture_dialog(char* out_relative_path, size_t max_len);
 
+/**
+ * @brief Opens a folder dialog for selecting a Minecraft saves directory.
+ * Stores the full absolute path. Used for PATH_MODE_MANUAL.
+ * @param out_path Buffer to store the selected folder path.
+ * @param max_len Size of the output buffer.
+ * @return true if a folder was selected, false if cancelled.
+ */
+bool open_saves_folder_dialog(char* out_path, size_t max_len);
+
+/**
+ * @brief Opens a folder dialog for selecting a specific world folder inside a saves directory.
+ * Stores the full absolute path. Used for PATH_MODE_FIXED_WORLD.
+ * @param out_path Buffer to store the selected folder path.
+ * @param max_len Size of the output buffer.
+ * @param saves_path Optional starting directory hint (the current saves path). May be NULL.
+ * @return true if a folder was selected, false if cancelled.
+ */
+bool open_world_folder_dialog(char* out_path, size_t max_len, const char* saves_path);
+
 #endif // DIALOG_UTILS_H

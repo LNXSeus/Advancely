@@ -82,11 +82,11 @@ static bool get_auto_saves_path(char *out_path, size_t max_len) {
     }
     if (home_dir) {
 #if __APPLE__
-        snprintf(out_path, max_len, "%s/Library/Application Support/minecraft/saves", home_dir);
+    snprintf(out_path, max_len, "%s/Library/Application Support/minecraft/saves", home_dir);
 #else
-        snprintf(out_path, max_len, "%s/.minecraft/saves", home_dir);
+    snprintf(out_path, max_len, "%s/.minecraft/saves", home_dir);
 #endif
-        return true;
+    return true;
     }
 #endif
     return false;
@@ -151,7 +151,7 @@ static uint64_t get_latest_modification_time(const char *dir_path) {
         }
     }
     closedir(dir);
-    return (uint64_t)latest_time;
+    return (uint64_t) latest_time;
 #endif
 }
 
@@ -273,11 +273,11 @@ static bool get_active_instance_saves_path(char *out_path, size_t max_len) {
             pid_t pid = pids[i];
             if (pid == 0) continue;
 
-            int mib[3] = { CTL_KERN, KERN_PROCARGS2, pid };
+            int mib[3] = {CTL_KERN, KERN_PROCARGS2, pid};
             size_t arg_max;
             if (sysctl(mib, 3, nullptr, &arg_max, nullptr, 0) == -1) continue;
 
-            char *arg_buf = (char *)malloc(arg_max);
+            char *arg_buf = (char *) malloc(arg_max);
             if (!arg_buf) continue;
 
             if (sysctl(mib, 3, arg_buf, &arg_max, nullptr, 0) == -1) {
@@ -451,7 +451,30 @@ bool get_saves_path(char *out_path, size_t max_len, PathMode mode, const char *m
         if (!success) {
             log_message(LOG_ERROR, "[PATH UTILS] Could not find an active MultiMC/Prism instance.\n");
         }
+    } else if (mode == PATH_MODE_FIXED_WORLD) {
+        // The user supplied a full path to a specific world folder, e.g.
+        //   /home/user/.minecraft/saves/MyWorld
+        // The saves folder is one level up from that.
+        if (manual_path && strlen(manual_path) > 0) {
+            strncpy(out_path, manual_path, max_len - 1);
+            out_path[max_len - 1] = '\0';
+            normalize_path(out_path);
+            // Strip trailing slash if present
+            size_t len = strlen(out_path);
+            if (len > 1 && out_path[len - 1] == '/') out_path[--len] = '\0';
+            // Go up one level to get the saves folder
+            char *last_slash = strrchr(out_path, '/');
+            if (last_slash && last_slash != out_path) {
+                *last_slash = '\0';
+                success = true;
+            } else {
+                log_message(LOG_ERROR, "[PATH UTILS] Fixed world path has no parent directory: %s\n", manual_path);
+            }
+        } else {
+            log_message(LOG_ERROR, "[PATH UTILS] Fixed world path is empty.\n");
+        }
     }
+    // TODO: Continue here (2nd last message), then jump up and continue AFTER step 3b
 
     // normalize path
     if (success) {
@@ -480,29 +503,47 @@ void find_player_data_files(
     out_stats_path[0] = '\0';
     out_unlocks_path[0] = '\0';
 
-    // Find the most recently modified world directory first, as it's needed in most cases
     char latest_world_name[MAX_PATH_LENGTH] = {0};
-    char search_path[MAX_PATH_LENGTH];
-    snprintf(search_path, sizeof(search_path), "%s/*", saves_path);
 
-    WIN32_FIND_DATAA find_world_data;
-    HANDLE h_find_world = FindFirstFileA(search_path, &find_world_data);
-    if (h_find_world == INVALID_HANDLE_VALUE) {
-        log_message(LOG_ERROR, "[PATH UTILS] Cannot find files in saves directory: %s\n", saves_path);
-        return;
-    }
-    FILETIME latest_time = {0, 0};
-    do {
-        if ((find_world_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && strcmp(find_world_data.cFileName, ".") != 0
-            && strcmp(find_world_data.cFileName, "..") != 0) {
-            if (CompareFileTime(&find_world_data.ftLastWriteTime, &latest_time) > 0) {
-                latest_time = find_world_data.ftLastWriteTime;
-                strncpy(latest_world_name, find_world_data.cFileName, sizeof(latest_world_name) - 1);
-                latest_world_name[sizeof(latest_world_name) - 1] = '\0';
-            }
+    if (settings && settings->path_mode == PATH_MODE_FIXED_WORLD &&
+        settings->fixed_world_path[0] != '\0') {
+        // Fixed World Mode: extract world name from the configured path.
+        char normalized[MAX_PATH_LENGTH];
+        strncpy(normalized, settings->fixed_world_path, sizeof(normalized) - 1);
+        normalized[sizeof(normalized) - 1] = '\0';
+        normalize_path(normalized);
+        size_t nlen = strlen(normalized);
+        if (nlen > 1 && normalized[nlen - 1] == '/') normalized[--nlen] = '\0';
+        char *last_slash = strrchr(normalized, '/');
+        const char *world_name_start = last_slash ? last_slash + 1 : normalized;
+        strncpy(latest_world_name, world_name_start, sizeof(latest_world_name) - 1);
+        latest_world_name[sizeof(latest_world_name) - 1] = '\0';
+        log_message(LOG_INFO, "[PATH UTILS] Fixed world mode. Using world: %s\n", latest_world_name);
+    } else {
+        // Auto/Manual/Instance: scan for the most recently modified world folder.
+        char search_path[MAX_PATH_LENGTH];
+        snprintf(search_path, sizeof(search_path), "%s/*", saves_path);
+
+        WIN32_FIND_DATAA find_world_data;
+        HANDLE h_find_world = FindFirstFileA(search_path, &find_world_data);
+        if (h_find_world == INVALID_HANDLE_VALUE) {
+            log_message(LOG_ERROR, "[PATH UTILS] Cannot find files in saves directory: %s\n", saves_path);
+            return;
         }
-    } while (FindNextFileA(h_find_world, &find_world_data) != 0);
-    FindClose(h_find_world);
+        FILETIME latest_time = {0, 0};
+        do {
+            if ((find_world_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
+                strcmp(find_world_data.cFileName, ".") != 0 &&
+                strcmp(find_world_data.cFileName, "..") != 0) {
+                if (CompareFileTime(&find_world_data.ftLastWriteTime, &latest_time) > 0) {
+                    latest_time = find_world_data.ftLastWriteTime;
+                    strncpy(latest_world_name, find_world_data.cFileName, sizeof(latest_world_name) - 1);
+                    latest_world_name[sizeof(latest_world_name) - 1] = '\0';
+                }
+            }
+        } while (FindNextFileA(h_find_world, &find_world_data) != 0);
+        FindClose(h_find_world);
+    }
 
     if (strlen(latest_world_name) > 0) {
         strncpy(out_world_name, latest_world_name, max_len - 1);
@@ -625,36 +666,55 @@ void find_player_data_files(
     out_stats_path[0] = '\0';
     out_unlocks_path[0] = '\0';
 
-    // Find the most recently modified world directory first
     char latest_world_name[MAX_PATH_LENGTH] = {0};
-    DIR *saves_dir = opendir(saves_path);
-    if (!saves_dir) {
-        log_message(LOG_ERROR,"[PATH UTILS] Cannot open saves directory: %s\n", saves_path);
-        return;
-    }
-    struct dirent *entry;
-    time_t latest_time = 0;
-    while ((entry = readdir(saves_dir)) != nullptr) {
-        if (entry->d_type == DT_DIR && strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
-            char world_path[MAX_PATH_LENGTH];
-            snprintf(world_path, sizeof(world_path), "%s/%s", saves_path, entry->d_name);
-            struct stat stat_buf;
-            if (stat(world_path, &stat_buf) == 0) {
-                if (stat_buf.st_mtime > latest_time) {
-                    latest_time = stat_buf.st_mtime;
-                    strncpy(latest_world_name, entry->d_name, sizeof(latest_world_name) - 1);
-                    latest_world_name[sizeof(latest_world_name) - 1] = '\0';
+
+    if (settings && settings->path_mode == PATH_MODE_FIXED_WORLD &&
+        settings->fixed_world_path[0] != '\0') {
+        // Fixed World Mode: extract world name from the configured path.
+        char normalized[MAX_PATH_LENGTH];
+        strncpy(normalized, settings->fixed_world_path, sizeof(normalized) - 1);
+        normalized[sizeof(normalized) - 1] = '\0';
+        normalize_path(normalized);
+        size_t nlen = strlen(normalized);
+        if (nlen > 1 && normalized[nlen - 1] == '/') normalized[--nlen] = '\0';
+        char *last_slash = strrchr(normalized, '/');
+        const char *world_name_start = last_slash ? last_slash + 1 : normalized;
+        strncpy(latest_world_name, world_name_start, sizeof(latest_world_name) - 1);
+        latest_world_name[sizeof(latest_world_name) - 1] = '\0';
+        log_message(LOG_INFO, "[PATH UTILS] Fixed world mode. Using world: %s\n", latest_world_name);
+    } else {
+        // Auto/Manual/Instance: scan for the most recently modified world folder.
+        DIR *saves_dir = opendir(saves_path);
+        if (!saves_dir) {
+            log_message(LOG_ERROR, "[PATH UTILS] Cannot open saves directory: %s\n", saves_path);
+            return;
+        }
+        struct dirent *entry;
+        time_t latest_time = 0;
+        while ((entry = readdir(saves_dir)) != nullptr) {
+            if (entry->d_type == DT_DIR &&
+                strcmp(entry->d_name, ".") != 0 &&
+                strcmp(entry->d_name, "..") != 0) {
+                char world_path[MAX_PATH_LENGTH];
+                snprintf(world_path, sizeof(world_path), "%s/%s", saves_path, entry->d_name);
+                struct stat stat_buf;
+                if (stat(world_path, &stat_buf) == 0) {
+                    if (stat_buf.st_mtime > latest_time) {
+                        latest_time = stat_buf.st_mtime;
+                        strncpy(latest_world_name, entry->d_name, sizeof(latest_world_name) - 1);
+                        latest_world_name[sizeof(latest_world_name) - 1] = '\0';
+                    }
                 }
             }
         }
+        closedir(saves_dir);
     }
-    closedir(saves_dir);
 
     if (strlen(latest_world_name) > 0) {
         strncpy(out_world_name, latest_world_name, max_len - 1);
         out_world_name[max_len - 1] = '\0';
         if (settings) {
-            log_message(LOG_INFO,"[PATH UTILS] Found latest world: %s\n", out_world_name);
+            log_message(LOG_INFO, "[PATH UTILS] Found latest world: %s\n", out_world_name);
         }
     } else {
         strncpy(out_world_name, "No Worlds Found", max_len - 1);
@@ -674,7 +734,8 @@ void find_player_data_files(
                         if (strstr(entry->d_name, ".dat")) {
                             snprintf(out_stats_path, max_len, "%s/%s", stats_path_dir, entry->d_name);
                             if (settings) {
-                                log_message(LOG_INFO,"[PATH UTILS] Found legacy per-world stats file: %s\n", out_stats_path);
+                                log_message(LOG_INFO, "[PATH UTILS] Found legacy per-world stats file: %s\n",
+                                            out_stats_path);
                             }
                             break;
                         }
@@ -698,7 +759,7 @@ void find_player_data_files(
                     if (strstr(entry->d_name, ".dat")) {
                         snprintf(out_stats_path, max_len, "%s/%s", stats_path_dir, entry->d_name);
                         if (settings) {
-                            log_message(LOG_INFO,"[PATH UTILS] Found legacy global stats file: %s\n", out_stats_path);
+                            log_message(LOG_INFO, "[PATH UTILS] Found legacy global stats file: %s\n", out_stats_path);
                         }
                         break;
                     }
@@ -725,7 +786,7 @@ void find_player_data_files(
                 if (strstr(entry->d_name, ".json")) {
                     snprintf(out_stats_path, max_len, "%s/%s", folder_path, entry->d_name);
                     if (settings) {
-                        log_message(LOG_INFO,"[PATH UTILS] Found mid/modern era stats file: %s\n", out_stats_path);
+                        log_message(LOG_INFO, "[PATH UTILS] Found mid/modern era stats file: %s\n", out_stats_path);
                     }
                     break;
                 }
@@ -844,7 +905,7 @@ bool get_executable_path(char *out_path, size_t max_len) {
     }
     return true;
 #elif defined(__APPLE__)
-    uint32_t size = (uint32_t)max_len;
+    uint32_t size = (uint32_t) max_len;
     if (_NSGetExecutablePath(out_path, &size) != 0) {
         // Buffer was too small.
         return false;

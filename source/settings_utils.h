@@ -55,7 +55,8 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_ENABLE_OVERLAY false // Stream overlay will be off by default
 #define DEFAULT_USING_STATS_PER_WORLD_LEGACY true
 #define DEFAULT_USING_HERMES false
-#define DEFAULT_PATH_MODE PATH_MODE_AUTO
+#define DEFAULT_PATH_MODE PATH_MODE_INSTANCE
+#define DEFAULT_FIXED_WORLD_PATH ""
 #define DEFAULT_FPS 60
 #define DEFAULT_OVERLAY_FPS 60
 #define DEFAULT_TRACKER_ALWAYS_ON_TOP true
@@ -176,6 +177,7 @@ struct AppSettings {
     char display_version_str[64]; // The version string to display, e.g., "1.21.10". (same advancements)
     PathMode path_mode; // The mode for finding the saves path (auto or manual).
     char manual_saves_path[MAX_PATH_LENGTH]; // The user-defined path to the saves folder if path_mode is manual.
+    char fixed_world_path[MAX_PATH_LENGTH]; // Full path to the fixed world folder for PATH_MODE_FIXED_WORLD
     char category[MAX_PATH_LENGTH]; // The speedrun or goal category, used to build the template file name.
     char optional_flag[MAX_PATH_LENGTH]; // An optional string appended to the template file name for variants.
     char category_display_name[MAX_PATH_LENGTH]; // The user-configurable display name for the category.

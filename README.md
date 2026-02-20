@@ -18,7 +18,7 @@
 
 ## This tracker supports an arbitrary number of advancements, recipes, custom statistics, unlocks, multi-stage goals, manual goals, and custom counters for over 100 Minecraft versions.
 
-## Advancely is fully speedrun legal based on the [Minecraft Speedrunning rules (A.3.10.a, A.11.1)](https://www.minecraftspeedrunning.com/public-resources/rules) by only reading from within the 'advancements', 'stats' and 'unlocks' (25w14craftmine) folders of a world that update when the game saves.
+## Advancely is fully speedrun legal based on the [Minecraft Speedrunning rules (A.3.10.a, A.11.1)](https://www.minecraftspeedrunning.com/public-resources/rules) by only reading from within the 'advancements', 'stats' and 'unlocks' (25w14craftmine) folders of a world that update when the game saves. With the **[Hermes Mod](https://github.com/DuncanRuns/Hermes)** tracker updates are instant and don't require pausing, allowed by the [Minecraft Speedrunning rules (A.8.14 and A.8.15)](https://www.minecraftspeedrunning.com/public-resources/rules).
 
 ### Built for flexibility, Advancely supports everything from vanilla speedruns to modded adventures and datapacks through the creation of custom templates with a built-in template editor. It automatically detects changes in your latest singleplayer world, providing real-time progress updates.
 
@@ -75,7 +75,7 @@ Thank you for supporting the project!
 
 ## What is Advancely?
 
-> 📺 **Video Guide:** [Intro (0:00)](https://youtu.be/Rxd1RJqg2WQ?t=0m00s) • [The Basics (1:50)](https://youtu.be/Rxd1RJqg2WQ?t=1m50s)
+> 📺 **Video Guide: ** [Intro (0:00)](https://youtu.be/Rxd1RJqg2WQ?t=0m00s) • [The Basics (1:50)](https://youtu.be/Rxd1RJqg2WQ?t=1m50s)
 
 <p align="center">
   <img src="readme_assets/Advancely_v0.9.413_Preview.png" alt="Advancely Preview v0.9.413">
@@ -124,11 +124,22 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
 <summary><strong>View All Core Features</strong></summary>
 <br>
 
-* **Automatic Instance Tracking**: For users of a custom launcher like **Prism Launcher**, **MultiMC** etc., Advancely
-  can automatically detect which instance you are actively playing and track it even if multiple instances are open at
-  once. It intelligently
-  selects the instance you last interacted with. Find out
-  more [here](https://github.com/LNXSeus/Advancely#the-settings-window-esc).
+* **Automatic Instance Tracking** *(default)*: Advancely automatically detects which Minecraft instance you
+  are actively playing and tracks it, even if multiple instances are open at once. This is the default
+  path detection mode. It works with **Prism Launcher**, **MultiMC**, and similar launchers. Find out
+  more [here](#the-settings-window-esc).
+* **Fixed World Mode**: Lock the tracker to one specific world folder. Unlike the default mode which always
+  follows your most recently played world, Fixed World Mode keeps the tracker focused on a single chosen world
+  regardless of which world you open next. Useful for long-form playthroughs, modded runs, or setups where
+  you want the tracker to stay on a specific save. Configure it in Settings by selecting **"Fixed World"** and
+  browsing to the world folder.
+* **Hermes Mod Live Tracking**: When the [Hermes mod](https://github.com/DuncanRuns/Hermes) is installed,
+  Advancely can read its encrypted `play.log.enc` in real-time, updating stats and advancements as they happen
+  rather than waiting for the game to save. Enable this in Settings under **"Using Hermes Mod (Live Tracking)"**.
+  The update timer in the info bar and overlay changes from `Upd:` to `Synced:` when Hermes is active, indicating
+  the last full disk sync rather than the last live event. All values self-correct on every normal game save.
+  Compatible ultimately with all Fabric versions. Stat and advancement/achievement changes are applied instantly; the
+  game files remain the authoritative source of truth.
 * **Interactive Map View**: The main tracker window is an interactive map where you can pan by holding `Right-Click` or
   `Middle-Click`, zoom with the `Mouse Wheel`, and lock the layout in place by pressing `SPACE`.
 * **Scrollable Lists**: Goals containing large numbers of sub-items (like "All Animals Bred" or complex stats) are
@@ -223,7 +234,8 @@ your operating system. The `vX.X.X` is the Advancely version, that is also displ
 
 * **Windows:** `Advancely-vX.X.X-Windows.zip`
 * **Linux (Portable):** `Advancely-vX.X.X-Linux.zip` — The standalone executable (no installation required).
-* **Linux (Debian/Ubuntu):** `advancely-vX.X.X-Linux.deb` — The native installer for Ubuntu 25+ (or systems with SDL3 installed).
+* **Linux (Debian/Ubuntu):** `advancely-vX.X.X-Linux.deb` — The native installer for Ubuntu 25+ (or systems with SDL3
+  installed).
 * **Linux (Fedora/RHEL):** `advancely-vX.X.X-Linux.rpm` — The native installer for Fedora/RedHat systems.
 * **macOS:** `Advancely-vX.X.X-macOS-Universal.zip` — For both Intel (down to macOS 13 Ventura) and Silicon Macs.
 
@@ -239,7 +251,6 @@ your operating system. The `vX.X.X` is the Advancely version, that is also displ
     ```
 
 #### For all other installations
-
 
 To ensure the application works correctly, please follow the instructions for your operating system.
 
