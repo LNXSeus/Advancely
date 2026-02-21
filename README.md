@@ -18,9 +18,7 @@
 
 ## This tracker supports an arbitrary number of advancements, recipes, custom statistics, unlocks, multi-stage goals, manual goals, and custom counters for over 100 Minecraft versions.
 
-## Advancely is fully speedrun legal based on the [Minecraft Speedrunning rules (A.3.10.a, A.11.1)](https://www.minecraftspeedrunning.com/public-resources/rules) by only reading from within the 'advancements', 'stats' and 'unlocks' (25w14craftmine) folders of a world that update when the game saves. With the
-
-**[Hermes Mod](https://github.com/DuncanRuns/Hermes)** tracker updates are instant and don't require pausing, allowed by the [Minecraft Speedrunning rules (A.8.14 and A.8.15)](https://www.minecraftspeedrunning.com/public-resources/rules).
+## Advancely is fully speedrun legal based on the [Minecraft Speedrunning rules (A.3.10.a, A.11.1)](https://www.minecraftspeedrunning.com/public-resources/rules) by only reading from within the 'advancements', 'stats' and 'unlocks' (25w14craftmine) folders of a world that update when the game saves. With the **[Hermes Mod](https://github.com/DuncanRuns/Hermes)** tracker updates are instant and don't require pausing, **STILL AWAITING VERIFICATION** by the [Minecraft Speedrunning rules (A.8.14 and A.8.15)](https://www.minecraftspeedrunning.com/public-resources/rules).
 
 ### Built for flexibility, Advancely supports everything from vanilla speedruns to modded adventures and datapacks through the creation of custom templates with a built-in template editor. It automatically detects changes in your latest singleplayer world, providing real-time progress updates.
 
@@ -161,7 +159,7 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
   regardless of which world you open next. Useful for long-form playthroughs, modded runs, or setups where
   you want the tracker to stay on a specific save. Configure it in Settings by selecting **"Fixed World"** and
   browsing to the world folder.
-* **Hermes Mod Live Tracking**: When the [Hermes mod](https://github.com/DuncanRuns/Hermes) is installed,
+* **Hermes Mod Live Tracking (STILL AWAITING VERIFICATION)**: When the [Hermes mod](https://github.com/DuncanRuns/Hermes) is installed,
   Advancely can read its encrypted `play.log.enc` in real-time, updating stats and advancements as they happen
   rather than waiting for the game to save. Enable this in Settings under **"Using Hermes Mod (Live Tracking)"**.
   The update timer in the info bar and overlay changes from `Upd:` to `Synced:` when Hermes is active, indicating
