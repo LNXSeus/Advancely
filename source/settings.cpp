@@ -379,7 +379,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "Automatically finds the default Minecraft (-Launcher) saves path for your OS.\n"
                  "Windows: %%APPDATA%%\\.minecraft\\saves\n"
                  "Linux: ~/.minecraft/saves\n"
-                 "macOS: ~/Library/Application Support/minecraft/saves\n");
+                 "macOS: ~/Library/Application Support/minecraft/saves\n"
+                 "This is Path Mode: %d", PATH_MODE_AUTO);
         ImGui::SetTooltip("%s", default_saves_path_tooltip_buffer);
     }
 
@@ -392,7 +393,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "DEFAULT: Automatically detect and track the active Minecraft instance\n"
                  "launched from MultiMC or Prism Launcher, even when switching between\n"
                  "multiple running instances. The tracker always follows the most recently\n"
-                 "active world. Having Minecraft closed may cause 'No Worlds Found'.");
+                 "active world. Having Minecraft closed may cause 'No Worlds Found'.\n"
+                 "This is Path Mode: %d", PATH_MODE_INSTANCE);
         ImGui::SetTooltip("%s", tooltip);
     }
 
@@ -405,7 +407,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                  "Unlike other modes, the tracker stays on the chosen world\n"
                  "regardless of which world you open next in Minecraft.\n"
                  "Useful for long-form playthroughs, modded runs, or setups\n"
-                 "where you always want to track a specific save.");
+                 "where you always want to track a specific save.\n"
+                 "This is Path Mode: %d", PATH_MODE_FIXED_WORLD);
         ImGui::SetTooltip("%s", tooltip);
     }
 
@@ -442,7 +445,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     if (ImGui::IsItemHovered()) {
         char tooltip[512];
         snprintf(tooltip, sizeof(tooltip), "Manually specify the path to your '.minecraft/saves' folder.\n"
-                 "Useful for custom launchers or non-standard installations.");
+                 "Useful for custom launchers or non-standard installations.\n"
+                 "This is Path Mode: %d", PATH_MODE_MANUAL);
         ImGui::SetTooltip("%s", tooltip);
     }
 
