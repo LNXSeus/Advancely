@@ -161,24 +161,50 @@ bool open_font_file_dialog(char *out_filename, size_t max_len) {
     std::string full_path_str = selected_path;
     normalize_path(full_path_str);
 
-    // Check if the selected path is inside the required fonts directory
-    if (full_path_str.rfind(start_path, 0) == 0) {
-        // rfind with pos=0 checks if string starts with
-        // Path is valid, extract just the filename
-        const char *filename = strrchr(selected_path, '/');
-        if (!filename) filename = strrchr(selected_path, '\\'); // Fallback for Windows paths
-        filename = filename ? filename + 1 : selected_path;
+    // Extract just the filename regardless of where it came from
+    const char *filename = strrchr(selected_path, '/');
+    if (!filename) filename = strrchr(selected_path, '\\');
+    filename = filename ? filename + 1 : selected_path;
 
+    // If the file is already inside the fonts directory, use it directly
+    if (full_path_str.rfind(start_path, 0) == 0) {
         strncpy(out_filename, filename, max_len - 1);
         out_filename[max_len - 1] = '\0';
         return true;
     }
 
-    // If the path was invalid, show an error
-    tinyfd_messageBox("Invalid Font Location",
-                      "You must select a font from within the applications resources/fonts directory.", "ok", "error",
-                      1);
-    return false;
+    // Warn the user the file will be copied before proceeding
+    int confirmed = tinyfd_messageBox(
+        "Copy Font?",
+        "This font is outside the resources/fonts folder and will be copied into it.\n"
+        "Note: frequently importing different fonts will accumulate files in that folder.",
+        "yesno", "question", 1
+    );
+    if (confirmed != 1) return false;
+
+    // Otherwise, copy it into the fonts directory so the app can find it
+    std::string dest_path = start_path + filename;
+    FILE *src = fopen(selected_path, "rb");
+    if (!src) {
+        tinyfd_messageBox("Error", "Could not open the selected font file.", "ok", "error", 1);
+        return false;
+    }
+    FILE *dst = fopen(dest_path.c_str(), "wb");
+    if (!dst) {
+        fclose(src);
+        tinyfd_messageBox("Error", "Could not copy font into the resources/fonts directory.", "ok", "error", 1);
+        return false;
+    }
+    char copy_buf[4096];
+    size_t bytes;
+    while ((bytes = fread(copy_buf, 1, sizeof(copy_buf), src)) > 0)
+        fwrite(copy_buf, 1, bytes, dst);
+    fclose(src);
+    fclose(dst);
+
+    strncpy(out_filename, filename, max_len - 1);
+    out_filename[max_len - 1] = '\0';
+    return true;
 }
 
 bool open_gui_texture_dialog(char *out_relative_path, size_t max_len) {
@@ -222,29 +248,58 @@ bool open_gui_texture_dialog(char *out_relative_path, size_t max_len) {
     std::string full_path_str = selected_path;
     normalize_path(full_path_str); // Normalize back to forward slashes for comparison
 
-    // Check if the selected path is inside the required gui directory
-    if (full_path_str.rfind(start_path, 0) == 0) {
-        // Check if string starts with start_path
-        // Path is valid, extract just the filename (relative path within gui/)
-        std::string relative_path = full_path_str.substr(start_path.length());
+    // Extract just the filename regardless of where it came from
+    const char *filename = strrchr(selected_path, '/');
+    if (!filename) filename = strrchr(selected_path, '\\');
+    filename = filename ? filename + 1 : selected_path;
 
+    // If the file is already inside the gui directory, use it directly
+    if (full_path_str.rfind(start_path, 0) == 0) {
+        std::string relative_path = full_path_str.substr(start_path.length());
         strncpy(out_relative_path, relative_path.c_str(), max_len - 1);
         out_relative_path[max_len - 1] = '\0';
         return true;
     }
 
-    // If the path was invalid, show an error
-    tinyfd_messageBox("Invalid Texture Location",
-                      "You must select a texture from within the applications resources/gui directory.", "ok", "error",
-                      1);
-    return false;
+    // Warn the user the file will be copied before proceeding
+    int confirmed = tinyfd_messageBox(
+        "Copy Texture?",
+        "This texture is outside the resources/gui folder and will be copied into it.\n"
+        "Note: frequently importing different textures will accumulate files in that folder.",
+        "yesno", "question", 1
+    );
+    if (confirmed != 1) return false;
+
+    // Otherwise, copy it into the gui directory so the app can find it
+    std::string dest_path = start_path + filename;
+    FILE *src = fopen(selected_path, "rb");
+    if (!src) {
+        tinyfd_messageBox("Error", "Could not open the selected texture file.", "ok", "error", 1);
+        return false;
+    }
+    FILE *dst = fopen(dest_path.c_str(), "wb");
+    if (!dst) {
+        fclose(src);
+        tinyfd_messageBox("Error", "Could not copy texture into the resources/gui directory.", "ok", "error", 1);
+        return false;
+    }
+    char copy_buf[4096];
+    size_t bytes;
+    while ((bytes = fread(copy_buf, 1, sizeof(copy_buf), src)) > 0)
+        fwrite(copy_buf, 1, bytes, dst);
+    fclose(src);
+    fclose(dst);
+
+    strncpy(out_relative_path, filename, max_len - 1);
+    out_relative_path[max_len - 1] = '\0';
+    return true;
 }
 
 bool open_saves_folder_dialog(char *out_path, size_t max_len) {
     // Start the dialog in the current saves path if it exists, otherwise home dir.
     const char *selected = tinyfd_selectFolderDialog(
         "Select Minecraft Saves Folder",
-        nullptr  // NULL lets tinyfd start at a sensible default (home dir)
+        nullptr // NULL lets tinyfd start at a sensible default (home dir)
     );
 
     if (!selected) return false; // User cancelled
@@ -269,7 +324,7 @@ bool open_world_folder_dialog(char *out_path, size_t max_len, const char *saves_
     if (saves_path && saves_path[0] != '\0' && path_exists(saves_path)) {
         start_dir_native = saves_path;
 #ifdef _WIN32
-        for (char &c : start_dir_native) { if (c == '/') c = '\\'; }
+        for (char &c: start_dir_native) { if (c == '/') c = '\\'; }
 #endif
         start_dir = start_dir_native.c_str();
     }

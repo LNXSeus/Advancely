@@ -354,7 +354,7 @@ If you still encounter issues, you can strip the quarantine tags manually:
 2. **Right-click** (or Control-click) `Advancely.app` and select **Open** from the menu.
 3. A warning will appear. Click **Open**. macOS will now remember that you trust this application.
 
-✔️ **Method 3: System Settings (If Method 1 fails)**
+✔️ **Method 3: System Settings (If Method 1 and 2 fail)**
 If the app still refuses to open:
 
 1. Open **System Settings** -> **Privacy & Security**.

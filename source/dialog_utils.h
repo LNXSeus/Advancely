@@ -12,18 +12,18 @@
 
 #include <cstddef>
 
-bool open_icon_file_dialog(char* out_relative_path, size_t max_len);
+bool open_icon_file_dialog(char *out_relative_path, size_t max_len);
 
-bool open_font_file_dialog(char* out_filename, size_t max_len);
+bool open_font_file_dialog(char *out_filename, size_t max_len);
 
 /**
  * @brief Opens a file dialog for selecting GUI background textures (.png, .gif).
- * Starts in the 'resources/gui/' directory and validates the selection.
- * @param out_relative_path Buffer to store the selected texture filename (relative to resources/gui/).
+ * Starts in the 'resources/gui/' directory. Files outside this directory are copied in automatically.
+ * @param out_relative_path Buffer to store the texture filename (relative to resources/gui/).
  * @param max_len Size of the output buffer.
  * @return true if a valid file was selected, false otherwise (cancel or invalid).
  */
-bool open_gui_texture_dialog(char* out_relative_path, size_t max_len);
+bool open_gui_texture_dialog(char *out_relative_path, size_t max_len);
 
 /**
  * @brief Opens a folder dialog for selecting a Minecraft saves directory.
@@ -32,7 +32,7 @@ bool open_gui_texture_dialog(char* out_relative_path, size_t max_len);
  * @param max_len Size of the output buffer.
  * @return true if a folder was selected, false if cancelled.
  */
-bool open_saves_folder_dialog(char* out_path, size_t max_len);
+bool open_saves_folder_dialog(char *out_path, size_t max_len);
 
 /**
  * @brief Opens a folder dialog for selecting a specific world folder inside a saves directory.
@@ -42,6 +42,6 @@ bool open_saves_folder_dialog(char* out_path, size_t max_len);
  * @param saves_path Optional starting directory hint (the current saves path). May be NULL.
  * @return true if a folder was selected, false if cancelled.
  */
-bool open_world_folder_dialog(char* out_path, size_t max_len, const char* saves_path);
+bool open_world_folder_dialog(char *out_path, size_t max_len, const char *saves_path);
 
 #endif // DIALOG_UTILS_H

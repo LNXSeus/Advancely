@@ -2180,7 +2180,20 @@ int main(int argc, char *argv[]) {
         CloseHandle(tracker->overlay_process_info.hProcess);
         CloseHandle(tracker->overlay_process_info.hThread);
 #else
-        sleep(1); // Give it 1 second to shut down
+        // Give it 1 second to shut down gracefully via the shared memory flag
+        sleep(1);
+        // If it's still alive, force-kill it
+        if (kill(tracker->overlay_pid, 0) == 0) {
+            log_message(LOG_INFO, "[MAIN] Overlay still running after grace period, sending SIGTERM.\n");
+            kill(tracker->overlay_pid, SIGTERM);
+            // Wait briefly for it to handle the signal, then SIGKILL if still alive
+            usleep(300000); // 0.3 seconds
+            if (kill(tracker->overlay_pid, 0) == 0) {
+                log_message(LOG_INFO, "[MAIN] Overlay did not respond to SIGTERM, sending SIGKILL.\n");
+                kill(tracker->overlay_pid, SIGKILL);
+            }
+            waitpid(tracker->overlay_pid, nullptr, WNOHANG);
+        }
 #endif
     }
 
