@@ -287,6 +287,33 @@ Use your favorite AUR helper, e.g.:
 
 _Massive thanks to [R0dn3yS](https://github.com/R0dn3yS) for the AUR packages!_
 
+* **NixOS:**
+
+Advancely is available via [mcsr-nixos](https://git.uku3lig.net/uku/mcsr-nixos), a collection of NixOS packages for Minecraft speedrunning.
+
+Add the following to your `flake.nix` inputs:
+```nix
+  inputs.mcsr-nixos = {
+    url = "https://git.uku3lig.net/uku/mcsr-nixos/archive/main.tar.gz";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
+```
+
+Then add it to your system configuration:
+```nix
+  { pkgs, mcsr-nixos, ... }:
+  let
+    mcsrPkgs = mcsr-nixos.packages.${pkgs.stdenv.hostPlatform.system};
+  in
+  {
+    environment.systemPackages = [
+      mcsrPkgs.advancely
+    ];
+  }
+```
+
+_Massive thanks to [uku3lig](https://git.uku3lig.net/uku) for the NixOS package!_
+
 #### For all other installations
 
 To ensure the application works correctly, please follow the instructions for your operating system.
@@ -961,6 +988,7 @@ Massive thanks to all people involved in improving and shaping Advancely:
 * **[R0dn3yS](https://github.com/R0dn3yS)**: Helped fixing renaming issue for 1.16 all_advancements templates and crash
   on Linux w/ nikander100.
 * **[nikander100](https://github.com/nikander100)**: Helped fixing Segmentation fault on Linux.
+* **[uku](https://git.uku3lig.net/uku)**: NixOS package via mcsr-nixos.
 
 </details>
 
