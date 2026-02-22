@@ -650,13 +650,19 @@ From the main editor view, you can manage entire template packages:
 
 * **Create New Template**: Builds a new, empty template from scratch for the selected version. You provide a unique
   `Category Name` and an `Optional Flag`.
-* **Copy Template**: Duplicates an existing template, including all its langusage files. This is the perfect starting
+* **Copy Template**: Duplicates an existing template, including all its language files. This is the perfect starting
   point for creating a variation of a complex template.
 * **Delete Template**: Permanently removes a template and all of its associated language **and notes files**.
 * **Import Template**: Imports a full template package from a `.zip` file. You can confirm or change the version,
-  category, and flag before the files are added.
+  category, and flag before the files are added. If the zip contains bundled icon files, an **Import bundled icon
+  files** checkbox will appear and enabling it extracts those icons directly into your `resources/icons/` folder so
+  they resolve automatically with no further setup required (icons get put into the same folder structure as the template).
 * **Export Template**: Packages the selected template and all its language files into a single `.zip` file, perfect for
-  sharing with others on the [Official Advancely Discord](https://discord.gg/TyNgXDz).
+  sharing with others on the [Official Advancely Discord](https://discord.gg/TyNgXDz). Clicking the button opens a
+  small confirmation popup where you can optionally enable **Bundle icon files** before confirming and this copies all
+  icon files referenced by the template into an `icons/` folder inside the zip. This is strictly a **copy** operation and
+  your local `resources/icons/` folder is never modified or deleted. Recommended whenever your template uses custom
+  icons not included with a standard Advancely install, so recipients get everything they need in a single file.
 
 ### Language File Management
 

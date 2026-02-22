@@ -1457,6 +1457,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static char import_category[MAX_PATH_LENGTH] = "";
     static char import_flag[MAX_PATH_LENGTH] = "";
 
+    static bool import_zip_has_icons = false; // set when zip is opened
+    static bool import_icons_checkbox = false; // user's choice
+    static bool show_export_options_popup = false; // Popup for export options (includes icons checkbox)
+    static bool export_include_icons = false; // include icons in zip
+
     // Imports from world file
     // Advancements
     static bool show_import_advancements_popup = false;
@@ -2245,6 +2250,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     import_version_idx = creator_version_idx;
 
                     show_import_confirmation_view = true;
+                    import_zip_has_icons = zip_contains_icons(open_path);
+                    import_icons_checkbox = import_zip_has_icons; // default ON if icons present
                     show_create_new_view = false;
                     show_copy_view = false;
                     editing_template = false;
@@ -2282,16 +2289,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     }
     ImGui::SameLine();
 
+    // Export Template Button opens popup
+    // Disabled when there are unsaved changes or no template is selected
     // Export Template Button
     // Disabled when there are unsaved changes or no template is selected
     ImGui::BeginDisabled(has_unsaved_changes_in_editor || selected_template_index == -1);
     if (ImGui::Button("Export Template")) {
         if (selected_template_index != -1) {
-            handle_export_template(discovered_templates[selected_template_index], creator_version_str, status_message,
-                                   sizeof(status_message));
-            save_message_type = MSG_SUCCESS; // Use success color to make the message visible
-        } else {
-            save_message_type = MSG_ERROR;
+            show_export_options_popup = true;
         }
     }
     ImGui::EndDisabled();
@@ -2300,16 +2305,53 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (selected_template_index == -1) {
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a template from the list to export.");
         } else if (has_unsaved_changes_in_editor) {
-            // Unsaved changes in editor
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                      "You have unsaved changes in the editor. Save them first.");
         } else {
-            // Exporting
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                      "Export the selected template as a .zip file, including its main file and all language files.\n\n"
                      "Feel free to share them on the Official Advancely Discord (discord.gg/TyNgXDz)!");
         }
         ImGui::SetTooltip("%s", tooltip_buffer);
+    }
+
+    if (show_export_options_popup)
+        ImGui::OpenPopup("Export Template");
+
+    if (ImGui::BeginPopupModal("Export Template", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        const DiscoveredTemplate &selected = discovered_templates[selected_template_index];
+        ImGui::Text("Exporting: %s%s  (%s)", selected.category, selected.optional_flag, creator_version_str);
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::Checkbox("Bundle icon files", &export_include_icons);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "Copies all icon files referenced by this template into the zip under an icons/ folder.\n"
+                "This is a COPY and your existing icons folder is never modified or deleted.\n"
+                "Recommended when sharing templates that use custom icons not installed by default.");
+        }
+        ImGui::Spacing();
+        ImGui::Separator();
+
+        if (ImGui::Button("Export", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+            handle_export_template(discovered_templates[selected_template_index], creator_version_str,
+                                   export_include_icons,
+                                   status_message, sizeof(status_message));
+            save_message_type = MSG_SUCCESS;
+            show_export_options_popup = false;
+            ImGui::CloseCurrentPopup();
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("You can also press ENTER.");
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            show_export_options_popup = false;
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
     }
 
     // Delete Confirmation Popup
@@ -6893,6 +6935,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         ImGui::Spacing();
 
+        // Import icon files checkbox (only shown if the zip contains icons)
+        if (import_zip_has_icons) {
+            ImGui::Checkbox("Import bundled icon files", &import_icons_checkbox);
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    "Extracts the icon files bundled in this zip into your resources/icons/ folder.\n"
+                    "Icon paths in the imported template will be updated automatically to point to them.\n"
+                    "Disable this if you already have the required icons installed.");
+            }
+        }
+
         // Deleting .zip after import
         ImGui::Checkbox("Delete .zip after import", &import_zip_delete_after);
         if (ImGui::IsItemHovered()) {
@@ -6932,14 +6985,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     save_message_type = MSG_ERROR;
                 } else {
                     if (execute_import_from_zip(import_zip_path, version_str, import_category, import_flag,
+                                                import_zip_has_icons && import_icons_checkbox,
                                                 status_message,
                                                 sizeof(status_message))) {
                         // SUCCESS!
                         if (import_zip_delete_after) {
                             remove(import_zip_path);
                         }
-                        snprintf(status_message, sizeof(status_message), "Template imported to version %s!",
-                                 version_str);
+                        if (import_zip_has_icons && import_icons_checkbox)
+                            snprintf(status_message, sizeof(status_message),
+                                     "Template imported to version %s (icons installed)!", version_str);
+                        else
+                            snprintf(status_message, sizeof(status_message),
+                                     "Template imported to version %s!", version_str);
                         show_import_confirmation_view = false;
                         // Switch UI to the newly imported version
                         strncpy(creator_version_str, version_str, sizeof(creator_version_str) - 1);

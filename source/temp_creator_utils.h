@@ -52,7 +52,8 @@ struct ImportableUnlock {
  * @param error_msg_size The size of the error_message buffer.
  * @return true on success, false on failure.
  */
-bool parse_player_stats_for_import(const char* file_path, MC_Version version, std::vector<ImportableStat>& out_stats, char* error_message, size_t error_msg_size);
+bool parse_player_stats_for_import(const char *file_path, MC_Version version, std::vector<ImportableStat> &out_stats,
+                                   char *error_message, size_t error_msg_size);
 
 /**
  * @brief Parses a player's advancements.json file into a structure suitable for the import UI.
@@ -63,7 +64,9 @@ bool parse_player_stats_for_import(const char* file_path, MC_Version version, st
  * @param error_msg_size The size of the error_message buffer.
  * @return true on success, false on failure.
  */
-bool parse_player_advancements_for_import(const char* file_path, MC_Version version, std::vector<ImportableAdvancement>& out_advancements, char* error_message, size_t error_msg_size);
+bool parse_player_advancements_for_import(const char *file_path, MC_Version version,
+                                          std::vector<ImportableAdvancement> &out_advancements, char *error_message,
+                                          size_t error_msg_size);
 
 /**
  * @brief Parses a player's unlocks.json file into a simple list of unlock root names from 'obtained' array.
@@ -73,7 +76,8 @@ bool parse_player_advancements_for_import(const char* file_path, MC_Version vers
  * @param error_msg_size The size of the error_message buffer.
  * @return true on success, false on failure.
  */
-bool parse_player_unlocks_for_import(const char* file_path, std::vector<ImportableUnlock>& out_unlocks, char* error_message, size_t error_msg_size);
+bool parse_player_unlocks_for_import(const char *file_path, std::vector<ImportableUnlock> &out_unlocks,
+                                     char *error_message, size_t error_msg_size);
 
 /**
  * @brief Ensures that the directory for a given file path exists, creating it if necessary.
@@ -197,30 +201,35 @@ bool get_info_from_zip(const char *zip_path, char *out_version, char *out_catego
                        size_t msg_size);
 
 /**
- * @brief Performs the final import by extracting a zip file to a specified template location.
- * The import is only performed successfully if the exact template name does not already exist
- * for the selected version.
- * @param zip_path Path to the source .zip file.
- * @param version The user-confirmed version for the new template.
- * @param category The user-confirmed category for the new template.
- * @param flag The user-confirmed flag for the new template.
- * @param error_message Buffer to store an error message on failure.
- * @param msg_size Size of the error_message buffer.
- * @return true on success, false on failure.
+ * @brief Imports a template from a zip, optionally extracting bundled icon files.
+ *
+ * @param zip_path       Path to the source zip.
+ * @param version        User-confirmed version for the imported template.
+ * @param category       User-confirmed category.
+ * @param flag           User-confirmed flag.
+ * @param import_icons   If true and the zip contains icons/, extract them to resources/icons/
+ *                       and relink the icon paths in the extracted template JSON.
+ * @param error_message  Output buffer for error text.
+ * @param msg_size       Size of error_message.
+ * @return true on success.
  */
-bool execute_import_from_zip(const char *zip_path, const char *version, const char *category, const char *flag,
+bool execute_import_from_zip(const char *zip_path, const char *version, const char *category,
+                             const char *flag, bool import_icons,
                              char *error_message, size_t msg_size);
 
 /**
- * @brief Opens a save dialog and handles the export of a selected template to a .zip file.
- * @param selected_template The template info to be exported.
- * @param version The version of the selected template.
- * @param status_message A buffer to store the success or error message.
- * @param msg_size The size of the status_message buffer.
- * @return true on success, false on failure or cancellation.
+ * @brief Exports a template to a zip, optionally bundling icon files.
+ *
+ * @param selected_template  Template metadata.
+ * @param version            Version string.
+ * @param include_icons      If true, referenced icon files are copied into the zip under icons/.
+ * @param status_message     Output buffer for success/error text.
+ * @param msg_size           Size of status_message.
+ * @return true on success.
  */
-bool handle_export_template(const DiscoveredTemplate &selected_template, const char *version, char *status_message,
-                            size_t msg_size);
+bool handle_export_template(const DiscoveredTemplate &selected_template, const char *version,
+                            bool include_icons,
+                            char *status_message, size_t msg_size);
 
 /**
 * @brief Opens the file explorer and highlights the selected language file.
@@ -229,7 +238,8 @@ bool handle_export_template(const DiscoveredTemplate &selected_template, const c
 * @param flag The optional flag of the parent template.
 * @param lang_flag_to_export The language flag of the file to show.
 */
-void handle_export_language(const char *version, const char *category, const char *flag, const char *lang_flag_to_export);
+void handle_export_language(const char *version, const char *category, const char *flag,
+                            const char *lang_flag_to_export);
 
 
 /**
@@ -243,7 +253,26 @@ void handle_export_language(const char *version, const char *category, const cha
 * @param error_msg_size The size of the error_message buffer.
 * @return true on success, false on failure.
 */
-bool execute_import_language_file(const char *version, const char *category, const char *flag, const char *source_path, const char *new_lang_flag, char *error_message, size_t error_msg_size);
+bool execute_import_language_file(const char *version, const char *category, const char *flag, const char *source_path,
+                                  const char *new_lang_flag, char *error_message, size_t error_msg_size);
+
+/**
+ * @brief Scans a template JSON file and collects all unique icon paths referenced in it.
+ * Paths are relative to the icons/ directory, e.g. "vanilla/stick.png".
+ * @param template_json_path Full path to the template .json file.
+ * @param out_icon_paths Vector to be populated with unique relative icon paths.
+ * @return true if the file was read successfully (even if no icons found).
+ */
+bool collect_icon_paths_from_template(const char *template_json_path,
+                                      std::vector<std::string> &out_icon_paths);
+
+/**
+* @brief Returns true if the zip contains any files under an "icons/" prefix.
+* Call after get_info_from_zip to decide whether to show the import-icons checkbox.
+* @param zip_path Path to the zip file.
+* @return true if at least one icon file is present in the zip.
+*/
+bool zip_contains_icons(const char *zip_path);
 
 #ifdef __cplusplus
 }

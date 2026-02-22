@@ -12,6 +12,7 @@
 #include <cstring>
 #include <sys/stat.h> // For stat and mkdir
 #include <cctype> // For isalnum
+#include <functional>
 
 #include "temp_creator_utils.h"
 #include "logger.h"
@@ -39,10 +40,11 @@
 #include <sys/wait.h>
 #endif
 
-bool parse_player_stats_for_import(const char* file_path, MC_Version version, std::vector<ImportableStat>& out_stats, char* error_message, size_t error_msg_size) {
+bool parse_player_stats_for_import(const char *file_path, MC_Version version, std::vector<ImportableStat> &out_stats,
+                                   char *error_message, size_t error_msg_size) {
     out_stats.clear();
 
-    cJSON* root = cJSON_from_file(file_path);
+    cJSON *root = cJSON_from_file(file_path);
     if (!root) {
         snprintf(error_message, error_msg_size, "Error: Could not read or parse the selected JSON file.");
         return false;
@@ -50,20 +52,21 @@ bool parse_player_stats_for_import(const char* file_path, MC_Version version, st
 
     if (version <= MC_VERSION_1_6_4) {
         // Legacy .dat file (parsed as json)
-        cJSON* stats_change = cJSON_GetObjectItem(root, "stats-change");
+        cJSON *stats_change = cJSON_GetObjectItem(root, "stats-change");
         if (cJSON_IsArray(stats_change)) {
-            cJSON* stat_entry;
+            cJSON *stat_entry;
             cJSON_ArrayForEach(stat_entry, stats_change) {
-                cJSON* item = stat_entry->child;
+                cJSON *item = stat_entry->child;
                 // Legacy stats can also be achievements
                 if (item && item->string) {
                     out_stats.push_back({item->string, false});
                 }
             }
         }
-    } else if (version <= MC_VERSION_1_12_2) { // Mid-era stats until 1.12.2
+    } else if (version <= MC_VERSION_1_12_2) {
+        // Mid-era stats until 1.12.2
         // Mid-era flat json file
-        cJSON* stat_entry = nullptr;
+        cJSON *stat_entry = nullptr;
         cJSON_ArrayForEach(stat_entry, root) {
             // Only import entries that are simple numbers, excluding complex objects (achievements with criteria).
             if (stat_entry->string && cJSON_IsNumber(stat_entry)) {
@@ -72,16 +75,17 @@ bool parse_player_stats_for_import(const char* file_path, MC_Version version, st
         }
     } else {
         // Modern nested json file (1.13+)
-        cJSON* stats_obj = cJSON_GetObjectItem(root, "stats");
+        cJSON *stats_obj = cJSON_GetObjectItem(root, "stats");
         if (stats_obj) {
-            cJSON* category_obj = nullptr;
+            cJSON *category_obj = nullptr;
             cJSON_ArrayForEach(category_obj, stats_obj) {
                 if (category_obj->string) {
-                    cJSON* stat_entry = nullptr;
+                    cJSON *stat_entry = nullptr;
                     cJSON_ArrayForEach(stat_entry, category_obj) {
                         if (stat_entry->string) {
                             char full_root_name[256];
-                            snprintf(full_root_name, sizeof(full_root_name), "%s/%s", category_obj->string, stat_entry->string);
+                            snprintf(full_root_name, sizeof(full_root_name), "%s/%s", category_obj->string,
+                                     stat_entry->string);
                             out_stats.push_back({full_root_name, false});
                         }
                     }
@@ -98,7 +102,8 @@ bool parse_player_stats_for_import(const char* file_path, MC_Version version, st
     return true;
 }
 
-bool parse_player_advancements_for_import(const char *file_path, MC_Version version, std::vector<ImportableAdvancement> &out_advancements,
+bool parse_player_advancements_for_import(const char *file_path, MC_Version version,
+                                          std::vector<ImportableAdvancement> &out_advancements,
                                           char *error_message, size_t error_msg_size) {
     out_advancements.clear();
 
@@ -110,11 +115,11 @@ bool parse_player_advancements_for_import(const char *file_path, MC_Version vers
 
     if (version <= MC_VERSION_1_6_4) {
         // --- Legacy .dat file parsing for achievements ---
-        cJSON* stats_change = cJSON_GetObjectItem(root, "stats-change");
+        cJSON *stats_change = cJSON_GetObjectItem(root, "stats-change");
         if (cJSON_IsArray(stats_change)) {
-            cJSON* stat_entry;
+            cJSON *stat_entry;
             cJSON_ArrayForEach(stat_entry, stats_change) {
-                cJSON* item = stat_entry->child;
+                cJSON *item = stat_entry->child;
                 // Legacy achievements start with ID 5242880. We check if the first character is '5'.
                 if (item && item->string && item->string[0] == '5') {
                     ImportableAdvancement new_adv;
@@ -124,10 +129,9 @@ bool parse_player_advancements_for_import(const char *file_path, MC_Version vers
                 }
             }
         }
-    }
-    else if (version <= MC_VERSION_1_11_2) {
+    } else if (version <= MC_VERSION_1_11_2) {
         // --- Mid-era stats file parsing for ALL achievements ---
-        cJSON* achievement_json = nullptr;
+        cJSON *achievement_json = nullptr;
         cJSON_ArrayForEach(achievement_json, root) {
             // We only care about entries that are actual achievements.
             if (!achievement_json->string || strncmp(achievement_json->string, "achievement.", 12) != 0) {
@@ -201,7 +205,7 @@ bool parse_player_unlocks_for_import(const char *file_path, std::vector<Importab
 
     cJSON *obtained_obj = cJSON_GetObjectItem(root, "obtained");
     if (cJSON_IsObject(obtained_obj)) {
-        cJSON* unlock_entry = nullptr;
+        cJSON *unlock_entry = nullptr;
         cJSON_ArrayForEach(unlock_entry, obtained_obj) {
             if (unlock_entry->string) {
                 out_unlocks.push_back({unlock_entry->string, false});
@@ -597,12 +601,13 @@ bool copy_template_files(const char *src_version, const char *src_category, cons
         FindClose(h_find);
     }
 #else // POSIX
-    DIR* dir = opendir(src_category_path);
+    DIR *dir = opendir(src_category_path);
     if (dir) {
-        struct dirent* entry;
+        struct dirent *entry;
         while ((entry = readdir(dir)) != nullptr) {
-            if (strncmp(entry->d_name, src_base_filename, strlen(src_base_filename)) == 0 && strstr(entry->d_name, "_lang") && strstr(entry->d_name, ".json")) {
-                const char* lang_suffix_start = strstr(entry->d_name, "_lang");
+            if (strncmp(entry->d_name, src_base_filename, strlen(src_base_filename)) == 0 &&
+                strstr(entry->d_name, "_lang") && strstr(entry->d_name, ".json")) {
+                const char *lang_suffix_start = strstr(entry->d_name, "_lang");
 
                 char src_lang_path[MAX_PATH_LENGTH];
                 snprintf(src_lang_path, sizeof(src_lang_path), "%s/%s", src_category_path, entry->d_name);
@@ -672,17 +677,17 @@ bool delete_template_files(const char *version, const char *category, const char
         FindClose(h_find);
     }
 #else // POSIX
-    DIR* dir = opendir(category_path);
+    DIR *dir = opendir(category_path);
     if (dir) {
-        struct dirent* entry;
+        struct dirent *entry;
         while ((entry = readdir(dir)) != nullptr) {
-            const char* filename = entry->d_name;
+            const char *filename = entry->d_name;
             size_t base_len = strlen(base_filename);
 
             // Check if the filename starts with the exact base name
             if (strncmp(filename, base_filename, base_len) == 0) {
-                const char* suffix = filename + base_len;
-                 // Now check if the suffix is one of the valid ones for a template file
+                const char *suffix = filename + base_len;
+                // Now check if the suffix is one of the valid ones for a template file
                 if (strcmp(suffix, ".json") == 0 ||
                     strcmp(suffix, "_snapshot.json") == 0 ||
                     strcmp(suffix, "_notes.txt") == 0 ||
@@ -691,10 +696,10 @@ bool delete_template_files(const char *version, const char *category, const char
                     char file_to_delete[MAX_PATH_LENGTH];
                     snprintf(file_to_delete, sizeof(file_to_delete), "%s/%s", category_path, filename);
                     if (remove(file_to_delete) != 0) {
-                       log_message(LOG_ERROR, "[TEMP CREATE UTILS] Failed to delete file: %s\n", file_to_delete);
-                       all_success = false;
+                        log_message(LOG_ERROR, "[TEMP CREATE UTILS] Failed to delete file: %s\n", file_to_delete);
+                        all_success = false;
                     } else {
-                       log_message(LOG_INFO, "[TEMP CREATE UTILS] Deleted file: %s\n", file_to_delete);
+                        log_message(LOG_INFO, "[TEMP CREATE UTILS] Deleted file: %s\n", file_to_delete);
                     }
                 }
             }
@@ -708,7 +713,7 @@ bool delete_template_files(const char *version, const char *category, const char
 #ifdef _WIN32
         if (RemoveDirectoryA(category_path)) {
 #else
-        if (rmdir(category_path) == 0) {
+            if (rmdir(category_path) == 0) {
 #endif
             log_message(LOG_INFO, "[TEMP CREATE UTILS] Removed empty category directory: %s\n", category_path);
 
@@ -719,7 +724,7 @@ bool delete_template_files(const char *version, const char *category, const char
 #ifdef _WIN32
                 if (RemoveDirectoryA(version_path)) {
 #else
-                if (rmdir(version_path) == 0) {
+                    if (rmdir(version_path) == 0) {
 #endif
                     log_message(LOG_INFO, "[TEMP CREATE UTILS] Removed empty version directory: %s\n", version_path);
                 }
@@ -869,9 +874,171 @@ bool delete_lang_file(const char *version, const char *category, const char *fla
 // --- TEMPLATE IMPORT/EXPORT LOGIC ---
 
 
-// Helper function to create a zip archive from a template's files
+// Recursively collect all "icon" string values from a cJSON object/array
+static void collect_icons_recursive(const cJSON *node, std::vector<std::string> &out) {
+    if (!node) return;
+    if (cJSON_IsObject(node)) {
+        const cJSON *child = node->child;
+        while (child) {
+            if (strcmp(child->string, "icon") == 0 && cJSON_IsString(child)) {
+                const char *val = child->valuestring;
+                if (val && val[0] != '\0') {
+                    // Deduplicate
+                    bool found = false;
+                    for (auto &s: out) {
+                        if (s == val) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) out.push_back(val);
+                }
+            } else {
+                collect_icons_recursive(child, out);
+            }
+            child = child->next;
+        }
+    } else if (cJSON_IsArray(node)) {
+        const cJSON *elem = node->child;
+        while (elem) {
+            collect_icons_recursive(elem, out);
+            elem = elem->next;
+        }
+    }
+}
+
+bool collect_icon_paths_from_template(const char *template_json_path,
+                                      std::vector<std::string> &out_icon_paths) {
+    cJSON *root = cJSON_from_file(template_json_path);
+    if (!root) return false;
+    collect_icons_recursive(root, out_icon_paths);
+    cJSON_Delete(root);
+    return true;
+}
+
+bool zip_contains_icons(const char *zip_path) {
+    mz_zip_archive zip = {};
+    if (!mz_zip_reader_init_file(&zip, zip_path, 0)) return false;
+    bool found = false;
+    mz_uint n = mz_zip_reader_get_num_files(&zip);
+    for (mz_uint i = 0; i < n; i++) {
+        mz_zip_archive_file_stat fs;
+        if (!mz_zip_reader_file_stat(&zip, i, &fs) || fs.m_is_directory) continue;
+        if (strncmp(fs.m_filename, "icons/", 6) == 0) {
+            found = true;
+            break;
+        }
+    }
+    mz_zip_reader_end(&zip);
+    return found;
+}
+
+// TODO: Remove
+// // Helper function to create a zip archive from a template's files
+// static bool create_zip_from_template(const char *output_zip_path, const DiscoveredTemplate &template_info,
+//                                      const char *version, char *status_message, size_t msg_size) {
+//     mz_zip_archive zip_archive = {};
+//     if (!mz_zip_writer_init_file(&zip_archive, output_zip_path, 0)) {
+//         snprintf(status_message, msg_size, "Error: Could not create zip file at the specified location.");
+//         return false;
+//     }
+//
+//     char version_filename[64];
+//     version_to_filename_format(version, version_filename, sizeof(version_filename));
+//
+//     char base_filename[MAX_PATH_LENGTH];
+//     snprintf(base_filename, sizeof(base_filename), "%s_%s%s", version_filename, template_info.category,
+//              template_info.optional_flag);
+//
+//     char category_path[MAX_PATH_LENGTH];
+//     snprintf(category_path, sizeof(category_path), "%s/templates/%s/%s", get_resources_path(), version,
+//              template_info.category);
+//
+//     bool file_added = false;
+//
+// #ifdef _WIN32
+//     char search_path[MAX_PATH_LENGTH];
+//     snprintf(search_path, sizeof(search_path), "%s\\*", category_path); // Broad search first
+//     WIN32_FIND_DATAA find_data;
+//     HANDLE h_find = FindFirstFileA(search_path, &find_data);
+//
+//     if (h_find != INVALID_HANDLE_VALUE) {
+//         do {
+//             const char *filename = find_data.cFileName;
+//             size_t base_len = strlen(base_filename);
+//
+//             // Check if the filename starts with the exact base name
+//             if (strncmp(filename, base_filename, base_len) == 0) {
+//                 const char *suffix = filename + base_len;
+//                 // Now check if the suffix is one of the valid ones for a template file
+//                 if (strcmp(suffix, ".json") == 0 ||
+//                     strncmp(suffix, "_lang", 5) == 0) // Catches _lang.json and _lang_*.json
+//                 {
+//                     char full_path[MAX_PATH_LENGTH];
+//                     snprintf(full_path, sizeof(full_path), "%s/%s", category_path, filename);
+//                     if (mz_zip_writer_add_file(&zip_archive, filename, full_path, nullptr, 0, MZ_DEFAULT_COMPRESSION)) {
+//                         file_added = true;
+//                     } else {
+//                         snprintf(status_message, msg_size, "Error: Failed to add '%s' to zip.", filename);
+//                         mz_zip_writer_end(&zip_archive);
+//                         FindClose(h_find);
+//                         return false;
+//                     }
+//                 }
+//             }
+//         } while (FindNextFileA(h_find, &find_data) != 0);
+//         FindClose(h_find);
+//     }
+// #else // POSIX
+//     DIR* dir = opendir(category_path);
+//     if (dir) {
+//         struct dirent* entry;
+//         while ((entry = readdir(dir)) != nullptr) {
+//             // Check if it's a file
+//             if (entry->d_type == DT_REG) {
+//                 const char* filename = entry->d_name;
+//                 size_t base_len = strlen(base_filename);
+//
+//                 // Check if the filename starts with the exact base name
+//                 if (strncmp(filename, base_filename, base_len) == 0) {
+//                     const char* suffix = filename + base_len;
+//                     // Now check if the suffix is one of the valid ones for a template file
+//                     if (strcmp(suffix, ".json") == 0 ||
+//                         strncmp(suffix, "_lang", 5) == 0) // Catches _lang.json and _lang_*.json
+//                     {
+//                         char full_path[MAX_PATH_LENGTH];
+//                         snprintf(full_path, sizeof(full_path), "%s/%s", category_path, filename);
+//
+//                         if (mz_zip_writer_add_file(&zip_archive, filename, full_path, nullptr, 0, MZ_DEFAULT_COMPRESSION)) {
+//                             file_added = true;
+//                         } else {
+//                             snprintf(status_message, msg_size, "Error: Failed to add '%s' to zip.", filename);
+//                             mz_zip_writer_end(&zip_archive);
+//                             closedir(dir);
+//                             return false;
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//         closedir(dir);
+//     }
+// #endif
+//
+//     if (!file_added) {
+//         snprintf(status_message, msg_size, "Error: No files found to export for this template.");
+//         mz_zip_writer_end(&zip_archive);
+//         return false;
+//     }
+//
+//     mz_zip_writer_finalize_archive(&zip_archive);
+//     mz_zip_writer_end(&zip_archive);
+//     return true;
+// }
+
 static bool create_zip_from_template(const char *output_zip_path, const DiscoveredTemplate &template_info,
-                                     const char *version, char *status_message, size_t msg_size) {
+                                     const char *version, bool include_icons,
+                                     char *status_message, size_t msg_size) {
     mz_zip_archive zip_archive = {};
     if (!mz_zip_writer_init_file(&zip_archive, output_zip_path, 0)) {
         snprintf(status_message, msg_size, "Error: Could not create zip file at the specified location.");
@@ -889,32 +1056,44 @@ static bool create_zip_from_template(const char *output_zip_path, const Discover
     snprintf(category_path, sizeof(category_path), "%s/templates/%s/%s", get_resources_path(), version,
              template_info.category);
 
+    // --- Collect icon paths from main template JSON if needed ---
+    std::vector<std::string> icon_paths;
+    char main_template_full_path[MAX_PATH_LENGTH];
+    snprintf(main_template_full_path, sizeof(main_template_full_path), "%s/%s.json", category_path, base_filename);
+
+    if (include_icons) {
+        collect_icon_paths_from_template(main_template_full_path, icon_paths);
+    }
+
+
+
     bool file_added = false;
+
+    // --- Lambda to add template files (platform-independent loop body) ---
+    auto add_template_file = [&](const char *filename) -> bool {
+        char full_path[MAX_PATH_LENGTH];
+        snprintf(full_path, sizeof(full_path), "%s/%s", category_path, filename);
+        if (!mz_zip_writer_add_file(&zip_archive, filename, full_path, nullptr, 0, MZ_DEFAULT_COMPRESSION)) {
+            snprintf(status_message, msg_size, "Error: Failed to add '%s' to zip.", filename);
+            return false;
+        }
+        file_added = true;
+        return true;
+    };
 
 #ifdef _WIN32
     char search_path[MAX_PATH_LENGTH];
-    snprintf(search_path, sizeof(search_path), "%s\\*", category_path); // Broad search first
+    snprintf(search_path, sizeof(search_path), "%s\\*", category_path);
     WIN32_FIND_DATAA find_data;
     HANDLE h_find = FindFirstFileA(search_path, &find_data);
-
     if (h_find != INVALID_HANDLE_VALUE) {
         do {
             const char *filename = find_data.cFileName;
             size_t base_len = strlen(base_filename);
-
-            // Check if the filename starts with the exact base name
             if (strncmp(filename, base_filename, base_len) == 0) {
                 const char *suffix = filename + base_len;
-                // Now check if the suffix is one of the valid ones for a template file
-                if (strcmp(suffix, ".json") == 0 ||
-                    strncmp(suffix, "_lang", 5) == 0) // Catches _lang.json and _lang_*.json
-                {
-                    char full_path[MAX_PATH_LENGTH];
-                    snprintf(full_path, sizeof(full_path), "%s/%s", category_path, filename);
-                    if (mz_zip_writer_add_file(&zip_archive, filename, full_path, nullptr, 0, MZ_DEFAULT_COMPRESSION)) {
-                        file_added = true;
-                    } else {
-                        snprintf(status_message, msg_size, "Error: Failed to add '%s' to zip.", filename);
+                if (strcmp(suffix, ".json") == 0 || strncmp(suffix, "_lang", 5) == 0) {
+                    if (!add_template_file(filename)) {
                         mz_zip_writer_end(&zip_archive);
                         FindClose(h_find);
                         return false;
@@ -924,30 +1103,18 @@ static bool create_zip_from_template(const char *output_zip_path, const Discover
         } while (FindNextFileA(h_find, &find_data) != 0);
         FindClose(h_find);
     }
-#else // POSIX
-    DIR* dir = opendir(category_path);
+#else
+    DIR *dir = opendir(category_path);
     if (dir) {
-        struct dirent* entry;
+        struct dirent *entry;
         while ((entry = readdir(dir)) != nullptr) {
-            // Check if it's a file
             if (entry->d_type == DT_REG) {
-                const char* filename = entry->d_name;
+                const char *filename = entry->d_name;
                 size_t base_len = strlen(base_filename);
-
-                // Check if the filename starts with the exact base name
                 if (strncmp(filename, base_filename, base_len) == 0) {
-                    const char* suffix = filename + base_len;
-                    // Now check if the suffix is one of the valid ones for a template file
-                    if (strcmp(suffix, ".json") == 0 ||
-                        strncmp(suffix, "_lang", 5) == 0) // Catches _lang.json and _lang_*.json
-                    {
-                        char full_path[MAX_PATH_LENGTH];
-                        snprintf(full_path, sizeof(full_path), "%s/%s", category_path, filename);
-
-                        if (mz_zip_writer_add_file(&zip_archive, filename, full_path, nullptr, 0, MZ_DEFAULT_COMPRESSION)) {
-                            file_added = true;
-                        } else {
-                            snprintf(status_message, msg_size, "Error: Failed to add '%s' to zip.", filename);
+                    const char *suffix = filename + base_len;
+                    if (strcmp(suffix, ".json") == 0 || strncmp(suffix, "_lang", 5) == 0) {
+                        if (!add_template_file(filename)) {
                             mz_zip_writer_end(&zip_archive);
                             closedir(dir);
                             return false;
@@ -966,32 +1133,86 @@ static bool create_zip_from_template(const char *output_zip_path, const Discover
         return false;
     }
 
+    // --- Add icon files to the zip under icons/<relative_path> ---
+    if (include_icons) {
+        char icons_base[MAX_PATH_LENGTH];
+        snprintf(icons_base, sizeof(icons_base), "%s/icons", get_application_dir());
+
+        for (const auto &rel_path: icon_paths) {
+            char full_icon_path[MAX_PATH_LENGTH];
+            snprintf(full_icon_path, sizeof(full_icon_path), "%s/%s", icons_base, rel_path.c_str());
+
+            if (!path_exists(full_icon_path)) {
+                log_message(LOG_INFO, "[EXPORT] Icon not found, skipping: %s\n", full_icon_path);
+                continue;
+            }
+
+            // Zip entry path: "icons/<rel_path>"  e.g. "icons/mymod/custom.png"
+            char zip_entry_name[MAX_PATH_LENGTH];
+            snprintf(zip_entry_name, sizeof(zip_entry_name), "icons/%s", rel_path.c_str());
+
+            if (!mz_zip_writer_add_file(&zip_archive, zip_entry_name, full_icon_path,
+                                        nullptr, 0, MZ_DEFAULT_COMPRESSION)) {
+                snprintf(status_message, msg_size, "Error: Failed to add icon '%s' to zip.", rel_path.c_str());
+                mz_zip_writer_end(&zip_archive);
+                return false;
+            }
+        }
+    }
+
     mz_zip_writer_finalize_archive(&zip_archive);
     mz_zip_writer_end(&zip_archive);
     return true;
 }
 
-// Main function to handle the export process
-bool handle_export_template(const DiscoveredTemplate &selected_template, const char *version, char *status_message,
-                            size_t msg_size) {
+// TODO: Remove
+// // Main function to handle the export process
+// bool handle_export_template(const DiscoveredTemplate &selected_template, const char *version, char *status_message,
+//                             size_t msg_size) {
+//     char suggested_filename[MAX_PATH_LENGTH];
+//     snprintf(suggested_filename, sizeof(suggested_filename), "%s_%s%s.zip", version, selected_template.category,
+//              selected_template.optional_flag);
+//
+//     const char *filter_patterns[1] = {"*.zip"};
+//     const char *save_path = tinyfd_saveFileDialog("Export Template", suggested_filename, 1, filter_patterns,
+//                                                   "ZIP archives");
+//
+//     if (!save_path) {
+//         snprintf(status_message, msg_size, "Export canceled.");
+//         return false;
+//     }
+//
+//     if (create_zip_from_template(save_path, selected_template, version, status_message, msg_size)) {
+//         snprintf(status_message, msg_size, "Template exported successfully!");
+//         return true;
+//     }
+//     // If it fails, create_zip_from_template will have already set the error message.
+//     return false;
+// }
+
+bool handle_export_template(const DiscoveredTemplate &selected_template, const char *version,
+                            bool include_icons,
+                            char *status_message, size_t msg_size) {
     char suggested_filename[MAX_PATH_LENGTH];
-    snprintf(suggested_filename, sizeof(suggested_filename), "%s_%s%s.zip", version, selected_template.category,
-             selected_template.optional_flag);
+    snprintf(suggested_filename, sizeof(suggested_filename), "%s_%s%s.zip", version,
+             selected_template.category, selected_template.optional_flag);
 
     const char *filter_patterns[1] = {"*.zip"};
-    const char *save_path = tinyfd_saveFileDialog("Export Template", suggested_filename, 1, filter_patterns,
-                                                  "ZIP archives");
-
+    const char *save_path = tinyfd_saveFileDialog("Export Template", suggested_filename,
+                                                  1, filter_patterns, "ZIP archives");
     if (!save_path) {
         snprintf(status_message, msg_size, "Export canceled.");
         return false;
     }
 
-    if (create_zip_from_template(save_path, selected_template, version, status_message, msg_size)) {
-        snprintf(status_message, msg_size, "Template exported successfully!");
+    if (create_zip_from_template(save_path, selected_template, version,
+                                 include_icons, status_message, msg_size)) {
+        if (include_icons)
+            snprintf(status_message, msg_size, "Template exported successfully (with icons)!");
+        else
+            snprintf(status_message, msg_size, "Template exported successfully!");
         return true;
     }
-    // If it fails, create_zip_from_template will have already set the error message.
     return false;
 }
 
@@ -1135,7 +1356,8 @@ bool get_info_from_zip(const char *zip_path, char *out_version, char *out_catego
     return true;
 }
 
-bool execute_import_from_zip(const char *zip_path, const char *version, const char *category, const char *flag,
+bool execute_import_from_zip(const char *zip_path, const char *version, const char *category,
+                             const char *flag, bool import_icons,
                              char *error_message, size_t msg_size) {
     // Final validation before extracting
     char version_filename[64];
@@ -1207,6 +1429,8 @@ bool execute_import_from_zip(const char *zip_path, const char *version, const ch
             const char *suffix = original_filename + old_base_len;
             snprintf(new_filename, sizeof(new_filename), "%s%s", new_base_filename, suffix);
         } else {
+            // Skip icon files — handled separately in the icon extraction pass below
+            if (strncmp(original_filename, "icons/", 6) == 0) continue;
             // Not a core template file, extract with original name to preserve any extra files
             strncpy(new_filename, original_filename, sizeof(new_filename) - 1);
             new_filename[sizeof(new_filename) - 1] = '\0';
@@ -1218,6 +1442,41 @@ bool execute_import_from_zip(const char *zip_path, const char *version, const ch
             snprintf(error_message, msg_size, "Error: Failed to extract '%s'.", original_filename);
             success = false;
             break;
+        }
+    }
+
+    // --- Extract icon files if requested ---
+    if (import_icons && success) {
+        char icons_base[MAX_PATH_LENGTH];
+        snprintf(icons_base, sizeof(icons_base), "%s/icons", get_application_dir());
+
+        // Re-iterate the zip for icon entries
+        for (mz_uint i = 0; i < num_files; i++) {
+            mz_zip_archive_file_stat file_stat;
+            if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat) || file_stat.m_is_directory) continue;
+
+            if (strncmp(file_stat.m_filename, "icons/", 6) != 0) continue;
+
+            // Destination: resources/icons/<everything after "icons/">
+            const char *rel_icon_path = file_stat.m_filename + 6; // skip "icons/"
+            char dest_icon_path[MAX_PATH_LENGTH];
+            snprintf(dest_icon_path, sizeof(dest_icon_path), "%s/%s", icons_base, rel_icon_path);
+
+            char dest_icon_dir[MAX_PATH_LENGTH];
+            get_parent_directory(dest_icon_path, dest_icon_dir, sizeof(dest_icon_dir), 1);
+            // Append trailing slash so fs_ensure_directory_exists treats it as a directory
+            size_t dir_len = strlen(dest_icon_dir);
+            if (dir_len > 0 && dest_icon_dir[dir_len - 1] != '/') {
+                dest_icon_dir[dir_len] = '/';
+                dest_icon_dir[dir_len + 1] = '\0';
+            }
+            fs_ensure_directory_exists(dest_icon_dir);
+
+            if (!mz_zip_reader_extract_to_file(&zip_archive, i, dest_icon_path, 0)) {
+                log_message(LOG_INFO, "[IMPORT] Warning: Could not extract icon '%s', skipping.\n",
+                            file_stat.m_filename);
+                // Non-fatal: continue extracting other icons
+            }
         }
     }
 
@@ -1244,20 +1503,20 @@ void handle_export_language(const char *version, const char *category, const cha
     ShellExecuteA(nullptr, "open", "explorer", command, nullptr, SW_SHOW);
 #else // macOS and Linux
     pid_t pid = fork();
-    if (pid == 0) { // Child process
+    if (pid == 0) {  // Child process
 #if __APPLE__
-        // Use "open -R" to reveal the file in Finder
-        char* args[] = {(char*)"open", (char*)"-R", lang_path, nullptr};
-        execvp(args[0], args);
+    // Use "open -R" to reveal the file in Finder
+    char *args[] = {(char *) "open", (char *) "-R", lang_path, nullptr};
+    execvp(args[0], args);
 #else // Linux
-        // Highlighting a file isn't a standard feature, so we open the parent directory.
-        char parent_dir[MAX_PATH_LENGTH];
-        if (get_parent_directory(lang_path, parent_dir, sizeof(parent_dir), 1)) {
-            char* args[] = {(char*)"xdg-open", parent_dir, nullptr};
-            execvp(args[0], args);
-        }
+    // Highlighting a file isn't a standard feature, so we open the parent directory.
+    char parent_dir[MAX_PATH_LENGTH];
+    if (get_parent_directory(lang_path, parent_dir, sizeof(parent_dir), 1)) {
+        char *args[] = {(char *) "xdg-open", parent_dir, nullptr};
+        execvp(args[0], args);
+    }
 #endif
-        _exit(127); // Exit if exec fails
+    _exit(127); // Exit if exec fails
     } else if (pid < 0) {
         log_message(LOG_ERROR, "[TEMP CREATE UTILS] Failed to fork process to open folder.\n");
     }
