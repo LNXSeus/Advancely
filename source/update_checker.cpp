@@ -150,21 +150,32 @@ bool check_for_updates(const char *current_version, char *out_latest_version, si
                         is_new_version_available = true;
 
 #if defined(_WIN32)
-                        const char* os_identifier = "-Windows";
+                        const char *os_identifier = "-Windows";
 #elif defined(__APPLE__)
-                        const char* os_identifier = "-macOS-Universal";
+                        const char *os_identifier = "-macOS-Universal";
 #else
-                        const char* os_identifier = "-Linux";
+                        const char *os_identifier = "-Linux";
 #endif
 
                         const cJSON *assets = cJSON_GetObjectItem(json, "assets");
                         if (cJSON_IsArray(assets)) {
-                            cJSON* asset;
+                            cJSON *asset;
                             cJSON_ArrayForEach(asset, assets) {
-                                const cJSON* asset_name_json = cJSON_GetObjectItem(asset, "name");
-                                if (cJSON_IsString(asset_name_json) && strstr(asset_name_json->valuestring, os_identifier)) {
+                                const cJSON *asset_name_json = cJSON_GetObjectItem(asset, "name");
+                                bool asset_name_matches = cJSON_IsString(asset_name_json) &&
+                                                          strstr(asset_name_json->valuestring, os_identifier) !=
+                                                          nullptr;
+#if !defined(_WIN32) && !defined(__APPLE__)
+                                // On Linux, explicitly select only the portable .zip, not .deb or .rpm
+                                if (asset_name_matches) {
+                                    const char *ext = strrchr(asset_name_json->valuestring, '.');
+                                    asset_name_matches = (ext != nullptr && strcmp(ext, ".zip") == 0);
+                                }
+#endif
+                                if (asset_name_matches) {
                                     const cJSON *download_url_json = cJSON_GetObjectItem(asset, "browser_download_url");
-                                    if (cJSON_IsString(download_url_json) && (download_url_json->valuestring != nullptr)) {
+                                    if (cJSON_IsString(download_url_json) && (
+                                            download_url_json->valuestring != nullptr)) {
                                         strncpy(out_download_url, download_url_json->valuestring, url_max_len - 1);
                                         out_download_url[url_max_len - 1] = '\0';
                                         break;
@@ -240,21 +251,21 @@ bool download_update_zip(const char *url) {
 #endif
 }
 
-bool apply_update(const char* main_executable_path) {
-    const char* temp_dir = "update_temp";
+bool apply_update(const char *main_executable_path) {
+    const char *temp_dir = "update_temp";
     if (!path_exists(temp_dir)) {
         log_message(LOG_ERROR, "[UPDATE] Update directory '%s' not found.\n", temp_dir);
         return false;
     }
 
 #ifdef _WIN32
-    FILE* updater_script = fopen("updater.bat", "w");
+    FILE *updater_script = fopen("updater.bat", "w");
     if (!updater_script) {
         log_message(LOG_ERROR, "[UPDATE] Could not create updater.bat script.\n");
         return false;
     }
 
-    const char* exe_filename = strrchr(main_executable_path, '\\');
+    const char *exe_filename = strrchr(main_executable_path, '\\');
     if (!exe_filename) exe_filename = strrchr(main_executable_path, '/');
     if (exe_filename) exe_filename++;
     else exe_filename = main_executable_path;
@@ -276,10 +287,13 @@ bool apply_update(const char* main_executable_path) {
 
     // Safely merge resource subfolders using robocopy. This will overwrite existing files
     // but will NOT delete user-created files or the config/notes folders.
-    fprintf(updater_script, "robocopy \"%s\\resources\\templates\" \".\\resources\\templates\" /E /IS /NFL /NDL\n", temp_dir);
+    fprintf(updater_script, "robocopy \"%s\\resources\\templates\" \".\\resources\\templates\" /E /IS /NFL /NDL\n",
+            temp_dir);
     fprintf(updater_script, "robocopy \"%s\\resources\\fonts\" \".\\resources\\fonts\" /E /IS /NFL /NDL\n", temp_dir);
     fprintf(updater_script, "robocopy \"%s\\resources\\gui\" \".\\resources\\gui\" /E /IS /NFL /NDL\n", temp_dir);
-    fprintf(updater_script, "robocopy \"%s\\resources\\reference_files\" \".\\resources\\reference_files\" /E /IS /NFL /NDL\n", temp_dir);
+    fprintf(updater_script,
+            "robocopy \"%s\\resources\\reference_files\" \".\\resources\\reference_files\" /E /IS /NFL /NDL\n",
+            temp_dir);
     fprintf(updater_script, "robocopy \"%s\\resources\\icons\" \".\\resources\\icons\" /E /IS /NFL /NDL\n", temp_dir);
 
     fprintf(updater_script, "echo Cleaning up temporary files...\n");
@@ -294,8 +308,8 @@ bool apply_update(const char* main_executable_path) {
     ShellExecuteA(nullptr, "open", "updater.bat", nullptr, nullptr, SW_HIDE);
 
 #else
-    (void)main_executable_path;
-    FILE* updater_script = fopen("updater.sh", "w");
+    (void) main_executable_path;
+    FILE *updater_script = fopen("updater.sh", "w");
     if (!updater_script) {
         log_message(LOG_ERROR, "[UPDATE] Could not create updater.sh script.\n");
         return false;
@@ -309,34 +323,66 @@ bool apply_update(const char* main_executable_path) {
 
     fprintf(updater_script, "echo \"Applying update...\"\n");
 
+    // The release zip may extract into a named subdirectory inside update_temp
+    // (e.g. update_temp/Advancely-Universal/ on macOS, update_temp/Advancely-Linux/ on Linux).
+    // Detect the actual source root dynamically so the script works regardless of zip structure.
+    fprintf(updater_script, "SOURCE_DIR=\"./%s\"\n", temp_dir);
+    fprintf(updater_script, "SUBDIR=$(find \"./%s\" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | head -1)\n",
+            temp_dir);
+    fprintf(updater_script, "if [ -n \"$SUBDIR\" ]; then SOURCE_DIR=\"$SUBDIR\"; fi\n");
+    fprintf(updater_script, "echo \"Update source directory: $SOURCE_DIR\"\n");
+
 #if defined(__APPLE__)
-    // macOS: Replace the .app bundle, but merge the "resources" folder.
-    fprintf(updater_script, "rm -rf ./Advancely.app\n");
-    fprintf(updater_script, "cp -R ./%s/Advancely.app ./\n", temp_dir);
-    fprintf(updater_script, "cp ./%s/*.txt ./\n", temp_dir);
-    fprintf(updater_script, "cp ./%s/*.md ./\n", temp_dir);
+    // macOS: Safely replace the .app bundle using a copy-then-swap approach.
+    // We copy to a temp name FIRST so that if the copy fails, the original is untouched.
+    fprintf(updater_script, "if [ -d \"${SOURCE_DIR}/Advancely.app\" ]; then\n");
+    fprintf(updater_script, "    echo \"Copying new Advancely.app...\"\n");
+    fprintf(updater_script, "    cp -R \"${SOURCE_DIR}/Advancely.app\" ./Advancely_update.app\n");
+    fprintf(updater_script, "    rm -rf ./Advancely.app\n");
+    fprintf(updater_script, "    mv ./Advancely_update.app ./Advancely.app\n");
+    fprintf(updater_script, "    echo \"Advancely.app replaced successfully.\"\n");
+    fprintf(updater_script, "else\n");
+    fprintf(updater_script,
+            "    echo \"ERROR: Advancely.app not found in update package at $SOURCE_DIR — aborting.\"\n");
+    fprintf(updater_script, "    exit 1\n");
+    fprintf(updater_script, "fi\n");
+    fprintf(updater_script, "cp \"${SOURCE_DIR}/\"*.txt ./ 2>/dev/null || true\n");
+    fprintf(updater_script, "cp \"${SOURCE_DIR}/\"*.md ./ 2>/dev/null || true\n");
 #else
     // Linux: Overwrite main executable and libraries.
-    fprintf(updater_script, "cp ./%s/Advancely ./\n", temp_dir);
-    fprintf(updater_script, "cp ./%s/*.so* ./\n", temp_dir);
-    fprintf(updater_script, "cp ./%s/*.txt ./\n", temp_dir);
-    fprintf(updater_script, "cp ./%s/*.md ./\n", temp_dir);
+    fprintf(updater_script, "cp \"${SOURCE_DIR}/Advancely\" ./\n");
+    // Handle both old layout (flat .so files) and new layout (lib/ subfolder)
+    fprintf(updater_script, "if [ -d \"${SOURCE_DIR}/lib\" ]; then\n");
+    fprintf(updater_script, "    mkdir -p ./lib\n");
+    fprintf(updater_script, "    rsync -av \"${SOURCE_DIR}/lib/\" ./lib/ 2>/dev/null || true\n");
+    fprintf(updater_script, "else\n");
+    fprintf(updater_script, "    cp \"${SOURCE_DIR}/\"*.so* ./ 2>/dev/null || true\n");
+    fprintf(updater_script, "fi\n");
+    fprintf(updater_script, "cp \"${SOURCE_DIR}/\"*.txt ./ 2>/dev/null || true\n");
+    fprintf(updater_script, "cp \"${SOURCE_DIR}/\"*.md ./ 2>/dev/null || true\n");
 #endif
 
     // For both Linux and macOS, safely merge the resource subdirectories using rsync.
-    // This overwrites official files but leaves user-created files and the config/notes folders alone.
-    fprintf(updater_script, "rsync -av ./%s/resources/fonts/ ./resources/fonts/\n", temp_dir);
-    fprintf(updater_script, "rsync -av ./%s/resources/gui/ ./resources/gui/\n", temp_dir);
-    fprintf(updater_script, "rsync -av ./%s/resources/icons/ ./resources/icons/\n", temp_dir);
-    fprintf(updater_script, "rsync -av ./%s/resources/reference_files/ ./resources/reference_files/\n", temp_dir);
-    fprintf(updater_script, "rsync -av ./%s/resources/templates/ ./resources/templates/\n", temp_dir);
+    // This overwrites official files but leaves user-created files and config/notes folders alone.
+    // Non-fatal (|| true) in case a resource folder doesn't exist in this release.
+    fprintf(updater_script, "rsync -av \"${SOURCE_DIR}/resources/fonts/\" ./resources/fonts/ 2>/dev/null || true\n");
+    fprintf(updater_script, "rsync -av \"${SOURCE_DIR}/resources/gui/\" ./resources/gui/ 2>/dev/null || true\n");
+    fprintf(updater_script, "rsync -av \"${SOURCE_DIR}/resources/icons/\" ./resources/icons/ 2>/dev/null || true\n");
+    fprintf(updater_script,
+            "rsync -av \"${SOURCE_DIR}/resources/reference_files/\" ./resources/reference_files/ 2>/dev/null || true\n");
+    fprintf(updater_script,
+            "rsync -av \"${SOURCE_DIR}/resources/templates/\" ./resources/templates/ 2>/dev/null || true\n");
 
     fprintf(updater_script, "echo \"Cleaning up temporary files...\"\n");
-    fprintf(updater_script, "rm -rf ./%s\n", temp_dir);
+    fprintf(updater_script, "rm -rf \"./%s\"\n", temp_dir);
 
     fprintf(updater_script, "echo \"Relaunching Advancely...\"\n");
 #if defined(__APPLE__)
-    fprintf(updater_script, "open ./Advancely.app --args --updated &\n");
+    fprintf(updater_script, "if [ -d \"./Advancely.app\" ]; then\n");
+    fprintf(updater_script, "    open ./Advancely.app --args --updated\n");
+    fprintf(updater_script, "else\n");
+    fprintf(updater_script, "    echo \"ERROR: Advancely.app does not exist after update — cannot relaunch.\"\n");
+    fprintf(updater_script, "fi\n");
 #else
     fprintf(updater_script, "chmod +x ./Advancely\n");
     fprintf(updater_script, "./Advancely --updated &\n");
@@ -362,13 +408,13 @@ bool application_restart() {
     }
 
 #ifdef _WIN32
-    FILE* restarter_script = fopen("restarter.bat", "w");
+    FILE *restarter_script = fopen("restarter.bat", "w");
     if (!restarter_script) {
         log_message(LOG_ERROR, "[RESTART] Could not create restarter.bat script.\n");
         return false;
     }
 
-    const char* exe_filename = strrchr(main_executable_path, '\\');
+    const char *exe_filename = strrchr(main_executable_path, '\\');
     if (!exe_filename) exe_filename = strrchr(main_executable_path, '/');
     exe_filename = exe_filename ? exe_filename + 1 : main_executable_path;
 
@@ -387,7 +433,7 @@ bool application_restart() {
     ShellExecuteA(nullptr, "open", "restarter.bat", nullptr, nullptr, SW_HIDE);
 
 #else // For macOS and Linux
-    FILE* restarter_script = fopen("restarter.sh", "w");
+    FILE *restarter_script = fopen("restarter.sh", "w");
     if (!restarter_script) {
         log_message(LOG_ERROR, "[RESTART] Could not create restarter.sh script.\n");
         return false;
