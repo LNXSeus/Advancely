@@ -323,29 +323,37 @@ bool apply_update(const char *main_executable_path) {
 
     fprintf(updater_script, "echo \"Applying update...\"\n");
 
-    // The release zip may extract into a named subdirectory inside update_temp
-    // (e.g. update_temp/Advancely-Universal/ on macOS, update_temp/Advancely-Linux/ on Linux).
-    // Detect the actual source root dynamically so the script works regardless of zip structure.
-    fprintf(updater_script, "SOURCE_DIR=\"./%s\"\n", temp_dir);
-    fprintf(updater_script, "SUBDIR=$(find \"./%s\" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | head -1)\n",
-            temp_dir);
-    fprintf(updater_script, "if [ -n \"$SUBDIR\" ]; then SOURCE_DIR=\"$SUBDIR\"; fi\n");
+    // Handle double-zip: if update_temp contains a nested zip, extract it first.
+    // Then locate Advancely.app (macOS) or the Advancely executable (Linux) directly,
+    // regardless of how many wrapper folders the zip contains.
+    fprintf(updater_script, "NESTED_ZIP=$(find \"./%s\" -maxdepth 2 -name \"*.zip\" 2>/dev/null | head -1)\n", temp_dir);
+    fprintf(updater_script, "if [ -n \"$NESTED_ZIP\" ]; then\n");
+    fprintf(updater_script, "    echo \"Found nested zip: $NESTED_ZIP — extracting...\"\n");
+    fprintf(updater_script, "    unzip -o \"$NESTED_ZIP\" -d \"./%s\"\n", temp_dir);
+    fprintf(updater_script, "fi\n");
+#if defined(__APPLE__)
+    fprintf(updater_script, "APP_PATH=$(find \"./%s\" -name \"Advancely.app\" -maxdepth 4 -type d 2>/dev/null | head -1)\n", temp_dir);
+    fprintf(updater_script, "if [ -n \"$APP_PATH\" ]; then SOURCE_DIR=$(dirname \"$APP_PATH\"); else\n");
+    fprintf(updater_script, "    echo \"ERROR: Could not locate Advancely.app anywhere in the update package — aborting.\"\n");
+    fprintf(updater_script, "    exit 1\n");
+    fprintf(updater_script, "fi\n");
+#else
+    fprintf(updater_script, "EXE_PATH=$(find \"./%s\" -name \"Advancely\" -maxdepth 4 -type f 2>/dev/null | head -1)\n", temp_dir);
+    fprintf(updater_script, "if [ -n \"$EXE_PATH\" ]; then SOURCE_DIR=$(dirname \"$EXE_PATH\"); else\n");
+    fprintf(updater_script, "    echo \"ERROR: Could not locate Advancely executable anywhere in the update package — aborting.\"\n");
+    fprintf(updater_script, "    exit 1\n");
+    fprintf(updater_script, "fi\n");
+#endif
     fprintf(updater_script, "echo \"Update source directory: $SOURCE_DIR\"\n");
 
 #if defined(__APPLE__)
     // macOS: Safely replace the .app bundle using a copy-then-swap approach.
     // We copy to a temp name FIRST so that if the copy fails, the original is untouched.
-    fprintf(updater_script, "if [ -d \"${SOURCE_DIR}/Advancely.app\" ]; then\n");
-    fprintf(updater_script, "    echo \"Copying new Advancely.app...\"\n");
-    fprintf(updater_script, "    cp -R \"${SOURCE_DIR}/Advancely.app\" ./Advancely_update.app\n");
-    fprintf(updater_script, "    rm -rf ./Advancely.app\n");
-    fprintf(updater_script, "    mv ./Advancely_update.app ./Advancely.app\n");
-    fprintf(updater_script, "    echo \"Advancely.app replaced successfully.\"\n");
-    fprintf(updater_script, "else\n");
-    fprintf(updater_script,
-            "    echo \"ERROR: Advancely.app not found in update package at $SOURCE_DIR — aborting.\"\n");
-    fprintf(updater_script, "    exit 1\n");
-    fprintf(updater_script, "fi\n");
+    fprintf(updater_script, "echo \"Copying new Advancely.app...\"\n");
+    fprintf(updater_script, "cp -R \"${SOURCE_DIR}/Advancely.app\" ./Advancely_update.app\n");
+    fprintf(updater_script, "rm -rf ./Advancely.app\n");
+    fprintf(updater_script, "mv ./Advancely_update.app ./Advancely.app\n");
+    fprintf(updater_script, "echo \"Advancely.app replaced successfully.\"\n");
     fprintf(updater_script, "cp \"${SOURCE_DIR}/\"*.txt ./ 2>/dev/null || true\n");
     fprintf(updater_script, "cp \"${SOURCE_DIR}/\"*.md ./ 2>/dev/null || true\n");
 #else
