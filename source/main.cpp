@@ -1712,19 +1712,25 @@ int main(int argc, char *argv[]) {
 
             // Increment the time since the last update every frame
             tracker->time_since_last_update += deltaTime;
-            // Periodically check if the active instance has changed (every 2 seconds)
-            // This ensures that if the user switches to another open Minecraft instance,
-            // the tracker follows it automatically.
+            // Periodically check if the active instance has changed.
+            // When an instance is actively being tracked, poll every 2s to react quickly
+            // to instance switches. When no Minecraft process is running, back off to
+            // every 10s to avoid hammering the process table for nothing.
             if (app_settings.path_mode == PATH_MODE_INSTANCE) {
                 static float time_since_instance_check = 0.0f;
+                static bool last_instance_found = false; // Track whether we found an instance last time
+
                 time_since_instance_check += deltaTime;
 
-                if (time_since_instance_check > 2.0f) {
+                const float poll_interval = last_instance_found ? 2.0f : 10.0f;
+
+                if (time_since_instance_check > poll_interval) {
                     time_since_instance_check = 0.0f;
                     char detected_path[MAX_PATH_LENGTH];
 
                     // Ask path_utils what the currently active instance is
                     if (get_saves_path(detected_path, MAX_PATH_LENGTH, PATH_MODE_INSTANCE, nullptr)) {
+                        last_instance_found = true;
                         // If it differs from what we are currently watching
                         if (strcmp(detected_path, tracker->saves_path) != 0) {
                             log_message(LOG_INFO, "[MAIN] Active instance switch detected.\nOld: %s\nNew: %s\n",
@@ -1734,6 +1740,13 @@ int main(int argc, char *argv[]) {
                             // This safely de-inits dmon, re-inits paths, and reloads the template.
                             SDL_SetAtomicInt(&g_settings_changed, 1);
                         }
+                    } else {
+                        // No Minecraft instance found — log only on state transition to avoid spam
+                        if (last_instance_found) {
+                            log_message(
+                                LOG_INFO, "[MAIN] No active Minecraft instance detected. Reducing poll rate.\n");
+                        }
+                        last_instance_found = false;
                     }
                 }
             }
@@ -1885,6 +1898,12 @@ int main(int argc, char *argv[]) {
 
                 // Update the tracker with the new paths and template data
                 tracker_reinit_template(tracker, &app_settings);
+
+                // tracker_load_and_parse_data (called inside reinit) may write to
+                // settings.json to sync template/hotkey data, which causes dmon to
+                // immediately fire settings_watch_callback and set g_settings_changed=1
+                // again, creating an infinite reinit loop. Swallow that spurious flag here.
+                SDL_SetAtomicInt(&g_settings_changed, 0);
 
                 // Start watching the new directory
                 if (path_exists(tracker->saves_path)) {

@@ -166,6 +166,65 @@ static uint64_t get_latest_modification_time(const char *dir_path) {
  */
 static bool get_active_instance_saves_path(char *out_path, size_t max_len) {
     std::vector<std::string> candidate_saves_paths;
+
+    // Fast pre-check: bail out early if no java process is running at all
+    // This avoids the expensive full process scan when Minecraft is not open.
+#ifdef _WIN32
+    {
+        HANDLE h_snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (h_snap == INVALID_HANDLE_VALUE) return false;
+        bool java_found = false;
+        PROCESSENTRY32 pe;
+        pe.dwSize = sizeof(PROCESSENTRY32);
+        if (Process32First(h_snap, &pe)) {
+            do {
+                if (stricmp(pe.szExeFile, "javaw.exe") == 0 || stricmp(pe.szExeFile, "java.exe") == 0) {
+                    java_found = true;
+                    break;
+                }
+            } while (Process32Next(h_snap, &pe));
+        }
+        CloseHandle(h_snap);
+        if (!java_found) return false;
+    }
+#elif defined(__APPLE__)
+    {
+        pid_t pids[2048];
+        int count = proc_listpids(PROC_ALL_PIDS, 0, pids, sizeof(pids));
+        bool java_found = false;
+        for (int i = 0; i < count && !java_found; i++) {
+            if (pids[i] == 0) continue;
+            char name[64] = {0};
+            proc_name(pids[i], name, sizeof(name));
+            if (strstr(name, "java")) java_found = true;
+        }
+        if (!java_found) return false;
+    }
+#else // Linux
+    {
+        bool java_found = false;
+        DIR *quick_dir = opendir("/proc");
+        if (quick_dir) {
+            struct dirent *qe;
+            while ((qe = readdir(quick_dir)) != nullptr && !java_found) {
+                pid_t pid = atoi(qe->d_name);
+                if (pid == 0) continue;
+                char comm_path[64];
+                snprintf(comm_path, sizeof(comm_path), "/proc/%d/comm", pid);
+                FILE *f = fopen(comm_path, "r");
+                if (!f) continue;
+                char comm[32] = {0};
+                fread(comm, 1, sizeof(comm) - 1, f);
+                fclose(f);
+                if (strstr(comm, "java")) java_found = true;
+            }
+            closedir(quick_dir);
+        }
+        if (!java_found) return false;
+    }
+#endif
+    // End pre-check. A java process exists; proceed with the full scan.
+
 #ifdef _WIN32
     HANDLE h_process_snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (h_process_snap == INVALID_HANDLE_VALUE) return false;
@@ -449,7 +508,8 @@ bool get_saves_path(char *out_path, size_t max_len, PathMode mode, const char *m
     } else if (mode == PATH_MODE_INSTANCE) {
         success = get_active_instance_saves_path(out_path, max_len);
         if (!success) {
-            log_message(LOG_ERROR, "[PATH UTILS] Could not find an active MultiMC/Prism instance.\n");
+            // Log Info so it doesn't spam the log
+            log_message(LOG_INFO, "[PATH UTILS] Could not find an active MultiMC/Prism instance.\n");
         }
     } else if (mode == PATH_MODE_FIXED_WORLD) {
         // The user supplied a full path to a specific world folder, e.g.

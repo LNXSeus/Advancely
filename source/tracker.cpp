@@ -6102,7 +6102,13 @@ void tracker_reinit_paths(Tracker *t, const AppSettings *settings) {
             }
         }
     } else {
-        log_message(LOG_ERROR, "[TRACKER] CRITICAL: Failed to get saves path.\n");
+        // Only log at ERROR level once; use INFO for the common "MC not running" case
+        // to avoid spam when PATH_MODE_INSTANCE is active with no game open.
+        if (settings->path_mode == PATH_MODE_INSTANCE) {
+            log_message(LOG_INFO, "[TRACKER] No instance saves path found (Minecraft not running?).\n");
+        } else {
+            log_message(LOG_ERROR, "[TRACKER] CRITICAL: Failed to get saves path.\n");
+        }
 
         // Ensure paths are empty
         t->saves_path[0] = '\0';
