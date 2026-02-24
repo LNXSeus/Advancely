@@ -3168,8 +3168,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SetTooltip(
                             "Click the order badges next to %s to assign a sort order first.",
                             advancements_label_plural_lower);
-                    else ImGui::SetTooltip("Rearrange the numbered %s among themselves.",
-                                           advancements_label_plural_lower);
+                    else
+                        ImGui::SetTooltip("Rearrange the numbered %s among themselves.",
+                                          advancements_label_plural_lower);
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("Reset Order##adv")) {
@@ -3353,9 +3354,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         snprintf(cat_badge_label, sizeof(cat_badge_label), " - ##cat_badge_%zu", i);
                     }
 
-                    float cat_text_w = ImGui::CalcTextSize(current_template_data.advancements[i].sort_order > 0
-                                                               ? cat_badge_label
-                                                               : " - ").x;
+                    const char *cat_text_end = strstr(cat_badge_label, "##");
+                    float cat_text_w = ImGui::CalcTextSize(cat_badge_label, cat_text_end).x;
                     float cat_badge_w = std::max(28.0f, cat_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
 
                     if (ImGui::Button(cat_badge_label, ImVec2(cat_badge_w, 0))) {
@@ -3997,9 +3997,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             snprintf(crit_badge_label, sizeof(crit_badge_label), " - ##crit_badge_%zu", j);
                         }
 
-                        float crit_text_w = ImGui::CalcTextSize(
-                            criterion.sort_order > 0 ? crit_badge_label : " - ").x;
-                        float crit_badge_w = std::max(20.0f, crit_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
+                        const char *crit_text_end = strstr(crit_badge_label, "##");
+                        float crit_text_w = ImGui::CalcTextSize(crit_badge_label, crit_text_end).x;
+                        float crit_badge_w = std::max(28.0f, crit_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
 
                         if (ImGui::Button(crit_badge_label, ImVec2(crit_badge_w, 0))) {
                             if (criterion.sort_order > 0)
@@ -4423,10 +4423,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         snprintf(stat_badge_label, sizeof(stat_badge_label), " - ##stat_badge_%zu", i);
                     }
 
-                    float stat_text_w = ImGui::CalcTextSize(current_template_data.stats[i].sort_order > 0
-                                                                ? stat_badge_label
-                                                                : " - ").x;
-                    float stat_badge_w = std::max(20.0f, stat_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
+                    const char *stat_text_end = strstr(stat_badge_label, "##");
+                    float stat_text_w = ImGui::CalcTextSize(stat_badge_label, stat_text_end).x;
+                    float stat_badge_w = std::max(28.0f, stat_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
 
                     if (ImGui::Button(stat_badge_label, ImVec2(stat_badge_w, 0))) {
                         if (current_template_data.stats[i].sort_order > 0)
@@ -5110,11 +5109,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 snprintf(crit_badge_label, sizeof(crit_badge_label), " - ##scrit_badge_%zu", j);
                             }
 
-                            float crit_text_w = ImGui::CalcTextSize(crit.sort_order > 0 ? crit_badge_label : " - ").x;
-                            float crit_badge_w = std::max(20.0f, crit_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
+                            const char *crit_text_end = strstr(crit_badge_label, "##");
+                            float crit_text_w = ImGui::CalcTextSize(crit_badge_label, crit_text_end).x;
+                            float crit_badge_w = std::max(28.0f, crit_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
 
                             if (ImGui::Button(crit_badge_label, ImVec2(crit_badge_w, 0))) {
-                                if (crit.sort_order > 0) crit.sort_order = 0;
+                                if (crit.sort_order > 0)
+                                    crit.sort_order = 0;
                                 else crit.sort_order = next_sort_idx++;
                             }
                             if (ImGui::IsItemHovered()) ImGui::SetTooltip("Click to assign criterion sort order");
@@ -5483,11 +5484,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             snprintf(badge_label, sizeof(badge_label), " - ##badge_%zu", i);
                         }
 
-                        // Calculate dynamic width based on the text (ignoring the hidden ## ID part)
-                        const char *visible_text = (unlock.sort_order > 0) ? badge_label : " - ";
-                        float text_width = ImGui::CalcTextSize(visible_text).x;
-                        // Enforce a minimum width of 28.0f, but expand if the text needs more room + padding
-                        float badge_width = std::max(20.0f, text_width + ImGui::GetStyle().FramePadding.x * 4.0f);
+                        const char *text_end = strstr(badge_label, "##");
+                        float text_width = ImGui::CalcTextSize(badge_label, text_end).x;
+                        float badge_width = std::max(28.0f, text_width + ImGui::GetStyle().FramePadding.x * 4.0f);
 
                         if (ImGui::Button(badge_label, ImVec2(badge_width, 0))) {
                             if (unlock.sort_order > 0) unlock.sort_order = 0;
@@ -5852,12 +5851,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         snprintf(badge_label, sizeof(badge_label), " - ##badge_%zu", i);
                     }
 
-                    // Calculate dynamic width based on the text (ignoring the hidden ## ID part)
-                    const char *visible_text = (goal.sort_order > 0) ? badge_label : " - ";
-                    // If you're doing this in Custom Goals, it would just be (goal.sort_order > 0)
-                    float text_width = ImGui::CalcTextSize(visible_text).x;
-                    // Enforce a minimum width of 28.0f, but expand if the text needs more room + padding
-                    float badge_width = std::max(20.0f, text_width + ImGui::GetStyle().FramePadding.x * 4.0f);
+                    const char *text_end = strstr(badge_label, "##");
+                    float text_width = ImGui::CalcTextSize(badge_label, text_end).x;
+                    float badge_width = std::max(28.0f, text_width + ImGui::GetStyle().FramePadding.x * 4.0f);
 
                     if (ImGui::Button(badge_label, ImVec2(badge_width, 0))) {
                         if (goal.sort_order > 0) goal.sort_order = 0;
@@ -6223,10 +6219,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         snprintf(ms_badge_label, sizeof(ms_badge_label), " - ##ms_badge_%zu", i);
                     }
 
-                    float ms_text_w = ImGui::CalcTextSize(current_template_data.multi_stage_goals[i].sort_order > 0
-                                                              ? ms_badge_label
-                                                              : " - ").x;
-                    float ms_badge_w = std::max(20.0f, ms_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
+                    const char *ms_text_end = strstr(ms_badge_label, "##");
+                    float ms_text_w = ImGui::CalcTextSize(ms_badge_label, ms_text_end).x;
+                    float ms_badge_w = std::max(28.0f, ms_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
 
                     if (ImGui::Button(ms_badge_label, ImVec2(ms_badge_w, 0))) {
                         if (current_template_data.multi_stage_goals[i].sort_order > 0)
@@ -7217,11 +7212,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             snprintf(stage_badge_label, sizeof(stage_badge_label), " - ##stage_badge_%zu", j);
                         }
 
-                        float stage_text_w = ImGui::CalcTextSize(stage.sort_order > 0 ? stage_badge_label : " - ").x;
-                        float stage_badge_w = std::max(20.0f, stage_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
+                        const char *stage_text_end = strstr(stage_badge_label, "##");
+                        float stage_text_w = ImGui::CalcTextSize(stage_badge_label, stage_text_end).x;
+                        float stage_badge_w = std::max(28.0f, stage_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
 
                         if (ImGui::Button(stage_badge_label, ImVec2(stage_badge_w, 0))) {
-                            if (stage.sort_order > 0) stage.sort_order = 0;
+                            if (stage.sort_order > 0)
+                                stage.sort_order = 0;
                             else stage.sort_order = next_sort_idx++;
                         }
                         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Click to assign stage sort order");
