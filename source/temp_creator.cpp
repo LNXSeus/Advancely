@@ -97,6 +97,7 @@ struct EditorTrackableItem {
     int goal;
     bool is_hidden;
     bool in_2nd_row;
+    int sort_order = 0;
 };
 
 // A struct to hold a category (like an advancement) and its criteria
@@ -109,6 +110,7 @@ struct EditorTrackableCategory {
     bool is_recipe; // UI flag to distinguish recipes from advancements -> count towards progress percentage instead
     bool is_simple_stat; // UI flag to distinguish simple vs complex stats
     std::vector<EditorTrackableItem> criteria; // Criteria then are trackable items
+    int sort_order = 0;
 };
 
 // Structs for Multi-Stage Goal editing
@@ -120,6 +122,7 @@ struct EditorSubGoal {
     char root_name[192];
     int required_progress;
     char icon_path[256]; // Icon path for each stage
+    int sort_order = 0;
 };
 
 struct EditorMultiStageGoal {
@@ -130,6 +133,7 @@ struct EditorMultiStageGoal {
     bool in_2nd_row;
     bool use_stage_icons;
     std::vector<EditorSubGoal> stages;
+    int sort_order = 0;
 };
 
 struct EditorTemplate {
@@ -225,6 +229,34 @@ static bool are_editor_templates_different(const EditorTemplate &a, const Editor
         if (are_editor_multi_stage_goals_different(a.multi_stage_goals[i], b.multi_stage_goals[i])) return true;
     }
     return false;
+}
+
+// Sorts only the items that have a sort_order > 0, leaving others in their original positions.
+template<typename T>
+static void apply_partial_sort(std::vector<T> &vec) {
+    std::vector<size_t> indices;
+    std::vector<T> extracted;
+
+    // 1. Find all numbered items and record their original positions
+    for (size_t i = 0; i < vec.size(); ++i) {
+        if (vec[i].sort_order > 0) {
+            indices.push_back(i);
+            extracted.push_back(vec[i]);
+        }
+    }
+
+    if (indices.empty()) return;
+
+    // 2. Sort the extracted items by their assigned order
+    std::sort(extracted.begin(), extracted.end(), [](const T &a, const T &b) {
+        return a.sort_order < b.sort_order;
+    });
+
+    // 3. Put them back into the exact same slots they came from, now sorted
+    for (size_t i = 0; i < indices.size(); ++i) {
+        vec[indices[i]] = extracted[i];
+        vec[indices[i]].sort_order = 0; // Clear the badge after sorting
+    }
 }
 
 // Helper to check for duplicate root_names in a vector of items
@@ -1421,6 +1453,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static EditorMultiStageGoal *selected_ms_goal = nullptr;
     static bool show_unsaved_changes_popup = false;
     static std::function<void()> pending_action = nullptr;
+
+    // State for the Ordering system
+    static int next_sort_idx = 1;
 
     // To switch between importing advancements or their criteria
     enum AdvancementImportMode { BATCH_ADVANCEMENT_IMPORT, CRITERIA_ONLY_IMPORT };
@@ -3381,6 +3416,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     new_advancement.is_simple_stat = source_adv_ptr->is_simple_stat;
                     new_advancement.criteria = source_adv_ptr->criteria; // std::vector handles its own deep copy.
 
+                    new_advancement.sort_order = 0;
+                    for (auto& crit : new_advancement.criteria) {
+                        crit.sort_order = 0; // Clear badges on cloned children
+                    }
+
                     // --- Generate a unique root_name for the copy ---
                     char base_name[192];
                     strncpy(base_name, source_adv_ptr->root_name, sizeof(base_name) - 1);
@@ -3896,6 +3936,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_criterion.goal = source_criterion.goal;
                         new_criterion.is_hidden = source_criterion.is_hidden;
 
+                        new_criterion.sort_order = 0;
+
                         char base_name[192];
                         strncpy(base_name, source_criterion.root_name, sizeof(base_name) - 1);
                         base_name[sizeof(base_name) - 1] = '\0';
@@ -4288,6 +4330,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     new_stat.is_recipe = source_stat_ptr->is_recipe;
                     new_stat.is_simple_stat = source_stat_ptr->is_simple_stat;
                     new_stat.criteria = source_stat_ptr->criteria; // std::vector handles its own deep copy safely.
+
+                    new_stat.sort_order = 0;
+                    for (auto& crit : new_stat.criteria) {
+                        crit.sort_order = 0;
+                    }
 
 
                     // Now, generate a unique name for the new copy
@@ -4880,6 +4927,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             new_crit.goal = source_criterion.goal;
                             new_crit.is_hidden = source_criterion.is_hidden;
 
+                            new_crit.sort_order = 0;
+
                             char base_name[192];
                             strncpy(base_name, source_criterion.root_name, sizeof(base_name) - 1);
                             base_name[sizeof(base_name) - 1] = '\0';
@@ -4989,6 +5038,39 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  "Click the 'Help' button for more info.");
                         ImGui::SetTooltip("%s", add_unlock_tooltip_buffer);
                     }
+
+                    // --- Sorting Controls ---
+                    bool can_sort = false;
+                    for (const auto& goal : current_template_data.unlocks) {
+                        if (goal.sort_order > 0) { can_sort = true; break; }
+                    }
+
+                    // Calculate the total width of both buttons + the spacing between them
+                    float sort_btn_width = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                    float reset_btn_width = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                    float total_buttons_width = sort_btn_width + reset_btn_width + ImGui::GetStyle().ItemSpacing.x;
+
+                    // Push the cursor to the right edge, minus the width of our buttons
+                    ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_buttons_width);
+
+                    ImGui::BeginDisabled(!can_sort);
+                    if (ImGui::Button("Sort")) {
+                        apply_partial_sort(current_template_data.unlocks);
+                        next_sort_idx = 1;
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        if (!can_sort) ImGui::SetTooltip("Click the order badges next to goals to assign a sort order first.");
+                        else ImGui::SetTooltip("Rearrange the numbered items among themselves.");
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Reset Order")) {
+                        for (auto& goal : current_template_data.unlocks) goal.sort_order = 0;
+                        next_sort_idx = 1;
+                    }
+                    ImGui::EndDisabled();
+
+                    ImGui::Separator();
 
                     // Determine if search is active for this scope
                     bool is_unlock_search_active = (
@@ -5133,6 +5215,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
+                        ImGui::SameLine();
+
+                        // --- Sort Badge ---
+                        char badge_label[32];
+                        if (unlock.sort_order > 0) {
+                            snprintf(badge_label, sizeof(badge_label), "%d##badge_%zu", unlock.sort_order, i);
+                        } else {
+                            snprintf(badge_label, sizeof(badge_label), " - ##badge_%zu", i);
+                        }
+
+                        // Calculate dynamic width based on the text (ignoring the hidden ## ID part)
+                        const char* visible_text = (unlock.sort_order > 0) ? badge_label : " - ";
+                        float text_width = ImGui::CalcTextSize(visible_text).x;
+                        // Enforce a minimum width of 28.0f, but expand if the text needs more room + padding
+                        float badge_width = std::max(28.0f, text_width + ImGui::GetStyle().FramePadding.x * 4.0f);
+
+                        if (ImGui::Button(badge_label, ImVec2(badge_width, 0))) {
+                            if (unlock.sort_order > 0) unlock.sort_order = 0;
+                            else unlock.sort_order = next_sort_idx++;
+                        }
+                        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Click to assign sort order");
+
                         ImGui::EndGroup();
 
                         ImGui::SetCursorScreenPos(item_start_cursor_pos);
@@ -5187,6 +5291,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_item.icon_path[sizeof(new_item.icon_path) - 1] = '\0';
                         new_item.goal = source_item.goal;
                         new_item.is_hidden = source_item.is_hidden;
+
+                        new_item.sort_order = 0;
 
                         char base_name[192];
                         strncpy(base_name, source_item.root_name, sizeof(base_name) - 1);
@@ -5255,6 +5361,42 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 ImGui::SameLine();
                 ImGui::TextDisabled("(Hotkeys are configured in the main Settings window)");
+
+                // --- Sorting Controls ---
+                bool can_sort = false;
+                for (const auto &goal: current_template_data.custom_goals) {
+                    if (goal.sort_order > 0) {
+                        can_sort = true;
+                        break;
+                    }
+                }
+
+                // Calculate the total width of both buttons + the spacing between them
+                float sort_btn_width = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                float reset_btn_width = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                float total_buttons_width = sort_btn_width + reset_btn_width + ImGui::GetStyle().ItemSpacing.x;
+
+                // Push the cursor to the right edge, minus the width of our buttons
+                ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_buttons_width);
+
+                ImGui::BeginDisabled(!can_sort);
+                if (ImGui::Button("Sort")) {
+                    apply_partial_sort(current_template_data.custom_goals);
+                    next_sort_idx = 1; // Reset counter for the next sort operation
+                    save_message_type = MSG_NONE;
+                }
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                    if (!can_sort) ImGui::SetTooltip(
+                        "Click the order badges next to goals to assign a sort order first.");
+                    else ImGui::SetTooltip("Rearrange the numbered items among themselves.");
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Reset Order")) {
+                    for (auto &goal: current_template_data.custom_goals) goal.sort_order = 0;
+                    next_sort_idx = 1;
+                }
+                ImGui::EndDisabled();
+                ImGui::Separator();
 
                 // Determine if search is active for this scope
                 bool is_custom_search_active = (current_search_scope == SCOPE_CUSTOM && tc_search_buffer[0] != '\0');
@@ -5423,6 +5565,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
                     ImGui::SameLine();
+
                     if (ImGui::Button("Remove")) {
                         item_to_remove = i;
                         save_message_type = MSG_NONE; // Clear message on new edit
@@ -5431,6 +5574,31 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         char tooltip_buffer[128];
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Custom Goal:\n%s", goal.root_name);
                         ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+
+                    ImGui::SameLine();
+
+                    // --- Sort Badge ---
+                    char badge_label[32];
+                    if (goal.sort_order > 0) {
+                        snprintf(badge_label, sizeof(badge_label), "%d##badge_%zu", goal.sort_order, i);
+                    } else {
+                        snprintf(badge_label, sizeof(badge_label), " - ##badge_%zu", i);
+                    }
+
+                    // Calculate dynamic width based on the text (ignoring the hidden ## ID part)
+                    const char* visible_text = (goal.sort_order > 0) ? badge_label : " - ";
+                    // If you're doing this in Custom Goals, it would just be (goal.sort_order > 0)
+                    float text_width = ImGui::CalcTextSize(visible_text).x;
+                    // Enforce a minimum width of 28.0f, but expand if the text needs more room + padding
+                    float badge_width = std::max(28.0f, text_width + ImGui::GetStyle().FramePadding.x * 4.0f);
+
+                    if (ImGui::Button(badge_label, ImVec2(badge_width, 0))) {
+                        if (goal.sort_order > 0) goal.sort_order = 0;
+                        else goal.sort_order = next_sort_idx++;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        ImGui::SetTooltip("Click to assign sort order");
                     }
 
                     ImGui::EndGroup();
@@ -5491,6 +5659,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     new_item.icon_path[sizeof(new_item.icon_path) - 1] = '\0';
                     new_item.goal = source_item.goal;
                     new_item.is_hidden = source_item.is_hidden;
+
+                    new_item.sort_order = 0;
 
                     char base_name[192];
                     strncpy(base_name, source_item.root_name, sizeof(base_name) - 1);
@@ -5824,6 +5994,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     new_goal.in_2nd_row = source_goal_ptr->in_2nd_row;
                     new_goal.use_stage_icons = source_goal_ptr->use_stage_icons;
                     new_goal.stages = source_goal_ptr->stages; // std::vector handles its own deep copy safely.
+
+                    new_goal.sort_order = 0;
+                    for (auto& stage : new_goal.stages) {
+                        stage.sort_order = 0;
+                    }
 
                     // Now, generate a unique name for the new copy
                     char base_name[192];
@@ -6719,6 +6894,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_stage.root_name[sizeof(new_stage.root_name) - 1] = '\0';
                         new_stage.type = source_stage.type;
                         new_stage.required_progress = source_stage.required_progress;
+
+                        new_stage.sort_order = 0;
 
                         // If the source was the Final (SUBGOAL_MANUAL) stage, the copy cannot also be Final
                         // Reset it to SUBGOAL_STAT
