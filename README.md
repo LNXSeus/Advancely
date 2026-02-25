@@ -684,6 +684,7 @@ Opening a template reveals a tabbed interface where you can define every goal.
 > GIF by uploading it to [**ezgif.com/maker**](https://ezgif.com/maker), selecting the **"Don't Stack Frames"** option,
 > and exporting the result.
 
+* **Sorting & Reordering**: You can easily rearrange any goals, categories, criteria, or stages. Click the small badge next to an item to assign it a sequential sort order. Once you've numbered the items you want to move, click the **Sort** button to instantly reorder them, or use **Reset Order** to clear your selections. Combine the search feature with the badge sorting for efficient template creation!
 * **Advancements & Recipes**: List all achievements or advancements you want to track. Each entry has a `Root Name` (the
   in-game ID, e.g., `minecraft:story/mine_stone`), a `Display Name`, and an `Icon Path`. You can also import or add
   `Criteria` to track sub-tasks, and a checkbox designates an entry as a `Recipe` to sort it into its own section and
