@@ -1454,8 +1454,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static bool show_unsaved_changes_popup = false;
     static std::function<void()> pending_action = nullptr;
 
-    // State for the Ordering system
-    static int next_sort_idx = 1;
+    // Helper to dynamically calculate the next sort order per list
+    auto get_next_sort_order = [](const auto &list) -> int {
+        int max_val = 0;
+        for (const auto &item: list) {
+            if (item.sort_order > max_val) max_val = item.sort_order;
+        }
+        return max_val + 1;
+    };
 
     // To switch between importing advancements or their criteria
     enum AdvancementImportMode { BATCH_ADVANCEMENT_IMPORT, CRITERIA_ONLY_IMPORT };
@@ -1761,7 +1767,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 tc_search_buffer[0] = '\0';
             }
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Clear Search");
+                char tooltip_buffer[32];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Clear Search");
+                ImGui::SetTooltip("%s", tooltip_buffer);
             }
         } else {
             // Invisible dummy to maintain layout
@@ -2361,10 +2369,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         ImGui::Checkbox("Bundle icon files", &export_include_icons);
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(
-                "Copies all icon files referenced by this template into the zip under an icons/ folder.\n"
-                "This is a COPY and your existing icons folder is never modified or deleted.\n"
-                "Recommended when sharing templates that use custom icons not installed by default.");
+            char tooltip_buffer[512];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Copies all icon files referenced by this template into the zip under an icons/ folder.\n"
+                     "This is a COPY and your existing icons folder is never modified or deleted.\n"
+                     "Recommended when sharing templates that use custom icons not installed by default.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
         }
         ImGui::Spacing();
         ImGui::Separator();
@@ -2378,7 +2388,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::CloseCurrentPopup();
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("You can also press ENTER.");
+            char tooltip_buffer[64];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "You can also press ENTER.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
@@ -2482,8 +2494,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::Separator();
         ImGui::InputText("New Language Flag", import_lang_flag_buffer, sizeof(import_lang_flag_buffer));
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(
-                "Enter a flag for the new language (e.g., 'de', 'fr_ca').\nCannot be empty or contain special characters except for underscores, dots, and the %% sign.");
+            char tooltip_buffer[256];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Enter a flag for the new language (e.g., 'de', 'fr_ca').\n"
+                     "Cannot be empty or contain special characters except for underscores, dots, and the %% sign.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
         }
 
         // Deleting language file after import
@@ -3160,28 +3175,33 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::BeginDisabled(!can_sort_adv);
                 if (ImGui::Button("Sort##adv")) {
                     apply_partial_sort(current_template_data.advancements);
-                    next_sort_idx = 1;
                     save_message_type = MSG_NONE;
                 }
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    if (!can_sort_adv)
-                        ImGui::SetTooltip(
-                            "Click the order badges next to %s to assign a sort order first.",
-                            advancements_label_plural_lower);
-                    else
-                        ImGui::SetTooltip("Rearrange the numbered %s among themselves.",
-                                          advancements_label_plural_lower);
+                    char tooltip_buffer[128];
+                    if (!can_sort_adv) {
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Click the order badges next to %s to assign a sort order first.",
+                                 advancements_label_plural_lower);
+                    } else {
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Rearrange the numbered %s among themselves.",
+                                 advancements_label_plural_lower);
+                    }
+                    ImGui::SetTooltip("%s", tooltip_buffer);
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("Reset Order##adv")) {
                     for (auto &adv: current_template_data.advancements) adv.sort_order = 0;
-                    next_sort_idx = 1;
                 }
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    if (!can_sort_adv)
-                        ImGui::SetTooltip("No sort orders assigned yet.");
-                    else
-                        ImGui::SetTooltip("Clear all assigned sort orders from %s.", advancements_label_plural_lower);
+                    char tooltip_buffer[128];
+                    if (!can_sort_adv) {
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
+                    } else {
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Clear all assigned sort orders from %s.",
+                                 advancements_label_plural_lower);
+                    }
+                    ImGui::SetTooltip("%s", tooltip_buffer);
                 }
                 ImGui::EndDisabled();
 
@@ -3347,11 +3367,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // --- Sort Badge (Category) ---
                     char cat_badge_label[32];
-                    if (current_template_data.advancements[i].sort_order > 0) {
-                        snprintf(cat_badge_label, sizeof(cat_badge_label), "%d##cat_badge_%zu",
-                                 current_template_data.advancements[i].sort_order, i);
+                    if (advancement.sort_order > 0) {
+                        snprintf(cat_badge_label, sizeof(cat_badge_label), "%d##cat_badge", advancement.sort_order);
                     } else {
-                        snprintf(cat_badge_label, sizeof(cat_badge_label), " - ##cat_badge_%zu", i);
+                        snprintf(cat_badge_label, sizeof(cat_badge_label), " - ##cat_badge");
                     }
 
                     const char *cat_text_end = strstr(cat_badge_label, "##");
@@ -3359,11 +3378,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     float cat_badge_w = std::max(28.0f, cat_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
 
                     if (ImGui::Button(cat_badge_label, ImVec2(cat_badge_w, 0))) {
-                        if (current_template_data.advancements[i].sort_order > 0)
-                            current_template_data.advancements[i].sort_order = 0;
-                        else current_template_data.advancements[i].sort_order = next_sort_idx++;
+                        if (advancement.sort_order > 0)
+                            advancement.sort_order = 0;
+                        else advancement.sort_order = get_next_sort_order(current_template_data.advancements);
                     }
-                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Click to assign category sort order");
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[128];
+                        if (advancement.sort_order > 0) {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to remove %s sort order",
+                                     advancements_label_singular_lower);
+                        } else {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to assign %s sort order",
+                                     advancements_label_singular_lower);
+                        }
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
                     ImGui::SameLine();
 
                     // Draw the "X" (Remove) button
@@ -3824,25 +3853,32 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ImGui::Button(sort_crit_id)) {
                             apply_partial_sort(advancement.criteria);
-                            next_sort_idx = 1;
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                            if (!can_sort_crit)
-                                ImGui::SetTooltip(
-                                    "Click the order badges next to criteria to assign a sort order first.");
-                            else ImGui::SetTooltip("Rearrange the numbered criteria among themselves.");
+                            char tooltip_buffer[128];
+                            if (!can_sort_crit) {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Click the order badges next to criteria to assign a sort order first.");
+                            } else {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Rearrange the numbered criteria among themselves.");
+                            }
+                            ImGui::SetTooltip("%s", tooltip_buffer);
                         }
                         ImGui::SameLine();
                         if (ImGui::Button(reset_crit_id)) {
                             for (auto &crit: advancement.criteria) crit.sort_order = 0;
-                            next_sort_idx = 1;
                         }
                         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                            if (!can_sort_crit)
-                                ImGui::SetTooltip("No sort orders assigned yet.");
-                            else
-                                ImGui::SetTooltip("Clear all assigned sort orders from criteria.");
+                            char tooltip_buffer[128];
+                            if (!can_sort_crit) {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
+                            } else {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Clear all assigned sort orders from criteria.");
+                            }
+                            ImGui::SetTooltip("%s", tooltip_buffer);
                         }
                         ImGui::EndDisabled();
                     } // End of conditional criteria block for above 1.6.4 otherwise no criteria
@@ -4004,9 +4040,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::Button(crit_badge_label, ImVec2(crit_badge_w, 0))) {
                             if (criterion.sort_order > 0)
                                 criterion.sort_order = 0;
-                            else criterion.sort_order = next_sort_idx++;
+                            else criterion.sort_order = get_next_sort_order(advancement.criteria);
                         }
-                        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Click to assign criterion sort order");
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            if (criterion.sort_order > 0) {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Click to remove criterion sort order");
+                            } else {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Click to assign criterion sort order");
+                            }
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
                         ImGui::EndGroup();
 
                         ImGui::SameLine();
@@ -4214,25 +4260,32 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::BeginDisabled(!can_sort_stat);
                 if (ImGui::Button("Sort##stat")) {
                     apply_partial_sort(current_template_data.stats);
-                    next_sort_idx = 1;
                     save_message_type = MSG_NONE;
                 }
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    if (!can_sort_stat)
-                        ImGui::SetTooltip(
-                            "Click the order badges next to categories to assign a sort order first.");
-                    else ImGui::SetTooltip("Rearrange the numbered categories among themselves.");
+                    char tooltip_buffer[128];
+                    if (!can_sort_stat) {
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Click the order badges next to categories to assign a sort order first.");
+                    } else {
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Rearrange the numbered categories among themselves.");
+                    }
+                    ImGui::SetTooltip("%s", tooltip_buffer);
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("Reset Order##stat")) {
                     for (auto &stat_cat: current_template_data.stats) stat_cat.sort_order = 0;
-                    next_sort_idx = 1;
                 }
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    if (!can_sort_stat)
-                        ImGui::SetTooltip("No sort orders assigned yet.");
-                    else
-                        ImGui::SetTooltip("Clear all assigned sort orders from categories.");
+                    char tooltip_buffer[128];
+                    if (!can_sort_stat) {
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
+                    } else {
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Clear all assigned sort orders from categories.");
+                    }
+                    ImGui::SetTooltip("%s", tooltip_buffer);
                 }
                 ImGui::EndDisabled();
 
@@ -4416,11 +4469,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // --- Sort Badge (Stat Category) ---
                     char stat_badge_label[64];
-                    if (current_template_data.stats[i].sort_order > 0) {
-                        snprintf(stat_badge_label, sizeof(stat_badge_label), "%d##stat_badge_%zu",
-                                 current_template_data.stats[i].sort_order, i);
+                    if (stat.sort_order > 0) {
+                        snprintf(stat_badge_label, sizeof(stat_badge_label), "%d##stat_badge", stat.sort_order);
                     } else {
-                        snprintf(stat_badge_label, sizeof(stat_badge_label), " - ##stat_badge_%zu", i);
+                        snprintf(stat_badge_label, sizeof(stat_badge_label), " - ##stat_badge");
                     }
 
                     const char *stat_text_end = strstr(stat_badge_label, "##");
@@ -4428,11 +4480,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     float stat_badge_w = std::max(28.0f, stat_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
 
                     if (ImGui::Button(stat_badge_label, ImVec2(stat_badge_w, 0))) {
-                        if (current_template_data.stats[i].sort_order > 0)
-                            current_template_data.stats[i].sort_order = 0;
-                        else current_template_data.stats[i].sort_order = next_sort_idx++;
+                        if (stat.sort_order > 0)
+                            stat.sort_order = 0;
+                        else stat.sort_order = get_next_sort_order(current_template_data.stats);
                     }
-                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Click to assign category sort order");
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[128];
+                        if (stat.sort_order > 0) {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to remove stat sort order");
+                        } else {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to assign stat sort order");
+                        }
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
                     ImGui::SameLine();
 
                     if (ImGui::Button("X")) { stat_to_remove_idx = i; }
@@ -4946,13 +5006,32 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ImGui::Button(sort_crit_id)) {
                             apply_partial_sort(stat_cat.criteria);
-                            next_sort_idx = 1;
                             save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            char tooltip_buffer[128];
+                            if (!can_sort_crit) {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Click the order badges next to criteria to assign a sort order first.");
+                            } else {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Rearrange the numbered criteria among themselves.");
+                            }
+                            ImGui::SetTooltip("%s", tooltip_buffer);
                         }
                         ImGui::SameLine();
                         if (ImGui::Button(reset_crit_id)) {
                             for (auto &crit: stat_cat.criteria) crit.sort_order = 0;
-                            next_sort_idx = 1;
+                        }
+                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            char tooltip_buffer[128];
+                            if (!can_sort_crit) {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
+                            } else {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Clear all assigned sort orders from criteria.");
+                            }
+                            ImGui::SetTooltip("%s", tooltip_buffer);
                         }
                         ImGui::EndDisabled();
 
@@ -5116,9 +5195,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (ImGui::Button(crit_badge_label, ImVec2(crit_badge_w, 0))) {
                                 if (crit.sort_order > 0)
                                     crit.sort_order = 0;
-                                else crit.sort_order = next_sort_idx++;
+                                else crit.sort_order = get_next_sort_order(stat_cat.criteria);
                             }
-                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Click to assign criterion sort order");
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buffer[128];
+                                if (crit.sort_order > 0) {
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "Click to remove sub-stat sort order");
+                                } else {
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "Click to assign sub-stat sort order");
+                                }
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
                             ImGui::EndGroup();
 
                             ImGui::SameLine();
@@ -5308,25 +5397,32 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::BeginDisabled(!can_sort);
                     if (ImGui::Button("Sort##unlocks")) {
                         apply_partial_sort(current_template_data.unlocks);
-                        next_sort_idx = 1; // Reset counter for the next sort operation
                         save_message_type = MSG_NONE;
                     }
                     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        if (!can_sort)
-                            ImGui::SetTooltip(
-                                "Click the order badges next to unlocks to assign a sort order first.");
-                        else ImGui::SetTooltip("Rearrange the numbered unlocks among themselves.");
+                        char tooltip_buffer[128];
+                        if (!can_sort) {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Click the order badges next to unlocks to assign a sort order first.");
+                        } else {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Rearrange the numbered unlocks among themselves.");
+                        }
+                        ImGui::SetTooltip("%s", tooltip_buffer);
                     }
                     ImGui::SameLine();
                     if (ImGui::Button("Reset Order##unlocks")) {
                         for (auto &unlock: current_template_data.unlocks) unlock.sort_order = 0;
-                        next_sort_idx = 1;
                     }
                     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        if (!can_sort)
-                            ImGui::SetTooltip("No sort orders assigned yet.");
-                        else
-                            ImGui::SetTooltip("Clear all assigned sort orders from unlocks.");
+                        char tooltip_buffer[128];
+                        if (!can_sort) {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
+                        } else {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Clear all assigned sort orders from unlocks.");
+                        }
+                        ImGui::SetTooltip("%s", tooltip_buffer);
                     }
                     ImGui::EndDisabled();
                     ImGui::NewLine();
@@ -5490,9 +5586,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (ImGui::Button(badge_label, ImVec2(badge_width, 0))) {
                             if (unlock.sort_order > 0) unlock.sort_order = 0;
-                            else unlock.sort_order = next_sort_idx++;
+                            else unlock.sort_order = get_next_sort_order(current_template_data.unlocks);
                         }
-                        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Click to assign sort order");
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            if (unlock.sort_order > 0) {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to remove unlock sort order");
+                            } else {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to assign unlock sort order");
+                            }
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
                         ImGui::EndGroup();
 
                         ImGui::SameLine();
@@ -5640,25 +5744,32 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::BeginDisabled(!can_sort);
                 if (ImGui::Button("Sort")) {
                     apply_partial_sort(current_template_data.custom_goals);
-                    next_sort_idx = 1; // Reset counter for the next sort operation
                     save_message_type = MSG_NONE;
                 }
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    if (!can_sort)
-                        ImGui::SetTooltip(
-                            "Click the order badges next to goals to assign a sort order first.");
-                    else ImGui::SetTooltip("Rearrange the numbered items among themselves.");
+                    char tooltip_buffer[128];
+                    if (!can_sort) {
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Click the order badges next to goals to assign a sort order first.");
+                    } else {
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Rearrange the numbered items among themselves.");
+                    }
+                    ImGui::SetTooltip("%s", tooltip_buffer);
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("Reset Order")) {
                     for (auto &goal: current_template_data.custom_goals) goal.sort_order = 0;
-                    next_sort_idx = 1;
                 }
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    if (!can_sort)
-                        ImGui::SetTooltip("No sort orders assigned yet.");
-                    else
-                        ImGui::SetTooltip("Clear all assigned sort orders from custom goals.");
+                    char tooltip_buffer[128];
+                    if (!can_sort) {
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
+                    } else {
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Clear all assigned sort orders from custom goals.");
+                    }
+                    ImGui::SetTooltip("%s", tooltip_buffer);
                 }
                 ImGui::EndDisabled();
                 ImGui::NewLine();
@@ -5857,10 +5968,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     if (ImGui::Button(badge_label, ImVec2(badge_width, 0))) {
                         if (goal.sort_order > 0) goal.sort_order = 0;
-                        else goal.sort_order = next_sort_idx++;
+                        else goal.sort_order = get_next_sort_order(current_template_data.custom_goals);
                     }
                     if (ImGui::IsItemHovered()) {
-                        ImGui::SetTooltip("Click to assign sort order");
+                        char tooltip_buffer[128];
+                        if (goal.sort_order > 0) {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to remove custom goal sort order");
+                        } else {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to assign custom goal sort order");
+                        }
+                        ImGui::SetTooltip("%s", tooltip_buffer);
                     }
                     ImGui::EndGroup();
 
@@ -5978,25 +6095,32 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::BeginDisabled(!can_sort_ms);
                 if (ImGui::Button("Sort##ms")) {
                     apply_partial_sort(current_template_data.multi_stage_goals);
-                    next_sort_idx = 1;
                     save_message_type = MSG_NONE;
                 }
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    if (!can_sort_ms)
-                        ImGui::SetTooltip(
-                            "Click the order badges next to goals to assign a sort order first.");
-                    else ImGui::SetTooltip("Rearrange the numbered items among themselves.");
+                    char tooltip_buffer[128];
+                    if (!can_sort_ms) {
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Click the order badges next to goals to assign a sort order first.");
+                    } else {
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Rearrange the numbered items among themselves.");
+                    }
+                    ImGui::SetTooltip("%s", tooltip_buffer);
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("Reset Order##ms")) {
                     for (auto &ms_goal: current_template_data.multi_stage_goals) ms_goal.sort_order = 0;
-                    next_sort_idx = 1;
                 }
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    if (!can_sort_ms)
-                        ImGui::SetTooltip("No sort orders assigned yet.");
-                    else
-                        ImGui::SetTooltip("Clear all assigned sort orders from multi-stage goals.");
+                    char tooltip_buffer[128];
+                    if (!can_sort_ms) {
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
+                    } else {
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Clear all assigned sort orders from multi-stage goals.");
+                    }
+                    ImGui::SetTooltip("%s", tooltip_buffer);
                 }
                 ImGui::EndDisabled();
 
@@ -6212,11 +6336,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // --- Sort Badge (Multi-Stage Goal) ---
                     char ms_badge_label[64];
-                    if (current_template_data.multi_stage_goals[i].sort_order > 0) {
-                        snprintf(ms_badge_label, sizeof(ms_badge_label), "%d##ms_badge_%zu",
-                                 current_template_data.multi_stage_goals[i].sort_order, i);
+                    if (goal.sort_order > 0) {
+                        snprintf(ms_badge_label, sizeof(ms_badge_label), "%d##ms_badge", goal.sort_order);
                     } else {
-                        snprintf(ms_badge_label, sizeof(ms_badge_label), " - ##ms_badge_%zu", i);
+                        snprintf(ms_badge_label, sizeof(ms_badge_label), " - ##ms_badge");
                     }
 
                     const char *ms_text_end = strstr(ms_badge_label, "##");
@@ -6224,11 +6347,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     float ms_badge_w = std::max(28.0f, ms_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
 
                     if (ImGui::Button(ms_badge_label, ImVec2(ms_badge_w, 0))) {
-                        if (current_template_data.multi_stage_goals[i].sort_order > 0)
-                            current_template_data.multi_stage_goals[i].sort_order = 0;
-                        else current_template_data.multi_stage_goals[i].sort_order = next_sort_idx++;
+                        if (goal.sort_order > 0)
+                            goal.sort_order = 0;
+                        else goal.sort_order = get_next_sort_order(current_template_data.multi_stage_goals);
                     }
-                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Click to assign goal sort order");
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[128];
+                        if (goal.sort_order > 0) {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Click to remove multi-stage goal sort order");
+                        } else {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Click to assign multi-stage goal sort order");
+                        }
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
                     ImGui::SameLine();
 
                     if (ImGui::Button("X")) { goal_to_remove_idx = i; }
@@ -6683,24 +6816,32 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     if (ImGui::Button(sort_stage_id)) {
                         apply_partial_sort(goal.stages);
-                        next_sort_idx = 1;
                         save_message_type = MSG_NONE;
                     }
                     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        if (!can_sort_stage)
-                            ImGui::SetTooltip("Click the order badges next to stages to assign a sort order first.");
-                        else ImGui::SetTooltip("Rearrange the numbered stages among themselves.");
+                        char tooltip_buffer[128];
+                        if (!can_sort_stage) {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Click the order badges next to stages to assign a sort order first.");
+                        } else {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Rearrange the numbered stages among themselves.");
+                        }
+                        ImGui::SetTooltip("%s", tooltip_buffer);
                     }
                     ImGui::SameLine();
                     if (ImGui::Button(reset_stage_id)) {
                         for (auto &stage: goal.stages) stage.sort_order = 0;
-                        next_sort_idx = 1;
                     }
                     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        if (!can_sort_stage)
-                            ImGui::SetTooltip("No sort orders assigned yet.");
-                        else
-                            ImGui::SetTooltip("Clear all assigned sort orders from stages.");
+                        char tooltip_buffer[128];
+                        if (!can_sort_stage) {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
+                        } else {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Clear all assigned sort orders from stages.");
+                        }
+                        ImGui::SetTooltip("%s", tooltip_buffer);
                     }
                     ImGui::EndDisabled();
 
@@ -7219,9 +7360,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::Button(stage_badge_label, ImVec2(stage_badge_w, 0))) {
                             if (stage.sort_order > 0)
                                 stage.sort_order = 0;
-                            else stage.sort_order = next_sort_idx++;
+                            else stage.sort_order = get_next_sort_order(goal.stages);
                         }
-                        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Click to assign stage sort order");
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            if (stage.sort_order > 0) {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to remove stage sort order");
+                            } else {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to assign stage sort order");
+                            }
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
                         ImGui::EndGroup();
 
                         ImGui::SameLine();
@@ -7503,10 +7652,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (import_zip_has_icons) {
             ImGui::Checkbox("Import bundled icon files", &import_icons_checkbox);
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip(
-                    "Extracts the icon files bundled in this zip into your resources/icons/ folder.\n"
-                    "Icon paths in the imported template will be updated automatically to point to them.\n"
-                    "Disable this if you already have the required icons installed.");
+                char tooltip_buffer[512];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Extracts the icon files bundled in this zip into your resources/icons/ folder.\n"
+                         "Icon paths in the imported template will be updated automatically to point to them.\n"
+                         "Disable this if you already have the required icons installed.");
+                ImGui::SetTooltip("%s", tooltip_buffer);
             }
         }
 
@@ -7926,8 +8077,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                              "Changes the behavior of the SELECTION tools.\n\n"
                              "CHECKED: 'Select/Deselect All' and Shift+Click affect criteria.\n\n"
                              "UNCHECKED: 'Select/Deselect All' and Shift+Click affect parent advancements only.");
-                    ImGui::SetTooltip(
-                        "%s", include_criteria_tooltip_buffer);
+                    ImGui::SetTooltip("%s", include_criteria_tooltip_buffer);
                 }
             }
         } // End of batch import
