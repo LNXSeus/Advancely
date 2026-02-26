@@ -31,7 +31,6 @@ extern "C" {
 #include "dmon.h"
 #include <cJSON.h>
 
-// #define MINIZ_IMPLEMENTATION // TODO: Remove
 #include "external/miniz.h"
 }
 
@@ -947,7 +946,6 @@ int main(int argc, char *argv[]) {
 
                         // 1. Read the header from the start of the buffer.
                         memcpy(&header, buffer_head, sizeof(OverlayIPCHeader));
-                        // buffer_head += sizeof(OverlayIPCHeader); // Move pointer past the header. // TODO: Remove?
 
                         // 2. Update the proxy tracker with the live data from the header.
                         strncpy(proxy_tracker.world_name, header.world_name, MAX_PATH_LENGTH - 1);
