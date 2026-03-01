@@ -80,7 +80,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_TRACKER_SECTION_CUSTOM_WIDTH_ENABLED false // Default for *each* section's checkbox
 #define DEFAULT_TRACKER_SECTION_ITEM_WIDTH 128.0f // Default item width in pixels
 
-#define DEFAULT_SCROLLABLE_LIST_THRESHOLD 16 // Items before scrolling kicks in // TODO: Figure out best value
+#define DEFAULT_SCROLLABLE_LIST_THRESHOLD 16 // Items before scrolling kicks in
 #define DEFAULT_TRACKER_LIST_SCROLL_SPEED 36.0f // Default pixels per scroll step
 
 #define DEFAULT_NOTES_USE_ROBOTO false // Default: use the standard Minecraft font for notes otherwise roboto

@@ -534,7 +534,6 @@ bool get_saves_path(char *out_path, size_t max_len, PathMode mode, const char *m
             log_message(LOG_ERROR, "[PATH UTILS] Fixed world path is empty.\n");
         }
     }
-    // TODO: Continue here (2nd last message), then jump up and continue AFTER step 3b
 
     // normalize path
     if (success) {

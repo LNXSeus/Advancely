@@ -1749,8 +1749,6 @@ int main(int argc, char *argv[]) {
                 }
             }
 
-
-            // TODO: Not passing an overlay right now
             handle_global_events(tracker, nullptr, &app_settings, &is_running, &settings_opened, &deltaTime);
 
 
