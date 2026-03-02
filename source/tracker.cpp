@@ -6463,7 +6463,7 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
         if (len == 0) continue;
 
         // Decrypt.
-        std::string decrypted = t->hermes_rotator.decryptLine(std::string(line_buf, len));
+        std::string decrypted = t->hermes_rotator.processLine(std::string(line_buf, len));
 
         cJSON *event = cJSON_ParseWithLength(decrypted.c_str(), decrypted.size());
         if (!event) {

@@ -10,17 +10,32 @@
 // C++ port of Rotator.ROT_HERMES from the Hermes Minecraft mod
 // (https://github.com/DuncanRuns/Hermes).
 //
-// Hermes encrypts its live play.log (in the world's hermes/restricted/ folder)
-// using a modified ROT47 cipher: the printable-ASCII charset is first shuffled
-// with a seeded Java LCG, then shifted by 47, and finally a partial byte-array
-// reversal ("halfReverse") is applied on top of the substitution.
 //
-// This file provides DECRYPTION only, which is all Advancely needs.
-// Usage:
-//
-//   HermesRotator rot;                        // build tables once
-//   std::string json = rot.decryptLine(line); // decrypt one ciphered line
-//
+// If this class is copied for external tools using live data, please also include the warning!
+
+/**
+ * WARNING: USING CIPHERED DATA DURING THE RUN IS NOT ALLOWED, PLEASE CONTACT THE SPEEDRUN.COM/MC MODERATION TEAM IF YOU WANT TO USE CIPHERED DATA.
+ * <br>
+ * AVERTISSEMENT : L’UTILISATION DE DONNÉES CHIFFRÉES PENDANT L’EXÉCUTION N’EST PAS AUTORISÉE. VEUILLEZ CONTACTER L’ÉQUIPE DE MODÉRATION DE SPEEDRUN.COM/MC SI VOUS SOUHAITEZ UTILISER DES DONNÉES CHIFFRÉES.
+ * <br>
+ * ADVERTENCIA: NO SE PERMITE EL USO DE DATOS CIFRADOS DURANTE LA EJECUCIÓN. POR FAVOR, CONTACTE AL EQUIPO DE MODERACIÓN DE SPEEDRUN.COM/MC SI DESEA UTILIZAR DATOS CIFRADOS.
+ * <br>
+ * WARNUNG: DIE VERWENDUNG VON VERSCHLÜSSELTEN DATEN WÄHREND DES LAUFS IST NICHT ERLAUBT. BITTE KONTAKTIEREN SIE DAS MODERATIONSTEAM VON SPEEDRUN.COM/MC, WENN SIE VERSCHLÜSSELTE DATEN VERWENDEN MÖCHTEN.
+ * <br>
+ * ПОПЕРЕДЖЕННЯ: ВИКОРИСТАННЯ ЗАШИФРОВАНИХ ДАНИХ ПІД ЧАС СПІДРАНУ НЕ ДОЗВОЛЕНО. БУДЬ ЛАСКА, ЗВ’ЯЖІТЬСЯ З МОДЕРАЦІЙНОЮ КОМАНДОЮ SPEEDRUN.COM/MC, ЯКЩО ВИ ХОЧЕТЕ ВИКОРИСТОВУВАТИ ЗАШИФРОВАНІ ДАНІ.
+ * <br>
+ * AVVISO: L’USO DI DATI CIFRATI DURANTE L’ESECUZIONE NON È CONSENTITO. SI PREGA DI CONTATTARE IL TEAM DI MODERAZIONE DI SPEEDRUN.COM/MC SE SI DESIDERA UTILIZZARE DATI CIFRATI.
+ * <br>
+ * AVISO: NÃO É PERMITIDO O USO DE DADOS CIFRADOS DURANTE A EXECUÇÃO. POR FAVOR, ENTRE EM CONTATO COM A EQUIPE DE MODERAÇÃO DE SPEEDRUN.COM/MC SE QUISER UTILIZAR DADOS CIFRADOS.
+ * <br>
+ * ПРЕДУПРЕЖДЕНИЕ: ИСПОЛЬЗОВАНИЕ ЗАШИФРОВАННЫХ ДАННЫХ ВО ВРЕМЯ ЗАПУСКА ЗАПРЕЩЕНО. ЕСЛИ ВЫ ХОТИТЕ ИСПОЛЬЗОВАТЬ ЗАШИФРОВАННЫЕ ДАННЫЕ, ПОЖАЛУЙСТА, СВЯЖИТЕСЬ С МОДЕРАЦИОННОЙ КОМАНДОЙ SPEEDRUN.COM/MC.
+ * <br>
+ * 警告：运行过程中不允许使用加密数据，如需使用加密数据，请联系 SPEEDRUN.COM/MC 的管理团队。
+ * <br>
+ * 警告：実行中に暗号化されたデータを使用することは許可されていません。暗号化データを使用したい場合は、SPEEDRUN.COM/MC のモデレーションチームに連絡してください。
+ * <br>
+ * 경고: 실행 중 암호화된 데이터를 사용하는 것은 허용되지 않습니다. 암호화된 데이터를 사용하려면 SPEEDRUN.COM/MC의 모더레이션 팀에 문의하십시오.
+ */
 
 #pragma once
 
@@ -72,43 +87,19 @@ public:
     }
 };
 
-
-// ============================================================
-//  HermesRotator
-//
-//  Replicates Rotator.ROT_HERMES from the Hermes mod.
-//
-//  Encryption (done by Hermes):
-//    1. rotate()       – substitution via shuffled+shifted swap table
-//    2. halfReverse()  – partial array reversal
-//
-//  Decryption (what Advancely needs):
-//    1. halfReverse()      – self-inverse; undoes step 2 above
-//    2. inverseRotate()    – inverse substitution; undoes step 1 above
-//
-//  Construct once and reuse; the tables are constant after init.
-// ============================================================
 class HermesRotator {
-    // Printable ASCII range: '!' (33) .. '~' (126) – 94 characters
     static constexpr uint8_t MIN_VAL     = 33;
     static constexpr uint8_t MAX_VAL     = 126;
-    static constexpr int     N           = 94;   // charset size
+    static constexpr int     N           = 94;
     static constexpr int64_t SHUFFLE_SEED = 7499203634667178692LL;
 
-    uint8_t swapArray_[N];    // forward substitution  (encrypt, not used by Advancely)
-    uint8_t invSwapArray_[N]; // inverse substitution  (decrypt)
+    uint8_t substitutionTable_[N];
 
-    // --------------------------------------------------------
-    // Build swapArray_ and invSwapArray_ once at construction.
-    // --------------------------------------------------------
     void buildTables() {
-        // 1. Start with printable ASCII in order
         uint8_t chars[N];
         for (int i = 0; i < N; i++)
             chars[i] = (uint8_t)(MIN_VAL + i);
 
-        // 2. Shuffle using Java's seeded LCG
-        //    (pool.remove(random.nextInt(pool.size())) in Java)
         JavaRandom rng(SHUFFLE_SEED);
         std::vector<uint8_t> pool(chars, chars + N);
         for (int i = 0; i < N; i++) {
@@ -117,29 +108,14 @@ class HermesRotator {
             pool.erase(pool.begin() + idx);
         }
 
-        // 3. Initialise swap table to identity
         for (int i = 0; i < N; i++)
-            swapArray_[i] = (uint8_t)(MIN_VAL + i);
+            substitutionTable_[i] = (uint8_t)(MIN_VAL + i);
 
-        // 4. Apply rotation by N/2 = 47 positions
-        const int shift = N / 2; // 47
+        const int shift = N / 2;
         for (int i = 0; i < N; i++)
-            swapArray_[chars[i] - MIN_VAL] = chars[(i + shift) % N];
-
-        // 5. Derive the inverse table from the forward table
-        for (int i = 0; i < N; i++)
-            invSwapArray_[swapArray_[i] - MIN_VAL] = (uint8_t)(MIN_VAL + i);
+            substitutionTable_[chars[i] - MIN_VAL] = chars[(i + shift) % N];
     }
 
-    // --------------------------------------------------------
-    //  halfReverse – matches Rotator.halfReverse() in Java.
-    //
-    //  For i = 0, 2, 4, ... (even indices only) in [0, len/2):
-    //    swap bytes[i] <-> bytes[len - 1 - i]
-    //
-    //  Odd-indexed positions in the first half are NOT touched.
-    //  Calling this twice restores the original array (self-inverse).
-    // --------------------------------------------------------
     static void halfReverse_(uint8_t* bytes, int len) {
         for (int i = 0; i < len / 2; i += 2) {
             uint8_t tmp        = bytes[i];
@@ -148,63 +124,28 @@ class HermesRotator {
         }
     }
 
-    // Forward substitution (kept for completeness / future use)
-    void rotate_(uint8_t* bytes, int len) const {
+    void applySubstitution_(uint8_t* bytes, int len) const {
         for (int i = 0; i < len; i++) {
             uint8_t c = bytes[i];
             if (c >= MIN_VAL && c <= MAX_VAL)
-                bytes[i] = swapArray_[c - MIN_VAL];
-        }
-    }
-
-    // Inverse substitution – undoes rotate_()
-    void inverseRotate_(uint8_t* bytes, int len) const {
-        for (int i = 0; i < len; i++) {
-            uint8_t c = bytes[i];
-            if (c >= MIN_VAL && c <= MAX_VAL)
-                bytes[i] = invSwapArray_[c - MIN_VAL];
+                bytes[i] = substitutionTable_[c - MIN_VAL];
         }
     }
 
 public:
-    // Build the substitution tables on construction (cheap; done once).
     HermesRotator() { buildTables(); }
 
-    // ----------------------------------------------------------
-    //  decryptLine – decrypt one line from hermes/restricted/play.log
-    //
-    //  Hermes encrypted it with: rotate() then halfReverse()
-    //  We reverse both operations in reverse order.
-    //
-    //  `bytes` is modified in-place.  `len` must be the byte count
-    //  of the line WITHOUT any trailing newline characters.
-    // ----------------------------------------------------------
-    void decryptLine(uint8_t* bytes, int len) const {
-        halfReverse_(bytes, len);   // undo halfReverse first
-        inverseRotate_(bytes, len); // then undo the substitution
+    void processLine(uint8_t* bytes, int len) const {
+        halfReverse_(bytes, len);
+        applySubstitution_(bytes, len);
     }
 
-    // Convenience overload for std::string lines.
-    // Strips a trailing '\r' if present (Windows line endings).
-    std::string decryptLine(const std::string& line) const {
+    std::string processLine(const std::string& line) const {
         std::string out = line;
-        // Strip trailing CR if the file was written with CRLF endings
         if (!out.empty() && out.back() == '\r')
             out.pop_back();
 
-        decryptLine(reinterpret_cast<uint8_t*>(out.data()), (int)out.size());
-        return out;
-    }
-
-    // ----------------------------------------------------------
-    //  encryptLine – provided for completeness / testing only.
-    //  Advancely never writes to the play.log.
-    // ----------------------------------------------------------
-    std::string encryptLine(const std::string& line) const {
-        std::string out = line;
-        uint8_t* b = reinterpret_cast<uint8_t*>(out.data());
-        rotate_(b, (int)out.size());
-        halfReverse_(b, (int)out.size());
+        processLine(reinterpret_cast<uint8_t*>(out.data()), (int)out.size());
         return out;
     }
 };
