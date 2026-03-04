@@ -4090,7 +4090,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                                        int count, const char *section_title) {
     // LOD Thresholds
     const float LOD_TEXT_MAIN_THRESHOLD = settings->lod_text_main_threshold; // Hide Main Name
-    const float LOD_TEXT_SUB_THRESHOLD  = settings->lod_text_sub_threshold;  // Hide Progress Text
+    const float LOD_TEXT_SUB_THRESHOLD = settings->lod_text_sub_threshold; // Hide Progress Text
 
     // Pre-calculate line heights once per frame (Optimization)
     const float main_text_line_height = settings->tracker_font_size;
@@ -6444,30 +6444,46 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
     if (fseek(t->hermes_play_log, t->hermes_file_offset, SEEK_SET) != 0)
         return;
 
-    char line_buf[8192];
     bool any_changed = false;
 
-    while (fgets(line_buf, sizeof(line_buf), t->hermes_play_log)) {
-        size_t len = strlen(line_buf);
-        if (len == 0) continue;
+    while (true) {
+        long start_offset = ftell(t->hermes_play_log);
+        std::string line_buf;
+        char chunk[8192];
+        bool newline_found = false;
 
-        // Incomplete line — Minecraft is still writing. Retry next frame.
-        if (line_buf[len - 1] != '\n') break;
+        // Read chunks until we hit the end of the line or EOF
+        while (fgets(chunk, sizeof(chunk), t->hermes_play_log)) {
+            line_buf += chunk;
+            if (!line_buf.empty() && line_buf.back() == '\n') {
+                newline_found = true;
+                break;
+            }
+        }
+
+        if (!newline_found) {
+            // Incomplete line — Minecraft is still writing or we reached EOF. Retry next frame.
+            // Reset to start of this line so we read it completely next time.
+            fseek(t->hermes_play_log, start_offset, SEEK_SET);
+            break;
+        }
 
         // Commit read position past this complete line.
         t->hermes_file_offset = ftell(t->hermes_play_log);
 
         // Strip trailing CR/LF.
-        while (len > 0 && (line_buf[len - 1] == '\n' || line_buf[len - 1] == '\r'))
-            line_buf[--len] = '\0';
-        if (len == 0) continue;
+        while (!line_buf.empty() && (line_buf.back() == '\n' || line_buf.back() == '\r')) {
+            line_buf.pop_back();
+        }
+
+        if (line_buf.empty()) continue;
 
         // Decrypt.
-        std::string decrypted = t->hermes_rotator.processLine(std::string(line_buf, len));
+        std::string decrypted = t->hermes_rotator.processLine(line_buf);
 
         cJSON *event = cJSON_ParseWithLength(decrypted.c_str(), decrypted.size());
         if (!event) {
-            log_message(LOG_ERROR, "[TRACKER - HERMES] Failed to parse decrypted line (len=%zu)\n", len);
+            log_message(LOG_ERROR, "[TRACKER - HERMES] Failed to parse decrypted line (len=%zu)\n", line_buf.size());
             continue;
         }
 
