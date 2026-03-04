@@ -728,7 +728,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     "  when the game actually saves.");
                 ImGui::Spacing();
                 ImGui::TextDisabled("Requires Hermes to be installed and a world to be loaded.");
-                ImGui::TextDisabled("The mod's log is at: [World]/hermes/restricted/play.log.enc");
                 ImGui::PopTextWrapPos();
                 ImGui::EndTooltip();
             }
