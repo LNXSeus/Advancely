@@ -16,17 +16,13 @@
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
 
   <releases>
-    <release version="1.1.1" date="2026-02-20">
+    <release version="1.2.0" date="2026-03-04">
       <description>
         <ul>
-          <li>Introduced native Linux system packages (.deb and .rpm).</li>
-          <li>Implemented XDG compliance: User data is now stored in ~/.local/share/advancely.</li>
-          <li>Fixed dependency issues by bundling SDL3 libraries.</li>
-          <li>Added Hermes Mod Support.</li>
-          <li>Added support for Ctrl/Cmd + S to save templates and Settings.</li>
-          <li>Added option to track specific world.</li>
-          <li>Out-Of-Bounds protection.</li>
-          <li>Other small fixes and changes. See GitHub for more details.</li>
+          <li>Brought back Hermes support as it's legalized for Advancely now.</li>
+          <li>Sorted settings into tabs.</li>
+          <li>Importing and exporting templates allows icons to go with it.</li>
+          <li>Added improved sorting within template editor.</li>
         </ul>
       </description>
     </release>
