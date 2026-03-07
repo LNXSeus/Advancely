@@ -625,6 +625,7 @@ Nearly every aspect of the overlay can be tailored to your liking from the setti
     * [6.2.5 Multi-Stage Goals](https://youtu.be/Rxd1RJqg2WQ?t=27m45s)
     * [6.2.6 Unlocks](https://youtu.be/Rxd1RJqg2WQ?t=28m56s)
 * [6.3 Buttons](https://youtu.be/Rxd1RJqg2WQ?t=29m05s)
+    * [6.3.1 Sorting Badges](https://youtu.be/lKDQGEbx20M?t=19m53s)
 * [6.4 Languages](https://youtu.be/Rxd1RJqg2WQ?t=29m53s)
 * [6.5 Search Bar](https://youtu.be/Rxd1RJqg2WQ?t=30m46s)
 * [6.6 Legacy Versions](https://youtu.be/Rxd1RJqg2WQ?t=31m23s)
