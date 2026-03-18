@@ -75,7 +75,7 @@ Love using Advancely? You can have your name immortalized in the tracker!
 
 Simply [**donate here**](https://streamlabs.com/lnxseus/tip) and include the word "**Advancely**" in your donation
 message. **With the next release** your name will be added to the official supporter showcase that appears on the stream
-overlay when anyone completes a run.
+overlay when anyone completes a run and you'll get a special role on my [Discord](https://discord.gg/TyNgXDz).
 
 Thank you for supporting the project!
 

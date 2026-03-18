@@ -1746,6 +1746,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              " • A negative scroll speed animates items from right to left.\n"
                              " • Horizontal spacing depends on the length of the display text.\n\n"
                              "IMPORTANT FOR STREAMERS:\n"
+                             "On Windows you MUST use GAME CAPTURE for the overlay (NOT window capture).\n"
                              "Applying settings will restart the overlay window.\n"
                              "You may need to reselect it in your streaming software (e.g., OBS).",
                              advancements_label_plural_lowercase
@@ -2616,7 +2617,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                  "Support the development of Advancely! <3\n\n"
                  "IMPORTANT: Please include the word 'Advancely' in your\n"
                  "donation message to be immortalized on the overlay's\n"
-                 "supporter showcase after a completed run!");
+                 "supporter showcase after a completed run and receive a\n"
+                 "special role on discord!");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
 
