@@ -5449,7 +5449,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
     // Enforce minimum width for the title bar
     const char *info_window_title =
-            "Info | ESC: Settings | Pan: RMB/MMB Drag | Zoom: Wheel | Click: LMB | Move Win: LMB Drag";
+        "Info | ESC: Settings | SPACE: Lock | Pan: RMB/MMB Drag | Zoom: Wheel | Click: LMB | Move Win: LMB Drag";
     ImVec2 title_size = ImGui::CalcTextSize(info_window_title);
     // Add padding (WindowPadding * 2 + extra for safety/frame borders)
     float min_info_width = title_size.x + (ImGui::GetStyle().WindowPadding.x * 2.0f) + 40.0f;
