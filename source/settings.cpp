@@ -2540,7 +2540,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                  "  - Check For Updates: %s\n"
                  "  - Print Debug To Console: %s\n"
                  "  - Show Welcome on Startup: %s; Notes Use Settings Font: %s\n\n"
-                 "More found in resources/reference_files/Default_Settings.png",
+                 "More found in resources/reference_files/settings.json",
 
                  DEFAULT_PATH_MODE,
                  DEFAULT_VERSION,
