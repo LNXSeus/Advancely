@@ -89,6 +89,42 @@ static bool is_valid_filename_part_for_ui(const char *part) {
     return true;
 }
 
+// Local helpers for manual positions in the editor
+static void parse_editor_manual_pos(cJSON *parent_json, const char *key, ManualPos *pos) {
+    pos->is_set = false;
+    pos->x = 0.0f;
+    pos->y = 0.0f;
+    cJSON *pos_obj = cJSON_GetObjectItem(parent_json, key);
+    if (pos_obj) {
+        cJSON *x = cJSON_GetObjectItem(pos_obj, "x");
+        cJSON *y = cJSON_GetObjectItem(pos_obj, "y");
+        if (cJSON_IsNumber(x) && cJSON_IsNumber(y)) {
+            pos->x = (float) x->valuedouble;
+            pos->y = (float) y->valuedouble;
+            pos->is_set = true;
+        }
+    }
+}
+
+static void save_editor_manual_pos(cJSON *parent_json, const char *key, const ManualPos &pos) {
+    if (pos.is_set) {
+        cJSON *pos_obj = cJSON_CreateObject();
+        cJSON_AddNumberToObject(pos_obj, "x", pos.x);
+        cJSON_AddNumberToObject(pos_obj, "y", pos.y);
+        cJSON_AddItemToObject(parent_json, key, pos_obj);
+    }
+}
+
+static bool are_manual_positions_different(const ManualPos &a, const ManualPos &b) {
+    if (a.is_set != b.is_set) return true;
+    if (a.is_set) {
+        if (a.x != b.x || a.y != b.y) return true;
+    }
+    return false;
+}
+
+// End of local helpers for manual positioning
+
 // In-memory representation of a template for editing
 struct EditorTrackableItem {
     char root_name[192];
@@ -98,6 +134,9 @@ struct EditorTrackableItem {
     bool is_hidden;
     bool in_2nd_row;
     int sort_order = 0;
+
+    ManualPos icon_pos = {};
+    ManualPos text_pos = {};
 };
 
 // A struct to hold a category (like an advancement) and its criteria
@@ -111,6 +150,10 @@ struct EditorTrackableCategory {
     bool is_simple_stat; // UI flag to distinguish simple vs complex stats
     std::vector<EditorTrackableItem> criteria; // Criteria then are trackable items
     int sort_order = 0;
+
+    ManualPos icon_pos = {};
+    ManualPos text_pos = {};
+    ManualPos progress_pos = {};
 };
 
 // Structs for Multi-Stage Goal editing
@@ -123,6 +166,9 @@ struct EditorSubGoal {
     int required_progress;
     char icon_path[256]; // Icon path for each stage
     int sort_order = 0;
+
+    ManualPos icon_pos = {};
+    ManualPos text_pos = {};
 };
 
 struct EditorMultiStageGoal {
@@ -134,6 +180,10 @@ struct EditorMultiStageGoal {
     bool use_stage_icons;
     std::vector<EditorSubGoal> stages;
     int sort_order = 0;
+
+    ManualPos icon_pos = {};
+    ManualPos text_pos = {};
+    ManualPos progress_pos = {};
 };
 
 struct EditorTemplate {
@@ -144,17 +194,19 @@ struct EditorTemplate {
     std::vector<EditorMultiStageGoal> multi_stage_goals;
 };
 
-// Helper function to compare two EditorTrackableItem structs
+// Helper function to compare two EditorTrackableItem structs, custom goals and unlocks
 static bool are_editor_items_different(const EditorTrackableItem &a, const EditorTrackableItem &b) {
     return strcmp(a.root_name, b.root_name) != 0 ||
            strcmp(a.display_name, b.display_name) != 0 ||
            strcmp(a.icon_path, b.icon_path) != 0 ||
            a.goal != b.goal ||
            a.is_hidden != b.is_hidden ||
-           a.in_2nd_row != b.in_2nd_row;
+           a.in_2nd_row != b.in_2nd_row ||
+           are_manual_positions_different(a.icon_pos, b.icon_pos) ||
+           are_manual_positions_different(a.text_pos, b.text_pos);
 }
 
-// Helper function to compare two EditorTrackableCategory structs
+// Helper function to compare two EditorTrackableCategory structs, advancements and stats
 static bool are_editor_categories_different(const EditorTrackableCategory &a, const EditorTrackableCategory &b) {
     if (strcmp(a.root_name, b.root_name) != 0 ||
         strcmp(a.display_name, b.display_name) != 0 ||
@@ -163,6 +215,9 @@ static bool are_editor_categories_different(const EditorTrackableCategory &a, co
         a.in_2nd_row != b.in_2nd_row ||
         a.is_recipe != b.is_recipe ||
         a.is_simple_stat != b.is_simple_stat ||
+        are_manual_positions_different(a.icon_pos, b.icon_pos) ||
+        are_manual_positions_different(a.text_pos, b.text_pos) ||
+        are_manual_positions_different(a.progress_pos, b.progress_pos) ||
         a.criteria.size() != b.criteria.size()) {
         return true;
     }
@@ -174,7 +229,7 @@ static bool are_editor_categories_different(const EditorTrackableCategory &a, co
     return false;
 }
 
-// Comparison helpers for multi-stage goals
+// Comparison helpers for multi-stage goals, stages
 static bool are_editor_sub_goals_different(const EditorSubGoal &a, const EditorSubGoal &b) {
     return strcmp(a.stage_id, b.stage_id) != 0 ||
            strcmp(a.display_text, b.display_text) != 0 ||
@@ -185,6 +240,7 @@ static bool are_editor_sub_goals_different(const EditorSubGoal &a, const EditorS
            strcmp(a.icon_path, b.icon_path) != 0;
 }
 
+// Multi-stage goals
 static bool are_editor_multi_stage_goals_different(const EditorMultiStageGoal &a, const EditorMultiStageGoal &b) {
     if (strcmp(a.root_name, b.root_name) != 0 ||
         strcmp(a.display_name, b.display_name) != 0 ||
@@ -192,6 +248,9 @@ static bool are_editor_multi_stage_goals_different(const EditorMultiStageGoal &a
         a.is_hidden != b.is_hidden ||
         a.in_2nd_row != b.in_2nd_row ||
         a.use_stage_icons != b.use_stage_icons ||
+        are_manual_positions_different(a.icon_pos, b.icon_pos) ||
+        are_manual_positions_different(a.text_pos, b.text_pos) ||
+        are_manual_positions_different(a.progress_pos, b.progress_pos) ||
         a.stages.size() != b.stages.size()) {
         return true;
     }
@@ -533,6 +592,9 @@ static void parse_editor_trackable_items(cJSON *json_array, std::vector<EditorTr
             new_item.display_name[sizeof(new_item.display_name) - 1] = '\0';
         }
 
+        // Parse manual positions
+        parse_editor_manual_pos(item_json, "icon_pos", &new_item.icon_pos);
+        parse_editor_manual_pos(item_json, "text_pos", &new_item.text_pos);
 
         item_vector.push_back(new_item);
     }
@@ -561,6 +623,11 @@ static void parse_editor_trackable_categories(cJSON *json_object,
         }
         if (cJSON_IsBool(hidden)) new_cat.is_hidden = cJSON_IsTrue(hidden);
         if (cJSON_IsBool(is_recipe_json)) new_cat.is_recipe = cJSON_IsTrue(is_recipe_json);
+
+        // Parse manual positions for the parent
+        parse_editor_manual_pos(category_json, "icon_pos", &new_cat.icon_pos);
+        parse_editor_manual_pos(category_json, "text_pos", &new_cat.text_pos);
+        parse_editor_manual_pos(category_json, "progress_pos", &new_cat.progress_pos);
 
         char lang_key[256];
         char temp_root_name[291];
@@ -614,6 +681,10 @@ static void parse_editor_trackable_categories(cJSON *json_object,
                     new_crit.display_name[sizeof(new_crit.display_name) - 1] = '\0';
                 }
 
+                // Parse manual positions for the criteria
+                parse_editor_manual_pos(criterion_json, "icon_pos", &new_crit.icon_pos);
+                parse_editor_manual_pos(criterion_json, "text_pos", &new_crit.text_pos);
+
                 criteria_items.push_back(new_crit);
             }
             new_cat.criteria = criteria_items;
@@ -646,6 +717,11 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
         }
         if (cJSON_IsBool(hidden)) new_cat.is_hidden = cJSON_IsTrue(hidden);
         if (cJSON_IsBool(in_2nd_row)) new_cat.in_2nd_row = cJSON_IsTrue(in_2nd_row); // Only for main stat not sub-stats
+
+        // Parse manual positions for the parent
+        parse_editor_manual_pos(category_json, "icon_pos", &new_cat.icon_pos);
+        parse_editor_manual_pos(category_json, "text_pos", &new_cat.text_pos);
+        parse_editor_manual_pos(category_json, "progress_pos", &new_cat.progress_pos);
 
         // Language file
         char cat_lang_key[256];
@@ -692,6 +768,10 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
                     strncpy(new_crit.display_name, new_crit.root_name, sizeof(new_crit.display_name) - 1);
                     new_crit.display_name[sizeof(new_crit.display_name) - 1] = '\0';
                 }
+
+                // Parse manual positions for the criteria
+                parse_editor_manual_pos(criterion_json, "icon_pos", &new_crit.icon_pos);
+                parse_editor_manual_pos(criterion_json, "text_pos", &new_crit.text_pos);
 
                 new_cat.criteria.push_back(new_crit);
             }
@@ -893,6 +973,8 @@ static void serialize_editor_trackable_items(cJSON *parent, const char *key,
         if (item.in_2nd_row) {
             cJSON_AddBoolToObject(item_json, "in_2nd_row", true);
         }
+        save_editor_manual_pos(item_json, "icon_pos", item.icon_pos);
+        save_editor_manual_pos(item_json, "text_pos", item.text_pos);
         cJSON_AddItemToArray(array, item_json);
     }
     cJSON_AddItemToObject(parent, key, array);
@@ -921,10 +1003,15 @@ static void serialize_editor_trackable_categories(cJSON *parent, const char *key
             if (crit.is_hidden) {
                 cJSON_AddBoolToObject(crit_json, "hidden", crit.is_hidden);
             }
+            save_editor_manual_pos(crit_json, "icon_pos", crit.icon_pos);
+            save_editor_manual_pos(crit_json, "text_pos", crit.text_pos);
             cJSON_AddItemToObject(criteria_object, crit.root_name, crit_json);
         }
         cJSON_AddItemToObject(cat_json, "criteria", criteria_object);
 
+        save_editor_manual_pos(cat_json, "icon_pos", cat.icon_pos);
+        save_editor_manual_pos(cat_json, "text_pos", cat.text_pos);
+        save_editor_manual_pos(cat_json, "progress_pos", cat.progress_pos);
         cJSON_AddItemToObject(cat_object, cat.root_name, cat_json);
     }
     cJSON_AddItemToObject(parent, key, cat_object);
@@ -961,10 +1048,16 @@ static void serialize_editor_stats(cJSON *parent, const std::vector<EditorTracka
                 if (crit.goal != 0) {
                     cJSON_AddNumberToObject(crit_json, "target", crit.goal);
                 }
+                save_editor_manual_pos(crit_json, "icon_pos", crit.icon_pos);
+                save_editor_manual_pos(crit_json, "text_pos", crit.text_pos);
                 cJSON_AddItemToObject(criteria_object, crit.root_name, crit_json);
             }
             cJSON_AddItemToObject(cat_json, "criteria", criteria_object);
         }
+
+        save_editor_manual_pos(cat_json, "icon_pos", cat.icon_pos);
+        save_editor_manual_pos(cat_json, "text_pos", cat.text_pos);
+        save_editor_manual_pos(cat_json, "progress_pos", cat.progress_pos);
         cJSON_AddItemToObject(cat_object, cat.root_name, cat_json);
     }
     cJSON_AddItemToObject(parent, "stats", cat_object);
@@ -1021,9 +1114,15 @@ static void serialize_editor_multi_stage_goals(cJSON *parent, const std::vector<
                 cJSON_AddNumberToObject(stage_json, "target", stage.required_progress);
             }
 
+            save_editor_manual_pos(stage_json, "icon_pos", stage.icon_pos);
+            save_editor_manual_pos(stage_json, "text_pos", stage.text_pos);
             cJSON_AddItemToArray(stages_array, stage_json);
         }
         cJSON_AddItemToObject(goal_json, "stages", stages_array);
+
+        save_editor_manual_pos(goal_json, "icon_pos", goal.icon_pos);
+        save_editor_manual_pos(goal_json, "text_pos", goal.text_pos);
+        save_editor_manual_pos(goal_json, "progress_pos", goal.progress_pos);
         cJSON_AddItemToArray(goals_array, goal_json);
     }
     cJSON_AddItemToObject(parent, "multi_stage_goals", goals_array);

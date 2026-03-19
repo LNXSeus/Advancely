@@ -883,6 +883,10 @@ _(Submit your template through the [official discord](https://discord.gg/TyNgXDz
 
 ## Known Limitations
 
+<details>
+<summary><strong>View Known Limitations</strong></summary>
+<br>
+
 * **Symbolic Links**: On Windows and macOS, the real-time file watcher may not function correctly if your
   `.minecraft/saves` folder is a symbolic link. For best results, please provide a direct path to your saves folder in
   the settings if you use a custom location.
@@ -903,6 +907,10 @@ _(Submit your template through the [official discord](https://discord.gg/TyNgXDz
   `advancely_overlay_log.txt` file will tell you about incompatible images.
   To fix this, re-save the images in a standard format or use ImageMagick:
   `magick mogrify -define png:format=png32 -interlace none -strip -depth 8 *.png`.
+* **Frame drops when no saves folder**: Whenever Advancely is set to track the active instance, 
+but no instance is open, it might hook onto a different java process and unsuccessfully try to locate a saves folder from it.
+
+</details>
 
 ***
 

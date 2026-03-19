@@ -156,6 +156,13 @@ typedef struct {
     Uint32 total_duration; // The sum of all delays, for looping
 } AnimatedTexture;
 
+// Represents a manually set position for an element on the tracker map
+struct ManualPos {
+    float x;
+    float y;
+    bool is_set; // True if the user has manually placed this, false to fallback to auto-layout
+};
+
 // A generic struct for a sub-item, like and advancement's criterion or a stat
 struct TrackableItem {
     char root_name[192]; // The unique ID, e.g., "minecraft:husbandry/balanced_diet"
@@ -187,6 +194,10 @@ struct TrackableItem {
     // Animation State
     float alpha; // Current transparency (1.0f = opaque, 0.0f = transparent)
     bool is_visible_on_overlay; // Tracks if the item should be rendered
+
+    // Manual Layout Positions
+    ManualPos icon_pos;
+    ManualPos text_pos;
 };
 
 
@@ -234,6 +245,11 @@ struct TrackableCategory {
 
     // Scroll state for long lists
     float scroll_y;
+
+    // Manual Layout Positions
+    ManualPos icon_pos;
+    ManualPos text_pos;
+    ManualPos progress_pos;
 };
 
 
@@ -263,6 +279,10 @@ struct SubGoal {
     SDL_Texture *texture;
     AnimatedTexture *anim_texture;
     uint64_t icon_hash;
+
+    // Manual Layout Positions
+    ManualPos icon_pos;
+    ManualPos text_pos;
 };
 
 // Represents a complete multi-stage goal
@@ -285,6 +305,11 @@ struct MultiStageGoal {
     // Animation State
     float alpha; // Current transparency (1.0f = opaque, 0.0f = transparent)
     bool is_visible_on_overlay; // Tracks if the item should be rendered
+
+    // Manual Layout Positions
+    ManualPos icon_pos;
+    ManualPos text_pos;
+    ManualPos progress_pos;
 };
 
 // The main container for all data loaded from the template files.
@@ -325,6 +350,9 @@ struct TemplateData {
     long long playtime_snapshot; // Stores playtime at world load for legacy versions
     char snapshot_world_name[MAX_PATH_LENGTH]; // The world the current snapshot belongs to
     char last_known_world_name[MAX_PATH_LENGTH]; // The last world the tracker was active in, to detect changes.
+
+    // For Manual Layout Positions
+    bool has_manual_layout; // If true, use manual layout positions and place all other automatic goals to the right
 };
 
 // PATHMODE AND VERSION STUFF

@@ -27,6 +27,7 @@
 #include "path_utils.h"
 #include "settings_utils.h" // For note related defaults as well
 #include "file_utils.h" // has the cJSON_from_file function
+#include "template_scanner.h" // For parse_manual_pos
 #include "temp_creator_utils.h"
 #include "global_event_handler.h"
 #include "format_utils.h"
@@ -1157,7 +1158,8 @@ static void tracker_update_stats_modern(Tracker *t, const cJSON *player_stats_js
 static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *lang_json,
                                      TrackableCategory ***categories_array,
                                      int *count, int *total_criteria_count, const char *lang_key_prefix,
-                                     bool is_stat_category, MC_Version version, const AppSettings *settings) {
+                                     bool is_stat_category, MC_Version version, const AppSettings *settings,
+                                     bool *template_has_manual_layout) {
     (void) settings;
     if (!category_json) {
         log_message(LOG_INFO, "[TRACKER] tracker_parse_categories: category_json is nullptr\n");
@@ -1188,6 +1190,10 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
         new_cat->is_hidden = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "hidden")); // Hide if hidden in template
         new_cat->is_recipe = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "is_recipe"));
         new_cat->in_2nd_row = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "in_2nd_row")); // 2nd row of overlay
+
+        parse_manual_pos(cat_json, "icon_pos", &new_cat->icon_pos, template_has_manual_layout);
+        parse_manual_pos(cat_json, "text_pos", &new_cat->text_pos, template_has_manual_layout);
+        parse_manual_pos(cat_json, "progress_pos", &new_cat->progress_pos, template_has_manual_layout);
 
         if (cat_json->string) {
             strncpy(new_cat->root_name, cat_json->string, sizeof(new_cat->root_name) - 1);
@@ -1279,6 +1285,8 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
 
                         // When hidden is true in template
                         new_crit->is_hidden = cJSON_IsTrue(cJSON_GetObjectItem(crit_item, "hidden"));
+                        parse_manual_pos(crit_item, "icon_pos", &new_crit->icon_pos, template_has_manual_layout);
+                        parse_manual_pos(crit_item, "text_pos", &new_crit->text_pos, template_has_manual_layout);
                         new_cat->is_recipe = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "is_recipe"));
 
                         strncpy(new_crit->root_name, crit_item->string, sizeof(new_crit->root_name) - 1);
@@ -1371,6 +1379,9 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                     strncpy(the_criterion->icon_path, new_cat->icon_path, sizeof(the_criterion->icon_path) - 1);
                     the_criterion->icon_path[sizeof(the_criterion->icon_path) - 1] = '\0';
                     the_criterion->is_shared = true; // Mark for overlay indicator
+
+                    the_criterion->icon_pos = new_cat->icon_pos;
+                    the_criterion->text_pos = new_cat->text_pos;
 
                     cJSON *target = cJSON_GetObjectItem(cat_json, "target");
                     if (cJSON_IsNumber(target)) the_criterion->goal = target->valueint;
@@ -1567,7 +1578,8 @@ static void tracker_detect_shared_icons(Tracker *t, const AppSettings *settings)
  */
 static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJSON *lang_json,
                                             TrackableItem ***items_array,
-                                            int *count, const char *lang_key_prefix, const AppSettings *settings) {
+                                            int *count, const char *lang_key_prefix, const AppSettings *settings,
+                                            bool *template_has_manual_layout) {
     (void) settings;
     (void) t;
     if (!category_json) {
@@ -1596,6 +1608,9 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
             // When hidden is true in template
             new_item->is_hidden = cJSON_IsTrue(cJSON_GetObjectItem(item_json, "hidden"));
             new_item->in_2nd_row = cJSON_IsTrue(cJSON_GetObjectItem(item_json, "in_2nd_row")); // 2nd row of overlay
+
+            parse_manual_pos(item_json, "icon_pos", &new_item->icon_pos, template_has_manual_layout);
+            parse_manual_pos(item_json, "text_pos", &new_item->text_pos, template_has_manual_layout);
 
             cJSON *root_name_json = cJSON_GetObjectItem(item_json, "root_name");
             if (cJSON_IsString(root_name_json)) {
@@ -1670,7 +1685,8 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
  */
 static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON *lang_json,
                                             MultiStageGoal ***goals_array,
-                                            int *count, const AppSettings *settings) {
+                                            int *count, const AppSettings *settings,
+                                            bool *template_has_manual_layout) {
     (void) t;
     (void) lang_json;
     (void) settings;
@@ -1711,6 +1727,10 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
         // Hide when hidden is true in template
         new_goal->is_hidden = cJSON_IsTrue(cJSON_GetObjectItem(goal_item_json, "hidden"));
         new_goal->in_2nd_row = cJSON_IsTrue(cJSON_GetObjectItem(goal_item_json, "in_2nd_row")); // 2nd row of overlay
+
+        parse_manual_pos(goal_item_json, "icon_pos", &new_goal->icon_pos, template_has_manual_layout);
+        parse_manual_pos(goal_item_json, "text_pos", &new_goal->text_pos, template_has_manual_layout);
+        parse_manual_pos(goal_item_json, "progress_pos", &new_goal->progress_pos, template_has_manual_layout);
 
         // Parse root_name and icon
         cJSON *root_name = cJSON_GetObjectItem(goal_item_json, "root_name");
@@ -1800,6 +1820,9 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
                     new_stage->root_name[sizeof(new_stage->root_name) - 1] = '\0';
                 }
                 if (cJSON_IsNumber(target_val)) new_stage->required_progress = target_val->valueint; // This is a number
+
+                parse_manual_pos(stage_item_json, "icon_pos", &new_stage->icon_pos, template_has_manual_layout);
+                parse_manual_pos(stage_item_json, "text_pos", &new_stage->text_pos, template_has_manual_layout);
 
 
                 // Look up stage display name from lang file
@@ -5449,7 +5472,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
     // Enforce minimum width for the title bar
     const char *info_window_title =
-        "Info | ESC: Settings | SPACE: Lock | Pan: RMB/MMB Drag | Zoom: Wheel | Click: LMB | Move Win: LMB Drag";
+            "Info | ESC: Settings | SPACE: Lock | Pan: RMB/MMB Drag | Zoom: Wheel | Click: LMB | Move Win: LMB Drag";
     ImVec2 title_size = ImGui::CalcTextSize(info_window_title);
     // Add padding (WindowPadding * 2 + extra for safety/frame borders)
     float min_info_width = title_size.x + (ImGui::GetStyle().WindowPadding.x * 2.0f) + 40.0f;
@@ -5633,6 +5656,10 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     ImVec2 reset_text_size = ImGui::CalcTextSize("Reset Layout");
     float reset_checkbox_width = frame_height + style.ItemInnerSpacing.x + reset_text_size.x + frame_padding_x * 0.5f;
 
+    ImVec2 manual_layout_text_size = ImGui::CalcTextSize("Manual Layout");
+    float manual_layout_checkbox_width = frame_height + style.ItemInnerSpacing.x + manual_layout_text_size.x +
+                                         frame_padding_x * 0.5f;
+
     ImVec2 notes_text_size = ImGui::CalcTextSize("Notes");
     float notes_checkbox_width = frame_height + style.ItemInnerSpacing.x + notes_text_size.x + frame_padding_x * 0.5f;
 
@@ -5642,6 +5669,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                                  search_box_width + button_padding_x +
                                  lock_checkbox_width + button_padding_x +
                                  reset_checkbox_width + button_padding_x +
+                                 manual_layout_checkbox_width + button_padding_x +
                                  notes_checkbox_width;
 
     // Calculate button height consistently
@@ -5805,6 +5833,22 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         snprintf(reset_layout_tooltip_buffer, sizeof(reset_layout_tooltip_buffer),
                  "Resets camera position and zoom level to their defaults.");
         ImGui::SetTooltip("%s", reset_layout_tooltip_buffer);
+    }
+
+    ImGui::SameLine();
+
+    ImGui::BeginDisabled(!t->template_data); // Prevent crashing if template_data is null
+    bool temp_manual = t->template_data ? t->template_data->has_manual_layout : false;
+    if (ImGui::Checkbox("Manual Layout", &temp_manual)) {
+        if (t->template_data) {
+            t->template_data->has_manual_layout = temp_manual;
+        }
+    }
+    ImGui::EndDisabled();
+
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        ImGui::SetTooltip("Toggles between procedural 'Auto Layout' and 'Manual Layout'.\n"
+                          "If the template contains any manual coordinates, this defaults to ON.");
     }
 
     ImGui::SameLine();
@@ -6616,11 +6660,15 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
 
 
     MC_Version version = settings_get_version_from_string(settings->version_str);
+
+    // Set flag to false -> so it's automatic placement
+    t->template_data->has_manual_layout = false;
+
     // Parse the 5 main categories
     // False as it's for advancements
     tracker_parse_categories(t, advancements_json, lang_json, &t->template_data->advancements,
                              &t->template_data->advancement_count, &t->template_data->total_criteria_count,
-                             "advancement.", false, version, settings);
+                             "advancement.", false, version, settings, &t->template_data->has_manual_layout);
 
     // After parsing, calculate the count of actual advancements (excluding recipes)
     t->template_data->advancement_goal_count = 0;
@@ -6637,19 +6685,22 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     // True as it's for stats
     tracker_parse_categories(t, stats_json, lang_json, &t->template_data->stats,
                              &t->template_data->stat_count, &t->template_data->stat_total_criteria_count, "stat.",
-                             true, version, settings);
+                             true, version, settings, &t->template_data->has_manual_layout);
 
     // Parse "unlock." prefix for unlocks
     tracker_parse_simple_trackables(t, unlocks_json, lang_json, &t->template_data->unlocks,
-                                    &t->template_data->unlock_count, "unlock.", settings);
+                                    &t->template_data->unlock_count, "unlock.", settings,
+                                    &t->template_data->has_manual_layout);
 
     // Parse "custom." prefix for custom goals
     tracker_parse_simple_trackables(t, custom_json, lang_json, &t->template_data->custom_goals,
-                                    &t->template_data->custom_goal_count, "custom.", settings);
+                                    &t->template_data->custom_goal_count, "custom.", settings,
+                                    &t->template_data->has_manual_layout);
 
     tracker_parse_multi_stage_goals(t, multi_stage_goals_json, lang_json,
                                     &t->template_data->multi_stage_goals,
-                                    &t->template_data->multi_stage_goal_count, settings);
+                                    &t->template_data->multi_stage_goal_count, settings,
+                                    &t->template_data->has_manual_layout);
 
 
     // Detect and flag criteria that are shared between multiple advancements

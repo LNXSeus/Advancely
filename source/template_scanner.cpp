@@ -30,6 +30,27 @@
 #define D_FILENAME(dirent) ((dirent)->d_name)
 #endif
 
+// Helper to read manual positions from JSON
+void parse_manual_pos(cJSON *parent_json, const char *key, ManualPos *pos, bool *template_has_manual_layout) {
+    pos->is_set = false;
+    pos->x = 0.0f;
+    pos->y = 0.0f;
+
+    cJSON *pos_obj = cJSON_GetObjectItemCaseSensitive(parent_json, key);
+    if (pos_obj && cJSON_IsObject(pos_obj)) {
+        cJSON *x_val = cJSON_GetObjectItemCaseSensitive(pos_obj, "x");
+        cJSON *y_val = cJSON_GetObjectItemCaseSensitive(pos_obj, "y");
+
+        if (cJSON_IsNumber(x_val) && cJSON_IsNumber(y_val)) {
+            pos->x = (float) x_val->valuedouble;
+            pos->y = (float) y_val->valuedouble;
+            pos->is_set = true;
+
+            if (template_has_manual_layout) *template_has_manual_layout = true;
+        }
+    }
+}
+
 // Helper to convert version string "1.16.1" to "1_16_1"
 static void version_to_filename_format(const char *version_in, char *version_out, size_t max_len) {
     strncpy(version_out, version_in, max_len - 1);
@@ -79,9 +100,10 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
                 const char *filename = D_FILENAME(find_file_data);
 
                 // --- Phase 1: Find main template files ---
-                const char* ext = strrchr(filename, '.');
+                const char *ext = strrchr(filename, '.');
                 // Universal filters for language, notes, and non-json files
-                if (!ext || strcmp(ext, ".json") != 0 || strstr(filename, "_lang") || strstr(filename, "_notes")) continue;
+                if (!ext || strcmp(ext, ".json") != 0 || strstr(filename, "_lang") || strstr(filename, "_notes"))
+                    continue;
 
                 // Legacy-only filter for _snapshot files
                 if (is_legacy_version && strstr(filename, "_snapshot")) continue;
@@ -97,7 +119,7 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
                 snprintf(expected_prefix, sizeof(expected_prefix), "%s_%s", version_fmt, category);
                 if (strncmp(base_name, expected_prefix, strlen(expected_prefix)) != 0) continue;
 
-                const char* flag_start = base_name + strlen(expected_prefix);
+                const char *flag_start = base_name + strlen(expected_prefix);
 
                 DiscoveredTemplate dt = {};
                 strncpy(dt.category, category, sizeof(dt.category) - 1);
@@ -110,8 +132,8 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
                 HANDLE h_find_lang = FindFirstFileA(file_search_path, &find_lang_data);
                 if (h_find_lang != INVALID_HANDLE_VALUE) {
                     do {
-                        const char* lang_filename = D_FILENAME(find_lang_data);
-                        const char* lang_part = strstr(lang_filename, "_lang");
+                        const char *lang_filename = D_FILENAME(find_lang_data);
+                        const char *lang_part = strstr(lang_filename, "_lang");
                         if (lang_part) {
                             char lang_base_name[MAX_PATH_LENGTH];
                             strncpy(lang_base_name, lang_filename, lang_part - lang_filename);
@@ -122,10 +144,11 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
                                 if (strcmp(lang_part, "_lang.json") == 0) {
                                     dt.available_lang_flags.emplace_back(""); // Default
                                 } else if (strncmp(lang_part, "_lang_", strlen("_lang_")) == 0) {
-                                    const char* lang_flag_start = lang_part + strlen("_lang_");
-                                    const char* lang_flag_end = strstr(lang_flag_start, ".json");
+                                    const char *lang_flag_start = lang_part + strlen("_lang_");
+                                    const char *lang_flag_end = strstr(lang_flag_start, ".json");
                                     if (lang_flag_end) {
-                                        dt.available_lang_flags.emplace_back(lang_flag_start, lang_flag_end - lang_flag_start);
+                                        dt.available_lang_flags.emplace_back(
+                                            lang_flag_start, lang_flag_end - lang_flag_start);
                                     }
                                 }
                             }
@@ -139,7 +162,6 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
                 }
                 std::sort(dt.available_lang_flags.begin(), dt.available_lang_flags.end());
                 found_templates_vec.push_back(std::move(dt));
-
             } while (FindNextFileA(h_find_file, &find_file_data) != 0);
             FindClose(h_find_file);
         }
@@ -147,35 +169,37 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
     FindClose(h_find_cat);
 
 #else // POSIX (Linux/macOS) implementation with Vector buffering fix
-    DIR* version_dir = opendir(base_path);
+    DIR *version_dir = opendir(base_path);
     if (!version_dir) return;
-    struct dirent* cat_entry;
+    struct dirent *cat_entry;
     while ((cat_entry = readdir(version_dir)) != nullptr) {
-        if (cat_entry->d_type == DT_DIR && strcmp(cat_entry->d_name, ".") != 0 && strcmp(cat_entry->d_name, "..") != 0) {
-            const char* category = cat_entry->d_name;
+        if (cat_entry->d_type == DT_DIR && strcmp(cat_entry->d_name, ".") != 0 && strcmp(cat_entry->d_name, "..") !=
+            0) {
+            const char *category = cat_entry->d_name;
             char cat_path_str[MAX_PATH_LENGTH];
             snprintf(cat_path_str, sizeof(cat_path_str), "%s/%s", base_path, category);
 
-            DIR* cat_dir = opendir(cat_path_str);
+            DIR *cat_dir = opendir(cat_path_str);
             if (!cat_dir) continue;
 
             // Read all files into memory first
             // This avoids the nested rewinddir/readdir bug where the inner loop
             // consumes the stream meant for the outer loop on some filesystems.
             std::vector<std::string> file_list;
-            struct dirent* file_entry;
+            struct dirent *file_entry;
             while ((file_entry = readdir(cat_dir)) != nullptr) {
                 file_list.push_back(file_entry->d_name);
             }
             closedir(cat_dir); // Close immediately after reading
 
             // Iterate the list to find templates
-            for (const auto& filename_str : file_list) {
-                const char* filename = filename_str.c_str();
+            for (const auto &filename_str: file_list) {
+                const char *filename = filename_str.c_str();
 
                 // --- Phase 1: Find main template files ---
-                const char* ext = strrchr(filename, '.');
-                if (!ext || strcmp(ext, ".json") != 0 || strstr(filename, "_lang") || strstr(filename, "_notes")) continue;
+                const char *ext = strrchr(filename, '.');
+                if (!ext || strcmp(ext, ".json") != 0 || strstr(filename, "_lang") || strstr(filename, "_notes"))
+                    continue;
 
                 // Legacy-only filter for _snapshot files
                 if (is_legacy_version && strstr(filename, "_snapshot")) continue;
@@ -191,7 +215,7 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
                 snprintf(expected_prefix, sizeof(expected_prefix), "%s_%s", version_fmt, category);
                 if (strncmp(base_name, expected_prefix, strlen(expected_prefix)) != 0) continue;
 
-                const char* flag_start = base_name + strlen(expected_prefix);
+                const char *flag_start = base_name + strlen(expected_prefix);
 
                 DiscoveredTemplate dt = {};
                 strncpy(dt.category, category, sizeof(dt.category) - 1);
@@ -201,9 +225,9 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
 
                 // --- Phase 2: Find all associated language files for THIS template ---
                 // Iterate the SAME file_list from memory
-                for (const auto& lang_filename_str : file_list) {
-                    const char* lang_filename = lang_filename_str.c_str();
-                    const char* lang_part = strstr(lang_filename, "_lang");
+                for (const auto &lang_filename_str: file_list) {
+                    const char *lang_filename = lang_filename_str.c_str();
+                    const char *lang_part = strstr(lang_filename, "_lang");
                     if (lang_part) {
                         char lang_base_name[MAX_PATH_LENGTH];
                         strncpy(lang_base_name, lang_filename, lang_part - lang_filename);
@@ -214,10 +238,11 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
                             if (strcmp(lang_part, "_lang.json") == 0) {
                                 dt.available_lang_flags.emplace_back(""); // Default
                             } else if (strncmp(lang_part, "_lang_", strlen("_lang_")) == 0) {
-                                const char* lang_flag_start = lang_part + strlen("_lang_");
-                                const char* lang_flag_end = strstr(lang_flag_start, ".json");
+                                const char *lang_flag_start = lang_part + strlen("_lang_");
+                                const char *lang_flag_end = strstr(lang_flag_start, ".json");
                                 if (lang_flag_end) {
-                                    dt.available_lang_flags.emplace_back(lang_flag_start, lang_flag_end - lang_flag_start);
+                                    dt.available_lang_flags.emplace_back(
+                                        lang_flag_start, lang_flag_end - lang_flag_start);
                                 }
                             }
                         }
@@ -244,7 +269,7 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
     }
 }
 
-void free_discovered_templates(DiscoveredTemplate** templates, int* count) {
+void free_discovered_templates(DiscoveredTemplate **templates, int *count) {
     if (*templates) {
         delete[] *templates;
         *templates = nullptr;
