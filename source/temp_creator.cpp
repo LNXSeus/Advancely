@@ -3869,7 +3869,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::CollapsingHeader("Layout Coordinates")) {
                         render_manual_pos_ui("icon", advancements_label_singular_lower, "Icon Position", &advancement.icon_pos, save_message_type);
                         render_manual_pos_ui("text", advancements_label_singular_lower, "Text Position", &advancement.text_pos, save_message_type);
-                        render_manual_pos_ui("prog", advancements_label_singular_lower, "Progress Position", &advancement.progress_pos, save_message_type);
+
+                        // ONLY show progress pos if this advancement has criteria!
+                        if (!advancement.criteria.empty()) {
+                            render_manual_pos_ui("prog", advancements_label_singular_lower, "Progress Position", &advancement.progress_pos, save_message_type);
+                        }
                     }
 
                     // Conditionally render the criteria section only for versions that support it.
@@ -4983,7 +4987,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (ImGui::CollapsingHeader("Layout Coordinates")) {
                         render_manual_pos_ui("s_icon", "stat category", "Icon Position", &stat_cat.icon_pos, save_message_type);
                         render_manual_pos_ui("s_text", "stat category", "Text Position", &stat_cat.text_pos, save_message_type);
-                        render_manual_pos_ui("s_prog", "stat category", "Progress Position", &stat_cat.progress_pos, save_message_type);
+
+                        // ONLY show progress pos if this is a Multi-Stat Category!
+                        if (!stat_cat.is_simple_stat) {
+                            render_manual_pos_ui("s_prog", "stat category", "Progress Position", &stat_cat.progress_pos, save_message_type);
+                        }
                     }
 
                     ImGui::Separator();
