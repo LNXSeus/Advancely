@@ -6000,8 +6000,11 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         settings_save(settings, t->template_data, SAVE_CONTEXT_ALL); // Save the preference instantly
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Toggles between procedural 'Auto Layout' and 'Manual Layout'.\n"
-            "");
+        char tooltip_buffer[256];
+        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                 "Toggles between procedural 'Auto Layout' and 'Manual Layout'.\n"
+                 "Any non-manually placed goals get pushed to the right.");
+        ImGui::SetTooltip("%s", tooltip_buffer);
     }
     ImGui::EndDisabled();
 

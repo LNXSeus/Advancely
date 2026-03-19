@@ -3116,8 +3116,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::TextColored(color, "%s", status_message);
         }
 
-        // --- VISUAL LAYOUT EDITOR TOGGLE ---
-        ImGui::SameLine();
+// --- VISUAL LAYOUT EDITOR TOGGLE ---
+        const char* vis_btn_text = t->is_visual_layout_editing ? "Stop Visual Editing" : "Visual Layout Editor";
+        float vis_btn_width = ImGui::CalcTextSize(vis_btn_text).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+
+        // Right-align the button on the same line
+        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - vis_btn_width);
+
         // Check if the template currently loaded in the editor is the same one active in the main tracker
         bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
                                    strcmp(selected_template_info.category, app_settings->category) == 0 &&
@@ -3125,20 +3130,31 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         if (!is_active_template) {
             ImGui::BeginDisabled();
-            ImGui::Button("Visual Layout Editor");
+            ImGui::Button(vis_btn_text);
             ImGui::EndDisabled();
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                ImGui::SetTooltip("You must apply this template in the main Settings window\n"
+                char tooltip_buffer[256];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "You must apply this template in the main Settings window\n"
                                   "to use the visual map editor.");
+                ImGui::SetTooltip("%s", tooltip_buffer);
             }
         } else {
-            if (ImGui::Button(t->is_visual_layout_editing ? "Stop Visual Editing" : "Visual Layout Editor")) {
+            if (ImGui::Button(vis_btn_text)) {
                 t->is_visual_layout_editing = !t->is_visual_layout_editing;
+
+                // Automatically force "Manual Layout" ON if they start editing
+                if (t->is_visual_layout_editing) {
+                    app_settings->use_manual_layout = true;
+                    settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
+                }
             }
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Toggle drag-and-drop editing directly on the main tracker map.\n\n"
+                char tooltip_buffer[512];
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Toggle drag-and-drop editing directly on the main tracker map.\n"
+                                  "Activating this will automatically turn on 'Manual Layout' mode.\n\n"
                                   "WARNING: Official default templates get overwritten on updates.\n"
                                   "Always work on a 'Copy' if you want to keep your custom layout!");
+                ImGui::SetTooltip("%s", tooltip_buffer);
             }
         }
 
