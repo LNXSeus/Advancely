@@ -94,6 +94,7 @@ struct Tracker {
     bool notes_window_open; // Flag to control the visibility of the notes window.
     bool temp_creator_window_open; // Flag to control the visibility of the template creator window.
     bool is_temp_creator_focused;  // Flag to track if the template creator window has focus.
+    bool is_visual_layout_editing; // Flag to enable drag-and-drop on the main map for manual goal placement
 
 
     char notes_buffer[65536]; // 64KB buffer to hold the text for the notes.

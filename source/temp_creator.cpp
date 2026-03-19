@@ -1488,6 +1488,37 @@ static void synchronize_legacy_ms_goal_stats(EditorTemplate &editor_data) {
     }
 }
 
+// Helper to render collapsible coordinate fields in the details panes, currently used for manual goal placement coords
+static void render_manual_pos_ui(const char* label_id, const char* tooltip_item_name, const char* pos_type, ManualPos* pos, SaveMessageType& save_msg) {
+    ImGui::PushID(label_id);
+
+    bool was_set = pos->is_set;
+    if (ImGui::Checkbox(pos_type, &pos->is_set)) {
+        save_msg = MSG_NONE; // Triggers unsaved changes!
+        // Give it a sensible default if they are turning it on for the first time
+        if (pos->is_set && !was_set && pos->x == 0.0f && pos->y == 0.0f) {
+            pos->x = 100.0f; pos->y = 100.0f;
+        }
+    }
+    if (ImGui::IsItemHovered()) {
+        char tooltip[256];
+        snprintf(tooltip, sizeof(tooltip), "Enable manual positioning for the %s of this %s.", pos_type, tooltip_item_name);
+        ImGui::SetTooltip("%s", tooltip);
+    }
+
+    if (pos->is_set) {
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(80);
+        if (ImGui::DragFloat("X", &pos->x, 1.0f)) { save_msg = MSG_NONE; }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("X Coordinate");
+
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(80);
+        if (ImGui::DragFloat("Y", &pos->y, 1.0f)) { save_msg = MSG_NONE; }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Y Coordinate");
+    }
+    ImGui::PopID();
+}
 
 // -------------------------------------------- END OF STATIC FUNCTIONS --------------------------------------------
 
@@ -3085,6 +3116,32 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::TextColored(color, "%s", status_message);
         }
 
+        // --- VISUAL LAYOUT EDITOR TOGGLE ---
+        ImGui::SameLine();
+        // Check if the template currently loaded in the editor is the same one active in the main tracker
+        bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
+                                   strcmp(selected_template_info.category, app_settings->category) == 0 &&
+                                   strcmp(selected_template_info.optional_flag, app_settings->optional_flag) == 0);
+
+        if (!is_active_template) {
+            ImGui::BeginDisabled();
+            ImGui::Button("Visual Layout Editor");
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                ImGui::SetTooltip("You must apply this template in the main Settings window\n"
+                                  "to use the visual map editor.");
+            }
+        } else {
+            if (ImGui::Button(t->is_visual_layout_editing ? "Stop Visual Editing" : "Visual Layout Editor")) {
+                t->is_visual_layout_editing = !t->is_visual_layout_editing;
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Toggle drag-and-drop editing directly on the main tracker map.\n\n"
+                                  "WARNING: Official default templates get overwritten on updates.\n"
+                                  "Always work on a 'Copy' if you want to keep your custom layout!");
+            }
+        }
+
         // Popup window for unsaved changes
         if (show_unsaved_changes_popup) {
             ImGui::OpenPopup("Unsaved Changes");
@@ -3792,6 +3849,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  advancements_label_singular_lower);
                         ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                     }
+
+                    if (ImGui::CollapsingHeader("Layout Coordinates")) {
+                        render_manual_pos_ui("icon", advancements_label_singular_lower, "Icon Position", &advancement.icon_pos, save_message_type);
+                        render_manual_pos_ui("text", advancements_label_singular_lower, "Text Position", &advancement.text_pos, save_message_type);
+                        render_manual_pos_ui("prog", advancements_label_singular_lower, "Progress Position", &advancement.progress_pos, save_message_type);
+                    }
+
                     // Conditionally render the criteria section only for versions that support it.
                     if (creator_selected_version > MC_VERSION_1_6_4) {
                         ImGui::Separator();
@@ -4147,6 +4211,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
+
+                        if (ImGui::CollapsingHeader("Layout Coordinates")) {
+                            render_manual_pos_ui("c_icon", "criterion", "Icon Position", &criterion.icon_pos, save_message_type);
+                            render_manual_pos_ui("c_text", "criterion", "Text Position", &criterion.text_pos, save_message_type);
+                        }
+
                         ImGui::EndGroup();
 
                         ImGui::SameLine();
@@ -4893,6 +4963,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  "but have their own icons similar to %s criteria.", advancements_label_singular_lower);
                         ImGui::SetTooltip("%s", multi_stat_tooltip_buffer);
                     }
+
+                    if (ImGui::CollapsingHeader("Layout Coordinates")) {
+                        render_manual_pos_ui("s_icon", "stat category", "Icon Position", &stat_cat.icon_pos, save_message_type);
+                        render_manual_pos_ui("s_text", "stat category", "Text Position", &stat_cat.text_pos, save_message_type);
+                        render_manual_pos_ui("s_prog", "stat category", "Progress Position", &stat_cat.progress_pos, save_message_type);
+                    }
+
                     ImGui::Separator();
 
                     if (stat_cat.is_simple_stat) {
@@ -5302,6 +5379,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
+
+                            if (ImGui::CollapsingHeader("Layout Coordinates")) {
+                                render_manual_pos_ui("sc_icon", "sub-stat", "Icon Position", &crit.icon_pos, save_message_type);
+                                render_manual_pos_ui("sc_text", "sub-stat", "Text Position", &crit.text_pos, save_message_type);
+                            }
+
                             ImGui::EndGroup();
 
                             ImGui::SameLine();
@@ -5691,6 +5774,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
+
+                        if (ImGui::CollapsingHeader("Layout Coordinates")) {
+                            render_manual_pos_ui("u_icon", "unlock", "Icon Position", &unlock.icon_pos, save_message_type);
+                            render_manual_pos_ui("u_text", "unlock", "Text Position", &unlock.text_pos, save_message_type);
+                        }
+
                         ImGui::EndGroup();
 
                         ImGui::SameLine();
@@ -6073,6 +6162,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
+
+                    if (ImGui::CollapsingHeader("Layout Coordinates")) {
+                        render_manual_pos_ui("cg_icon", "custom goal", "Icon Position", &goal.icon_pos, save_message_type);
+                        render_manual_pos_ui("cg_text", "custom goal", "Text Position", &goal.text_pos, save_message_type);
+                    }
+
                     ImGui::EndGroup();
 
                     ImGui::SameLine();
@@ -6746,6 +6841,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         snprintf(tooltip, sizeof(tooltip), "Enable unique icons for every stage.\n"
                                  "If unchecked, the main goal icon is used for all stages.");
                         ImGui::SetTooltip("%s", tooltip);
+                    }
+
+                    if (ImGui::CollapsingHeader("Layout Coordinates")) {
+                        render_manual_pos_ui("ms_icon", "multi-stage goal", "Icon Position", &goal.icon_pos, save_message_type);
+                        render_manual_pos_ui("ms_text", "multi-stage goal", "Text Position", &goal.text_pos, save_message_type);
+                        render_manual_pos_ui("ms_prog", "multi-stage goal", "Progress Position", &goal.progress_pos, save_message_type);
                     }
 
                     ImGui::Separator();

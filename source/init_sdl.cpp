@@ -73,6 +73,9 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
         return false;
     } // Then destroy the renderer in tracker_free
 
+    // So one can't be in visual layout editing mode when starting Advancely to place goals manually
+    t->is_visual_layout_editing = false;
+
     log_message(LOG_INFO, "[INIT SDL] Tracker initialized!\n");
 
     return true;
