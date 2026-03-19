@@ -2869,7 +2869,7 @@ static float get_global_safe_x(Tracker *t) {
 
     float max_x = 0.0f;
 
-    auto check_pos = [&](const ManualPos& pos, float assumed_width) {
+    auto check_pos = [&](const ManualPos &pos, float assumed_width) {
         if (pos.is_set) {
             float right_edge = pos.x + assumed_width;
             if (right_edge > max_x) max_x = right_edge;
@@ -2885,7 +2885,7 @@ static float get_global_safe_x(Tracker *t) {
     TemplateData *td = t->template_data;
     for (int i = 0; i < td->advancement_count; i++) {
         if (td->advancements[i]) {
-            TrackableCategory* cat = td->advancements[i];
+            TrackableCategory *cat = td->advancements[i];
             // If parent is placed, assume a much wider width if it has children!
             float baseline_width = (cat->criteria_count > 0) ? 450.0f : 120.0f;
 
@@ -2899,7 +2899,7 @@ static float get_global_safe_x(Tracker *t) {
     }
     for (int i = 0; i < td->stat_count; i++) {
         if (td->stats[i]) {
-            TrackableCategory* cat = td->stats[i];
+            TrackableCategory *cat = td->stats[i];
             float baseline_width = (cat->criteria_count > 0 && !cat->is_single_stat_category) ? 450.0f : 120.0f;
 
             check_pos(cat->icon_pos, baseline_width);
@@ -3425,6 +3425,38 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             if (!parent_matches && !child_matches_search) continue;
             // Skip if neither parent nor any child matches search
 
+            // --- PREPARE CHILDREN LIST ---
+            std::vector<TrackableItem *> children_to_render;
+            if (parent_matches) {
+                for (int j = 0; j < cat->criteria_count; ++j) {
+                    TrackableItem *crit = cat->criteria[j];
+                    if (!crit) continue;
+                    bool should_hide_crit_render = false;
+                    switch (settings->goal_hiding_mode) {
+                        case HIDE_ALL_COMPLETED: should_hide_crit_render = crit->is_hidden || crit->done;
+                            break;
+                        case HIDE_ONLY_TEMPLATE_HIDDEN: should_hide_crit_render = crit->is_hidden;
+                            break;
+                        case SHOW_ALL: should_hide_crit_render = false;
+                            break;
+                    }
+                    if (!should_hide_crit_render) children_to_render.push_back(crit);
+                }
+            } else {
+                children_to_render = matching_children;
+            }
+
+            // Count how many children are manually placed vs unplaced
+            int unplaced_criteria_count = 0;
+            bool has_manual_child = false;
+            for (TrackableItem *crit: children_to_render) {
+                if (settings->use_manual_layout && (crit->icon_pos.is_set || crit->text_pos.is_set)) {
+                    has_manual_child = true;
+                } else {
+                    unplaced_criteria_count++;
+                }
+            }
+
 
             // --- Item Height Calculation (OPTIMIZED: Math only, no ImGui calls) ---
 
@@ -3440,81 +3472,33 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 if (is_complex) {
                     has_progress_text = true; // Multi-stat always has counter
                 } else if (cat->criteria_count == 1) {
-                    // Single-stat
                     TrackableItem *crit = cat->criteria[0];
                     if (crit->goal > 0 || crit->goal == -1) has_progress_text = true;
                 }
             } else {
-                // Advancement
                 if (cat->criteria_count > 0) has_progress_text = true;
             }
 
-            int visible_criteria_render_count = 0;
-
-            if (is_complex) {
-                if (parent_matches) {
-                    // Count children based on logic
-                    for (int j = 0; j < cat->criteria_count; j++) {
-                        TrackableItem *crit = cat->criteria[j];
-                        if (!crit) continue;
-
-                        bool should_hide_crit_render = false;
-                        switch (settings->goal_hiding_mode) {
-                            case HIDE_ALL_COMPLETED: should_hide_crit_render = crit->is_hidden || crit->done;
-                                break;
-                            case HIDE_ONLY_TEMPLATE_HIDDEN: should_hide_crit_render = crit->is_hidden;
-                                break;
-                            case SHOW_ALL: should_hide_crit_render = false;
-                                break;
-                        }
-                        if (!should_hide_crit_render) visible_criteria_render_count++;
-                    }
-                } else {
-                    visible_criteria_render_count = matching_children.size();
-                }
-            }
-
-            // --- ESTIMATED HEIGHT CALCULATION ---
             // Base icon + Main text + Padding
             float item_height = 96.0f + main_text_line_height + 4.0f;
-
-            if (has_snapshot_text) {
-                item_height += sub_text_line_height + 4.0f;
-            }
-
-            if (has_progress_text) {
-                item_height += sub_text_line_height + 4.0f;
-            }
-
-            // Check if ANY child of this category uses a manual position
-            bool has_manual_child = false;
-            if (settings->use_manual_layout) {
-                for (int j = 0; j < cat->criteria_count; j++) {
-                    TrackableItem *crit = cat->criteria[j];
-                    if (crit && (crit->icon_pos.is_set || crit->text_pos.is_set)) {
-                        has_manual_child = true;
-                        break;
-                    }
-                }
-            }
+            if (has_snapshot_text) item_height += sub_text_line_height + 4.0f;
+            if (has_progress_text) item_height += sub_text_line_height + 4.0f;
 
             bool use_scrolling_list = false;
             float single_criterion_height = 36.0f; // Height for each criterion row
             float criteria_list_height = 0.0f; // The pixel height the list will take up
 
-            if (visible_criteria_render_count > 0) {
+            // ONLY expand parent height based on UNPLACED criteria!
+            if (unplaced_criteria_count > 0) {
                 item_height += 12.0f; // Initial padding before criteria list
 
                 // Check if we exceed the threshold AND no children are manually placed
-                if (is_complex && visible_criteria_render_count > settings->scrollable_list_threshold && !has_manual_child) {
+                if (is_complex && unplaced_criteria_count > settings->scrollable_list_threshold && !has_manual_child) {
                     use_scrolling_list = true;
-                    // Fix the height to exactly N items
                     criteria_list_height = (float) settings->scrollable_list_threshold * single_criterion_height;
                 } else {
-                    // Standard full height (expand to fit all items)
-                    criteria_list_height = (float) visible_criteria_render_count * single_criterion_height;
+                    criteria_list_height = (float) unplaced_criteria_count * single_criterion_height;
                 }
-
                 item_height += criteria_list_height;
             }
 
@@ -3755,111 +3739,69 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 }
 
                 // Render Criteria/Sub-Stats (if complex and visible)
-                if (is_complex && visible_criteria_render_count > 0) {
+                if (is_complex && !children_to_render.empty()) {
                     float sub_item_y_offset_world = item_y + (current_text_y - screen_pos.y) / t->zoom_level + 8.0f;
-                    // Start below last text + padding
 
                     // --- SCROLLING SETUP ---
                     ImVec2 list_min_screen, list_max_screen;
-
-                    // Calculate logical (unzoomed) content heights
-                    float total_content_height_logical =
-                            (float) visible_criteria_render_count * single_criterion_height;
+                    float total_content_height_logical = (float) unplaced_criteria_count * single_criterion_height;
                     float visible_height_logical = criteria_list_height;
                     float max_scroll_logical = total_content_height_logical - visible_height_logical;
                     if (max_scroll_logical < 0) max_scroll_logical = 0;
 
                     if (use_scrolling_list) {
-                        // Calculate Screen Space Box for the list
-                        list_min_screen = ImVec2(
-                            screen_pos.x,
-                            (sub_item_y_offset_world * t->zoom_level) + t->camera_offset.y
-                        );
-                        list_max_screen = ImVec2(
-                            screen_pos.x + (uniform_item_width * t->zoom_level),
-                            list_min_screen.y + (criteria_list_height * t->zoom_level)
-                        );
+                        list_min_screen = ImVec2(screen_pos.x,
+                                                 (sub_item_y_offset_world * t->zoom_level) + t->camera_offset.y);
+                        list_max_screen = ImVec2(screen_pos.x + (uniform_item_width * t->zoom_level),
+                                                 list_min_screen.y + (criteria_list_height * t->zoom_level));
 
-                        // Handle Mouse Wheel Input
-                        // Only consume wheel if hovering and list actually needs scrolling
                         if (ImGui::IsMouseHoveringRect(list_min_screen, list_max_screen) && max_scroll_logical > 0) {
-                            t->is_hovering_scrollable_list = true; // Block main zoom
-
-                            if (io.MouseWheel != 0.0f) {
-                                // Use user-configured speed
+                            t->is_hovering_scrollable_list = true;
+                            if (io.MouseWheel != 0.0f)
                                 cat->scroll_y -= io.MouseWheel * settings->tracker_list_scroll_speed;
-                            }
                         }
 
-                        // Clamp Scroll Position (Logical Pixels)
                         if (cat->scroll_y < 0.0f) cat->scroll_y = 0.0f;
                         if (cat->scroll_y > max_scroll_logical) cat->scroll_y = max_scroll_logical;
 
-                        // Push Clip Rect
                         draw_list->PushClipRect(list_min_screen, list_max_screen, true);
                     }
 
-                    // Decide which list of children to iterate over based on search results
-                    std::vector<TrackableItem *> children_to_render;
-                    if (parent_matches) {
-                        // If parent matched, render all non-hidden children
-                        for (int j = 0; j < cat->criteria_count; ++j) {
-                            TrackableItem *crit = cat->criteria[j];
-                            if (!crit) continue;
-                            bool should_hide_crit_render = false;
-                            switch (settings->goal_hiding_mode) {
-                                case HIDE_ALL_COMPLETED: should_hide_crit_render = crit->is_hidden || crit->done;
-                                    break;
-                                case HIDE_ONLY_TEMPLATE_HIDDEN: should_hide_crit_render = crit->is_hidden;
-                                    break;
-                                case SHOW_ALL: should_hide_crit_render = false;
-                                    break;
-                            }
-                            if (!should_hide_crit_render) children_to_render.push_back(crit);
-                        }
-                    } else {
-                        // If only children matched, render only the ones from the matching list
-                        children_to_render = matching_children;
-                    }
-
-
-                    // Render each visible child
-                    int render_index = 0; // Needed for relative positioning
+                    int render_index = 0; // Needed for relative positioning of UNPLACED items
                     for (TrackableItem *crit: children_to_render) {
-                        if (!crit) continue; // Should not happen, but safety check
+                        if (!crit) continue;
 
-                        // Calculate base Y relative to start of list
-                        float relative_y = (float) render_index * single_criterion_height;
+                        bool is_manually_placed =
+                                settings->use_manual_layout && (crit->icon_pos.is_set || crit->text_pos.is_set);
 
-                        // Calculate Screen Y
-                        float item_screen_y = ((sub_item_y_offset_world + relative_y) * t->zoom_level) + t->
-                                              camera_offset.y;
+                        float item_screen_y = 0.0f;
+                        if (!is_manually_placed) {
+                            float relative_y = (float) render_index * single_criterion_height;
+                            item_screen_y = ((sub_item_y_offset_world + relative_y) * t->zoom_level) + t->camera_offset.
+                                            y;
 
-                        // Apply Scroll Offset (screen space)
-                        if (use_scrolling_list) {
-                            item_screen_y -= (cat->scroll_y * t->zoom_level); // Zooming is applied here
-
-                            // INTERNAL CULLING: Skip items completely outside the scroll view
-                            float item_h_screen = single_criterion_height * t->zoom_level;
-                            // Allow a small buffer so partially visible items draw
-                            if (item_screen_y + item_h_screen < list_min_screen.y || item_screen_y > list_max_screen.
-                                y) {
-                                render_index++;
-                                continue;
+                            if (use_scrolling_list) {
+                                item_screen_y -= (cat->scroll_y * t->zoom_level);
+                                float item_h_screen = single_criterion_height * t->zoom_level;
+                                if (item_screen_y + item_h_screen < list_min_screen.y || item_screen_y > list_max_screen
+                                    .y) {
+                                    render_index++; // Must tick up for culled items to maintain scroll position!
+                                    continue;
+                                }
                             }
                         }
 
-                        // Define position for icon/text logic
-                        ImVec2 crit_base_pos_screen = ImVec2((item_x * t->zoom_level) + t->camera_offset.x,
-                                                             item_screen_y);
-
-                        // Apply manual icon position for criteria
-                        if (settings->use_manual_layout && crit->icon_pos.is_set) {
+                        ImVec2 crit_base_pos_screen;
+                        if (is_manually_placed) {
                             crit_base_pos_screen = ImVec2((crit->icon_pos.x * t->zoom_level) + t->camera_offset.x,
                                                           (crit->icon_pos.y * t->zoom_level) + t->camera_offset.y);
+                        } else {
+                            crit_base_pos_screen = ImVec2((item_x * t->zoom_level) + t->camera_offset.x, item_screen_y);
                         }
 
                         float current_element_x_screen = crit_base_pos_screen.x;
+
+                        // LOD for Sub-Item Icon
 
                         // LOD for Sub-Item Icon
                         if (t->zoom_level > LOD_ICON_DETAIL_THRESHOLD) {
@@ -4035,7 +3977,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             }
                         }
 
-                        render_index++;
+                        // Only advance the list gap for items actually sitting in the list
+                        if (!is_manually_placed) {
+                            render_index++;
+                        }
                     } // End loop through children_to_render
 
                     // --- DRAW SCROLLBAR & POP CLIP ---
@@ -6056,7 +6001,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     }
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Toggles between procedural 'Auto Layout' and 'Manual Layout'.\n"
-                          "");
+            "");
     }
     ImGui::EndDisabled();
 
