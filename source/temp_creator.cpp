@@ -166,9 +166,6 @@ struct EditorSubGoal {
     int required_progress;
     char icon_path[256]; // Icon path for each stage
     int sort_order = 0;
-
-    ManualPos icon_pos = {};
-    ManualPos text_pos = {};
 };
 
 struct EditorMultiStageGoal {
@@ -1114,8 +1111,6 @@ static void serialize_editor_multi_stage_goals(cJSON *parent, const std::vector<
                 cJSON_AddNumberToObject(stage_json, "target", stage.required_progress);
             }
 
-            save_editor_manual_pos(stage_json, "icon_pos", stage.icon_pos);
-            save_editor_manual_pos(stage_json, "text_pos", stage.text_pos);
             cJSON_AddItemToArray(stages_array, stage_json);
         }
         cJSON_AddItemToObject(goal_json, "stages", stages_array);

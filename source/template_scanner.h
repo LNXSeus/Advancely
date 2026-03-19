@@ -28,7 +28,7 @@ typedef struct {
 } DiscoveredTemplate;
 
 // Helper to read manual positions from JSON
-void parse_manual_pos(cJSON *parent_json, const char *key, ManualPos *pos, bool *template_has_manual_layout);
+void parse_manual_pos(cJSON *parent_json, const char *key, ManualPos *pos);
 
 /**
 * @brief Scans the template directory for a given version to find all valid templates and all of their associated language files.

@@ -2,6 +2,8 @@
 	"advancements":	{
 		"minecraft:story/deflect_arrow":	{
 			"icon":	"items/Shield_JE2_BE1.png",
+			"icon_pos": { "x": 400, "y": 600 },
+			"text_pos": { "x": 400, "y": -200 },
 			"criteria":	{
 			}
 		},
@@ -12,9 +14,14 @@
 		},
 		"minecraft:mines/all_special_mines_completed":	{
 			"icon":	"blocks/Beacon_JE6_BE2.png",
+			"icon_pos": { "x": 400, "y": -500 },
+			"text_pos": { "x": 400, "y": 200 },
+			"progress_pos": { "x":  400, "y":  300 },
 			"criteria":	{
 				"minecraft:wither_boss":	{
-					"icon":	"items/wither_spawn_egg_25w14craftmine.png"
+					"icon":	"items/wither_spawn_egg_25w14craftmine.png",
+					"icon_pos": { "x": 400, "y": 260 },
+					"text_pos": { "x": 450, "y": 270 }
 				},
 				"minecraft:kuiper_belt":	{
 					"icon":	"items/polar_bear_spawn_egg_25w14craftmine.png"
@@ -103,25 +110,33 @@
 		},
 		"stat_category:inf_dirt_collection":	{
 			"icon":	"blocks/Dirt.png",
+			"icon_pos": { "x": 900, "y": 100 },
+			"text_pos": { "x": 700, "y": 200 },
 			"criteria":	{
 				"minecraft:mined/minecraft:dirt":	{
 					"icon":	"blocks/Oak_Log_(UD)_JE8_BE3.png",
-					"target":	-1
+					"target":	-1,
+					"icon_pos": { "x": 700, "y": 260 },
+					"text_pos": { "x": 750, "y": 270 }
 				}
 			}
 		}
 	},
 	"unlocks":	[{
 			"root_name":	"minecraft:exploration",
-			"icon":	"items/Leather_Boots_(item)_JE4_BE3.png"
+			"icon":	"items/Leather_Boots_(item)_JE4_BE3.png",
+			"icon_pos": { "x": 2000, "y": 100 },
+			"text_pos": { "x": 1000, "y": 200 }
 		}, {
 			"root_name":	"minecraft:ender_pearl_starter",
 			"icon":	"items/ender_pearl_1.20.2.png"
 		}],
 	"custom":	[{
-			"root_name":	"custom:unbreaking_3_book",
-			"icon":	"items/enchanted_book_1.20.2.png"
-		}, {
+		"root_name":	"custom:unbreaking_3_book",
+		"icon":	"items/enchanted_book_1.20.2.png",
+		"icon_pos": { "x": 1300, "y": 100 },
+		"text_pos": { "x": 1300, "y": 200 }
+	}, {
 			"root_name":	"custom:deepslate_emerald_count",
 			"icon":	"blocks/Deepslate_Emerald_Ore_JE1_BE1.png",
 			"target":	5
@@ -133,7 +148,10 @@
 	"multi_stage_goals":	[{
 			"root_name":	"ms_goal:getting_started",
 			"icon":	"blocks/Dirt.png",
-			"stages":	[{
+		"icon_pos": { "x": 1600, "y": 100 },
+		"text_pos": { "x": 1600, "y": 200 },
+		"progress_pos": { "x": 1750, "y": 120 },
+		"stages": [{
 					"stage_id":	"0",
 					"type":	"stat",
 					"root_name":	"minecraft:mined/minecraft:dirt",

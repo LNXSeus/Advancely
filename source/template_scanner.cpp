@@ -31,7 +31,8 @@
 #endif
 
 // Helper to read manual positions from JSON
-void parse_manual_pos(cJSON *parent_json, const char *key, ManualPos *pos, bool *template_has_manual_layout) {
+void parse_manual_pos(cJSON *parent_json, const char *key, ManualPos *pos) {
+
     pos->is_set = false;
     pos->x = 0.0f;
     pos->y = 0.0f;
@@ -45,8 +46,6 @@ void parse_manual_pos(cJSON *parent_json, const char *key, ManualPos *pos, bool 
             pos->x = (float) x_val->valuedouble;
             pos->y = (float) y_val->valuedouble;
             pos->is_set = true;
-
-            if (template_has_manual_layout) *template_has_manual_layout = true;
         }
     }
 }

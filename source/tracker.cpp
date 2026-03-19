@@ -1158,8 +1158,7 @@ static void tracker_update_stats_modern(Tracker *t, const cJSON *player_stats_js
 static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *lang_json,
                                      TrackableCategory ***categories_array,
                                      int *count, int *total_criteria_count, const char *lang_key_prefix,
-                                     bool is_stat_category, MC_Version version, const AppSettings *settings,
-                                     bool *template_has_manual_layout) {
+                                     bool is_stat_category, MC_Version version, const AppSettings *settings) {
     (void) settings;
     if (!category_json) {
         log_message(LOG_INFO, "[TRACKER] tracker_parse_categories: category_json is nullptr\n");
@@ -1191,9 +1190,9 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
         new_cat->is_recipe = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "is_recipe"));
         new_cat->in_2nd_row = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "in_2nd_row")); // 2nd row of overlay
 
-        parse_manual_pos(cat_json, "icon_pos", &new_cat->icon_pos, template_has_manual_layout);
-        parse_manual_pos(cat_json, "text_pos", &new_cat->text_pos, template_has_manual_layout);
-        parse_manual_pos(cat_json, "progress_pos", &new_cat->progress_pos, template_has_manual_layout);
+        parse_manual_pos(cat_json, "icon_pos", &new_cat->icon_pos);
+        parse_manual_pos(cat_json, "text_pos", &new_cat->text_pos);
+        parse_manual_pos(cat_json, "progress_pos", &new_cat->progress_pos);
 
         if (cat_json->string) {
             strncpy(new_cat->root_name, cat_json->string, sizeof(new_cat->root_name) - 1);
@@ -1285,8 +1284,8 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
 
                         // When hidden is true in template
                         new_crit->is_hidden = cJSON_IsTrue(cJSON_GetObjectItem(crit_item, "hidden"));
-                        parse_manual_pos(crit_item, "icon_pos", &new_crit->icon_pos, template_has_manual_layout);
-                        parse_manual_pos(crit_item, "text_pos", &new_crit->text_pos, template_has_manual_layout);
+                        parse_manual_pos(crit_item, "icon_pos", &new_crit->icon_pos);
+                        parse_manual_pos(crit_item, "text_pos", &new_crit->text_pos);
                         new_cat->is_recipe = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "is_recipe"));
 
                         strncpy(new_crit->root_name, crit_item->string, sizeof(new_crit->root_name) - 1);
@@ -1578,8 +1577,7 @@ static void tracker_detect_shared_icons(Tracker *t, const AppSettings *settings)
  */
 static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJSON *lang_json,
                                             TrackableItem ***items_array,
-                                            int *count, const char *lang_key_prefix, const AppSettings *settings,
-                                            bool *template_has_manual_layout) {
+                                            int *count, const char *lang_key_prefix, const AppSettings *settings) {
     (void) settings;
     (void) t;
     if (!category_json) {
@@ -1609,8 +1607,8 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
             new_item->is_hidden = cJSON_IsTrue(cJSON_GetObjectItem(item_json, "hidden"));
             new_item->in_2nd_row = cJSON_IsTrue(cJSON_GetObjectItem(item_json, "in_2nd_row")); // 2nd row of overlay
 
-            parse_manual_pos(item_json, "icon_pos", &new_item->icon_pos, template_has_manual_layout);
-            parse_manual_pos(item_json, "text_pos", &new_item->text_pos, template_has_manual_layout);
+            parse_manual_pos(item_json, "icon_pos", &new_item->icon_pos);
+            parse_manual_pos(item_json, "text_pos", &new_item->text_pos);
 
             cJSON *root_name_json = cJSON_GetObjectItem(item_json, "root_name");
             if (cJSON_IsString(root_name_json)) {
@@ -1685,8 +1683,7 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
  */
 static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON *lang_json,
                                             MultiStageGoal ***goals_array,
-                                            int *count, const AppSettings *settings,
-                                            bool *template_has_manual_layout) {
+                                            int *count, const AppSettings *settings) {
     (void) t;
     (void) lang_json;
     (void) settings;
@@ -1728,9 +1725,9 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
         new_goal->is_hidden = cJSON_IsTrue(cJSON_GetObjectItem(goal_item_json, "hidden"));
         new_goal->in_2nd_row = cJSON_IsTrue(cJSON_GetObjectItem(goal_item_json, "in_2nd_row")); // 2nd row of overlay
 
-        parse_manual_pos(goal_item_json, "icon_pos", &new_goal->icon_pos, template_has_manual_layout);
-        parse_manual_pos(goal_item_json, "text_pos", &new_goal->text_pos, template_has_manual_layout);
-        parse_manual_pos(goal_item_json, "progress_pos", &new_goal->progress_pos, template_has_manual_layout);
+        parse_manual_pos(goal_item_json, "icon_pos", &new_goal->icon_pos);
+        parse_manual_pos(goal_item_json, "text_pos", &new_goal->text_pos);
+        parse_manual_pos(goal_item_json, "progress_pos", &new_goal->progress_pos);
 
         // Parse root_name and icon
         cJSON *root_name = cJSON_GetObjectItem(goal_item_json, "root_name");
@@ -1820,10 +1817,6 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
                     new_stage->root_name[sizeof(new_stage->root_name) - 1] = '\0';
                 }
                 if (cJSON_IsNumber(target_val)) new_stage->required_progress = target_val->valueint; // This is a number
-
-                parse_manual_pos(stage_item_json, "icon_pos", &new_stage->icon_pos, template_has_manual_layout);
-                parse_manual_pos(stage_item_json, "text_pos", &new_stage->text_pos, template_has_manual_layout);
-
 
                 // Look up stage display name from lang file
                 char stage_lang_key[256];
@@ -2868,6 +2861,71 @@ static void render_section_separator(Tracker *t, const AppSettings *settings, fl
     current_y += line_y_offset + 20.0f; // TODO: Adjust vertical spacing here, 50 total
 }
 
+// Helper to calculate the global safe starting X-coordinate for unplaced auto-layout items
+// Shifting them to the right of all manually placed items that have coordinates within the template
+// Helper to calculate the global safe starting X-coordinate for unplaced auto-layout items
+static float get_global_safe_x(Tracker *t) {
+    if (!t || !t->template_data) return 50.0f;
+
+    float max_x = 0.0f;
+
+    auto check_pos = [&](const ManualPos& pos, float assumed_width) {
+        if (pos.is_set) {
+            float right_edge = pos.x + assumed_width;
+            if (right_edge > max_x) max_x = right_edge;
+        }
+    };
+
+    auto check_item = [&](TrackableItem *item) {
+        if (!item) return;
+        check_pos(item->icon_pos, 120.0f);
+        check_pos(item->text_pos, 250.0f);
+    };
+
+    TemplateData *td = t->template_data;
+    for (int i = 0; i < td->advancement_count; i++) {
+        if (td->advancements[i]) {
+            TrackableCategory* cat = td->advancements[i];
+            // If parent is placed, assume a much wider width if it has children!
+            float baseline_width = (cat->criteria_count > 0) ? 450.0f : 120.0f;
+
+            check_pos(cat->icon_pos, baseline_width);
+            check_pos(cat->text_pos, 250.0f);
+            check_pos(cat->progress_pos, 150.0f);
+            for (int j = 0; j < cat->criteria_count; j++) {
+                check_item(cat->criteria[j]);
+            }
+        }
+    }
+    for (int i = 0; i < td->stat_count; i++) {
+        if (td->stats[i]) {
+            TrackableCategory* cat = td->stats[i];
+            float baseline_width = (cat->criteria_count > 0 && !cat->is_single_stat_category) ? 450.0f : 120.0f;
+
+            check_pos(cat->icon_pos, baseline_width);
+            check_pos(cat->text_pos, 250.0f);
+            check_pos(cat->progress_pos, 150.0f);
+            for (int j = 0; j < cat->criteria_count; j++) {
+                check_item(cat->criteria[j]);
+            }
+        }
+    }
+    for (int i = 0; i < td->unlock_count; i++) check_item(td->unlocks[i]);
+    for (int i = 0; i < td->custom_goal_count; i++) check_item(td->custom_goals[i]);
+    for (int i = 0; i < td->multi_stage_goal_count; i++) {
+        if (td->multi_stage_goals[i]) {
+            check_pos(td->multi_stage_goals[i]->icon_pos, 120.0f);
+            check_pos(td->multi_stage_goals[i]->text_pos, 250.0f);
+            check_pos(td->multi_stage_goals[i]->progress_pos, 150.0f);
+        }
+    }
+
+    if (max_x > 0.0f) {
+        return max_x + 50.0f; // Return absolute furthest point + 50px padding
+    }
+    return 50.0f;
+}
+
 /**
  * @brief Renders a section of items that are TrackableCategories (e.g., Advancements, Recipes, Stats).
  * This function handles the uniform grid layout and the two-pass rendering for simple vs. complex items.
@@ -3084,10 +3142,13 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
 
     // Call the modified separator function with calculated counts
-    render_section_separator(t, settings, current_y, section_title, text_color,
-                             completed_count, total_visible_count,
-                             section_has_sub_items ? completed_sub_count : -1, // Pass -1 if no sub-items
-                             section_has_sub_items ? total_visible_sub_count : -1);
+    if (!settings->use_manual_layout) {
+        // Only if not in manual mode
+        render_section_separator(t, settings, current_y, section_title, text_color,
+                                 completed_count, total_visible_count,
+                                 section_has_sub_items ? completed_sub_count : -1, // Pass -1 if no sub-items
+                                 section_has_sub_items ? total_visible_sub_count : -1);
+    }
 
 
     // --- Calculate Uniform Item Width (based on items that will be rendered) ---
@@ -3276,8 +3337,19 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
     }
     // --- End of Width Calculation ---
 
+    // --- GLOBAL HYBRID SHIFT ---
+    float padding = 50.0f;
+    if (settings->use_manual_layout) {
+        padding = get_global_safe_x(t);
 
-    float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
+        // Prevent auto-layout items from squeezing into a single column!
+        // We force the wrapping width to allow at least 3 items to fit side-by-side
+        float min_wrapping_width = padding + (uniform_item_width * 3.0f);
+        if (wrapping_width < min_wrapping_width) {
+            wrapping_width = min_wrapping_width;
+        }
+    }
+    float current_x = padding, row_max_height = 0.0f;
 
     // Adjust vertical spacing -> need to do this for all render_*_section functions
     const float vertical_spacing = settings->tracker_vertical_spacing; // Changed from 16.0f
@@ -3414,6 +3486,18 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 item_height += sub_text_line_height + 4.0f;
             }
 
+            // Check if ANY child of this category uses a manual position
+            bool has_manual_child = false;
+            if (settings->use_manual_layout) {
+                for (int j = 0; j < cat->criteria_count; j++) {
+                    TrackableItem *crit = cat->criteria[j];
+                    if (crit && (crit->icon_pos.is_set || crit->text_pos.is_set)) {
+                        has_manual_child = true;
+                        break;
+                    }
+                }
+            }
+
             bool use_scrolling_list = false;
             float single_criterion_height = 36.0f; // Height for each criterion row
             float criteria_list_height = 0.0f; // The pixel height the list will take up
@@ -3421,8 +3505,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             if (visible_criteria_render_count > 0) {
                 item_height += 12.0f; // Initial padding before criteria list
 
-                // Check if we exceed the threshold defined in settings
-                if (is_complex && visible_criteria_render_count > settings->scrollable_list_threshold) {
+                // Check if we exceed the threshold AND no children are manually placed
+                if (is_complex && visible_criteria_render_count > settings->scrollable_list_threshold && !has_manual_child) {
                     use_scrolling_list = true;
                     // Fix the height to exactly N items
                     criteria_list_height = (float) settings->scrollable_list_threshold * single_criterion_height;
@@ -3436,21 +3520,42 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
 
             // --- Layout and Culling ---
-            if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
-                current_x = padding;
-                current_y += row_max_height;
-                row_max_height = 0.0f;
+            float item_x = current_x;
+            float item_y = current_y;
+
+            if (settings->use_manual_layout && cat->icon_pos.is_set) {
+                item_x = cat->icon_pos.x;
+                item_y = cat->icon_pos.y;
+            } else {
+                // Procedural Auto-Layout Wrapping
+                if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
+                    current_x = padding;
+                    current_y += row_max_height;
+                    row_max_height = 0.0f;
+                    item_x = current_x;
+                    item_y = current_y;
+                }
+                // Update procedural layout cursors
+                current_x += uniform_item_width;
+                row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
             }
 
-            ImVec2 screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
-                                       (current_y * t->zoom_level) + t->camera_offset.y);
+            ImVec2 screen_pos = ImVec2((item_x * t->zoom_level) + t->camera_offset.x,
+                                       (item_y * t->zoom_level) + t->camera_offset.y);
 
             // Culling logic
             ImVec2 item_size_on_screen = ImVec2(uniform_item_width * t->zoom_level, item_height * t->zoom_level);
+
+
             bool is_visible_on_screen = !(screen_pos.x > io.DisplaySize.x || (screen_pos.x + item_size_on_screen.x) < 0
                                           ||
                                           screen_pos.y > io.DisplaySize.y || (screen_pos.y + item_size_on_screen.y) <
                                           0);
+
+            // Disable coarse parent culling in manual layout so detached text/criteria don't vanish
+            if (settings->use_manual_layout) {
+                is_visible_on_screen = true;
+            }
 
 
             // --- Rendering Core Logic (Only if visible) ---
@@ -3595,60 +3700,63 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 }
 
 
-                // Render Text (Main Name, Snapshot, Progress)
+                // --- TEXT CENTERING AND POSITIONING ---
+                float text_x_center = screen_pos.x + (bg_size.x * t->zoom_level) * 0.5f;
                 float current_text_y = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
                 float main_font_size = settings->tracker_font_size;
-                float sub_font_size = settings->tracker_sub_font_size; // Max 32 to prevent shifting downwards
+                float sub_font_size = settings->tracker_sub_font_size;
 
-                // Determine text color based on completion status
                 ImU32 current_text_color = is_considered_complete_render ? text_color_faded : text_color;
 
-                // LOD: Only render Main Text if zoom is sufficient
-                if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
-                    // Main Name
-                    draw_list->AddText(nullptr, main_font_size * t->zoom_level,
-                                       ImVec2(
-                                           screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) *
-                                           0.5f,
-                                           current_text_y), current_text_color, cat->display_name);
+                if (settings->use_manual_layout && cat->text_pos.is_set) {
+                    text_x_center = (cat->text_pos.x * t->zoom_level) + t->camera_offset.x + (
+                                        text_size.x * t->zoom_level) * 0.5f;
+                    current_text_y = (cat->text_pos.y * t->zoom_level) + t->camera_offset.y;
                 }
-                // ADVANCE LAYOUT EVEN IF NOT RENDERED
-                current_text_y += text_size.y * t->zoom_level + 4.0f * t->zoom_level;
 
-                // Snapshot Text (if applicable)
+                // Main Name
+                if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
+                    draw_list->AddText(nullptr, main_font_size * t->zoom_level,
+                                       ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, current_text_y),
+                                       current_text_color, cat->display_name);
+                }
+                current_text_y += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // ADVANCE LAYOUT
+
+                // Snapshot Text
                 if (has_snapshot_text) {
-                    // LOD: Tie snapshot text to main text visibility
                     if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
                         draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
-                                           ImVec2(
-                                               screen_pos.x + (
-                                                   bg_size.x * t->zoom_level - snapshot_text_size.x * t->zoom_level) *
-                                               0.5f,
-                                               current_text_y), text_color_faded, snapshot_text); // Use faded color
+                                           ImVec2(text_x_center - (snapshot_text_size.x * t->zoom_level) * 0.5f,
+                                                  current_text_y),
+                                           text_color_faded, snapshot_text);
                     }
-                    // ADVANCE LAYOUT EVEN IF NOT RENDERED
                     current_text_y += snapshot_text_size.y * t->zoom_level + 4.0f * t->zoom_level;
                 }
 
-                // Progress Text (if applicable)
+                // Progress Text
                 if (has_progress_text) {
-                    // LOD: Tie progress text to SUB text visibility (as requested)
+                    float prog_x_center = text_x_center;
+                    float prog_y = current_text_y;
+
+                    // Apply manual progress_pos if set
+                    if (settings->use_manual_layout && cat->progress_pos.is_set) {
+                        prog_x_center = (cat->progress_pos.x * t->zoom_level) + t->camera_offset.x + (
+                                            progress_text_size.x * t->zoom_level) * 0.5f;
+                        prog_y = (cat->progress_pos.y * t->zoom_level) + t->camera_offset.y;
+                    }
+
                     if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
                         draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
-                                           ImVec2(
-                                               screen_pos.x + (
-                                                   bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level) *
-                                               0.5f,
-                                               current_text_y), current_text_color, progress_text);
+                                           ImVec2(prog_x_center - (progress_text_size.x * t->zoom_level) * 0.5f,
+                                                  prog_y),
+                                           current_text_color, progress_text);
                     }
-                    // ADVANCE LAYOUT EVEN IF NOT RENDERED
-                    current_text_y += progress_text_size.y * t->zoom_level + 4.0f * t->zoom_level;
-                    // Add padding even after last text line before criteria
+                    current_text_y = prog_y + progress_text_size.y * t->zoom_level + 4.0f * t->zoom_level;
                 }
 
                 // Render Criteria/Sub-Stats (if complex and visible)
                 if (is_complex && visible_criteria_render_count > 0) {
-                    float sub_item_y_offset_world = current_y + (current_text_y - screen_pos.y) / t->zoom_level + 8.0f;
+                    float sub_item_y_offset_world = item_y + (current_text_y - screen_pos.y) / t->zoom_level + 8.0f;
                     // Start below last text + padding
 
                     // --- SCROLLING SETUP ---
@@ -3742,8 +3850,15 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         }
 
                         // Define position for icon/text logic
-                        ImVec2 crit_base_pos_screen = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
+                        ImVec2 crit_base_pos_screen = ImVec2((item_x * t->zoom_level) + t->camera_offset.x,
                                                              item_screen_y);
+
+                        // Apply manual icon position for criteria
+                        if (settings->use_manual_layout && crit->icon_pos.is_set) {
+                            crit_base_pos_screen = ImVec2((crit->icon_pos.x * t->zoom_level) + t->camera_offset.x,
+                                                          (crit->icon_pos.y * t->zoom_level) + t->camera_offset.y);
+                        }
+
                         float current_element_x_screen = crit_base_pos_screen.x;
 
                         // LOD for Sub-Item Icon
@@ -3873,52 +3988,47 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                         // Render Child Text and Progress
                         // LOD: Check if zoom level is sufficient for sub-text
+                        // Render Child Text and Progress
                         if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
                             ImU32 current_child_text_color = crit->done ? text_color_faded : text_color;
 
-                            // Calculate text height using the correct font scale
-                            float scale_factor = 1.0f;
-                            if (settings->tracker_font_size > 0.0f) {
-                                // Prevent division by zero
-                                scale_factor = settings->tracker_sub_font_size / settings->tracker_font_size;
-                            }
-
-                            ImGui::PushFont(t->tracker_font); // Ensure we're scaling from the correct base font
+                            float scale_factor = (settings->tracker_font_size > 0.0f)
+                                                     ? (settings->tracker_sub_font_size / settings->tracker_font_size)
+                                                     : 1.0f;
+                            ImGui::PushFont(t->tracker_font);
                             ImGui::SetWindowFontScale(scale_factor);
-
-                            // Calculate the height of the text. (Width is also needed for the X advance)
                             ImVec2 child_text_size = ImGui::CalcTextSize(crit->display_name);
-
-                            ImGui::SetWindowFontScale(1.0f); // Restore scale
+                            ImGui::SetWindowFontScale(1.0f);
                             ImGui::PopFont();
 
-                            // Calculate the vertically centered Y position
-                            // (BoxTop) + ( (BoxHeight - TextHeight) / 2 )
-                            // Both the box height AND the text height must be scaled by zoom.
                             float text_y_pos = crit_base_pos_screen.y + (
                                                    (32.0f * t->zoom_level) - (child_text_size.y * t->zoom_level)) *
                                                0.5f;
-
-                            // Draw the text
                             ImVec2 child_text_pos = ImVec2(current_element_x_screen, text_y_pos);
+
+                            if (settings->use_manual_layout && crit->text_pos.is_set) {
+                                child_text_pos = ImVec2((crit->text_pos.x * t->zoom_level) + t->camera_offset.x,
+                                                        (crit->text_pos.y * t->zoom_level) + t->camera_offset.y);
+                                current_element_x_screen = child_text_pos.x;
+                                // Update cursor so progress text follows naturally
+                            }
+
                             draw_list->AddText(nullptr, sub_font_size * t->zoom_level, child_text_pos,
                                                current_child_text_color, crit->display_name);
 
-                            // Advance X position using the width we just calculated
                             current_element_x_screen += (child_text_size.x * t->zoom_level) + (4.0f * t->zoom_level);
 
                             char crit_progress_text[32] = "";
                             if (is_stat_section) {
                                 if (crit->goal > 0) {
                                     snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d / %d)",
-                                             crit->progress,
-                                             crit->goal);
+                                             crit->progress, crit->goal);
                                 } else if (crit->goal == -1) {
                                     snprintf(crit_progress_text, sizeof(crit_progress_text), "(%d)", crit->progress);
                                 }
 
                                 if (crit_progress_text[0] != '\0') {
-                                    ImVec2 crit_progress_pos = ImVec2(current_element_x_screen, text_y_pos);
+                                    ImVec2 crit_progress_pos = ImVec2(current_element_x_screen, child_text_pos.y);
                                     draw_list->AddText(nullptr, sub_font_size * t->zoom_level, crit_progress_pos,
                                                        current_child_text_color, crit_progress_text);
                                 }
@@ -4091,10 +4201,6 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     }
                 } // End if (is_stat_section) for parent checkbox
             } // End if (is_visible_on_screen)
-
-            // --- Update Layout Position ---
-            current_x += uniform_item_width; // Use the final uniform_item_width directly
-            row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
         } // End loop through categories for this pass
     }; // End of render_pass lambda
 
@@ -4203,8 +4309,11 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
     float scale_factor; // Declare scale_factor here
 
     // Call separator with calculated counts (sub-counts are -1)
-    render_section_separator(t, settings, current_y, section_title, text_color,
-                             completed_count, total_visible_count, -1, -1);
+    if (!settings->use_manual_layout) {
+        // Only if not in manual mode
+        render_section_separator(t, settings, current_y, section_title, text_color,
+                                 completed_count, total_visible_count, -1, -1);
+    }
 
 
     // --- Calculate Uniform Item Width (based on items that will be rendered) ---
@@ -4255,7 +4364,19 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         uniform_item_width += horizontal_spacing;
     }
 
-    float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
+    // --- GLOBAL HYBRID SHIFT ---
+    float padding = 50.0f;
+    if (settings->use_manual_layout) {
+        padding = get_global_safe_x(t);
+
+        // Prevent auto-layout items from squeezing into a single column!
+        // We force the wrapping width to allow at least 3 items to fit side-by-side
+        float min_wrapping_width = padding + (uniform_item_width * 3.0f);
+        if (wrapping_width < min_wrapping_width) {
+            wrapping_width = min_wrapping_width;
+        }
+    }
+    float current_x = padding, row_max_height = 0.0f;
 
     // Adjust vertical spacing
     const float vertical_spacing = settings->tracker_vertical_spacing; // Changed from 16.0f
@@ -4308,19 +4429,38 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
             item_height += sub_text_line_height + 4.0f;
         }
 
-        if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
-            current_x = padding;
-            current_y += row_max_height;
-            row_max_height = 0.0f;
+        float item_x = current_x;
+        float item_y = current_y;
+
+        if (settings->use_manual_layout && item->icon_pos.is_set) {
+            item_x = item->icon_pos.x;
+            item_y = item->icon_pos.y;
+        } else {
+            // Procedural Auto-Layout Wrapping
+            if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
+                current_x = padding;
+                current_y += row_max_height;
+                row_max_height = 0.0f;
+                item_x = current_x;
+                item_y = current_y;
+            }
+            // Update procedural layout cursors
+            current_x += uniform_item_width;
+            row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
         }
 
-        ImVec2 screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
-                                   (current_y * t->zoom_level) + t->camera_offset.y);
+        ImVec2 screen_pos = ImVec2((item_x * t->zoom_level) + t->camera_offset.x,
+                                   (item_y * t->zoom_level) + t->camera_offset.y);
 
         // --- Culling Logic ---
         ImVec2 item_size_on_screen = ImVec2(uniform_item_width * t->zoom_level, item_height * t->zoom_level);
         bool is_visible_on_screen = !(screen_pos.x > io.DisplaySize.x || (screen_pos.x + item_size_on_screen.x) < 0 ||
                                       screen_pos.y > io.DisplaySize.y || (screen_pos.y + item_size_on_screen.y) < 0);
+
+        // Disable coarse parent culling in manual layout so detached text/criteria don't vanish
+        if (settings->use_manual_layout) {
+            is_visible_on_screen = true;
+        }
 
 
         // --- Rendering Core Logic ---
@@ -4426,40 +4566,38 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
             if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
                 float main_text_size = settings->tracker_font_size;
                 float sub_font_size = settings->tracker_sub_font_size;
-                ImU32 current_text_color = item->done ? text_color_faded : text_color; // Fade text if done
+                ImU32 current_text_color = item->done ? text_color_faded : text_color; // Fade if done
 
-                // Calculate Y position for the first line of text
+                // --- TEXT CENTERING AND POSITIONING ---
+                float text_x_center = screen_pos.x + (bg_size.x * t->zoom_level) * 0.5f;
                 float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
+
+                if (settings->use_manual_layout && item->text_pos.is_set) {
+                    text_x_center = (item->text_pos.x * t->zoom_level) + t->camera_offset.x + (
+                                        text_size.x * t->zoom_level) * 0.5f;
+                    text_y_pos = (item->text_pos.y * t->zoom_level) + t->camera_offset.y;
+                }
 
                 // Draw Main Name (centered)
                 draw_list->AddText(nullptr, main_text_size * t->zoom_level,
-                                   ImVec2(
-                                       screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
-                                       text_y_pos), current_text_color,
-                                   item->display_name);
+                                   ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos),
+                                   current_text_color, item->display_name);
 
+                // Draw Progress Text below main name (if applicable, centered)
                 if (has_progress_text) {
                     text_y_pos += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // Move Y down
 
-                    // LOD for progress text
+                    // LOD: Hide progress text if zoomed out
                     if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
-                        // Using same threshold for now, could be separate
                         draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
-                                           ImVec2(
-                                               screen_pos.x + (
-                                                   bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level) *
-                                               0.5f,
-                                               text_y_pos), current_text_color,
-                                           progress_text);
+                                           ImVec2(text_x_center - (progress_text_size.x * t->zoom_level) * 0.5f,
+                                                  text_y_pos),
+                                           current_text_color, progress_text);
                     }
                 }
             }
             // NO Checkboxes rendered here
         } // End if (is_visible_on_screen)
-
-        // --- Update Layout Position ---
-        current_x += uniform_item_width; // Use the final uniform_item_width directly
-        row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
     }
     // --- End Rendering Loop ---
 
@@ -4574,8 +4712,11 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
     float scale_factor; // Declare scale_factor here
 
     // Call separator with calculated counts (sub-counts are -1)
-    render_section_separator(t, settings, current_y, section_title, text_color,
-                             completed_count, total_visible_count, -1, -1);
+    if (!settings->use_manual_layout) {
+        // Only if not in manual mode
+        render_section_separator(t, settings, current_y, section_title, text_color,
+                                 completed_count, total_visible_count, -1, -1);
+    }
 
 
     // --- Calculate Uniform Item Width (based on items that will be rendered) ---
@@ -4643,8 +4784,19 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
     }
     // --- End of Width Calculation ---
 
+    // --- GLOBAL HYBRID SHIFT ---
+    float padding = 50.0f;
+    if (settings->use_manual_layout) {
+        padding = get_global_safe_x(t);
 
-    float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
+        // Prevent auto-layout items from squeezing into a single column!
+        // We force the wrapping width to allow at least 3 items to fit side-by-side
+        float min_wrapping_width = padding + (uniform_item_width * 3.0f);
+        if (wrapping_width < min_wrapping_width) {
+            wrapping_width = min_wrapping_width;
+        }
+    }
+    float current_x = padding, row_max_height = 0.0f;
 
     // Adjust vertical spacing
     const float vertical_spacing = settings->tracker_vertical_spacing; // Changed from 16.0f
@@ -4696,19 +4848,38 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             item_height += sub_text_line_height + 4.0f;
         }
 
-        if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
-            current_x = padding;
-            current_y += row_max_height;
-            row_max_height = 0.0f;
+        float item_x = current_x;
+        float item_y = current_y;
+
+        if (settings->use_manual_layout && item->icon_pos.is_set) {
+            item_x = item->icon_pos.x;
+            item_y = item->icon_pos.y;
+        } else {
+            // Procedural Auto-Layout Wrapping
+            if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
+                current_x = padding;
+                current_y += row_max_height;
+                row_max_height = 0.0f;
+                item_x = current_x;
+                item_y = current_y;
+            }
+            // Update procedural layout cursors
+            current_x += uniform_item_width;
+            row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
         }
 
-        ImVec2 screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
-                                   (current_y * t->zoom_level) + t->camera_offset.y);
+        ImVec2 screen_pos = ImVec2((item_x * t->zoom_level) + t->camera_offset.x,
+                                   (item_y * t->zoom_level) + t->camera_offset.y);
 
         // --- Culling Logic ---
         ImVec2 item_size_on_screen = ImVec2(uniform_item_width * t->zoom_level, item_height * t->zoom_level);
         bool is_visible_on_screen = !(screen_pos.x > io.DisplaySize.x || (screen_pos.x + item_size_on_screen.x) < 0 ||
                                       screen_pos.y > io.DisplaySize.y || (screen_pos.y + item_size_on_screen.y) < 0);
+
+        // Disable coarse parent culling in manual layout so detached text/criteria don't vanish
+        if (settings->use_manual_layout) {
+            is_visible_on_screen = true;
+        }
 
 
         // --- Rendering Core Logic ---
@@ -4817,37 +4988,39 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 // --- End Icon Scaling and Centering Logic ---
             }
 
-            // Render Text (Name and Progress)
-            float main_font_size = settings->tracker_font_size;
-            float sub_font_size = settings->tracker_sub_font_size; // Max 32 pt
-            ImU32 current_text_color = item->done ? text_color_faded : text_color; // Fade if done
-
-            // Calculate Y position for the first line of text
-            float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
-
-            // Draw Main Name (centered)
-            // LOD: Hide main text if zoomed out too far
+            // Render Text
+            // LOD: Check if zoom level is sufficient for text
             if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
-                draw_list->AddText(nullptr, main_font_size * t->zoom_level,
-                                   ImVec2(
-                                       screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
-                                       text_y_pos), current_text_color,
-                                   item->display_name);
-            }
+                float main_text_size = settings->tracker_font_size;
+                float sub_font_size = settings->tracker_sub_font_size;
+                ImU32 current_text_color = item->done ? text_color_faded : text_color; // Fade if done
 
-            // Draw Progress Text below main name (if applicable, centered)
-            if (has_progress_text) {
-                text_y_pos += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // Move Y down
+                // --- TEXT CENTERING AND POSITIONING ---
+                float text_x_center = screen_pos.x + (bg_size.x * t->zoom_level) * 0.5f;
+                float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
 
-                // LOD: Hide progress text if zoomed out
-                if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
-                    draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
-                                       ImVec2(
-                                           screen_pos.x + (
-                                               bg_size.x * t->zoom_level - progress_text_size.x * t->zoom_level)
-                                           * 0.5f,
-                                           text_y_pos), current_text_color,
-                                       progress_text);
+                if (settings->use_manual_layout && item->text_pos.is_set) {
+                    text_x_center = (item->text_pos.x * t->zoom_level) + t->camera_offset.x + (
+                                        text_size.x * t->zoom_level) * 0.5f;
+                    text_y_pos = (item->text_pos.y * t->zoom_level) + t->camera_offset.y;
+                }
+
+                // Draw Main Name (centered)
+                draw_list->AddText(nullptr, main_text_size * t->zoom_level,
+                                   ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos),
+                                   current_text_color, item->display_name);
+
+                // Draw Progress Text below main name (if applicable, centered)
+                if (has_progress_text) {
+                    text_y_pos += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // Move Y down
+
+                    // LOD: Hide progress text if zoomed out
+                    if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
+                        draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
+                                           ImVec2(text_x_center - (progress_text_size.x * t->zoom_level) * 0.5f,
+                                                  text_y_pos),
+                                           current_text_color, progress_text);
+                    }
                 }
             }
 
@@ -4891,10 +5064,6 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 }
             } // End if (can_be_overridden && visible)
         } // End if (is_visible_on_screen)
-
-        // --- Update Layout Position ---
-        current_x += uniform_item_width; // Use the final uniform_item_width directly
-        row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
     }
     // --- End Rendering Loop ---
 
@@ -5033,9 +5202,12 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
     float scale_factor; // Declare scale_factor here
 
     // Call separator with calculated counts
-    render_section_separator(t, settings, current_y, section_title, text_color,
-                             completed_count, total_visible_count,
-                             completed_sub_count, total_visible_sub_count); // Pass stage counts
+    if (!settings->use_manual_layout) {
+        // Only if not in manual mode
+        render_section_separator(t, settings, current_y, section_title, text_color,
+                                 completed_count, total_visible_count,
+                                 completed_sub_count, total_visible_sub_count); // Pass stage counts
+    }
 
 
     // --- Calculate Uniform Item Width (based on items that will be rendered) ---
@@ -5109,8 +5281,20 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
     }
     // --- End of Width Calculation ---
 
+    // --- GLOBAL HYBRID SHIFT ---
+    float padding = 50.0f;
+    if (settings->use_manual_layout) {
+        padding = get_global_safe_x(t);
 
-    float padding = 50.0f, current_x = padding, row_max_height = 0.0f;
+        // Prevent auto-layout items from squeezing into a single column!
+        // We force the wrapping width to allow at least 3 items to fit side-by-side
+        float min_wrapping_width = padding + (uniform_item_width * 3.0f);
+        if (wrapping_width < min_wrapping_width) {
+            wrapping_width = min_wrapping_width;
+        }
+    }
+    float current_x = padding, row_max_height = 0.0f;
+
     // Adjust vertical spacing
     const float vertical_spacing = settings->tracker_vertical_spacing; // Changed from 16.0f
 
@@ -5152,19 +5336,35 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         // Multi-Stage goals always have both lines of text
         float item_height = 96.0f + main_text_line_height + 4.0f + sub_text_line_height + 4.0f;
 
-        if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
-            current_x = padding;
-            current_y += row_max_height;
-            row_max_height = 0.0f;
+        float item_x = current_x;
+        float item_y = current_y;
+
+        if (settings->use_manual_layout && goal->icon_pos.is_set) {
+            item_x = goal->icon_pos.x;
+            item_y = goal->icon_pos.y;
+        } else {
+            // Procedural Auto-Layout Wrapping
+            if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
+                current_x = padding;
+                current_y += row_max_height;
+                row_max_height = 0.0f;
+                item_x = current_x;
+                item_y = current_y;
+            }
         }
 
-        ImVec2 screen_pos = ImVec2((current_x * t->zoom_level) + t->camera_offset.x,
-                                   (current_y * t->zoom_level) + t->camera_offset.y);
+        ImVec2 screen_pos = ImVec2((item_x * t->zoom_level) + t->camera_offset.x,
+                                   (item_y * t->zoom_level) + t->camera_offset.y);
 
         // --- Culling Logic ---
         ImVec2 item_size_on_screen = ImVec2(uniform_item_width * t->zoom_level, item_height * t->zoom_level);
         bool is_visible_on_screen = !(screen_pos.x > io.DisplaySize.x || (screen_pos.x + item_size_on_screen.x) < 0 ||
                                       screen_pos.y > io.DisplaySize.y || (screen_pos.y + item_size_on_screen.y) < 0);
+
+        // Disable coarse parent culling in manual layout so detached text/criteria don't vanish
+        if (settings->use_manual_layout) {
+            is_visible_on_screen = true;
+        }
 
 
         // --- Rendering Core Logic ---
@@ -5304,30 +5504,41 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             float sub_font_size = settings->tracker_sub_font_size;
             ImU32 current_text_color = is_done_render ? text_color_faded : text_color; // Fade if done
 
-            // Calculate Y position for the first line of text
+            // --- TEXT CENTERING AND POSITIONING ---
+            float text_x_center = screen_pos.x + (bg_size.x * t->zoom_level) * 0.5f;
             float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
+
+            if (settings->use_manual_layout && goal->text_pos.is_set) {
+                text_x_center = (goal->text_pos.x * t->zoom_level) + t->camera_offset.x + (text_size.x * t->zoom_level)
+                                * 0.5f;
+                text_y_pos = (goal->text_pos.y * t->zoom_level) + t->camera_offset.y;
+            }
 
             // Draw Main Name (centered)
             // LOD: Hide main name if zoomed out too far
             if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
                 draw_list->AddText(nullptr, main_font_size * t->zoom_level,
-                                   ImVec2(
-                                       screen_pos.x + (bg_size.x * t->zoom_level - text_size.x * t->zoom_level) * 0.5f,
-                                       text_y_pos), current_text_color,
-                                   goal->display_name);
+                                   ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos),
+                                   current_text_color, goal->display_name);
             }
 
             // Draw Current Stage Text (uses sub_font_size)
-            text_y_pos += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // Move Y down
+            float stage_text_y = text_y_pos + text_size.y * t->zoom_level + 4.0f * t->zoom_level;
+            float stage_text_x_center = text_x_center;
+
+            // Apply manual progress_pos if set
+            if (settings->use_manual_layout && goal->progress_pos.is_set) {
+                stage_text_x_center = (goal->progress_pos.x * t->zoom_level) + t->camera_offset.x + (
+                                          stage_text_size.x * t->zoom_level) * 0.5f;
+                stage_text_y = (goal->progress_pos.y * t->zoom_level) + t->camera_offset.y;
+            }
 
             // LOD: Hide stage text if zoomed out
             if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
                 draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
-                                   ImVec2(
-                                       screen_pos.x + (bg_size.x * t->zoom_level - stage_text_size.x * t->zoom_level) *
-                                       0.5f,
-                                       text_y_pos), current_text_color,
-                                   stage_text); // Use formatted stage text
+                                   ImVec2(stage_text_x_center - (stage_text_size.x * t->zoom_level) * 0.5f,
+                                          stage_text_y),
+                                   current_text_color, stage_text); // Use formatted stage text
             }
         } // End if (is_visible_on_screen)
 
@@ -5838,18 +6049,16 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     ImGui::SameLine();
 
     ImGui::BeginDisabled(!t->template_data); // Prevent crashing if template_data is null
-    bool temp_manual = t->template_data ? t->template_data->has_manual_layout : false;
+    bool temp_manual = settings->use_manual_layout;
     if (ImGui::Checkbox("Manual Layout", &temp_manual)) {
-        if (t->template_data) {
-            t->template_data->has_manual_layout = temp_manual;
-        }
+        settings->use_manual_layout = temp_manual;
+        settings_save(settings, t->template_data, SAVE_CONTEXT_ALL); // Save the preference instantly
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Toggles between procedural 'Auto Layout' and 'Manual Layout'.\n"
+                          "");
     }
     ImGui::EndDisabled();
-
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("Toggles between procedural 'Auto Layout' and 'Manual Layout'.\n"
-                          "If the template contains any manual coordinates, this defaults to ON.");
-    }
 
     ImGui::SameLine();
 
@@ -6661,14 +6870,11 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
 
     MC_Version version = settings_get_version_from_string(settings->version_str);
 
-    // Set flag to false -> so it's automatic placement
-    t->template_data->has_manual_layout = false;
-
     // Parse the 5 main categories
     // False as it's for advancements
     tracker_parse_categories(t, advancements_json, lang_json, &t->template_data->advancements,
                              &t->template_data->advancement_count, &t->template_data->total_criteria_count,
-                             "advancement.", false, version, settings, &t->template_data->has_manual_layout);
+                             "advancement.", false, version, settings);
 
     // After parsing, calculate the count of actual advancements (excluding recipes)
     t->template_data->advancement_goal_count = 0;
@@ -6685,22 +6891,19 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     // True as it's for stats
     tracker_parse_categories(t, stats_json, lang_json, &t->template_data->stats,
                              &t->template_data->stat_count, &t->template_data->stat_total_criteria_count, "stat.",
-                             true, version, settings, &t->template_data->has_manual_layout);
+                             true, version, settings);
 
     // Parse "unlock." prefix for unlocks
     tracker_parse_simple_trackables(t, unlocks_json, lang_json, &t->template_data->unlocks,
-                                    &t->template_data->unlock_count, "unlock.", settings,
-                                    &t->template_data->has_manual_layout);
+                                    &t->template_data->unlock_count, "unlock.", settings);
 
     // Parse "custom." prefix for custom goals
     tracker_parse_simple_trackables(t, custom_json, lang_json, &t->template_data->custom_goals,
-                                    &t->template_data->custom_goal_count, "custom.", settings,
-                                    &t->template_data->has_manual_layout);
+                                    &t->template_data->custom_goal_count, "custom.", settings);
 
     tracker_parse_multi_stage_goals(t, multi_stage_goals_json, lang_json,
                                     &t->template_data->multi_stage_goals,
-                                    &t->template_data->multi_stage_goal_count, settings,
-                                    &t->template_data->has_manual_layout);
+                                    &t->template_data->multi_stage_goal_count, settings);
 
 
     // Detect and flag criteria that are shared between multiple advancements

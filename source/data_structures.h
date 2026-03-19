@@ -279,10 +279,6 @@ struct SubGoal {
     SDL_Texture *texture;
     AnimatedTexture *anim_texture;
     uint64_t icon_hash;
-
-    // Manual Layout Positions
-    ManualPos icon_pos;
-    ManualPos text_pos;
 };
 
 // Represents a complete multi-stage goal
@@ -350,9 +346,6 @@ struct TemplateData {
     long long playtime_snapshot; // Stores playtime at world load for legacy versions
     char snapshot_world_name[MAX_PATH_LENGTH]; // The world the current snapshot belongs to
     char last_known_world_name[MAX_PATH_LENGTH]; // The last world the tracker was active in, to detect changes.
-
-    // For Manual Layout Positions
-    bool has_manual_layout; // If true, use manual layout positions and place all other automatic goals to the right
 };
 
 // PATHMODE AND VERSION STUFF

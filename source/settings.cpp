@@ -425,7 +425,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "DEFAULT: Automatically detect and track the active Minecraft instance\n"
                          "launched from MultiMC or Prism Launcher, even when switching between\n"
                          "multiple running instances. The tracker always follows the most recently\n"
-                         "active world. Having Minecraft closed may cause 'No Worlds Found'.\n"
+                         "active world.\n"
+                         "Having Minecraft closed may cause 'No Worlds Found' or\n"
+                         "issues with checkboxes.\n"
                          "This is Path Mode: %d", PATH_MODE_INSTANCE);
                 ImGui::SetTooltip("%s", tooltip);
             }
@@ -1395,10 +1397,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 if (temp_settings.scrollable_list_threshold > 2048) temp_settings.scrollable_list_threshold = 2048;
             }
             if (ImGui::IsItemHovered()) {
-                char scroll_tooltip[256];
+                char scroll_tooltip[512];
                 snprintf(scroll_tooltip, sizeof(scroll_tooltip),
                          "The maximum number of criteria/sub-stats to show before turning the list into a scrollable box.\n"
-                         " Use the Scroll Wheel or left-click dragging the bar to scroll.\n"
+                         "Use the Scroll Wheel or left-click dragging the bar to scroll.\n"
+                         "\n\nNote: Scrollable lists are automatically disabled for a specific goal\n"
+                         "if 'Manual Layout' is active and any of its criteria/sub-stats use manual coordinates."
                          "Default: %d", DEFAULT_SCROLLABLE_LIST_THRESHOLD);
                 ImGui::SetTooltip("%s", scroll_tooltip);
             }
@@ -1411,9 +1415,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     temp_settings.tracker_list_scroll_speed = 1024.0f;
             }
             if (ImGui::IsItemHovered()) {
-                char speed_tooltip[128];
+                char speed_tooltip[256];
                 snprintf(speed_tooltip, sizeof(speed_tooltip),
                          "How many pixels the list scrolls per mouse wheel notch.\n"
+                         "Use the Scroll Wheel or left-click dragging the bar to scroll.\n"
                          "Default: %.0f px", DEFAULT_TRACKER_LIST_SCROLL_SPEED);
                 ImGui::SetTooltip("%s", speed_tooltip);
             }
