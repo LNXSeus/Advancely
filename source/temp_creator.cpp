@@ -1788,7 +1788,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // Dynamically create the window title based on unsaved changes
     // On VERY FIRST OPEN it has this size -> nothing in imgui.ini file
     // Hide Close Button when in Visual Editor Mode
-    bool* window_open_ptr = (t && t->is_visual_layout_editing) ? nullptr : p_open;
+    bool *window_open_ptr = (t && t->is_visual_layout_editing) ? nullptr : p_open;
     ImGui::Begin("Template Editor", window_open_ptr);
 
     if (t) {
@@ -3093,8 +3093,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
                     if (t->template_data->multi_stage_goals[i] && strcmp(
                             ed_msg.root_name, t->template_data->multi_stage_goals[i]->root_name) == 0) {
-                        TrackableCategory *tr_msg = (TrackableCategory *) t->template_data->multi_stage_goals[i];
-                        // Cast is safe for positions
+                        MultiStageGoal *tr_msg = t->template_data->multi_stage_goals[i];
                         sync_pos(ed_msg.icon_pos, tr_msg->icon_pos);
                         sync_pos(ed_msg.text_pos, tr_msg->text_pos);
                         sync_pos(ed_msg.progress_pos, tr_msg->progress_pos);
@@ -3259,7 +3258,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 char tooltip_buffer[512];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Toggle drag-and-drop editing directly on the main tracker map.\n"
-                         "Activating this will automatically turn on 'Manual Layout' mode.\n\n"
+                         "Activating this will automatically turn on 'Manual Layout' mode.\n"
+                         "Make sure you're trackig a world.\n\n"
                          "WARNING: Official default templates get overwritten on updates.\n"
                          "Always work on a 'Copy' if you want to keep your custom layout!");
                 ImGui::SetTooltip("%s", tooltip_buffer);
@@ -3332,10 +3332,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::Spacing();
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.65f, 0.0f, 1.0f)); // Bright Orange/Yellow Warning Color
             ImGui::TextWrapped("VISUAL EDITING ACTIVE: Drag items on the tracker map to reposition them! "
-                               "Don't forget to click 'Stop Visual Editing' AND 'Save' when you are finished!");
+                "Don't forget to click 'Stop Visual Editing' AND 'Save' when you are finished!");
             ImGui::PopStyleColor();
+
+            ImGui::Separator();
         }
-        ImGui::Separator();
 
         if (ImGui::BeginTabBar("EditorTabs")) {
             // "Advancements" or "Achievements" tab depending on version
