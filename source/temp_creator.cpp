@@ -1489,7 +1489,8 @@ static void synchronize_legacy_ms_goal_stats(EditorTemplate &editor_data) {
 }
 
 // Helper to render collapsible coordinate fields in the details panes, currently used for manual goal placement coords
-static void render_manual_pos_ui(const char* label_id, const char* tooltip_item_name, const char* pos_type, ManualPos* pos, SaveMessageType& save_msg) {
+static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_name, const char *pos_type,
+                                 ManualPos *pos, SaveMessageType &save_msg) {
     ImGui::PushID(label_id);
 
     bool was_set = pos->is_set;
@@ -1497,12 +1498,14 @@ static void render_manual_pos_ui(const char* label_id, const char* tooltip_item_
         save_msg = MSG_NONE; // Triggers unsaved changes!
         // Give it a sensible default if they are turning it on for the first time
         if (pos->is_set && !was_set && pos->x == 0.0f && pos->y == 0.0f) {
-            pos->x = 100.0f; pos->y = 100.0f;
+            pos->x = 100.0f;
+            pos->y = 100.0f;
         }
     }
     if (ImGui::IsItemHovered()) {
         char tooltip[256];
-        snprintf(tooltip, sizeof(tooltip), "Enable manual positioning for the %s of this %s.", pos_type, tooltip_item_name);
+        snprintf(tooltip, sizeof(tooltip), "Enable manual positioning for the %s of this %s.", pos_type,
+                 tooltip_item_name);
         ImGui::SetTooltip("%s", tooltip);
     }
 
@@ -2998,6 +3001,103 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // "Editing Template" Form
 
     if (editing_template) {
+        // --- REAL-TIME MEMORY SYNC FOR VISUAL EDITING ---
+        // If the user is dragging items on the map, copy the coordinates from Tracker memory to Editor memory!
+        if (t && t->is_visual_layout_editing && t->template_data) {
+            auto sync_pos = [](ManualPos &editor_pos, const ManualPos &tracker_pos) {
+                if (tracker_pos.is_set) {
+                    editor_pos.is_set = true;
+                    editor_pos.x = tracker_pos.x;
+                    editor_pos.y = tracker_pos.y;
+                }
+            };
+
+            auto sync_item = [&](EditorTrackableItem &ed_item, TrackableItem *tr_item) {
+                if (!tr_item) return;
+                sync_pos(ed_item.icon_pos, tr_item->icon_pos);
+                sync_pos(ed_item.text_pos, tr_item->text_pos);
+            };
+
+            // Sync Advancements
+            for (auto &ed_adv: current_template_data.advancements) {
+                for (int i = 0; i < t->template_data->advancement_count; i++) {
+                    if (t->template_data->advancements[i] && strcmp(ed_adv.root_name,
+                                                                    t->template_data->advancements[i]->root_name) ==
+                        0) {
+                        TrackableCategory *tr_adv = t->template_data->advancements[i];
+                        sync_pos(ed_adv.icon_pos, tr_adv->icon_pos);
+                        sync_pos(ed_adv.text_pos, tr_adv->text_pos);
+                        sync_pos(ed_adv.progress_pos, tr_adv->progress_pos);
+                        // Sync criteria
+                        for (auto &ed_crit: ed_adv.criteria) {
+                            for (int j = 0; j < tr_adv->criteria_count; j++) {
+                                if (tr_adv->criteria[j] && strcmp(ed_crit.root_name, tr_adv->criteria[j]->root_name) ==
+                                    0) {
+                                    sync_item(ed_crit, tr_adv->criteria[j]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Sync Stats
+            for (auto &ed_stat: current_template_data.stats) {
+                for (int i = 0; i < t->template_data->stat_count; i++) {
+                    if (t->template_data->stats[i] && strcmp(ed_stat.root_name, t->template_data->stats[i]->root_name)
+                        == 0) {
+                        TrackableCategory *tr_stat = t->template_data->stats[i];
+                        sync_pos(ed_stat.icon_pos, tr_stat->icon_pos);
+                        sync_pos(ed_stat.text_pos, tr_stat->text_pos);
+                        sync_pos(ed_stat.progress_pos, tr_stat->progress_pos);
+                        // Sync criteria
+                        for (auto &ed_crit: ed_stat.criteria) {
+                            for (int j = 0; j < tr_stat->criteria_count; j++) {
+                                if (tr_stat->criteria[j] && strcmp(ed_crit.root_name, tr_stat->criteria[j]->root_name)
+                                    == 0) {
+                                    sync_item(ed_crit, tr_stat->criteria[j]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Sync Simple Items
+            for (auto &ed_unlock: current_template_data.unlocks) {
+                for (int i = 0; i < t->template_data->unlock_count; i++) {
+                    if (t->template_data->unlocks[i] && strcmp(ed_unlock.root_name,
+                                                               t->template_data->unlocks[i]->root_name) == 0) {
+                        sync_item(ed_unlock, t->template_data->unlocks[i]);
+                    }
+                }
+            }
+            for (auto &ed_cg: current_template_data.custom_goals) {
+                for (int i = 0; i < t->template_data->custom_goal_count; i++) {
+                    if (t->template_data->custom_goals[i] && strcmp(ed_cg.root_name,
+                                                                    t->template_data->custom_goals[i]->root_name) ==
+                        0) {
+                        sync_item(ed_cg, t->template_data->custom_goals[i]);
+                    }
+                }
+            }
+
+            // Sync MS Goals
+            for (auto &ed_msg: current_template_data.multi_stage_goals) {
+                for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
+                    if (t->template_data->multi_stage_goals[i] && strcmp(
+                            ed_msg.root_name, t->template_data->multi_stage_goals[i]->root_name) == 0) {
+                        TrackableCategory *tr_msg = (TrackableCategory *) t->template_data->multi_stage_goals[i];
+                        // Cast is safe for positions
+                        sync_pos(ed_msg.icon_pos, tr_msg->icon_pos);
+                        sync_pos(ed_msg.text_pos, tr_msg->text_pos);
+                        sync_pos(ed_msg.progress_pos, tr_msg->progress_pos);
+                    }
+                }
+            }
+        }
+        // --- END SYNC BLOCK ---
+
         // --- CORE EDITOR VIEW ---
         ImGui::PushID(&selected_template_info); // Use address of info struct for a unique ID
 
@@ -3116,8 +3216,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::TextColored(color, "%s", status_message);
         }
 
-// --- VISUAL LAYOUT EDITOR TOGGLE ---
-        const char* vis_btn_text = t->is_visual_layout_editing ? "Stop Visual Editing" : "Visual Layout Editor";
+        // --- VISUAL LAYOUT EDITOR TOGGLE ---
+        const char *vis_btn_text = t->is_visual_layout_editing ? "Stop Visual Editing" : "Visual Layout Editor";
         float vis_btn_width = ImGui::CalcTextSize(vis_btn_text).x + ImGui::GetStyle().FramePadding.x * 2.0f;
 
         // Right-align the button on the same line
@@ -3134,8 +3234,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             ImGui::EndDisabled();
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char tooltip_buffer[256];
-                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "You must apply this template in the main Settings window\n"
-                                  "to use the visual map editor.");
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "You must apply this template in the main Settings window\n"
+                         "to use the visual map editor.");
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
         } else {
@@ -3150,10 +3251,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
             if (ImGui::IsItemHovered()) {
                 char tooltip_buffer[512];
-                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Toggle drag-and-drop editing directly on the main tracker map.\n"
-                                  "Activating this will automatically turn on 'Manual Layout' mode.\n\n"
-                                  "WARNING: Official default templates get overwritten on updates.\n"
-                                  "Always work on a 'Copy' if you want to keep your custom layout!");
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                         "Toggle drag-and-drop editing directly on the main tracker map.\n"
+                         "Activating this will automatically turn on 'Manual Layout' mode.\n\n"
+                         "WARNING: Official default templates get overwritten on updates.\n"
+                         "Always work on a 'Copy' if you want to keep your custom layout!");
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
         }
@@ -3867,12 +3969,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     if (ImGui::CollapsingHeader("Layout Coordinates")) {
-                        render_manual_pos_ui("icon", advancements_label_singular_lower, "Icon Position", &advancement.icon_pos, save_message_type);
-                        render_manual_pos_ui("text", advancements_label_singular_lower, "Text Position", &advancement.text_pos, save_message_type);
+                        render_manual_pos_ui("icon", advancements_label_singular_lower, "Icon Position",
+                                             &advancement.icon_pos, save_message_type);
+                        render_manual_pos_ui("text", advancements_label_singular_lower, "Text Position",
+                                             &advancement.text_pos, save_message_type);
 
                         // ONLY show progress pos if this advancement has criteria!
                         if (!advancement.criteria.empty()) {
-                            render_manual_pos_ui("prog", advancements_label_singular_lower, "Progress Position", &advancement.progress_pos, save_message_type);
+                            render_manual_pos_ui("prog", advancements_label_singular_lower, "Progress Position",
+                                                 &advancement.progress_pos, save_message_type);
                         }
                     }
 
@@ -4233,8 +4338,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         if (ImGui::CollapsingHeader("Layout Coordinates")) {
-                            render_manual_pos_ui("c_icon", "criterion", "Icon Position", &criterion.icon_pos, save_message_type);
-                            render_manual_pos_ui("c_text", "criterion", "Text Position", &criterion.text_pos, save_message_type);
+                            render_manual_pos_ui("c_icon", "criterion", "Icon Position", &criterion.icon_pos,
+                                                 save_message_type);
+                            render_manual_pos_ui("c_text", "criterion", "Text Position", &criterion.text_pos,
+                                                 save_message_type);
                         }
 
                         ImGui::EndGroup();
@@ -4985,12 +5092,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     if (ImGui::CollapsingHeader("Layout Coordinates")) {
-                        render_manual_pos_ui("s_icon", "stat category", "Icon Position", &stat_cat.icon_pos, save_message_type);
-                        render_manual_pos_ui("s_text", "stat category", "Text Position", &stat_cat.text_pos, save_message_type);
+                        render_manual_pos_ui("s_icon", "stat category", "Icon Position", &stat_cat.icon_pos,
+                                             save_message_type);
+                        render_manual_pos_ui("s_text", "stat category", "Text Position", &stat_cat.text_pos,
+                                             save_message_type);
 
                         // ONLY show progress pos if this is a Multi-Stat Category!
                         if (!stat_cat.is_simple_stat) {
-                            render_manual_pos_ui("s_prog", "stat category", "Progress Position", &stat_cat.progress_pos, save_message_type);
+                            render_manual_pos_ui("s_prog", "stat category", "Progress Position", &stat_cat.progress_pos,
+                                                 save_message_type);
                         }
                     }
 
@@ -5405,8 +5515,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
 
                             if (ImGui::CollapsingHeader("Layout Coordinates")) {
-                                render_manual_pos_ui("sc_icon", "sub-stat", "Icon Position", &crit.icon_pos, save_message_type);
-                                render_manual_pos_ui("sc_text", "sub-stat", "Text Position", &crit.text_pos, save_message_type);
+                                render_manual_pos_ui("sc_icon", "sub-stat", "Icon Position", &crit.icon_pos,
+                                                     save_message_type);
+                                render_manual_pos_ui("sc_text", "sub-stat", "Text Position", &crit.text_pos,
+                                                     save_message_type);
                             }
 
                             ImGui::EndGroup();
@@ -5800,8 +5912,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         if (ImGui::CollapsingHeader("Layout Coordinates")) {
-                            render_manual_pos_ui("u_icon", "unlock", "Icon Position", &unlock.icon_pos, save_message_type);
-                            render_manual_pos_ui("u_text", "unlock", "Text Position", &unlock.text_pos, save_message_type);
+                            render_manual_pos_ui("u_icon", "unlock", "Icon Position", &unlock.icon_pos,
+                                                 save_message_type);
+                            render_manual_pos_ui("u_text", "unlock", "Text Position", &unlock.text_pos,
+                                                 save_message_type);
                         }
 
                         ImGui::EndGroup();
@@ -6188,8 +6302,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     if (ImGui::CollapsingHeader("Layout Coordinates")) {
-                        render_manual_pos_ui("cg_icon", "custom goal", "Icon Position", &goal.icon_pos, save_message_type);
-                        render_manual_pos_ui("cg_text", "custom goal", "Text Position", &goal.text_pos, save_message_type);
+                        render_manual_pos_ui("cg_icon", "custom goal", "Icon Position", &goal.icon_pos,
+                                             save_message_type);
+                        render_manual_pos_ui("cg_text", "custom goal", "Text Position", &goal.text_pos,
+                                             save_message_type);
                     }
 
                     ImGui::EndGroup();
@@ -6868,9 +6984,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     if (ImGui::CollapsingHeader("Layout Coordinates")) {
-                        render_manual_pos_ui("ms_icon", "multi-stage goal", "Icon Position", &goal.icon_pos, save_message_type);
-                        render_manual_pos_ui("ms_text", "multi-stage goal", "Text Position", &goal.text_pos, save_message_type);
-                        render_manual_pos_ui("ms_prog", "multi-stage goal", "Progress Position", &goal.progress_pos, save_message_type);
+                        render_manual_pos_ui("ms_icon", "multi-stage goal", "Icon Position", &goal.icon_pos,
+                                             save_message_type);
+                        render_manual_pos_ui("ms_text", "multi-stage goal", "Text Position", &goal.text_pos,
+                                             save_message_type);
+                        render_manual_pos_ui("ms_prog", "multi-stage goal", "Progress Position", &goal.progress_pos,
+                                             save_message_type);
                     }
 
                     ImGui::Separator();
