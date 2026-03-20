@@ -137,6 +137,7 @@ struct EditorTrackableItem {
 
     ManualPos icon_pos = {};
     ManualPos text_pos = {};
+    ManualPos progress_pos = {}; // For custom goal progress, not for unlocks
 };
 
 // A struct to hold a category (like an advancement) and its criteria
@@ -592,6 +593,7 @@ static void parse_editor_trackable_items(cJSON *json_array, std::vector<EditorTr
         // Parse manual positions
         parse_editor_manual_pos(item_json, "icon_pos", &new_item.icon_pos);
         parse_editor_manual_pos(item_json, "text_pos", &new_item.text_pos);
+        parse_editor_manual_pos(item_json, "progress_pos", &new_item.progress_pos); // For custom goals
 
         item_vector.push_back(new_item);
     }
@@ -972,6 +974,7 @@ static void serialize_editor_trackable_items(cJSON *parent, const char *key,
         }
         save_editor_manual_pos(item_json, "icon_pos", item.icon_pos);
         save_editor_manual_pos(item_json, "text_pos", item.text_pos);
+        save_editor_manual_pos(item_json, "progress_pos", item.progress_pos); // For custom goals
         cJSON_AddItemToArray(array, item_json);
     }
     cJSON_AddItemToObject(parent, key, array);
@@ -3030,6 +3033,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 if (!tr_item) return;
                 sync_pos(ed_item.icon_pos, tr_item->icon_pos);
                 sync_pos(ed_item.text_pos, tr_item->text_pos);
+                sync_pos(ed_item.progress_pos, tr_item->progress_pos); // for custom goal progress
             };
 
             // Sync Advancements
@@ -3215,7 +3219,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 // Reloading template on revert changes -> matters for visual editor mode
                 bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
                                            strcmp(selected_template_info.category, app_settings->category) == 0 &&
-                                           strcmp(selected_template_info.optional_flag, app_settings->optional_flag) == 0);
+                                           strcmp(selected_template_info.optional_flag,
+                                                  app_settings->optional_flag) == 0);
                 if (is_active_template) {
                     SDL_SetAtomicInt(&g_settings_changed, 1);
                 }
@@ -3284,7 +3289,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Toggle drag-and-drop editing directly on the main tracker map.\n"
                          "Activating this will automatically turn on 'Manual Layout' mode\n"
-                         "and set your 'Goal Visibility' to 'Show All' so you can see every item.\n\n"
+                         "and set your 'Goal Visibility' to 'Show All' so you can see every item.\n"
+                         "Custom Goal Hotkeys are disabled while Visual Editing is active.\n\n"
                          "WARNING:\n"
                          "Make sure you're tracking a world.\n"
                          "Official default templates get overwritten on updates.\n"
@@ -3333,7 +3339,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 // Reloading template on revert changes -> matters for visual editor mode
                 bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
                                            strcmp(selected_template_info.category, app_settings->category) == 0 &&
-                                           strcmp(selected_template_info.optional_flag, app_settings->optional_flag) == 0);
+                                           strcmp(selected_template_info.optional_flag,
+                                                  app_settings->optional_flag) == 0);
                 if (is_active_template) {
                     SDL_SetAtomicInt(&g_settings_changed, 1);
                 }
@@ -6359,6 +6366,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                              save_message_type);
                         render_manual_pos_ui("cg_text", "custom goal", "Text Position", &goal.text_pos,
                                              save_message_type);
+
+                        // ONLY show progress pos if this Custom Goal is a counter!
+                        if (goal.goal > 0 || goal.goal == -1) {
+                            render_manual_pos_ui("cg_prog", "custom goal", "Progress Position", &goal.progress_pos,
+                                                 save_message_type);
+                        }
                     }
 
                     ImGui::EndGroup();

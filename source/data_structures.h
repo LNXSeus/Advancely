@@ -198,6 +198,7 @@ struct TrackableItem {
     // Manual Layout Positions
     ManualPos icon_pos;
     ManualPos text_pos;
+    ManualPos progress_pos; // For custom goals to separate progress, not for unlocks
 };
 
 

@@ -58,7 +58,8 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
 
                 // Defensive check to prevent crash if data is not ready
                 // CUSTOM GOAL HOTKEYS
-                if (t && t->template_data && t->template_data->custom_goals) {
+                // Hotkeys don't work when in visual layout editing mode
+                if (t && t->template_data && t->template_data->custom_goals && !t->is_visual_layout_editing) {
                     for (int i = 0; i < app_settings->hotkey_count; i++) {
                         HotkeyBinding *hb = &app_settings->hotkeys[i];
                         TrackableItem *target_goal = nullptr;

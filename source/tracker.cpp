@@ -1609,6 +1609,7 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
 
             parse_manual_pos(item_json, "icon_pos", &new_item->icon_pos);
             parse_manual_pos(item_json, "text_pos", &new_item->text_pos);
+            parse_manual_pos(item_json, "progress_pos", &new_item->progress_pos); // Only for custom goals
 
             cJSON *root_name_json = cJSON_GetObjectItem(item_json, "root_name");
             if (cJSON_IsString(root_name_json)) {
@@ -2920,6 +2921,7 @@ static float get_global_safe_x(Tracker *t) {
         if (!item) return;
         check_pos(item->icon_pos, 120.0f);
         check_pos(item->text_pos, 250.0f);
+        check_pos(item->progress_pos, 150.0f); // Custom goal progress, obv. not unlocks
     };
 
     TemplateData *td = t->template_data;
@@ -5073,14 +5075,29 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
                 // Draw Progress Text below main name (if applicable, centered)
                 if (has_progress_text) {
-                    text_y_pos += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // Move Y down
+                    float prog_x_center = text_x_center;
+                    float prog_y = text_y_pos + text_size.y * t->zoom_level + 4.0f * t->zoom_level;
+
+                    // Apply manual progress_pos if set
+                    if (settings->use_manual_layout && item->progress_pos.is_set) {
+                        prog_x_center = (item->progress_pos.x * t->zoom_level) + t->camera_offset.x + (progress_text_size.x * t->zoom_level) * 0.5f;
+                        prog_y = (item->progress_pos.y * t->zoom_level) + t->camera_offset.y;
+                    }
 
                     // LOD: Hide progress text if zoomed out
                     if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
                         draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
-                                           ImVec2(text_x_center - (progress_text_size.x * t->zoom_level) * 0.5f,
-                                                  text_y_pos),
+                                           ImVec2(prog_x_center - (progress_text_size.x * t->zoom_level) * 0.5f, prog_y),
                                            current_text_color, progress_text);
+
+                        // --- VISUAL LAYOUT DRAGGING (CG PROGRESS) ---
+                        char drag_id[256];
+                        snprintf(drag_id, sizeof(drag_id), "drag_cg_prog_%s", item->root_name);
+                        handle_visual_layout_dragging(t, drag_id,
+                            ImVec2(prog_x_center - (progress_text_size.x * t->zoom_level) * 0.5f, prog_y),
+                            ImVec2(progress_text_size.x * t->zoom_level, progress_text_size.y * t->zoom_level),
+                            item->progress_pos);
+                        // --------------------------------------------
                     }
                 }
             }
