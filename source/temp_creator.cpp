@@ -3267,19 +3267,27 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (ImGui::Button(vis_btn_text)) {
                 t->is_visual_layout_editing = !t->is_visual_layout_editing;
 
-                // Automatically force "Manual Layout" ON if they start editing
                 if (t->is_visual_layout_editing) {
+                    // Automatically force "Manual Layout" ON
                     app_settings->use_manual_layout = true;
+
+                    // Force the hiding mode to SHOW_ALL so they can edit completed items
+                    app_settings->goal_hiding_mode = SHOW_ALL;
+
+                    // Save and immediately trigger a reload so the hidden items pop into view!
                     settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
+                    SDL_SetAtomicInt(&g_settings_changed, 1);
                 }
             }
             if (ImGui::IsItemHovered()) {
-                char tooltip_buffer[512];
+                char tooltip_buffer[640];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Toggle drag-and-drop editing directly on the main tracker map.\n"
-                         "Activating this will automatically turn on 'Manual Layout' mode.\n"
-                         "Make sure you're trackig a world.\n\n"
-                         "WARNING: Official default templates get overwritten on updates.\n"
+                         "Activating this will automatically turn on 'Manual Layout' mode\n"
+                         "and set your 'Goal Visibility' to 'Show All' so you can see every item.\n\n"
+                         "WARNING:\n"
+                         "Make sure you're tracking a world.\n"
+                         "Official default templates get overwritten on updates.\n"
                          "Always work on a 'Copy' if you want to keep your custom layout!");
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
