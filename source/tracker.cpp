@@ -2774,7 +2774,7 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
     ImGui::InvisibleButton("##drag_handle", hit_box_size);
 
     if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
-        ImGuiIO& io = ImGui::GetIO();
+        ImGuiIO &io = ImGui::GetIO();
 
         // If this is the very first time dragging it, reverse-engineer its current
         // procedural screen position back into World X/Y coordinates!
@@ -3490,8 +3490,14 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             int unplaced_criteria_count = 0;
             bool has_manual_child = false;
             for (TrackableItem *crit: children_to_render) {
+                // Disable scroll list if ANY part of the item is dragged
                 if (settings->use_manual_layout && (crit->icon_pos.is_set || crit->text_pos.is_set)) {
                     has_manual_child = true;
+                }
+
+                // ONLY remove the item from the vertical list height if the ICON is placed
+                if (settings->use_manual_layout && crit->icon_pos.is_set) {
+                    // It's detached, don't count it
                 } else {
                     unplaced_criteria_count++;
                 }
@@ -3725,8 +3731,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                 // --- VISUAL LAYOUT DRAGGING (PARENT ICON) ---
                 char drag_id[256];
-                snprintf(drag_id, sizeof(drag_id), "drag_cat_icon_%s_%s", is_stat_section ? "stat" : "adv", cat->root_name);
-                handle_visual_layout_dragging(t, drag_id, screen_pos, ImVec2(bg_size.x * t->zoom_level, bg_size.y * t->zoom_level), cat->icon_pos);
+                snprintf(drag_id, sizeof(drag_id), "drag_cat_icon_%s_%s", is_stat_section ? "stat" : "adv",
+                         cat->root_name);
+                handle_visual_layout_dragging(t, drag_id, screen_pos,
+                                              ImVec2(bg_size.x * t->zoom_level, bg_size.y * t->zoom_level),
+                                              cat->icon_pos);
 
                 // --- TEXT CENTERING AND POSITIONING ---
                 float text_x_center = screen_pos.x + (bg_size.x * t->zoom_level) * 0.5f;
@@ -3749,11 +3758,13 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                        current_text_color, cat->display_name);
 
                     // --- VISUAL LAYOUT DRAGGING (PARENT TEXT) ---
-                    snprintf(drag_id, sizeof(drag_id), "drag_cat_text_%s_%s", is_stat_section ? "stat" : "adv", cat->root_name);
+                    snprintf(drag_id, sizeof(drag_id), "drag_cat_text_%s_%s", is_stat_section ? "stat" : "adv",
+                             cat->root_name);
                     handle_visual_layout_dragging(t, drag_id,
-                        ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, current_text_y),
-                        ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level),
-                        cat->text_pos);
+                                                  ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f,
+                                                         current_text_y),
+                                                  ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level),
+                                                  cat->text_pos);
                 }
                 current_text_y += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // ADVANCE LAYOUT
 
@@ -3787,11 +3798,15 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                            current_text_color, progress_text);
 
                         // --- VISUAL LAYOUT DRAGGING (PARENT PROGRESS) ---
-                        snprintf(drag_id, sizeof(drag_id), "drag_cat_prog_%s_%s", is_stat_section ? "stat" : "adv", cat->root_name);
+                        snprintf(drag_id, sizeof(drag_id), "drag_cat_prog_%s_%s", is_stat_section ? "stat" : "adv",
+                                 cat->root_name);
                         handle_visual_layout_dragging(t, drag_id,
-                            ImVec2(prog_x_center - (progress_text_size.x * t->zoom_level) * 0.5f, prog_y),
-                            ImVec2(progress_text_size.x * t->zoom_level, progress_text_size.y * t->zoom_level),
-                            cat->progress_pos);
+                                                      ImVec2(
+                                                          prog_x_center - (progress_text_size.x * t->zoom_level) * 0.5f,
+                                                          prog_y),
+                                                      ImVec2(progress_text_size.x * t->zoom_level,
+                                                             progress_text_size.y * t->zoom_level),
+                                                      cat->progress_pos);
                     }
                     current_text_y = prog_y + progress_text_size.y * t->zoom_level + 4.0f * t->zoom_level;
                 }
@@ -3830,7 +3845,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         if (!crit) continue;
 
                         bool is_manually_placed =
-                                settings->use_manual_layout && (crit->icon_pos.is_set || crit->text_pos.is_set);
+                                settings->use_manual_layout && crit->icon_pos.is_set;
 
                         float item_screen_y = 0.0f;
                         if (!is_manually_placed) {
@@ -3932,7 +3947,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                         // --- VISUAL LAYOUT DRAGGING (CRIT ICON) ---
                         snprintf(drag_id, sizeof(drag_id), "drag_crit_icon_%s_%s", cat->root_name, crit->root_name);
-                        handle_visual_layout_dragging(t, drag_id, crit_base_pos_screen, ImVec2(32.0f * t->zoom_level, 32.0f * t->zoom_level), crit->icon_pos);
+                        handle_visual_layout_dragging(t, drag_id, crit_base_pos_screen,
+                                                      ImVec2(32.0f * t->zoom_level, 32.0f * t->zoom_level),
+                                                      crit->icon_pos);
 
                         current_element_x_screen += 32.0f * t->zoom_level + 4.0f * t->zoom_level;
                         // Icon width + padding
@@ -3961,7 +3978,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             }
 
                             // Deactivating left click when in visual editing mode
-                            if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->is_visual_layout_editing) {
+                            if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->
+                                is_visual_layout_editing) {
                                 // Toggle manual completion and update 'done' status
                                 crit->is_manually_completed = !crit->is_manually_completed;
                                 bool crit_naturally_done = (crit->goal > 0 && crit->progress >= crit->goal);
@@ -4024,8 +4042,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             // --- VISUAL LAYOUT DRAGGING (CRIT TEXT) ---
                             snprintf(drag_id, sizeof(drag_id), "drag_crit_text_%s_%s", cat->root_name, crit->root_name);
                             handle_visual_layout_dragging(t, drag_id, child_text_pos,
-                                ImVec2(child_text_size.x * t->zoom_level, child_text_size.y * t->zoom_level),
-                                crit->text_pos);
+                                                          ImVec2(child_text_size.x * t->zoom_level,
+                                                                 child_text_size.y * t->zoom_level),
+                                                          crit->text_pos);
 
                             current_element_x_screen += (child_text_size.x * t->zoom_level) + (4.0f * t->zoom_level);
 
@@ -4188,7 +4207,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     }
 
                     // Deactivating left click when in visual editing mode
-                    if (is_hovered_parent && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->is_visual_layout_editing) {
+                    if (is_hovered_parent && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->
+                        is_visual_layout_editing) {
                         cat->is_manually_completed = !cat->is_manually_completed;
                         // Update parent 'done' status
                         bool all_children_naturally_done = (
@@ -5572,9 +5592,9 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                 // --- VISUAL LAYOUT DRAGGING (TEXT) ---
                 snprintf(drag_id, sizeof(drag_id), "drag_ms_text_%s", goal->root_name);
                 handle_visual_layout_dragging(t, drag_id,
-                    ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos),
-                    ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level),
-                    goal->text_pos);
+                                              ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos),
+                                              ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level),
+                                              goal->text_pos);
             }
 
             // Draw Current Stage Text (uses sub_font_size)
@@ -5598,9 +5618,11 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                 // --- VISUAL LAYOUT DRAGGING (PROGRESS) ---
                 snprintf(drag_id, sizeof(drag_id), "drag_ms_prog_%s", goal->root_name);
                 handle_visual_layout_dragging(t, drag_id,
-                    ImVec2(stage_text_x_center - (stage_text_size.x * t->zoom_level) * 0.5f, stage_text_y),
-                    ImVec2(stage_text_size.x * t->zoom_level, stage_text_size.y * t->zoom_level),
-                    goal->progress_pos);
+                                              ImVec2(stage_text_x_center - (stage_text_size.x * t->zoom_level) * 0.5f,
+                                                     stage_text_y),
+                                              ImVec2(stage_text_size.x * t->zoom_level,
+                                                     stage_text_size.y * t->zoom_level),
+                                              goal->progress_pos);
             }
         } // End if (is_visible_on_screen)
 
