@@ -1787,8 +1787,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     // Dynamically create the window title based on unsaved changes
     // On VERY FIRST OPEN it has this size -> nothing in imgui.ini file
-    ImGui::SetNextWindowSize(ImVec2(1280, 720), ImGuiCond_FirstUseEver);
-    ImGui::Begin("Template Editor", p_open);
+    // Hide Close Button when in Visual Editor Mode
+    bool* window_open_ptr = (t && t->is_visual_layout_editing) ? nullptr : p_open;
+    ImGui::Begin("Template Editor", window_open_ptr);
 
     if (t) {
         // For global event handler to not clash with the other Ctrl + F or Cmd + F
@@ -3325,6 +3326,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
             ImGui::EndPopup();
         }
+
+        // --- VISUAL EDITING WARNING BANNER ---
+        if (t && t->is_visual_layout_editing) {
+            ImGui::Spacing();
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.65f, 0.0f, 1.0f)); // Bright Orange/Yellow Warning Color
+            ImGui::TextWrapped("VISUAL EDITING ACTIVE: Drag items on the tracker map to reposition them! "
+                               "Don't forget to click 'Stop Visual Editing' AND 'Save' when you are finished!");
+            ImGui::PopStyleColor();
+        }
+        ImGui::Separator();
 
         if (ImGui::BeginTabBar("EditorTabs")) {
             // "Advancements" or "Achievements" tab depending on version
