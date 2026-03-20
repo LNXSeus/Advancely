@@ -3725,7 +3725,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                 // --- VISUAL LAYOUT DRAGGING (PARENT ICON) ---
                 char drag_id[256];
-                snprintf(drag_id, sizeof(drag_id), "drag_cat_icon_%s", cat->root_name);
+                snprintf(drag_id, sizeof(drag_id), "drag_cat_icon_%s_%s", is_stat_section ? "stat" : "adv", cat->root_name);
                 handle_visual_layout_dragging(t, drag_id, screen_pos, ImVec2(bg_size.x * t->zoom_level, bg_size.y * t->zoom_level), cat->icon_pos);
 
                 // --- TEXT CENTERING AND POSITIONING ---
@@ -3749,7 +3749,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                        current_text_color, cat->display_name);
 
                     // --- VISUAL LAYOUT DRAGGING (PARENT TEXT) ---
-                    snprintf(drag_id, sizeof(drag_id), "drag_cat_text_%s", cat->root_name);
+                    snprintf(drag_id, sizeof(drag_id), "drag_cat_text_%s_%s", is_stat_section ? "stat" : "adv", cat->root_name);
                     handle_visual_layout_dragging(t, drag_id,
                         ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, current_text_y),
                         ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level),
@@ -3787,7 +3787,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                            current_text_color, progress_text);
 
                         // --- VISUAL LAYOUT DRAGGING (PARENT PROGRESS) ---
-                        snprintf(drag_id, sizeof(drag_id), "drag_cat_prog_%s", cat->root_name);
+                        snprintf(drag_id, sizeof(drag_id), "drag_cat_prog_%s_%s", is_stat_section ? "stat" : "adv", cat->root_name);
                         handle_visual_layout_dragging(t, drag_id,
                             ImVec2(prog_x_center - (progress_text_size.x * t->zoom_level) * 0.5f, prog_y),
                             ImVec2(progress_text_size.x * t->zoom_level, progress_text_size.y * t->zoom_level),
@@ -3931,7 +3931,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         }
 
                         // --- VISUAL LAYOUT DRAGGING (CRIT ICON) ---
-                        snprintf(drag_id, sizeof(drag_id), "drag_crit_icon_%s", crit->root_name);
+                        snprintf(drag_id, sizeof(drag_id), "drag_crit_icon_%s_%s", cat->root_name, crit->root_name);
                         handle_visual_layout_dragging(t, drag_id, crit_base_pos_screen, ImVec2(32.0f * t->zoom_level, 32.0f * t->zoom_level), crit->icon_pos);
 
                         current_element_x_screen += 32.0f * t->zoom_level + 4.0f * t->zoom_level;
@@ -4022,7 +4022,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                current_child_text_color, crit->display_name);
 
                             // --- VISUAL LAYOUT DRAGGING (CRIT TEXT) ---
-                            snprintf(drag_id, sizeof(drag_id), "drag_crit_text_%s", crit->root_name);
+                            snprintf(drag_id, sizeof(drag_id), "drag_crit_text_%s_%s", cat->root_name, crit->root_name);
                             handle_visual_layout_dragging(t, drag_id, child_text_pos,
                                 ImVec2(child_text_size.x * t->zoom_level, child_text_size.y * t->zoom_level),
                                 crit->text_pos);
@@ -4578,7 +4578,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
             // --- VISUAL LAYOUT DRAGGING (ICON) ---
             char drag_id[256];
-            snprintf(drag_id, sizeof(drag_id), "drag_icon_%s", item->root_name);
+            snprintf(drag_id, sizeof(drag_id), "drag_unlock_icon_%s", item->root_name);
             handle_visual_layout_dragging(t, drag_id, screen_pos,
                                           ImVec2(bg_size.x * t->zoom_level, bg_size.y * t->zoom_level), item->icon_pos);
 
@@ -4605,7 +4605,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                                    current_text_color, item->display_name);
 
                 // --- VISUAL LAYOUT DRAGGING (TEXT) ---
-                snprintf(drag_id, sizeof(drag_id), "drag_text_%s", item->root_name);
+                snprintf(drag_id, sizeof(drag_id), "drag_unlock_text_%s", item->root_name);
                 handle_visual_layout_dragging(t, drag_id,
                                               ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos),
                                               ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level),
@@ -5018,7 +5018,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
             // --- VISUAL LAYOUT DRAGGING (ICON) ---
             char drag_id[256];
-            snprintf(drag_id, sizeof(drag_id), "drag_icon_%s", item->root_name);
+            snprintf(drag_id, sizeof(drag_id), "drag_cg_icon_%s", item->root_name);
             handle_visual_layout_dragging(t, drag_id, screen_pos,
                                           ImVec2(bg_size.x * t->zoom_level, bg_size.y * t->zoom_level), item->icon_pos);
 
@@ -5045,7 +5045,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                                    current_text_color, item->display_name);
 
                 // --- VISUAL LAYOUT DRAGGING (TEXT) ---
-                snprintf(drag_id, sizeof(drag_id), "drag_text_%s", item->root_name);
+                snprintf(drag_id, sizeof(drag_id), "drag_cg_text_%s", item->root_name);
                 handle_visual_layout_dragging(t, drag_id,
                                               ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos),
                                               ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level),
