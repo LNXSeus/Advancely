@@ -2773,18 +2773,23 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
     ImGui::SetCursorScreenPos(item_screen_pos);
     ImGui::InvisibleButton("##drag_handle", hit_box_size);
 
-    // If the user clicks and drags this specific item
     if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
-        ImGuiIO &io = ImGui::GetIO();
+        ImGuiIO& io = ImGui::GetIO();
 
-        // Ensure the manual flag is flipped ON if it wasn't already
-        target_pos.is_set = true;
+        // If this is the very first time dragging it, reverse-engineer its current
+        // procedural screen position back into World X/Y coordinates!
+        if (!target_pos.is_set) {
+            target_pos.is_set = true;
+            target_pos.x = (item_screen_pos.x - t->camera_offset.x) / t->zoom_level;
+            target_pos.y = (item_screen_pos.y - t->camera_offset.y) / t->zoom_level;
+        }
 
-        // Convert the raw screen-space mouse delta into world-space coordinate delta
+        // Apply drag delta
         target_pos.x += (io.MouseDelta.x / t->zoom_level);
         target_pos.y += (io.MouseDelta.y / t->zoom_level);
 
-        // Tell the UI that there are unsaved changes
+        // Signal the Editor to sync this frame!
+        t->visual_layout_just_dragged = true;
         SDL_SetAtomicInt(&g_templates_changed, 1);
     }
 

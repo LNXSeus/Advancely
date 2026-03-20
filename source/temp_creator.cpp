@@ -3016,8 +3016,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     if (editing_template) {
         // --- REAL-TIME MEMORY SYNC FOR VISUAL EDITING ---
-        // If the user is dragging items on the map, copy the coordinates from Tracker memory to Editor memory!
-        if (t && t->is_visual_layout_editing && t->template_data) {
+        // Only when the user is dragging items on the map, copy the coordinates from Tracker memory to Editor memory!
+        if (t && t->is_visual_layout_editing && t->template_data && t->visual_layout_just_dragged) {
             auto sync_pos = [](ManualPos &editor_pos, const ManualPos &tracker_pos) {
                 if (tracker_pos.is_set) {
                     editor_pos.is_set = true;
@@ -3108,6 +3108,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                 }
             }
+
+            // We caught the drag, so turn off the sync until the mouse moves again
+            t->visual_layout_just_dragged = false;
         }
         // --- END SYNC BLOCK ---
 
