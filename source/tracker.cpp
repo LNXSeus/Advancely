@@ -3955,7 +3955,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                 draw_list->AddLine(p2, p3, checkmark_color, 2.0f * t->zoom_level);
                             }
 
-                            if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                            // Deactivating left click when in visual editing mode
+                            if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->is_visual_layout_editing) {
                                 // Toggle manual completion and update 'done' status
                                 crit->is_manually_completed = !crit->is_manually_completed;
                                 bool crit_naturally_done = (crit->goal > 0 && crit->progress >= crit->goal);
@@ -4181,7 +4182,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         draw_list->AddLine(p2, p3, checkmark_color, 2.0f * t->zoom_level);
                     }
 
-                    if (is_hovered_parent && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                    // Deactivating left click when in visual editing mode
+                    if (is_hovered_parent && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->is_visual_layout_editing) {
                         cat->is_manually_completed = !cat->is_manually_completed;
                         // Update parent 'done' status
                         bool all_children_naturally_done = (
@@ -5085,7 +5087,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 }
 
                 // Handle click interaction
-                if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                // Deactivating when in visual layout editor mode
+                if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->is_visual_layout_editing) {
                     item->done = !item->done; // Toggle done state
                     // Update progress for consistency (1 if done, 0 otherwise) for simple toggles/overridden counters
                     if (item->goal <= 0 || item->goal == -1) {

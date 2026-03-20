@@ -1528,6 +1528,11 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
 void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t) {
     (void) t;
 
+    // --- FORCE OPEN DURING VISUAL EDITING ---
+    if (t && t->is_visual_layout_editing) {
+        *p_open = true;
+    }
+
     if (!*p_open) {
         return;
     }

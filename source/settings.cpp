@@ -425,9 +425,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "DEFAULT: Automatically detect and track the active Minecraft instance\n"
                          "launched from MultiMC or Prism Launcher, even when switching between\n"
                          "multiple running instances. The tracker always follows the most recently\n"
-                         "active world.\n"
-                         "Having Minecraft closed may cause 'No Worlds Found' or\n"
-                         "issues with checkboxes.\n"
+                         "active world.\n\n"
+                         "WARNING:\n"
+                         "Without Minecraft running the tracker may not work correctly.\n"
                          "This is Path Mode: %d", PATH_MODE_INSTANCE);
                 ImGui::SetTooltip("%s", tooltip);
             }
