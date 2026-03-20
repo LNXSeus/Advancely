@@ -1811,6 +1811,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         current_template_data = saved_template_data;
         save_message_type = MSG_NONE;
         status_message[0] = '\0';
+
+        // Reloading template on revert changes -> matters for visual editor mode
+        bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
+                                   strcmp(selected_template_info.category, app_settings->category) == 0 &&
+                                   strcmp(selected_template_info.optional_flag, app_settings->optional_flag) == 0);
+        if (is_active_template) {
+            SDL_SetAtomicInt(&g_settings_changed, 1);
+        }
     }
 
     // Handle Ctrl+S / Cmd+S to save
@@ -3200,6 +3208,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 current_template_data = saved_template_data;
                 save_message_type = MSG_NONE; // Clear any existing message
                 status_message[0] = '\0'; // Clear the message text
+
+                // Reloading template on revert changes -> matters for visual editor mode
+                bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
+                                           strcmp(selected_template_info.category, app_settings->category) == 0 &&
+                                           strcmp(selected_template_info.optional_flag, app_settings->optional_flag) == 0);
+                if (is_active_template) {
+                    SDL_SetAtomicInt(&g_settings_changed, 1);
+                }
             }
         }
 
@@ -3302,6 +3318,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             // Also use spacebar
             if (ImGui::Button("Discard", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Space)) {
                 current_template_data = saved_template_data; // Restore saved data as current
+
+                // Reloading template on revert changes -> matters for visual editor mode
+                bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
+                                           strcmp(selected_template_info.category, app_settings->category) == 0 &&
+                                           strcmp(selected_template_info.optional_flag, app_settings->optional_flag) == 0);
+                if (is_active_template) {
+                    SDL_SetAtomicInt(&g_settings_changed, 1);
+                }
+
                 if (pending_action) pending_action();
                 ImGui::CloseCurrentPopup();
             }
