@@ -1498,6 +1498,22 @@ static void reset_manual_pos(ManualPos *pos) {
     pos->y = 0.0f;
 }
 
+// Helper to render the "Layout Coordinates" collapsing header with a goal-specific tooltip
+static bool render_layout_coordinates_header(const char *goal_type_name) {
+    bool open = ImGui::CollapsingHeader("Layout Coordinates");
+    if (ImGui::IsItemHovered()) {
+        char tooltip[512];
+        snprintf(tooltip, sizeof(tooltip),
+                 "Manual positions for this %s's elements.\n"
+                 "Enable 'Manual Layout' in the tracker settings to see these take effect.\n"
+                 "Use the 'Visual Layout Editor' button to drag goals directly on the map\n"
+                 "and have the coordinates update automatically.",
+                 goal_type_name);
+        ImGui::SetTooltip("%s", tooltip);
+    }
+    return open;
+}
+
 // Helper to render collapsible coordinate fields in the details panes, currently used for manual goal placement coords
 static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_name, const char *pos_type,
                                  ManualPos *pos, SaveMessageType &save_msg) {
@@ -4101,7 +4117,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                     }
 
-                    if (ImGui::CollapsingHeader("Layout Coordinates")) {
+                    if (render_layout_coordinates_header(advancements_label_singular_lower)) {
                         render_manual_pos_ui("icon", advancements_label_singular_lower, "Icon Position",
                                              &advancement.icon_pos, save_message_type);
                         render_manual_pos_ui("text", advancements_label_singular_lower, "Text Position",
@@ -4470,7 +4486,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
-                        if (ImGui::CollapsingHeader("Layout Coordinates")) {
+                        if (render_layout_coordinates_header("criterion")) {
                             render_manual_pos_ui("c_icon", "criterion", "Icon Position", &criterion.icon_pos,
                                                  save_message_type);
                             render_manual_pos_ui("c_text", "criterion", "Text Position", &criterion.text_pos,
@@ -5264,7 +5280,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SetTooltip("%s", multi_stat_tooltip_buffer);
                     }
 
-                    if (ImGui::CollapsingHeader("Layout Coordinates")) {
+                    if (render_layout_coordinates_header("stat category")) {
                         render_manual_pos_ui("s_icon", "stat category", "Icon Position", &stat_cat.icon_pos,
                                              save_message_type);
                         render_manual_pos_ui("s_text", "stat category", "Text Position", &stat_cat.text_pos,
@@ -5687,7 +5703,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
 
-                            if (ImGui::CollapsingHeader("Layout Coordinates")) {
+                            if (render_layout_coordinates_header("sub-stat")) {
                                 render_manual_pos_ui("sc_icon", "sub-stat", "Icon Position", &crit.icon_pos,
                                                      save_message_type);
                                 render_manual_pos_ui("sc_text", "sub-stat", "Text Position", &crit.text_pos,
@@ -6084,7 +6100,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
-                        if (ImGui::CollapsingHeader("Layout Coordinates")) {
+                        if (render_layout_coordinates_header("unlock")) {
                             render_manual_pos_ui("u_icon", "unlock", "Icon Position", &unlock.icon_pos,
                                                  save_message_type);
                             render_manual_pos_ui("u_text", "unlock", "Text Position", &unlock.text_pos,
@@ -6474,7 +6490,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
 
-                    if (ImGui::CollapsingHeader("Layout Coordinates")) {
+                    if (render_layout_coordinates_header("custom goal")) {
                         render_manual_pos_ui("cg_icon", "custom goal", "Icon Position", &goal.icon_pos,
                                              save_message_type);
                         render_manual_pos_ui("cg_text", "custom goal", "Text Position", &goal.text_pos,
@@ -7188,7 +7204,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SetTooltip("%s", tooltip);
                     }
 
-                    if (ImGui::CollapsingHeader("Layout Coordinates")) {
+                    if (render_layout_coordinates_header("multi-stage goal")) {
                         render_manual_pos_ui("ms_icon", "multi-stage goal", "Icon Position", &goal.icon_pos,
                                              save_message_type);
                         render_manual_pos_ui("ms_text", "multi-stage goal", "Text Position", &goal.text_pos,
