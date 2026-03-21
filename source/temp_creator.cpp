@@ -1491,6 +1491,13 @@ static void synchronize_legacy_ms_goal_stats(EditorTemplate &editor_data) {
     }
 }
 
+// Helper to reset a single ManualPos back to its default state
+static void reset_manual_pos(ManualPos *pos) {
+    pos->is_set = false;
+    pos->x = 0.0f;
+    pos->y = 0.0f;
+}
+
 // Helper to render collapsible coordinate fields in the details panes, currently used for manual goal placement coords
 static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_name, const char *pos_type,
                                  ManualPos *pos, SaveMessageType &save_msg) {
@@ -1522,6 +1529,18 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
         ImGui::SetNextItemWidth(80);
         if (ImGui::DragFloat("Y", &pos->y, 1.0f)) { save_msg = MSG_NONE; }
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Y Coordinate");
+
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Reset")) {
+            reset_manual_pos(pos);
+            save_msg = MSG_NONE;
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip[256];
+            snprintf(tooltip, sizeof(tooltip), "Reset the %s of this %s back to auto-layout.", pos_type,
+                     tooltip_item_name);
+            ImGui::SetTooltip("%s", tooltip);
+        }
     }
     ImGui::PopID();
 }
@@ -1789,7 +1808,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // UI RENDERING
 
     // Dynamically create the window title based on unsaved changes
-    // On VERY FIRST OPEN it has this size -> nothing in imgui.ini file
+    // On VERY FIRST OPEN default to 720p — only applies when nothing is stored in imgui.ini yet
+    ImGui::SetNextWindowSize(ImVec2(1280, 720), ImGuiCond_FirstUseEver);
     // Hide Close Button when in Visual Editor Mode
     bool *window_open_ptr = (t && t->is_visual_layout_editing) ? nullptr : p_open;
     ImGui::Begin("Template Editor", window_open_ptr);
@@ -3942,6 +3962,40 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     char details_title[64];
                     snprintf(details_title, sizeof(details_title), "Edit %s Details", advancements_label_upper);
                     ImGui::Text("%s", details_title);
+
+                    // "Reset All Positions" button — only if any position is manually set
+                    {
+                        bool any_pos_set = advancement.icon_pos.is_set || advancement.text_pos.is_set ||
+                                           advancement.progress_pos.is_set;
+                        for (size_t ci = 0; !any_pos_set && ci < advancement.criteria.size(); ci++) {
+                            auto &c = advancement.criteria[ci];
+                            if (c.icon_pos.is_set || c.text_pos.is_set) any_pos_set = true;
+                        }
+                        if (any_pos_set) {
+                            const char *reset_btn = "Reset All Positions";
+                            float btn_w = ImGui::CalcTextSize(reset_btn).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                            ImGui::SameLine(ImGui::GetContentRegionAvail().x - btn_w);
+                            if (ImGui::SmallButton(reset_btn)) {
+                                reset_manual_pos(&advancement.icon_pos);
+                                reset_manual_pos(&advancement.text_pos);
+                                reset_manual_pos(&advancement.progress_pos);
+                                for (auto &c : advancement.criteria) {
+                                    reset_manual_pos(&c.icon_pos);
+                                    reset_manual_pos(&c.text_pos);
+                                }
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip[256];
+                                snprintf(tooltip, sizeof(tooltip),
+                                         "Reset all manual positions for this %s\n"
+                                         "and its criteria back to auto-layout.",
+                                         advancements_label_singular_lower);
+                                ImGui::SetTooltip("%s", tooltip);
+                            }
+                        }
+                    }
+
                     ImGui::Separator();
 
                     if (ImGui::InputText("Root Name", advancement.root_name, sizeof(advancement.root_name))) {
@@ -5027,6 +5081,36 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     auto &stat_cat = *selected_stat;
 
                     ImGui::Text("Edit Stat Details");
+
+                    // "Reset All Positions" button — only if any position is manually set
+                    {
+                        bool any_pos_set = stat_cat.icon_pos.is_set || stat_cat.text_pos.is_set ||
+                                           stat_cat.progress_pos.is_set;
+                        for (size_t ci = 0; !any_pos_set && ci < stat_cat.criteria.size(); ci++) {
+                            auto &c = stat_cat.criteria[ci];
+                            if (c.icon_pos.is_set || c.text_pos.is_set) any_pos_set = true;
+                        }
+                        if (any_pos_set) {
+                            const char *reset_btn = "Reset All Positions";
+                            float btn_w = ImGui::CalcTextSize(reset_btn).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                            ImGui::SameLine(ImGui::GetContentRegionAvail().x - btn_w);
+                            if (ImGui::SmallButton(reset_btn)) {
+                                reset_manual_pos(&stat_cat.icon_pos);
+                                reset_manual_pos(&stat_cat.text_pos);
+                                reset_manual_pos(&stat_cat.progress_pos);
+                                for (auto &c : stat_cat.criteria) {
+                                    reset_manual_pos(&c.icon_pos);
+                                    reset_manual_pos(&c.text_pos);
+                                }
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("Reset all manual positions for this stat\n"
+                                                  "and its sub-stats back to auto-layout.");
+                            }
+                        }
+                    }
+
                     ImGui::Separator();
 
                     if (ImGui::InputText("Category Key", stat_cat.root_name, sizeof(stat_cat.root_name))) {
@@ -6942,6 +7026,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     auto &goal = *selected_ms_goal;
 
                     ImGui::Text("Edit Multi-Stage Goal Details");
+
+                    // "Reset All Positions" button — only if any position is manually set
+                    {
+                        bool any_pos_set = goal.icon_pos.is_set || goal.text_pos.is_set ||
+                                           goal.progress_pos.is_set;
+                        if (any_pos_set) {
+                            const char *reset_btn = "Reset All Positions";
+                            float btn_w = ImGui::CalcTextSize(reset_btn).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                            ImGui::SameLine(ImGui::GetContentRegionAvail().x - btn_w);
+                            if (ImGui::SmallButton(reset_btn)) {
+                                reset_manual_pos(&goal.icon_pos);
+                                reset_manual_pos(&goal.text_pos);
+                                reset_manual_pos(&goal.progress_pos);
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                ImGui::SetTooltip("Reset all manual positions for this\n"
+                                                  "multi-stage goal back to auto-layout.");
+                            }
+                        }
+                    }
+
                     ImGui::Separator();
 
                     if (ImGui::InputText("Goal Root Name", goal.root_name, sizeof(goal.root_name))) {

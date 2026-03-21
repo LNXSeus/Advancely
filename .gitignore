@@ -7,3 +7,4 @@ cmake-build-*/
 .cache/
 build/
 .DS_Store
+.claude/
