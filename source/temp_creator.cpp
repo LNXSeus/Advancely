@@ -1523,12 +1523,20 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
         ImGui::SameLine();
         ImGui::SetNextItemWidth(80);
         if (ImGui::DragFloat("X", &pos->x, 1.0f)) { save_msg = MSG_NONE; }
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("X Coordinate");
+        if (ImGui::IsItemHovered()) {
+            char tooltip[64];
+            snprintf(tooltip, sizeof(tooltip), "X Coordinate");
+            ImGui::SetTooltip("%s", tooltip);
+        }
 
         ImGui::SameLine();
         ImGui::SetNextItemWidth(80);
         if (ImGui::DragFloat("Y", &pos->y, 1.0f)) { save_msg = MSG_NONE; }
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Y Coordinate");
+        if (ImGui::IsItemHovered()) {
+            char tooltip[64];
+            snprintf(tooltip, sizeof(tooltip), "Y Coordinate");
+            ImGui::SetTooltip("%s", tooltip);
+        }
 
         ImGui::SameLine();
         if (ImGui::SmallButton("Reset")) {
@@ -1537,8 +1545,10 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
         }
         if (ImGui::IsItemHovered()) {
             char tooltip[256];
-            snprintf(tooltip, sizeof(tooltip), "Reset the %s of this %s back to auto-layout.", pos_type,
-                     tooltip_item_name);
+            snprintf(tooltip, sizeof(tooltip),
+                     "Reset the %s of this %s back to the auto-layout.\n"
+                     "Save the template for the change to take visual effect.",
+                     pos_type, tooltip_item_name);
             ImGui::SetTooltip("%s", tooltip);
         }
     }
@@ -3987,10 +3997,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                             if (ImGui::IsItemHovered()) {
                                 char tooltip[256];
-                                snprintf(tooltip, sizeof(tooltip),
-                                         "Reset all manual positions for this %s\n"
-                                         "and its criteria back to auto-layout.",
-                                         advancements_label_singular_lower);
+                                if (creator_selected_version > MC_VERSION_1_6_4) {
+                                    snprintf(tooltip, sizeof(tooltip),
+                                             "Reset all manual positions for this %s\n"
+                                             "and its criteria back to the auto-layout.\n"
+                                             "Save the template for the changes to take visual effect.",
+                                             advancements_label_singular_lower);
+                                } else {
+                                    snprintf(tooltip, sizeof(tooltip),
+                                             "Reset all manual positions for this %s back to the auto-layout.\n"
+                                             "Save the template for the changes to take visual effect.",
+                                             advancements_label_singular_lower);
+                                }
                                 ImGui::SetTooltip("%s", tooltip);
                             }
                         }
@@ -5105,8 +5123,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
-                                ImGui::SetTooltip("Reset all manual positions for this stat\n"
-                                                  "and its sub-stats back to auto-layout.");
+                                char tooltip[256];
+                                if (!stat_cat.is_simple_stat) {
+                                    snprintf(tooltip, sizeof(tooltip),
+                                             "Reset all manual positions for this stat category\n"
+                                             "and its sub-stats back to the auto-layout.\n"
+                                             "Save the template for the changes to take visual effect.");
+                                } else {
+                                    snprintf(tooltip, sizeof(tooltip),
+                                             "Reset all manual positions for this stat back to the auto-layout.\n"
+                                             "Save the template for the changes to take visual effect.");
+                                }
+                                ImGui::SetTooltip("%s", tooltip);
                             }
                         }
                     }
@@ -7042,8 +7070,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
-                                ImGui::SetTooltip("Reset all manual positions for this\n"
-                                                  "multi-stage goal back to auto-layout.");
+                                char tooltip[256];
+                                snprintf(tooltip, sizeof(tooltip),
+                                         "Reset all manual positions for this\n"
+                                         "multi-stage goal back to the auto-layout.\n"
+                                         "Save the template for the changes to take visual effect.");
+                                ImGui::SetTooltip("%s", tooltip);
                             }
                         }
                     }
