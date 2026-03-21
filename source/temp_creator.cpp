@@ -3285,12 +3285,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
             }
             if (ImGui::IsItemHovered()) {
-                char tooltip_buffer[640];
+                char tooltip_buffer[1024];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Toggle drag-and-drop editing directly on the main tracker map.\n"
                          "Activating this will automatically turn on 'Manual Layout' mode\n"
                          "and set your 'Goal Visibility' to 'Show All' so you can see every item.\n"
-                         "Custom Goal Hotkeys are disabled while Visual Editing is active.\n\n"
+                         "Custom Goal Hotkeys are disabled while Visual Editing is active.\n"
+                         "Applying settings is also disabled while active to prevent template reloads.\n\n"
                          "WARNING:\n"
                          "Make sure you're tracking a world.\n"
                          "Official default templates get overwritten on updates.\n"

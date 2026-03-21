@@ -1604,8 +1604,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         } // End of Tracker Visuals Tab
 
         if (ImGui::BeginTabItem("UI Visuals")) {
-
-
             ImGui::Text("UI Fonts");
 
             // --- Settings/UI Font ---
@@ -2160,14 +2158,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         } // End of Overlay Tab
 
         if (ImGui::BeginTabItem("Co-op")) {
-
             ImGui::Text("Coming Soon...");
 
             ImGui::EndTabItem();
         } // End of Co-op Tab
 
         if (ImGui::BeginTabItem("Hotkeys")) {
-            ImGui::TextDisabled("Select a template with custom goals using target values different from 0 to adjust their hotkeys here.");
+            ImGui::TextDisabled(
+                "Select a template with custom goals using target values different from 0 to adjust their hotkeys here.");
             // --- Hotkey Settings ---
 
             // This section is only displayed if the current template has custom counters.
@@ -2348,9 +2346,17 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
     const bool window_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
     const bool no_popup_open = !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup);
 
+    // Disable "Apply Settings" button on visual editing mode
+    bool visual_editing = t && t->is_visual_layout_editing;
+
     // Apply the changes or pressing Enter or Ctrl/Cmd + S keys in the settings window when NO popup is shown
-    if (ImGui::Button("Apply Settings") ||
-        ((enter_pressed || ctrl_s_pressed) && window_focused && no_popup_open)) {
+
+    if (visual_editing) ImGui::BeginDisabled();
+    bool apply_clicked = ImGui::Button("Apply Settings");
+    if (visual_editing) ImGui::EndDisabled();
+
+    // Apply the changes or pressing Enter or Ctrl/Cmd + S keys in the settings window when NO popup is shown
+    if (!visual_editing && (apply_clicked || ((enter_pressed || ctrl_s_pressed) && window_focused && no_popup_open))) {
         // Reset message visibility on each new attempt
         show_applied_message = false;
         show_defaults_applied_message = false; // Reset the other message
@@ -2442,13 +2448,19 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
     }
 
     // Hover text for the apply button
-    if (ImGui::IsItemHovered()) {
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         char apply_button_tooltip_buffer[1024];
-        snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
-                 "Apply any changes made in this window. You can also press 'ENTER' or 'Ctrl/Cmd + S' to apply.\n"
-                 "Changes made to the overlay window will cause the overlay to restart,\n"
-                 "which might lead to OBS not capturing the overlay anymore.\n"
-                 "It will fail to apply if any warnings are shown.");
+        if (visual_editing) {
+            snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
+                     "Disabled while the Visual Layout Editor is active.\n"
+                     "Applying settings reloads the template and breaks active editing.");
+        } else {
+            snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
+                     "Apply any changes made in this window. You can also press 'ENTER' or 'Ctrl/Cmd + S' to apply.\n"
+                     "Changes made to the overlay window will cause the overlay to restart,\n"
+                     "which might lead to OBS not capturing the overlay anymore.\n"
+                     "It will fail to apply if any warnings are shown.");
+        }
         ImGui::SetTooltip("%s", apply_button_tooltip_buffer);
     }
 
@@ -2561,7 +2573,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                  DEFAULT_TRACKER_SECTION_ITEM_WIDTH,
                  DEFAULT_LOD_TEXT_SUB_THRESHOLD, DEFAULT_LOD_TEXT_MAIN_THRESHOLD, DEFAULT_LOD_ICON_DETAIL_THRESHOLD,
                  DEFAULT_SCROLLABLE_LIST_THRESHOLD, DEFAULT_TRACKER_LIST_SCROLL_SPEED,
-                 DEFAULT_TRACKER_FONT, DEFAULT_TRACKER_FONT_SIZE, DEFAULT_TRACKER_SUB_FONT_SIZE, DEFAULT_TRACKER_UI_FONT_SIZE,
+                 DEFAULT_TRACKER_FONT, DEFAULT_TRACKER_FONT_SIZE, DEFAULT_TRACKER_SUB_FONT_SIZE,
+                 DEFAULT_TRACKER_UI_FONT_SIZE,
                  DEFAULT_ADV_BG_PATH, DEFAULT_ADV_BG_HALF_DONE_PATH, DEFAULT_ADV_BG_DONE_PATH,
                  DEFAULT_UI_FONT, DEFAULT_UI_FONT_SIZE,
                  DEFAULT_ENABLE_OVERLAY ? "Enabled" : "Disabled",
