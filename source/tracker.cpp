@@ -2872,20 +2872,36 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
         draw_anchor_crosshair(draw_list, anchor_screen, crosshair_size);
     }
 
-    // Give it a helpful tooltip so users know what they are grabbing
-    if (is_hovered) {
-        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+    // Show tooltip on hover or while dragging
+    if (is_hovered || is_dragging) {
+        if (is_hovered) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
         char tooltip[512];
-        if (parent_display_name) {
-            snprintf(tooltip, sizeof(tooltip),
-                     "%s: \"%s\" - %s\nPart of \"%s\"\n"
-                     "Drag to reposition.",
-                     goal_type, display_name, element_type, parent_display_name);
+        if (is_dragging) {
+            if (parent_display_name) {
+                snprintf(tooltip, sizeof(tooltip),
+                         "%s: \"%s\" - %s\nPart of \"%s\"\n\n"
+                         "X: %.0f   Y: %.0f",
+                         goal_type, display_name, element_type, parent_display_name,
+                         target_pos.x, target_pos.y);
+            } else {
+                snprintf(tooltip, sizeof(tooltip),
+                         "%s: \"%s\" - %s\n\n"
+                         "X: %.0f   Y: %.0f",
+                         goal_type, display_name, element_type,
+                         target_pos.x, target_pos.y);
+            }
         } else {
-            snprintf(tooltip, sizeof(tooltip),
-                     "%s: \"%s\" - %s\n"
-                     "Drag to reposition.",
-                     goal_type, display_name, element_type);
+            if (parent_display_name) {
+                snprintf(tooltip, sizeof(tooltip),
+                         "%s: \"%s\" - %s\nPart of \"%s\"\n"
+                         "Drag to reposition.",
+                         goal_type, display_name, element_type, parent_display_name);
+            } else {
+                snprintf(tooltip, sizeof(tooltip),
+                         "%s: \"%s\" - %s\n"
+                         "Drag to reposition.",
+                         goal_type, display_name, element_type);
+            }
         }
         ImGui::SetTooltip("%s", tooltip);
     }
