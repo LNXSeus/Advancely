@@ -156,11 +156,26 @@ typedef struct {
     Uint32 total_duration; // The sum of all delays, for looping
 } AnimatedTexture;
 
+// Defines the reference point on an element's bounding box for manual positioning.
+// The anchor determines which point of the element the coordinates of the template editor refer to.
+enum AnchorPoint {
+    ANCHOR_TOP_LEFT = 0,
+    ANCHOR_TOP_CENTER,
+    ANCHOR_TOP_RIGHT,
+    ANCHOR_CENTER_LEFT,
+    ANCHOR_CENTER,
+    ANCHOR_CENTER_RIGHT,
+    ANCHOR_BOTTOM_LEFT,
+    ANCHOR_BOTTOM_CENTER,
+    ANCHOR_BOTTOM_RIGHT
+};
+
 // Represents a manually set position for an element on the tracker map
 struct ManualPos {
     float x;
     float y;
     bool is_set; // True if the user has manually placed this, false to fallback to auto-layout
+    AnchorPoint anchor = ANCHOR_TOP_LEFT; // The reference point for the coordinates
 };
 
 // A generic struct for a sub-item, like and advancement's criterion or a stat

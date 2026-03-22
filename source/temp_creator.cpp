@@ -94,6 +94,7 @@ static void parse_editor_manual_pos(cJSON *parent_json, const char *key, ManualP
     pos->is_set = false;
     pos->x = 0.0f;
     pos->y = 0.0f;
+    pos->anchor = ANCHOR_TOP_LEFT;
     cJSON *pos_obj = cJSON_GetObjectItem(parent_json, key);
     if (pos_obj) {
         cJSON *x = cJSON_GetObjectItem(pos_obj, "x");
@@ -103,6 +104,13 @@ static void parse_editor_manual_pos(cJSON *parent_json, const char *key, ManualP
             pos->y = (float) y->valuedouble;
             pos->is_set = true;
         }
+        cJSON *anchor_val = cJSON_GetObjectItem(pos_obj, "anchor");
+        if (cJSON_IsNumber(anchor_val)) {
+            int a = anchor_val->valueint;
+            if (a >= ANCHOR_TOP_LEFT && a <= ANCHOR_BOTTOM_RIGHT) {
+                pos->anchor = (AnchorPoint) a;
+            }
+        }
     }
 }
 
@@ -111,6 +119,9 @@ static void save_editor_manual_pos(cJSON *parent_json, const char *key, const Ma
         cJSON *pos_obj = cJSON_CreateObject();
         cJSON_AddNumberToObject(pos_obj, "x", pos.x);
         cJSON_AddNumberToObject(pos_obj, "y", pos.y);
+        if (pos.anchor != ANCHOR_TOP_LEFT) {
+            cJSON_AddNumberToObject(pos_obj, "anchor", pos.anchor);
+        }
         cJSON_AddItemToObject(parent_json, key, pos_obj);
     }
 }
@@ -119,6 +130,7 @@ static bool are_manual_positions_different(const ManualPos &a, const ManualPos &
     if (a.is_set != b.is_set) return true;
     if (a.is_set) {
         if (a.x != b.x || a.y != b.y) return true;
+        if (a.anchor != b.anchor) return true;
     }
     return false;
 }
@@ -896,6 +908,12 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
                 new_goal.stages.push_back(new_stage);
             }
         }
+
+        // Parse manual layout positions
+        parse_editor_manual_pos(goal_json, "icon_pos", &new_goal.icon_pos);
+        parse_editor_manual_pos(goal_json, "text_pos", &new_goal.text_pos);
+        parse_editor_manual_pos(goal_json, "progress_pos", &new_goal.progress_pos);
+
         goals_vector.push_back(new_goal);
     }
 }
@@ -1496,7 +1514,15 @@ static void reset_manual_pos(ManualPos *pos) {
     pos->is_set = false;
     pos->x = 0.0f;
     pos->y = 0.0f;
+    pos->anchor = ANCHOR_TOP_LEFT; // Top left is default
 }
+
+// Labels for the AnchorPoint dropdown, matching the enum order
+static const char *anchor_point_labels[] = {
+    "Top Left", "Top Center", "Top Right",
+    "Center Left", "Center", "Center Right",
+    "Bottom Left", "Bottom Center", "Bottom Right"
+};
 
 // Helper to render the "Layout Coordinates" collapsing header with a goal-specific tooltip
 static bool render_layout_coordinates_header(const char *goal_type_name) {
@@ -1551,6 +1577,22 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
         if (ImGui::IsItemHovered()) {
             char tooltip[64];
             snprintf(tooltip, sizeof(tooltip), "Y Coordinate");
+            ImGui::SetTooltip("%s", tooltip);
+        }
+
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(110);
+        int current_anchor = (int) pos->anchor;
+        if (ImGui::Combo("Anchor", &current_anchor, anchor_point_labels, IM_ARRAYSIZE(anchor_point_labels))) {
+            pos->anchor = (AnchorPoint) current_anchor;
+            save_msg = MSG_NONE;
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip[256];
+            snprintf(tooltip, sizeof(tooltip),
+                     "The reference point on this %s's bounding box.\n"
+                     "Coordinates are relative to this anchor point.",
+                     pos_type);
             ImGui::SetTooltip("%s", tooltip);
         }
 
@@ -3163,6 +3205,99 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             t->visual_layout_just_dragged = false;
         }
         // --- END SYNC BLOCK ---
+
+        // --- REVERSE SYNC: EDITOR → RUNTIME (every frame while visual layout editor is active) ---
+        // Pushes ManualPos changes made in the template editor (coordinates, is_set, anchor)
+        // to the runtime tracker structs so they are immediately reflected on the tracker map.
+        if (t && t->is_visual_layout_editing && t->template_data) {
+            auto reverse_sync_pos = [](const ManualPos &editor_pos, ManualPos &tracker_pos) {
+                tracker_pos.x = editor_pos.x;
+                tracker_pos.y = editor_pos.y;
+                tracker_pos.is_set = editor_pos.is_set;
+                tracker_pos.anchor = editor_pos.anchor;
+            };
+
+            auto reverse_sync_item = [&](const EditorTrackableItem &ed_item, TrackableItem *tr_item) {
+                if (!tr_item) return;
+                reverse_sync_pos(ed_item.icon_pos, tr_item->icon_pos);
+                reverse_sync_pos(ed_item.text_pos, tr_item->text_pos);
+                reverse_sync_pos(ed_item.progress_pos, tr_item->progress_pos);
+            };
+
+            // Reverse Sync Advancements
+            for (const auto &ed_adv: current_template_data.advancements) {
+                for (int i = 0; i < t->template_data->advancement_count; i++) {
+                    if (t->template_data->advancements[i] && strcmp(ed_adv.root_name,
+                                                                    t->template_data->advancements[i]->root_name) == 0) {
+                        TrackableCategory *tr_adv = t->template_data->advancements[i];
+                        reverse_sync_pos(ed_adv.icon_pos, tr_adv->icon_pos);
+                        reverse_sync_pos(ed_adv.text_pos, tr_adv->text_pos);
+                        reverse_sync_pos(ed_adv.progress_pos, tr_adv->progress_pos);
+                        for (const auto &ed_crit: ed_adv.criteria) {
+                            for (int j = 0; j < tr_adv->criteria_count; j++) {
+                                if (tr_adv->criteria[j] && strcmp(ed_crit.root_name, tr_adv->criteria[j]->root_name) == 0) {
+                                    reverse_sync_item(ed_crit, tr_adv->criteria[j]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Reverse Sync Stats
+            for (const auto &ed_stat: current_template_data.stats) {
+                for (int i = 0; i < t->template_data->stat_count; i++) {
+                    if (t->template_data->stats[i] && strcmp(ed_stat.root_name,
+                                                             t->template_data->stats[i]->root_name) == 0) {
+                        TrackableCategory *tr_stat = t->template_data->stats[i];
+                        reverse_sync_pos(ed_stat.icon_pos, tr_stat->icon_pos);
+                        reverse_sync_pos(ed_stat.text_pos, tr_stat->text_pos);
+                        reverse_sync_pos(ed_stat.progress_pos, tr_stat->progress_pos);
+                        for (const auto &ed_crit: ed_stat.criteria) {
+                            for (int j = 0; j < tr_stat->criteria_count; j++) {
+                                if (tr_stat->criteria[j] && strcmp(ed_crit.root_name, tr_stat->criteria[j]->root_name) == 0) {
+                                    reverse_sync_item(ed_crit, tr_stat->criteria[j]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Reverse Sync Unlocks
+            for (const auto &ed_unlock: current_template_data.unlocks) {
+                for (int i = 0; i < t->template_data->unlock_count; i++) {
+                    if (t->template_data->unlocks[i] && strcmp(ed_unlock.root_name,
+                                                               t->template_data->unlocks[i]->root_name) == 0) {
+                        reverse_sync_item(ed_unlock, t->template_data->unlocks[i]);
+                    }
+                }
+            }
+
+            // Reverse Sync Custom Goals
+            for (const auto &ed_cg: current_template_data.custom_goals) {
+                for (int i = 0; i < t->template_data->custom_goal_count; i++) {
+                    if (t->template_data->custom_goals[i] && strcmp(ed_cg.root_name,
+                                                                    t->template_data->custom_goals[i]->root_name) == 0) {
+                        reverse_sync_item(ed_cg, t->template_data->custom_goals[i]);
+                    }
+                }
+            }
+
+            // Reverse Sync Multi-Stage Goals
+            for (const auto &ed_msg: current_template_data.multi_stage_goals) {
+                for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
+                    if (t->template_data->multi_stage_goals[i] && strcmp(
+                            ed_msg.root_name, t->template_data->multi_stage_goals[i]->root_name) == 0) {
+                        MultiStageGoal *tr_msg = t->template_data->multi_stage_goals[i];
+                        reverse_sync_pos(ed_msg.icon_pos, tr_msg->icon_pos);
+                        reverse_sync_pos(ed_msg.text_pos, tr_msg->text_pos);
+                        reverse_sync_pos(ed_msg.progress_pos, tr_msg->progress_pos);
+                    }
+                }
+            }
+        }
+        // --- END REVERSE SYNC BLOCK ---
 
         // --- CORE EDITOR VIEW ---
         ImGui::PushID(&selected_template_info); // Use address of info struct for a unique ID

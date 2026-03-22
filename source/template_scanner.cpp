@@ -36,6 +36,7 @@ void parse_manual_pos(cJSON *parent_json, const char *key, ManualPos *pos) {
     pos->is_set = false;
     pos->x = 0.0f;
     pos->y = 0.0f;
+    pos->anchor = ANCHOR_TOP_LEFT; // Top left as default
 
     cJSON *pos_obj = cJSON_GetObjectItemCaseSensitive(parent_json, key);
     if (pos_obj && cJSON_IsObject(pos_obj)) {
@@ -46,6 +47,14 @@ void parse_manual_pos(cJSON *parent_json, const char *key, ManualPos *pos) {
             pos->x = (float) x_val->valuedouble;
             pos->y = (float) y_val->valuedouble;
             pos->is_set = true;
+        }
+
+        cJSON *anchor_val = cJSON_GetObjectItemCaseSensitive(pos_obj, "anchor");
+        if (cJSON_IsNumber(anchor_val)) {
+            int a = anchor_val->valueint;
+            if (a >= ANCHOR_TOP_LEFT && a <= ANCHOR_BOTTOM_RIGHT) {
+                pos->anchor = (AnchorPoint) a;
+            }
         }
     }
 }

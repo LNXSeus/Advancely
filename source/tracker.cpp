@@ -2764,6 +2764,65 @@ void tracker_render(Tracker *t, const AppSettings *settings) {
 
 // START OF STATIC FUNCTIONS ------------------------------------
 
+// Computes the pixel offset to apply when rendering an element based on its anchor point.
+// For TOP_LEFT (default), the offset is (0,0). For CENTER, it shifts by (-width/2, -height/2), etc.
+// The element_width and element_height are in world coordinates (pre-zoom).
+static ImVec2 get_anchor_offset(AnchorPoint anchor, float element_width, float element_height) {
+    float offset_x = 0.0f;
+    float offset_y = 0.0f;
+
+    switch (anchor) {
+        case ANCHOR_TOP_LEFT:                                                  break;
+        case ANCHOR_TOP_CENTER:    offset_x = -element_width * 0.5f;          break;
+        case ANCHOR_TOP_RIGHT:     offset_x = -element_width;                 break;
+        case ANCHOR_CENTER_LEFT:   offset_y = -element_height * 0.5f;         break;
+        case ANCHOR_CENTER:        offset_x = -element_width * 0.5f;
+                                   offset_y = -element_height * 0.5f;         break;
+        case ANCHOR_CENTER_RIGHT:  offset_x = -element_width;
+                                   offset_y = -element_height * 0.5f;         break;
+        case ANCHOR_BOTTOM_LEFT:   offset_y = -element_height;                break;
+        case ANCHOR_BOTTOM_CENTER: offset_x = -element_width * 0.5f;
+                                   offset_y = -element_height;                break;
+        case ANCHOR_BOTTOM_RIGHT:  offset_x = -element_width;
+                                   offset_y = -element_height;                break;
+    }
+
+    return ImVec2(offset_x, offset_y);
+}
+
+// Draws a contrasting crosshair (black outline + white inner) at the given screen position.
+static void draw_anchor_crosshair(ImDrawList *draw_list, ImVec2 pos, float size) {
+    ImU32 outline_color = IM_COL32(0, 0, 0, 200);
+    ImU32 inner_color = IM_COL32(255, 255, 255, 220);
+    float half = size * 0.5f;
+
+    // Horizontal line - black outline then white inner
+    draw_list->AddLine(ImVec2(pos.x - half, pos.y), ImVec2(pos.x + half, pos.y), outline_color, 3.0f);
+    draw_list->AddLine(ImVec2(pos.x - half, pos.y), ImVec2(pos.x + half, pos.y), inner_color, 1.0f);
+
+    // Vertical line - black outline then white inner
+    draw_list->AddLine(ImVec2(pos.x, pos.y - half), ImVec2(pos.x, pos.y + half), outline_color, 3.0f);
+    draw_list->AddLine(ImVec2(pos.x, pos.y - half), ImVec2(pos.x, pos.y + half), inner_color, 1.0f);
+}
+
+// Computes the screen position of the anchor point within an element's bounding box.
+// item_screen_pos is the top-left of the rendered element, hit_box_size is in screen pixels.
+static ImVec2 get_anchor_screen_pos(AnchorPoint anchor, ImVec2 item_screen_pos, ImVec2 hit_box_size) {
+    float ax = 0.0f, ay = 0.0f; // Fractional position within the bounding box
+    switch (anchor) {
+        case ANCHOR_TOP_LEFT:      ax = 0.0f; ay = 0.0f; break;
+        case ANCHOR_TOP_CENTER:    ax = 0.5f; ay = 0.0f; break;
+        case ANCHOR_TOP_RIGHT:     ax = 1.0f; ay = 0.0f; break;
+        case ANCHOR_CENTER_LEFT:   ax = 0.0f; ay = 0.5f; break;
+        case ANCHOR_CENTER:        ax = 0.5f; ay = 0.5f; break;
+        case ANCHOR_CENTER_RIGHT:  ax = 1.0f; ay = 0.5f; break;
+        case ANCHOR_BOTTOM_LEFT:   ax = 0.0f; ay = 1.0f; break;
+        case ANCHOR_BOTTOM_CENTER: ax = 0.5f; ay = 1.0f; break;
+        case ANCHOR_BOTTOM_RIGHT:  ax = 1.0f; ay = 1.0f; break;
+    }
+    return ImVec2(item_screen_pos.x + hit_box_size.x * ax, item_screen_pos.y + hit_box_size.y * ay);
+}
+
 // Helper function to handle Visual Layout Drag-and-Drop editing
 static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 item_screen_pos, ImVec2 hit_box_size,
                                           ManualPos &target_pos, const char *goal_type,
@@ -2776,15 +2835,24 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
     ImGui::SetCursorScreenPos(item_screen_pos);
     ImGui::InvisibleButton("##drag_handle", hit_box_size);
 
-    if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+    bool is_dragging = ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left);
+    bool is_hovered = ImGui::IsItemHovered();
+
+    if (is_dragging) {
         ImGuiIO &io = ImGui::GetIO();
 
         // If this is the very first time dragging it, reverse-engineer its current
         // procedural screen position back into World X/Y coordinates!
+        // We need to undo the anchor offset to store the anchor point, not the top-left.
         if (!target_pos.is_set) {
             target_pos.is_set = true;
-            target_pos.x = (item_screen_pos.x - t->camera_offset.x) / t->zoom_level;
-            target_pos.y = (item_screen_pos.y - t->camera_offset.y) / t->zoom_level;
+            float world_top_left_x = (item_screen_pos.x - t->camera_offset.x) / t->zoom_level;
+            float world_top_left_y = (item_screen_pos.y - t->camera_offset.y) / t->zoom_level;
+            float element_w = hit_box_size.x / t->zoom_level;
+            float element_h = hit_box_size.y / t->zoom_level;
+            ImVec2 anchor_off = get_anchor_offset(target_pos.anchor, element_w, element_h);
+            target_pos.x = world_top_left_x - anchor_off.x;
+            target_pos.y = world_top_left_y - anchor_off.y;
         }
 
         // Apply drag delta
@@ -2796,8 +2864,16 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
         SDL_SetAtomicInt(&g_templates_changed, 1);
     }
 
+    // Draw anchor crosshair when dragging or hovering
+    if (is_dragging || is_hovered) {
+        ImDrawList *draw_list = ImGui::GetForegroundDrawList();
+        ImVec2 anchor_screen = get_anchor_screen_pos(target_pos.anchor, item_screen_pos, hit_box_size);
+        float crosshair_size = 12.0f;
+        draw_anchor_crosshair(draw_list, anchor_screen, crosshair_size);
+    }
+
     // Give it a helpful tooltip so users know what they are grabbing
-    if (ImGui::IsItemHovered()) {
+    if (is_hovered) {
         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
         char tooltip[512];
         if (parent_display_name) {
@@ -3569,8 +3645,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             float item_y = current_y;
 
             if (settings->use_manual_layout && cat->icon_pos.is_set) {
-                item_x = cat->icon_pos.x;
-                item_y = cat->icon_pos.y;
+                ImVec2 anchor_off = get_anchor_offset(cat->icon_pos.anchor, 96.0f, item_height);
+                item_x = cat->icon_pos.x + anchor_off.x;
+                item_y = cat->icon_pos.y + anchor_off.y;
             } else {
                 // Procedural Auto-Layout Wrapping
                 if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
@@ -3765,9 +3842,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 ImU32 current_text_color = is_considered_complete_render ? text_color_faded : text_color;
 
                 if (settings->use_manual_layout && cat->text_pos.is_set) {
-                    text_x_center = (cat->text_pos.x * t->zoom_level) + t->camera_offset.x + (
+                    ImVec2 text_anchor_off = get_anchor_offset(cat->text_pos.anchor, text_size.x, text_size.y);
+                    text_x_center = ((cat->text_pos.x + text_anchor_off.x) * t->zoom_level) + t->camera_offset.x + (
                                         text_size.x * t->zoom_level) * 0.5f;
-                    current_text_y = (cat->text_pos.y * t->zoom_level) + t->camera_offset.y;
+                    current_text_y = ((cat->text_pos.y + text_anchor_off.y) * t->zoom_level) + t->camera_offset.y;
                 }
 
                 // Main Name
@@ -3805,9 +3883,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                     // Apply manual progress_pos if set
                     if (settings->use_manual_layout && cat->progress_pos.is_set) {
-                        prog_x_center = (cat->progress_pos.x * t->zoom_level) + t->camera_offset.x + (
+                        ImVec2 prog_anchor_off = get_anchor_offset(cat->progress_pos.anchor, progress_text_size.x, progress_text_size.y);
+                        prog_x_center = ((cat->progress_pos.x + prog_anchor_off.x) * t->zoom_level) + t->camera_offset.x + (
                                             progress_text_size.x * t->zoom_level) * 0.5f;
-                        prog_y = (cat->progress_pos.y * t->zoom_level) + t->camera_offset.y;
+                        prog_y = ((cat->progress_pos.y + prog_anchor_off.y) * t->zoom_level) + t->camera_offset.y;
                     }
 
                     if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
@@ -3885,8 +3964,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                         ImVec2 crit_base_pos_screen;
                         if (is_manually_placed) {
-                            crit_base_pos_screen = ImVec2((crit->icon_pos.x * t->zoom_level) + t->camera_offset.x,
-                                                          (crit->icon_pos.y * t->zoom_level) + t->camera_offset.y);
+                            ImVec2 crit_icon_anchor_off = get_anchor_offset(crit->icon_pos.anchor, 32.0f, 32.0f);
+                            crit_base_pos_screen = ImVec2(((crit->icon_pos.x + crit_icon_anchor_off.x) * t->zoom_level) + t->camera_offset.x,
+                                                          ((crit->icon_pos.y + crit_icon_anchor_off.y) * t->zoom_level) + t->camera_offset.y);
                         } else {
                             crit_base_pos_screen = ImVec2((item_x * t->zoom_level) + t->camera_offset.x, item_screen_y);
                         }
@@ -4050,8 +4130,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             ImVec2 child_text_pos = ImVec2(current_element_x_screen, text_y_pos);
 
                             if (settings->use_manual_layout && crit->text_pos.is_set) {
-                                child_text_pos = ImVec2((crit->text_pos.x * t->zoom_level) + t->camera_offset.x,
-                                                        (crit->text_pos.y * t->zoom_level) + t->camera_offset.y);
+                                ImVec2 crit_text_anchor_off = get_anchor_offset(crit->text_pos.anchor, child_text_size.x, child_text_size.y);
+                                child_text_pos = ImVec2(((crit->text_pos.x + crit_text_anchor_off.x) * t->zoom_level) + t->camera_offset.x,
+                                                        ((crit->text_pos.y + crit_text_anchor_off.y) * t->zoom_level) + t->camera_offset.y);
                                 current_element_x_screen = child_text_pos.x;
                                 // Update cursor so progress text follows naturally
                             }
@@ -4489,8 +4570,9 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         float item_y = current_y;
 
         if (settings->use_manual_layout && item->icon_pos.is_set) {
-            item_x = item->icon_pos.x;
-            item_y = item->icon_pos.y;
+            ImVec2 anchor_off = get_anchor_offset(item->icon_pos.anchor, 96.0f, item_height);
+            item_x = item->icon_pos.x + anchor_off.x;
+            item_y = item->icon_pos.y + anchor_off.y;
         } else {
             // Procedural Auto-Layout Wrapping
             if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
@@ -4636,9 +4718,10 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                 float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
 
                 if (settings->use_manual_layout && item->text_pos.is_set) {
-                    text_x_center = (item->text_pos.x * t->zoom_level) + t->camera_offset.x + (
+                    ImVec2 text_anchor_off = get_anchor_offset(item->text_pos.anchor, text_size.x, text_size.y);
+                    text_x_center = ((item->text_pos.x + text_anchor_off.x) * t->zoom_level) + t->camera_offset.x + (
                                         text_size.x * t->zoom_level) * 0.5f;
-                    text_y_pos = (item->text_pos.y * t->zoom_level) + t->camera_offset.y;
+                    text_y_pos = ((item->text_pos.y + text_anchor_off.y) * t->zoom_level) + t->camera_offset.y;
                 }
 
                 // Draw Main Name (centered)
@@ -4922,8 +5005,9 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         float item_y = current_y;
 
         if (settings->use_manual_layout && item->icon_pos.is_set) {
-            item_x = item->icon_pos.x;
-            item_y = item->icon_pos.y;
+            ImVec2 anchor_off = get_anchor_offset(item->icon_pos.anchor, 96.0f, item_height);
+            item_x = item->icon_pos.x + anchor_off.x;
+            item_y = item->icon_pos.y + anchor_off.y;
         } else {
             // Procedural Auto-Layout Wrapping
             if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
@@ -5077,9 +5161,10 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
 
                 if (settings->use_manual_layout && item->text_pos.is_set) {
-                    text_x_center = (item->text_pos.x * t->zoom_level) + t->camera_offset.x + (
+                    ImVec2 text_anchor_off = get_anchor_offset(item->text_pos.anchor, text_size.x, text_size.y);
+                    text_x_center = ((item->text_pos.x + text_anchor_off.x) * t->zoom_level) + t->camera_offset.x + (
                                         text_size.x * t->zoom_level) * 0.5f;
-                    text_y_pos = (item->text_pos.y * t->zoom_level) + t->camera_offset.y;
+                    text_y_pos = ((item->text_pos.y + text_anchor_off.y) * t->zoom_level) + t->camera_offset.y;
                 }
 
                 // Draw Main Name (centered)
@@ -5101,9 +5186,10 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
                     // Apply manual progress_pos if set
                     if (settings->use_manual_layout && item->progress_pos.is_set) {
-                        prog_x_center = (item->progress_pos.x * t->zoom_level) + t->camera_offset.x + (
+                        ImVec2 prog_anchor_off = get_anchor_offset(item->progress_pos.anchor, progress_text_size.x, progress_text_size.y);
+                        prog_x_center = ((item->progress_pos.x + prog_anchor_off.x) * t->zoom_level) + t->camera_offset.x + (
                                             progress_text_size.x * t->zoom_level) * 0.5f;
-                        prog_y = (item->progress_pos.y * t->zoom_level) + t->camera_offset.y;
+                        prog_y = ((item->progress_pos.y + prog_anchor_off.y) * t->zoom_level) + t->camera_offset.y;
                     }
 
                     // LOD: Hide progress text if zoomed out
@@ -5445,8 +5531,9 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         float item_y = current_y;
 
         if (settings->use_manual_layout && goal->icon_pos.is_set) {
-            item_x = goal->icon_pos.x;
-            item_y = goal->icon_pos.y;
+            ImVec2 anchor_off = get_anchor_offset(goal->icon_pos.anchor, 96.0f, item_height);
+            item_x = goal->icon_pos.x + anchor_off.x;
+            item_y = goal->icon_pos.y + anchor_off.y;
         } else {
             // Procedural Auto-Layout Wrapping
             if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
@@ -5621,9 +5708,10 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
 
             if (settings->use_manual_layout && goal->text_pos.is_set) {
-                text_x_center = (goal->text_pos.x * t->zoom_level) + t->camera_offset.x + (text_size.x * t->zoom_level)
+                ImVec2 text_anchor_off = get_anchor_offset(goal->text_pos.anchor, text_size.x, text_size.y);
+                text_x_center = ((goal->text_pos.x + text_anchor_off.x) * t->zoom_level) + t->camera_offset.x + (text_size.x * t->zoom_level)
                                 * 0.5f;
-                text_y_pos = (goal->text_pos.y * t->zoom_level) + t->camera_offset.y;
+                text_y_pos = ((goal->text_pos.y + text_anchor_off.y) * t->zoom_level) + t->camera_offset.y;
             }
 
             // Draw Main Name (centered)
@@ -5647,9 +5735,10 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
             // Apply manual progress_pos if set
             if (settings->use_manual_layout && goal->progress_pos.is_set) {
-                stage_text_x_center = (goal->progress_pos.x * t->zoom_level) + t->camera_offset.x + (
+                ImVec2 prog_anchor_off = get_anchor_offset(goal->progress_pos.anchor, stage_text_size.x, stage_text_size.y);
+                stage_text_x_center = ((goal->progress_pos.x + prog_anchor_off.x) * t->zoom_level) + t->camera_offset.x + (
                                           stage_text_size.x * t->zoom_level) * 0.5f;
-                stage_text_y = (goal->progress_pos.y * t->zoom_level) + t->camera_offset.y;
+                stage_text_y = ((goal->progress_pos.y + prog_anchor_off.y) * t->zoom_level) + t->camera_offset.y;
             }
 
             // LOD: Hide stage text if zoomed out
