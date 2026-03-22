@@ -3886,6 +3886,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     new_advancement.is_recipe = source_adv_ptr->is_recipe;
                     new_advancement.is_simple_stat = source_adv_ptr->is_simple_stat;
                     new_advancement.criteria = source_adv_ptr->criteria; // std::vector handles its own deep copy.
+                    new_advancement.icon_pos = source_adv_ptr->icon_pos;
+                    new_advancement.text_pos = source_adv_ptr->text_pos;
+                    new_advancement.progress_pos = source_adv_ptr->progress_pos;
 
                     new_advancement.sort_order = 0;
                     for (auto &crit: new_advancement.criteria) {
@@ -4552,6 +4555,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_criterion.icon_path[sizeof(new_criterion.icon_path) - 1] = '\0';
                         new_criterion.goal = source_criterion.goal;
                         new_criterion.is_hidden = source_criterion.is_hidden;
+                        new_criterion.icon_pos = source_criterion.icon_pos;
+                        new_criterion.text_pos = source_criterion.text_pos;
+                        new_criterion.progress_pos = source_criterion.progress_pos;
 
                         new_criterion.sort_order = 0;
 
@@ -5024,6 +5030,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     new_stat.is_recipe = source_stat_ptr->is_recipe;
                     new_stat.is_simple_stat = source_stat_ptr->is_simple_stat;
                     new_stat.criteria = source_stat_ptr->criteria; // std::vector handles its own deep copy safely.
+                    new_stat.icon_pos = source_stat_ptr->icon_pos;
+                    new_stat.text_pos = source_stat_ptr->text_pos;
+                    new_stat.progress_pos = source_stat_ptr->progress_pos;
 
                     new_stat.sort_order = 0;
                     for (auto &crit: new_stat.criteria) {
@@ -5765,6 +5774,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             new_crit.icon_path[sizeof(new_crit.icon_path) - 1] = '\0';
                             new_crit.goal = source_criterion.goal;
                             new_crit.is_hidden = source_criterion.is_hidden;
+                            new_crit.icon_pos = source_criterion.icon_pos;
+                            new_crit.text_pos = source_criterion.text_pos;
+                            new_crit.progress_pos = source_criterion.progress_pos;
 
                             new_crit.sort_order = 0;
 
@@ -6163,6 +6175,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_item.icon_path[sizeof(new_item.icon_path) - 1] = '\0';
                         new_item.goal = source_item.goal;
                         new_item.is_hidden = source_item.is_hidden;
+                        new_item.icon_pos = source_item.icon_pos;
+                        new_item.text_pos = source_item.text_pos;
+                        new_item.progress_pos = source_item.progress_pos;
 
                         new_item.sort_order = 0;
 
@@ -6562,6 +6577,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     new_item.icon_path[sizeof(new_item.icon_path) - 1] = '\0';
                     new_item.goal = source_item.goal;
                     new_item.is_hidden = source_item.is_hidden;
+                    new_item.icon_pos = source_item.icon_pos;
+                    new_item.text_pos = source_item.text_pos;
+                    new_item.progress_pos = source_item.progress_pos;
 
                     new_item.sort_order = 0;
 
@@ -6974,6 +6992,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     new_goal.in_2nd_row = source_goal_ptr->in_2nd_row;
                     new_goal.use_stage_icons = source_goal_ptr->use_stage_icons;
                     new_goal.stages = source_goal_ptr->stages; // std::vector handles its own deep copy safely.
+                    new_goal.icon_pos = source_goal_ptr->icon_pos;
+                    new_goal.text_pos = source_goal_ptr->text_pos;
+                    new_goal.progress_pos = source_goal_ptr->progress_pos;
 
                     new_goal.sort_order = 0;
                     for (auto &stage: new_goal.stages) {
