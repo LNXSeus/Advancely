@@ -170,6 +170,9 @@ enum AnchorPoint {
     ANCHOR_BOTTOM_RIGHT
 };
 
+// Maximum absolute value for manual position coordinates (well within float integer precision)
+#define MANUAL_POS_MAX 10000000.0f
+
 // Represents a manually set position for an element on the tracker map
 struct ManualPos {
     float x;

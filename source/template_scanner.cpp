@@ -13,6 +13,7 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include "settings_utils.h" // For version checking
 
@@ -44,8 +45,8 @@ void parse_manual_pos(cJSON *parent_json, const char *key, ManualPos *pos) {
         cJSON *y_val = cJSON_GetObjectItemCaseSensitive(pos_obj, "y");
 
         if (cJSON_IsNumber(x_val) && cJSON_IsNumber(y_val)) {
-            pos->x = (float) x_val->valuedouble;
-            pos->y = (float) y_val->valuedouble;
+            pos->x = fminf(fmaxf((float) x_val->valuedouble, -MANUAL_POS_MAX), MANUAL_POS_MAX);
+            pos->y = fminf(fmaxf((float) y_val->valuedouble, -MANUAL_POS_MAX), MANUAL_POS_MAX);
             pos->is_set = true;
         }
 

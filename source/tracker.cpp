@@ -2855,9 +2855,9 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
             target_pos.y = roundf(world_top_left_y - anchor_off.y);
         }
 
-        // Apply drag delta and snap to full pixels
-        target_pos.x = roundf(target_pos.x + (io.MouseDelta.x / t->zoom_level));
-        target_pos.y = roundf(target_pos.y + (io.MouseDelta.y / t->zoom_level));
+        // Apply drag delta, snap to full pixels, and clamp to safe range +- 10 Mil
+        target_pos.x = fminf(fmaxf(roundf(target_pos.x + (io.MouseDelta.x / t->zoom_level)), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+        target_pos.y = fminf(fmaxf(roundf(target_pos.y + (io.MouseDelta.y / t->zoom_level)), -MANUAL_POS_MAX), MANUAL_POS_MAX);
 
         // Signal the Editor to sync this frame!
         t->visual_layout_just_dragged = true;

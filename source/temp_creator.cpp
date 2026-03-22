@@ -101,8 +101,8 @@ static void parse_editor_manual_pos(cJSON *parent_json, const char *key, ManualP
         cJSON *x = cJSON_GetObjectItem(pos_obj, "x");
         cJSON *y = cJSON_GetObjectItem(pos_obj, "y");
         if (cJSON_IsNumber(x) && cJSON_IsNumber(y)) {
-            pos->x = (float) x->valuedouble;
-            pos->y = (float) y->valuedouble;
+            pos->x = fminf(fmaxf((float) x->valuedouble, -MANUAL_POS_MAX), MANUAL_POS_MAX);
+            pos->y = fminf(fmaxf((float) y->valuedouble, -MANUAL_POS_MAX), MANUAL_POS_MAX);
             pos->is_set = true;
         }
         cJSON *anchor_val = cJSON_GetObjectItem(pos_obj, "anchor");
@@ -1565,8 +1565,8 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
     if (pos->is_set) {
         ImGui::SameLine();
         ImGui::SetNextItemWidth(80);
-        if (ImGui::DragFloat("X", &pos->x, 1.0f, 0.0f, 0.0f, "%.0f")) {
-            pos->x = roundf(pos->x);
+        if (ImGui::DragFloat("X", &pos->x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+            pos->x = fminf(fmaxf(roundf(pos->x), -MANUAL_POS_MAX), MANUAL_POS_MAX);
             save_msg = MSG_NONE;
         }
         if (ImGui::IsItemHovered()) {
@@ -1577,8 +1577,8 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
 
         ImGui::SameLine();
         ImGui::SetNextItemWidth(80);
-        if (ImGui::DragFloat("Y", &pos->y, 1.0f, 0.0f, 0.0f, "%.0f")) {
-            pos->y = roundf(pos->y);
+        if (ImGui::DragFloat("Y", &pos->y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+            pos->y = fminf(fmaxf(roundf(pos->y), -MANUAL_POS_MAX), MANUAL_POS_MAX);
             save_msg = MSG_NONE;
         }
         if (ImGui::IsItemHovered()) {
