@@ -2851,13 +2851,13 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
             float element_w = hit_box_size.x / t->zoom_level;
             float element_h = hit_box_size.y / t->zoom_level;
             ImVec2 anchor_off = get_anchor_offset(target_pos.anchor, element_w, element_h);
-            target_pos.x = world_top_left_x - anchor_off.x;
-            target_pos.y = world_top_left_y - anchor_off.y;
+            target_pos.x = roundf(world_top_left_x - anchor_off.x);
+            target_pos.y = roundf(world_top_left_y - anchor_off.y);
         }
 
-        // Apply drag delta
-        target_pos.x += (io.MouseDelta.x / t->zoom_level);
-        target_pos.y += (io.MouseDelta.y / t->zoom_level);
+        // Apply drag delta and snap to full pixels
+        target_pos.x = roundf(target_pos.x + (io.MouseDelta.x / t->zoom_level));
+        target_pos.y = roundf(target_pos.y + (io.MouseDelta.y / t->zoom_level));
 
         // Signal the Editor to sync this frame!
         t->visual_layout_just_dragged = true;

@@ -10,6 +10,7 @@
 #include "temp_creator.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "settings_utils.h"
 #include "logger.h"
@@ -117,8 +118,8 @@ static void parse_editor_manual_pos(cJSON *parent_json, const char *key, ManualP
 static void save_editor_manual_pos(cJSON *parent_json, const char *key, const ManualPos &pos) {
     if (pos.is_set) {
         cJSON *pos_obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(pos_obj, "x", pos.x);
-        cJSON_AddNumberToObject(pos_obj, "y", pos.y);
+        cJSON_AddNumberToObject(pos_obj, "x", roundf(pos.x));
+        cJSON_AddNumberToObject(pos_obj, "y", roundf(pos.y));
         if (pos.anchor != ANCHOR_TOP_LEFT) {
             cJSON_AddNumberToObject(pos_obj, "anchor", pos.anchor);
         }
@@ -1564,7 +1565,10 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
     if (pos->is_set) {
         ImGui::SameLine();
         ImGui::SetNextItemWidth(80);
-        if (ImGui::DragFloat("X", &pos->x, 1.0f)) { save_msg = MSG_NONE; }
+        if (ImGui::DragFloat("X", &pos->x, 1.0f, 0.0f, 0.0f, "%.0f")) {
+            pos->x = roundf(pos->x);
+            save_msg = MSG_NONE;
+        }
         if (ImGui::IsItemHovered()) {
             char tooltip[64];
             snprintf(tooltip, sizeof(tooltip), "X Coordinate");
@@ -1573,7 +1577,10 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
 
         ImGui::SameLine();
         ImGui::SetNextItemWidth(80);
-        if (ImGui::DragFloat("Y", &pos->y, 1.0f)) { save_msg = MSG_NONE; }
+        if (ImGui::DragFloat("Y", &pos->y, 1.0f, 0.0f, 0.0f, "%.0f")) {
+            pos->y = roundf(pos->y);
+            save_msg = MSG_NONE;
+        }
         if (ImGui::IsItemHovered()) {
             char tooltip[64];
             snprintf(tooltip, sizeof(tooltip), "Y Coordinate");
