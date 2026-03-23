@@ -2827,7 +2827,9 @@ static ImVec2 get_anchor_screen_pos(AnchorPoint anchor, ImVec2 item_screen_pos, 
 static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 item_screen_pos, ImVec2 hit_box_size,
                                           ManualPos &target_pos, const char *goal_type,
                                           const char *display_name, const char *element_type,
-                                          const char *parent_display_name = nullptr) {
+                                          const char *root_name = nullptr,
+                                          const char *parent_display_name = nullptr,
+                                          const char *parent_root_name = nullptr) {
     if (!t->is_visual_layout_editing) return;
 
     ImGui::PushID(id);
@@ -2840,6 +2842,36 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
 
     if (is_dragging) {
         ImGuiIO &io = ImGui::GetIO();
+
+        // Communicate the dragged goal's identity to the template editor
+        // For criteria/sub-stats, select the parent goal instead
+        if (parent_root_name && parent_root_name[0] != '\0') {
+            strncpy(t->visual_drag_root_name, parent_root_name, sizeof(t->visual_drag_root_name) - 1);
+            t->visual_drag_root_name[sizeof(t->visual_drag_root_name) - 1] = '\0';
+            // Store the child's own root_name for opening its collapsible header
+            if (root_name && root_name[0] != '\0') {
+                strncpy(t->visual_drag_child_root_name, root_name, sizeof(t->visual_drag_child_root_name) - 1);
+                t->visual_drag_child_root_name[sizeof(t->visual_drag_child_root_name) - 1] = '\0';
+            } else {
+                t->visual_drag_child_root_name[0] = '\0';
+            }
+            // Map child type back to parent type
+            // "Criterion" -> "Advancement", "Achievement" -> "Achievement", "Sub-Stat" -> "Stat"
+            if (strcmp(goal_type, "Sub-Stat") == 0) {
+                strncpy(t->visual_drag_goal_type, "Stat", sizeof(t->visual_drag_goal_type) - 1);
+            } else if (strcmp(goal_type, "Achievement") == 0) {
+                strncpy(t->visual_drag_goal_type, "Achievement", sizeof(t->visual_drag_goal_type) - 1);
+            } else {
+                strncpy(t->visual_drag_goal_type, "Advancement", sizeof(t->visual_drag_goal_type) - 1);
+            }
+            t->visual_drag_goal_type[sizeof(t->visual_drag_goal_type) - 1] = '\0';
+        } else if (root_name && root_name[0] != '\0') {
+            strncpy(t->visual_drag_root_name, root_name, sizeof(t->visual_drag_root_name) - 1);
+            t->visual_drag_root_name[sizeof(t->visual_drag_root_name) - 1] = '\0';
+            strncpy(t->visual_drag_goal_type, goal_type, sizeof(t->visual_drag_goal_type) - 1);
+            t->visual_drag_goal_type[sizeof(t->visual_drag_goal_type) - 1] = '\0';
+            t->visual_drag_child_root_name[0] = '\0'; // No child when dragging a parent
+        }
 
         // If this is the very first time dragging it, reverse-engineer its current
         // procedural screen position back into World X/Y coordinates!
@@ -3847,7 +3879,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                          cat->root_name);
                 handle_visual_layout_dragging(t, drag_id, screen_pos,
                                               ImVec2(bg_size.x * t->zoom_level, bg_size.y * t->zoom_level),
-                                              cat->icon_pos, cat_type, cat->display_name, "Icon");
+                                              cat->icon_pos, cat_type, cat->display_name, "Icon",
+                                              cat->root_name);
 
                 // --- TEXT CENTERING AND POSITIONING ---
                 float text_x_center = screen_pos.x + (bg_size.x * t->zoom_level) * 0.5f;
@@ -3877,7 +3910,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                   ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f,
                                                          current_text_y),
                                                   ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level),
-                                                  cat->text_pos, cat_type, cat->display_name, "Text");
+                                                  cat->text_pos, cat_type, cat->display_name, "Text",
+                                                  cat->root_name);
                 }
                 current_text_y += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // ADVANCE LAYOUT
 
@@ -3920,7 +3954,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                           prog_y),
                                                       ImVec2(progress_text_size.x * t->zoom_level,
                                                              progress_text_size.y * t->zoom_level),
-                                                      cat->progress_pos, cat_type, cat->display_name, "Progress");
+                                                      cat->progress_pos, cat_type, cat->display_name, "Progress",
+                                                      cat->root_name);
                     }
                     current_text_y = prog_y + progress_text_size.y * t->zoom_level + 4.0f * t->zoom_level;
                 }
@@ -4065,7 +4100,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         handle_visual_layout_dragging(t, drag_id, crit_base_pos_screen,
                                                       ImVec2(32.0f * t->zoom_level, 32.0f * t->zoom_level),
                                                       crit->icon_pos, crit_type, crit->display_name,
-                                                      "Icon", cat->display_name);
+                                                      "Icon", crit->root_name,
+                                                      cat->display_name, cat->root_name);
 
                         current_element_x_screen += 32.0f * t->zoom_level + 4.0f * t->zoom_level;
                         // Icon width + padding
@@ -4162,7 +4198,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                           ImVec2(child_text_size.x * t->zoom_level,
                                                                  child_text_size.y * t->zoom_level),
                                                           crit->text_pos, crit_type, crit->display_name,
-                                                          "Text", cat->display_name);
+                                                          "Text", crit->root_name,
+                                                          cat->display_name, cat->root_name);
 
                             current_element_x_screen += (child_text_size.x * t->zoom_level) + (4.0f * t->zoom_level);
 
@@ -4720,7 +4757,8 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
             snprintf(drag_id, sizeof(drag_id), "drag_unlock_icon_%s", item->root_name);
             handle_visual_layout_dragging(t, drag_id, screen_pos,
                                           ImVec2(bg_size.x * t->zoom_level, bg_size.y * t->zoom_level),
-                                          item->icon_pos, "Unlock", item->display_name, "Icon");
+                                          item->icon_pos, "Unlock", item->display_name, "Icon",
+                                          item->root_name);
 
             // Render Text
             // LOD: Check if zoom level is sufficient for text
@@ -4750,7 +4788,8 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                 handle_visual_layout_dragging(t, drag_id,
                                               ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos),
                                               ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level),
-                                              item->text_pos, "Unlock", item->display_name, "Text");
+                                              item->text_pos, "Unlock", item->display_name, "Text",
+                                              item->root_name);
 
                 // Draw Progress Text below main name (if applicable, centered)
                 if (has_progress_text) {
@@ -5163,7 +5202,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             snprintf(drag_id, sizeof(drag_id), "drag_cg_icon_%s", item->root_name);
             handle_visual_layout_dragging(t, drag_id, screen_pos,
                                           ImVec2(bg_size.x * t->zoom_level, bg_size.y * t->zoom_level),
-                                          item->icon_pos, "Custom Goal", item->display_name, "Icon");
+                                          item->icon_pos, "Custom Goal", item->display_name, "Icon",
+                                          item->root_name);
 
             // Render Text
             // LOD: Check if zoom level is sufficient for text
@@ -5193,7 +5233,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 handle_visual_layout_dragging(t, drag_id,
                                               ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos),
                                               ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level),
-                                              item->text_pos, "Custom Goal", item->display_name, "Text");
+                                              item->text_pos, "Custom Goal", item->display_name, "Text",
+                                              item->root_name);
 
                 // Draw Progress Text below main name (if applicable, centered)
                 if (has_progress_text) {
@@ -5224,7 +5265,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                                                           prog_y),
                                                       ImVec2(progress_text_size.x * t->zoom_level,
                                                              progress_text_size.y * t->zoom_level),
-                                                      item->progress_pos, "Custom Goal", item->display_name, "Progress");
+                                                      item->progress_pos, "Custom Goal", item->display_name, "Progress",
+                                                      item->root_name);
                         // --------------------------------------------
                     }
                 }
@@ -5712,7 +5754,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             snprintf(drag_id, sizeof(drag_id), "drag_ms_icon_%s", goal->root_name);
             handle_visual_layout_dragging(t, drag_id, screen_pos,
                                           ImVec2(bg_size.x * t->zoom_level, bg_size.y * t->zoom_level),
-                                          goal->icon_pos, "Multi-Stage Goal", goal->display_name, "Icon");
+                                          goal->icon_pos, "Multi-Stage Goal", goal->display_name, "Icon",
+                                          goal->root_name);
 
             // Render Text (Main Name and Current Stage Text)
             float main_font_size = settings->tracker_font_size;
@@ -5742,7 +5785,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                 handle_visual_layout_dragging(t, drag_id,
                                               ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos),
                                               ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level),
-                                              goal->text_pos, "Multi-Stage Goal", goal->display_name, "Text");
+                                              goal->text_pos, "Multi-Stage Goal", goal->display_name, "Text",
+                                              goal->root_name);
             }
 
             // Draw Current Stage Text (uses sub_font_size)
@@ -5771,7 +5815,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                                                      stage_text_y),
                                               ImVec2(stage_text_size.x * t->zoom_level,
                                                      stage_text_size.y * t->zoom_level),
-                                              goal->progress_pos, "Multi-Stage Goal", goal->display_name, "Progress");
+                                              goal->progress_pos, "Multi-Stage Goal", goal->display_name, "Progress",
+                                              goal->root_name);
             }
         } // End if (is_visible_on_screen)
 

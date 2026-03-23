@@ -1526,7 +1526,8 @@ static const char *anchor_point_labels[] = {
 };
 
 // Helper to render the "Layout Coordinates" collapsing header with a goal-specific tooltip
-static bool render_layout_coordinates_header(const char *goal_type_name) {
+static bool render_layout_coordinates_header(const char *goal_type_name, bool force_open = false) {
+    if (force_open) ImGui::SetNextItemOpen(true);
     bool open = ImGui::CollapsingHeader("Layout Coordinates");
     if (ImGui::IsItemHovered()) {
         char tooltip[512];
@@ -1683,6 +1684,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static EditorMultiStageGoal *selected_ms_goal = nullptr;
     static bool show_unsaved_changes_popup = false;
     static std::function<void()> pending_action = nullptr;
+
+    // Visual drag auto-select: which tab to force-select and which goal's header to force-open
+    enum ForceSelectTab { FORCE_TAB_NONE = 0, FORCE_TAB_ADVANCEMENTS, FORCE_TAB_STATS, FORCE_TAB_UNLOCKS, FORCE_TAB_CUSTOM, FORCE_TAB_MULTISTAGE };
+    static ForceSelectTab force_select_tab = FORCE_TAB_NONE;
+    static char force_open_header_root_name[192] = ""; // Root name of goal whose Layout Coordinates header to force-open
+    static char force_open_child_header_root_name[192] = ""; // Root name of criterion/sub-stat whose Layout Coordinates header to force-open
 
     // Helper to dynamically calculate the next sort order per list
     auto get_next_sort_order = [](const auto &list) -> int {
@@ -1848,6 +1855,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         editor_has_unsaved_changes = are_editor_templates_different(current_template_data, saved_template_data);
     }
 
+    // Communicate unsaved changes state to settings window via tracker
+    if (t) {
+        t->template_editor_has_unsaved_changes = editing_template && editor_has_unsaved_changes;
+    }
 
     // Handle user trying to close the window with unsaved changes
     if (was_open_last_frame && !(*p_open) && editor_has_unsaved_changes) {
@@ -1885,8 +1896,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // Dynamically create the window title based on unsaved changes
     // On VERY FIRST OPEN default to 720p — only applies when nothing is stored in imgui.ini yet
     ImGui::SetNextWindowSize(ImVec2(1280, 720), ImGuiCond_FirstUseEver);
-    // Hide Close Button when in Visual Editor Mode
-    bool *window_open_ptr = (t && t->is_visual_layout_editing) ? nullptr : p_open;
+    // Hide Close Button when in Visual Editor Mode or when there are unsaved changes
+    bool hide_close_button = (t && t->is_visual_layout_editing) || editor_has_unsaved_changes;
+    bool *window_open_ptr = hide_close_button ? nullptr : p_open;
     ImGui::Begin("Template Editor", window_open_ptr);
 
     if (t) {
@@ -3113,6 +3125,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // "Editing Template" Form
 
     if (editing_template) {
+        // Clear force-open headers when not actively dragging
+        if (!t || !t->visual_layout_just_dragged) {
+            force_open_header_root_name[0] = '\0';
+            force_open_child_header_root_name[0] = '\0';
+        }
+
         // --- REAL-TIME MEMORY SYNC FOR VISUAL EDITING ---
         // Only when the user is dragging items on the map, copy the coordinates from Tracker memory to Editor memory!
         if (t && t->is_visual_layout_editing && t->template_data && t->visual_layout_just_dragged) {
@@ -3208,15 +3226,69 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
             }
 
+            // Auto-select the dragged goal in the template editor and switch to its tab
+            if (t->visual_drag_root_name[0] != '\0') {
+                // Store root name for force-opening the Layout Coordinates header
+                strncpy(force_open_header_root_name, t->visual_drag_root_name, sizeof(force_open_header_root_name) - 1);
+                force_open_header_root_name[sizeof(force_open_header_root_name) - 1] = '\0';
+
+                // Store child root name for force-opening criterion/sub-stat header
+                strncpy(force_open_child_header_root_name, t->visual_drag_child_root_name, sizeof(force_open_child_header_root_name) - 1);
+                force_open_child_header_root_name[sizeof(force_open_child_header_root_name) - 1] = '\0';
+
+                if (strcmp(t->visual_drag_goal_type, "Advancement") == 0 ||
+                    strcmp(t->visual_drag_goal_type, "Achievement") == 0) {
+                    for (auto &adv : current_template_data.advancements) {
+                        if (strcmp(adv.root_name, t->visual_drag_root_name) == 0) {
+                            selected_advancement = &adv;
+                            selected_stat = nullptr;
+                            selected_ms_goal = nullptr;
+                            force_select_tab = FORCE_TAB_ADVANCEMENTS;
+                            break;
+                        }
+                    }
+                } else if (strcmp(t->visual_drag_goal_type, "Stat") == 0) {
+                    for (auto &stat : current_template_data.stats) {
+                        if (strcmp(stat.root_name, t->visual_drag_root_name) == 0) {
+                            selected_stat = &stat;
+                            selected_advancement = nullptr;
+                            selected_ms_goal = nullptr;
+                            force_select_tab = FORCE_TAB_STATS;
+                            break;
+                        }
+                    }
+                } else if (strcmp(t->visual_drag_goal_type, "Multi-Stage Goal") == 0) {
+                    for (auto &goal : current_template_data.multi_stage_goals) {
+                        if (strcmp(goal.root_name, t->visual_drag_root_name) == 0) {
+                            selected_ms_goal = &goal;
+                            selected_advancement = nullptr;
+                            selected_stat = nullptr;
+                            force_select_tab = FORCE_TAB_MULTISTAGE;
+                            break;
+                        }
+                    }
+                } else if (strcmp(t->visual_drag_goal_type, "Unlock") == 0) {
+                    force_select_tab = FORCE_TAB_UNLOCKS;
+                } else if (strcmp(t->visual_drag_goal_type, "Custom Goal") == 0) {
+                    force_select_tab = FORCE_TAB_CUSTOM;
+                }
+            }
+
             // We caught the drag, so turn off the sync until the mouse moves again
             t->visual_layout_just_dragged = false;
         }
         // --- END SYNC BLOCK ---
 
-        // --- REVERSE SYNC: EDITOR → RUNTIME (every frame while visual layout editor is active) ---
+        // --- REVERSE SYNC: EDITOR → RUNTIME (every frame when editing the active template) ---
         // Pushes ManualPos changes made in the template editor (coordinates, is_set, anchor)
         // to the runtime tracker structs so they are immediately reflected on the tracker map.
-        if (t && t->is_visual_layout_editing && t->template_data) {
+        // This runs whenever the edited template is the active one, not just during visual editing,
+        // to prevent flickering when entering visual editing mode with pending position changes.
+        bool is_editing_active_template = t && t->template_data &&
+            strcmp(creator_version_str, app_settings->version_str) == 0 &&
+            strcmp(selected_template_info.category, app_settings->category) == 0 &&
+            strcmp(selected_template_info.optional_flag, app_settings->optional_flag) == 0;
+        if (is_editing_active_template) {
             auto reverse_sync_pos = [](const ManualPos &editor_pos, ManualPos &tracker_pos) {
                 tracker_pos.x = editor_pos.x;
                 tracker_pos.y = editor_pos.y;
@@ -3461,6 +3533,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 t->is_visual_layout_editing = !t->is_visual_layout_editing;
 
                 if (t->is_visual_layout_editing) {
+                    // Auto-save the template if there are unsaved changes to prevent
+                    // flickering when the settings reload re-parses the template from disk
+                    bool has_unsaved = are_editor_templates_different(current_template_data, saved_template_data);
+                    if (has_unsaved) {
+                        validate_and_save_template(creator_version_str, selected_template_info,
+                                                   selected_lang_flag, current_template_data,
+                                                   saved_template_data, save_message_type,
+                                                   status_message, app_settings);
+                    }
+
                     // Automatically force "Manual Layout" ON
                     app_settings->use_manual_layout = true;
 
@@ -3479,7 +3561,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                          "Activating this will automatically turn on 'Manual Layout' mode\n"
                          "and set your 'Goal Visibility' to 'Show All' so you can see every item.\n"
                          "Custom Goal Hotkeys are disabled while Visual Editing is active.\n"
-                         "Applying settings is also disabled while active to prevent template reloads.\n\n"
+                         "Applying settings is also disabled while active to prevent template reloads.\n"
+                         "Unsaved template changes will be auto-saved when activating.\n\n"
                          "WARNING:\n"
                          "Make sure you're tracking a world.\n"
                          "Official default templates get overwritten on updates.\n"
@@ -3572,7 +3655,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         if (ImGui::BeginTabBar("EditorTabs")) {
             // "Advancements" or "Achievements" tab depending on version
-            if (ImGui::BeginTabItem(advancements_label_plural_upper)) {
+            {
+            ImGuiTabItemFlags adv_tab_flags = (force_select_tab == FORCE_TAB_ADVANCEMENTS) ? ImGuiTabItemFlags_SetSelected : 0;
+            if (force_select_tab == FORCE_TAB_ADVANCEMENTS) force_select_tab = FORCE_TAB_NONE;
+            if (ImGui::BeginTabItem(advancements_label_plural_upper, nullptr, adv_tab_flags)) {
                 // TWO-PANE LAYOUT
                 float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                 ImGui::BeginChild("AdvancementListPane", ImVec2(pane_width, 0), true);
@@ -3942,16 +4028,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // Compare pointers
                         // Check if the user is selecting a *different* item than the one currently selected
                         if (&advancement != selected_advancement) {
-                            if (editor_has_unsaved_changes) {
-                                show_unsaved_changes_popup = true;
-                                // The pending action now captures the pointer to the newly selected advancement
-                                pending_action = [&, new_selection = &advancement]() {
-                                    selected_advancement = new_selection;
-                                };
-                            } else {
-                                // No unsaved changes, so we can select the new item immediately
-                                selected_advancement = &advancement;
-                            }
+                            selected_advancement = &advancement;
                         }
                     }
 
@@ -4262,7 +4339,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                     }
 
-                    if (render_layout_coordinates_header(advancements_label_singular_lower)) {
+                    if (render_layout_coordinates_header(advancements_label_singular_lower,
+                            force_open_header_root_name[0] != '\0' && strcmp(advancement.root_name, force_open_header_root_name) == 0)) {
                         render_manual_pos_ui("icon", advancements_label_singular_lower, "Icon Position",
                                              &advancement.icon_pos, save_message_type);
                         render_manual_pos_ui("text", advancements_label_singular_lower, "Text Position",
@@ -4631,7 +4709,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
-                        if (render_layout_coordinates_header("criterion")) {
+                        if (render_layout_coordinates_header("criterion",
+                                force_open_child_header_root_name[0] != '\0' && strcmp(criterion.root_name, force_open_child_header_root_name) == 0)) {
                             render_manual_pos_ui("c_icon", "criterion", "Icon Position", &criterion.icon_pos,
                                                  save_message_type);
                             render_manual_pos_ui("c_text", "criterion", "Text Position", &criterion.text_pos,
@@ -4736,8 +4815,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::EndChild();
                 ImGui::EndTabItem();
             }
+            } // end adv tab scope
 
-            if (ImGui::BeginTabItem("Stats")) {
+            {
+            ImGuiTabItemFlags stats_tab_flags = (force_select_tab == FORCE_TAB_STATS) ? ImGuiTabItemFlags_SetSelected : 0;
+            if (force_select_tab == FORCE_TAB_STATS) force_select_tab = FORCE_TAB_NONE;
+            if (ImGui::BeginTabItem("Stats", nullptr, stats_tab_flags)) {
                 // TWO PANE LAYOUT for Stats
                 float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                 ImGui::BeginChild("StatListPane", ImVec2(pane_width, 0), true);
@@ -5101,14 +5184,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     if (ImGui::Selectable(label, &stat == selected_stat)) {
                         if (&stat != selected_stat) {
-                            if (editor_has_unsaved_changes) {
-                                show_unsaved_changes_popup = true;
-                                pending_action = [&, new_selection = &stat]() {
-                                    selected_stat = new_selection;
-                                };
-                            } else {
-                                selected_stat = &stat;
-                            }
+                            selected_stat = &stat;
                         }
                     }
 
@@ -5431,7 +5507,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SetTooltip("%s", multi_stat_tooltip_buffer);
                     }
 
-                    if (render_layout_coordinates_header("stat category")) {
+                    if (render_layout_coordinates_header("stat category",
+                            force_open_header_root_name[0] != '\0' && strcmp(stat_cat.root_name, force_open_header_root_name) == 0)) {
                         render_manual_pos_ui("s_icon", "stat category", "Icon Position", &stat_cat.icon_pos,
                                              save_message_type);
                         render_manual_pos_ui("s_text", "stat category", "Text Position", &stat_cat.text_pos,
@@ -5854,7 +5931,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
 
-                            if (render_layout_coordinates_header("sub-stat")) {
+                            if (render_layout_coordinates_header("sub-stat",
+                                    force_open_child_header_root_name[0] != '\0' && strcmp(crit.root_name, force_open_child_header_root_name) == 0)) {
                                 render_manual_pos_ui("sc_icon", "sub-stat", "Icon Position", &crit.icon_pos,
                                                      save_message_type);
                                 render_manual_pos_ui("sc_text", "sub-stat", "Text Position", &crit.text_pos,
@@ -5953,11 +6031,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::EndChild();
                 ImGui::EndTabItem();
             }
+            } // end stats tab scope
 
 
             // Only show the Unlocks tab for the specific version
             if (strcmp(creator_version_str, "25w14craftmine") == 0) {
-                if (ImGui::BeginTabItem("Unlocks")) {
+                ImGuiTabItemFlags unlocks_tab_flags = (force_select_tab == FORCE_TAB_UNLOCKS) ? ImGuiTabItemFlags_SetSelected : 0;
+                if (force_select_tab == FORCE_TAB_UNLOCKS) force_select_tab = FORCE_TAB_NONE;
+                if (ImGui::BeginTabItem("Unlocks", nullptr, unlocks_tab_flags)) {
                     // Import unlocks button
                     if (ImGui::Button("Import Unlocks")) {
                         char start_path[MAX_PATH_LENGTH];
@@ -6254,7 +6335,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
-                        if (render_layout_coordinates_header("unlock")) {
+                        if (render_layout_coordinates_header("unlock",
+                                force_open_header_root_name[0] != '\0' && strcmp(unlock.root_name, force_open_header_root_name) == 0)) {
                             render_manual_pos_ui("u_icon", "unlock", "Icon Position", &unlock.icon_pos,
                                                  save_message_type);
                             render_manual_pos_ui("u_text", "unlock", "Text Position", &unlock.text_pos,
@@ -6350,8 +6432,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     ImGui::EndTabItem();
                 }
             }
+            {
+            ImGuiTabItemFlags custom_tab_flags = (force_select_tab == FORCE_TAB_CUSTOM) ? ImGuiTabItemFlags_SetSelected : 0;
+            if (force_select_tab == FORCE_TAB_CUSTOM) force_select_tab = FORCE_TAB_NONE;
             if (ImGui::BeginTabItem
-                ("Custom Goals")) {
+                ("Custom Goals", nullptr, custom_tab_flags)) {
                 if (ImGui::Button("Add New Custom Goal")) {
                     // Create a new custom goal with default values
                     EditorTrackableItem new_goal = {};
@@ -6647,7 +6732,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
 
-                    if (render_layout_coordinates_header("custom goal")) {
+                    if (render_layout_coordinates_header("custom goal",
+                            force_open_header_root_name[0] != '\0' && strcmp(goal.root_name, force_open_header_root_name) == 0)) {
                         render_manual_pos_ui("cg_icon", "custom goal", "Icon Position", &goal.icon_pos,
                                              save_message_type);
                         render_manual_pos_ui("cg_text", "custom goal", "Text Position", &goal.text_pos,
@@ -6751,7 +6837,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 ImGui::EndTabItem();
             }
-            if (ImGui::BeginTabItem("Multi-Stage Goals")) {
+            } // end custom goals tab scope
+            {
+            ImGuiTabItemFlags ms_tab_flags = (force_select_tab == FORCE_TAB_MULTISTAGE) ? ImGuiTabItemFlags_SetSelected : 0;
+            if (force_select_tab == FORCE_TAB_MULTISTAGE) force_select_tab = FORCE_TAB_NONE;
+            if (ImGui::BeginTabItem("Multi-Stage Goals", nullptr, ms_tab_flags)) {
                 // Flag to track changes in this version
                 // Specifically for hidden legacy stats for multi-stage goals
                 // This flag still tracks ALL CHANGES within multi-stage goals
@@ -7065,14 +7155,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     if (ImGui::Selectable(label, &goal == selected_ms_goal)) {
                         if (&goal != selected_ms_goal) {
-                            if (editor_has_unsaved_changes) {
-                                show_unsaved_changes_popup = true;
-                                pending_action = [&, new_selection = &goal]() {
-                                    selected_ms_goal = new_selection;
-                                };
-                            } else {
-                                selected_ms_goal = &goal;
-                            }
+                            selected_ms_goal = &goal;
                         }
                     }
 
@@ -7367,7 +7450,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SetTooltip("%s", tooltip);
                     }
 
-                    if (render_layout_coordinates_header("multi-stage goal")) {
+                    if (render_layout_coordinates_header("multi-stage goal",
+                            force_open_header_root_name[0] != '\0' && strcmp(goal.root_name, force_open_header_root_name) == 0)) {
                         render_manual_pos_ui("ms_icon", "multi-stage goal", "Icon Position", &goal.icon_pos,
                                              save_message_type);
                         render_manual_pos_ui("ms_text", "multi-stage goal", "Text Position", &goal.text_pos,
@@ -8199,6 +8283,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                 ImGui::EndTabItem();
             }
+            } // end multi-stage goals tab scope
             ImGui::EndTabBar();
         }
         ImGui::PopID();
