@@ -3162,6 +3162,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
             // Auto-select the dragged goal in the template editor and switch to its tab
             if (t->visual_drag_root_name[0] != '\0') {
+                // Clear search so the dragged item's collapsible section is visible
+                tc_search_buffer[0] = '\0';
+
                 // Store root name for force-opening the Layout Coordinates header
                 strncpy(force_open_header_root_name, t->visual_drag_root_name, sizeof(force_open_header_root_name) - 1);
                 force_open_header_root_name[sizeof(force_open_header_root_name) - 1] = '\0';
