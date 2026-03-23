@@ -2433,6 +2433,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     }
                 }
 
+                // Preserve the live Manual Layout toggle (it's controlled from the tracker, not settings)
+                temp_settings.use_manual_layout = app_settings->use_manual_layout;
+
                 // Copy temp settings to the real settings, save, and trigger a reload
                 memcpy(app_settings, &temp_settings, sizeof(AppSettings));
                 memcpy(&saved_settings, &temp_settings, sizeof(AppSettings)); // Update clean snapshot
@@ -2607,6 +2610,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
     if (ImGui::Button("Restart Advancely")) {
         // 1. Save any pending changes from the settings window first.
+        temp_settings.use_manual_layout = app_settings->use_manual_layout;
         memcpy(app_settings, &temp_settings, sizeof(AppSettings));
         settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
 
