@@ -24,7 +24,6 @@
 #include <vector>
 #include <string>
 #include <unordered_set> // For checking duplicates
-#include <functional> // For std::function
 
 #include "tinyfiledialogs.h"
 
@@ -1683,9 +1682,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static EditorTrackableCategory *selected_advancement = nullptr;
     static EditorTrackableCategory *selected_stat = nullptr;
     static EditorMultiStageGoal *selected_ms_goal = nullptr;
-    static bool show_unsaved_changes_popup = false;
-    static std::function<void()> pending_action = nullptr;
-
     // Visual drag auto-select: which tab to force-select and which goal's header to force-open
     enum ForceSelectTab { FORCE_TAB_NONE = 0, FORCE_TAB_ADVANCEMENTS, FORCE_TAB_STATS, FORCE_TAB_UNLOCKS, FORCE_TAB_CUSTOM, FORCE_TAB_MULTISTAGE };
     static ForceSelectTab force_select_tab = FORCE_TAB_NONE;
@@ -1861,13 +1857,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         t->template_editor_has_unsaved_changes = editing_template && editor_has_unsaved_changes;
     }
 
-    // Handle user trying to close the window with unsaved changes
-    if (was_open_last_frame && !(*p_open) && editor_has_unsaved_changes) {
-        *p_open = true; // Prevent window from closing
-        show_unsaved_changes_popup = true;
-        pending_action = [&]() { *p_open = false; }; // The pending action is to close the window
-    }
-
     // Check if the selected template is the one currently in use
     bool is_current_template = false;
     if (selected_template_index != -1) {
@@ -1894,11 +1883,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     // UI RENDERING
 
+    bool visual_editing_active = t && t->is_visual_layout_editing;
+    bool has_unsaved_changes_in_editor = editing_template && editor_has_unsaved_changes;
+
     // Dynamically create the window title based on unsaved changes
     // On VERY FIRST OPEN default to 720p — only applies when nothing is stored in imgui.ini yet
     ImGui::SetNextWindowSize(ImVec2(1280, 720), ImGuiCond_FirstUseEver);
     // Hide Close Button when in Visual Editor Mode or when there are unsaved changes
-    bool hide_close_button = (t && t->is_visual_layout_editing) || editor_has_unsaved_changes;
+    bool hide_close_button = visual_editing_active || editor_has_unsaved_changes;
     bool *window_open_ptr = hide_close_button ? nullptr : p_open;
     ImGui::Begin("Template Editor", window_open_ptr);
 
@@ -1947,59 +1939,40 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     }
 
     // Version Selector
+    bool template_switching_disabled = visual_editing_active || has_unsaved_changes_in_editor;
+    ImGui::BeginDisabled(template_switching_disabled);
     ImGui::SetNextItemWidth(250); // Set a reasonable width for the combo box
-    int original_version_idx = creator_version_idx; // UUse a temporary variable for the combo
     if (ImGui::Combo("Template Version", &creator_version_idx, version_display_c_strs.data(),
                      version_display_c_strs.size())) {
-        // This block runs when the user makes a new selection.
-        // creator_version_idx now holds the NEW index the user clicked.
+        strncpy(creator_version_str, VERSION_STRINGS[creator_version_idx], sizeof(creator_version_str) - 1);
+        creator_version_str[sizeof(creator_version_str) - 1] = '\0';
+        editing_template = false; // Always exit editor on version change
 
-        // If there are unsaved changes, we must block this action and show a popup.
-        if (editing_template && editor_has_unsaved_changes) {
-            // The user's newly selected index is stored for the pending action.
-            int newly_selected_idx = creator_version_idx;
-
-            // IMMEDIATELY REVERT the change in our state variable.
-            // This makes the combo box snap back to the original value on the next frame.
-            creator_version_idx = original_version_idx;
-
-            // Now, show the popup and set the pending action to apply the change later.
-            show_unsaved_changes_popup = true;
-            // Capture by reference, but newly_selected_idx by value to ensure the lambda has access to the latest values
-            pending_action = [&, newly_selected_idx]() {
-                // The action to run if user clicks "Save" or "Discard"
-                creator_version_idx = newly_selected_idx;
-                strncpy(creator_version_str, VERSION_STRINGS[creator_version_idx], sizeof(creator_version_str) - 1);
-                creator_version_str[sizeof(creator_version_str) - 1] = '\0';
-                editing_template = false; // Always exit editor when switching version
-
-                // Reset search buffer
-                tc_search_buffer[0] = '\0';
-                selected_advancement = nullptr;
-                selected_stat = nullptr;
-                selected_ms_goal = nullptr;
-            };
-        } else {
-            // No unsaved changes, so the change is final.
-            strncpy(creator_version_str, VERSION_STRINGS[creator_version_idx], sizeof(creator_version_str) - 1);
-            creator_version_str[sizeof(creator_version_str) - 1] = '\0';
-            editing_template = false; // Always exit editor on version change
-
-            // Reset search and selection state
-            tc_search_buffer[0] = '\0';
-            selected_advancement = nullptr;
-            selected_stat = nullptr;
-            selected_ms_goal = nullptr;
-        }
+        // Reset search and selection state
+        tc_search_buffer[0] = '\0';
+        selected_advancement = nullptr;
+        selected_stat = nullptr;
+        selected_ms_goal = nullptr;
     }
 
-    if (ImGui::IsItemHovered()) {
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         char version_combo_tooltip_buffer[1024];
-        snprintf(version_combo_tooltip_buffer, sizeof(version_combo_tooltip_buffer),
-                 "Select the game version for which you want to manage templates.\n"
-                 "The number in brackets shows how many templates are available for that version.");
+        if (visual_editing_active) {
+            snprintf(version_combo_tooltip_buffer, sizeof(version_combo_tooltip_buffer),
+                     "Cannot change version while Visual Editing is active.\n"
+                     "Stop Visual Editing first.");
+        } else if (has_unsaved_changes_in_editor) {
+            snprintf(version_combo_tooltip_buffer, sizeof(version_combo_tooltip_buffer),
+                     "Cannot change version while the template has unsaved changes.\n"
+                     "Save or revert your changes first.");
+        } else {
+            snprintf(version_combo_tooltip_buffer, sizeof(version_combo_tooltip_buffer),
+                     "Select the game version for which you want to manage templates.\n"
+                     "The number in brackets shows how many templates are available for that version.");
+        }
         ImGui::SetTooltip("%s", version_combo_tooltip_buffer);
     }
+    ImGui::EndDisabled(); // template_switching_disabled
 
     ImGui::SameLine();
 
@@ -2166,6 +2139,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
 
     // Left Pane: Template List
+    ImGui::BeginDisabled(template_switching_disabled);
     ImGui::BeginChild("TemplateList", ImVec2(250, 0), true);
     ImGui::Text("Existing Templates");
     ImGui::Separator();
@@ -2215,44 +2189,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
 
         if (ImGui::Selectable(item_label, selected_template_index == i)) {
-            // Define the action of switching to a new template, capturing the correct original index 'i'
-            auto switch_template_action = [&, i]() {
-                selected_template_index = i;
-                selected_lang_index = -1; // Reset language selection
-                selected_lang_flag = ""; // default
-                // If we are in the editor, we must update the loaded data
-                if (editing_template) {
-                    selected_template_info = discovered_templates[i];
-                    if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag,
-                                                  current_template_data,
-                                                  status_message)) {
-                        // Also update the 'saved' snapshot to reflect the newly loaded state
-                        saved_template_data = current_template_data;
-
-                        // Exit editor to prevent confusion
-                        editing_template = false;
-
-                        // Reset search buffer and selections
-                        tc_search_buffer[0] = '\0';
-                        selected_advancement = nullptr;
-                        selected_stat = nullptr;
-                        selected_ms_goal = nullptr;
-                    }
-                }
-            };
-
-            // If switching to a DIFFERENT template with unsaved changes, show popup
-            if (editing_template && editor_has_unsaved_changes && selected_template_index != i) {
-                show_unsaved_changes_popup = true;
-                pending_action = switch_template_action;
-            } else {
-                // Otherwise, perform the switch immediately
-                switch_template_action();
-            }
-
-            // On any new template selection, reset the language selection
-            selected_lang_index = -1;
+            selected_template_index = i;
+            selected_lang_index = -1; // Reset language selection
             selected_lang_flag = ""; // default
+            // If we are in the editor, we must update the loaded data
+            if (editing_template) {
+                selected_template_info = discovered_templates[i];
+                if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag,
+                                              current_template_data,
+                                              status_message)) {
+                    // Also update the 'saved' snapshot to reflect the newly loaded state
+                    saved_template_data = current_template_data;
+
+                    // Exit editor to prevent confusion
+                    editing_template = false;
+
+                    // Reset search buffer and selections
+                    tc_search_buffer[0] = '\0';
+                    selected_advancement = nullptr;
+                    selected_stat = nullptr;
+                    selected_ms_goal = nullptr;
+                }
+            }
 
             // General state changes on any selection
             show_create_new_view = false;
@@ -2261,6 +2219,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
     }
     ImGui::EndChild();
+    ImGui::EndDisabled(); // template_switching_disabled (template list)
 
     ImGui::SameLine();
 
@@ -2270,39 +2229,34 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     // --- Main Action Buttons ---
 
-    bool has_unsaved_changes_in_editor = editing_template && editor_has_unsaved_changes;
+    // Disable all template-switching actions while visual editing is active or there are unsaved changes
+    ImGui::BeginDisabled(template_switching_disabled);
 
-    ImGui::BeginDisabled(has_unsaved_changes_in_editor);
     if (ImGui::Button("Create New Template")) {
-        auto create_action = [&]() {
-            show_create_new_view = true;
-            show_copy_view = false;
-            editing_template = false;
-            selected_template_index = -1;
-            status_message[0] = '\0';
-            new_template_category[0] = '\0';
-            new_template_flag[0] = '\0';
+        show_create_new_view = true;
+        show_copy_view = false;
+        editing_template = false;
+        selected_template_index = -1;
+        status_message[0] = '\0';
+        new_template_category[0] = '\0';
+        new_template_flag[0] = '\0';
 
-            // Reset search buffer
-            tc_search_buffer[0] = '\0';
-            selected_advancement = nullptr;
-            selected_stat = nullptr;
-            selected_ms_goal = nullptr;
-        };
-        if (editing_template && editor_has_unsaved_changes) {
-            show_unsaved_changes_popup = true;
-            pending_action = create_action;
-        } else {
-            create_action();
-        }
+        // Reset search buffer
+        tc_search_buffer[0] = '\0';
+        selected_advancement = nullptr;
+        selected_stat = nullptr;
+        selected_ms_goal = nullptr;
     }
-    ImGui::EndDisabled();
-
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         char tooltip_buffer[256];
-        if (has_unsaved_changes_in_editor) {
+        if (visual_editing_active) {
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "You have unsaved changes in the editor. Save them first.");
+                     "Cannot create a new template while Visual Editing is active.\n"
+                     "Stop Visual Editing first.");
+        } else if (has_unsaved_changes_in_editor) {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Cannot create a new template while the template has unsaved changes.\n"
+                     "Save or revert your changes first.");
         } else {
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Create a new, empty template for version: %s",
                      creator_version_str);
@@ -2314,35 +2268,34 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
     ImGui::BeginDisabled(selected_template_index == -1);
     if (ImGui::Button("Edit Template")) {
-        auto action = [&]() {
-            editing_template = true;
-            show_create_new_view = false;
-            show_copy_view = false;
+        editing_template = true;
+        show_create_new_view = false;
+        show_copy_view = false;
 
-            if (selected_template_index != -1) {
-                if (selected_lang_index == -1) selected_lang_index = 0;
+        if (selected_template_index != -1) {
+            if (selected_lang_index == -1) selected_lang_index = 0;
 
-                selected_template_info = discovered_templates[selected_template_index];
-                selected_lang_flag = selected_template_info.available_lang_flags[selected_lang_index];
+            selected_template_info = discovered_templates[selected_template_index];
+            selected_lang_flag = selected_template_info.available_lang_flags[selected_lang_index];
 
-                if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag,
-                                              current_template_data, status_message)) {
-                    saved_template_data = current_template_data;
-                }
+            if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag,
+                                          current_template_data, status_message)) {
+                saved_template_data = current_template_data;
             }
-        };
-        if (editor_has_unsaved_changes) {
-            show_unsaved_changes_popup = true;
-            pending_action = action;
-        } else {
-            action();
         }
     }
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        char tooltip_buffer[128];
-        if (selected_template_index == -1) {
-            // When no template is selected
+        char tooltip_buffer[256];
+        if (visual_editing_active) {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Cannot open a different template while Visual Editing is active.\n"
+                     "Stop Visual Editing first.");
+        } else if (has_unsaved_changes_in_editor) {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Cannot open a different template while the template has unsaved changes.\n"
+                     "Save or revert your changes first.");
+        } else if (selected_template_index == -1) {
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a template from the list to edit.");
         } else {
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Open the editor for the selected template.");
@@ -2352,8 +2305,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::SameLine();
 
     // Allow copying of the currently used template
-    // Disabled on unsaved changes in editor or no template selected
-    ImGui::BeginDisabled(has_unsaved_changes_in_editor || selected_template_index == -1);
+    ImGui::BeginDisabled(selected_template_index == -1);
     if (ImGui::Button("Copy Template")) {
         if (selected_template_index != -1) {
             show_copy_view = true;
@@ -2413,15 +2365,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         char tooltip_buffer[1024];
-        if (selected_template_index == -1) {
-            // Tooltip for the DISABLED state.
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a template from the list to copy.");
-        } else if (has_unsaved_changes_in_editor) {
-            // Unsaved changes in editor
+        if (visual_editing_active) {
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "You have unsaved changes in the editor. Save them first.");
+                     "Cannot copy a template while Visual Editing is active.\n"
+                     "Stop Visual Editing first.");
+        } else if (has_unsaved_changes_in_editor) {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Cannot copy a template while the template has unsaved changes.\n"
+                     "Save or revert your changes first.");
+        } else if (selected_template_index == -1) {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a template from the list to copy.");
         } else {
-            // Enabled state
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                      "Creates a copy of the selected template. You can then change its version, category, or flag.\n\n"
                      "Note: This action copies the main template file and all of its\n"
@@ -2444,9 +2398,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
     }
 
-    // Disable if nothing is selected or the selected template is in use or unsaved changes in editor or default
+    // Disable if nothing is selected or the selected template is in use or default
     ImGui::BeginDisabled(
-        selected_template_index == -1 || is_current_template || has_unsaved_changes_in_editor || is_default_template);
+        selected_template_index == -1 || is_current_template || is_default_template);
     if (ImGui::Button("Delete Template")) {
         if (selected_template_index != -1) {
             ImGui::OpenPopup("Delete Template?");
@@ -2455,12 +2409,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         char tooltip_buffer[512];
-        if (has_unsaved_changes_in_editor) {
-            // Unsaved changes in editor
+        if (visual_editing_active) {
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "You have unsaved changes in the editor. Save them first.");
+                     "Cannot delete a template while Visual Editing is active.\n"
+                     "Stop Visual Editing first.");
+        } else if (has_unsaved_changes_in_editor) {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Cannot delete a template while the template has unsaved changes.\n"
+                     "Save or revert your changes first.");
         } else if (is_default_template) {
-            // Can't delete default template
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "The default template cannot be deleted.");
         } else if (selected_template_index != -1 && is_current_template) {
             // Selected template is in use
@@ -2517,64 +2474,55 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::SameLine();
 
     // Import Template Button
-    ImGui::BeginDisabled(has_unsaved_changes_in_editor);
     if (ImGui::Button("Import Template")) {
-        auto import_action = [&]() {
 #ifdef __APPLE__
-            const char *filter_patterns[2] = {"*.zip", "public.zip-archive"};
-            int filter_count = 2;
+        const char *filter_patterns[2] = {"*.zip", "public.zip-archive"};
+        int filter_count = 2;
 #else
-            const char *filter_patterns[1] = {"*.zip"};
-            int filter_count = 1;
+        const char *filter_patterns[1] = {"*.zip"};
+        int filter_count = 1;
 #endif
-            const char *open_path = tinyfd_openFileDialog("Import Template From Zip", "", filter_count, filter_patterns,
-                                                          "Template ZIP Archive", 0);
-            if (open_path) {
-                char version[64], category[MAX_PATH_LENGTH], flag[MAX_PATH_LENGTH];
-                if (get_info_from_zip(open_path, version, category, flag, status_message, sizeof(status_message))) {
-                    // Success: Pre-fill the confirmation view
-                    strncpy(import_zip_path, open_path, sizeof(import_zip_path) - 1);
-                    import_zip_path[sizeof(import_zip_path) - 1] = '\0';
+        const char *open_path = tinyfd_openFileDialog("Import Template From Zip", "", filter_count, filter_patterns,
+                                                      "Template ZIP Archive", 0);
+        if (open_path) {
+            char version[64], category[MAX_PATH_LENGTH], flag[MAX_PATH_LENGTH];
+            if (get_info_from_zip(open_path, version, category, flag, status_message, sizeof(status_message))) {
+                // Success: Pre-fill the confirmation view
+                strncpy(import_zip_path, open_path, sizeof(import_zip_path) - 1);
+                import_zip_path[sizeof(import_zip_path) - 1] = '\0';
 
-                    strncpy(import_category, category, sizeof(import_category) - 1);
-                    import_category[sizeof(import_category) - 1] = '\0';
+                strncpy(import_category, category, sizeof(import_category) - 1);
+                import_category[sizeof(import_category) - 1] = '\0';
 
-                    strncpy(import_flag, flag, sizeof(import_flag) - 1);
-                    import_flag[sizeof(import_flag) - 1] = '\0';
+                strncpy(import_flag, flag, sizeof(import_flag) - 1);
+                import_flag[sizeof(import_flag) - 1] = '\0';
 
-                    // Pre-select the version dropdown to match the creator's current version.
-                    import_version_idx = creator_version_idx;
+                // Pre-select the version dropdown to match the creator's current version.
+                import_version_idx = creator_version_idx;
 
-                    show_import_confirmation_view = true;
-                    import_zip_has_icons = zip_contains_icons(open_path);
-                    import_icons_checkbox = import_zip_has_icons; // default ON if icons present
-                    show_create_new_view = false;
-                    show_copy_view = false;
-                    editing_template = false;
-                } else {
-                    // On failure, get_info_from_zip already set the status_message
-                    ImGui::OpenPopup("Import Error"); // Trigger popup for other errors
-                }
+                show_import_confirmation_view = true;
+                import_zip_has_icons = zip_contains_icons(open_path);
+                import_icons_checkbox = import_zip_has_icons; // default ON if icons present
+                show_create_new_view = false;
+                show_copy_view = false;
+                editing_template = false;
+            } else {
+                // On failure, get_info_from_zip already set the status_message
+                ImGui::OpenPopup("Import Error"); // Trigger popup for other errors
             }
-        };
-
-        if (editing_template && editor_has_unsaved_changes) {
-            show_unsaved_changes_popup = true;
-            pending_action = import_action;
-        } else {
-            import_action();
         }
     }
-    ImGui::EndDisabled();
-
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         char tooltip_buffer[512];
-        if (has_unsaved_changes_in_editor) {
-            // Unsaved changes in editor
+        if (visual_editing_active) {
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "You have unsaved changes in the editor. Save them first.");
+                     "Cannot import a template while Visual Editing is active.\n"
+                     "Stop Visual Editing first.");
+        } else if (has_unsaved_changes_in_editor) {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Cannot import a template while the template has unsaved changes.\n"
+                     "Save or revert your changes first.");
         } else {
-            // Legacy _snapshot naming restriction
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                      "Import a template from a .zip file.\n"
                      "Import a full template package, including the main file and all language files.\n"
@@ -2585,11 +2533,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     }
     ImGui::SameLine();
 
-    // Export Template Button opens popup
-    // Disabled when there are unsaved changes or no template is selected
     // Export Template Button
-    // Disabled when there are unsaved changes or no template is selected
-    ImGui::BeginDisabled(has_unsaved_changes_in_editor || selected_template_index == -1);
+    ImGui::BeginDisabled(selected_template_index == -1);
     if (ImGui::Button("Export Template")) {
         if (selected_template_index != -1) {
             show_export_options_popup = true;
@@ -2598,11 +2543,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         char tooltip_buffer[256];
-        if (selected_template_index == -1) {
-            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a template from the list to export.");
+        if (visual_editing_active) {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Cannot export a template while Visual Editing is active.\n"
+                     "Stop Visual Editing first.");
         } else if (has_unsaved_changes_in_editor) {
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "You have unsaved changes in the editor. Save them first.");
+                     "Cannot export a template while the template has unsaved changes.\n"
+                     "Save or revert your changes first.");
+        } else if (selected_template_index == -1) {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a template from the list to export.");
         } else {
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                      "Export the selected template as a .zip file, including its main file and all language files.\n\n"
@@ -2610,6 +2560,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
+    ImGui::EndDisabled(); // template_switching_disabled (action buttons)
 
     if (show_export_options_popup)
         ImGui::OpenPopup("Export Template");
@@ -2965,16 +2916,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         ImGui::EndChild();
 
-        auto create_action = [&]() {
+        if (ImGui::Button("Create Language")) {
             show_create_lang_popup = true;
             lang_flag_buffer[0] = '\0';
             status_message[0] = '\0';
-        };
-        if (ImGui::Button("Create Language")) {
-            if (editor_has_unsaved_changes) {
-                show_unsaved_changes_popup = true;
-                pending_action = create_action;
-            } else { create_action(); }
         }
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[256];
@@ -2984,17 +2929,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         ImGui::SameLine();
         ImGui::BeginDisabled(selected_lang_index == -1);
-        auto copy_action = [&]() {
+        if (ImGui::Button("Copy Language")) {
             show_copy_lang_popup = true;
             lang_flag_buffer[0] = '\0';
             status_message[0] = '\0';
             lang_to_copy_from = selected.available_lang_flags[selected_lang_index];
-        };
-        if (ImGui::Button("Copy Language")) {
-            if (editor_has_unsaved_changes) {
-                show_unsaved_changes_popup = true;
-                pending_action = copy_action;
-            } else { copy_action(); }
         }
         ImGui::EndDisabled();
 
@@ -3043,12 +2982,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
 
         ImGui::BeginDisabled(!can_delete);
-        auto delete_action = [&]() { ImGui::OpenPopup("Delete Language?"); };
         if (ImGui::Button("Delete Language")) {
-            if (editor_has_unsaved_changes) {
-                show_unsaved_changes_popup = true;
-                pending_action = delete_action;
-            } else { delete_action(); }
+            ImGui::OpenPopup("Delete Language?");
         }
         ImGui::EndDisabled();
 
@@ -3068,7 +3003,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         }
         ImGui::SameLine();
 
-        ImGui::BeginDisabled(has_unsaved_changes_in_editor);
         if (ImGui::Button("Import Language")) {
 #ifdef __APPLE__
             const char *filter_patterns[2] = {"*.json", "public.json"};
@@ -3086,8 +3020,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 show_import_lang_popup = true;
             }
         }
-        ImGui::EndDisabled();
-        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        if (ImGui::IsItemHovered()) {
             char tooltip_buffer[256];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                      "Import a language file (.json) for the selected template '%s%s'.\n"
@@ -3402,6 +3335,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::Separator();
 
         // --- Language Selector inside Editor ---
+        ImGui::BeginDisabled(template_switching_disabled);
         ImGui::SetNextItemWidth(250);
         std::vector<const char *> lang_display_names;
         for (const auto &flag: selected_template_info.available_lang_flags) {
@@ -3417,33 +3351,35 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         if (ImGui::Combo("Display Language", &current_lang_idx, lang_display_names.data(),
                          (int) lang_display_names.size())) {
-            auto switch_action = [&, current_lang_idx]() {
-                selected_lang_flag = selected_template_info.available_lang_flags[current_lang_idx];
-                if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag,
-                                              current_template_data, status_message)) {
-                    saved_template_data = current_template_data;
-                    save_message_type = MSG_NONE;
-                    status_message[0] = '\0';
-                }
-            };
-
-            if (editor_has_unsaved_changes) {
-                show_unsaved_changes_popup = true;
-                pending_action = switch_action;
-            } else {
-                switch_action();
+            selected_lang_flag = selected_template_info.available_lang_flags[current_lang_idx];
+            if (load_template_for_editing(creator_version_str, selected_template_info, selected_lang_flag,
+                                          current_template_data, status_message)) {
+                saved_template_data = current_template_data;
+                save_message_type = MSG_NONE;
+                status_message[0] = '\0';
             }
         }
         // Display language tooltip
-        if (ImGui::IsItemHovered()) {
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
             char select_lang_file_tooltip_buffer[1024];
-            snprintf(select_lang_file_tooltip_buffer, sizeof(select_lang_file_tooltip_buffer),
-                     "Select the language file for editing display names.\n\n"
-                     "• Loading: Changing this selection will reload all 'Display Name' fields in the editor from the chosen file.\n"
-                     "• Saving: Edits to display names are saved to the language selected here when you click the main 'Save' button.\n\n"
-                     "This keeps the template's core structure separate from its translations.");
+            if (visual_editing_active) {
+                snprintf(select_lang_file_tooltip_buffer, sizeof(select_lang_file_tooltip_buffer),
+                         "Cannot change language while Visual Editing is active.\n"
+                         "Stop Visual Editing first.");
+            } else if (has_unsaved_changes_in_editor) {
+                snprintf(select_lang_file_tooltip_buffer, sizeof(select_lang_file_tooltip_buffer),
+                         "Cannot change language while the template has unsaved changes.\n"
+                         "Save or revert your changes first.");
+            } else {
+                snprintf(select_lang_file_tooltip_buffer, sizeof(select_lang_file_tooltip_buffer),
+                         "Select the language file for editing display names.\n\n"
+                         "• Loading: Changing this selection will reload all 'Display Name' fields in the editor from the chosen file.\n"
+                         "• Saving: Edits to display names are saved to the language selected here when you click the main 'Save' button.\n\n"
+                         "This keeps the template's core structure separate from its translations.");
+            }
             ImGui::SetTooltip("%s", select_lang_file_tooltip_buffer);
         }
+        ImGui::EndDisabled(); // template_switching_disabled (language selector)
         ImGui::Separator();
 
         // Save when creator window is focused
@@ -3570,77 +3506,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                          "Always work on a 'Copy' if you want to keep your custom layout!");
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
-        }
-
-        // Popup window for unsaved changes
-        if (show_unsaved_changes_popup) {
-            ImGui::OpenPopup("Unsaved Changes");
-            show_unsaved_changes_popup = false;
-        }
-
-        if (ImGui::BeginPopupModal("Unsaved Changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::Text("You have unsaved changes. Do you want to save them?\n\n");
-            if (ImGui::Button("Save", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
-                // Call the central validation and save function.
-                // It returns true only if validation passes AND the file is saved successfully.
-                bool save_successful = validate_and_save_template(creator_version_str, selected_template_info,
-                                                                  selected_lang_flag,
-                                                                  current_template_data,
-                                                                  saved_template_data, save_message_type,
-                                                                  status_message,
-                                                                  app_settings);
-
-                // Only proceed and close the popup if the save was successful.
-                // If it fails, the popup remains open, and the error message is shown in the main editor view.
-                if (save_successful) {
-                    if (pending_action) pending_action();
-                    ImGui::CloseCurrentPopup();
-                }
-            }
-            // Save hover text
-            if (ImGui::IsItemHovered()) {
-                char press_enter_save_tooltip_buffer[1024];
-                snprintf(press_enter_save_tooltip_buffer, sizeof(press_enter_save_tooltip_buffer),
-                         "Press ENTER to save.");
-                ImGui::SetTooltip("%s", press_enter_save_tooltip_buffer);
-            }
-            ImGui::SameLine();
-            // Also use spacebar
-            if (ImGui::Button("Discard", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Space)) {
-                current_template_data = saved_template_data; // Restore saved data as current
-
-                // Reloading template on revert changes -> matters for visual editor mode
-                bool is_active_template = (strcmp(creator_version_str, app_settings->version_str) == 0 &&
-                                           strcmp(selected_template_info.category, app_settings->category) == 0 &&
-                                           strcmp(selected_template_info.optional_flag,
-                                                  app_settings->optional_flag) == 0);
-                if (is_active_template) {
-                    SDL_SetAtomicInt(&g_settings_changed, 1);
-                }
-
-                if (pending_action) pending_action();
-                ImGui::CloseCurrentPopup();
-            }
-            // Discard hover text
-            if (ImGui::IsItemHovered()) {
-                char press_space_discard_tooltip_buffer[1024];
-                snprintf(press_space_discard_tooltip_buffer, sizeof(press_space_discard_tooltip_buffer),
-                         "Press SPACE to discard.");
-                ImGui::SetTooltip("%s", press_space_discard_tooltip_buffer);
-            }
-            ImGui::SameLine();
-            // Cancel or pressing ESC
-            if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-                ImGui::CloseCurrentPopup();
-            }
-            // Cancel hover text
-            if (ImGui::IsItemHovered()) {
-                char press_esc_cancel_tooltip_buffer[1024];
-                snprintf(press_esc_cancel_tooltip_buffer, sizeof(press_esc_cancel_tooltip_buffer),
-                         "Press ESC to cancel.");
-                ImGui::SetTooltip("%s", press_esc_cancel_tooltip_buffer);
-            }
-            ImGui::EndPopup();
         }
 
         // --- VISUAL EDITING WARNING BANNER ---
