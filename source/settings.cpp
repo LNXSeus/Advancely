@@ -1122,9 +1122,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             // --- Section Order ---
             ImGui::SeparatorText("Section Order");
             if (ImGui::IsItemHovered()) {
-                char section_order_tooltip_buffer[1024];
+                char section_order_tooltip_buffer[256];
                 snprintf(section_order_tooltip_buffer, sizeof(section_order_tooltip_buffer),
                          "Drag and drop to reorder the sections in the main tracker window.\n"
+                         "This doesn't affect the 'Manual Layout'.\n"
                          "Drop items between others to insert them at that position.");
                 ImGui::SetTooltip("%s", section_order_tooltip_buffer);
             }
