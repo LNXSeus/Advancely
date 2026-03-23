@@ -3693,7 +3693,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             float item_y = current_y;
 
             if (settings->use_manual_layout && cat->icon_pos.is_set) {
-                ImVec2 anchor_off = get_anchor_offset(cat->icon_pos.anchor, 96.0f, item_height);
+                ImVec2 anchor_off = get_anchor_offset(cat->icon_pos.anchor, 96.0f, 96.0f);
                 item_x = cat->icon_pos.x + anchor_off.x;
                 item_y = cat->icon_pos.y + anchor_off.y;
             } else {
@@ -4623,7 +4623,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         float item_y = current_y;
 
         if (settings->use_manual_layout && item->icon_pos.is_set) {
-            ImVec2 anchor_off = get_anchor_offset(item->icon_pos.anchor, 96.0f, item_height);
+            ImVec2 anchor_off = get_anchor_offset(item->icon_pos.anchor, 96.0f, 96.0f);
             item_x = item->icon_pos.x + anchor_off.x;
             item_y = item->icon_pos.y + anchor_off.y;
         } else {
@@ -5060,7 +5060,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         float item_y = current_y;
 
         if (settings->use_manual_layout && item->icon_pos.is_set) {
-            ImVec2 anchor_off = get_anchor_offset(item->icon_pos.anchor, 96.0f, item_height);
+            ImVec2 anchor_off = get_anchor_offset(item->icon_pos.anchor, 96.0f, 96.0f);
             item_x = item->icon_pos.x + anchor_off.x;
             item_y = item->icon_pos.y + anchor_off.y;
         } else {
@@ -5589,7 +5589,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         float item_y = current_y;
 
         if (settings->use_manual_layout && goal->icon_pos.is_set) {
-            ImVec2 anchor_off = get_anchor_offset(goal->icon_pos.anchor, 96.0f, item_height);
+            ImVec2 anchor_off = get_anchor_offset(goal->icon_pos.anchor, 96.0f, 96.0f);
             item_x = goal->icon_pos.x + anchor_off.x;
             item_y = goal->icon_pos.y + anchor_off.y;
         } else {
