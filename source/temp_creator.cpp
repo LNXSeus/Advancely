@@ -1529,6 +1529,7 @@ static const char *anchor_point_labels[] = {
 static bool render_layout_coordinates_header(const char *goal_type_name, bool force_open = false) {
     if (force_open) ImGui::SetNextItemOpen(true);
     bool open = ImGui::CollapsingHeader("Layout Coordinates");
+    if (force_open) ImGui::SetScrollHereY(0.0f);
     if (ImGui::IsItemHovered()) {
         char tooltip[512];
         snprintf(tooltip, sizeof(tooltip),
