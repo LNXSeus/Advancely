@@ -287,10 +287,20 @@ static bool are_editor_multi_stage_goals_different(const EditorMultiStageGoal &a
 
 // Decorations
 static bool are_editor_decorations_different(const EditorDecorationElement &a, const EditorDecorationElement &b) {
-    return strcmp(a.id, b.id) != 0 ||
-           a.type != b.type ||
-           strcmp(a.display_text, b.display_text) != 0 ||
-           are_manual_positions_different(a.pos, b.pos);
+    if (strcmp(a.id, b.id) != 0 ||
+        a.type != b.type ||
+        strcmp(a.display_text, b.display_text) != 0 ||
+        are_manual_positions_different(a.pos, b.pos)) {
+        return true;
+    }
+    if (a.type == DECORATION_LINE) {
+        if (are_manual_positions_different(a.pos2, b.pos2) ||
+            a.thickness != b.thickness ||
+            a.opacity != b.opacity) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // Main comparison function for the entire editor state
@@ -8674,7 +8684,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          "Line thickness in pixels (before zoom scaling).");
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
-                            if (ImGui::SliderFloat("Opacity", &deco.opacity, 0.0f, 1.0f, "%.2f")) {
+                            if (ImGui::SliderFloat("Opacity", &deco.opacity, 0.01f, 1.0f, "%.2f")) {
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
