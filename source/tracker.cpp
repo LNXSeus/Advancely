@@ -1881,6 +1881,79 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
 
 
 /**
+ * @brief Parses the "decorations" array from the template JSON file.
+ *
+ * Decorations are manual layout elements like text headers, lines, and arrows.
+ * They are only rendered when manual layout mode is active.
+ *
+ * @param decorations_json The cJSON array for the "decorations" key from the template file.
+ * @param lang_json The cJSON object from the language file.
+ * @param decorations_array A pointer to the array of DecorationElement pointers to be populated.
+ * @param count A pointer to an integer that will store the number of decorations parsed.
+ */
+static void tracker_parse_decorations(cJSON *decorations_json, cJSON *lang_json,
+                                      DecorationElement ***decorations_array, int *count) {
+    if (!decorations_json) {
+        *count = 0;
+        return;
+    }
+
+    *count = cJSON_GetArraySize(decorations_json);
+    if (*count <= 0) {
+        *count = 0;
+        return;
+    }
+
+    *decorations_array = (DecorationElement **) calloc(*count, sizeof(DecorationElement *));
+    int i = 0;
+    cJSON *item_json = nullptr;
+    cJSON_ArrayForEach(item_json, decorations_json) {
+        auto *elem = (DecorationElement *) calloc(1, sizeof(DecorationElement));
+
+        // Parse ID
+        cJSON *id_json = cJSON_GetObjectItem(item_json, "id");
+        if (cJSON_IsString(id_json)) {
+            strncpy(elem->id, id_json->valuestring, sizeof(elem->id) - 1);
+            elem->id[sizeof(elem->id) - 1] = '\0';
+        }
+
+        // Parse type
+        cJSON *type_json = cJSON_GetObjectItem(item_json, "type");
+        if (cJSON_IsString(type_json)) {
+            if (strcmp(type_json->valuestring, "text_header") == 0) {
+                elem->type = DECORATION_TEXT_HEADER;
+            }
+            // Future: else if "line", "arrow", etc.
+        }
+
+        // Parse display text from lang file, falling back to template
+        if (elem->type == DECORATION_TEXT_HEADER) {
+            // Try lang file first: "decoration.<id>"
+            char lang_key[256];
+            snprintf(lang_key, sizeof(lang_key), "decoration.%s", elem->id);
+            cJSON *lang_val = lang_json ? cJSON_GetObjectItem(lang_json, lang_key) : nullptr;
+            if (cJSON_IsString(lang_val)) {
+                strncpy(elem->display_text, lang_val->valuestring, sizeof(elem->display_text) - 1);
+            } else {
+                cJSON *text_json = cJSON_GetObjectItem(item_json, "text");
+                if (cJSON_IsString(text_json)) {
+                    strncpy(elem->display_text, text_json->valuestring, sizeof(elem->display_text) - 1);
+                } else {
+                    // Fallback to ID so display text isn't empty
+                    strncpy(elem->display_text, elem->id, sizeof(elem->display_text) - 1);
+                }
+            }
+            elem->display_text[sizeof(elem->display_text) - 1] = '\0';
+        }
+
+        // Parse position
+        parse_manual_pos(item_json, "pos", &elem->pos);
+
+        (*decorations_array)[i++] = elem;
+    }
+}
+
+/**
  * @brief Updates unlock progress from a pre-loaded cJSON object and counts completed unlocks.
  * @param t A pointer to the Tracker struct.
  * @param player_unlocks_json The parsed player unlocks JSON file.
@@ -2335,11 +2408,20 @@ static void tracker_free_template_data(TemplateData *td) {
         free_multi_stage_goals(td->multi_stage_goals, td->multi_stage_goal_count);
     }
 
+    // Free decoration elements
+    if (td->decorations) {
+        for (int i = 0; i < td->decoration_count; i++) {
+            free(td->decorations[i]);
+        }
+        free(td->decorations);
+    }
+
     td->advancements = nullptr;
     td->stats = nullptr;
     td->unlocks = nullptr;
     td->custom_goals = nullptr;
     td->multi_stage_goals = nullptr;
+    td->decorations = nullptr;
 
     // Zero out the entire struct to reset all pointers and counts safely.
     memset(td, 0, sizeof(TemplateData));
@@ -2772,19 +2854,27 @@ static ImVec2 get_anchor_offset(AnchorPoint anchor, float element_width, float e
     float offset_y = 0.0f;
 
     switch (anchor) {
-        case ANCHOR_TOP_LEFT:                                                  break;
-        case ANCHOR_TOP_CENTER:    offset_x = -element_width * 0.5f;          break;
-        case ANCHOR_TOP_RIGHT:     offset_x = -element_width;                 break;
-        case ANCHOR_CENTER_LEFT:   offset_y = -element_height * 0.5f;         break;
-        case ANCHOR_CENTER:        offset_x = -element_width * 0.5f;
-                                   offset_y = -element_height * 0.5f;         break;
-        case ANCHOR_CENTER_RIGHT:  offset_x = -element_width;
-                                   offset_y = -element_height * 0.5f;         break;
-        case ANCHOR_BOTTOM_LEFT:   offset_y = -element_height;                break;
+        case ANCHOR_TOP_LEFT: break;
+        case ANCHOR_TOP_CENTER: offset_x = -element_width * 0.5f;
+            break;
+        case ANCHOR_TOP_RIGHT: offset_x = -element_width;
+            break;
+        case ANCHOR_CENTER_LEFT: offset_y = -element_height * 0.5f;
+            break;
+        case ANCHOR_CENTER: offset_x = -element_width * 0.5f;
+            offset_y = -element_height * 0.5f;
+            break;
+        case ANCHOR_CENTER_RIGHT: offset_x = -element_width;
+            offset_y = -element_height * 0.5f;
+            break;
+        case ANCHOR_BOTTOM_LEFT: offset_y = -element_height;
+            break;
         case ANCHOR_BOTTOM_CENTER: offset_x = -element_width * 0.5f;
-                                   offset_y = -element_height;                break;
-        case ANCHOR_BOTTOM_RIGHT:  offset_x = -element_width;
-                                   offset_y = -element_height;                break;
+            offset_y = -element_height;
+            break;
+        case ANCHOR_BOTTOM_RIGHT: offset_x = -element_width;
+            offset_y = -element_height;
+            break;
     }
 
     return ImVec2(offset_x, offset_y);
@@ -2810,15 +2900,33 @@ static void draw_anchor_crosshair(ImDrawList *draw_list, ImVec2 pos, float size)
 static ImVec2 get_anchor_screen_pos(AnchorPoint anchor, ImVec2 item_screen_pos, ImVec2 hit_box_size) {
     float ax = 0.0f, ay = 0.0f; // Fractional position within the bounding box
     switch (anchor) {
-        case ANCHOR_TOP_LEFT:      ax = 0.0f; ay = 0.0f; break;
-        case ANCHOR_TOP_CENTER:    ax = 0.5f; ay = 0.0f; break;
-        case ANCHOR_TOP_RIGHT:     ax = 1.0f; ay = 0.0f; break;
-        case ANCHOR_CENTER_LEFT:   ax = 0.0f; ay = 0.5f; break;
-        case ANCHOR_CENTER:        ax = 0.5f; ay = 0.5f; break;
-        case ANCHOR_CENTER_RIGHT:  ax = 1.0f; ay = 0.5f; break;
-        case ANCHOR_BOTTOM_LEFT:   ax = 0.0f; ay = 1.0f; break;
-        case ANCHOR_BOTTOM_CENTER: ax = 0.5f; ay = 1.0f; break;
-        case ANCHOR_BOTTOM_RIGHT:  ax = 1.0f; ay = 1.0f; break;
+        case ANCHOR_TOP_LEFT: ax = 0.0f;
+            ay = 0.0f;
+            break;
+        case ANCHOR_TOP_CENTER: ax = 0.5f;
+            ay = 0.0f;
+            break;
+        case ANCHOR_TOP_RIGHT: ax = 1.0f;
+            ay = 0.0f;
+            break;
+        case ANCHOR_CENTER_LEFT: ax = 0.0f;
+            ay = 0.5f;
+            break;
+        case ANCHOR_CENTER: ax = 0.5f;
+            ay = 0.5f;
+            break;
+        case ANCHOR_CENTER_RIGHT: ax = 1.0f;
+            ay = 0.5f;
+            break;
+        case ANCHOR_BOTTOM_LEFT: ax = 0.0f;
+            ay = 1.0f;
+            break;
+        case ANCHOR_BOTTOM_CENTER: ax = 0.5f;
+            ay = 1.0f;
+            break;
+        case ANCHOR_BOTTOM_RIGHT: ax = 1.0f;
+            ay = 1.0f;
+            break;
     }
     return ImVec2(item_screen_pos.x + hit_box_size.x * ax, item_screen_pos.y + hit_box_size.y * ay);
 }
@@ -2888,8 +2996,10 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
         }
 
         // Apply drag delta, snap to full pixels, and clamp to safe range +- 10 Mil
-        target_pos.x = fminf(fmaxf(roundf(target_pos.x + (io.MouseDelta.x / t->zoom_level)), -MANUAL_POS_MAX), MANUAL_POS_MAX);
-        target_pos.y = fminf(fmaxf(roundf(target_pos.y + (io.MouseDelta.y / t->zoom_level)), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+        target_pos.x = fminf(fmaxf(roundf(target_pos.x + (io.MouseDelta.x / t->zoom_level)), -MANUAL_POS_MAX),
+                             MANUAL_POS_MAX);
+        target_pos.y = fminf(fmaxf(roundf(target_pos.y + (io.MouseDelta.y / t->zoom_level)), -MANUAL_POS_MAX),
+                             MANUAL_POS_MAX);
 
         // Signal the Editor to sync this frame!
         t->visual_layout_just_dragged = true;
@@ -3096,6 +3206,11 @@ static float get_global_safe_x(Tracker *t) {
             check_pos(td->multi_stage_goals[i]->icon_pos, 120.0f);
             check_pos(td->multi_stage_goals[i]->text_pos, 250.0f);
             check_pos(td->multi_stage_goals[i]->progress_pos, 150.0f);
+        }
+    }
+    for (int i = 0; i < td->decoration_count; i++) {
+        if (td->decorations[i]) {
+            check_pos(td->decorations[i]->pos, 300.0f);
         }
     }
 
@@ -3871,10 +3986,12 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                 // --- VISUAL LAYOUT DRAGGING (PARENT ICON) ---
                 char drag_id[256];
-                const char *cat_type = is_stat_section ? "Stat" :
-                                       (version <= MC_VERSION_1_11_2 ? "Achievement" : "Advancement");
-                const char *crit_type = is_stat_section ? "Sub-Stat" :
-                                        (version <= MC_VERSION_1_11_2 ? "Achievement" : "Criterion");
+                const char *cat_type = is_stat_section
+                                           ? "Stat"
+                                           : (version <= MC_VERSION_1_11_2 ? "Achievement" : "Advancement");
+                const char *crit_type = is_stat_section
+                                            ? "Sub-Stat"
+                                            : (version <= MC_VERSION_1_11_2 ? "Achievement" : "Criterion");
                 snprintf(drag_id, sizeof(drag_id), "drag_cat_icon_%s_%s", is_stat_section ? "stat" : "adv",
                          cat->root_name);
                 handle_visual_layout_dragging(t, drag_id, screen_pos,
@@ -3933,8 +4050,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                     // Apply manual progress_pos if set
                     if (settings->use_manual_layout && cat->progress_pos.is_set) {
-                        ImVec2 prog_anchor_off = get_anchor_offset(cat->progress_pos.anchor, progress_text_size.x, progress_text_size.y);
-                        prog_x_center = ((cat->progress_pos.x + prog_anchor_off.x) * t->zoom_level) + t->camera_offset.x + (
+                        ImVec2 prog_anchor_off = get_anchor_offset(cat->progress_pos.anchor, progress_text_size.x,
+                                                                   progress_text_size.y);
+                        prog_x_center = ((cat->progress_pos.x + prog_anchor_off.x) * t->zoom_level) + t->camera_offset.x
+                                        + (
                                             progress_text_size.x * t->zoom_level) * 0.5f;
                         prog_y = ((cat->progress_pos.y + prog_anchor_off.y) * t->zoom_level) + t->camera_offset.y;
                     }
@@ -4016,8 +4135,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         ImVec2 crit_base_pos_screen;
                         if (is_manually_placed) {
                             ImVec2 crit_icon_anchor_off = get_anchor_offset(crit->icon_pos.anchor, 32.0f, 32.0f);
-                            crit_base_pos_screen = ImVec2(((crit->icon_pos.x + crit_icon_anchor_off.x) * t->zoom_level) + t->camera_offset.x,
-                                                          ((crit->icon_pos.y + crit_icon_anchor_off.y) * t->zoom_level) + t->camera_offset.y);
+                            crit_base_pos_screen = ImVec2(
+                                ((crit->icon_pos.x + crit_icon_anchor_off.x) * t->zoom_level) + t->camera_offset.x,
+                                ((crit->icon_pos.y + crit_icon_anchor_off.y) * t->zoom_level) + t->camera_offset.y);
                         } else {
                             crit_base_pos_screen = ImVec2((item_x * t->zoom_level) + t->camera_offset.x, item_screen_y);
                         }
@@ -4182,9 +4302,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             ImVec2 child_text_pos = ImVec2(current_element_x_screen, text_y_pos);
 
                             if (settings->use_manual_layout && crit->text_pos.is_set) {
-                                ImVec2 crit_text_anchor_off = get_anchor_offset(crit->text_pos.anchor, child_text_size.x, child_text_size.y);
-                                child_text_pos = ImVec2(((crit->text_pos.x + crit_text_anchor_off.x) * t->zoom_level) + t->camera_offset.x,
-                                                        ((crit->text_pos.y + crit_text_anchor_off.y) * t->zoom_level) + t->camera_offset.y);
+                                ImVec2 crit_text_anchor_off = get_anchor_offset(
+                                    crit->text_pos.anchor, child_text_size.x, child_text_size.y);
+                                child_text_pos = ImVec2(
+                                    ((crit->text_pos.x + crit_text_anchor_off.x) * t->zoom_level) + t->camera_offset.x,
+                                    ((crit->text_pos.y + crit_text_anchor_off.y) * t->zoom_level) + t->camera_offset.y);
                                 current_element_x_screen = child_text_pos.x;
                                 // Update cursor so progress text follows naturally
                             }
@@ -5243,8 +5365,10 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
                     // Apply manual progress_pos if set
                     if (settings->use_manual_layout && item->progress_pos.is_set) {
-                        ImVec2 prog_anchor_off = get_anchor_offset(item->progress_pos.anchor, progress_text_size.x, progress_text_size.y);
-                        prog_x_center = ((item->progress_pos.x + prog_anchor_off.x) * t->zoom_level) + t->camera_offset.x + (
+                        ImVec2 prog_anchor_off = get_anchor_offset(item->progress_pos.anchor, progress_text_size.x,
+                                                                   progress_text_size.y);
+                        prog_x_center = ((item->progress_pos.x + prog_anchor_off.x) * t->zoom_level) + t->camera_offset.
+                                        x + (
                                             progress_text_size.x * t->zoom_level) * 0.5f;
                         prog_y = ((item->progress_pos.y + prog_anchor_off.y) * t->zoom_level) + t->camera_offset.y;
                     }
@@ -5768,7 +5892,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
             if (settings->use_manual_layout && goal->text_pos.is_set) {
                 ImVec2 text_anchor_off = get_anchor_offset(goal->text_pos.anchor, text_size.x, text_size.y);
-                text_x_center = ((goal->text_pos.x + text_anchor_off.x) * t->zoom_level) + t->camera_offset.x + (text_size.x * t->zoom_level)
+                text_x_center = ((goal->text_pos.x + text_anchor_off.x) * t->zoom_level) + t->camera_offset.x + (
+                                    text_size.x * t->zoom_level)
                                 * 0.5f;
                 text_y_pos = ((goal->text_pos.y + text_anchor_off.y) * t->zoom_level) + t->camera_offset.y;
             }
@@ -5795,8 +5920,10 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
             // Apply manual progress_pos if set
             if (settings->use_manual_layout && goal->progress_pos.is_set) {
-                ImVec2 prog_anchor_off = get_anchor_offset(goal->progress_pos.anchor, stage_text_size.x, stage_text_size.y);
-                stage_text_x_center = ((goal->progress_pos.x + prog_anchor_off.x) * t->zoom_level) + t->camera_offset.x + (
+                ImVec2 prog_anchor_off = get_anchor_offset(goal->progress_pos.anchor, stage_text_size.x,
+                                                           stage_text_size.y);
+                stage_text_x_center = ((goal->progress_pos.x + prog_anchor_off.x) * t->zoom_level) + t->camera_offset.x
+                                      + (
                                           stage_text_size.x * t->zoom_level) * 0.5f;
                 stage_text_y = ((goal->progress_pos.y + prog_anchor_off.y) * t->zoom_level) + t->camera_offset.y;
             }
@@ -5849,6 +5976,67 @@ static int NotesEditCallback(ImGuiInputTextCallbackData *data) {
     return 0;
 }
 
+
+/**
+ * @brief Renders decoration elements (text headers, lines, arrows) on the tracker map.
+ * Only renders when manual layout mode is active.
+ */
+static void render_decorations(Tracker *t, const AppSettings *settings) {
+    if (!settings->use_manual_layout) return;
+    if (!t->template_data || t->template_data->decoration_count <= 0) return;
+
+    ImDrawList *draw_list = ImGui::GetWindowDrawList();
+    ImU32 text_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
+                                settings->text_color.a);
+    float main_font_size = settings->tracker_font_size;
+
+    for (int i = 0; i < t->template_data->decoration_count; i++) {
+        DecorationElement *elem = t->template_data->decorations[i];
+        if (!elem) continue;
+
+        switch (elem->type) {
+            case DECORATION_TEXT_HEADER: {
+                if (elem->display_text[0] == '\0') continue;
+
+                // Measure text
+                float scale_factor;
+                SET_FONT_SCALE(main_font_size, t->tracker_font->LegacySize);
+                ImVec2 text_size = ImGui::CalcTextSize(elem->display_text);
+                RESET_FONT_SCALE();
+
+                // Position
+                float text_x, text_y;
+                if (elem->pos.is_set) {
+                    ImVec2 anchor_off = get_anchor_offset(elem->pos.anchor, text_size.x, text_size.y);
+                    text_x = ((elem->pos.x + anchor_off.x) * t->zoom_level) + t->camera_offset.x;
+                    text_y = ((elem->pos.y + anchor_off.y) * t->zoom_level) + t->camera_offset.y;
+                } else {
+                    // Fallback: render at a default position (shouldn't normally happen)
+                    text_x = (100.0f * t->zoom_level) + t->camera_offset.x;
+                    text_y = (100.0f * t->zoom_level) + t->camera_offset.y;
+                }
+
+                // LOD: Use main text threshold
+                if (t->zoom_level > settings->lod_text_main_threshold) {
+                    draw_list->AddText(nullptr, main_font_size * t->zoom_level,
+                                       ImVec2(text_x, text_y),
+                                       text_color, elem->display_text);
+
+                    // Visual layout dragging
+                    char drag_id[128];
+                    snprintf(drag_id, sizeof(drag_id), "drag_deco_%s", elem->id);
+                    handle_visual_layout_dragging(t, drag_id,
+                                                  ImVec2(text_x, text_y),
+                                                  ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level),
+                                                  elem->pos, "Decoration", elem->display_text, "Text",
+                                                  elem->id);
+                }
+                break;
+            }
+                // Future: case DECORATION_LINE, DECORATION_ARROW
+        }
+    }
+}
 
 // END OF STATIC FUNCTIONS ------------------------------------
 
@@ -5937,6 +6125,10 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                 break;
         }
     }
+
+    // Render decorations (text headers, lines, arrows) - only visible in manual layout mode
+    render_decorations(t, settings);
+
 
     // --- Info Bar ---
 
@@ -7141,12 +7333,13 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
         return false;
     }
 
-    // Parse the 3 main categories from the template
+    // Parse the main categories from the template
     cJSON *advancements_json = cJSON_GetObjectItem(template_json, "advancements");
     cJSON *stats_json = cJSON_GetObjectItem(template_json, "stats");
     cJSON *unlocks_json = cJSON_GetObjectItem(template_json, "unlocks");
     cJSON *custom_json = cJSON_GetObjectItem(template_json, "custom"); // Custom goals, manually checked of by user
     cJSON *multi_stage_goals_json = cJSON_GetObjectItem(template_json, "multi_stage_goals");
+    cJSON *decorations_json = cJSON_GetObjectItem(template_json, "decorations");
 
 
     MC_Version version = settings_get_version_from_string(settings->version_str);
@@ -7185,6 +7378,10 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     tracker_parse_multi_stage_goals(t, multi_stage_goals_json, lang_json,
                                     &t->template_data->multi_stage_goals,
                                     &t->template_data->multi_stage_goal_count, settings);
+
+    tracker_parse_decorations(decorations_json, lang_json,
+                              &t->template_data->decorations,
+                              &t->template_data->decoration_count);
 
 
     // Detect and flag criteria that are shared between multiple advancements

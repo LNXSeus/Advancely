@@ -1445,7 +1445,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Select the font for the main tracker view.\n"
                          "This affects the goal display text, the top info bar,\n"
-                         "the bottom control buttons and the notes window.\n"
+                         "the bottom control buttons, the notes window,\n"
+                         "and manual layout text header decorations.\n"
                          "Only choose fonts within the resources/fonts directory.\n\n"
                          "A restart is required to properly apply changes.");
                 ImGui::SetTooltip("%s", tooltip_buffer);
@@ -1459,7 +1460,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             if (ImGui::IsItemHovered()) {
                 char tooltip_buffer[1024];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "Adjust the font size for main goal names and the notes window.\n"
+                         "Adjust the font size for main goal names, the notes window,\n"
+                         "and manual layout text header decorations.\n"
                          "Default: %.1f pt.",
                          DEFAULT_TRACKER_FONT_SIZE);
                 ImGui::SetTooltip("%s", tooltip_buffer);
@@ -2608,6 +2610,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
     ImGui::SameLine();
 
+    if (apply_disabled) ImGui::BeginDisabled();
     if (ImGui::Button("Restart Advancely")) {
         // 1. Save any pending changes from the settings window first.
         temp_settings.use_manual_layout = app_settings->use_manual_layout;
@@ -2626,13 +2629,25 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                "Could not create the restart script. Please restart the application manually.");
         }
     }
-    if (ImGui::IsItemHovered()) {
-        char tooltip_buffer[1024];
-        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                 "Saves all current settings and restarts the application.\n"
-                 "This is required to apply changes to fonts within the tracker window.");
-        ImGui::SetTooltip("%s", tooltip_buffer);
+    // Hover text for the restart button
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        char restart_button_tooltip_buffer[1024];
+        if (visual_editing) {
+            snprintf(restart_button_tooltip_buffer, sizeof(restart_button_tooltip_buffer),
+                     "Disabled while the Visual Layout Editor is active.\n"
+                     "Restarting reloads the template and breaks active editing.");
+        } else if (template_unsaved) {
+            snprintf(restart_button_tooltip_buffer, sizeof(restart_button_tooltip_buffer),
+                     "Disabled while the Template Editor has unsaved changes.\n"
+                     "Save or revert your template changes first, then restart.");
+        } else {
+            snprintf(restart_button_tooltip_buffer, sizeof(restart_button_tooltip_buffer),
+                     "Saves all current settings and restarts the application.\n"
+                     "This is required to apply changes to fonts within the tracker window.");
+        }
+        ImGui::SetTooltip("%s", restart_button_tooltip_buffer);
     }
+    if (apply_disabled) ImGui::EndDisabled();
 
     ImGui::SameLine();
 

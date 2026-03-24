@@ -327,6 +327,24 @@ struct MultiStageGoal {
     ManualPos progress_pos;
 };
 
+// --------- DECORATIONS (Manual Layout Elements) ---------
+
+enum DecorationType {
+    DECORATION_TEXT_HEADER = 0
+    // Future: DECORATION_LINE, DECORATION_ARROW
+};
+
+// A decoration element for manual layout positioning (text headers, lines, arrows, etc.)
+struct DecorationElement {
+    char id[64]; // Unique ID, e.g., "header_1"
+    DecorationType type;
+
+    // Text Header fields
+    char display_text[192]; // The user-facing text to render
+
+    ManualPos pos; // Position on the tracker map
+};
+
 // The main container for all data loaded from the template files.
 struct TemplateData {
     int advancement_count; // Amount of advancements defined in the template under "advancements"
@@ -351,6 +369,9 @@ struct TemplateData {
 
     int multi_stage_goal_count; // Number of multi-stage goals
     MultiStageGoal **multi_stage_goals;
+
+    int decoration_count; // Number of decoration elements (text headers, lines, arrows)
+    DecorationElement **decorations;
 
     // Overall Progress Metrics
     int total_criteria_count;

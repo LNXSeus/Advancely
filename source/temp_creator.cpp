@@ -196,12 +196,21 @@ struct EditorMultiStageGoal {
     ManualPos progress_pos = {};
 };
 
+struct EditorDecorationElement {
+    char id[64];
+    DecorationType type;
+    char display_text[192]; // For text headers
+    ManualPos pos = {};
+    int sort_order = 0;
+};
+
 struct EditorTemplate {
     std::vector<EditorTrackableCategory> advancements;
     std::vector<EditorTrackableCategory> stats;
     std::vector<EditorTrackableItem> unlocks;
     std::vector<EditorTrackableItem> custom_goals;
     std::vector<EditorMultiStageGoal> multi_stage_goals;
+    std::vector<EditorDecorationElement> decorations;
 };
 
 // Helper function to compare two EditorTrackableItem structs, custom goals and unlocks
@@ -273,13 +282,22 @@ static bool are_editor_multi_stage_goals_different(const EditorMultiStageGoal &a
 }
 
 
+// Decorations
+static bool are_editor_decorations_different(const EditorDecorationElement &a, const EditorDecorationElement &b) {
+    return strcmp(a.id, b.id) != 0 ||
+           a.type != b.type ||
+           strcmp(a.display_text, b.display_text) != 0 ||
+           are_manual_positions_different(a.pos, b.pos);
+}
+
 // Main comparison function for the entire editor state
 static bool are_editor_templates_different(const EditorTemplate &a, const EditorTemplate &b) {
     if (a.unlocks.size() != b.unlocks.size() ||
         a.custom_goals.size() != b.custom_goals.size() ||
         a.advancements.size() != b.advancements.size() ||
         a.stats.size() != b.stats.size() ||
-        a.multi_stage_goals.size() != b.multi_stage_goals.size()) {
+        a.multi_stage_goals.size() != b.multi_stage_goals.size() ||
+        a.decorations.size() != b.decorations.size()) {
         return true;
     }
     for (size_t i = 0; i < a.unlocks.size(); ++i) {
@@ -296,6 +314,9 @@ static bool are_editor_templates_different(const EditorTemplate &a, const Editor
     }
     for (size_t i = 0; i < a.multi_stage_goals.size(); ++i) {
         if (are_editor_multi_stage_goals_different(a.multi_stage_goals[i], b.multi_stage_goals[i])) return true;
+    }
+    for (size_t i = 0; i < a.decorations.size(); ++i) {
+        if (are_editor_decorations_different(a.decorations[i], b.decorations[i])) return true;
     }
     return false;
 }
@@ -373,6 +394,23 @@ static bool has_duplicate_ms_goal_root_names(const std::vector<EditorMultiStageG
         if (!seen_names.insert(goal.root_name).second) {
             snprintf(error_message_buffer, 256, "Error: Duplicate multi-stage goal root name found: '%s'",
                      goal.root_name);
+            return true;
+        }
+    }
+    return false;
+}
+
+// Helper to check for duplicate IDs in decorations
+static bool has_duplicate_decoration_ids(const std::vector<EditorDecorationElement> &decorations,
+                                         char *error_message_buffer) {
+    std::unordered_set<std::string> seen_ids;
+    for (const auto &deco: decorations) {
+        if (deco.id[0] == '\0') {
+            snprintf(error_message_buffer, 256, "Error: A decoration has an empty ID.");
+            return true;
+        }
+        if (!seen_ids.insert(deco.id).second) {
+            snprintf(error_message_buffer, 256, "Error: Duplicate decoration ID found: '%s'", deco.id);
             return true;
         }
     }
@@ -918,6 +956,52 @@ static void parse_editor_multi_stage_goals(cJSON *json_array, std::vector<Editor
     }
 }
 
+// Parser for decoration elements
+static void parse_editor_decorations(cJSON *json_array, std::vector<EditorDecorationElement> &decorations_vector,
+                                     cJSON *lang_json) {
+    if (!json_array || !cJSON_IsArray(json_array)) return;
+
+    cJSON *item_json = nullptr;
+    cJSON_ArrayForEach(item_json, json_array) {
+        EditorDecorationElement new_elem = {};
+
+        cJSON *id_json = cJSON_GetObjectItem(item_json, "id");
+        if (cJSON_IsString(id_json)) {
+            strncpy(new_elem.id, id_json->valuestring, sizeof(new_elem.id) - 1);
+            new_elem.id[sizeof(new_elem.id) - 1] = '\0';
+        }
+
+        cJSON *type_json = cJSON_GetObjectItem(item_json, "type");
+        if (cJSON_IsString(type_json)) {
+            if (strcmp(type_json->valuestring, "text_header") == 0) {
+                new_elem.type = DECORATION_TEXT_HEADER;
+            }
+        }
+
+        // Display text from lang file, fallback to template
+        if (new_elem.type == DECORATION_TEXT_HEADER) {
+            char lang_key[256];
+            snprintf(lang_key, sizeof(lang_key), "decoration.%s", new_elem.id);
+            cJSON *lang_val = lang_json ? cJSON_GetObjectItem(lang_json, lang_key) : nullptr;
+            if (cJSON_IsString(lang_val)) {
+                strncpy(new_elem.display_text, lang_val->valuestring, sizeof(new_elem.display_text) - 1);
+            } else {
+                cJSON *text_json = cJSON_GetObjectItem(item_json, "text");
+                if (cJSON_IsString(text_json)) {
+                    strncpy(new_elem.display_text, text_json->valuestring, sizeof(new_elem.display_text) - 1);
+                } else {
+                    // Fallback to ID so display text isn't empty
+                    strncpy(new_elem.display_text, new_elem.id, sizeof(new_elem.display_text) - 1);
+                }
+            }
+            new_elem.display_text[sizeof(new_elem.display_text) - 1] = '\0';
+        }
+
+        parse_editor_manual_pos(item_json, "pos", &new_elem.pos);
+        decorations_vector.push_back(new_elem);
+    }
+}
+
 // Main function to load a whole template for editing
 static bool load_template_for_editing(const char *version, const DiscoveredTemplate &template_info,
                                       const std::string &lang_flag,
@@ -927,6 +1011,7 @@ static bool load_template_for_editing(const char *version, const DiscoveredTempl
     editor_data.unlocks.clear();
     editor_data.custom_goals.clear();
     editor_data.multi_stage_goals.clear();
+    editor_data.decorations.clear();
 
     char version_filename[64]; // Replacing . with _
     strncpy(version_filename, version, sizeof(version_filename) - 1);
@@ -966,6 +1051,7 @@ static bool load_template_for_editing(const char *version, const DiscoveredTempl
     parse_editor_trackable_items(cJSON_GetObjectItem(root, "custom"), editor_data.custom_goals, lang_json, "custom.");
     parse_editor_multi_stage_goals(cJSON_GetObjectItem(root, "multi_stage_goals"), editor_data.multi_stage_goals,
                                    lang_json);
+    parse_editor_decorations(cJSON_GetObjectItem(root, "decorations"), editor_data.decorations, lang_json);
 
     cJSON_Delete(root);
     cJSON_Delete(lang_json);
@@ -1144,6 +1230,27 @@ static void serialize_editor_multi_stage_goals(cJSON *parent, const std::vector<
     cJSON_AddItemToObject(parent, "multi_stage_goals", goals_array);
 }
 
+// Serializer for decoration elements
+static void serialize_editor_decorations(cJSON *parent,
+                                         const std::vector<EditorDecorationElement> &decorations_vector) {
+    cJSON *array = cJSON_CreateArray();
+    for (const auto &elem: decorations_vector) {
+        cJSON *item_json = cJSON_CreateObject();
+        cJSON_AddStringToObject(item_json, "id", elem.id);
+
+        switch (elem.type) {
+            case DECORATION_TEXT_HEADER:
+                cJSON_AddStringToObject(item_json, "type", "text_header");
+                break;
+                // Future: DECORATION_LINE, DECORATION_ARROW
+        }
+
+        save_editor_manual_pos(item_json, "pos", elem.pos);
+        cJSON_AddItemToArray(array, item_json);
+    }
+    cJSON_AddItemToObject(parent, "decorations", array);
+}
+
 // Main function to save the in-memory editor data back to a file
 static bool save_template_from_editor(const char *version, const DiscoveredTemplate &template_info,
                                       const std::string &lang_flag,
@@ -1181,11 +1288,13 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
     cJSON_DeleteItemFromObject(root, "unlocks");
     cJSON_DeleteItemFromObject(root, "custom");
     cJSON_DeleteItemFromObject(root, "multi_stage_goals");
+    cJSON_DeleteItemFromObject(root, "decorations");
     serialize_editor_trackable_categories(root, "advancements", editor_data.advancements);
     serialize_editor_stats(root, editor_data.stats);
     serialize_editor_trackable_items(root, "unlocks", editor_data.unlocks);
     serialize_editor_trackable_items(root, "custom", editor_data.custom_goals);
     serialize_editor_multi_stage_goals(root, editor_data.multi_stage_goals);
+    serialize_editor_decorations(root, editor_data.decorations);
 
     // Write the modified JSON object back to the file
     FILE *file = fopen(template_path, "w");
@@ -1265,6 +1374,15 @@ static bool save_template_from_editor(const char *version, const DiscoveredTempl
             snprintf(stage_lang_key, sizeof(stage_lang_key), "multi_stage_goal.%s.stage.%s", goal.root_name,
                      stage.stage_id);
             cJSON_AddStringToObject(lang_json, stage_lang_key, stage.display_text);
+        }
+    }
+
+    // 6. Decorations (Text Headers, Lines, Arrows)
+    for (const auto &deco: editor_data.decorations) {
+        if (deco.type == DECORATION_TEXT_HEADER && deco.display_text[0] != '\0') {
+            char deco_lang_key[256];
+            snprintf(deco_lang_key, sizeof(deco_lang_key), "decoration.%s", deco.id);
+            cJSON_AddStringToObject(lang_json, deco_lang_key, deco.display_text);
         }
     }
 
@@ -1415,6 +1533,13 @@ static bool validate_and_save_template(const char *creator_version_str,
                 validation_passed = false;
                 break;
             }
+        }
+    }
+
+    // --- Decorations Validation ---
+    if (validation_passed) {
+        if (has_duplicate_decoration_ids(current_template_data.decorations, status_message)) {
+            validation_passed = false;
         }
     }
 
@@ -1683,10 +1808,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static EditorTrackableCategory *selected_stat = nullptr;
     static EditorMultiStageGoal *selected_ms_goal = nullptr;
     // Visual drag auto-select: which tab to force-select and which goal's header to force-open
-    enum ForceSelectTab { FORCE_TAB_NONE = 0, FORCE_TAB_ADVANCEMENTS, FORCE_TAB_STATS, FORCE_TAB_UNLOCKS, FORCE_TAB_CUSTOM, FORCE_TAB_MULTISTAGE };
+    enum ForceSelectTab {
+        FORCE_TAB_NONE = 0, FORCE_TAB_ADVANCEMENTS, FORCE_TAB_STATS, FORCE_TAB_UNLOCKS, FORCE_TAB_CUSTOM,
+        FORCE_TAB_MULTISTAGE, FORCE_TAB_DECORATIONS
+    };
     static ForceSelectTab force_select_tab = FORCE_TAB_NONE;
-    static char force_open_header_root_name[192] = ""; // Root name of goal whose Layout Coordinates header to force-open
-    static char force_open_child_header_root_name[192] = ""; // Root name of criterion/sub-stat whose Layout Coordinates header to force-open
+    static char force_open_header_root_name[192] = "";
+    // Root name of goal whose Layout Coordinates header to force-open
+    static char force_open_child_header_root_name[192] = "";
+    // Root name of criterion/sub-stat whose Layout Coordinates header to force-open
 
     // Helper to dynamically calculate the next sort order per list
     auto get_next_sort_order = [](const auto &list) -> int {
@@ -1712,6 +1842,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         SCOPE_UNLOCKS,
         SCOPE_CUSTOM,
         SCOPE_MULTISTAGE,
+        SCOPE_DECORATIONS,
         // Details search scopes
         SCOPE_ADVANCEMENT_DETAILS,
         SCOPE_STAT_DETAILS,
@@ -2035,6 +2166,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         const char *scope_names[] = {
             "Templates", "Languages", adv_ach_scope_name, "Stats", "Unlocks", "Custom Goals", "Multi-Stage Goals",
+            "Decorations",
             adv_details_scope_name, "Stat Details", "MS Goal Details"
         };
 
@@ -2054,6 +2186,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             case SCOPE_CUSTOM: current_scope_name = scope_names[SCOPE_CUSTOM];
                 break;
             case SCOPE_MULTISTAGE: current_scope_name = scope_names[SCOPE_MULTISTAGE];
+                break;
+            case SCOPE_DECORATIONS: current_scope_name = scope_names[SCOPE_DECORATIONS];
                 break;
             case SCOPE_ADVANCEMENT_DETAILS: current_scope_name = adv_details_scope_name;
                 break;
@@ -2103,6 +2237,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 if (ImGui::Selectable(scope_names[SCOPE_MULTISTAGE], current_search_scope == SCOPE_MULTISTAGE)) {
                     current_search_scope = SCOPE_MULTISTAGE;
+                    tc_search_buffer[0] = '\0'; // Clear search on change
+                }
+                if (ImGui::Selectable(scope_names[SCOPE_DECORATIONS], current_search_scope == SCOPE_DECORATIONS)) {
+                    current_search_scope = SCOPE_DECORATIONS;
                     tc_search_buffer[0] = '\0'; // Clear search on change
                 }
 
@@ -3160,6 +3298,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
             }
 
+            // Sync Decorations
+            for (auto &ed_deco: current_template_data.decorations) {
+                for (int i = 0; i < t->template_data->decoration_count; i++) {
+                    if (t->template_data->decorations[i] && strcmp(
+                            ed_deco.id, t->template_data->decorations[i]->id) == 0) {
+                        sync_pos(ed_deco.pos, t->template_data->decorations[i]->pos);
+                    }
+                }
+            }
+
             // Auto-select the dragged goal in the template editor and switch to its tab
             if (t->visual_drag_root_name[0] != '\0') {
                 // Clear search so the dragged item's collapsible section is visible
@@ -3170,12 +3318,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 force_open_header_root_name[sizeof(force_open_header_root_name) - 1] = '\0';
 
                 // Store child root name for force-opening criterion/sub-stat header
-                strncpy(force_open_child_header_root_name, t->visual_drag_child_root_name, sizeof(force_open_child_header_root_name) - 1);
+                strncpy(force_open_child_header_root_name, t->visual_drag_child_root_name,
+                        sizeof(force_open_child_header_root_name) - 1);
                 force_open_child_header_root_name[sizeof(force_open_child_header_root_name) - 1] = '\0';
 
                 if (strcmp(t->visual_drag_goal_type, "Advancement") == 0 ||
                     strcmp(t->visual_drag_goal_type, "Achievement") == 0) {
-                    for (auto &adv : current_template_data.advancements) {
+                    for (auto &adv: current_template_data.advancements) {
                         if (strcmp(adv.root_name, t->visual_drag_root_name) == 0) {
                             selected_advancement = &adv;
                             selected_stat = nullptr;
@@ -3185,7 +3334,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
                 } else if (strcmp(t->visual_drag_goal_type, "Stat") == 0) {
-                    for (auto &stat : current_template_data.stats) {
+                    for (auto &stat: current_template_data.stats) {
                         if (strcmp(stat.root_name, t->visual_drag_root_name) == 0) {
                             selected_stat = &stat;
                             selected_advancement = nullptr;
@@ -3195,7 +3344,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
                     }
                 } else if (strcmp(t->visual_drag_goal_type, "Multi-Stage Goal") == 0) {
-                    for (auto &goal : current_template_data.multi_stage_goals) {
+                    for (auto &goal: current_template_data.multi_stage_goals) {
                         if (strcmp(goal.root_name, t->visual_drag_root_name) == 0) {
                             selected_ms_goal = &goal;
                             selected_advancement = nullptr;
@@ -3208,6 +3357,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     force_select_tab = FORCE_TAB_UNLOCKS;
                 } else if (strcmp(t->visual_drag_goal_type, "Custom Goal") == 0) {
                     force_select_tab = FORCE_TAB_CUSTOM;
+                } else if (strcmp(t->visual_drag_goal_type, "Decoration") == 0) {
+                    force_select_tab = FORCE_TAB_DECORATIONS;
                 }
             }
 
@@ -3222,9 +3373,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // This runs whenever the edited template is the active one, not just during visual editing,
         // to prevent flickering when entering visual editing mode with pending position changes.
         bool is_editing_active_template = t && t->template_data &&
-            strcmp(creator_version_str, app_settings->version_str) == 0 &&
-            strcmp(selected_template_info.category, app_settings->category) == 0 &&
-            strcmp(selected_template_info.optional_flag, app_settings->optional_flag) == 0;
+                                          strcmp(creator_version_str, app_settings->version_str) == 0 &&
+                                          strcmp(selected_template_info.category, app_settings->category) == 0 &&
+                                          strcmp(selected_template_info.optional_flag,
+                                                 app_settings->optional_flag) == 0;
         if (is_editing_active_template) {
             auto reverse_sync_pos = [](const ManualPos &editor_pos, ManualPos &tracker_pos) {
                 tracker_pos.x = editor_pos.x;
@@ -3244,14 +3396,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             for (const auto &ed_adv: current_template_data.advancements) {
                 for (int i = 0; i < t->template_data->advancement_count; i++) {
                     if (t->template_data->advancements[i] && strcmp(ed_adv.root_name,
-                                                                    t->template_data->advancements[i]->root_name) == 0) {
+                                                                    t->template_data->advancements[i]->root_name) ==
+                        0) {
                         TrackableCategory *tr_adv = t->template_data->advancements[i];
                         reverse_sync_pos(ed_adv.icon_pos, tr_adv->icon_pos);
                         reverse_sync_pos(ed_adv.text_pos, tr_adv->text_pos);
                         reverse_sync_pos(ed_adv.progress_pos, tr_adv->progress_pos);
                         for (const auto &ed_crit: ed_adv.criteria) {
                             for (int j = 0; j < tr_adv->criteria_count; j++) {
-                                if (tr_adv->criteria[j] && strcmp(ed_crit.root_name, tr_adv->criteria[j]->root_name) == 0) {
+                                if (tr_adv->criteria[j] && strcmp(ed_crit.root_name, tr_adv->criteria[j]->root_name) ==
+                                    0) {
                                     reverse_sync_item(ed_crit, tr_adv->criteria[j]);
                                 }
                             }
@@ -3271,7 +3425,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         reverse_sync_pos(ed_stat.progress_pos, tr_stat->progress_pos);
                         for (const auto &ed_crit: ed_stat.criteria) {
                             for (int j = 0; j < tr_stat->criteria_count; j++) {
-                                if (tr_stat->criteria[j] && strcmp(ed_crit.root_name, tr_stat->criteria[j]->root_name) == 0) {
+                                if (tr_stat->criteria[j] && strcmp(ed_crit.root_name, tr_stat->criteria[j]->root_name)
+                                    == 0) {
                                     reverse_sync_item(ed_crit, tr_stat->criteria[j]);
                                 }
                             }
@@ -3294,7 +3449,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             for (const auto &ed_cg: current_template_data.custom_goals) {
                 for (int i = 0; i < t->template_data->custom_goal_count; i++) {
                     if (t->template_data->custom_goals[i] && strcmp(ed_cg.root_name,
-                                                                    t->template_data->custom_goals[i]->root_name) == 0) {
+                                                                    t->template_data->custom_goals[i]->root_name) ==
+                        0) {
                         reverse_sync_item(ed_cg, t->template_data->custom_goals[i]);
                     }
                 }
@@ -3309,6 +3465,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         reverse_sync_pos(ed_msg.icon_pos, tr_msg->icon_pos);
                         reverse_sync_pos(ed_msg.text_pos, tr_msg->text_pos);
                         reverse_sync_pos(ed_msg.progress_pos, tr_msg->progress_pos);
+                    }
+                }
+            }
+
+            // Reverse Sync Decorations
+            for (const auto &ed_deco: current_template_data.decorations) {
+                for (int i = 0; i < t->template_data->decoration_count; i++) {
+                    if (t->template_data->decorations[i] && strcmp(
+                            ed_deco.id, t->template_data->decorations[i]->id) == 0) {
+                        reverse_sync_pos(ed_deco.pos, t->template_data->decorations[i]->pos);
                     }
                 }
             }
@@ -3525,2173 +3691,981 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::BeginTabBar("EditorTabs")) {
             // "Advancements" or "Achievements" tab depending on version
             {
-            ImGuiTabItemFlags adv_tab_flags = (force_select_tab == FORCE_TAB_ADVANCEMENTS) ? ImGuiTabItemFlags_SetSelected : 0;
-            if (force_select_tab == FORCE_TAB_ADVANCEMENTS) force_select_tab = FORCE_TAB_NONE;
-            if (ImGui::BeginTabItem(advancements_label_plural_upper, nullptr, adv_tab_flags)) {
-                // TWO-PANE LAYOUT
-                float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
-                ImGui::BeginChild("AdvancementListPane", ImVec2(pane_width, 0), true);
+                ImGuiTabItemFlags adv_tab_flags = (force_select_tab == FORCE_TAB_ADVANCEMENTS)
+                                                      ? ImGuiTabItemFlags_SetSelected
+                                                      : 0;
+                if (force_select_tab == FORCE_TAB_ADVANCEMENTS) force_select_tab = FORCE_TAB_NONE;
+                if (ImGui::BeginTabItem(advancements_label_plural_upper, nullptr, adv_tab_flags)) {
+                    // TWO-PANE LAYOUT
+                    float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
+                    ImGui::BeginChild("AdvancementListPane", ImVec2(pane_width, 0), true);
 
-                // LEFT PANE: List of Advancements/Achievements
+                    // LEFT PANE: List of Advancements/Achievements
 
-                // Import advancements/achievements on its own line
-                char import_button_label[64];
-                snprintf(import_button_label, sizeof(import_button_label), "Import %s",
-                         advancements_label_plural_upper);
-                if (ImGui::Button(import_button_label)) {
-                    current_advancement_import_mode = BATCH_ADVANCEMENT_IMPORT; // Reset mode to default
-                    char start_path[MAX_PATH_LENGTH];
-                    // Determine the correct starting path based on version and settings
-                    if (creator_selected_version <= MC_VERSION_1_6_4) {
-                        // Legacy achievements are in the stats file (global or local)
-                        if (app_settings->using_stats_per_world_legacy) {
+                    // Import advancements/achievements on its own line
+                    char import_button_label[64];
+                    snprintf(import_button_label, sizeof(import_button_label), "Import %s",
+                             advancements_label_plural_upper);
+                    if (ImGui::Button(import_button_label)) {
+                        current_advancement_import_mode = BATCH_ADVANCEMENT_IMPORT; // Reset mode to default
+                        char start_path[MAX_PATH_LENGTH];
+                        // Determine the correct starting path based on version and settings
+                        if (creator_selected_version <= MC_VERSION_1_6_4) {
+                            // Legacy achievements are in the stats file (global or local)
+                            if (app_settings->using_stats_per_world_legacy) {
+                                snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
+                            } else {
+                                char parent_dir[MAX_PATH_LENGTH];
+                                if (get_parent_directory(t->saves_path, parent_dir, sizeof(parent_dir), 1)) {
+                                    snprintf(start_path, sizeof(start_path), "%s/stats/", parent_dir);
+                                } else {
+                                    strncpy(start_path, t->saves_path, sizeof(start_path)); // Fallback
+                                    start_path[sizeof(start_path) - 1] = '\0';
+                                }
+                            }
+                        } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                            // Mid-era achievements are in the per-world stats file
                             snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
                         } else {
-                            char parent_dir[MAX_PATH_LENGTH];
-                            if (get_parent_directory(t->saves_path, parent_dir, sizeof(parent_dir), 1)) {
-                                snprintf(start_path, sizeof(start_path), "%s/stats/", parent_dir);
+                            // Modern advancements are in their own per-world folder
+                            snprintf(start_path, sizeof(start_path), "%s/%s/advancements/", t->saves_path,
+                                     t->world_name);
+                        }
+
+                        // --- Version-aware file filters ---
+#ifdef __APPLE__
+                        const char *json_filter[2] = {"*.json", "public.json"};
+                        const char *dat_filter[2] = {"*.dat", "public.data"};
+                        int filter_count = 2;
+#else
+                        const char *json_filter[1] = {"*.json"};
+                        const char *dat_filter[1] = {"*.dat"};
+                        int filter_count = 1;
+#endif
+                        const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
+                                                           ? dat_filter
+                                                           : json_filter;
+                        const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
+                                                      ? "DAT files"
+                                                      : "JSON files";
+                        const char *dialog_title = (creator_selected_version < MC_VERSION_1_12)
+                                                       ? "Select Player Stats File"
+                                                       : "Select Player Advancements File";
+                        const char *selection = tinyfd_openFileDialog(dialog_title, start_path, filter_count,
+                                                                      selected_filter, filter_desc, 0);
+
+                        if (selection) {
+                            import_error_message[0] = '\0';
+                            if (parse_player_advancements_for_import(selection, creator_selected_version,
+                                                                     importable_advancements,
+                                                                     import_error_message,
+                                                                     sizeof(import_error_message))) {
+                                show_import_advancements_popup = true;
+                                focus_import_search = true; // Focus search bar as soon as popup opens
+                                import_search_criteria_only = false; // Reset search mode
+                                import_select_criteria = false; // Reset selection mode
                             } else {
-                                strncpy(start_path, t->saves_path, sizeof(start_path)); // Fallback
-                                start_path[sizeof(start_path) - 1] = '\0';
+                                // If parsing fails, show the error in the main status message
+                                save_message_type = MSG_ERROR;
+                                strncpy(status_message, import_error_message, sizeof(status_message) - 1);
+                                status_message[sizeof(status_message) - 1] = '\0';
                             }
                         }
-                    } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                        // Mid-era achievements are in the per-world stats file
-                        snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
-                    } else {
-                        // Modern advancements are in their own per-world folder
-                        snprintf(start_path, sizeof(start_path), "%s/%s/advancements/", t->saves_path, t->world_name);
                     }
-
-                    // --- Version-aware file filters ---
-#ifdef __APPLE__
-                    const char *json_filter[2] = {"*.json", "public.json"};
-                    const char *dat_filter[2] = {"*.dat", "public.data"};
-                    int filter_count = 2;
-#else
-                    const char *json_filter[1] = {"*.json"};
-                    const char *dat_filter[1] = {"*.dat"};
-                    int filter_count = 1;
-#endif
-                    const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
-                                                       ? dat_filter
-                                                       : json_filter;
-                    const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
-                                                  ? "DAT files"
-                                                  : "JSON files";
-                    const char *dialog_title = (creator_selected_version < MC_VERSION_1_12)
-                                                   ? "Select Player Stats File"
-                                                   : "Select Player Advancements File";
-                    const char *selection = tinyfd_openFileDialog(dialog_title, start_path, filter_count,
-                                                                  selected_filter, filter_desc, 0);
-
-                    if (selection) {
-                        import_error_message[0] = '\0';
-                        if (parse_player_advancements_for_import(selection, creator_selected_version,
-                                                                 importable_advancements,
-                                                                 import_error_message, sizeof(import_error_message))) {
-                            show_import_advancements_popup = true;
-                            focus_import_search = true; // Focus search bar as soon as popup opens
-                            import_search_criteria_only = false; // Reset search mode
-                            import_select_criteria = false; // Reset selection mode
-                        } else {
-                            // If parsing fails, show the error in the main status message
-                            save_message_type = MSG_ERROR;
-                            strncpy(status_message, import_error_message, sizeof(status_message) - 1);
-                            status_message[sizeof(status_message) - 1] = '\0';
-                        }
-                    }
-                }
-                if (ImGui::IsItemHovered()) {
-                    char import_stats_tooltip[512];
-                    if (creator_selected_version <= MC_VERSION_1_6_4) {
-                        if (app_settings->using_stats_per_world_legacy) {
-                            // Legacy using stats per world
-                            snprintf(import_stats_tooltip, sizeof(import_stats_tooltip),
-                                     "Import legacy achievements directly from a local world's player achievements .dat file.\n"
-                                     "Cannot import already existing root names.");
-                        } else {
-                            // Legacy not using stats per world
-                            snprintf(import_stats_tooltip, sizeof(import_stats_tooltip),
-                                     "Import legacy achievements directly from a global world's player achievements .dat file.\n"
-                                     "Cannot import already existing root names.");
-                        }
-                    } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                        // Mid-era
-                        snprintf(import_stats_tooltip, sizeof(import_stats_tooltip),
-                                 "Import mid-era achievements directly from a world's player achievements .json file.\n"
-                                 "Cannot import already existing root names.");
-                    } else {
-                        // Modern
-                        snprintf(import_stats_tooltip, sizeof(import_stats_tooltip),
-                                 "Import modern advancements/recipes directly from a world's player advancements .json file.\n"
-                                 "Cannot import already existing root names.");
-                    }
-                    ImGui::SetTooltip("%s", import_stats_tooltip);
-                }
-
-                // --- Category Sorting Controls ---
-                bool can_sort_adv = false;
-                for (const auto &adv: current_template_data.advancements) {
-                    if (adv.sort_order > 0) {
-                        can_sort_adv = true;
-                        break;
-                    }
-                }
-
-                float sort_btn_width = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                float reset_btn_width = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                float total_buttons_width = sort_btn_width + reset_btn_width + ImGui::GetStyle().ItemSpacing.x;
-
-                ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_buttons_width);
-
-                ImGui::BeginDisabled(!can_sort_adv);
-                if (ImGui::Button("Sort##adv")) {
-                    apply_partial_sort(current_template_data.advancements);
-                    save_message_type = MSG_NONE;
-                }
-                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    char tooltip_buffer[128];
-                    if (!can_sort_adv) {
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Click the order badges next to %s to assign a sort order first.",
-                                 advancements_label_plural_lower);
-                    } else {
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Rearrange the numbered %s among themselves.",
-                                 advancements_label_plural_lower);
-                    }
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Reset Order##adv")) {
-                    for (auto &adv: current_template_data.advancements) adv.sort_order = 0;
-                }
-                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    char tooltip_buffer[128];
-                    if (!can_sort_adv) {
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
-                    } else {
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Clear all assigned sort orders from %s.",
-                                 advancements_label_plural_lower);
-                    }
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
-                ImGui::EndDisabled();
-
-                // Add Advancements/Achievements Button
-                char button_label[64];
-                snprintf(button_label, sizeof(button_label), "Add New %s", advancements_label_upper);
-                if (ImGui::Button(button_label)) {
-                    // Create new adv/ach with default values
-                    EditorTrackableCategory new_adv = {};
-                    int counter = 1;
-                    while (true) {
-                        char temp_name[256];
+                    if (ImGui::IsItemHovered()) {
+                        char import_stats_tooltip[512];
                         if (creator_selected_version <= MC_VERSION_1_6_4) {
-                            // Legacy
-                            snprintf(temp_name, sizeof(new_adv.root_name), "5242880_%d", counter);
+                            if (app_settings->using_stats_per_world_legacy) {
+                                // Legacy using stats per world
+                                snprintf(import_stats_tooltip, sizeof(import_stats_tooltip),
+                                         "Import legacy achievements directly from a local world's player achievements .dat file.\n"
+                                         "Cannot import already existing root names.");
+                            } else {
+                                // Legacy not using stats per world
+                                snprintf(import_stats_tooltip, sizeof(import_stats_tooltip),
+                                         "Import legacy achievements directly from a global world's player achievements .dat file.\n"
+                                         "Cannot import already existing root names.");
+                            }
                         } else if (creator_selected_version <= MC_VERSION_1_11_2) {
                             // Mid-era
-                            snprintf(temp_name, sizeof(new_adv.root_name), "achievement.new_%d", counter);
+                            snprintf(import_stats_tooltip, sizeof(import_stats_tooltip),
+                                     "Import mid-era achievements directly from a world's player achievements .json file.\n"
+                                     "Cannot import already existing root names.");
                         } else {
                             // Modern
-                            snprintf(temp_name, sizeof(new_adv.root_name), "awesome:new/advancement_%d", counter);
+                            snprintf(import_stats_tooltip, sizeof(import_stats_tooltip),
+                                     "Import modern advancements/recipes directly from a world's player advancements .json file.\n"
+                                     "Cannot import already existing root names.");
                         }
+                        ImGui::SetTooltip("%s", import_stats_tooltip);
+                    }
 
-                        bool name_exists = false;
-                        for (const auto &adv: current_template_data.advancements) {
-                            if (strcmp(adv.root_name, temp_name) == 0) {
-                                name_exists = true;
-                                break;
-                            }
-                        }
-                        if (!name_exists) {
-                            strncpy(new_adv.root_name, temp_name, sizeof(new_adv.root_name) - 1);
-                            new_adv.root_name[sizeof(new_adv.root_name) - 1] = '\0';
+                    // --- Category Sorting Controls ---
+                    bool can_sort_adv = false;
+                    for (const auto &adv: current_template_data.advancements) {
+                        if (adv.sort_order > 0) {
+                            can_sort_adv = true;
                             break;
                         }
-                        counter++;
-                    }
-                    snprintf(new_adv.display_name, sizeof(new_adv.display_name), "New %s %d", advancements_label_upper,
-                             counter);
-                    strncpy(new_adv.icon_path, "blocks/placeholder.png", sizeof(new_adv.icon_path) - 1);
-                    new_adv.icon_path[sizeof(new_adv.icon_path) - 1] = '\0';
-                    current_template_data.advancements.push_back(new_adv);
-                    save_message_type = MSG_NONE;
-                }
-                if (ImGui::IsItemHovered()) {
-                    char add_new_advancement_tooltip_buffer[1024];
-                    if (creator_selected_version <= MC_VERSION_1_6_4) {
-                        // Legacy
-                        snprintf(add_new_advancement_tooltip_buffer, sizeof(add_new_advancement_tooltip_buffer),
-                                 "Add a new blank achievement to this template.\n\n"
-                                 "Achievements act as a guide to completing tasks ingame\n"
-                                 "and additionally serve as challenges.\n"
-                                 "Advancely looks for achievements (e.g., '5242888' - The Lie)\n"
-                                 "within the (global or local) stats file.\n\n"
-                                 "Click the 'Help' button for more info.");
-                    } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                        // Mid-era
-                        snprintf(add_new_advancement_tooltip_buffer, sizeof(add_new_advancement_tooltip_buffer),
-                                 "Add a new blank achievement to this template.\n\n"
-                                 "Achievements act as a guide to completing tasks ingame\n"
-                                 "and additionally serve as challenges.\n"
-                                 "Advancely looks for achievements (e.g., 'achievement.buildWorkBench') within the stats file.\n\n"
-                                 "Click the 'Help' button for more info.");
-                    } else {
-                        // Modern
-                        snprintf(add_new_advancement_tooltip_buffer, sizeof(add_new_advancement_tooltip_buffer),
-                                 "Add a new blank advancement or recipe to this template.\n\n"
-                                 "Advancements act as a guide to completing tasks ingame and additionally serve as challenges.\n"
-                                 "Recipes (e.g., crafting, smelting, ...) are a structured way to perform item and block transformations.\n"
-                                 "Advancely looks for both advancements (e.g., 'minecraft:nether/all_effects') and recipes\n"
-                                 "(e.g., 'minecraft:recipes/misc/mojang_banner_pattern') within the advancements file.\n\n"
-                                 "Click the 'Help' button for more info.");
-                    }
-                    ImGui::SetTooltip("%s", add_new_advancement_tooltip_buffer);
-                }
-                ImGui::SameLine();
-                ImGui::Checkbox("Show Display Names", &show_advancement_display_names);
-                if (ImGui::IsItemHovered()) {
-                    char show_display_names_tooltip_buffer[256];
-                    snprintf(show_display_names_tooltip_buffer, sizeof(show_display_names_tooltip_buffer),
-                             "Toggle between showing user-facing display names and internal root names in this list.");
-                    ImGui::SetTooltip("%s", show_display_names_tooltip_buffer);
-                }
-                ImGui::Separator();
-
-                // Filtering and Rendering Logic
-
-                // 1. Create a list of pointers to render from
-                std::vector<EditorTrackableCategory *> advancements_to_render;
-
-                // 2. Populate the list: either with all items, or with filtered items.
-                bool search_active = (tc_search_buffer[0] != '\0' && current_search_scope == SCOPE_ADVANCEMENTS);
-
-                if (search_active) {
-                    // Search is active for this scope: populate with filtered results.
-                    for (auto &advancement: current_template_data.advancements) {
-                        bool parent_match = str_contains_insensitive(advancement.display_name, tc_search_buffer) ||
-                                            str_contains_insensitive(advancement.root_name, tc_search_buffer) ||
-                                            str_contains_insensitive(advancement.icon_path, tc_search_buffer);
-
-                        if (parent_match) {
-                            advancements_to_render.push_back(&advancement);
-                            continue; // Parent matches, no need to check children
-                        }
-
-                        // If parent doesn't match, check its children (criteria)
-                        bool child_match = false;
-                        for (const auto &criterion: advancement.criteria) {
-                            if (str_contains_insensitive(criterion.display_name, tc_search_buffer) ||
-                                str_contains_insensitive(criterion.root_name, tc_search_buffer) ||
-                                str_contains_insensitive(criterion.icon_path, tc_search_buffer)) {
-                                child_match = true;
-                                break;
-                            }
-                        }
-
-                        if (child_match) {
-                            advancements_to_render.push_back(&advancement);
-                        }
-                    }
-                } else {
-                    // Search is not active: populate with pointers to all items.
-                    for (auto &advancement: current_template_data.advancements) {
-                        advancements_to_render.push_back(&advancement);
-                    }
-                }
-
-                // --- Counter for the list ---
-                char counter_text[128];
-                snprintf(counter_text, sizeof(counter_text), "%zu %s", advancements_to_render.size(),
-                         advancements_to_render.size() == 1
-                             ? advancements_label_upper
-                             : advancements_label_plural_upper);
-                float text_width = ImGui::CalcTextSize(counter_text).x;
-                ImGui::SetCursorPosX(
-                    ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - text_width) *
-                    0.5f);
-                ImGui::TextDisabled("%s", counter_text);
-
-                int advancement_to_remove_idx = -1;
-                int advancement_to_copy_idx = -1; // To queue a copy action
-
-                // State for drag and drop
-                int adv_dnd_source_index = -1;
-                int adv_dnd_target_index = -1;
-
-                for (size_t i = 0; i < advancements_to_render.size(); ++i) {
-                    auto &advancement = *advancements_to_render[i]; // Dereference the pointer
-                    ImGui::PushID(&advancement); // Use pointer for a stable ID
-
-                    const char *display_name = advancement.display_name;
-                    const char *root_name = advancement.root_name;
-
-                    // Show display names based on setting
-                    const char *label = show_advancement_display_names
-                                            ? (display_name[0] ? display_name : root_name)
-                                            : root_name;
-                    if (label[0] == '\0') {
-                        char placeholder[64];
-                        snprintf(placeholder, sizeof(placeholder), "[New %s]", advancements_label_upper);
-                        label = placeholder;
                     }
 
-                    // --- Sort Badge (Category) ---
-                    char cat_badge_label[32];
-                    if (advancement.sort_order > 0) {
-                        snprintf(cat_badge_label, sizeof(cat_badge_label), "%d##cat_badge", advancement.sort_order);
-                    } else {
-                        snprintf(cat_badge_label, sizeof(cat_badge_label), " - ##cat_badge");
-                    }
+                    float sort_btn_width = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                    float reset_btn_width = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x *
+                                            2.0f;
+                    float total_buttons_width = sort_btn_width + reset_btn_width + ImGui::GetStyle().ItemSpacing.x;
 
-                    const char *cat_text_end = strstr(cat_badge_label, "##");
-                    float cat_text_w = ImGui::CalcTextSize(cat_badge_label, cat_text_end).x;
-                    float cat_badge_w = std::max(28.0f, cat_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
+                    ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_buttons_width);
 
-                    if (ImGui::Button(cat_badge_label, ImVec2(cat_badge_w, 0))) {
-                        if (advancement.sort_order > 0)
-                            advancement.sort_order = 0;
-                        else advancement.sort_order = get_next_sort_order(current_template_data.advancements);
+                    ImGui::BeginDisabled(!can_sort_adv);
+                    if (ImGui::Button("Sort##adv")) {
+                        apply_partial_sort(current_template_data.advancements);
+                        save_message_type = MSG_NONE;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                         char tooltip_buffer[128];
-                        if (advancement.sort_order > 0) {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to remove %s sort order",
-                                     advancements_label_singular_lower);
+                        if (!can_sort_adv) {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Click the order badges next to %s to assign a sort order first.",
+                                     advancements_label_plural_lower);
                         } else {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to assign %s sort order",
-                                     advancements_label_singular_lower);
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Rearrange the numbered %s among themselves.",
+                                     advancements_label_plural_lower);
                         }
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
                     ImGui::SameLine();
-
-                    // Draw the "X" (Remove) button
-                    if (ImGui::Button("X")) {
-                        advancement_to_remove_idx = i;
-                        save_message_type = MSG_NONE;
+                    if (ImGui::Button("Reset Order##adv")) {
+                        for (auto &adv: current_template_data.advancements) adv.sort_order = 0;
                     }
-                    if (ImGui::IsItemHovered()) {
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                         char tooltip_buffer[128];
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s", label);
+                        if (!can_sort_adv) {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
+                        } else {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Clear all assigned sort orders from %s.",
+                                     advancements_label_plural_lower);
+                        }
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
-                    ImGui::SameLine();
+                    ImGui::EndDisabled();
 
-                    // Draw the "Copy" button
-                    if (ImGui::Button("Copy")) {
-                        advancement_to_copy_idx = i;
+                    // Add Advancements/Achievements Button
+                    char button_label[64];
+                    snprintf(button_label, sizeof(button_label), "Add New %s", advancements_label_upper);
+                    if (ImGui::Button(button_label)) {
+                        // Create new adv/ach with default values
+                        EditorTrackableCategory new_adv = {};
+                        int counter = 1;
+                        while (true) {
+                            char temp_name[256];
+                            if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                // Legacy
+                                snprintf(temp_name, sizeof(new_adv.root_name), "5242880_%d", counter);
+                            } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                // Mid-era
+                                snprintf(temp_name, sizeof(new_adv.root_name), "achievement.new_%d", counter);
+                            } else {
+                                // Modern
+                                snprintf(temp_name, sizeof(new_adv.root_name), "awesome:new/advancement_%d", counter);
+                            }
+
+                            bool name_exists = false;
+                            for (const auto &adv: current_template_data.advancements) {
+                                if (strcmp(adv.root_name, temp_name) == 0) {
+                                    name_exists = true;
+                                    break;
+                                }
+                            }
+                            if (!name_exists) {
+                                strncpy(new_adv.root_name, temp_name, sizeof(new_adv.root_name) - 1);
+                                new_adv.root_name[sizeof(new_adv.root_name) - 1] = '\0';
+                                break;
+                            }
+                            counter++;
+                        }
+                        snprintf(new_adv.display_name, sizeof(new_adv.display_name), "New %s %d",
+                                 advancements_label_upper,
+                                 counter);
+                        strncpy(new_adv.icon_path, "blocks/placeholder.png", sizeof(new_adv.icon_path) - 1);
+                        new_adv.icon_path[sizeof(new_adv.icon_path) - 1] = '\0';
+                        current_template_data.advancements.push_back(new_adv);
                         save_message_type = MSG_NONE;
                     }
                     if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[128];
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Duplicate %s.", label);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-                    ImGui::SameLine();
-
-                    if (ImGui::Selectable(label, &advancement == selected_advancement)) {
-                        // Compare pointers
-                        // Check if the user is selecting a *different* item than the one currently selected
-                        if (&advancement != selected_advancement) {
-                            selected_advancement = &advancement;
-                        }
-                    }
-
-                    // DRAG AND DROP LOGIC
-                    // Make the entire row a drag source
-                    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
-                        // Use a unique payload ID for this list
-                        ImGui::SetDragDropPayload("ADVANCEMENT_DND", &i, sizeof(int));
-                        ImGui::Text("Reorder %s", label);
-                        ImGui::EndDragDropSource();
-                    }
-                    // Make the entire row a drop target
-                    if (ImGui::BeginDragDropTarget()) {
-                        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("ADVANCEMENT_DND")) {
-                            adv_dnd_source_index = *(const int *) payload->Data;
-                            adv_dnd_target_index = i;
-                        }
-                        ImGui::EndDragDropTarget();
-                    }
-
-                    ImGui::PopID();
-                }
-
-                // Handle Drag and Drop reordering after the loop
-                if (adv_dnd_source_index != -1 && adv_dnd_target_index != -1) {
-                    // Get pointers to the source and target items from the list that was rendered
-                    EditorTrackableCategory *source_item_ptr = advancements_to_render[adv_dnd_source_index];
-                    EditorTrackableCategory *target_item_ptr = advancements_to_render[adv_dnd_target_index];
-
-                    // Find the iterator for the source item in the original data vector
-                    auto source_it = std::find_if(current_template_data.advancements.begin(),
-                                                  current_template_data.advancements.end(),
-                                                  [&](const EditorTrackableCategory &adv) {
-                                                      return &adv == source_item_ptr;
-                                                  });
-
-                    // Create a copy of the item to move, then erase it
-                    EditorTrackableCategory item_to_move = *source_item_ptr;
-                    current_template_data.advancements.erase(source_it);
-
-                    // Find the iterator for the target item in the (now modified) original vector
-                    auto target_it = std::find_if(current_template_data.advancements.begin(),
-                                                  current_template_data.advancements.end(),
-                                                  [&](const EditorTrackableCategory &adv) {
-                                                      return &adv == target_item_ptr;
-                                                  });
-
-                    // Insert the copied item at the target's position
-                    current_template_data.advancements.insert(target_it, item_to_move);
-
-                    save_message_type = MSG_NONE;
-                }
-
-                // Handle Copying
-                if (advancement_to_copy_idx != -1) {
-                    char selected_root_name_before_op[192] = {};
-                    if (selected_advancement) {
-                        strncpy(selected_root_name_before_op, selected_advancement->root_name,
-                                sizeof(selected_root_name_before_op) - 1);
-                    }
-                    // Get a pointer to the source item to copy from the filtered list
-                    const EditorTrackableCategory *source_adv_ptr = advancements_to_render[advancement_to_copy_idx];
-
-                    // Perform a manual, safe copy to prevent memory corruption.
-                    EditorTrackableCategory new_advancement;
-                    strncpy(new_advancement.root_name, source_adv_ptr->root_name, sizeof(new_advancement.root_name));
-                    new_advancement.root_name[sizeof(new_advancement.root_name) - 1] = '\0';
-                    strncpy(new_advancement.display_name, source_adv_ptr->display_name,
-                            sizeof(new_advancement.display_name));
-                    new_advancement.display_name[sizeof(new_advancement.display_name) - 1] = '\0';
-                    strncpy(new_advancement.icon_path, source_adv_ptr->icon_path, sizeof(new_advancement.icon_path));
-                    new_advancement.icon_path[sizeof(new_advancement.icon_path) - 1] = '\0';
-                    new_advancement.is_hidden = source_adv_ptr->is_hidden;
-                    new_advancement.is_recipe = source_adv_ptr->is_recipe;
-                    new_advancement.is_simple_stat = source_adv_ptr->is_simple_stat;
-                    new_advancement.criteria = source_adv_ptr->criteria; // std::vector handles its own deep copy.
-                    new_advancement.icon_pos = source_adv_ptr->icon_pos;
-                    new_advancement.text_pos = source_adv_ptr->text_pos;
-                    new_advancement.progress_pos = source_adv_ptr->progress_pos;
-
-                    new_advancement.sort_order = 0;
-                    for (auto &crit: new_advancement.criteria) {
-                        crit.sort_order = 0; // Clear badges on cloned children
-                    }
-
-                    // --- Generate a unique root_name for the copy ---
-                    char base_name[192];
-                    strncpy(base_name, source_adv_ptr->root_name, sizeof(base_name) - 1);
-                    base_name[sizeof(base_name) - 1] = '\0';
-
-                    char new_name[192];
-                    int copy_counter = 1;
-                    while (true) {
-                        if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
-                        else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
-
-
-                        // Check against the full original list to ensure the name is truly unique
-                        bool name_exists = false;
-                        for (const auto &adv: current_template_data.advancements) {
-                            if (strcmp(adv.root_name, new_name) == 0) {
-                                name_exists = true;
-                                break;
-                            }
-                        }
-                        if (!name_exists) break; // Found a unique name
-                        copy_counter++;
-                    }
-                    strncpy(new_advancement.root_name, new_name, sizeof(new_advancement.root_name) - 1);
-                    new_advancement.root_name[sizeof(new_advancement.root_name) - 1] = '\0';
-                    // --- End of unique name generation ---
-
-                    // Find the position of the source item in the original vector
-                    auto it = std::find_if(current_template_data.advancements.begin(),
-                                           current_template_data.advancements.end(),
-                                           [&](const EditorTrackableCategory &adv) {
-                                               return &adv == source_adv_ptr;
-                                           });
-
-                    // Insert the new copy right after the source item
-                    if (it != current_template_data.advancements.end()) {
-                        current_template_data.advancements.insert(it + 1, new_advancement);
-                    } else {
-                        // Fallback: if source not found (shouldn't happen), add to the end
-                        current_template_data.advancements.push_back(new_advancement);
-                    }
-                    // Re-find and update the selected_advancement pointer
-                    if (selected_root_name_before_op[0] != '\0') {
-                        for (auto &adv: current_template_data.advancements) {
-                            if (strcmp(adv.root_name, selected_root_name_before_op) == 0) {
-                                selected_advancement = &adv;
-                                break;
-                            }
-                        }
-                    }
-                    save_message_type = MSG_NONE;
-                }
-
-                // Handle Removal
-                if (advancement_to_remove_idx != -1) {
-                    char selected_root_name_before_op[192] = {};
-                    if (selected_advancement) {
-                        strncpy(selected_root_name_before_op, selected_advancement->root_name,
-                                sizeof(selected_root_name_before_op) - 1);
-                    }
-
-                    EditorTrackableCategory *adv_to_remove = advancements_to_render[advancement_to_remove_idx];
-                    if (selected_advancement == adv_to_remove) {
-                        selected_advancement = nullptr;
-                    }
-
-                    current_template_data.advancements.erase(
-                        std::remove_if(current_template_data.advancements.begin(),
-                                       current_template_data.advancements.end(),
-                                       [&](const EditorTrackableCategory &adv) { return &adv == adv_to_remove; }),
-                        current_template_data.advancements.end()
-                    );
-
-                    // Re-find pointer if it wasn't the one being deleted
-                    if (selected_advancement && selected_root_name_before_op[0] != '\0') {
-                        for (auto &adv: current_template_data.advancements) {
-                            if (strcmp(adv.root_name, selected_root_name_before_op) == 0) {
-                                selected_advancement = &adv;
-                                break;
-                            }
-                        }
-                    }
-                    save_message_type = MSG_NONE;
-                }
-
-                ImGui::EndChild(); // End of Left Pane
-                ImGui::SameLine();
-
-                // RIGHT PANE: Details of Selected Advancement
-                ImGui::BeginChild("AdvancementDetailsPane", ImVec2(0, 0), true);
-                if (selected_advancement != nullptr) {
-                    auto &advancement = *selected_advancement; // Dereference pointer
-
-                    char details_title[64];
-                    snprintf(details_title, sizeof(details_title), "Edit %s Details", advancements_label_upper);
-                    ImGui::Text("%s", details_title);
-
-                    // "Reset All Positions" button — only if any position is manually set
-                    {
-                        bool any_pos_set = advancement.icon_pos.is_set || advancement.text_pos.is_set ||
-                                           advancement.progress_pos.is_set;
-                        for (size_t ci = 0; !any_pos_set && ci < advancement.criteria.size(); ci++) {
-                            auto &c = advancement.criteria[ci];
-                            if (c.icon_pos.is_set || c.text_pos.is_set) any_pos_set = true;
-                        }
-                        if (any_pos_set) {
-                            const char *reset_btn = "Reset All Positions";
-                            float btn_w = ImGui::CalcTextSize(reset_btn).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                            ImGui::SameLine(ImGui::GetContentRegionAvail().x - btn_w);
-                            if (ImGui::SmallButton(reset_btn)) {
-                                reset_manual_pos(&advancement.icon_pos);
-                                reset_manual_pos(&advancement.text_pos);
-                                reset_manual_pos(&advancement.progress_pos);
-                                for (auto &c : advancement.criteria) {
-                                    reset_manual_pos(&c.icon_pos);
-                                    reset_manual_pos(&c.text_pos);
-                                }
-                                save_message_type = MSG_NONE;
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char tooltip[256];
-                                if (creator_selected_version > MC_VERSION_1_6_4) {
-                                    snprintf(tooltip, sizeof(tooltip),
-                                             "Reset all manual positions for this %s\n"
-                                             "and its criteria back to the auto-layout.\n"
-                                             "Save the template for the changes to take visual effect.",
-                                             advancements_label_singular_lower);
-                                } else {
-                                    snprintf(tooltip, sizeof(tooltip),
-                                             "Reset all manual positions for this %s back to the auto-layout.\n"
-                                             "Save the template for the changes to take visual effect.",
-                                             advancements_label_singular_lower);
-                                }
-                                ImGui::SetTooltip("%s", tooltip);
-                            }
-                        }
-                    }
-
-                    ImGui::Separator();
-
-                    if (ImGui::InputText("Root Name", advancement.root_name, sizeof(advancement.root_name))) {
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char root_name_tooltip_buffer[128];
+                        char add_new_advancement_tooltip_buffer[1024];
                         if (creator_selected_version <= MC_VERSION_1_6_4) {
                             // Legacy
-                            snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
-                                     "The unique in-game ID for this %s, e.g., '5242896' (Sniper Duel).",
-                                     advancements_label_upper);
+                            snprintf(add_new_advancement_tooltip_buffer, sizeof(add_new_advancement_tooltip_buffer),
+                                     "Add a new blank achievement to this template.\n\n"
+                                     "Achievements act as a guide to completing tasks ingame\n"
+                                     "and additionally serve as challenges.\n"
+                                     "Advancely looks for achievements (e.g., '5242888' - The Lie)\n"
+                                     "within the (global or local) stats file.\n\n"
+                                     "Click the 'Help' button for more info.");
                         } else if (creator_selected_version <= MC_VERSION_1_11_2) {
                             // Mid-era
-                            snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
-                                     "The unique in-game ID for this %s, e.g., 'achievement.exploreAllBiomes'.",
-                                     advancements_label_upper);
+                            snprintf(add_new_advancement_tooltip_buffer, sizeof(add_new_advancement_tooltip_buffer),
+                                     "Add a new blank achievement to this template.\n\n"
+                                     "Achievements act as a guide to completing tasks ingame\n"
+                                     "and additionally serve as challenges.\n"
+                                     "Advancely looks for achievements (e.g., 'achievement.buildWorkBench') within the stats file.\n\n"
+                                     "Click the 'Help' button for more info.");
                         } else {
                             // Modern
-                            snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
-                                     "The unique in-game ID for this %s, e.g., 'minecraft:story/mine_stone'.",
-                                     advancements_label_upper);
+                            snprintf(add_new_advancement_tooltip_buffer, sizeof(add_new_advancement_tooltip_buffer),
+                                     "Add a new blank advancement or recipe to this template.\n\n"
+                                     "Advancements act as a guide to completing tasks ingame and additionally serve as challenges.\n"
+                                     "Recipes (e.g., crafting, smelting, ...) are a structured way to perform item and block transformations.\n"
+                                     "Advancely looks for both advancements (e.g., 'minecraft:nether/all_effects') and recipes\n"
+                                     "(e.g., 'minecraft:recipes/misc/mojang_banner_pattern') within the advancements file.\n\n"
+                                     "Click the 'Help' button for more info.");
                         }
-                        ImGui::SetTooltip("%s", root_name_tooltip_buffer);
-                    }
-                    if (ImGui::InputText("Display Name", advancement.display_name, sizeof(advancement.display_name))) {
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char display_name_tooltip_buffer[128];
-                        snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
-                                 "The user-facing name that appears on the tracker/overlay.");
-                        ImGui::SetTooltip("%s", display_name_tooltip_buffer);
-                    }
-                    if (ImGui::InputText("Icon Path", advancement.icon_path, sizeof(advancement.icon_path))) {
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char icon_path_tooltip_buffer[128];
-                        snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                 "Path to the icon file, relative to the 'resources/icons' directory.");
-                        ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
+                        ImGui::SetTooltip("%s", add_new_advancement_tooltip_buffer);
                     }
                     ImGui::SameLine();
-                    if (ImGui::Button("Browse##AdvIcon")) {
-                        char new_path[MAX_PATH_LENGTH];
-                        if (open_icon_file_dialog(new_path, sizeof(new_path))) {
-                            strncpy(advancement.icon_path, new_path, sizeof(advancement.icon_path) - 1);
-                            advancement.icon_path[sizeof(advancement.icon_path) - 1] = '\0';
-                            save_message_type = MSG_NONE;
-                        }
-                    }
-                    // resource folder tooltip
+                    ImGui::Checkbox("Show Display Names", &show_advancement_display_names);
                     if (ImGui::IsItemHovered()) {
-                        char resource_folder_tooltip_buffer[1024];
-                        snprintf(resource_folder_tooltip_buffer, sizeof(resource_folder_tooltip_buffer),
-                                 "The icon must be inside the 'resources/icons' folder!");
-                        ImGui::SetTooltip("%s", resource_folder_tooltip_buffer);
+                        char show_display_names_tooltip_buffer[256];
+                        snprintf(show_display_names_tooltip_buffer, sizeof(show_display_names_tooltip_buffer),
+                                 "Toggle between showing user-facing display names and internal root names in this list.");
+                        ImGui::SetTooltip("%s", show_display_names_tooltip_buffer);
                     }
-                    // Add the "Is Recipe" checkbox only for modern versions
-                    if (creator_selected_version >= MC_VERSION_1_12) {
-                        if (ImGui::Checkbox("Is Recipe", &advancement.is_recipe)) {
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char is_recipe_tooltip_buffer[512];
-                            snprintf(is_recipe_tooltip_buffer, sizeof(is_recipe_tooltip_buffer),
-                                     "Check this if the advancements entry is a recipe.\n"
-                                     "Recipes have their own tracker section and count towards the\n"
-                                     "percentage progress and not the main advancement counter.");
-                            ImGui::SetTooltip("%s", is_recipe_tooltip_buffer);
-                        }
-                        ImGui::SameLine();
-                    }
-                    if (ImGui::Checkbox("Hidden", &advancement.is_hidden)) {
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char hidden_tooltip_buffer[256];
-                        snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
-                                 "If checked, this %s will be fully hidden on the overlay\n"
-                                 "and hidden settings-based on the tracker.\n"
-                                 "Visibility can be toggled in the main tracker settings.\n",
-                                 advancements_label_singular_lower);
-                        ImGui::SetTooltip("%s", hidden_tooltip_buffer);
-                    }
+                    ImGui::Separator();
 
-                    if (render_layout_coordinates_header(advancements_label_singular_lower,
-                            force_open_header_root_name[0] != '\0' && strcmp(advancement.root_name, force_open_header_root_name) == 0)) {
-                        render_manual_pos_ui("icon", advancements_label_singular_lower, "Icon Position",
-                                             &advancement.icon_pos, save_message_type);
-                        render_manual_pos_ui("text", advancements_label_singular_lower, "Text Position",
-                                             &advancement.text_pos, save_message_type);
+                    // Filtering and Rendering Logic
 
-                        // ONLY show progress pos if this advancement has criteria!
-                        if (!advancement.criteria.empty()) {
-                            render_manual_pos_ui("prog", advancements_label_singular_lower, "Progress Position",
-                                                 &advancement.progress_pos, save_message_type);
-                        }
-                    }
+                    // 1. Create a list of pointers to render from
+                    std::vector<EditorTrackableCategory *> advancements_to_render;
 
-                    // Conditionally render the criteria section only for versions that support it.
-                    if (creator_selected_version > MC_VERSION_1_6_4) {
-                        ImGui::Separator();
-                        ImGui::Text("Criteria");
+                    // 2. Populate the list: either with all items, or with filtered items.
+                    bool search_active = (tc_search_buffer[0] != '\0' && current_search_scope == SCOPE_ADVANCEMENTS);
 
-                        // --- Counter for the criteria list ---
-                        char crit_counter_text[128];
-                        bool is_details_search_active = (
-                            current_search_scope == SCOPE_ADVANCEMENT_DETAILS && tc_search_buffer[0] != '\0');
-                        int visible_criteria_count = 0;
-                        if (!is_details_search_active) {
-                            visible_criteria_count = advancement.criteria.size();
-                        } else {
+                    if (search_active) {
+                        // Search is active for this scope: populate with filtered results.
+                        for (auto &advancement: current_template_data.advancements) {
+                            bool parent_match = str_contains_insensitive(advancement.display_name, tc_search_buffer) ||
+                                                str_contains_insensitive(advancement.root_name, tc_search_buffer) ||
+                                                str_contains_insensitive(advancement.icon_path, tc_search_buffer);
+
+                            if (parent_match) {
+                                advancements_to_render.push_back(&advancement);
+                                continue; // Parent matches, no need to check children
+                            }
+
+                            // If parent doesn't match, check its children (criteria)
+                            bool child_match = false;
                             for (const auto &criterion: advancement.criteria) {
                                 if (str_contains_insensitive(criterion.display_name, tc_search_buffer) ||
                                     str_contains_insensitive(criterion.root_name, tc_search_buffer) ||
                                     str_contains_insensitive(criterion.icon_path, tc_search_buffer)) {
-                                    visible_criteria_count++;
+                                    child_match = true;
+                                    break;
                                 }
                             }
-                        }
-                        snprintf(crit_counter_text, sizeof(crit_counter_text), "%d %s", visible_criteria_count,
-                                 visible_criteria_count == 1 ? "Criterion" : "Criteria");
-                        float crit_text_width = ImGui::CalcTextSize(crit_counter_text).x;
-                        ImGui::SameLine(ImGui::GetContentRegionAvail().x - crit_text_width);
-                        ImGui::TextDisabled("%s", crit_counter_text);
 
-                        // Import Criteria Button
-                        char import_crit_label[128];
-                        snprintf(import_crit_label, sizeof(import_crit_label), "Import %s Criteria",
-                                 advancements_label_upper);
-                        if (ImGui::Button(import_crit_label)) {
-                            current_advancement_import_mode = CRITERIA_ONLY_IMPORT;
-                            // This logic is copied from the main "Import Advancements" button
-                            char start_path[MAX_PATH_LENGTH];
-                            if (creator_selected_version <= MC_VERSION_1_11_2) {
-                                snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
-                            } else {
-                                snprintf(start_path, sizeof(start_path), "%s/%s/advancements/", t->saves_path,
-                                         t->world_name);
-                            }
-#ifdef __APPLE__
-                            const char *json_filter[2] = {"*.json", "public.json"};
-                            int filter_count = 2;
-#else
-                            const char *json_filter[1] = {"*.json"};
-                            int filter_count = 1;
-#endif
-                            const char *dialog_title = (creator_selected_version < MC_VERSION_1_12)
-                                                           ? "Select Player Stats File"
-                                                           : "Select Player Advancements File";
-
-                            const char *selection = tinyfd_openFileDialog(
-                                dialog_title, start_path, filter_count, json_filter, "JSON files", 0);
-
-                            if (selection) {
-                                import_error_message[0] = '\0';
-                                if (parse_player_advancements_for_import(selection, creator_selected_version,
-                                                                         importable_advancements,
-                                                                         import_error_message,
-                                                                         sizeof(import_error_message))) {
-                                    show_import_advancements_popup = true;
-                                    focus_import_search = true;
-                                    import_search_criteria_only = true; // Default search to criteria
-                                    import_select_criteria = true; // Default selection to criteria
-                                } else {
-                                    save_message_type = MSG_ERROR;
-                                    strncpy(status_message, import_error_message, sizeof(status_message) - 1);
-                                }
+                            if (child_match) {
+                                advancements_to_render.push_back(&advancement);
                             }
                         }
-                        if (ImGui::IsItemHovered()) {
-                            char tooltip[512];
-                            if (creator_selected_version <= MC_VERSION_1_11_2) {
-                                snprintf(tooltip, sizeof(tooltip),
-                                         "Import criteria for this %s directly from a player stats file.",
-                                         advancements_label_singular_lower);
-                            } else {
-                                snprintf(tooltip, sizeof(tooltip),
-                                         "Import criteria for this %s directly from a player advancements file.",
-                                         advancements_label_singular_lower);
-                            }
-                            ImGui::SetTooltip("%s", tooltip);
+                    } else {
+                        // Search is not active: populate with pointers to all items.
+                        for (auto &advancement: current_template_data.advancements) {
+                            advancements_to_render.push_back(&advancement);
                         }
-                        ImGui::SameLine();
+                    }
 
-                        char criterion_add_tooltip_buffer[256];
-                        snprintf(criterion_add_tooltip_buffer, sizeof(criterion_add_tooltip_buffer),
-                                 "Add New %s Criterion",
-                                 advancements_label_upper);
-                        if (ImGui::Button(criterion_add_tooltip_buffer)) {
-                            // Create new adv/ach criterion with default values
-                            EditorTrackableItem new_crit = {};
-                            int counter = 1;
-                            while (true) {
-                                snprintf(new_crit.root_name, sizeof(new_crit.root_name), "new_criterion_%d", counter);
-                                bool name_exists = false;
-                                for (const auto &crit: advancement.criteria) {
-                                    if (strcmp(crit.root_name, new_crit.root_name) == 0) {
-                                        name_exists = true;
-                                        break;
-                                    }
-                                }
-                                if (!name_exists) break;
-                                counter++;
-                            }
-                            snprintf(new_crit.display_name, sizeof(new_crit.display_name), "New Criterion %d", counter);
-                            strncpy(new_crit.icon_path, "blocks/placeholder.png", sizeof(new_crit.icon_path) - 1);
-                            new_crit.icon_path[sizeof(new_crit.icon_path) - 1] = '\0';
-                            advancement.criteria.push_back(new_crit);
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char add_new_criterion_tooltip_buffer[1024];
-                            if (creator_selected_version <= MC_VERSION_1_11_2) {
-                                // Mid-era
-                                snprintf(add_new_criterion_tooltip_buffer, sizeof(add_new_criterion_tooltip_buffer),
-                                         "Add a new blank achievement criterion to this template.\n\n"
-                                         "Achievements can have sub-tasks that must all be completed.\n"
-                                         "Advancely looks for achievement criteria (e.g., 'Swampland' of 'achievement.exploreAllBiomes')\n"
-                                         "within the stats file.\n\n"
-                                         "Click the 'Help' button for more info.");
-                            } else {
-                                // Modern
-                                snprintf(add_new_criterion_tooltip_buffer, sizeof(add_new_criterion_tooltip_buffer),
-                                         "Add a new blank advancement/recipe criterion to this template.\n\n"
-                                         "Advancements can have sub-tasks that must all be completed.\n"
-                                         "Advancely looks for advancement criteria (e.g., 'enchanted_golden_apple'\n"
-                                         "of 'minecraft:husbandry/balanced_diet') and recipe criteria\n"
-                                         "(e.g., 'has_nether_star' of 'minecraft:recipes/misc/beacon') within the advancements file.\n\n"
-                                         "Click the 'Help' button for more info.");
-                            }
-                            ImGui::SetTooltip("%s", add_new_criterion_tooltip_buffer);
-                        }
+                    // --- Counter for the list ---
+                    char counter_text[128];
+                    snprintf(counter_text, sizeof(counter_text), "%zu %s", advancements_to_render.size(),
+                             advancements_to_render.size() == 1
+                                 ? advancements_label_upper
+                                 : advancements_label_plural_upper);
+                    float text_width = ImGui::CalcTextSize(counter_text).x;
+                    ImGui::SetCursorPosX(
+                        ImGui::GetCursorPosX() + (
+                            ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - text_width) *
+                        0.5f);
+                    ImGui::TextDisabled("%s", counter_text);
 
-
-                        // --- Criteria Sorting Controls ---
-                        bool can_sort_crit = false;
-                        for (const auto &crit: advancement.criteria) {
-                            if (crit.sort_order > 0) {
-                                can_sort_crit = true;
-                                break;
-                            }
-                        }
-
-                        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_buttons_width);
-
-                        ImGui::BeginDisabled(!can_sort_crit);
-                        // Using root_name for the ID since we don't have 'i' in this scope
-                        char sort_crit_id[256], reset_crit_id[256];
-                        snprintf(sort_crit_id, sizeof(sort_crit_id), "Sort##crit_%s", advancement.root_name);
-                        snprintf(reset_crit_id, sizeof(reset_crit_id), "Reset Order##crit_%s", advancement.root_name);
-
-                        if (ImGui::Button(sort_crit_id)) {
-                            apply_partial_sort(advancement.criteria);
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                            char tooltip_buffer[128];
-                            if (!can_sort_crit) {
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                         "Click the order badges next to criteria to assign a sort order first.");
-                            } else {
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                         "Rearrange the numbered criteria among themselves.");
-                            }
-                            ImGui::SetTooltip("%s", tooltip_buffer);
-                        }
-                        ImGui::SameLine();
-                        if (ImGui::Button(reset_crit_id)) {
-                            for (auto &crit: advancement.criteria) crit.sort_order = 0;
-                        }
-                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                            char tooltip_buffer[128];
-                            if (!can_sort_crit) {
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
-                            } else {
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                         "Clear all assigned sort orders from criteria.");
-                            }
-                            ImGui::SetTooltip("%s", tooltip_buffer);
-                        }
-                        ImGui::EndDisabled();
-                    } // End of conditional criteria block for above 1.6.4 otherwise no criteria
-
-                    // Determine if a details search is active
-                    bool is_details_search_active = (
-                        current_search_scope == SCOPE_ADVANCEMENT_DETAILS && tc_search_buffer[0] != '\0');
-
-                    int criterion_to_remove = -1;
-                    int criterion_to_copy = -1;
+                    int advancement_to_remove_idx = -1;
+                    int advancement_to_copy_idx = -1; // To queue a copy action
 
                     // State for drag and drop
-                    int criterion_dnd_source_index = -1;
-                    int criterion_dnd_target_index = -1;
+                    int adv_dnd_source_index = -1;
+                    int adv_dnd_target_index = -1;
 
-                    for (size_t j = 0; j < advancement.criteria.size(); j++) {
-                        auto &criterion = advancement.criteria[j];
+                    for (size_t i = 0; i < advancements_to_render.size(); ++i) {
+                        auto &advancement = *advancements_to_render[i]; // Dereference the pointer
+                        ImGui::PushID(&advancement); // Use pointer for a stable ID
 
-                        if (is_details_search_active) {
-                            if (!str_contains_insensitive(criterion.display_name, tc_search_buffer) &&
-                                !str_contains_insensitive(criterion.root_name, tc_search_buffer) &&
-                                !str_contains_insensitive(criterion.icon_path, tc_search_buffer)) {
-                                continue;
+                        const char *display_name = advancement.display_name;
+                        const char *root_name = advancement.root_name;
+
+                        // Show display names based on setting
+                        const char *label = show_advancement_display_names
+                                                ? (display_name[0] ? display_name : root_name)
+                                                : root_name;
+                        if (label[0] == '\0') {
+                            char placeholder[64];
+                            snprintf(placeholder, sizeof(placeholder), "[New %s]", advancements_label_upper);
+                            label = placeholder;
+                        }
+
+                        // --- Sort Badge (Category) ---
+                        char cat_badge_label[32];
+                        if (advancement.sort_order > 0) {
+                            snprintf(cat_badge_label, sizeof(cat_badge_label), "%d##cat_badge", advancement.sort_order);
+                        } else {
+                            snprintf(cat_badge_label, sizeof(cat_badge_label), " - ##cat_badge");
+                        }
+
+                        const char *cat_text_end = strstr(cat_badge_label, "##");
+                        float cat_text_w = ImGui::CalcTextSize(cat_badge_label, cat_text_end).x;
+                        float cat_badge_w = std::max(28.0f, cat_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
+
+                        if (ImGui::Button(cat_badge_label, ImVec2(cat_badge_w, 0))) {
+                            if (advancement.sort_order > 0)
+                                advancement.sort_order = 0;
+                            else advancement.sort_order = get_next_sort_order(current_template_data.advancements);
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            if (advancement.sort_order > 0) {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to remove %s sort order",
+                                         advancements_label_singular_lower);
+                            } else {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to assign %s sort order",
+                                         advancements_label_singular_lower);
+                            }
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+
+                        // Draw the "X" (Remove) button
+                        if (ImGui::Button("X")) {
+                            advancement_to_remove_idx = i;
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s", label);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+
+                        // Draw the "Copy" button
+                        if (ImGui::Button("Copy")) {
+                            advancement_to_copy_idx = i;
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Duplicate %s.", label);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+
+                        if (ImGui::Selectable(label, &advancement == selected_advancement)) {
+                            // Compare pointers
+                            // Check if the user is selecting a *different* item than the one currently selected
+                            if (&advancement != selected_advancement) {
+                                selected_advancement = &advancement;
                             }
                         }
 
-                        ImGui::PushID(j);
-
-
-                        // Add vertical spacing creating the gap
-                        ImGui::Spacing();
-
-                        // Create a wide, 8-pixel-high invisible button to act as our drop zone
-                        ImGui::InvisibleButton("drop_target", ImVec2(-1, 8.0f));
-
-                        // We make the separator a drop target to allow dropping between items
+                        // DRAG AND DROP LOGIC
+                        // Make the entire row a drag source
+                        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
+                            // Use a unique payload ID for this list
+                            ImGui::SetDragDropPayload("ADVANCEMENT_DND", &i, sizeof(int));
+                            ImGui::Text("Reorder %s", label);
+                            ImGui::EndDragDropSource();
+                        }
+                        // Make the entire row a drop target
                         if (ImGui::BeginDragDropTarget()) {
-                            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("CRITERION_DND")) {
-                                criterion_dnd_source_index = *(const int *) payload->Data;
-                                criterion_dnd_target_index = j;
+                            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("ADVANCEMENT_DND")) {
+                                adv_dnd_source_index = *(const int *) payload->Data;
+                                adv_dnd_target_index = i;
                             }
                             ImGui::EndDragDropTarget();
-                        }
-
-                        // Draw a separator for visual feedback after the drop zone
-                        ImGui::Separator();
-
-                        // Use an invisible button overlaying the group as a drag handle
-                        ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
-                        ImGui::BeginGroup();
-
-                        if (ImGui::InputText("Criterion Root Name", criterion.root_name, sizeof(criterion.root_name))) {
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char root_name_tooltip_buffer[128];
-                            if (creator_selected_version <= MC_VERSION_1_11_2) {
-                                // Mid-era
-                                snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
-                                         "The unique in-game ID for this criterion, e.g., 'Forest'.");
-                            } else {
-                                // Modern
-                                snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
-                                         "The unique in-game ID for this criterion, e.g., 'minecraft:hoglin'.");
-                            }
-                            ImGui::SetTooltip("%s", root_name_tooltip_buffer);
-                        }
-                        if (ImGui::InputText("Display Name", criterion.display_name, sizeof(criterion.display_name))) {
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char display_name_tooltip_buffer[128];
-                            snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
-                                     "The user-facing name for this criterion.");
-                            ImGui::SetTooltip("%s", display_name_tooltip_buffer);
-                        }
-                        if (ImGui::InputText("Icon Path", criterion.icon_path, sizeof(criterion.icon_path))) {
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char icon_path_tooltip_buffer[1024];
-                            snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                     "Path to the icon file, relative to the 'resources/icons' directory.");
-                            ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
-                        }
-                        ImGui::SameLine();
-                        if (ImGui::Button("Browse##CritIcon")) {
-                            char new_path[MAX_PATH_LENGTH];
-                            if (open_icon_file_dialog(new_path, sizeof(new_path))) {
-                                strncpy(criterion.icon_path, new_path, sizeof(criterion.icon_path) - 1);
-                                criterion.icon_path[sizeof(criterion.icon_path) - 1] = '\0';
-                                save_message_type = MSG_NONE;
-                            }
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char icon_path_tooltip_buffer[1024];
-                            snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                     "The icon must be inside the 'resources/icons' folder!");
-                            ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
-                        }
-                        if (ImGui::Checkbox("Hidden", &criterion.is_hidden)) {
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char hidden_tooltip_buffer[1024];
-                            snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
-                                     "If checked, the icon of the criterion will be fully hidden on the overlay\n"
-                                     "(within 1st row) and hidden settings-based on the tracker.\n"
-                                     "The criterion name will still display below the %s name\n"
-                                     "on the overlay if it's the last one remaining.\n"
-                                     "This means it will still contribute to the horizontal spacing\n"
-                                     "of the second row unless the advancement is hidden.\n"
-                                     "Visibility can be toggled in the main tracker settings.",
-                                     advancements_label_singular_lower);
-                            ImGui::SetTooltip("%s", hidden_tooltip_buffer);
-                        }
-
-                        ImGui::SameLine();
-
-                        // "Copy" button for criteria
-                        if (ImGui::Button("Copy")) {
-                            criterion_to_copy = j;
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tooltip_buffer[128];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate %s Criterion:\n%s",
-                                     advancements_label_upper, criterion.root_name);
-                            ImGui::SetTooltip("%s", tooltip_buffer);
-                        }
-                        ImGui::SameLine();
-
-                        if (ImGui::Button("Remove")) {
-                            criterion_to_remove = j;
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tooltip_buffer[128];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s Criterion:\n%s",
-                                     advancements_label_upper, criterion.root_name);
-                            ImGui::SetTooltip("%s", tooltip_buffer);
-                        }
-
-                        ImGui::SameLine();
-
-                        // --- Sort Badge (Criterion) ---
-                        char crit_badge_label[64];
-                        if (criterion.sort_order > 0) {
-                            snprintf(crit_badge_label, sizeof(crit_badge_label), "%d##crit_badge_%zu",
-                                     criterion.sort_order, j);
-                        } else {
-                            snprintf(crit_badge_label, sizeof(crit_badge_label), " - ##crit_badge_%zu", j);
-                        }
-
-                        const char *crit_text_end = strstr(crit_badge_label, "##");
-                        float crit_text_w = ImGui::CalcTextSize(crit_badge_label, crit_text_end).x;
-                        float crit_badge_w = std::max(28.0f, crit_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
-
-                        if (ImGui::Button(crit_badge_label, ImVec2(crit_badge_w, 0))) {
-                            if (criterion.sort_order > 0)
-                                criterion.sort_order = 0;
-                            else criterion.sort_order = get_next_sort_order(advancement.criteria);
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tooltip_buffer[128];
-                            if (criterion.sort_order > 0) {
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                         "Click to remove criterion sort order");
-                            } else {
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                         "Click to assign criterion sort order");
-                            }
-                            ImGui::SetTooltip("%s", tooltip_buffer);
-                        }
-
-                        if (render_layout_coordinates_header("criterion",
-                                force_open_child_header_root_name[0] != '\0' && strcmp(criterion.root_name, force_open_child_header_root_name) == 0)) {
-                            render_manual_pos_ui("c_icon", "criterion", "Icon Position", &criterion.icon_pos,
-                                                 save_message_type);
-                            render_manual_pos_ui("c_text", "criterion", "Text Position", &criterion.text_pos,
-                                                 save_message_type);
-                        }
-
-                        ImGui::EndGroup();
-
-                        ImGui::SameLine();
-                        ImGui::SetCursorScreenPos(item_start_cursor_pos);
-                        ImGui::InvisibleButton("dnd_handle", ImGui::GetItemRectSize());
-
-                        // Use the flag to make the non-interactive group a drag source
-                        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
-                            ImGui::SetDragDropPayload("CRITERION_DND", &j, sizeof(int));
-                            ImGui::Text("Reorder %s", criterion.root_name);
-                            ImGui::EndDragDropSource();
                         }
 
                         ImGui::PopID();
                     }
 
-                    // Final drop target to allow dropping at the end of the list
-                    ImGui::InvisibleButton("final_drop_target_adv_crit", ImVec2(-1, 8.0f)); // Added larger drop zone
-                    if (ImGui::BeginDragDropTarget()) {
-                        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("CRITERION_DND")) {
-                            criterion_dnd_source_index = *(const int *) payload->Data;
-                            criterion_dnd_target_index = advancement.criteria.size();
+                    // Handle Drag and Drop reordering after the loop
+                    if (adv_dnd_source_index != -1 && adv_dnd_target_index != -1) {
+                        // Get pointers to the source and target items from the list that was rendered
+                        EditorTrackableCategory *source_item_ptr = advancements_to_render[adv_dnd_source_index];
+                        EditorTrackableCategory *target_item_ptr = advancements_to_render[adv_dnd_target_index];
+
+                        // Find the iterator for the source item in the original data vector
+                        auto source_it = std::find_if(current_template_data.advancements.begin(),
+                                                      current_template_data.advancements.end(),
+                                                      [&](const EditorTrackableCategory &adv) {
+                                                          return &adv == source_item_ptr;
+                                                      });
+
+                        // Create a copy of the item to move, then erase it
+                        EditorTrackableCategory item_to_move = *source_item_ptr;
+                        current_template_data.advancements.erase(source_it);
+
+                        // Find the iterator for the target item in the (now modified) original vector
+                        auto target_it = std::find_if(current_template_data.advancements.begin(),
+                                                      current_template_data.advancements.end(),
+                                                      [&](const EditorTrackableCategory &adv) {
+                                                          return &adv == target_item_ptr;
+                                                      });
+
+                        // Insert the copied item at the target's position
+                        current_template_data.advancements.insert(target_it, item_to_move);
+
+                        save_message_type = MSG_NONE;
+                    }
+
+                    // Handle Copying
+                    if (advancement_to_copy_idx != -1) {
+                        char selected_root_name_before_op[192] = {};
+                        if (selected_advancement) {
+                            strncpy(selected_root_name_before_op, selected_advancement->root_name,
+                                    sizeof(selected_root_name_before_op) - 1);
                         }
-                        ImGui::EndDragDropTarget();
-                    }
+                        // Get a pointer to the source item to copy from the filtered list
+                        const EditorTrackableCategory *source_adv_ptr = advancements_to_render[advancement_to_copy_idx];
 
-                    // Handle actions after the loop
-                    if (criterion_dnd_source_index != -1 && criterion_dnd_target_index != -1 &&
-                        criterion_dnd_source_index != criterion_dnd_target_index) {
-                        EditorTrackableItem item_to_move = advancement.criteria[criterion_dnd_source_index];
-                        advancement.criteria.erase(advancement.criteria.begin() + criterion_dnd_source_index);
-                        if (criterion_dnd_target_index > criterion_dnd_source_index) criterion_dnd_target_index--;
-                        advancement.criteria.insert(advancement.criteria.begin() + criterion_dnd_target_index,
-                                                    item_to_move);
-                        save_message_type = MSG_NONE;
-                    }
+                        // Perform a manual, safe copy to prevent memory corruption.
+                        EditorTrackableCategory new_advancement;
+                        strncpy(new_advancement.root_name, source_adv_ptr->root_name,
+                                sizeof(new_advancement.root_name));
+                        new_advancement.root_name[sizeof(new_advancement.root_name) - 1] = '\0';
+                        strncpy(new_advancement.display_name, source_adv_ptr->display_name,
+                                sizeof(new_advancement.display_name));
+                        new_advancement.display_name[sizeof(new_advancement.display_name) - 1] = '\0';
+                        strncpy(new_advancement.icon_path, source_adv_ptr->icon_path,
+                                sizeof(new_advancement.icon_path));
+                        new_advancement.icon_path[sizeof(new_advancement.icon_path) - 1] = '\0';
+                        new_advancement.is_hidden = source_adv_ptr->is_hidden;
+                        new_advancement.is_recipe = source_adv_ptr->is_recipe;
+                        new_advancement.is_simple_stat = source_adv_ptr->is_simple_stat;
+                        new_advancement.criteria = source_adv_ptr->criteria; // std::vector handles its own deep copy.
+                        new_advancement.icon_pos = source_adv_ptr->icon_pos;
+                        new_advancement.text_pos = source_adv_ptr->text_pos;
+                        new_advancement.progress_pos = source_adv_ptr->progress_pos;
 
+                        new_advancement.sort_order = 0;
+                        for (auto &crit: new_advancement.criteria) {
+                            crit.sort_order = 0; // Clear badges on cloned children
+                        }
 
-                    if (criterion_to_remove != -1) {
-                        advancement.criteria.erase(advancement.criteria.begin() + criterion_to_remove);
-                        save_message_type = MSG_NONE;
-                    }
-
-                    // Logic to handle the copy action after the loop
-                    if (criterion_to_copy != -1) {
-                        const auto &source_criterion = advancement.criteria[criterion_to_copy];
-
-
-                        // Perform a manual, safe copy.
-                        EditorTrackableItem new_criterion;
-                        strncpy(new_criterion.root_name, source_criterion.root_name, sizeof(new_criterion.root_name));
-                        new_criterion.root_name[sizeof(new_criterion.root_name) - 1] = '\0';
-                        strncpy(new_criterion.display_name, source_criterion.display_name,
-                                sizeof(new_criterion.display_name));
-                        new_criterion.display_name[sizeof(new_criterion.display_name) - 1] = '\0';
-                        strncpy(new_criterion.icon_path, source_criterion.icon_path, sizeof(new_criterion.icon_path));
-                        new_criterion.icon_path[sizeof(new_criterion.icon_path) - 1] = '\0';
-                        new_criterion.goal = source_criterion.goal;
-                        new_criterion.is_hidden = source_criterion.is_hidden;
-                        new_criterion.icon_pos = source_criterion.icon_pos;
-                        new_criterion.text_pos = source_criterion.text_pos;
-                        new_criterion.progress_pos = source_criterion.progress_pos;
-
-                        new_criterion.sort_order = 0;
-
+                        // --- Generate a unique root_name for the copy ---
                         char base_name[192];
-                        strncpy(base_name, source_criterion.root_name, sizeof(base_name) - 1);
+                        strncpy(base_name, source_adv_ptr->root_name, sizeof(base_name) - 1);
                         base_name[sizeof(base_name) - 1] = '\0';
+
                         char new_name[192];
                         int copy_counter = 1;
                         while (true) {
                             if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
                             else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
+
+
+                            // Check against the full original list to ensure the name is truly unique
                             bool name_exists = false;
-                            for (const auto &crit: advancement.criteria) {
-                                if (strcmp(crit.root_name, new_name) == 0) {
+                            for (const auto &adv: current_template_data.advancements) {
+                                if (strcmp(adv.root_name, new_name) == 0) {
                                     name_exists = true;
                                     break;
                                 }
                             }
-                            if (!name_exists) break;
+                            if (!name_exists) break; // Found a unique name
                             copy_counter++;
                         }
-                        strncpy(new_criterion.root_name, new_name, sizeof(new_criterion.root_name) - 1);
-                        new_criterion.root_name[sizeof(new_criterion.root_name) - 1] = '\0';
-                        advancement.criteria.insert(advancement.criteria.begin() + criterion_to_copy + 1,
-                                                    new_criterion);
+                        strncpy(new_advancement.root_name, new_name, sizeof(new_advancement.root_name) - 1);
+                        new_advancement.root_name[sizeof(new_advancement.root_name) - 1] = '\0';
+                        // --- End of unique name generation ---
+
+                        // Find the position of the source item in the original vector
+                        auto it = std::find_if(current_template_data.advancements.begin(),
+                                               current_template_data.advancements.end(),
+                                               [&](const EditorTrackableCategory &adv) {
+                                                   return &adv == source_adv_ptr;
+                                               });
+
+                        // Insert the new copy right after the source item
+                        if (it != current_template_data.advancements.end()) {
+                            current_template_data.advancements.insert(it + 1, new_advancement);
+                        } else {
+                            // Fallback: if source not found (shouldn't happen), add to the end
+                            current_template_data.advancements.push_back(new_advancement);
+                        }
+                        // Re-find and update the selected_advancement pointer
+                        if (selected_root_name_before_op[0] != '\0') {
+                            for (auto &adv: current_template_data.advancements) {
+                                if (strcmp(adv.root_name, selected_root_name_before_op) == 0) {
+                                    selected_advancement = &adv;
+                                    break;
+                                }
+                            }
+                        }
                         save_message_type = MSG_NONE;
                     }
-                } else {
-                    char select_prompt[128];
-                    snprintf(select_prompt, sizeof(select_prompt), "Select an %s from the list to edit its details.",
-                             advancements_label_upper);
-                    ImGui::Text("%s", select_prompt);
-                }
-                ImGui::EndChild();
-                ImGui::EndTabItem();
-            }
-            } // end adv tab scope
 
-            {
-            ImGuiTabItemFlags stats_tab_flags = (force_select_tab == FORCE_TAB_STATS) ? ImGuiTabItemFlags_SetSelected : 0;
-            if (force_select_tab == FORCE_TAB_STATS) force_select_tab = FORCE_TAB_NONE;
-            if (ImGui::BeginTabItem("Stats", nullptr, stats_tab_flags)) {
-                // TWO PANE LAYOUT for Stats
-                float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
-                ImGui::BeginChild("StatListPane", ImVec2(pane_width, 0), true);
+                    // Handle Removal
+                    if (advancement_to_remove_idx != -1) {
+                        char selected_root_name_before_op[192] = {};
+                        if (selected_advancement) {
+                            strncpy(selected_root_name_before_op, selected_advancement->root_name,
+                                    sizeof(selected_root_name_before_op) - 1);
+                        }
 
-                if (ImGui::Button("Import Stats")) {
-                    current_stat_import_mode = IMPORT_AS_TOP_LEVEL; // Set the mode as top level not sub-stat
-                    char start_path[MAX_PATH_LENGTH];
-                    // Determine the correct starting path based on version and settings
-                    if (creator_selected_version <= MC_VERSION_1_6_4) {
-                        if (app_settings->using_stats_per_world_legacy) {
-                            // Legacy, Per-World: .../saves/WORLD_NAME/stats/
-                            snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
-                        } else {
-                            // Legacy, Global: .../stats/
-                            char parent_dir[MAX_PATH_LENGTH];
-                            if (get_parent_directory(t->saves_path, parent_dir, sizeof(parent_dir), 1)) {
-                                snprintf(start_path, sizeof(start_path), "%s/stats/", parent_dir);
+                        EditorTrackableCategory *adv_to_remove = advancements_to_render[advancement_to_remove_idx];
+                        if (selected_advancement == adv_to_remove) {
+                            selected_advancement = nullptr;
+                        }
+
+                        current_template_data.advancements.erase(
+                            std::remove_if(current_template_data.advancements.begin(),
+                                           current_template_data.advancements.end(),
+                                           [&](const EditorTrackableCategory &adv) { return &adv == adv_to_remove; }),
+                            current_template_data.advancements.end()
+                        );
+
+                        // Re-find pointer if it wasn't the one being deleted
+                        if (selected_advancement && selected_root_name_before_op[0] != '\0') {
+                            for (auto &adv: current_template_data.advancements) {
+                                if (strcmp(adv.root_name, selected_root_name_before_op) == 0) {
+                                    selected_advancement = &adv;
+                                    break;
+                                }
+                            }
+                        }
+                        save_message_type = MSG_NONE;
+                    }
+
+                    ImGui::EndChild(); // End of Left Pane
+                    ImGui::SameLine();
+
+                    // RIGHT PANE: Details of Selected Advancement
+                    ImGui::BeginChild("AdvancementDetailsPane", ImVec2(0, 0), true);
+                    if (selected_advancement != nullptr) {
+                        auto &advancement = *selected_advancement; // Dereference pointer
+
+                        char details_title[64];
+                        snprintf(details_title, sizeof(details_title), "Edit %s Details", advancements_label_upper);
+                        ImGui::Text("%s", details_title);
+
+                        // "Reset All Positions" button — only if any position is manually set
+                        {
+                            bool any_pos_set = advancement.icon_pos.is_set || advancement.text_pos.is_set ||
+                                               advancement.progress_pos.is_set;
+                            for (size_t ci = 0; !any_pos_set && ci < advancement.criteria.size(); ci++) {
+                                auto &c = advancement.criteria[ci];
+                                if (c.icon_pos.is_set || c.text_pos.is_set) any_pos_set = true;
+                            }
+                            if (any_pos_set) {
+                                const char *reset_btn = "Reset All Positions";
+                                float btn_w = ImGui::CalcTextSize(reset_btn).x + ImGui::GetStyle().FramePadding.x *
+                                              2.0f;
+                                ImGui::SameLine(ImGui::GetContentRegionAvail().x - btn_w);
+                                if (ImGui::SmallButton(reset_btn)) {
+                                    reset_manual_pos(&advancement.icon_pos);
+                                    reset_manual_pos(&advancement.text_pos);
+                                    reset_manual_pos(&advancement.progress_pos);
+                                    for (auto &c: advancement.criteria) {
+                                        reset_manual_pos(&c.icon_pos);
+                                        reset_manual_pos(&c.text_pos);
+                                    }
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip[256];
+                                    if (creator_selected_version > MC_VERSION_1_6_4) {
+                                        snprintf(tooltip, sizeof(tooltip),
+                                                 "Reset all manual positions for this %s\n"
+                                                 "and its criteria back to the auto-layout.\n"
+                                                 "Save the template for the changes to take visual effect.",
+                                                 advancements_label_singular_lower);
+                                    } else {
+                                        snprintf(tooltip, sizeof(tooltip),
+                                                 "Reset all manual positions for this %s back to the auto-layout.\n"
+                                                 "Save the template for the changes to take visual effect.",
+                                                 advancements_label_singular_lower);
+                                    }
+                                    ImGui::SetTooltip("%s", tooltip);
+                                }
+                            }
+                        }
+
+                        ImGui::Separator();
+
+                        if (ImGui::InputText("Root Name", advancement.root_name, sizeof(advancement.root_name))) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char root_name_tooltip_buffer[128];
+                            if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                // Legacy
+                                snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
+                                         "The unique in-game ID for this %s, e.g., '5242896' (Sniper Duel).",
+                                         advancements_label_upper);
+                            } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                // Mid-era
+                                snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
+                                         "The unique in-game ID for this %s, e.g., 'achievement.exploreAllBiomes'.",
+                                         advancements_label_upper);
                             } else {
-                                strncpy(start_path, t->saves_path, sizeof(start_path)); // Fallback
-                                start_path[sizeof(start_path) - 1] = '\0';
+                                // Modern
+                                snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
+                                         "The unique in-game ID for this %s, e.g., 'minecraft:story/mine_stone'.",
+                                         advancements_label_upper);
+                            }
+                            ImGui::SetTooltip("%s", root_name_tooltip_buffer);
+                        }
+                        if (ImGui::InputText("Display Name", advancement.display_name,
+                                             sizeof(advancement.display_name))) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char display_name_tooltip_buffer[128];
+                            snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
+                                     "The user-facing name that appears on the tracker/overlay.");
+                            ImGui::SetTooltip("%s", display_name_tooltip_buffer);
+                        }
+                        if (ImGui::InputText("Icon Path", advancement.icon_path, sizeof(advancement.icon_path))) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char icon_path_tooltip_buffer[128];
+                            snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                     "Path to the icon file, relative to the 'resources/icons' directory.");
+                            ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Browse##AdvIcon")) {
+                            char new_path[MAX_PATH_LENGTH];
+                            if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                strncpy(advancement.icon_path, new_path, sizeof(advancement.icon_path) - 1);
+                                advancement.icon_path[sizeof(advancement.icon_path) - 1] = '\0';
+                                save_message_type = MSG_NONE;
                             }
                         }
-                    } else {
-                        // Mid-era and Modern stats are always in a per-world stats folder
-                        snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
-                    }
-
-                    // --- Version-aware file filters ---
-#ifdef __APPLE__
-                    const char *json_filter[2] = {"*.json", "public.json"};
-                    const char *dat_filter[2] = {"*.dat", "public.data"};
-                    int filter_count = 2;
-#else
-                    const char *json_filter[1] = {"*.json"};
-                    const char *dat_filter[1] = {"*.dat"};
-                    int filter_count = 1;
-#endif
-                    const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
-                                                       ? dat_filter
-                                                       : json_filter;
-                    const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
-                                                  ? "DAT files"
-                                                  : "JSON files";
-
-                    const char *selection = tinyfd_openFileDialog("Select Player Stats File", start_path, filter_count,
-                                                                  selected_filter, filter_desc, 0);
-
-                    if (selection) {
-                        import_error_message[0] = '\0';
-                        if (parse_player_stats_for_import(selection, creator_selected_version, importable_stats,
-                                                          import_error_message, sizeof(import_error_message))) {
-                            show_import_stats_popup = true;
-                            last_clicked_stat_index = -1; // Reset range selection
-                        } else {
-                            save_message_type = MSG_ERROR;
-                            strncpy(status_message, import_error_message, sizeof(status_message) - 1);
-                            status_message[sizeof(status_message) - 1] = '\0';
+                        // resource folder tooltip
+                        if (ImGui::IsItemHovered()) {
+                            char resource_folder_tooltip_buffer[1024];
+                            snprintf(resource_folder_tooltip_buffer, sizeof(resource_folder_tooltip_buffer),
+                                     "The icon must be inside the 'resources/icons' folder!");
+                            ImGui::SetTooltip("%s", resource_folder_tooltip_buffer);
                         }
-                    }
-                }
-                if (ImGui::IsItemHovered()) {
-                    char tooltip[512];
-
-                    if (creator_selected_version <= MC_VERSION_1_6_4) {
-                        if (app_settings->using_stats_per_world_legacy) {
-                            // Legacy using stats per world
-                            snprintf(tooltip, sizeof(tooltip),
-                                     "Import stats directly from a local world's player stats/achievements .dat file.\n"
-                                     "Cannot import already existing root names.");
-                        } else {
-                            // Legacy not using stats per world
-                            snprintf(tooltip, sizeof(tooltip),
-                                     "Import stats directly from a global world's player stats/achievements .dat file.\n"
-                                     "Cannot import already existing root names.");
-                        }
-                    } else if (creator_selected_version <= MC_VERSION_1_12_2) {
-                        // Mid-era (1.7.2 - 1.12.2)
-                        snprintf(tooltip, sizeof(tooltip),
-                                 "Import stats directly from a world's player stats .json file.\n"
-                                 "(Also contains achievements for 1.7.2 - 1.11.2).\n"
-                                 "Cannot import already existing root names.");
-                    } else {
-                        // Modern (1.13+)
-                        snprintf(tooltip, sizeof(tooltip),
-                                 "Import stats directly from a world's player stats .json file.\n"
-                                 "Cannot import already existing root names.");
-                    }
-                    ImGui::SetTooltip("%s", tooltip);
-                }
-
-                ImGui::SameLine();
-
-                // --- Sorting Controls ---
-                bool can_sort_stat = false;
-                for (const auto &stat_cat: current_template_data.stats) {
-                    if (stat_cat.sort_order > 0) {
-                        can_sort_stat = true;
-                        break;
-                    }
-                }
-
-                float sort_btn_width = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                float reset_btn_width = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                float total_buttons_width = sort_btn_width + reset_btn_width + ImGui::GetStyle().ItemSpacing.x;
-
-                ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_buttons_width);
-
-                ImGui::BeginDisabled(!can_sort_stat);
-                if (ImGui::Button("Sort##stat")) {
-                    apply_partial_sort(current_template_data.stats);
-                    save_message_type = MSG_NONE;
-                }
-                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    char tooltip_buffer[128];
-                    if (!can_sort_stat) {
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Click the order badges next to categories to assign a sort order first.");
-                    } else {
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Rearrange the numbered categories among themselves.");
-                    }
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Reset Order##stat")) {
-                    for (auto &stat_cat: current_template_data.stats) stat_cat.sort_order = 0;
-                }
-                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    char tooltip_buffer[128];
-                    if (!can_sort_stat) {
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
-                    } else {
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Clear all assigned sort orders from categories.");
-                    }
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
-                ImGui::EndDisabled();
-
-                // New Line
-                if (ImGui::Button("Add New Stat")) {
-                    // Create new stat category with default values
-                    EditorTrackableCategory new_stat = {};
-                    int counter = 1;
-                    while (true) {
-                        snprintf(new_stat.root_name, sizeof(new_stat.root_name), "new_stat_%d", counter);
-                        bool name_exists = false;
-                        for (const auto &stat: current_template_data.stats) {
-                            if (strcmp(stat.root_name, new_stat.root_name) == 0) {
-                                name_exists = true;
-                                break;
-                            }
-                        }
-                        if (!name_exists) break;
-                        counter++;
-                    }
-                    snprintf(new_stat.display_name, sizeof(new_stat.display_name), "New Stat %d", counter);
-                    strncpy(new_stat.icon_path, "blocks/placeholder.png", sizeof(new_stat.icon_path) - 1);
-                    new_stat.icon_path[sizeof(new_stat.icon_path) - 1] = '\0';
-                    new_stat.is_simple_stat = true; // Default to simple
-
-                    // Add a default criterion for the simple stat
-                    EditorTrackableItem new_crit = {};
-                    // Version-aware root name for the new criterion
-                    if (creator_selected_version <= MC_VERSION_1_6_4) {
-                        strncpy(new_crit.root_name, "0", sizeof(new_crit.root_name) - 1);
-                        new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
-                        // Legacy stats are numeric IDs
-                    } else if (creator_selected_version <= MC_VERSION_1_12_2) {
-                        // Mid-era stats are prefixed
-                        snprintf(new_crit.root_name, sizeof(new_crit.root_name), "stat.new_stat_%d", counter);
-                    } else {
-                        // Modern (1.13+)
-                        snprintf(new_crit.root_name, sizeof(new_crit.root_name),
-                                 "minecraft:custom/minecraft:new_stat_%d", counter); // Modern
-                    }
-                    new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
-                    new_crit.goal = 1; // Default to a completable goal
-                    new_stat.criteria.push_back(new_crit);
-
-                    current_template_data.stats.push_back(new_stat);
-                    save_message_type = MSG_NONE;
-                }
-                if (ImGui::IsItemHovered()) {
-                    char add_stat_tooltip_buffer[1024];
-                    if (creator_selected_version <= MC_VERSION_1_6_4) {
-                        // Legacy
-                        snprintf(add_stat_tooltip_buffer, sizeof(add_stat_tooltip_buffer),
-                                 "Add a new blank stat to this template.\n\n"
-                                 "Statistics allow tracking of certain actions in form of numerical data.\n"
-                                 "Advancely looks for statistics (e.g., '16908566'  - Times Used of\n"
-                                 "Diamond Pickaxe) in the (global or local) stats file.\n"
-                                 "Simple achievements (e.g., '5242880' - Taking Inventory) can also act as stats\n"
-                                 "(e.g., How many time you've opened your inventory).\n\n"
-                                 "Click the 'Help' button for more info.");
-                    } else if (creator_selected_version <= MC_VERSION_1_12_2) {
-                        // Mid-era (1.7.2 - 1.12.2)
-                        snprintf(add_stat_tooltip_buffer, sizeof(add_stat_tooltip_buffer),
-                                 "Add a new blank stat to this template.\n\n"
-                                 "Statistics allow tracking of certain actions in form of numerical data.\n"
-                                 "Advancely looks for statistics (e.g., 'stat.mineBlock.minecraft.tallgrass') in the stats file.\n"
-                                 "Simple achievements (e.g., 'achievement.mineWood') can also act as stats\n"
-                                 "(e.g., Logs mined (any log type)).\n\n"
-                                 "Click the 'Help' button for more info.");
-                    } else {
-                        // Modern (1.13+)
-                        snprintf(add_stat_tooltip_buffer, sizeof(add_stat_tooltip_buffer),
-                                 "Add a new blank stat to this template.\n\n"
-                                 "Statistics allow tracking of certain actions in form of numerical data.\n"
-                                 "Advancely looks for statistics (e.g., 'minecraft:custom/minecraft:jump') in the stats file.\n"
-                                 "The format for Advancely always is 'namespace:category/namespace:stat',\n"
-                                 "where the category is outside of the curly braces and the stat is inside.\n\n"
-                                 "Click the 'Help' button for more info.");
-                    }
-
-                    ImGui::SetTooltip("%s", add_stat_tooltip_buffer);
-                }
-                ImGui::SameLine();
-                ImGui::Checkbox("Show Display Names", &show_stat_display_names);
-                if (ImGui::IsItemHovered()) {
-                    char show_display_names_tooltip_buffer[1024];
-                    snprintf(show_display_names_tooltip_buffer, sizeof(show_display_names_tooltip_buffer),
-                             "Toggle between showing user-facing display names and internal root names in this list.");
-                    ImGui::SetTooltip("%s", show_display_names_tooltip_buffer);
-                }
-
-                ImGui::Separator();
-
-                // 1. Create a list of pointers to render from.
-                std::vector<EditorTrackableCategory *> stats_to_render;
-
-                // 2. Populate the list based on the search criteria.
-                bool search_active = (tc_search_buffer[0] != '\0' && current_search_scope == SCOPE_STATS);
-
-                if (search_active) {
-                    for (auto &stat_cat: current_template_data.stats) {
-                        // Skip internal helper stats from appearing in the list.
-                        if (strncmp(stat_cat.root_name, "hidden_ms_stat_", 15) == 0) {
-                            continue;
-                        }
-                        bool should_render = false;
-
-                        // Always check parent-level fields first
-                        // This covers the display name for both simple and complex stats.
-                        if (str_contains_insensitive(stat_cat.display_name, tc_search_buffer) ||
-                            str_contains_insensitive(stat_cat.root_name, tc_search_buffer) ||
-                            str_contains_insensitive(stat_cat.icon_path, tc_search_buffer)) {
-                            should_render = true;
-                        }
-
-                        // If parent didn't match, check child-level fields
-                        if (!should_render) {
-                            for (const auto &criterion: stat_cat.criteria) {
-                                char goal_str[32];
-                                snprintf(goal_str, sizeof(goal_str), "%d", criterion.goal);
-
-                                // For complex stats, we also check the criterion's own display name.
-                                bool name_match = !stat_cat.is_simple_stat && str_contains_insensitive(
-                                                      criterion.display_name, tc_search_buffer);
-
-                                // The core check for root name, icon path, and target goal, which applies to both simple and complex stats.
-                                if (name_match ||
-                                    str_contains_insensitive(criterion.root_name, tc_search_buffer) ||
-                                    str_contains_insensitive(criterion.icon_path, tc_search_buffer) ||
-                                    (criterion.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr)) {
-                                    should_render = true;
-                                    break; // A matching child was found, no need to check others.
-                                }
-                            }
-                        }
-
-                        if (should_render) {
-                            stats_to_render.push_back(&stat_cat);
-                        }
-                    }
-                } else {
-                    // Search is inactive, so show all non-hidden stats.
-                    for (auto &stat_cat: current_template_data.stats) {
-                        // Skip internal helper stats from appearing in the list.
-                        if (strncmp(stat_cat.root_name, "hidden_ms_stat_", 15) == 0) {
-                            continue;
-                        }
-                        stats_to_render.push_back(&stat_cat);
-                    }
-                }
-
-                // --- Counter for the list ---
-
-                char counter_text[128];
-                snprintf(counter_text, sizeof(counter_text), "%zu %s", stats_to_render.size(),
-                         stats_to_render.size() == 1 ? "Stat" : "Stats");
-                float text_width = ImGui::CalcTextSize(counter_text).x;
-                // Center Count
-                ImGui::SetCursorPosX(
-                    ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - text_width) *
-                    0.5f);
-                ImGui::TextDisabled("%s", counter_text);
-
-                // 3. Render the list using pointers.
-                int stat_to_remove_idx = -1;
-                int stat_to_copy_idx = -1;
-                int stat_dnd_source_index = -1;
-                int stat_dnd_target_index = -1;
-
-                for (size_t i = 0; i < stats_to_render.size(); i++) {
-                    auto &stat = *stats_to_render[i];
-                    ImGui::PushID(&stat);
-
-                    const char *display_name = stat.display_name;
-                    const char *root_name = stat.root_name;
-                    const char *label = show_stat_display_names
-                                            ? (display_name[0] ? display_name : root_name)
-                                            : root_name;
-                    if (label[0] == '\0') {
-                        label = "[New Stat]";
-                    }
-
-                    // --- Sort Badge (Stat Category) ---
-                    char stat_badge_label[64];
-                    if (stat.sort_order > 0) {
-                        snprintf(stat_badge_label, sizeof(stat_badge_label), "%d##stat_badge", stat.sort_order);
-                    } else {
-                        snprintf(stat_badge_label, sizeof(stat_badge_label), " - ##stat_badge");
-                    }
-
-                    const char *stat_text_end = strstr(stat_badge_label, "##");
-                    float stat_text_w = ImGui::CalcTextSize(stat_badge_label, stat_text_end).x;
-                    float stat_badge_w = std::max(28.0f, stat_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
-
-                    if (ImGui::Button(stat_badge_label, ImVec2(stat_badge_w, 0))) {
-                        if (stat.sort_order > 0)
-                            stat.sort_order = 0;
-                        else stat.sort_order = get_next_sort_order(current_template_data.stats);
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[128];
-                        if (stat.sort_order > 0) {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to remove stat sort order");
-                        } else {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to assign stat sort order");
-                        }
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-                    ImGui::SameLine();
-
-                    if (ImGui::Button("X")) { stat_to_remove_idx = i; }
-                    if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[128];
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s", label);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("Copy")) { stat_to_copy_idx = i; }
-                    if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[128];
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Duplicate %s.", label);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-                    ImGui::SameLine();
-
-                    if (ImGui::Selectable(label, &stat == selected_stat)) {
-                        if (&stat != selected_stat) {
-                            selected_stat = &stat;
-                        }
-                    }
-
-                    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
-                        ImGui::SetDragDropPayload("STAT_DND", &i, sizeof(int));
-                        ImGui::Text("Reorder %s", label);
-                        ImGui::EndDragDropSource();
-                    }
-                    if (ImGui::BeginDragDropTarget()) {
-                        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("STAT_DND")) {
-                            stat_dnd_source_index = *(const int *) payload->Data;
-                            stat_dnd_target_index = i;
-                        }
-                        ImGui::EndDragDropTarget();
-                    }
-                    ImGui::PopID();
-                }
-
-                // Handle Drag and Drop
-                if (stat_dnd_source_index != -1 && stat_dnd_target_index != -1) {
-                    EditorTrackableCategory *source_item_ptr = stats_to_render[stat_dnd_source_index];
-                    EditorTrackableCategory *target_item_ptr = stats_to_render[stat_dnd_target_index];
-
-                    auto source_it = std::find_if(current_template_data.stats.begin(),
-                                                  current_template_data.stats.end(),
-                                                  [&](const EditorTrackableCategory &s) {
-                                                      return &s == source_item_ptr;
-                                                  });
-
-                    EditorTrackableCategory item_to_move = *source_item_ptr;
-                    current_template_data.stats.erase(source_it);
-
-                    auto target_it = std::find_if(current_template_data.stats.begin(),
-                                                  current_template_data.stats.end(),
-                                                  [&](const EditorTrackableCategory &s) {
-                                                      return &s == target_item_ptr;
-                                                  });
-
-                    current_template_data.stats.insert(target_it, item_to_move);
-                    save_message_type = MSG_NONE;
-                }
-
-                // Handle Copying
-                if (stat_to_copy_idx != -1) {
-                    char selected_root_name_before_op[192] = {};
-                    if (selected_stat) {
-                        strncpy(selected_root_name_before_op, selected_stat->root_name,
-                                sizeof(selected_root_name_before_op) - 1);
-                    }
-                    const EditorTrackableCategory *source_stat_ptr = stats_to_render[stat_to_copy_idx];
-
-                    // Perform a manual, safe copy to prevent memory corruption from non-null-terminated strings.
-                    EditorTrackableCategory new_stat;
-                    strncpy(new_stat.root_name, source_stat_ptr->root_name, sizeof(new_stat.root_name));
-                    new_stat.root_name[sizeof(new_stat.root_name) - 1] = '\0';
-                    strncpy(new_stat.display_name, source_stat_ptr->display_name, sizeof(new_stat.display_name));
-                    new_stat.display_name[sizeof(new_stat.display_name) - 1] = '\0';
-                    strncpy(new_stat.icon_path, source_stat_ptr->icon_path, sizeof(new_stat.icon_path));
-                    new_stat.icon_path[sizeof(new_stat.icon_path) - 1] = '\0';
-                    new_stat.is_hidden = source_stat_ptr->is_hidden;
-                    new_stat.is_recipe = source_stat_ptr->is_recipe;
-                    new_stat.is_simple_stat = source_stat_ptr->is_simple_stat;
-                    new_stat.criteria = source_stat_ptr->criteria; // std::vector handles its own deep copy safely.
-                    new_stat.icon_pos = source_stat_ptr->icon_pos;
-                    new_stat.text_pos = source_stat_ptr->text_pos;
-                    new_stat.progress_pos = source_stat_ptr->progress_pos;
-
-                    new_stat.sort_order = 0;
-                    for (auto &crit: new_stat.criteria) {
-                        crit.sort_order = 0;
-                    }
-
-
-                    // Now, generate a unique name for the new copy
-                    char base_name[192];
-                    strncpy(base_name, source_stat_ptr->root_name, sizeof(base_name));
-                    base_name[sizeof(base_name) - 1] = '\0'; // Ensure base_name is safe to use in snprintf
-
-                    char new_name[192];
-                    int copy_counter = 1;
-                    while (true) {
-                        if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
-                        else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
-                        bool name_exists = false;
-                        for (const auto &s: current_template_data.stats) {
-                            if (strcmp(s.root_name, new_name) == 0) {
-                                name_exists = true;
-                                break;
-                            }
-                        }
-                        if (!name_exists) break;
-                        copy_counter++;
-                    }
-
-                    // Safely apply the new unique name
-                    strncpy(new_stat.root_name, new_name, sizeof(new_stat.root_name));
-                    new_stat.root_name[sizeof(new_stat.root_name) - 1] = '\0';
-
-                    auto it = std::find_if(current_template_data.stats.begin(), current_template_data.stats.end(),
-                                           [&](const EditorTrackableCategory &s) { return &s == source_stat_ptr; });
-
-                    if (it != current_template_data.stats.end()) {
-                        current_template_data.stats.insert(it + 1, new_stat);
-                    } else {
-                        current_template_data.stats.push_back(new_stat);
-                    }
-
-                    // Re-find and update the selected_stat pointer
-                    if (selected_root_name_before_op[0] != '\0') {
-                        for (auto &stat: current_template_data.stats) {
-                            if (strcmp(stat.root_name, selected_root_name_before_op) == 0) {
-                                selected_stat = &stat;
-                                break;
-                            }
-                        }
-                    }
-                    save_message_type = MSG_NONE;
-                }
-
-                // Handle Removal
-                if (stat_to_remove_idx != -1) {
-                    char selected_root_name_before_op[192] = {};
-                    if (selected_stat) {
-                        strncpy(selected_root_name_before_op, selected_stat->root_name,
-                                sizeof(selected_root_name_before_op) - 1);
-                    }
-
-                    EditorTrackableCategory *stat_to_remove = stats_to_render[stat_to_remove_idx];
-                    if (selected_stat == stat_to_remove) {
-                        selected_stat = nullptr;
-                    }
-
-                    current_template_data.stats.erase(
-                        std::remove_if(current_template_data.stats.begin(), current_template_data.stats.end(),
-                                       [&](const EditorTrackableCategory &s) { return &s == stat_to_remove; }),
-                        current_template_data.stats.end()
-                    );
-
-                    // Re-find pointer if it wasn't the one being deleted
-                    if (selected_stat && selected_root_name_before_op[0] != '\0') {
-                        for (auto &stat: current_template_data.stats) {
-                            if (strcmp(stat.root_name, selected_root_name_before_op) == 0) {
-                                selected_stat = &stat;
-                                break;
-                            }
-                        }
-                    }
-                    save_message_type = MSG_NONE;
-                }
-                ImGui::EndChild();
-                ImGui::SameLine();
-
-                ImGui::BeginChild("StatDetailsPane", ImVec2(0, 0), true);
-                if (selected_stat != nullptr) {
-                    auto &stat_cat = *selected_stat;
-
-                    ImGui::Text("Edit Stat Details");
-
-                    // "Reset All Positions" button — only if any position is manually set
-                    {
-                        bool any_pos_set = stat_cat.icon_pos.is_set || stat_cat.text_pos.is_set ||
-                                           stat_cat.progress_pos.is_set;
-                        for (size_t ci = 0; !any_pos_set && ci < stat_cat.criteria.size(); ci++) {
-                            auto &c = stat_cat.criteria[ci];
-                            if (c.icon_pos.is_set || c.text_pos.is_set) any_pos_set = true;
-                        }
-                        if (any_pos_set) {
-                            const char *reset_btn = "Reset All Positions";
-                            float btn_w = ImGui::CalcTextSize(reset_btn).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                            ImGui::SameLine(ImGui::GetContentRegionAvail().x - btn_w);
-                            if (ImGui::SmallButton(reset_btn)) {
-                                reset_manual_pos(&stat_cat.icon_pos);
-                                reset_manual_pos(&stat_cat.text_pos);
-                                reset_manual_pos(&stat_cat.progress_pos);
-                                for (auto &c : stat_cat.criteria) {
-                                    reset_manual_pos(&c.icon_pos);
-                                    reset_manual_pos(&c.text_pos);
-                                }
+                        // Add the "Is Recipe" checkbox only for modern versions
+                        if (creator_selected_version >= MC_VERSION_1_12) {
+                            if (ImGui::Checkbox("Is Recipe", &advancement.is_recipe)) {
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
-                                char tooltip[256];
-                                if (!stat_cat.is_simple_stat) {
-                                    snprintf(tooltip, sizeof(tooltip),
-                                             "Reset all manual positions for this stat category\n"
-                                             "and its sub-stats back to the auto-layout.\n"
-                                             "Save the template for the changes to take visual effect.");
-                                } else {
-                                    snprintf(tooltip, sizeof(tooltip),
-                                             "Reset all manual positions for this stat back to the auto-layout.\n"
-                                             "Save the template for the changes to take visual effect.");
-                                }
-                                ImGui::SetTooltip("%s", tooltip);
+                                char is_recipe_tooltip_buffer[512];
+                                snprintf(is_recipe_tooltip_buffer, sizeof(is_recipe_tooltip_buffer),
+                                         "Check this if the advancements entry is a recipe.\n"
+                                         "Recipes have their own tracker section and count towards the\n"
+                                         "percentage progress and not the main advancement counter.");
+                                ImGui::SetTooltip("%s", is_recipe_tooltip_buffer);
                             }
+                            ImGui::SameLine();
                         }
-                    }
-
-                    ImGui::Separator();
-
-                    if (ImGui::InputText("Category Key", stat_cat.root_name, sizeof(stat_cat.root_name))) {
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char root_name_tooltip_buffer[128];
-                        snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
-                                 "The unique key for this stat or stat category, e.g., 'stat:my_awesome_stat'.");
-                        ImGui::SetTooltip("%s", root_name_tooltip_buffer);
-                    }
-                    if (ImGui::InputText("Display Name", stat_cat.display_name, sizeof(stat_cat.display_name))) {
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char display_name_tooltip_buffer[128];
-                        snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
-                                 "The user-facing name for this single stat or stat category.");
-                        ImGui::SetTooltip("%s", display_name_tooltip_buffer);
-                    }
-                    if (ImGui::InputText("Icon Path", stat_cat.icon_path, sizeof(stat_cat.icon_path))) {
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char icon_path_tooltip_buffer[1024];
-                        snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                 "Path to the icon file, relative to the 'resources/icons' directory.");
-                        ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("Browse##StatIcon")) {
-                        char new_path[MAX_PATH_LENGTH];
-                        if (open_icon_file_dialog(new_path, sizeof(new_path))) {
-                            strncpy(stat_cat.icon_path, new_path, sizeof(stat_cat.icon_path) - 1);
-                            stat_cat.icon_path[sizeof(stat_cat.icon_path) - 1] = '\0';
-                            save_message_type = MSG_NONE;
-                        }
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char icon_path_tooltip_buffer[1024];
-                        snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                 "The icon must be inside the 'resources/icons' folder!");
-                        ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
-                    }
-                    if (ImGui::Checkbox("Hidden", &stat_cat.is_hidden)) {
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char hidden_tooltip_buffer[256];
-                        snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
-                                 "If checked, this stat (and all sub-stats) will be fully hidden on the overlay\n"
-                                 "and hidden settings-based on the tracker.\n"
-                                 "Visibility can be toggled in the main tracker settings");
-                        ImGui::SetTooltip("%s", hidden_tooltip_buffer);
-                    }
-
-                    ImGui::SameLine();
-                    if (ImGui::Checkbox("Row 2", &stat_cat.in_2nd_row)) {
-                        save_message_type = MSG_NONE;
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[256];
-                        if (creator_selected_version != MC_VERSION_25W14CRAFTMINE) {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Force this stat category to display on the 2nd row of the overlay\n"
-                                     "(normally reserved for %s).", advancements_label_plural_lower);
-                        } else {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Force this stat category to display on the 2nd row of the overlay\n"
-                                     "(normally reserved for %s/unlocks).", advancements_label_plural_lower);
-                        }
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-
-                    ImGui::SameLine();
-
-                    // Invert the logic for the checkbox to be more intuitive for the user
-                    bool is_multi_stat = !stat_cat.is_simple_stat;
-                    if (ImGui::Checkbox("Multi-Stat Category", &is_multi_stat)) {
-                        bool was_simple_stat = stat_cat.is_simple_stat;
-                        stat_cat.is_simple_stat = !is_multi_stat;
-
-                        // Ensure at least one criterion exists to avoid errors
-                        if (stat_cat.criteria.empty()) {
-                            stat_cat.criteria.push_back({});
-                        }
-
-                        // If switching FROM Simple TO Multi-Stat
-                        if (was_simple_stat && !stat_cat.is_simple_stat) {
-                            // Copy the parent's display name to the first criterion.
-                            strncpy(stat_cat.criteria[0].display_name, stat_cat.display_name,
-                                    sizeof(stat_cat.criteria[0].display_name) - 1);
-                            stat_cat.criteria[0].display_name[sizeof(stat_cat.criteria[0].display_name) - 1] = '\0';
-
-                            // Set a default placeholder icon for the newly visible sub-stat.
-                            strncpy(stat_cat.criteria[0].icon_path, "blocks/placeholder.png",
-                                    sizeof(stat_cat.criteria[0].icon_path) - 1);
-                            stat_cat.criteria[0].icon_path[sizeof(stat_cat.criteria[0].icon_path) - 1] = '\0';
-                        }
-                        // If switching FROM Multi-Stat TO Simple Stat
-                        else if (!was_simple_stat && stat_cat.is_simple_stat) {
-                            // Copy the first criterion's display name up to the parent.
-                            strncpy(stat_cat.display_name, stat_cat.criteria[0].display_name,
-                                    sizeof(stat_cat.display_name) - 1);
-                            stat_cat.display_name[sizeof(stat_cat.display_name) - 1] = '\0';
-
-                            // If there were multiple criteria, keep only the first one.
-                            if (stat_cat.criteria.size() > 1) {
-                                EditorTrackableItem first_crit = stat_cat.criteria[0];
-                                stat_cat.criteria.clear();
-                                stat_cat.criteria.push_back(first_crit);
-                            }
-                        }
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char multi_stat_tooltip_buffer[256];
-                        snprintf(multi_stat_tooltip_buffer, sizeof(multi_stat_tooltip_buffer),
-                                 "Toggle between a simple, single stat and a complex category\n"
-                                 "containing multiple sub-stats that individually act as a single stat,\n"
-                                 "but have their own icons similar to %s criteria.", advancements_label_singular_lower);
-                        ImGui::SetTooltip("%s", multi_stat_tooltip_buffer);
-                    }
-
-                    if (render_layout_coordinates_header("stat category",
-                            force_open_header_root_name[0] != '\0' && strcmp(stat_cat.root_name, force_open_header_root_name) == 0)) {
-                        render_manual_pos_ui("s_icon", "stat category", "Icon Position", &stat_cat.icon_pos,
-                                             save_message_type);
-                        render_manual_pos_ui("s_text", "stat category", "Text Position", &stat_cat.text_pos,
-                                             save_message_type);
-
-                        // ONLY show progress pos if this is a Multi-Stat Category!
-                        if (!stat_cat.is_simple_stat) {
-                            render_manual_pos_ui("s_prog", "stat category", "Progress Position", &stat_cat.progress_pos,
-                                                 save_message_type);
-                        }
-                    }
-
-                    ImGui::Separator();
-
-                    if (stat_cat.is_simple_stat) {
-                        // UI for a simple stat
-                        if (stat_cat.criteria.empty()) stat_cat.criteria.push_back({}); // Ensure one exists
-
-                        auto &simple_crit = stat_cat.criteria[0];
-                        if (ImGui::InputText("Stat Root Name", simple_crit.root_name, sizeof(simple_crit.root_name))) {
+                        if (ImGui::Checkbox("Hidden", &advancement.is_hidden)) {
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
-                            char stat_root_name_tooltip_buffer[256];
-                            if (creator_selected_version <= MC_VERSION_1_6_4) {
-                                // Legacy
-                                snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
-                                         "The unique in-game ID for the stat to track, e.g., '16842813' (Furnace Crafted).");
-                            } else if (creator_selected_version <= MC_VERSION_1_12_2) {
-                                // Mid-era (1.7.2 - 1.12.2)
-                                snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
-                                         "The unique in-game ID for the stat to track, e.g., 'stat.sprintOneCm'.");
+                            char hidden_tooltip_buffer[256];
+                            snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
+                                     "If checked, this %s will be fully hidden on the overlay\n"
+                                     "and hidden settings-based on the tracker.\n"
+                                     "Visibility can be toggled in the main tracker settings.\n",
+                                     advancements_label_singular_lower);
+                            ImGui::SetTooltip("%s", hidden_tooltip_buffer);
+                        }
+
+                        if (render_layout_coordinates_header(advancements_label_singular_lower,
+                                                             force_open_header_root_name[0] != '\0' && strcmp(
+                                                                 advancement.root_name,
+                                                                 force_open_header_root_name) == 0)) {
+                            render_manual_pos_ui("icon", advancements_label_singular_lower, "Icon Position",
+                                                 &advancement.icon_pos, save_message_type);
+                            render_manual_pos_ui("text", advancements_label_singular_lower, "Text Position",
+                                                 &advancement.text_pos, save_message_type);
+
+                            // ONLY show progress pos if this advancement has criteria!
+                            if (!advancement.criteria.empty()) {
+                                render_manual_pos_ui("prog", advancements_label_singular_lower, "Progress Position",
+                                                     &advancement.progress_pos, save_message_type);
+                            }
+                        }
+
+                        // Conditionally render the criteria section only for versions that support it.
+                        if (creator_selected_version > MC_VERSION_1_6_4) {
+                            ImGui::Separator();
+                            ImGui::Text("Criteria");
+
+                            // --- Counter for the criteria list ---
+                            char crit_counter_text[128];
+                            bool is_details_search_active = (
+                                current_search_scope == SCOPE_ADVANCEMENT_DETAILS && tc_search_buffer[0] != '\0');
+                            int visible_criteria_count = 0;
+                            if (!is_details_search_active) {
+                                visible_criteria_count = advancement.criteria.size();
                             } else {
-                                // Modern (1.13+)
-                                snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
-                                         "The unique in-game ID for the stat to track, e.g., 'minecraft:mined/minecraft:diamond_ore'.");
-                            }
-                            ImGui::SetTooltip("%s", stat_root_name_tooltip_buffer);
-                        }
-                        if (ImGui::InputInt("Target Value", &simple_crit.goal)) {
-                            // Clamping to -1
-                            if (simple_crit.goal < -1) {
-                                simple_crit.goal = -1;
-                            }
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char target_tooltip_buffer[512];
-                            snprintf(target_tooltip_buffer, sizeof(target_tooltip_buffer),
-                                     "Set the stat's behavior:\n"
-                                     "-1 = Infinite counter (manual completion via checkbox).\n"
-                                     ">0 = Progress-based counter (completes when value reached).\n"
-                                     "0 = NOT ALLOWED (Use a Custom Goal toggle instead).");
-                            ImGui::SetTooltip("%s", target_tooltip_buffer);
-                        }
-                    } else {
-                        // UI for a complex, multi-stat category (similar to advancements)
-                        ImGui::Text("Sub-Stats");
-
-                        // --- Counter for the sub-stat list ---
-                        char crit_counter_text[128];
-                        bool is_details_search_active = (
-                            current_search_scope == SCOPE_STAT_DETAILS && tc_search_buffer[0] != '\0');
-                        int visible_criteria_count = 0;
-                        if (!is_details_search_active) {
-                            visible_criteria_count = stat_cat.criteria.size();
-                        } else {
-                            for (const auto &crit: stat_cat.criteria) {
-                                char goal_str[32];
-                                snprintf(goal_str, sizeof(goal_str), "%d", crit.goal);
-                                if (str_contains_insensitive(crit.display_name, tc_search_buffer) ||
-                                    str_contains_insensitive(crit.root_name, tc_search_buffer) ||
-                                    str_contains_insensitive(crit.icon_path, tc_search_buffer) ||
-                                    (crit.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr)) {
-                                    visible_criteria_count++;
+                                for (const auto &criterion: advancement.criteria) {
+                                    if (str_contains_insensitive(criterion.display_name, tc_search_buffer) ||
+                                        str_contains_insensitive(criterion.root_name, tc_search_buffer) ||
+                                        str_contains_insensitive(criterion.icon_path, tc_search_buffer)) {
+                                        visible_criteria_count++;
+                                    }
                                 }
                             }
-                        }
-                        snprintf(crit_counter_text, sizeof(crit_counter_text), "%d %s", visible_criteria_count,
-                                 visible_criteria_count == 1 ? "Sub-Stat" : "Sub-Stats");
-                        float text_width = ImGui::CalcTextSize(crit_counter_text).x;
-                        ImGui::SameLine(ImGui::GetContentRegionAvail().x - text_width);
-                        ImGui::TextDisabled("%s", crit_counter_text);
+                            snprintf(crit_counter_text, sizeof(crit_counter_text), "%d %s", visible_criteria_count,
+                                     visible_criteria_count == 1 ? "Criterion" : "Criteria");
+                            float crit_text_width = ImGui::CalcTextSize(crit_counter_text).x;
+                            ImGui::SameLine(ImGui::GetContentRegionAvail().x - crit_text_width);
+                            ImGui::TextDisabled("%s", crit_counter_text);
 
-                        // "Import Sub-Stats" button
-                        if (ImGui::Button("Import Sub-Stats")) {
-                            current_stat_import_mode = IMPORT_AS_SUB_STAT; // Set the mode
-                            char start_path[MAX_PATH_LENGTH];
-                            if (creator_selected_version <= MC_VERSION_1_6_4) {
-                                if (app_settings->using_stats_per_world_legacy) {
+                            // Import Criteria Button
+                            char import_crit_label[128];
+                            snprintf(import_crit_label, sizeof(import_crit_label), "Import %s Criteria",
+                                     advancements_label_upper);
+                            if (ImGui::Button(import_crit_label)) {
+                                current_advancement_import_mode = CRITERIA_ONLY_IMPORT;
+                                // This logic is copied from the main "Import Advancements" button
+                                char start_path[MAX_PATH_LENGTH];
+                                if (creator_selected_version <= MC_VERSION_1_11_2) {
                                     snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
                                              t->world_name);
                                 } else {
-                                    char parent_dir[MAX_PATH_LENGTH];
-                                    if (get_parent_directory(t->saves_path, parent_dir, sizeof(parent_dir), 1)) {
-                                        snprintf(start_path, sizeof(start_path), "%s/stats/", parent_dir);
-                                    } else {
-                                        strncpy(start_path, t->saves_path, sizeof(start_path));
-                                    }
+                                    snprintf(start_path, sizeof(start_path), "%s/%s/advancements/", t->saves_path,
+                                             t->world_name);
                                 }
-                            } else {
-                                snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
-                            }
 #ifdef __APPLE__
-                            const char *json_filter[2] = {"*.json", "public.json"};
-                            const char *dat_filter[2] = {"*.dat", "public.data"};
-                            int filter_count = 2;
+                                const char *json_filter[2] = {"*.json", "public.json"};
+                                int filter_count = 2;
 #else
-                            const char *json_filter[1] = {"*.json"};
-                            const char *dat_filter[1] = {"*.dat"};
-                            int filter_count = 1;
+                                const char *json_filter[1] = {"*.json"};
+                                int filter_count = 1;
 #endif
-                            const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
-                                                               ? dat_filter
-                                                               : json_filter;
-                            const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
-                                                          ? "DAT files"
-                                                          : "JSON files";
-                            const char *selection = tinyfd_openFileDialog(
-                                "Select Player Stats File", start_path, filter_count, selected_filter, filter_desc, 0);
-                            if (selection) {
-                                import_error_message[0] = '\0';
-                                if (parse_player_stats_for_import(selection, creator_selected_version, importable_stats,
-                                                                  import_error_message, sizeof(import_error_message))) {
-                                    show_import_stats_popup = true;
-                                    last_clicked_stat_index = -1;
-                                } else {
-                                    save_message_type = MSG_ERROR;
-                                    strncpy(status_message, import_error_message, sizeof(status_message) - 1);
-                                }
-                            }
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tooltip[512];
+                                const char *dialog_title = (creator_selected_version < MC_VERSION_1_12)
+                                                               ? "Select Player Stats File"
+                                                               : "Select Player Advancements File";
 
-                            if (creator_selected_version <= MC_VERSION_1_6_4) {
-                                if (app_settings->using_stats_per_world_legacy) {
-                                    // Legacy using stats per world
-                                    snprintf(tooltip, sizeof(tooltip),
-                                             "Import sub-stats directly from a local world's player stats/achievements .dat file.\n"
-                                             "Cannot import already existing root names within this stat category.");
-                                } else {
-                                    // Legacy not using stats per world
-                                    snprintf(tooltip, sizeof(tooltip),
-                                             "Import sub-stats directly from a global world's player stats/achievements .dat file.\n"
-                                             "Cannot import already existing root names within this stat category.");
-                                }
-                            } else if (creator_selected_version <= MC_VERSION_1_12_2) {
-                                // Mid-era (1.7.2 - 1.12.2)
-                                snprintf(tooltip, sizeof(tooltip),
-                                         "Import sub-stats directly from a world's player stats/achievements .json file.\n"
-                                         "Cannot import already existing root names within this stat category.");
-                            } else {
-                                // Modern(1.13+)
-                                snprintf(tooltip, sizeof(tooltip),
-                                         "Import sub-stats directly from a world's player stats .json file.\n"
-                                         "Cannot import already existing root names within this stat category.");
-                            }
-                            ImGui::SetTooltip("%s", tooltip);
-                        }
-                        ImGui::SameLine();
+                                const char *selection = tinyfd_openFileDialog(
+                                    dialog_title, start_path, filter_count, json_filter, "JSON files", 0);
 
-                        // Add Criterion button only for multi-stat categories -> complex stats
-                        if (ImGui::Button("Add New Sub-Stat")) {
-                            // Create new stat criterion with default values
-                            EditorTrackableItem new_crit = {};
-                            int counter = 1;
-                            while (true) {
-                                snprintf(new_crit.root_name, sizeof(new_crit.root_name), "new_criterion_%d", counter);
-                                bool name_exists = false;
-                                for (const auto &crit: stat_cat.criteria) {
-                                    if (strcmp(crit.root_name, new_crit.root_name) == 0) {
-                                        name_exists = true;
-                                        break;
+                                if (selection) {
+                                    import_error_message[0] = '\0';
+                                    if (parse_player_advancements_for_import(selection, creator_selected_version,
+                                                                             importable_advancements,
+                                                                             import_error_message,
+                                                                             sizeof(import_error_message))) {
+                                        show_import_advancements_popup = true;
+                                        focus_import_search = true;
+                                        import_search_criteria_only = true; // Default search to criteria
+                                        import_select_criteria = true; // Default selection to criteria
+                                    } else {
+                                        save_message_type = MSG_ERROR;
+                                        strncpy(status_message, import_error_message, sizeof(status_message) - 1);
                                     }
                                 }
-                                if (!name_exists) break;
-                                counter++;
                             }
-                            snprintf(new_crit.display_name, sizeof(new_crit.display_name), "New Criterion %d", counter);
-                            strncpy(new_crit.icon_path, "blocks/placeholder.png", sizeof(new_crit.icon_path) - 1);
-                            new_crit.icon_path[sizeof(new_crit.icon_path) - 1] = '\0';
-                            new_crit.goal = 1; // Default to a completable goal
-                            stat_cat.criteria.push_back(new_crit);
-                            save_message_type = MSG_NONE;
-                        }
-
-                        // Tooltip for Add Criterion button
-                        if (ImGui::IsItemHovered()) {
-                            char add_stat_tooltip_buffer[1024];
-                            snprintf(add_stat_tooltip_buffer, sizeof(add_stat_tooltip_buffer),
-                                     "Add a new blank sub-stat to this template.\n\n"
-                                     "Sub-Stats are functionally identical to stats,\n"
-                                     "but have their own icons that then displays in\n"
-                                     "the topmost row of the overlay.\n\n"
-                                     "Click the 'Help' button for more info.");
-                            ImGui::SetTooltip("%s", add_stat_tooltip_buffer);
-                        }
-
-                        ImGui::SameLine();
-
-                        // --- Criteria Sorting Controls ---
-                        bool can_sort_crit = false;
-                        for (const auto &crit: stat_cat.criteria) {
-                            if (crit.sort_order > 0) {
-                                can_sort_crit = true;
-                                break;
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip[512];
+                                if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                    snprintf(tooltip, sizeof(tooltip),
+                                             "Import criteria for this %s directly from a player stats file.",
+                                             advancements_label_singular_lower);
+                                } else {
+                                    snprintf(tooltip, sizeof(tooltip),
+                                             "Import criteria for this %s directly from a player advancements file.",
+                                             advancements_label_singular_lower);
+                                }
+                                ImGui::SetTooltip("%s", tooltip);
                             }
-                        }
+                            ImGui::SameLine();
 
-                        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_buttons_width);
-
-                        ImGui::BeginDisabled(!can_sort_crit);
-                        char sort_crit_id[256], reset_crit_id[256];
-                        snprintf(sort_crit_id, sizeof(sort_crit_id), "Sort##scrit_%s", stat_cat.root_name);
-                        snprintf(reset_crit_id, sizeof(reset_crit_id), "Reset Order##scrit_%s", stat_cat.root_name);
-
-                        if (ImGui::Button(sort_crit_id)) {
-                            apply_partial_sort(stat_cat.criteria);
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                            char tooltip_buffer[128];
-                            if (!can_sort_crit) {
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                         "Click the order badges next to criteria to assign a sort order first.");
-                            } else {
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                         "Rearrange the numbered criteria among themselves.");
+                            char criterion_add_tooltip_buffer[256];
+                            snprintf(criterion_add_tooltip_buffer, sizeof(criterion_add_tooltip_buffer),
+                                     "Add New %s Criterion",
+                                     advancements_label_upper);
+                            if (ImGui::Button(criterion_add_tooltip_buffer)) {
+                                // Create new adv/ach criterion with default values
+                                EditorTrackableItem new_crit = {};
+                                int counter = 1;
+                                while (true) {
+                                    snprintf(new_crit.root_name, sizeof(new_crit.root_name), "new_criterion_%d",
+                                             counter);
+                                    bool name_exists = false;
+                                    for (const auto &crit: advancement.criteria) {
+                                        if (strcmp(crit.root_name, new_crit.root_name) == 0) {
+                                            name_exists = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!name_exists) break;
+                                    counter++;
+                                }
+                                snprintf(new_crit.display_name, sizeof(new_crit.display_name), "New Criterion %d",
+                                         counter);
+                                strncpy(new_crit.icon_path, "blocks/placeholder.png", sizeof(new_crit.icon_path) - 1);
+                                new_crit.icon_path[sizeof(new_crit.icon_path) - 1] = '\0';
+                                advancement.criteria.push_back(new_crit);
+                                save_message_type = MSG_NONE;
                             }
-                            ImGui::SetTooltip("%s", tooltip_buffer);
-                        }
-                        ImGui::SameLine();
-                        if (ImGui::Button(reset_crit_id)) {
-                            for (auto &crit: stat_cat.criteria) crit.sort_order = 0;
-                        }
-                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                            char tooltip_buffer[128];
-                            if (!can_sort_crit) {
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
-                            } else {
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                         "Clear all assigned sort orders from criteria.");
+                            if (ImGui::IsItemHovered()) {
+                                char add_new_criterion_tooltip_buffer[1024];
+                                if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                    // Mid-era
+                                    snprintf(add_new_criterion_tooltip_buffer, sizeof(add_new_criterion_tooltip_buffer),
+                                             "Add a new blank achievement criterion to this template.\n\n"
+                                             "Achievements can have sub-tasks that must all be completed.\n"
+                                             "Advancely looks for achievement criteria (e.g., 'Swampland' of 'achievement.exploreAllBiomes')\n"
+                                             "within the stats file.\n\n"
+                                             "Click the 'Help' button for more info.");
+                                } else {
+                                    // Modern
+                                    snprintf(add_new_criterion_tooltip_buffer, sizeof(add_new_criterion_tooltip_buffer),
+                                             "Add a new blank advancement/recipe criterion to this template.\n\n"
+                                             "Advancements can have sub-tasks that must all be completed.\n"
+                                             "Advancely looks for advancement criteria (e.g., 'enchanted_golden_apple'\n"
+                                             "of 'minecraft:husbandry/balanced_diet') and recipe criteria\n"
+                                             "(e.g., 'has_nether_star' of 'minecraft:recipes/misc/beacon') within the advancements file.\n\n"
+                                             "Click the 'Help' button for more info.");
+                                }
+                                ImGui::SetTooltip("%s", add_new_criterion_tooltip_buffer);
                             }
-                            ImGui::SetTooltip("%s", tooltip_buffer);
-                        }
-                        ImGui::EndDisabled();
 
-                        int crit_to_remove = -1;
-                        int crit_to_copy = -1;
 
-                        int stat_crit_dnd_source_index = -1;
-                        int stat_crit_dnd_target_index = -1;
-                        for (size_t j = 0; j < stat_cat.criteria.size(); j++) {
-                            auto &crit = stat_cat.criteria[j];
+                            // --- Criteria Sorting Controls ---
+                            bool can_sort_crit = false;
+                            for (const auto &crit: advancement.criteria) {
+                                if (crit.sort_order > 0) {
+                                    can_sort_crit = true;
+                                    break;
+                                }
+                            }
+
+                            ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_buttons_width);
+
+                            ImGui::BeginDisabled(!can_sort_crit);
+                            // Using root_name for the ID since we don't have 'i' in this scope
+                            char sort_crit_id[256], reset_crit_id[256];
+                            snprintf(sort_crit_id, sizeof(sort_crit_id), "Sort##crit_%s", advancement.root_name);
+                            snprintf(reset_crit_id, sizeof(reset_crit_id), "Reset Order##crit_%s",
+                                     advancement.root_name);
+
+                            if (ImGui::Button(sort_crit_id)) {
+                                apply_partial_sort(advancement.criteria);
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                char tooltip_buffer[128];
+                                if (!can_sort_crit) {
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "Click the order badges next to criteria to assign a sort order first.");
+                                } else {
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "Rearrange the numbered criteria among themselves.");
+                                }
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Button(reset_crit_id)) {
+                                for (auto &crit: advancement.criteria) crit.sort_order = 0;
+                            }
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                char tooltip_buffer[128];
+                                if (!can_sort_crit) {
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
+                                } else {
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "Clear all assigned sort orders from criteria.");
+                                }
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
+                            ImGui::EndDisabled();
+                        } // End of conditional criteria block for above 1.6.4 otherwise no criteria
+
+                        // Determine if a details search is active
+                        bool is_details_search_active = (
+                            current_search_scope == SCOPE_ADVANCEMENT_DETAILS && tc_search_buffer[0] != '\0');
+
+                        int criterion_to_remove = -1;
+                        int criterion_to_copy = -1;
+
+                        // State for drag and drop
+                        int criterion_dnd_source_index = -1;
+                        int criterion_dnd_target_index = -1;
+
+                        for (size_t j = 0; j < advancement.criteria.size(); j++) {
+                            auto &criterion = advancement.criteria[j];
 
                             if (is_details_search_active) {
-                                char goal_str[32];
-                                snprintf(goal_str, sizeof(goal_str), "%d", crit.goal);
-                                if (!str_contains_insensitive(crit.display_name, tc_search_buffer) &&
-                                    !str_contains_insensitive(crit.root_name, tc_search_buffer) &&
-                                    !str_contains_insensitive(crit.icon_path, tc_search_buffer) &&
-                                    (crit.goal == 0 || strstr(goal_str, tc_search_buffer) == nullptr)) {
+                                if (!str_contains_insensitive(criterion.display_name, tc_search_buffer) &&
+                                    !str_contains_insensitive(criterion.root_name, tc_search_buffer) &&
+                                    !str_contains_insensitive(criterion.icon_path, tc_search_buffer)) {
                                     continue;
                                 }
                             }
 
                             ImGui::PushID(j);
 
+
+                            // Add vertical spacing creating the gap
                             ImGui::Spacing();
+
+                            // Create a wide, 8-pixel-high invisible button to act as our drop zone
                             ImGui::InvisibleButton("drop_target", ImVec2(-1, 8.0f));
+
+                            // We make the separator a drop target to allow dropping between items
                             if (ImGui::BeginDragDropTarget()) {
-                                if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("STAT_CRITERION_DND")) {
-                                    stat_crit_dnd_source_index = *(const int *) payload->Data;
-                                    stat_crit_dnd_target_index = j;
+                                if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("CRITERION_DND")) {
+                                    criterion_dnd_source_index = *(const int *) payload->Data;
+                                    criterion_dnd_target_index = j;
                                 }
                                 ImGui::EndDragDropTarget();
                             }
 
+                            // Draw a separator for visual feedback after the drop zone
+                            ImGui::Separator();
+
+                            // Use an invisible button overlaying the group as a drag handle
                             ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
                             ImGui::BeginGroup();
 
-                            ImGui::Separator();
-                            if (ImGui::InputText("Sub-Stat Root Name", crit.root_name, sizeof(crit.root_name))) {
+                            if (ImGui::InputText("Criterion Root Name", criterion.root_name,
+                                                 sizeof(criterion.root_name))) {
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
-                                char stat_root_name_tooltip_buffer[256];
-                                if (creator_selected_version <= MC_VERSION_1_6_4) {
-                                    // Legacy
-                                    snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
-                                             "The unique in-game ID for the stat to track,\n"
-                                             "e.g., '1100' (Playtime in ticks), '16974109' (Gold Pickaxe Broken).");
-                                } else if (creator_selected_version <= MC_VERSION_1_12_2) {
-                                    // Mid-era (1.7.2 - 1.12.2)
-                                    snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
-                                             "The unique in-game ID for the stat to track, e.g., 'stat.sprintOneCm'.");
+                                char root_name_tooltip_buffer[128];
+                                if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                    // Mid-era
+                                    snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
+                                             "The unique in-game ID for this criterion, e.g., 'Forest'.");
                                 } else {
-                                    // Modern(1.13+)
-                                    snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
-                                             "The unique in-game ID for the stat to track, e.g., 'minecraft:picked_up/minecraft:deepslate_emerald_ore'.");
+                                    // Modern
+                                    snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
+                                             "The unique in-game ID for this criterion, e.g., 'minecraft:hoglin'.");
                                 }
-                                ImGui::SetTooltip("%s", stat_root_name_tooltip_buffer);
+                                ImGui::SetTooltip("%s", root_name_tooltip_buffer);
                             }
-                            if (ImGui::InputText("Display Name", crit.display_name, sizeof(crit.display_name))) {
+                            if (ImGui::InputText("Display Name", criterion.display_name,
+                                                 sizeof(criterion.display_name))) {
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
                                 char display_name_tooltip_buffer[128];
                                 snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
-                                         "The user-facing name for this sub-stat.");
+                                         "The user-facing name for this criterion.");
                                 ImGui::SetTooltip("%s", display_name_tooltip_buffer);
                             }
-                            if (ImGui::InputText("Icon Path", crit.icon_path, sizeof(crit.icon_path))) {
+                            if (ImGui::InputText("Icon Path", criterion.icon_path, sizeof(criterion.icon_path))) {
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
@@ -5701,11 +4675,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                             }
                             ImGui::SameLine();
-                            if (ImGui::Button("Browse##StatCritIcon")) {
+                            if (ImGui::Button("Browse##CritIcon")) {
                                 char new_path[MAX_PATH_LENGTH];
                                 if (open_icon_file_dialog(new_path, sizeof(new_path))) {
-                                    strncpy(crit.icon_path, new_path, sizeof(crit.icon_path) - 1);
-                                    crit.icon_path[sizeof(crit.icon_path) - 1] = '\0';
+                                    strncpy(criterion.icon_path, new_path, sizeof(criterion.icon_path) - 1);
+                                    criterion.icon_path[sizeof(criterion.icon_path) - 1] = '\0';
                                     save_message_type = MSG_NONE;
                                 }
                             }
@@ -5715,68 +4689,58 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          "The icon must be inside the 'resources/icons' folder!");
                                 ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
                             }
-                            if (ImGui::InputInt("Target Value", &crit.goal)) {
-                                // Clamping to -1
-                                if (crit.goal < -1) {
-                                    crit.goal = -1;
-                                }
+                            if (ImGui::Checkbox("Hidden", &criterion.is_hidden)) {
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
-                                char target_tooltip_buffer[512];
-                                snprintf(target_tooltip_buffer, sizeof(target_tooltip_buffer),
-                                         "Set the sub-stat's behavior:\n"
-                                         "-1 = Infinite counter (manual completion via checkbox).\n"
-                                         ">0 = Progress-based counter (completes when value reached).\n"
-                                         "0 = NOT ALLOWED (Use a Custom Goal toggle instead).");
-                                ImGui::SetTooltip("%s", target_tooltip_buffer);
-                            }
-                            if (ImGui::Checkbox("Hidden", &crit.is_hidden)) {
-                                save_message_type = MSG_NONE;
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char hidden_tooltip_buffer[256];
+                                char hidden_tooltip_buffer[1024];
                                 snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
-                                         "If checked, this sub-stat will be fully hidden on the overlay\n"
-                                         "and hidden settings-based on the tracker.\n"
-                                         "Visibility can be toggled in the main tracker settings.\n\n"
-                                         "NOTE: Hidden sub-stats are also excluded from the cycle rotation\n"
-                                         "on the overlay.");
+                                         "If checked, the icon of the criterion will be fully hidden on the overlay\n"
+                                         "(within 1st row) and hidden settings-based on the tracker.\n"
+                                         "The criterion name will still display below the %s name\n"
+                                         "on the overlay if it's the last one remaining.\n"
+                                         "This means it will still contribute to the horizontal spacing\n"
+                                         "of the second row unless the advancement is hidden.\n"
+                                         "Visibility can be toggled in the main tracker settings.",
+                                         advancements_label_singular_lower);
                                 ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                             }
 
                             ImGui::SameLine();
+
+                            // "Copy" button for criteria
                             if (ImGui::Button("Copy")) {
-                                crit_to_copy = j;
+                                criterion_to_copy = j;
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
                                 char tooltip_buffer[128];
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Sub-Stat:\n%s",
-                                         crit.root_name);
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate %s Criterion:\n%s",
+                                         advancements_label_upper, criterion.root_name);
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
                             ImGui::SameLine();
+
                             if (ImGui::Button("Remove")) {
-                                crit_to_remove = j;
+                                criterion_to_remove = j;
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
                                 char tooltip_buffer[128];
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Sub-Stat:\n%s",
-                                         crit.root_name);
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s Criterion:\n%s",
+                                         advancements_label_upper, criterion.root_name);
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
 
                             ImGui::SameLine();
 
-                            // --- Sort Badge (Stat Criterion) ---
+                            // --- Sort Badge (Criterion) ---
                             char crit_badge_label[64];
-                            if (crit.sort_order > 0) {
-                                snprintf(crit_badge_label, sizeof(crit_badge_label), "%d##scrit_badge_%zu",
-                                         crit.sort_order, j);
+                            if (criterion.sort_order > 0) {
+                                snprintf(crit_badge_label, sizeof(crit_badge_label), "%d##crit_badge_%zu",
+                                         criterion.sort_order, j);
                             } else {
-                                snprintf(crit_badge_label, sizeof(crit_badge_label), " - ##scrit_badge_%zu", j);
+                                snprintf(crit_badge_label, sizeof(crit_badge_label), " - ##crit_badge_%zu", j);
                             }
 
                             const char *crit_text_end = strstr(crit_badge_label, "##");
@@ -5784,27 +4748,29 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             float crit_badge_w = std::max(28.0f, crit_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
 
                             if (ImGui::Button(crit_badge_label, ImVec2(crit_badge_w, 0))) {
-                                if (crit.sort_order > 0)
-                                    crit.sort_order = 0;
-                                else crit.sort_order = get_next_sort_order(stat_cat.criteria);
+                                if (criterion.sort_order > 0)
+                                    criterion.sort_order = 0;
+                                else criterion.sort_order = get_next_sort_order(advancement.criteria);
                             }
                             if (ImGui::IsItemHovered()) {
                                 char tooltip_buffer[128];
-                                if (crit.sort_order > 0) {
+                                if (criterion.sort_order > 0) {
                                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                             "Click to remove sub-stat sort order");
+                                             "Click to remove criterion sort order");
                                 } else {
                                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                             "Click to assign sub-stat sort order");
+                                             "Click to assign criterion sort order");
                                 }
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
 
-                            if (render_layout_coordinates_header("sub-stat",
-                                    force_open_child_header_root_name[0] != '\0' && strcmp(crit.root_name, force_open_child_header_root_name) == 0)) {
-                                render_manual_pos_ui("sc_icon", "sub-stat", "Icon Position", &crit.icon_pos,
+                            if (render_layout_coordinates_header("criterion",
+                                                                 force_open_child_header_root_name[0] != '\0' && strcmp(
+                                                                     criterion.root_name,
+                                                                     force_open_child_header_root_name) == 0)) {
+                                render_manual_pos_ui("c_icon", "criterion", "Icon Position", &criterion.icon_pos,
                                                      save_message_type);
-                                render_manual_pos_ui("sc_text", "sub-stat", "Text Position", &crit.text_pos,
+                                render_manual_pos_ui("c_text", "criterion", "Text Position", &criterion.text_pos,
                                                      save_message_type);
                             }
 
@@ -5814,60 +4780,67 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::SetCursorScreenPos(item_start_cursor_pos);
                             ImGui::InvisibleButton("dnd_handle", ImGui::GetItemRectSize());
 
-                            if (ImGui::BeginDragDropSource()) {
-                                ImGui::SetDragDropPayload("STAT_CRITERION_DND", &j, sizeof(int));
-                                ImGui::Text("Reorder %s", crit.root_name);
+                            // Use the flag to make the non-interactive group a drag source
+                            if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
+                                ImGui::SetDragDropPayload("CRITERION_DND", &j, sizeof(int));
+                                ImGui::Text("Reorder %s", criterion.root_name);
                                 ImGui::EndDragDropSource();
                             }
 
                             ImGui::PopID();
                         }
 
-                        ImGui::InvisibleButton("final_drop_target_stat_crit", ImVec2(-1, 8.0f));
+                        // Final drop target to allow dropping at the end of the list
+                        ImGui::InvisibleButton("final_drop_target_adv_crit", ImVec2(-1, 8.0f));
                         // Added larger drop zone
                         if (ImGui::BeginDragDropTarget()) {
-                            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("STAT_CRITERION_DND")) {
-                                stat_crit_dnd_source_index = *(const int *) payload->Data;
-                                stat_crit_dnd_target_index = stat_cat.criteria.size();
+                            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("CRITERION_DND")) {
+                                criterion_dnd_source_index = *(const int *) payload->Data;
+                                criterion_dnd_target_index = advancement.criteria.size();
                             }
                             ImGui::EndDragDropTarget();
                         }
 
-                        if (stat_crit_dnd_source_index != -1 && stat_crit_dnd_target_index != -1 &&
-                            stat_crit_dnd_source_index != stat_crit_dnd_target_index) {
-                            EditorTrackableItem item_to_move = stat_cat.criteria[stat_crit_dnd_source_index];
-                            stat_cat.criteria.erase(stat_cat.criteria.begin() + stat_crit_dnd_source_index);
-                            if (stat_crit_dnd_target_index > stat_crit_dnd_source_index) stat_crit_dnd_target_index--;
-                            stat_cat.criteria.insert(stat_cat.criteria.begin() + stat_crit_dnd_target_index,
-                                                     item_to_move);
+                        // Handle actions after the loop
+                        if (criterion_dnd_source_index != -1 && criterion_dnd_target_index != -1 &&
+                            criterion_dnd_source_index != criterion_dnd_target_index) {
+                            EditorTrackableItem item_to_move = advancement.criteria[criterion_dnd_source_index];
+                            advancement.criteria.erase(advancement.criteria.begin() + criterion_dnd_source_index);
+                            if (criterion_dnd_target_index > criterion_dnd_source_index) criterion_dnd_target_index--;
+                            advancement.criteria.insert(advancement.criteria.begin() + criterion_dnd_target_index,
+                                                        item_to_move);
                             save_message_type = MSG_NONE;
                         }
 
-                        if (crit_to_remove != -1) {
-                            stat_cat.criteria.erase(stat_cat.criteria.begin() + crit_to_remove);
+
+                        if (criterion_to_remove != -1) {
+                            advancement.criteria.erase(advancement.criteria.begin() + criterion_to_remove);
                             save_message_type = MSG_NONE;
                         }
 
                         // Logic to handle the copy action after the loop
-                        if (crit_to_copy != -1) {
-                            const auto &source_criterion = stat_cat.criteria[crit_to_copy];
+                        if (criterion_to_copy != -1) {
+                            const auto &source_criterion = advancement.criteria[criterion_to_copy];
+
 
                             // Perform a manual, safe copy.
-                            EditorTrackableItem new_crit;
-                            strncpy(new_crit.root_name, source_criterion.root_name, sizeof(new_crit.root_name));
-                            new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
-                            strncpy(new_crit.display_name, source_criterion.display_name,
-                                    sizeof(new_crit.display_name));
-                            new_crit.display_name[sizeof(new_crit.display_name) - 1] = '\0';
-                            strncpy(new_crit.icon_path, source_criterion.icon_path, sizeof(new_crit.icon_path));
-                            new_crit.icon_path[sizeof(new_crit.icon_path) - 1] = '\0';
-                            new_crit.goal = source_criterion.goal;
-                            new_crit.is_hidden = source_criterion.is_hidden;
-                            new_crit.icon_pos = source_criterion.icon_pos;
-                            new_crit.text_pos = source_criterion.text_pos;
-                            new_crit.progress_pos = source_criterion.progress_pos;
+                            EditorTrackableItem new_criterion;
+                            strncpy(new_criterion.root_name, source_criterion.root_name,
+                                    sizeof(new_criterion.root_name));
+                            new_criterion.root_name[sizeof(new_criterion.root_name) - 1] = '\0';
+                            strncpy(new_criterion.display_name, source_criterion.display_name,
+                                    sizeof(new_criterion.display_name));
+                            new_criterion.display_name[sizeof(new_criterion.display_name) - 1] = '\0';
+                            strncpy(new_criterion.icon_path, source_criterion.icon_path,
+                                    sizeof(new_criterion.icon_path));
+                            new_criterion.icon_path[sizeof(new_criterion.icon_path) - 1] = '\0';
+                            new_criterion.goal = source_criterion.goal;
+                            new_criterion.is_hidden = source_criterion.is_hidden;
+                            new_criterion.icon_pos = source_criterion.icon_pos;
+                            new_criterion.text_pos = source_criterion.text_pos;
+                            new_criterion.progress_pos = source_criterion.progress_pos;
 
-                            new_crit.sort_order = 0;
+                            new_criterion.sort_order = 0;
 
                             char base_name[192];
                             strncpy(base_name, source_criterion.root_name, sizeof(base_name) - 1);
@@ -5878,8 +4851,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
                                 else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
                                 bool name_exists = false;
-                                for (const auto &c: stat_cat.criteria) {
-                                    if (strcmp(c.root_name, new_name) == 0) {
+                                for (const auto &crit: advancement.criteria) {
+                                    if (strcmp(crit.root_name, new_name) == 0) {
                                         name_exists = true;
                                         break;
                                     }
@@ -5887,25 +4860,1268 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 if (!name_exists) break;
                                 copy_counter++;
                             }
-                            strncpy(new_crit.root_name, new_name, sizeof(new_crit.root_name) - 1);
-                            new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
-                            stat_cat.criteria.insert(stat_cat.criteria.begin() + crit_to_copy + 1, new_crit);
+                            strncpy(new_criterion.root_name, new_name, sizeof(new_criterion.root_name) - 1);
+                            new_criterion.root_name[sizeof(new_criterion.root_name) - 1] = '\0';
+                            advancement.criteria.insert(advancement.criteria.begin() + criterion_to_copy + 1,
+                                                        new_criterion);
                             save_message_type = MSG_NONE;
                         }
+                    } else {
+                        char select_prompt[128];
+                        snprintf(select_prompt, sizeof(select_prompt),
+                                 "Select an %s from the list to edit its details.",
+                                 advancements_label_upper);
+                        ImGui::Text("%s", select_prompt);
                     }
-                } else {
-                    ImGui::Text("Select a Stat from the list to edit its details.");
+                    ImGui::EndChild();
+                    ImGui::EndTabItem();
                 }
+            } // end adv tab scope
 
-                ImGui::EndChild();
-                ImGui::EndTabItem();
-            }
+            {
+                ImGuiTabItemFlags stats_tab_flags = (force_select_tab == FORCE_TAB_STATS)
+                                                        ? ImGuiTabItemFlags_SetSelected
+                                                        : 0;
+                if (force_select_tab == FORCE_TAB_STATS) force_select_tab = FORCE_TAB_NONE;
+                if (ImGui::BeginTabItem("Stats", nullptr, stats_tab_flags)) {
+                    // TWO PANE LAYOUT for Stats
+                    float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
+                    ImGui::BeginChild("StatListPane", ImVec2(pane_width, 0), true);
+
+                    if (ImGui::Button("Import Stats")) {
+                        current_stat_import_mode = IMPORT_AS_TOP_LEVEL; // Set the mode as top level not sub-stat
+                        char start_path[MAX_PATH_LENGTH];
+                        // Determine the correct starting path based on version and settings
+                        if (creator_selected_version <= MC_VERSION_1_6_4) {
+                            if (app_settings->using_stats_per_world_legacy) {
+                                // Legacy, Per-World: .../saves/WORLD_NAME/stats/
+                                snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
+                            } else {
+                                // Legacy, Global: .../stats/
+                                char parent_dir[MAX_PATH_LENGTH];
+                                if (get_parent_directory(t->saves_path, parent_dir, sizeof(parent_dir), 1)) {
+                                    snprintf(start_path, sizeof(start_path), "%s/stats/", parent_dir);
+                                } else {
+                                    strncpy(start_path, t->saves_path, sizeof(start_path)); // Fallback
+                                    start_path[sizeof(start_path) - 1] = '\0';
+                                }
+                            }
+                        } else {
+                            // Mid-era and Modern stats are always in a per-world stats folder
+                            snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path, t->world_name);
+                        }
+
+                        // --- Version-aware file filters ---
+#ifdef __APPLE__
+                        const char *json_filter[2] = {"*.json", "public.json"};
+                        const char *dat_filter[2] = {"*.dat", "public.data"};
+                        int filter_count = 2;
+#else
+                        const char *json_filter[1] = {"*.json"};
+                        const char *dat_filter[1] = {"*.dat"};
+                        int filter_count = 1;
+#endif
+                        const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
+                                                           ? dat_filter
+                                                           : json_filter;
+                        const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
+                                                      ? "DAT files"
+                                                      : "JSON files";
+
+                        const char *selection = tinyfd_openFileDialog("Select Player Stats File", start_path,
+                                                                      filter_count,
+                                                                      selected_filter, filter_desc, 0);
+
+                        if (selection) {
+                            import_error_message[0] = '\0';
+                            if (parse_player_stats_for_import(selection, creator_selected_version, importable_stats,
+                                                              import_error_message, sizeof(import_error_message))) {
+                                show_import_stats_popup = true;
+                                last_clicked_stat_index = -1; // Reset range selection
+                            } else {
+                                save_message_type = MSG_ERROR;
+                                strncpy(status_message, import_error_message, sizeof(status_message) - 1);
+                                status_message[sizeof(status_message) - 1] = '\0';
+                            }
+                        }
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip[512];
+
+                        if (creator_selected_version <= MC_VERSION_1_6_4) {
+                            if (app_settings->using_stats_per_world_legacy) {
+                                // Legacy using stats per world
+                                snprintf(tooltip, sizeof(tooltip),
+                                         "Import stats directly from a local world's player stats/achievements .dat file.\n"
+                                         "Cannot import already existing root names.");
+                            } else {
+                                // Legacy not using stats per world
+                                snprintf(tooltip, sizeof(tooltip),
+                                         "Import stats directly from a global world's player stats/achievements .dat file.\n"
+                                         "Cannot import already existing root names.");
+                            }
+                        } else if (creator_selected_version <= MC_VERSION_1_12_2) {
+                            // Mid-era (1.7.2 - 1.12.2)
+                            snprintf(tooltip, sizeof(tooltip),
+                                     "Import stats directly from a world's player stats .json file.\n"
+                                     "(Also contains achievements for 1.7.2 - 1.11.2).\n"
+                                     "Cannot import already existing root names.");
+                        } else {
+                            // Modern (1.13+)
+                            snprintf(tooltip, sizeof(tooltip),
+                                     "Import stats directly from a world's player stats .json file.\n"
+                                     "Cannot import already existing root names.");
+                        }
+                        ImGui::SetTooltip("%s", tooltip);
+                    }
+
+                    ImGui::SameLine();
+
+                    // --- Sorting Controls ---
+                    bool can_sort_stat = false;
+                    for (const auto &stat_cat: current_template_data.stats) {
+                        if (stat_cat.sort_order > 0) {
+                            can_sort_stat = true;
+                            break;
+                        }
+                    }
+
+                    float sort_btn_width = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                    float reset_btn_width = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x *
+                                            2.0f;
+                    float total_buttons_width = sort_btn_width + reset_btn_width + ImGui::GetStyle().ItemSpacing.x;
+
+                    ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_buttons_width);
+
+                    ImGui::BeginDisabled(!can_sort_stat);
+                    if (ImGui::Button("Sort##stat")) {
+                        apply_partial_sort(current_template_data.stats);
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tooltip_buffer[128];
+                        if (!can_sort_stat) {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Click the order badges next to categories to assign a sort order first.");
+                        } else {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Rearrange the numbered categories among themselves.");
+                        }
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Reset Order##stat")) {
+                        for (auto &stat_cat: current_template_data.stats) stat_cat.sort_order = 0;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tooltip_buffer[128];
+                        if (!can_sort_stat) {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
+                        } else {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Clear all assigned sort orders from categories.");
+                        }
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+                    ImGui::EndDisabled();
+
+                    // New Line
+                    if (ImGui::Button("Add New Stat")) {
+                        // Create new stat category with default values
+                        EditorTrackableCategory new_stat = {};
+                        int counter = 1;
+                        while (true) {
+                            snprintf(new_stat.root_name, sizeof(new_stat.root_name), "new_stat_%d", counter);
+                            bool name_exists = false;
+                            for (const auto &stat: current_template_data.stats) {
+                                if (strcmp(stat.root_name, new_stat.root_name) == 0) {
+                                    name_exists = true;
+                                    break;
+                                }
+                            }
+                            if (!name_exists) break;
+                            counter++;
+                        }
+                        snprintf(new_stat.display_name, sizeof(new_stat.display_name), "New Stat %d", counter);
+                        strncpy(new_stat.icon_path, "blocks/placeholder.png", sizeof(new_stat.icon_path) - 1);
+                        new_stat.icon_path[sizeof(new_stat.icon_path) - 1] = '\0';
+                        new_stat.is_simple_stat = true; // Default to simple
+
+                        // Add a default criterion for the simple stat
+                        EditorTrackableItem new_crit = {};
+                        // Version-aware root name for the new criterion
+                        if (creator_selected_version <= MC_VERSION_1_6_4) {
+                            strncpy(new_crit.root_name, "0", sizeof(new_crit.root_name) - 1);
+                            new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
+                            // Legacy stats are numeric IDs
+                        } else if (creator_selected_version <= MC_VERSION_1_12_2) {
+                            // Mid-era stats are prefixed
+                            snprintf(new_crit.root_name, sizeof(new_crit.root_name), "stat.new_stat_%d", counter);
+                        } else {
+                            // Modern (1.13+)
+                            snprintf(new_crit.root_name, sizeof(new_crit.root_name),
+                                     "minecraft:custom/minecraft:new_stat_%d", counter); // Modern
+                        }
+                        new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
+                        new_crit.goal = 1; // Default to a completable goal
+                        new_stat.criteria.push_back(new_crit);
+
+                        current_template_data.stats.push_back(new_stat);
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char add_stat_tooltip_buffer[1024];
+                        if (creator_selected_version <= MC_VERSION_1_6_4) {
+                            // Legacy
+                            snprintf(add_stat_tooltip_buffer, sizeof(add_stat_tooltip_buffer),
+                                     "Add a new blank stat to this template.\n\n"
+                                     "Statistics allow tracking of certain actions in form of numerical data.\n"
+                                     "Advancely looks for statistics (e.g., '16908566'  - Times Used of\n"
+                                     "Diamond Pickaxe) in the (global or local) stats file.\n"
+                                     "Simple achievements (e.g., '5242880' - Taking Inventory) can also act as stats\n"
+                                     "(e.g., How many time you've opened your inventory).\n\n"
+                                     "Click the 'Help' button for more info.");
+                        } else if (creator_selected_version <= MC_VERSION_1_12_2) {
+                            // Mid-era (1.7.2 - 1.12.2)
+                            snprintf(add_stat_tooltip_buffer, sizeof(add_stat_tooltip_buffer),
+                                     "Add a new blank stat to this template.\n\n"
+                                     "Statistics allow tracking of certain actions in form of numerical data.\n"
+                                     "Advancely looks for statistics (e.g., 'stat.mineBlock.minecraft.tallgrass') in the stats file.\n"
+                                     "Simple achievements (e.g., 'achievement.mineWood') can also act as stats\n"
+                                     "(e.g., Logs mined (any log type)).\n\n"
+                                     "Click the 'Help' button for more info.");
+                        } else {
+                            // Modern (1.13+)
+                            snprintf(add_stat_tooltip_buffer, sizeof(add_stat_tooltip_buffer),
+                                     "Add a new blank stat to this template.\n\n"
+                                     "Statistics allow tracking of certain actions in form of numerical data.\n"
+                                     "Advancely looks for statistics (e.g., 'minecraft:custom/minecraft:jump') in the stats file.\n"
+                                     "The format for Advancely always is 'namespace:category/namespace:stat',\n"
+                                     "where the category is outside of the curly braces and the stat is inside.\n\n"
+                                     "Click the 'Help' button for more info.");
+                        }
+
+                        ImGui::SetTooltip("%s", add_stat_tooltip_buffer);
+                    }
+                    ImGui::SameLine();
+                    ImGui::Checkbox("Show Display Names", &show_stat_display_names);
+                    if (ImGui::IsItemHovered()) {
+                        char show_display_names_tooltip_buffer[1024];
+                        snprintf(show_display_names_tooltip_buffer, sizeof(show_display_names_tooltip_buffer),
+                                 "Toggle between showing user-facing display names and internal root names in this list.");
+                        ImGui::SetTooltip("%s", show_display_names_tooltip_buffer);
+                    }
+
+                    ImGui::Separator();
+
+                    // 1. Create a list of pointers to render from.
+                    std::vector<EditorTrackableCategory *> stats_to_render;
+
+                    // 2. Populate the list based on the search criteria.
+                    bool search_active = (tc_search_buffer[0] != '\0' && current_search_scope == SCOPE_STATS);
+
+                    if (search_active) {
+                        for (auto &stat_cat: current_template_data.stats) {
+                            // Skip internal helper stats from appearing in the list.
+                            if (strncmp(stat_cat.root_name, "hidden_ms_stat_", 15) == 0) {
+                                continue;
+                            }
+                            bool should_render = false;
+
+                            // Always check parent-level fields first
+                            // This covers the display name for both simple and complex stats.
+                            if (str_contains_insensitive(stat_cat.display_name, tc_search_buffer) ||
+                                str_contains_insensitive(stat_cat.root_name, tc_search_buffer) ||
+                                str_contains_insensitive(stat_cat.icon_path, tc_search_buffer)) {
+                                should_render = true;
+                            }
+
+                            // If parent didn't match, check child-level fields
+                            if (!should_render) {
+                                for (const auto &criterion: stat_cat.criteria) {
+                                    char goal_str[32];
+                                    snprintf(goal_str, sizeof(goal_str), "%d", criterion.goal);
+
+                                    // For complex stats, we also check the criterion's own display name.
+                                    bool name_match = !stat_cat.is_simple_stat && str_contains_insensitive(
+                                                          criterion.display_name, tc_search_buffer);
+
+                                    // The core check for root name, icon path, and target goal, which applies to both simple and complex stats.
+                                    if (name_match ||
+                                        str_contains_insensitive(criterion.root_name, tc_search_buffer) ||
+                                        str_contains_insensitive(criterion.icon_path, tc_search_buffer) ||
+                                        (criterion.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr)) {
+                                        should_render = true;
+                                        break; // A matching child was found, no need to check others.
+                                    }
+                                }
+                            }
+
+                            if (should_render) {
+                                stats_to_render.push_back(&stat_cat);
+                            }
+                        }
+                    } else {
+                        // Search is inactive, so show all non-hidden stats.
+                        for (auto &stat_cat: current_template_data.stats) {
+                            // Skip internal helper stats from appearing in the list.
+                            if (strncmp(stat_cat.root_name, "hidden_ms_stat_", 15) == 0) {
+                                continue;
+                            }
+                            stats_to_render.push_back(&stat_cat);
+                        }
+                    }
+
+                    // --- Counter for the list ---
+
+                    char counter_text[128];
+                    snprintf(counter_text, sizeof(counter_text), "%zu %s", stats_to_render.size(),
+                             stats_to_render.size() == 1 ? "Stat" : "Stats");
+                    float text_width = ImGui::CalcTextSize(counter_text).x;
+                    // Center Count
+                    ImGui::SetCursorPosX(
+                        ImGui::GetCursorPosX() + (
+                            ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - text_width) *
+                        0.5f);
+                    ImGui::TextDisabled("%s", counter_text);
+
+                    // 3. Render the list using pointers.
+                    int stat_to_remove_idx = -1;
+                    int stat_to_copy_idx = -1;
+                    int stat_dnd_source_index = -1;
+                    int stat_dnd_target_index = -1;
+
+                    for (size_t i = 0; i < stats_to_render.size(); i++) {
+                        auto &stat = *stats_to_render[i];
+                        ImGui::PushID(&stat);
+
+                        const char *display_name = stat.display_name;
+                        const char *root_name = stat.root_name;
+                        const char *label = show_stat_display_names
+                                                ? (display_name[0] ? display_name : root_name)
+                                                : root_name;
+                        if (label[0] == '\0') {
+                            label = "[New Stat]";
+                        }
+
+                        // --- Sort Badge (Stat Category) ---
+                        char stat_badge_label[64];
+                        if (stat.sort_order > 0) {
+                            snprintf(stat_badge_label, sizeof(stat_badge_label), "%d##stat_badge", stat.sort_order);
+                        } else {
+                            snprintf(stat_badge_label, sizeof(stat_badge_label), " - ##stat_badge");
+                        }
+
+                        const char *stat_text_end = strstr(stat_badge_label, "##");
+                        float stat_text_w = ImGui::CalcTextSize(stat_badge_label, stat_text_end).x;
+                        float stat_badge_w = std::max(28.0f, stat_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
+
+                        if (ImGui::Button(stat_badge_label, ImVec2(stat_badge_w, 0))) {
+                            if (stat.sort_order > 0)
+                                stat.sort_order = 0;
+                            else stat.sort_order = get_next_sort_order(current_template_data.stats);
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            if (stat.sort_order > 0) {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to remove stat sort order");
+                            } else {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to assign stat sort order");
+                            }
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+
+                        if (ImGui::Button("X")) { stat_to_remove_idx = i; }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s", label);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Copy")) { stat_to_copy_idx = i; }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Duplicate %s.", label);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+
+                        if (ImGui::Selectable(label, &stat == selected_stat)) {
+                            if (&stat != selected_stat) {
+                                selected_stat = &stat;
+                            }
+                        }
+
+                        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
+                            ImGui::SetDragDropPayload("STAT_DND", &i, sizeof(int));
+                            ImGui::Text("Reorder %s", label);
+                            ImGui::EndDragDropSource();
+                        }
+                        if (ImGui::BeginDragDropTarget()) {
+                            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("STAT_DND")) {
+                                stat_dnd_source_index = *(const int *) payload->Data;
+                                stat_dnd_target_index = i;
+                            }
+                            ImGui::EndDragDropTarget();
+                        }
+                        ImGui::PopID();
+                    }
+
+                    // Handle Drag and Drop
+                    if (stat_dnd_source_index != -1 && stat_dnd_target_index != -1) {
+                        EditorTrackableCategory *source_item_ptr = stats_to_render[stat_dnd_source_index];
+                        EditorTrackableCategory *target_item_ptr = stats_to_render[stat_dnd_target_index];
+
+                        auto source_it = std::find_if(current_template_data.stats.begin(),
+                                                      current_template_data.stats.end(),
+                                                      [&](const EditorTrackableCategory &s) {
+                                                          return &s == source_item_ptr;
+                                                      });
+
+                        EditorTrackableCategory item_to_move = *source_item_ptr;
+                        current_template_data.stats.erase(source_it);
+
+                        auto target_it = std::find_if(current_template_data.stats.begin(),
+                                                      current_template_data.stats.end(),
+                                                      [&](const EditorTrackableCategory &s) {
+                                                          return &s == target_item_ptr;
+                                                      });
+
+                        current_template_data.stats.insert(target_it, item_to_move);
+                        save_message_type = MSG_NONE;
+                    }
+
+                    // Handle Copying
+                    if (stat_to_copy_idx != -1) {
+                        char selected_root_name_before_op[192] = {};
+                        if (selected_stat) {
+                            strncpy(selected_root_name_before_op, selected_stat->root_name,
+                                    sizeof(selected_root_name_before_op) - 1);
+                        }
+                        const EditorTrackableCategory *source_stat_ptr = stats_to_render[stat_to_copy_idx];
+
+                        // Perform a manual, safe copy to prevent memory corruption from non-null-terminated strings.
+                        EditorTrackableCategory new_stat;
+                        strncpy(new_stat.root_name, source_stat_ptr->root_name, sizeof(new_stat.root_name));
+                        new_stat.root_name[sizeof(new_stat.root_name) - 1] = '\0';
+                        strncpy(new_stat.display_name, source_stat_ptr->display_name, sizeof(new_stat.display_name));
+                        new_stat.display_name[sizeof(new_stat.display_name) - 1] = '\0';
+                        strncpy(new_stat.icon_path, source_stat_ptr->icon_path, sizeof(new_stat.icon_path));
+                        new_stat.icon_path[sizeof(new_stat.icon_path) - 1] = '\0';
+                        new_stat.is_hidden = source_stat_ptr->is_hidden;
+                        new_stat.is_recipe = source_stat_ptr->is_recipe;
+                        new_stat.is_simple_stat = source_stat_ptr->is_simple_stat;
+                        new_stat.criteria = source_stat_ptr->criteria; // std::vector handles its own deep copy safely.
+                        new_stat.icon_pos = source_stat_ptr->icon_pos;
+                        new_stat.text_pos = source_stat_ptr->text_pos;
+                        new_stat.progress_pos = source_stat_ptr->progress_pos;
+
+                        new_stat.sort_order = 0;
+                        for (auto &crit: new_stat.criteria) {
+                            crit.sort_order = 0;
+                        }
+
+
+                        // Now, generate a unique name for the new copy
+                        char base_name[192];
+                        strncpy(base_name, source_stat_ptr->root_name, sizeof(base_name));
+                        base_name[sizeof(base_name) - 1] = '\0'; // Ensure base_name is safe to use in snprintf
+
+                        char new_name[192];
+                        int copy_counter = 1;
+                        while (true) {
+                            if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
+                            else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
+                            bool name_exists = false;
+                            for (const auto &s: current_template_data.stats) {
+                                if (strcmp(s.root_name, new_name) == 0) {
+                                    name_exists = true;
+                                    break;
+                                }
+                            }
+                            if (!name_exists) break;
+                            copy_counter++;
+                        }
+
+                        // Safely apply the new unique name
+                        strncpy(new_stat.root_name, new_name, sizeof(new_stat.root_name));
+                        new_stat.root_name[sizeof(new_stat.root_name) - 1] = '\0';
+
+                        auto it = std::find_if(current_template_data.stats.begin(), current_template_data.stats.end(),
+                                               [&](const EditorTrackableCategory &s) { return &s == source_stat_ptr; });
+
+                        if (it != current_template_data.stats.end()) {
+                            current_template_data.stats.insert(it + 1, new_stat);
+                        } else {
+                            current_template_data.stats.push_back(new_stat);
+                        }
+
+                        // Re-find and update the selected_stat pointer
+                        if (selected_root_name_before_op[0] != '\0') {
+                            for (auto &stat: current_template_data.stats) {
+                                if (strcmp(stat.root_name, selected_root_name_before_op) == 0) {
+                                    selected_stat = &stat;
+                                    break;
+                                }
+                            }
+                        }
+                        save_message_type = MSG_NONE;
+                    }
+
+                    // Handle Removal
+                    if (stat_to_remove_idx != -1) {
+                        char selected_root_name_before_op[192] = {};
+                        if (selected_stat) {
+                            strncpy(selected_root_name_before_op, selected_stat->root_name,
+                                    sizeof(selected_root_name_before_op) - 1);
+                        }
+
+                        EditorTrackableCategory *stat_to_remove = stats_to_render[stat_to_remove_idx];
+                        if (selected_stat == stat_to_remove) {
+                            selected_stat = nullptr;
+                        }
+
+                        current_template_data.stats.erase(
+                            std::remove_if(current_template_data.stats.begin(), current_template_data.stats.end(),
+                                           [&](const EditorTrackableCategory &s) { return &s == stat_to_remove; }),
+                            current_template_data.stats.end()
+                        );
+
+                        // Re-find pointer if it wasn't the one being deleted
+                        if (selected_stat && selected_root_name_before_op[0] != '\0') {
+                            for (auto &stat: current_template_data.stats) {
+                                if (strcmp(stat.root_name, selected_root_name_before_op) == 0) {
+                                    selected_stat = &stat;
+                                    break;
+                                }
+                            }
+                        }
+                        save_message_type = MSG_NONE;
+                    }
+                    ImGui::EndChild();
+                    ImGui::SameLine();
+
+                    ImGui::BeginChild("StatDetailsPane", ImVec2(0, 0), true);
+                    if (selected_stat != nullptr) {
+                        auto &stat_cat = *selected_stat;
+
+                        ImGui::Text("Edit Stat Details");
+
+                        // "Reset All Positions" button — only if any position is manually set
+                        {
+                            bool any_pos_set = stat_cat.icon_pos.is_set || stat_cat.text_pos.is_set ||
+                                               stat_cat.progress_pos.is_set;
+                            for (size_t ci = 0; !any_pos_set && ci < stat_cat.criteria.size(); ci++) {
+                                auto &c = stat_cat.criteria[ci];
+                                if (c.icon_pos.is_set || c.text_pos.is_set) any_pos_set = true;
+                            }
+                            if (any_pos_set) {
+                                const char *reset_btn = "Reset All Positions";
+                                float btn_w = ImGui::CalcTextSize(reset_btn).x + ImGui::GetStyle().FramePadding.x *
+                                              2.0f;
+                                ImGui::SameLine(ImGui::GetContentRegionAvail().x - btn_w);
+                                if (ImGui::SmallButton(reset_btn)) {
+                                    reset_manual_pos(&stat_cat.icon_pos);
+                                    reset_manual_pos(&stat_cat.text_pos);
+                                    reset_manual_pos(&stat_cat.progress_pos);
+                                    for (auto &c: stat_cat.criteria) {
+                                        reset_manual_pos(&c.icon_pos);
+                                        reset_manual_pos(&c.text_pos);
+                                    }
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip[256];
+                                    if (!stat_cat.is_simple_stat) {
+                                        snprintf(tooltip, sizeof(tooltip),
+                                                 "Reset all manual positions for this stat category\n"
+                                                 "and its sub-stats back to the auto-layout.\n"
+                                                 "Save the template for the changes to take visual effect.");
+                                    } else {
+                                        snprintf(tooltip, sizeof(tooltip),
+                                                 "Reset all manual positions for this stat back to the auto-layout.\n"
+                                                 "Save the template for the changes to take visual effect.");
+                                    }
+                                    ImGui::SetTooltip("%s", tooltip);
+                                }
+                            }
+                        }
+
+                        ImGui::Separator();
+
+                        if (ImGui::InputText("Category Key", stat_cat.root_name, sizeof(stat_cat.root_name))) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char root_name_tooltip_buffer[128];
+                            snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
+                                     "The unique key for this stat or stat category, e.g., 'stat:my_awesome_stat'.");
+                            ImGui::SetTooltip("%s", root_name_tooltip_buffer);
+                        }
+                        if (ImGui::InputText("Display Name", stat_cat.display_name, sizeof(stat_cat.display_name))) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char display_name_tooltip_buffer[128];
+                            snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
+                                     "The user-facing name for this single stat or stat category.");
+                            ImGui::SetTooltip("%s", display_name_tooltip_buffer);
+                        }
+                        if (ImGui::InputText("Icon Path", stat_cat.icon_path, sizeof(stat_cat.icon_path))) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char icon_path_tooltip_buffer[1024];
+                            snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                     "Path to the icon file, relative to the 'resources/icons' directory.");
+                            ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Browse##StatIcon")) {
+                            char new_path[MAX_PATH_LENGTH];
+                            if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                strncpy(stat_cat.icon_path, new_path, sizeof(stat_cat.icon_path) - 1);
+                                stat_cat.icon_path[sizeof(stat_cat.icon_path) - 1] = '\0';
+                                save_message_type = MSG_NONE;
+                            }
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char icon_path_tooltip_buffer[1024];
+                            snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                     "The icon must be inside the 'resources/icons' folder!");
+                            ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
+                        }
+                        if (ImGui::Checkbox("Hidden", &stat_cat.is_hidden)) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char hidden_tooltip_buffer[256];
+                            snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
+                                     "If checked, this stat (and all sub-stats) will be fully hidden on the overlay\n"
+                                     "and hidden settings-based on the tracker.\n"
+                                     "Visibility can be toggled in the main tracker settings");
+                            ImGui::SetTooltip("%s", hidden_tooltip_buffer);
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::Checkbox("Row 2", &stat_cat.in_2nd_row)) {
+                            save_message_type = MSG_NONE;
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[256];
+                            if (creator_selected_version != MC_VERSION_25W14CRAFTMINE) {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Force this stat category to display on the 2nd row of the overlay\n"
+                                         "(normally reserved for %s).", advancements_label_plural_lower);
+                            } else {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Force this stat category to display on the 2nd row of the overlay\n"
+                                         "(normally reserved for %s/unlocks).", advancements_label_plural_lower);
+                            }
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+
+                        ImGui::SameLine();
+
+                        // Invert the logic for the checkbox to be more intuitive for the user
+                        bool is_multi_stat = !stat_cat.is_simple_stat;
+                        if (ImGui::Checkbox("Multi-Stat Category", &is_multi_stat)) {
+                            bool was_simple_stat = stat_cat.is_simple_stat;
+                            stat_cat.is_simple_stat = !is_multi_stat;
+
+                            // Ensure at least one criterion exists to avoid errors
+                            if (stat_cat.criteria.empty()) {
+                                stat_cat.criteria.push_back({});
+                            }
+
+                            // If switching FROM Simple TO Multi-Stat
+                            if (was_simple_stat && !stat_cat.is_simple_stat) {
+                                // Copy the parent's display name to the first criterion.
+                                strncpy(stat_cat.criteria[0].display_name, stat_cat.display_name,
+                                        sizeof(stat_cat.criteria[0].display_name) - 1);
+                                stat_cat.criteria[0].display_name[sizeof(stat_cat.criteria[0].display_name) - 1] = '\0';
+
+                                // Set a default placeholder icon for the newly visible sub-stat.
+                                strncpy(stat_cat.criteria[0].icon_path, "blocks/placeholder.png",
+                                        sizeof(stat_cat.criteria[0].icon_path) - 1);
+                                stat_cat.criteria[0].icon_path[sizeof(stat_cat.criteria[0].icon_path) - 1] = '\0';
+                            }
+                            // If switching FROM Multi-Stat TO Simple Stat
+                            else if (!was_simple_stat && stat_cat.is_simple_stat) {
+                                // Copy the first criterion's display name up to the parent.
+                                strncpy(stat_cat.display_name, stat_cat.criteria[0].display_name,
+                                        sizeof(stat_cat.display_name) - 1);
+                                stat_cat.display_name[sizeof(stat_cat.display_name) - 1] = '\0';
+
+                                // If there were multiple criteria, keep only the first one.
+                                if (stat_cat.criteria.size() > 1) {
+                                    EditorTrackableItem first_crit = stat_cat.criteria[0];
+                                    stat_cat.criteria.clear();
+                                    stat_cat.criteria.push_back(first_crit);
+                                }
+                            }
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char multi_stat_tooltip_buffer[256];
+                            snprintf(multi_stat_tooltip_buffer, sizeof(multi_stat_tooltip_buffer),
+                                     "Toggle between a simple, single stat and a complex category\n"
+                                     "containing multiple sub-stats that individually act as a single stat,\n"
+                                     "but have their own icons similar to %s criteria.",
+                                     advancements_label_singular_lower);
+                            ImGui::SetTooltip("%s", multi_stat_tooltip_buffer);
+                        }
+
+                        if (render_layout_coordinates_header("stat category",
+                                                             force_open_header_root_name[0] != '\0' && strcmp(
+                                                                 stat_cat.root_name,
+                                                                 force_open_header_root_name) == 0)) {
+                            render_manual_pos_ui("s_icon", "stat category", "Icon Position", &stat_cat.icon_pos,
+                                                 save_message_type);
+                            render_manual_pos_ui("s_text", "stat category", "Text Position", &stat_cat.text_pos,
+                                                 save_message_type);
+
+                            // ONLY show progress pos if this is a Multi-Stat Category!
+                            if (!stat_cat.is_simple_stat) {
+                                render_manual_pos_ui("s_prog", "stat category", "Progress Position",
+                                                     &stat_cat.progress_pos,
+                                                     save_message_type);
+                            }
+                        }
+
+                        ImGui::Separator();
+
+                        if (stat_cat.is_simple_stat) {
+                            // UI for a simple stat
+                            if (stat_cat.criteria.empty()) stat_cat.criteria.push_back({}); // Ensure one exists
+
+                            auto &simple_crit = stat_cat.criteria[0];
+                            if (ImGui::InputText("Stat Root Name", simple_crit.root_name,
+                                                 sizeof(simple_crit.root_name))) {
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char stat_root_name_tooltip_buffer[256];
+                                if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                    // Legacy
+                                    snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
+                                             "The unique in-game ID for the stat to track, e.g., '16842813' (Furnace Crafted).");
+                                } else if (creator_selected_version <= MC_VERSION_1_12_2) {
+                                    // Mid-era (1.7.2 - 1.12.2)
+                                    snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
+                                             "The unique in-game ID for the stat to track, e.g., 'stat.sprintOneCm'.");
+                                } else {
+                                    // Modern (1.13+)
+                                    snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
+                                             "The unique in-game ID for the stat to track, e.g., 'minecraft:mined/minecraft:diamond_ore'.");
+                                }
+                                ImGui::SetTooltip("%s", stat_root_name_tooltip_buffer);
+                            }
+                            if (ImGui::InputInt("Target Value", &simple_crit.goal)) {
+                                // Clamping to -1
+                                if (simple_crit.goal < -1) {
+                                    simple_crit.goal = -1;
+                                }
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char target_tooltip_buffer[512];
+                                snprintf(target_tooltip_buffer, sizeof(target_tooltip_buffer),
+                                         "Set the stat's behavior:\n"
+                                         "-1 = Infinite counter (manual completion via checkbox).\n"
+                                         ">0 = Progress-based counter (completes when value reached).\n"
+                                         "0 = NOT ALLOWED (Use a Custom Goal toggle instead).");
+                                ImGui::SetTooltip("%s", target_tooltip_buffer);
+                            }
+                        } else {
+                            // UI for a complex, multi-stat category (similar to advancements)
+                            ImGui::Text("Sub-Stats");
+
+                            // --- Counter for the sub-stat list ---
+                            char crit_counter_text[128];
+                            bool is_details_search_active = (
+                                current_search_scope == SCOPE_STAT_DETAILS && tc_search_buffer[0] != '\0');
+                            int visible_criteria_count = 0;
+                            if (!is_details_search_active) {
+                                visible_criteria_count = stat_cat.criteria.size();
+                            } else {
+                                for (const auto &crit: stat_cat.criteria) {
+                                    char goal_str[32];
+                                    snprintf(goal_str, sizeof(goal_str), "%d", crit.goal);
+                                    if (str_contains_insensitive(crit.display_name, tc_search_buffer) ||
+                                        str_contains_insensitive(crit.root_name, tc_search_buffer) ||
+                                        str_contains_insensitive(crit.icon_path, tc_search_buffer) ||
+                                        (crit.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr)) {
+                                        visible_criteria_count++;
+                                    }
+                                }
+                            }
+                            snprintf(crit_counter_text, sizeof(crit_counter_text), "%d %s", visible_criteria_count,
+                                     visible_criteria_count == 1 ? "Sub-Stat" : "Sub-Stats");
+                            float text_width = ImGui::CalcTextSize(crit_counter_text).x;
+                            ImGui::SameLine(ImGui::GetContentRegionAvail().x - text_width);
+                            ImGui::TextDisabled("%s", crit_counter_text);
+
+                            // "Import Sub-Stats" button
+                            if (ImGui::Button("Import Sub-Stats")) {
+                                current_stat_import_mode = IMPORT_AS_SUB_STAT; // Set the mode
+                                char start_path[MAX_PATH_LENGTH];
+                                if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                    if (app_settings->using_stats_per_world_legacy) {
+                                        snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
+                                                 t->world_name);
+                                    } else {
+                                        char parent_dir[MAX_PATH_LENGTH];
+                                        if (get_parent_directory(t->saves_path, parent_dir, sizeof(parent_dir), 1)) {
+                                            snprintf(start_path, sizeof(start_path), "%s/stats/", parent_dir);
+                                        } else {
+                                            strncpy(start_path, t->saves_path, sizeof(start_path));
+                                        }
+                                    }
+                                } else {
+                                    snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
+                                             t->world_name);
+                                }
+#ifdef __APPLE__
+                                const char *json_filter[2] = {"*.json", "public.json"};
+                                const char *dat_filter[2] = {"*.dat", "public.data"};
+                                int filter_count = 2;
+#else
+                                const char *json_filter[1] = {"*.json"};
+                                const char *dat_filter[1] = {"*.dat"};
+                                int filter_count = 1;
+#endif
+                                const char **selected_filter = (creator_selected_version <= MC_VERSION_1_6_4)
+                                                                   ? dat_filter
+                                                                   : json_filter;
+                                const char *filter_desc = (creator_selected_version <= MC_VERSION_1_6_4)
+                                                              ? "DAT files"
+                                                              : "JSON files";
+                                const char *selection = tinyfd_openFileDialog(
+                                    "Select Player Stats File", start_path, filter_count, selected_filter, filter_desc,
+                                    0);
+                                if (selection) {
+                                    import_error_message[0] = '\0';
+                                    if (parse_player_stats_for_import(selection, creator_selected_version,
+                                                                      importable_stats,
+                                                                      import_error_message,
+                                                                      sizeof(import_error_message))) {
+                                        show_import_stats_popup = true;
+                                        last_clicked_stat_index = -1;
+                                    } else {
+                                        save_message_type = MSG_ERROR;
+                                        strncpy(status_message, import_error_message, sizeof(status_message) - 1);
+                                    }
+                                }
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip[512];
+
+                                if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                    if (app_settings->using_stats_per_world_legacy) {
+                                        // Legacy using stats per world
+                                        snprintf(tooltip, sizeof(tooltip),
+                                                 "Import sub-stats directly from a local world's player stats/achievements .dat file.\n"
+                                                 "Cannot import already existing root names within this stat category.");
+                                    } else {
+                                        // Legacy not using stats per world
+                                        snprintf(tooltip, sizeof(tooltip),
+                                                 "Import sub-stats directly from a global world's player stats/achievements .dat file.\n"
+                                                 "Cannot import already existing root names within this stat category.");
+                                    }
+                                } else if (creator_selected_version <= MC_VERSION_1_12_2) {
+                                    // Mid-era (1.7.2 - 1.12.2)
+                                    snprintf(tooltip, sizeof(tooltip),
+                                             "Import sub-stats directly from a world's player stats/achievements .json file.\n"
+                                             "Cannot import already existing root names within this stat category.");
+                                } else {
+                                    // Modern(1.13+)
+                                    snprintf(tooltip, sizeof(tooltip),
+                                             "Import sub-stats directly from a world's player stats .json file.\n"
+                                             "Cannot import already existing root names within this stat category.");
+                                }
+                                ImGui::SetTooltip("%s", tooltip);
+                            }
+                            ImGui::SameLine();
+
+                            // Add Criterion button only for multi-stat categories -> complex stats
+                            if (ImGui::Button("Add New Sub-Stat")) {
+                                // Create new stat criterion with default values
+                                EditorTrackableItem new_crit = {};
+                                int counter = 1;
+                                while (true) {
+                                    snprintf(new_crit.root_name, sizeof(new_crit.root_name), "new_criterion_%d",
+                                             counter);
+                                    bool name_exists = false;
+                                    for (const auto &crit: stat_cat.criteria) {
+                                        if (strcmp(crit.root_name, new_crit.root_name) == 0) {
+                                            name_exists = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!name_exists) break;
+                                    counter++;
+                                }
+                                snprintf(new_crit.display_name, sizeof(new_crit.display_name), "New Criterion %d",
+                                         counter);
+                                strncpy(new_crit.icon_path, "blocks/placeholder.png", sizeof(new_crit.icon_path) - 1);
+                                new_crit.icon_path[sizeof(new_crit.icon_path) - 1] = '\0';
+                                new_crit.goal = 1; // Default to a completable goal
+                                stat_cat.criteria.push_back(new_crit);
+                                save_message_type = MSG_NONE;
+                            }
+
+                            // Tooltip for Add Criterion button
+                            if (ImGui::IsItemHovered()) {
+                                char add_stat_tooltip_buffer[1024];
+                                snprintf(add_stat_tooltip_buffer, sizeof(add_stat_tooltip_buffer),
+                                         "Add a new blank sub-stat to this template.\n\n"
+                                         "Sub-Stats are functionally identical to stats,\n"
+                                         "but have their own icons that then displays in\n"
+                                         "the topmost row of the overlay.\n\n"
+                                         "Click the 'Help' button for more info.");
+                                ImGui::SetTooltip("%s", add_stat_tooltip_buffer);
+                            }
+
+                            ImGui::SameLine();
+
+                            // --- Criteria Sorting Controls ---
+                            bool can_sort_crit = false;
+                            for (const auto &crit: stat_cat.criteria) {
+                                if (crit.sort_order > 0) {
+                                    can_sort_crit = true;
+                                    break;
+                                }
+                            }
+
+                            ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_buttons_width);
+
+                            ImGui::BeginDisabled(!can_sort_crit);
+                            char sort_crit_id[256], reset_crit_id[256];
+                            snprintf(sort_crit_id, sizeof(sort_crit_id), "Sort##scrit_%s", stat_cat.root_name);
+                            snprintf(reset_crit_id, sizeof(reset_crit_id), "Reset Order##scrit_%s", stat_cat.root_name);
+
+                            if (ImGui::Button(sort_crit_id)) {
+                                apply_partial_sort(stat_cat.criteria);
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                char tooltip_buffer[128];
+                                if (!can_sort_crit) {
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "Click the order badges next to criteria to assign a sort order first.");
+                                } else {
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "Rearrange the numbered criteria among themselves.");
+                                }
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Button(reset_crit_id)) {
+                                for (auto &crit: stat_cat.criteria) crit.sort_order = 0;
+                            }
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                char tooltip_buffer[128];
+                                if (!can_sort_crit) {
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
+                                } else {
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "Clear all assigned sort orders from criteria.");
+                                }
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
+                            ImGui::EndDisabled();
+
+                            int crit_to_remove = -1;
+                            int crit_to_copy = -1;
+
+                            int stat_crit_dnd_source_index = -1;
+                            int stat_crit_dnd_target_index = -1;
+                            for (size_t j = 0; j < stat_cat.criteria.size(); j++) {
+                                auto &crit = stat_cat.criteria[j];
+
+                                if (is_details_search_active) {
+                                    char goal_str[32];
+                                    snprintf(goal_str, sizeof(goal_str), "%d", crit.goal);
+                                    if (!str_contains_insensitive(crit.display_name, tc_search_buffer) &&
+                                        !str_contains_insensitive(crit.root_name, tc_search_buffer) &&
+                                        !str_contains_insensitive(crit.icon_path, tc_search_buffer) &&
+                                        (crit.goal == 0 || strstr(goal_str, tc_search_buffer) == nullptr)) {
+                                        continue;
+                                    }
+                                }
+
+                                ImGui::PushID(j);
+
+                                ImGui::Spacing();
+                                ImGui::InvisibleButton("drop_target", ImVec2(-1, 8.0f));
+                                if (ImGui::BeginDragDropTarget()) {
+                                    if (const ImGuiPayload *payload =
+                                            ImGui::AcceptDragDropPayload("STAT_CRITERION_DND")) {
+                                        stat_crit_dnd_source_index = *(const int *) payload->Data;
+                                        stat_crit_dnd_target_index = j;
+                                    }
+                                    ImGui::EndDragDropTarget();
+                                }
+
+                                ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
+                                ImGui::BeginGroup();
+
+                                ImGui::Separator();
+                                if (ImGui::InputText("Sub-Stat Root Name", crit.root_name, sizeof(crit.root_name))) {
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char stat_root_name_tooltip_buffer[256];
+                                    if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                        // Legacy
+                                        snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
+                                                 "The unique in-game ID for the stat to track,\n"
+                                                 "e.g., '1100' (Playtime in ticks), '16974109' (Gold Pickaxe Broken).");
+                                    } else if (creator_selected_version <= MC_VERSION_1_12_2) {
+                                        // Mid-era (1.7.2 - 1.12.2)
+                                        snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
+                                                 "The unique in-game ID for the stat to track, e.g., 'stat.sprintOneCm'.");
+                                    } else {
+                                        // Modern(1.13+)
+                                        snprintf(stat_root_name_tooltip_buffer, sizeof(stat_root_name_tooltip_buffer),
+                                                 "The unique in-game ID for the stat to track, e.g., 'minecraft:picked_up/minecraft:deepslate_emerald_ore'.");
+                                    }
+                                    ImGui::SetTooltip("%s", stat_root_name_tooltip_buffer);
+                                }
+                                if (ImGui::InputText("Display Name", crit.display_name, sizeof(crit.display_name))) {
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char display_name_tooltip_buffer[128];
+                                    snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
+                                             "The user-facing name for this sub-stat.");
+                                    ImGui::SetTooltip("%s", display_name_tooltip_buffer);
+                                }
+                                if (ImGui::InputText("Icon Path", crit.icon_path, sizeof(crit.icon_path))) {
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char icon_path_tooltip_buffer[1024];
+                                    snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                             "Path to the icon file, relative to the 'resources/icons' directory.");
+                                    ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
+                                }
+                                ImGui::SameLine();
+                                if (ImGui::Button("Browse##StatCritIcon")) {
+                                    char new_path[MAX_PATH_LENGTH];
+                                    if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                        strncpy(crit.icon_path, new_path, sizeof(crit.icon_path) - 1);
+                                        crit.icon_path[sizeof(crit.icon_path) - 1] = '\0';
+                                        save_message_type = MSG_NONE;
+                                    }
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char icon_path_tooltip_buffer[1024];
+                                    snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                             "The icon must be inside the 'resources/icons' folder!");
+                                    ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
+                                }
+                                if (ImGui::InputInt("Target Value", &crit.goal)) {
+                                    // Clamping to -1
+                                    if (crit.goal < -1) {
+                                        crit.goal = -1;
+                                    }
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char target_tooltip_buffer[512];
+                                    snprintf(target_tooltip_buffer, sizeof(target_tooltip_buffer),
+                                             "Set the sub-stat's behavior:\n"
+                                             "-1 = Infinite counter (manual completion via checkbox).\n"
+                                             ">0 = Progress-based counter (completes when value reached).\n"
+                                             "0 = NOT ALLOWED (Use a Custom Goal toggle instead).");
+                                    ImGui::SetTooltip("%s", target_tooltip_buffer);
+                                }
+                                if (ImGui::Checkbox("Hidden", &crit.is_hidden)) {
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char hidden_tooltip_buffer[256];
+                                    snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
+                                             "If checked, this sub-stat will be fully hidden on the overlay\n"
+                                             "and hidden settings-based on the tracker.\n"
+                                             "Visibility can be toggled in the main tracker settings.\n\n"
+                                             "NOTE: Hidden sub-stats are also excluded from the cycle rotation\n"
+                                             "on the overlay.");
+                                    ImGui::SetTooltip("%s", hidden_tooltip_buffer);
+                                }
+
+                                ImGui::SameLine();
+                                if (ImGui::Button("Copy")) {
+                                    crit_to_copy = j;
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip_buffer[128];
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Sub-Stat:\n%s",
+                                             crit.root_name);
+                                    ImGui::SetTooltip("%s", tooltip_buffer);
+                                }
+                                ImGui::SameLine();
+                                if (ImGui::Button("Remove")) {
+                                    crit_to_remove = j;
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip_buffer[128];
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Sub-Stat:\n%s",
+                                             crit.root_name);
+                                    ImGui::SetTooltip("%s", tooltip_buffer);
+                                }
+
+                                ImGui::SameLine();
+
+                                // --- Sort Badge (Stat Criterion) ---
+                                char crit_badge_label[64];
+                                if (crit.sort_order > 0) {
+                                    snprintf(crit_badge_label, sizeof(crit_badge_label), "%d##scrit_badge_%zu",
+                                             crit.sort_order, j);
+                                } else {
+                                    snprintf(crit_badge_label, sizeof(crit_badge_label), " - ##scrit_badge_%zu", j);
+                                }
+
+                                const char *crit_text_end = strstr(crit_badge_label, "##");
+                                float crit_text_w = ImGui::CalcTextSize(crit_badge_label, crit_text_end).x;
+                                float crit_badge_w = std::max(
+                                    28.0f, crit_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
+
+                                if (ImGui::Button(crit_badge_label, ImVec2(crit_badge_w, 0))) {
+                                    if (crit.sort_order > 0)
+                                        crit.sort_order = 0;
+                                    else crit.sort_order = get_next_sort_order(stat_cat.criteria);
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip_buffer[128];
+                                    if (crit.sort_order > 0) {
+                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                 "Click to remove sub-stat sort order");
+                                    } else {
+                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                 "Click to assign sub-stat sort order");
+                                    }
+                                    ImGui::SetTooltip("%s", tooltip_buffer);
+                                }
+
+                                if (render_layout_coordinates_header("sub-stat",
+                                                                     force_open_child_header_root_name[0] != '\0' &&
+                                                                     strcmp(crit.root_name,
+                                                                            force_open_child_header_root_name) == 0)) {
+                                    render_manual_pos_ui("sc_icon", "sub-stat", "Icon Position", &crit.icon_pos,
+                                                         save_message_type);
+                                    render_manual_pos_ui("sc_text", "sub-stat", "Text Position", &crit.text_pos,
+                                                         save_message_type);
+                                }
+
+                                ImGui::EndGroup();
+
+                                ImGui::SameLine();
+                                ImGui::SetCursorScreenPos(item_start_cursor_pos);
+                                ImGui::InvisibleButton("dnd_handle", ImGui::GetItemRectSize());
+
+                                if (ImGui::BeginDragDropSource()) {
+                                    ImGui::SetDragDropPayload("STAT_CRITERION_DND", &j, sizeof(int));
+                                    ImGui::Text("Reorder %s", crit.root_name);
+                                    ImGui::EndDragDropSource();
+                                }
+
+                                ImGui::PopID();
+                            }
+
+                            ImGui::InvisibleButton("final_drop_target_stat_crit", ImVec2(-1, 8.0f));
+                            // Added larger drop zone
+                            if (ImGui::BeginDragDropTarget()) {
+                                if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("STAT_CRITERION_DND")) {
+                                    stat_crit_dnd_source_index = *(const int *) payload->Data;
+                                    stat_crit_dnd_target_index = stat_cat.criteria.size();
+                                }
+                                ImGui::EndDragDropTarget();
+                            }
+
+                            if (stat_crit_dnd_source_index != -1 && stat_crit_dnd_target_index != -1 &&
+                                stat_crit_dnd_source_index != stat_crit_dnd_target_index) {
+                                EditorTrackableItem item_to_move = stat_cat.criteria[stat_crit_dnd_source_index];
+                                stat_cat.criteria.erase(stat_cat.criteria.begin() + stat_crit_dnd_source_index);
+                                if (stat_crit_dnd_target_index > stat_crit_dnd_source_index) stat_crit_dnd_target_index
+                                        --;
+                                stat_cat.criteria.insert(stat_cat.criteria.begin() + stat_crit_dnd_target_index,
+                                                         item_to_move);
+                                save_message_type = MSG_NONE;
+                            }
+
+                            if (crit_to_remove != -1) {
+                                stat_cat.criteria.erase(stat_cat.criteria.begin() + crit_to_remove);
+                                save_message_type = MSG_NONE;
+                            }
+
+                            // Logic to handle the copy action after the loop
+                            if (crit_to_copy != -1) {
+                                const auto &source_criterion = stat_cat.criteria[crit_to_copy];
+
+                                // Perform a manual, safe copy.
+                                EditorTrackableItem new_crit;
+                                strncpy(new_crit.root_name, source_criterion.root_name, sizeof(new_crit.root_name));
+                                new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
+                                strncpy(new_crit.display_name, source_criterion.display_name,
+                                        sizeof(new_crit.display_name));
+                                new_crit.display_name[sizeof(new_crit.display_name) - 1] = '\0';
+                                strncpy(new_crit.icon_path, source_criterion.icon_path, sizeof(new_crit.icon_path));
+                                new_crit.icon_path[sizeof(new_crit.icon_path) - 1] = '\0';
+                                new_crit.goal = source_criterion.goal;
+                                new_crit.is_hidden = source_criterion.is_hidden;
+                                new_crit.icon_pos = source_criterion.icon_pos;
+                                new_crit.text_pos = source_criterion.text_pos;
+                                new_crit.progress_pos = source_criterion.progress_pos;
+
+                                new_crit.sort_order = 0;
+
+                                char base_name[192];
+                                strncpy(base_name, source_criterion.root_name, sizeof(base_name) - 1);
+                                base_name[sizeof(base_name) - 1] = '\0';
+                                char new_name[192];
+                                int copy_counter = 1;
+                                while (true) {
+                                    if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
+                                    else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
+                                    bool name_exists = false;
+                                    for (const auto &c: stat_cat.criteria) {
+                                        if (strcmp(c.root_name, new_name) == 0) {
+                                            name_exists = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!name_exists) break;
+                                    copy_counter++;
+                                }
+                                strncpy(new_crit.root_name, new_name, sizeof(new_crit.root_name) - 1);
+                                new_crit.root_name[sizeof(new_crit.root_name) - 1] = '\0';
+                                stat_cat.criteria.insert(stat_cat.criteria.begin() + crit_to_copy + 1, new_crit);
+                                save_message_type = MSG_NONE;
+                            }
+                        }
+                    } else {
+                        ImGui::Text("Select a Stat from the list to edit its details.");
+                    }
+
+                    ImGui::EndChild();
+                    ImGui::EndTabItem();
+                }
             } // end stats tab scope
 
 
             // Only show the Unlocks tab for the specific version
             if (strcmp(creator_version_str, "25w14craftmine") == 0) {
-                ImGuiTabItemFlags unlocks_tab_flags = (force_select_tab == FORCE_TAB_UNLOCKS) ? ImGuiTabItemFlags_SetSelected : 0;
+                ImGuiTabItemFlags unlocks_tab_flags = (force_select_tab == FORCE_TAB_UNLOCKS)
+                                                          ? ImGuiTabItemFlags_SetSelected
+                                                          : 0;
                 if (force_select_tab == FORCE_TAB_UNLOCKS) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem("Unlocks", nullptr, unlocks_tab_flags)) {
                     // Import unlocks button
@@ -6205,7 +6421,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         if (render_layout_coordinates_header("unlock",
-                                force_open_header_root_name[0] != '\0' && strcmp(unlock.root_name, force_open_header_root_name) == 0)) {
+                                                             force_open_header_root_name[0] != '\0' && strcmp(
+                                                                 unlock.root_name, force_open_header_root_name) == 0)) {
                             render_manual_pos_ui("u_icon", "unlock", "Icon Position", &unlock.icon_pos,
                                                  save_message_type);
                             render_manual_pos_ui("u_text", "unlock", "Text Position", &unlock.text_pos,
@@ -6300,1074 +6517,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     ImGui::EndTabItem();
                 }
-            }
-            {
-            ImGuiTabItemFlags custom_tab_flags = (force_select_tab == FORCE_TAB_CUSTOM) ? ImGuiTabItemFlags_SetSelected : 0;
-            if (force_select_tab == FORCE_TAB_CUSTOM) force_select_tab = FORCE_TAB_NONE;
-            if (ImGui::BeginTabItem
-                ("Custom Goals", nullptr, custom_tab_flags)) {
-                if (ImGui::Button("Add New Custom Goal")) {
-                    // Create a new custom goal with default values
-                    EditorTrackableItem new_goal = {};
-                    int counter = 1;
-                    while (true) {
-                        snprintf(new_goal.root_name, sizeof(new_goal.root_name), "new_custom_goal_%d", counter);
-                        bool name_exists = false;
-                        for (const auto &goal: current_template_data.custom_goals) {
-                            if (strcmp(goal.root_name, new_goal.root_name) == 0) {
-                                name_exists = true;
-                                break;
-                            }
-                        }
-                        if (!name_exists) break;
-                        counter++;
-                    }
-                    snprintf(new_goal.display_name, sizeof(new_goal.display_name), "New Custom Goal %d", counter);
-                    strncpy(new_goal.icon_path, "blocks/placeholder.png", sizeof(new_goal.icon_path) - 1);
-                    new_goal.icon_path[sizeof(new_goal.icon_path) - 1] = '\0';
-                    new_goal.goal = 1; // Default to a progress-based counter
-                    current_template_data.custom_goals.push_back(new_goal);
-                    save_message_type = MSG_NONE;
-                }
-                if (ImGui::IsItemHovered()) {
-                    char add_custom_goal_tooltip_buffer[1024];
-                    snprintf(add_custom_goal_tooltip_buffer, sizeof(add_custom_goal_tooltip_buffer),
-                             "Add a new blank custom goal to this template.\n"
-                             "Custom Goals are useful for tracking objectives manually\n"
-                             "that cannot be automatically detected by reading the game's world files.\n"
-                             "E.g., the amount of times a structure has been visited.\n"
-                             "Depending on the target value custom goals can have hotkeys.\n"
-                             "These can then be configured in the settings window after selecting the template.\n"
-                             "You need to be tabbed into the main tracker window for hotkeys to work.\n\n"
-                             "Click the 'Help' button for more info.");
-                    ImGui::SetTooltip("%s", add_custom_goal_tooltip_buffer);
-                }
-                ImGui::SameLine();
-                ImGui::TextDisabled("(Hotkeys are configured in the main Settings window)");
-
-                // --- Sorting Controls ---
-                bool can_sort = false;
-                for (const auto &goal: current_template_data.custom_goals) {
-                    if (goal.sort_order > 0) {
-                        can_sort = true;
-                        break;
-                    }
-                }
-
-                // Calculate the total width of both buttons + the spacing between them
-                float sort_btn_width = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                float reset_btn_width = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                float total_buttons_width = sort_btn_width + reset_btn_width + ImGui::GetStyle().ItemSpacing.x;
-
-                // Push the cursor to the right edge, minus the width of our buttons
-                ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_buttons_width);
-
-                ImGui::BeginDisabled(!can_sort);
-                if (ImGui::Button("Sort")) {
-                    apply_partial_sort(current_template_data.custom_goals);
-                    save_message_type = MSG_NONE;
-                }
-                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    char tooltip_buffer[128];
-                    if (!can_sort) {
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Click the order badges next to goals to assign a sort order first.");
-                    } else {
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Rearrange the numbered items among themselves.");
-                    }
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Reset Order")) {
-                    for (auto &goal: current_template_data.custom_goals) goal.sort_order = 0;
-                }
-                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    char tooltip_buffer[128];
-                    if (!can_sort) {
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
-                    } else {
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Clear all assigned sort orders from custom goals.");
-                    }
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
-                ImGui::EndDisabled();
-                ImGui::NewLine();
-
-                // Determine if search is active for this scope
-                bool is_custom_search_active = (current_search_scope == SCOPE_CUSTOM && tc_search_buffer[0] != '\0');
-
-                // Create a filtered list to render
-                std::vector<EditorTrackableItem *> goals_to_render;
-                if (is_custom_search_active) {
-                    for (auto &goal: current_template_data.custom_goals) {
-                        char goal_str[32];
-                        snprintf(goal_str, sizeof(goal_str), "%d", goal.goal);
-
-                        if (str_contains_insensitive(goal.display_name, tc_search_buffer) ||
-                            str_contains_insensitive(goal.root_name, tc_search_buffer) ||
-                            str_contains_insensitive(goal.icon_path, tc_search_buffer) ||
-                            (goal.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr)) {
-                            goals_to_render.push_back(&goal);
-                        }
-                    }
-                } else {
-                    for (auto &goal: current_template_data.custom_goals) {
-                        goals_to_render.push_back(&goal);
-                    }
-                }
-
-                // --- Counter for the list ---
-                char counter_text[128];
-                size_t count = goals_to_render.size();
-                snprintf(counter_text, sizeof(counter_text), "%zu %s", count,
-                         count == 1 ? "Custom Goal" : "Custom Goals");
-                float text_width = ImGui::CalcTextSize(counter_text).x;
-                ImGui::SameLine(ImGui::GetContentRegionAvail().x - text_width);
-                ImGui::TextDisabled("%s", counter_text);
-
-                int item_to_remove = -1;
-                int item_to_copy = -1;
-                int custom_dnd_source_index = -1;
-                int custom_dnd_target_index = -1;
-
-                for (size_t i = 0; i < goals_to_render.size(); ++i) {
-                    auto &goal = *goals_to_render[i];
-
-                    ImGui::PushID(i);
-
-                    // Add some vertical spacing to create a gap
-                    ImGui::Spacing();
-                    //Create a wide, 8-pixel-high invisible button to act as our drop zone
-                    ImGui::InvisibleButton("drop_target", ImVec2(-1, 8.0f));
-
-                    // Drop target for dropping between items
-                    if (ImGui::BeginDragDropTarget()) {
-                        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("CUSTOM_GOAL_DND")) {
-                            custom_dnd_source_index = *(const int *) payload->Data;
-                            custom_dnd_target_index = i;
-                        }
-                        ImGui::EndDragDropTarget();
-                    }
-
-                    // Draw a separator for visual feedback after the drop zone
-                    ImGui::Separator();
-
-                    // Get cursor position to overlay the invisible button later
-                    ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
-
-                    ImGui::BeginGroup();
-                    if (ImGui::InputText("Goal Root Name", goal.root_name, sizeof(goal.root_name))) {
-                        save_message_type = MSG_NONE; // Clear message on new edit
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char root_name_tooltip_buffer[256];
-                        snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
-                                 "A unique ID for this custom goal (e.g., 'fun_counter').\n"
-                                 "This is used to save progress and assign hotkeys.");
-                        ImGui::SetTooltip("%s", root_name_tooltip_buffer);
-                    }
-                    if (ImGui::InputText("Display Name", goal.display_name, sizeof(goal.display_name))) {
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char display_name_tooltip_buffer[256];
-                        snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
-                                 "The user-facing name for this custom goal.\n"
-                                 "If target value isn't 0 you'll find this name at the bottom\n"
-                                 "of the settings window to configure hotkeys.");
-                        ImGui::SetTooltip("%s", display_name_tooltip_buffer);
-                    }
-                    if (ImGui::InputText("Icon Path", goal.icon_path, sizeof(goal.icon_path))) {
-                        save_message_type = MSG_NONE; // Clear message on new edit
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char icon_path_tooltip_buffer[128];
-                        snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                 "Path to the icon file, relative to the 'resources/icons' directory.");
-                        ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("Browse##CritIcon")) {
-                        char new_path[MAX_PATH_LENGTH];
-                        if (open_icon_file_dialog(new_path, sizeof(new_path))) {
-                            strncpy(goal.icon_path, new_path, sizeof(goal.icon_path) - 1);
-                            goal.icon_path[sizeof(goal.icon_path) - 1] = '\0';
-                            save_message_type = MSG_NONE;
-                        }
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char icon_path_tooltip_buffer[1024];
-                        snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                 "The icon must be inside the 'resources/icons' folder!");
-                        ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
-                    }
-                    if (ImGui::InputInt("Target Value", &goal.goal)) {
-                        // No values below -1 allowed
-                        if (goal.goal < -1) {
-                            goal.goal = -1;
-                        }
-                        save_message_type = MSG_NONE; // Clear message on new edit
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char target_goal_tooltip_buffer[1024];
-                        snprintf(target_goal_tooltip_buffer, sizeof(target_goal_tooltip_buffer),
-                                 "Set the goal's behavior:\n"
-                                 "0 = Simple on/off toggle.\n"
-                                 "-1 = Infinite counter.\n"
-                                 ">0 = Progress-based counter that completes at this value.");
-                        ImGui::SetTooltip("%s", target_goal_tooltip_buffer);
-                    }
-                    if (ImGui::Checkbox("Hidden", &goal.is_hidden)) {
-                        save_message_type = MSG_NONE; // Clear message on new edit
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char hidden_tooltip_buffer[256];
-                        snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
-                                 "If checked, this custom goal will be fully hidden on the overlay\n"
-                                 "and hidden settings-based on the tracker.\n"
-                                 "Visibility can be toggled in the main tracker settings");
-                        ImGui::SetTooltip("%s", hidden_tooltip_buffer);
-                    }
-
-                    ImGui::SameLine();
-                    if (ImGui::Checkbox("Row 2", &goal.in_2nd_row)) {
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[256];
-                        if (creator_selected_version != MC_VERSION_25W14CRAFTMINE) {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Force this stat category to display on the 2nd row of the overlay\n"
-                                     "(normally reserved for %s).", advancements_label_plural_lower);
-                        } else {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Force this stat category to display on the 2nd row of the overlay\n"
-                                     "(normally reserved for %s/unlocks).", advancements_label_plural_lower);
-                        }
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-
-                    ImGui::SameLine();
-
-                    // "Copy" button for custom goals
-                    if (ImGui::Button("Copy")) {
-                        item_to_copy = i;
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[128];
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Custom Goal:\n%s", goal.root_name);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-                    ImGui::SameLine();
-
-                    if (ImGui::Button("Remove")) {
-                        item_to_remove = i;
-                        save_message_type = MSG_NONE; // Clear message on new edit
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[128];
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Custom Goal:\n%s", goal.root_name);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-
-                    ImGui::SameLine();
-
-                    // --- Sort Badge ---
-                    char badge_label[32];
-                    if (goal.sort_order > 0) {
-                        snprintf(badge_label, sizeof(badge_label), "%d##badge_%zu", goal.sort_order, i);
-                    } else {
-                        snprintf(badge_label, sizeof(badge_label), " - ##badge_%zu", i);
-                    }
-
-                    const char *text_end = strstr(badge_label, "##");
-                    float text_width = ImGui::CalcTextSize(badge_label, text_end).x;
-                    float badge_width = std::max(28.0f, text_width + ImGui::GetStyle().FramePadding.x * 4.0f);
-
-                    if (ImGui::Button(badge_label, ImVec2(badge_width, 0))) {
-                        if (goal.sort_order > 0) goal.sort_order = 0;
-                        else goal.sort_order = get_next_sort_order(current_template_data.custom_goals);
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[128];
-                        if (goal.sort_order > 0) {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to remove custom goal sort order");
-                        } else {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to assign custom goal sort order");
-                        }
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-
-                    if (render_layout_coordinates_header("custom goal",
-                            force_open_header_root_name[0] != '\0' && strcmp(goal.root_name, force_open_header_root_name) == 0)) {
-                        render_manual_pos_ui("cg_icon", "custom goal", "Icon Position", &goal.icon_pos,
-                                             save_message_type);
-                        render_manual_pos_ui("cg_text", "custom goal", "Text Position", &goal.text_pos,
-                                             save_message_type);
-
-                        // ONLY show progress pos if this Custom Goal is a counter!
-                        if (goal.goal > 0 || goal.goal == -1) {
-                            render_manual_pos_ui("cg_prog", "custom goal", "Progress Position", &goal.progress_pos,
-                                                 save_message_type);
-                        }
-                    }
-
-                    ImGui::EndGroup();
-
-                    ImGui::SameLine();
-                    // Create an invisible button over the entire group. This is our drag handle.
-                    ImGui::SetCursorScreenPos(item_start_cursor_pos);
-                    ImGui::InvisibleButton("dnd_handle", ImGui::GetItemRectSize());
-
-                    // Add the required flag here
-                    if (ImGui::BeginDragDropSource()) {
-                        ImGui::SetDragDropPayload("CUSTOM_GOAL_DND", &i, sizeof(int));
-                        ImGui::Text("Reorder %s", goal.root_name);
-                        ImGui::EndDragDropSource();
-                    }
-
-                    ImGui::PopID();
-                }
-
-                // Final drop target for end of list
-                ImGui::InvisibleButton("final_drop_target_custom", ImVec2(-1, 8.0f)); // Added larger drop zone
-                if (ImGui::BeginDragDropTarget()) {
-                    if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("CUSTOM_GOAL_DND")) {
-                        custom_dnd_source_index = *(const int *) payload->Data;
-                        custom_dnd_target_index = current_template_data.custom_goals.size();
-                    }
-                    ImGui::EndDragDropTarget();
-                }
-
-                if (custom_dnd_source_index != -1 && custom_dnd_target_index != -1 && custom_dnd_source_index !=
-                    custom_dnd_target_index) {
-                    EditorTrackableItem item_to_move = current_template_data.custom_goals[custom_dnd_source_index];
-                    current_template_data.custom_goals.erase(
-                        current_template_data.custom_goals.begin() + custom_dnd_source_index);
-                    if (custom_dnd_target_index > custom_dnd_source_index) custom_dnd_target_index--;
-                    current_template_data.custom_goals.insert(
-                        current_template_data.custom_goals.begin() + custom_dnd_target_index, item_to_move);
-                    save_message_type = MSG_NONE;
-                }
-
-
-                if (item_to_remove != -1) {
-                    current_template_data.custom_goals.erase(
-                        current_template_data.custom_goals.begin() + item_to_remove);
-                    save_message_type = MSG_NONE;
-                }
-
-                // Logic to handle the copy action after the loop
-                if (item_to_copy != -1) {
-                    const auto &source_item = current_template_data.custom_goals[item_to_copy];
-
-                    // Perform a manual, safe copy.
-                    EditorTrackableItem new_item;
-                    strncpy(new_item.root_name, source_item.root_name, sizeof(new_item.root_name));
-                    new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
-                    strncpy(new_item.display_name, source_item.display_name, sizeof(new_item.display_name));
-                    new_item.display_name[sizeof(new_item.display_name) - 1] = '\0';
-                    strncpy(new_item.icon_path, source_item.icon_path, sizeof(new_item.icon_path));
-                    new_item.icon_path[sizeof(new_item.icon_path) - 1] = '\0';
-                    new_item.goal = source_item.goal;
-                    new_item.is_hidden = source_item.is_hidden;
-                    new_item.icon_pos = source_item.icon_pos;
-                    new_item.text_pos = source_item.text_pos;
-                    new_item.progress_pos = source_item.progress_pos;
-
-                    new_item.sort_order = 0;
-
-                    char base_name[192];
-                    strncpy(base_name, source_item.root_name, sizeof(base_name) - 1);
-                    base_name[sizeof(base_name) - 1] = '\0';
-                    char new_name[192];
-                    int copy_counter = 1;
-                    while (true) {
-                        if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
-                        else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
-                        bool name_exists = false;
-                        for (const auto &item: current_template_data.custom_goals) {
-                            if (strcmp(item.root_name, new_name) == 0) {
-                                name_exists = true;
-                                break;
-                            }
-                        }
-                        if (!name_exists) break;
-                        copy_counter++;
-                    }
-                    strncpy(new_item.root_name, new_name, sizeof(new_item.root_name) - 1);
-                    new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
-                    current_template_data.custom_goals.insert(
-                        current_template_data.custom_goals.begin() + item_to_copy + 1, new_item);
-                    save_message_type = MSG_NONE;
-                }
-                ImGui::EndTabItem();
-            }
-            } // end custom goals tab scope
-            {
-            ImGuiTabItemFlags ms_tab_flags = (force_select_tab == FORCE_TAB_MULTISTAGE) ? ImGuiTabItemFlags_SetSelected : 0;
-            if (force_select_tab == FORCE_TAB_MULTISTAGE) force_select_tab = FORCE_TAB_NONE;
-            if (ImGui::BeginTabItem("Multi-Stage Goals", nullptr, ms_tab_flags)) {
-                // Flag to track changes in this version
-                // Specifically for hidden legacy stats for multi-stage goals
-                // This flag still tracks ALL CHANGES within multi-stage goals
-                bool ms_goal_data_changed = false;
-
-                // TWO-PANE LAYOUT for Multi-Stage Goals
-                float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
-                ImGui::BeginChild("MSGoalListPane", ImVec2(pane_width, 0), true);
-
-                // --- Sorting Controls ---
-                bool can_sort_ms = false;
-                for (const auto &goal: current_template_data.multi_stage_goals) {
-                    if (goal.sort_order > 0) {
-                        can_sort_ms = true;
-                        break;
-                    }
-                }
-
-                float sort_btn_width = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                float reset_btn_width = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                float total_buttons_width = sort_btn_width + reset_btn_width + ImGui::GetStyle().ItemSpacing.x;
-
-                ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_buttons_width);
-
-                ImGui::BeginDisabled(!can_sort_ms);
-                if (ImGui::Button("Sort##ms")) {
-                    apply_partial_sort(current_template_data.multi_stage_goals);
-                    save_message_type = MSG_NONE;
-                }
-                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    char tooltip_buffer[128];
-                    if (!can_sort_ms) {
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Click the order badges next to goals to assign a sort order first.");
-                    } else {
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Rearrange the numbered items among themselves.");
-                    }
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Reset Order##ms")) {
-                    for (auto &ms_goal: current_template_data.multi_stage_goals) ms_goal.sort_order = 0;
-                }
-                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    char tooltip_buffer[128];
-                    if (!can_sort_ms) {
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
-                    } else {
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                 "Clear all assigned sort orders from multi-stage goals.");
-                    }
-                    ImGui::SetTooltip("%s", tooltip_buffer);
-                }
-                ImGui::EndDisabled();
-
-                if (ImGui::Button("Add New Multi-Stage Goal")) {
-                    // Before modifying the vector, store the root_name of the currently selected item.
-                    char selected_root_name_before_op[192] = {};
-                    if (selected_ms_goal) {
-                        strncpy(selected_root_name_before_op, selected_ms_goal->root_name,
-                                sizeof(selected_root_name_before_op) - 1);
-                        selected_root_name_before_op[sizeof(selected_root_name_before_op) - 1] = '\0';
-                    }
-
-                    // Create a new multi-stage goal with default values and a final stage
-                    EditorMultiStageGoal new_goal = {};
-                    int counter = 1;
-                    while (true) {
-                        snprintf(new_goal.root_name, sizeof(new_goal.root_name), "new_ms_goal_%d", counter);
-                        bool name_exists = false;
-                        for (const auto &goal: current_template_data.multi_stage_goals) {
-                            if (strcmp(goal.root_name, new_goal.root_name) == 0) {
-                                name_exists = true;
-                                break;
-                            }
-                        }
-                        if (!name_exists) break;
-                        counter++;
-                    }
-                    snprintf(new_goal.display_name, sizeof(new_goal.display_name), "New Multi-Stage Goal %d", counter);
-                    strncpy(new_goal.icon_path, "blocks/placeholder.png", sizeof(new_goal.icon_path) - 1);
-                    new_goal.icon_path[sizeof(new_goal.icon_path) - 1] = '\0';
-
-                    // Add a default "Final" stage, which is required for validation
-                    EditorSubGoal final_stage = {};
-                    strncpy(final_stage.stage_id, "final", sizeof(final_stage.stage_id) - 1);
-                    final_stage.stage_id[sizeof(final_stage.stage_id) - 1] = '\0';
-                    strncpy(final_stage.display_text, "Final Stage", sizeof(final_stage.display_text) - 1);
-                    final_stage.display_text[sizeof(final_stage.display_text) - 1] = '\0';
-                    final_stage.type = SUBGOAL_MANUAL;
-                    new_goal.stages.push_back(final_stage);
-
-                    current_template_data.multi_stage_goals.push_back(new_goal);
-
-                    // After modifying the vector, re-find the selected item to get a valid pointer.
-                    if (selected_root_name_before_op[0] != '\0') {
-                        for (auto &goal: current_template_data.multi_stage_goals) {
-                            if (strcmp(goal.root_name, selected_root_name_before_op) == 0) {
-                                selected_ms_goal = &goal;
-                                break;
-                            }
-                        }
-                    }
-
-                    ms_goal_data_changed = true;
-                    save_message_type = MSG_NONE;
-                }
-                if (ImGui::IsItemHovered()) {
-                    char add_ms_goal_tooltip_buffer[1024]; // Increased buffer size for detailed text
-
-                    if (creator_selected_version <= MC_VERSION_1_6_4) {
-                        // Legacy Version Tooltip
-                        snprintf(add_ms_goal_tooltip_buffer, sizeof(add_ms_goal_tooltip_buffer),
-                                 "Add a new multi-stage goal to this template.\n\n"
-                                 "Multi-Stage Goals get completed one stage at a time.\n"
-                                 "The 'Type' of each stage determines how it is completed:\n"
-                                 " • Stat / Achievement: The ID number (e.g., '2011' - Items Dropped)\n"
-                                 "   to track in the stats file.\n"
-                                 " • Final: The mandatory last stage that completes the goal.\n\n"
-                                 "Click the 'Help' button for more info.");
-                    } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                        // Mid-Era Version Tooltip
-                        snprintf(add_ms_goal_tooltip_buffer, sizeof(add_ms_goal_tooltip_buffer),
-                                 "Add a new multi-stage goal to this template.\n\n"
-                                 "Multi-Stage Goals get completed one stage at a time.\n"
-                                 "The 'Type' of each stage determines how it is completed:\n"
-                                 " • Stat / Achievement: Root name (e.g., 'stat.craftItem.minecraft.planks')\n"
-                                 "   to track in the stats file.\n"
-                                 " • Criterion: A specific criterion (e.g., 'Sunflower Plains') of a parent achievement\n"
-                                 "   (e.g., 'achievement.exploreAllBiomes').\n"
-                                 " • Final: The mandatory last stage that completes the goal.\n\n"
-                                 "Click the 'Help' button for more info.");
-                    } else if (creator_selected_version <= MC_VERSION_1_12_2) {
-                        // Modern with mid-era stats Version Tooltip
-                        snprintf(add_ms_goal_tooltip_buffer, sizeof(add_ms_goal_tooltip_buffer),
-                                 "Add a new multi-stage goal to this template.\n\n"
-                                 "Multi-Stage Goals get completed one stage at a time.\n"
-                                 "The 'Type' of each stage determines how it is completed:\n"
-                                 " • Stat: Root name (e.g., 'stat.mobKills') from the stats file.\n"
-                                 " • Advancement: Root name of an advancement (e.g., 'minecraft:husbandry/tame_an_animal')\n"
-                                 "   or recipe (e.g., 'minecraft:recipes/redstone/stone_button') from the advancements file.\n"
-                                 " • Criterion: A specific criterion (e.g., 'cave_spider')\n"
-                                 "   of a parent advancement (e.g., 'minecraft:adventure/kill_a_mob').\n"
-                                 " • Final: The mandatory last stage that completes the goal.\n\n"
-                                 "Click the 'Help' button for more info.");
-                    } else if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
-                        // 25w14craftmine Version Tooltip
-                        snprintf(add_ms_goal_tooltip_buffer, sizeof(add_ms_goal_tooltip_buffer),
-                                 "Add a new multi-stage goal to this template.\n\n"
-                                 "Multi-Stage Goals get completed one stage at a time.\n"
-                                 "The 'Type' of each stage determines how it is completed:\n"
-                                 " • Stat: Root name (e.g., 'minecraft:mined/minecraft:spawner') from the stats file.\n"
-                                 " • Advancement: Root name of an advancement (e.g., 'minecraft:end/levitate')\n"
-                                 "   or recipe (e.g., 'minecraft:recipes/redstone/tnt') from the advancements file.\n"
-                                 " • Criterion: A specific criterion (e.g., 'minecraft:wither_boss')\n"
-                                 "   of a parent advancement (e.g., 'minecraft:mines/all_special_mines_completed').\n"
-                                 " • Unlock: Root name (e.g., 'minecraft:exploration') from the unlocks file.\n"
-                                 " • Final: The mandatory last stage that completes the goal.\n\n"
-                                 "Click the 'Help' button for more info.");
-                    } else {
-                        // Modern Versions (1.13+ excluding craftmine) Tooltip
-                        snprintf(add_ms_goal_tooltip_buffer, sizeof(add_ms_goal_tooltip_buffer),
-                                 "Add a new multi-stage goal to this template.\n\n"
-                                 "Multi-Stage Goals get completed one stage at a time.\n"
-                                 "The 'Type' of each stage determines how it is completed:\n"
-                                 " • Stat: Root name (e.g., 'minecraft:killed/minecraft:blaze') from the stats file.\n"
-                                 " • Advancement: Root name of an advancement (e.g., 'minecraft:story/cure_zombie_villager')\n"
-                                 "   or recipe (e.g., 'minecraft:recipes/decorations/anvil') from the advancements file.\n"
-                                 " • Criterion: A specific criterion (e.g., 'minecraft:spotted')\n"
-                                 "   of a parent advancement (e.g., 'minecraft:husbandry/whole_pack').\n"
-                                 " • Final: The mandatory last stage that completes the goal.\n\n"
-                                 "Click the 'Help' button for more info.");
-                    }
-
-                    ImGui::SetTooltip("%s", add_ms_goal_tooltip_buffer);
-                }
-                ImGui::SameLine();
-
-                ImGui::Checkbox("Show Display Names", &show_ms_goal_display_names);
-                ImGui::Separator();
-
-                // 1. Create a list of pointers to render from.
-                std::vector<EditorMultiStageGoal *> goals_to_render;
-
-                // 2. Populate the list based on search criteria.
-                bool search_active = (tc_search_buffer[0] != '\0' && current_search_scope == SCOPE_MULTISTAGE);
-
-                if (search_active) {
-                    for (auto &goal: current_template_data.multi_stage_goals) {
-                        bool parent_match = str_contains_insensitive(goal.display_name, tc_search_buffer) ||
-                                            str_contains_insensitive(goal.root_name, tc_search_buffer) ||
-                                            str_contains_insensitive(goal.icon_path, tc_search_buffer);
-
-                        if (parent_match) {
-                            goals_to_render.push_back(&goal);
-                            continue;
-                        }
-
-                        bool stage_match = false;
-                        for (const auto &stage: goal.stages) {
-                            // Convert target value into a string
-                            char target_val_str[32];
-                            snprintf(target_val_str, sizeof(target_val_str), "%d", stage.required_progress);
-
-                            // Check standard fields
-                            bool standard_match = str_contains_insensitive(stage.display_text, tc_search_buffer) ||
-                                                  str_contains_insensitive(stage.stage_id, tc_search_buffer) ||
-                                                  str_contains_insensitive(stage.root_name, tc_search_buffer) ||
-                                                  str_contains_insensitive(stage.parent_advancement, tc_search_buffer)
-                                                  ||
-                                                  strstr(target_val_str, tc_search_buffer) != nullptr;
-
-                            // Check stage icon path IF enabled, so it works with search
-                            bool icon_match = false;
-                            if (goal.use_stage_icons) {
-                                icon_match = str_contains_insensitive(stage.icon_path, tc_search_buffer);
-                            }
-
-                            if (standard_match || icon_match) {
-                                stage_match = true;
-                                break;
-                            }
-                        }
-
-                        if (stage_match) {
-                            goals_to_render.push_back(&goal);
-                        }
-                    }
-                } else {
-                    // Search is inactive, show all goals.
-                    for (auto &goal: current_template_data.multi_stage_goals) {
-                        goals_to_render.push_back(&goal);
-                    }
-                }
-
-                // --- Counter for the list ---
-                char counter_text[128];
-                snprintf(counter_text, sizeof(counter_text), "%zu %s", goals_to_render.size(),
-                         goals_to_render.size() == 1 ? "Multi-Stage Goal" : "Multi-Stage Goals");
-                float text_width = ImGui::CalcTextSize(counter_text).x;
-                // Center Count
-                ImGui::SetCursorPosX(
-                    ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - text_width) *
-                    0.5f);
-                ImGui::TextDisabled("%s", counter_text);
-
-                // 3. Render the list using pointers.
-                int goal_to_remove_idx = -1;
-                int goal_to_copy_idx = -1;
-                int ms_goal_dnd_source_index = -1;
-                int ms_goal_dnd_target_index = -1;
-
-                for (size_t i = 0; i < goals_to_render.size(); ++i) {
-                    auto &goal = *goals_to_render[i];
-                    ImGui::PushID(&goal);
-
-                    const char *display_name = goal.display_name;
-                    const char *root_name = goal.root_name;
-                    const char *label = show_ms_goal_display_names
-                                            ? (display_name[0] ? display_name : root_name)
-                                            : root_name;
-                    if (label[0] == '\0') {
-                        label = "[New Goal]";
-                    }
-
-                    // --- Sort Badge (Multi-Stage Goal) ---
-                    char ms_badge_label[64];
-                    if (goal.sort_order > 0) {
-                        snprintf(ms_badge_label, sizeof(ms_badge_label), "%d##ms_badge", goal.sort_order);
-                    } else {
-                        snprintf(ms_badge_label, sizeof(ms_badge_label), " - ##ms_badge");
-                    }
-
-                    const char *ms_text_end = strstr(ms_badge_label, "##");
-                    float ms_text_w = ImGui::CalcTextSize(ms_badge_label, ms_text_end).x;
-                    float ms_badge_w = std::max(28.0f, ms_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
-
-                    if (ImGui::Button(ms_badge_label, ImVec2(ms_badge_w, 0))) {
-                        if (goal.sort_order > 0)
-                            goal.sort_order = 0;
-                        else goal.sort_order = get_next_sort_order(current_template_data.multi_stage_goals);
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[128];
-                        if (goal.sort_order > 0) {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Click to remove multi-stage goal sort order");
-                        } else {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Click to assign multi-stage goal sort order");
-                        }
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-                    ImGui::SameLine();
-
-                    if (ImGui::Button("X")) { goal_to_remove_idx = i; }
-                    if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[128];
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s", label);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("Copy")) { goal_to_copy_idx = i; }
-                    if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[128];
-                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate %s.", label);
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-                    ImGui::SameLine();
-
-                    if (ImGui::Selectable(label, &goal == selected_ms_goal)) {
-                        if (&goal != selected_ms_goal) {
-                            selected_ms_goal = &goal;
-                        }
-                    }
-
-                    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
-                        ImGui::SetDragDropPayload("MS_GOAL_DND", &i, sizeof(int));
-                        ImGui::Text("Reorder %s", label);
-                        ImGui::EndDragDropSource();
-                    }
-                    if (ImGui::BeginDragDropTarget()) {
-                        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("MS_GOAL_DND")) {
-                            ms_goal_dnd_source_index = *(const int *) payload->Data;
-                            ms_goal_dnd_target_index = i;
-                        }
-                        ImGui::EndDragDropTarget();
-                    }
-                    ImGui::PopID();
-                }
-
-                // Handle Drag and Drop
-                if (ms_goal_dnd_source_index != -1 && ms_goal_dnd_target_index != -1) {
-                    EditorMultiStageGoal *source_item_ptr = goals_to_render[ms_goal_dnd_source_index];
-                    EditorMultiStageGoal *target_item_ptr = goals_to_render[ms_goal_dnd_target_index];
-
-                    auto source_it = std::find_if(current_template_data.multi_stage_goals.begin(),
-                                                  current_template_data.multi_stage_goals.end(),
-                                                  [&](const EditorMultiStageGoal &g) { return &g == source_item_ptr; });
-
-                    EditorMultiStageGoal item_to_move = *source_item_ptr;
-                    current_template_data.multi_stage_goals.erase(source_it);
-
-                    auto target_it = std::find_if(current_template_data.multi_stage_goals.begin(),
-                                                  current_template_data.multi_stage_goals.end(),
-                                                  [&](const EditorMultiStageGoal &g) { return &g == target_item_ptr; });
-
-                    current_template_data.multi_stage_goals.insert(target_it, item_to_move);
-                    ms_goal_data_changed = true;
-                    save_message_type = MSG_NONE;
-                }
-
-                // Handle Copying
-                if (goal_to_copy_idx != -1) {
-                    char selected_root_name_before_op[192] = {};
-                    if (selected_ms_goal) {
-                        strncpy(selected_root_name_before_op, selected_ms_goal->root_name,
-                                sizeof(selected_root_name_before_op) - 1);
-                    }
-
-                    const EditorMultiStageGoal *source_goal_ptr = goals_to_render[goal_to_copy_idx];
-
-                    // Perform a manual, safe copy to prevent memory corruption.
-                    EditorMultiStageGoal new_goal = {}; // Zero-initialize to prevent garbage in unset fields
-                    strncpy(new_goal.root_name, source_goal_ptr->root_name, sizeof(new_goal.root_name));
-                    new_goal.root_name[sizeof(new_goal.root_name) - 1] = '\0';
-                    strncpy(new_goal.display_name, source_goal_ptr->display_name, sizeof(new_goal.display_name));
-                    new_goal.display_name[sizeof(new_goal.display_name) - 1] = '\0';
-                    strncpy(new_goal.icon_path, source_goal_ptr->icon_path, sizeof(new_goal.icon_path));
-                    new_goal.icon_path[sizeof(new_goal.icon_path) - 1] = '\0';
-                    new_goal.is_hidden = source_goal_ptr->is_hidden;
-                    new_goal.in_2nd_row = source_goal_ptr->in_2nd_row;
-                    new_goal.use_stage_icons = source_goal_ptr->use_stage_icons;
-                    new_goal.stages = source_goal_ptr->stages; // std::vector handles its own deep copy safely.
-                    new_goal.icon_pos = source_goal_ptr->icon_pos;
-                    new_goal.text_pos = source_goal_ptr->text_pos;
-                    new_goal.progress_pos = source_goal_ptr->progress_pos;
-
-                    new_goal.sort_order = 0;
-                    for (auto &stage: new_goal.stages) {
-                        stage.sort_order = 0;
-                    }
-
-                    // Now, generate a unique name for the new copy
-                    char base_name[192];
-                    strncpy(base_name, new_goal.root_name, sizeof(base_name));
-                    base_name[sizeof(base_name) - 1] = '\0'; // Ensure base_name is safe to use
-
-                    char new_name[192];
-                    int copy_counter = 1;
-                    while (true) {
-                        if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
-                        else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
-                        bool name_exists = false;
-                        for (const auto &g: current_template_data.multi_stage_goals) {
-                            if (strcmp(g.root_name, new_name) == 0) {
-                                name_exists = true;
-                                break;
-                            }
-                        }
-                        if (!name_exists) break;
-                        copy_counter++;
-                    }
-
-                    // Safely apply the new unique name
-                    strncpy(new_goal.root_name, new_name, sizeof(new_goal.root_name));
-                    new_goal.root_name[sizeof(new_goal.root_name) - 1] = '\0';
-
-
-                    auto it = std::find_if(current_template_data.multi_stage_goals.begin(),
-                                           current_template_data.multi_stage_goals.end(),
-                                           [&](const EditorMultiStageGoal &g) { return &g == source_goal_ptr; });
-
-                    if (it != current_template_data.multi_stage_goals.end()) {
-                        current_template_data.multi_stage_goals.insert(it + 1, new_goal);
-                    } else {
-                        current_template_data.multi_stage_goals.push_back(new_goal);
-                    }
-
-                    // Re-find and update the selected_ms_goal pointer
-                    if (selected_root_name_before_op[0] != '\0') {
-                        for (auto &goal: current_template_data.multi_stage_goals) {
-                            if (strcmp(goal.root_name, selected_root_name_before_op) == 0) {
-                                selected_ms_goal = &goal;
-                                break;
-                            }
-                        }
-                    }
-                    ms_goal_data_changed = true;
-                    save_message_type = MSG_NONE;
-                }
-
-                // Handle Removal
-                if (goal_to_remove_idx != -1) {
-                    char selected_root_name_before_op[192] = {};
-                    if (selected_ms_goal) {
-                        strncpy(selected_root_name_before_op, selected_ms_goal->root_name,
-                                sizeof(selected_root_name_before_op) - 1);
-                    }
-
-                    EditorMultiStageGoal *goal_to_remove = goals_to_render[goal_to_remove_idx];
-                    if (selected_ms_goal == goal_to_remove) {
-                        selected_ms_goal = nullptr;
-                    }
-
-                    current_template_data.multi_stage_goals.erase(
-                        std::remove_if(current_template_data.multi_stage_goals.begin(),
-                                       current_template_data.multi_stage_goals.end(),
-                                       [&](const EditorMultiStageGoal &g) { return &g == goal_to_remove; }),
-                        current_template_data.multi_stage_goals.end()
-                    );
-
-                    // Re-find pointer if it wasn't the one being deleted
-                    if (selected_ms_goal && selected_root_name_before_op[0] != '\0') {
-                        for (auto &goal: current_template_data.multi_stage_goals) {
-                            if (strcmp(goal.root_name, selected_root_name_before_op) == 0) {
-                                selected_ms_goal = &goal;
-                                break;
-                            }
-                        }
-                    }
-                    ms_goal_data_changed = true;
-                    save_message_type = MSG_NONE;
-                }
-
-                ImGui::EndChild();
-                ImGui::SameLine();
-
-                ImGui::BeginChild("MSGoalDetailsPane", ImVec2(0, 0), true);
-                if (selected_ms_goal != nullptr) {
-                    auto &goal = *selected_ms_goal;
-
-                    ImGui::Text("Edit Multi-Stage Goal Details");
-
-                    // "Reset All Positions" button — only if any position is manually set
-                    {
-                        bool any_pos_set = goal.icon_pos.is_set || goal.text_pos.is_set ||
-                                           goal.progress_pos.is_set;
-                        if (any_pos_set) {
-                            const char *reset_btn = "Reset All Positions";
-                            float btn_w = ImGui::CalcTextSize(reset_btn).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                            ImGui::SameLine(ImGui::GetContentRegionAvail().x - btn_w);
-                            if (ImGui::SmallButton(reset_btn)) {
-                                reset_manual_pos(&goal.icon_pos);
-                                reset_manual_pos(&goal.text_pos);
-                                reset_manual_pos(&goal.progress_pos);
-                                save_message_type = MSG_NONE;
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char tooltip[256];
-                                snprintf(tooltip, sizeof(tooltip),
-                                         "Reset all manual positions for this\n"
-                                         "multi-stage goal back to the auto-layout.\n"
-                                         "Save the template for the changes to take visual effect.");
-                                ImGui::SetTooltip("%s", tooltip);
-                            }
-                        }
-                    }
-
-                    ImGui::Separator();
-
-                    if (ImGui::InputText("Goal Root Name", goal.root_name, sizeof(goal.root_name))) {
-                        ms_goal_data_changed = true;
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char root_name_tooltip_buffer[256];
-                        snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
-                                 "A unique ID for this entire multi-stage goal (e.g., 'awesome_ms_goal').");
-                        ImGui::SetTooltip("%s", root_name_tooltip_buffer);
-                    }
-                    if (ImGui::InputText("Display Name", goal.display_name, sizeof(goal.display_name))) {
-                        ms_goal_data_changed = true;
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char display_name_tooltip_buffer[128];
-                        snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
-                                 "The user-facing name for this multi-stage goal.");
-                        ImGui::SetTooltip("%s", display_name_tooltip_buffer);
-                    }
-                    if (ImGui::InputText("Icon Path", goal.icon_path, sizeof(goal.icon_path))) {
-                        ms_goal_data_changed = true;
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char icon_path_tooltip_buffer[1024];
-                        snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                 "Path to the icon file, relative to the 'resources/icons' directory.");
-                        ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("Browse##MSGoalIcon")) {
-                        char new_path[MAX_PATH_LENGTH];
-                        if (open_icon_file_dialog(new_path, sizeof(new_path))) {
-                            strncpy(goal.icon_path, new_path, sizeof(goal.icon_path) - 1);
-                            goal.icon_path[sizeof(goal.icon_path) - 1] = '\0';
-
-                            ms_goal_data_changed = true;
-                            save_message_type = MSG_NONE;
-                        }
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char icon_path_tooltip_buffer[1024];
-                        snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                 "The icon must be inside the 'resources/icons' folder!");
-                        ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
-                    }
-                    if (ImGui::Checkbox("Hidden", &goal.is_hidden)) {
-                        ms_goal_data_changed = true;
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char hidden_tooltip_buffer[512];
-                        snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
-                                 "If checked, this multi-stage goal will be fully hidden on the overlay\n"
-                                 "and hidden settings-based on the tracker.\n"
-                                 "Visibility can be toggled in the main tracker settings");
-                        ImGui::SetTooltip("%s", hidden_tooltip_buffer);
-                    }
-
-                    ImGui::SameLine();
-                    if (ImGui::Checkbox("Row 2", &goal.in_2nd_row)) {
-                        ms_goal_data_changed = true;
-                        save_message_type = MSG_NONE;
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[256];
-                        if (creator_selected_version != MC_VERSION_25W14CRAFTMINE) {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Force this stat category to display on the 2nd row of the overlay\n"
-                                     "(normally reserved for %s).", advancements_label_plural_lower);
-                        } else {
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Force this stat category to display on the 2nd row of the overlay\n"
-                                     "(normally reserved for %s/unlocks).", advancements_label_plural_lower);
-                        }
-                        ImGui::SetTooltip("%s", tooltip_buffer);
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Checkbox("Per-Stage Icons", &goal.use_stage_icons)) {
-                        ms_goal_data_changed = true;
-                        save_message_type = MSG_NONE;
-
-                        // Pre-fill stage icons with main goal icon to avoid errors
-                        if (goal.use_stage_icons) {
-                            for (auto &stage: goal.stages) {
-                                // Only pre-fill if currently empty to preserve previous edits if toggled off/on
-                                if (stage.icon_path[0] == '\0') {
-                                    if (goal.icon_path[0] != '\0') {
-                                        strncpy(stage.icon_path, goal.icon_path, sizeof(stage.icon_path) - 1);
-                                    } else {
-                                        // Fallback just in case main icon is also empty
-                                        strncpy(stage.icon_path, "blocks/placeholder.png", sizeof(stage.icon_path) - 1);
-                                    }
-                                    stage.icon_path[sizeof(stage.icon_path) - 1] = '\0';
-                                }
-                            }
-                        }
-                    }
-                    if (ImGui::IsItemHovered()) {
-                        char tooltip[256];
-                        snprintf(tooltip, sizeof(tooltip), "Enable unique icons for every stage.\n"
-                                 "If unchecked, the main goal icon is used for all stages.");
-                        ImGui::SetTooltip("%s", tooltip);
-                    }
-
-                    if (render_layout_coordinates_header("multi-stage goal",
-                            force_open_header_root_name[0] != '\0' && strcmp(goal.root_name, force_open_header_root_name) == 0)) {
-                        render_manual_pos_ui("ms_icon", "multi-stage goal", "Icon Position", &goal.icon_pos,
-                                             save_message_type);
-                        render_manual_pos_ui("ms_text", "multi-stage goal", "Text Position", &goal.text_pos,
-                                             save_message_type);
-                        render_manual_pos_ui("ms_prog", "multi-stage goal", "Progress Position", &goal.progress_pos,
-                                             save_message_type);
-                    }
-
-                    ImGui::Separator();
-                    ImGui::Text("Stages");
-
-                    // --- Counter for the stages list ---
-                    char stage_counter_text[128];
-                    bool is_details_search_active = (
-                        current_search_scope == SCOPE_MULTISTAGE_DETAILS && tc_search_buffer[0] != '\0');
-                    int visible_stages_count = 0;
-                    if (!is_details_search_active) {
-                        visible_stages_count = goal.stages.size();
-                    } else {
-                        for (const auto &stage: goal.stages) {
-                            char target_val_str[32];
-                            snprintf(target_val_str, sizeof(target_val_str), "%d", stage.required_progress);
-                            if (str_contains_insensitive(stage.display_text, tc_search_buffer) ||
-                                str_contains_insensitive(stage.stage_id, tc_search_buffer) ||
-                                str_contains_insensitive(stage.root_name, tc_search_buffer) ||
-                                str_contains_insensitive(stage.parent_advancement, tc_search_buffer) ||
-                                (stage.required_progress != 0 && strstr(target_val_str, tc_search_buffer) != nullptr)) {
-                                visible_stages_count++;
-                            }
-                        }
-                    }
-                    snprintf(stage_counter_text, sizeof(stage_counter_text), "%d %s", visible_stages_count,
-                             visible_stages_count == 1 ? "Stage" : "Stages");
-                    float stage_text_width = ImGui::CalcTextSize(stage_counter_text).x;
-                    ImGui::SameLine(ImGui::GetContentRegionAvail().x - stage_text_width);
-                    ImGui::TextDisabled("%s", stage_counter_text);
-
-
-                    if (ImGui::Button("Add New Stage")) {
-                        // Create a new stage with default values and insert it before the final stage
-                        EditorSubGoal new_stage = {};
+            } {
+                ImGuiTabItemFlags custom_tab_flags = (force_select_tab == FORCE_TAB_CUSTOM)
+                                                         ? ImGuiTabItemFlags_SetSelected
+                                                         : 0;
+                if (force_select_tab == FORCE_TAB_CUSTOM) force_select_tab = FORCE_TAB_NONE;
+                if (ImGui::BeginTabItem
+                    ("Custom Goals", nullptr, custom_tab_flags)) {
+                    if (ImGui::Button("Add New Custom Goal")) {
+                        // Create a new custom goal with default values
+                        EditorTrackableItem new_goal = {};
                         int counter = 1;
                         while (true) {
-                            snprintf(new_stage.stage_id, sizeof(new_stage.stage_id), "new_stage_%d", counter);
+                            snprintf(new_goal.root_name, sizeof(new_goal.root_name), "new_custom_goal_%d", counter);
                             bool name_exists = false;
-                            for (const auto &stage: goal.stages) {
-                                if (strcmp(stage.stage_id, new_stage.stage_id) == 0) {
+                            for (const auto &goal: current_template_data.custom_goals) {
+                                if (strcmp(goal.root_name, new_goal.root_name) == 0) {
                                     name_exists = true;
                                     break;
                                 }
@@ -7375,757 +6540,2185 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (!name_exists) break;
                             counter++;
                         }
-                        snprintf(new_stage.display_text, sizeof(new_stage.display_text), "New Stage %d", counter);
-                        new_stage.type = SUBGOAL_STAT; // Default to a common type
-                        // Version-aware root name for the new stage's trigger
-                        if (creator_selected_version <= MC_VERSION_1_6_4) {
-                            strncpy(new_stage.root_name, "0", sizeof(new_stage.root_name) - 1);
-                        } else if (creator_selected_version <= MC_VERSION_1_12_2) {
-                            // Mid-era (1.7 -1.12.2)
-                            strncpy(new_stage.root_name, "stat.cool", sizeof(new_stage.root_name) - 1);
-                        } else {
-                            // Modern (1.13+)
-                            strncpy(new_stage.root_name, "minecraft:custom/minecraft:new_stat",
-                                    sizeof(new_stage.root_name) - 1);
-                        }
-                        new_stage.root_name[sizeof(new_stage.root_name) - 1] = '\0';
-                        new_stage.required_progress = 1;
-
-                        // Insert the new stage just before the last element (which should be the "final" stage)
-                        if (!goal.stages.empty()) {
-                            goal.stages.insert(goal.stages.end() - 1, new_stage);
-                        } else {
-                            // Should not happen if new goals are created correctly, but as a fallback:
-                            goal.stages.push_back(new_stage);
-                        }
-
-                        ms_goal_data_changed = true;
+                        snprintf(new_goal.display_name, sizeof(new_goal.display_name), "New Custom Goal %d", counter);
+                        strncpy(new_goal.icon_path, "blocks/placeholder.png", sizeof(new_goal.icon_path) - 1);
+                        new_goal.icon_path[sizeof(new_goal.icon_path) - 1] = '\0';
+                        new_goal.goal = 1; // Default to a progress-based counter
+                        current_template_data.custom_goals.push_back(new_goal);
                         save_message_type = MSG_NONE;
                     }
-
                     if (ImGui::IsItemHovered()) {
-                        char tooltip_buffer[1024];
-
-                        if (creator_selected_version <= MC_VERSION_1_6_4) {
-                            // Legacy Version Tooltip
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Adds a new step to this multi-stage goal.\n\n"
-                                     "Stages are completed sequentially. New stages are always added before the 'Final' stage.\n\n"
-                                     "Available Stage Types for this version:\n"
-                                     " • Stat / Achievement: Completes when a stat (e.g., 16777217 - Stone mined)\n"
-                                     "   or achievement (e.g., 5242905 - Overkill) reaches the 'Target Value'.\n\n"
-                                     "Click the 'Help' button for more info.");
-                        } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                            // Mid-Era Version Tooltip
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Adds a new step to this multi-stage goal.\n\n"
-                                     "Stages are completed sequentially. New stages are always added before the 'Final' stage.\n\n"
-                                     "Available Stage Types for this version:\n"
-                                     " • Stat / Achievement: Completes when a stat (e.g., stat.fallOneCm)\n"
-                                     "   or achievement (e.g., 'achievement.buildPickaxe') reaches the 'Target Value'.\n"
-                                     " • Criterion: Completes when a specific criterion (e.g., 'Deep Ocean')\n"
-                                     "   of a parent achievement (e.g., 'achievement.exploreAllBiomes') is met.\n\n"
-                                     "Click the 'Help' button for more info.");
-                        } else if (creator_selected_version <= MC_VERSION_1_12_2) {
-                            // Mid-era stats, modern advancements
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Adds a new step to this multi-stage goal.\n\n"
-                                     "Stages are completed sequentially. New stages are always added before the 'Final' stage.\n\n"
-                                     "Available Stage Types for this version:\n"
-                                     " • Stat: Completes when a stat (e.g., 'stat.useItem.minecraft.beacon'\n"
-                                     "   reaches the 'Target Value'.\n"
-                                     " • Advancement: Completes when an advancement (e.g., 'minecraft:story/root')\n"
-                                     "   or recipe (e.g., 'minecraft:recipes/tools/stone_shovel') is obtained.\n"
-                                     " • Criterion: Completes when a specific criterion (e.g., 'bred_mooshroom')\n"
-                                     "   of a parent advancement (e.g., 'minecraft:husbandry/bred_all_animals') is met.\n\n"
-                                     "Click the 'Help' button for more info.");
-                        } else if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
-                            // 25w14craftmine Version Tooltip
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Adds a new step to this multi-stage goal.\n\n"
-                                     "Stages are completed sequentially. New stages are always added before the 'Final' stage.\n\n"
-                                     "Available Stage Types for this version:\n"
-                                     " • Stat: Completes when a stat (e.g., 'minecraft:custom/minecraft:aviate_one_cm')\n"
-                                     "   reaches the 'Target Value'.\n"
-                                     " • Advancement: Completes when an advancement (e.g., 'minecraft:feats/kuiper_world')\n"
-                                     "   or recipe (e.g., 'minecraft:recipes/misc/exit_eye') is obtained.\n"
-                                     " • Criterion: Completes when a specific criterion (e.g., 'minecraft:floating_islands_world')\n"
-                                     "   of a parent advancement (e.g., 'minecraft:mines/all_mine_ingredients') is met.\n"
-                                     " • Unlock: Completes when a specific player unlock (e.g., 'minecraft:jump_king_10') is obtained.\n\n"
-                                     "Click the 'Help' button for more info.");
-                        } else {
-                            // Modern Versions (1.13+ excluding craftmine) Tooltip
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Adds a new step to this multi-stage goal.\n\n"
-                                     "Stages are completed sequentially. New stages are always added before the 'Final' stage.\n\n"
-                                     "Available Stage Types for this version:\n"
-                                     " • Stat: Completes when a stat (e.g., 'minecraft:killed/minecraft:endermite'\n"
-                                     "   reaches the 'Target Value'.\n"
-                                     " • Advancement: Completes when an advancement (e.g., 'minecraft:nether/ride_strider')\n"
-                                     "   or recipe (e.g., 'minecraft:recipes/decorations/grindstone') is obtained.\n"
-                                     " • Criterion: Completes when a specific criterion (e.g., 'minecraft:creaking')\n"
-                                     "   of a parent advancement (e.g., 'minecraft:adventure/kill_all_mobs') is met.\n\n"
-                                     "Click the 'Help' button for more info.");
-                        }
-
-                        ImGui::SetTooltip("%s", tooltip_buffer);
+                        char add_custom_goal_tooltip_buffer[1024];
+                        snprintf(add_custom_goal_tooltip_buffer, sizeof(add_custom_goal_tooltip_buffer),
+                                 "Add a new blank custom goal to this template.\n"
+                                 "Custom Goals are useful for tracking objectives manually\n"
+                                 "that cannot be automatically detected by reading the game's world files.\n"
+                                 "E.g., the amount of times a structure has been visited.\n"
+                                 "Depending on the target value custom goals can have hotkeys.\n"
+                                 "These can then be configured in the settings window after selecting the template.\n"
+                                 "You need to be tabbed into the main tracker window for hotkeys to work.\n\n"
+                                 "Click the 'Help' button for more info.");
+                        ImGui::SetTooltip("%s", add_custom_goal_tooltip_buffer);
                     }
-
                     ImGui::SameLine();
+                    ImGui::TextDisabled("(Hotkeys are configured in the main Settings window)");
 
-                    // --- Stages Sorting Controls ---
-                    bool can_sort_stage = false;
-                    for (const auto &stage: goal.stages) {
-                        if (stage.sort_order > 0) {
-                            can_sort_stage = true;
+                    // --- Sorting Controls ---
+                    bool can_sort = false;
+                    for (const auto &goal: current_template_data.custom_goals) {
+                        if (goal.sort_order > 0) {
+                            can_sort = true;
                             break;
                         }
                     }
 
+                    // Calculate the total width of both buttons + the spacing between them
+                    float sort_btn_width = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                    float reset_btn_width = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x *
+                                            2.0f;
+                    float total_buttons_width = sort_btn_width + reset_btn_width + ImGui::GetStyle().ItemSpacing.x;
+
+                    // Push the cursor to the right edge, minus the width of our buttons
                     ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_buttons_width);
 
-                    ImGui::BeginDisabled(!can_sort_stage);
-                    char sort_stage_id[256], reset_stage_id[256];
-                    snprintf(sort_stage_id, sizeof(sort_stage_id), "Sort##stage_%s", goal.root_name);
-                    snprintf(reset_stage_id, sizeof(reset_stage_id), "Reset Order##stage_%s", goal.root_name);
-
-                    if (ImGui::Button(sort_stage_id)) {
-                        apply_partial_sort(goal.stages);
+                    ImGui::BeginDisabled(!can_sort);
+                    if (ImGui::Button("Sort")) {
+                        apply_partial_sort(current_template_data.custom_goals);
                         save_message_type = MSG_NONE;
                     }
                     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                         char tooltip_buffer[128];
-                        if (!can_sort_stage) {
+                        if (!can_sort) {
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Click the order badges next to stages to assign a sort order first.");
+                                     "Click the order badges next to goals to assign a sort order first.");
                         } else {
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Rearrange the numbered stages among themselves.");
+                                     "Rearrange the numbered items among themselves.");
                         }
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
                     ImGui::SameLine();
-                    if (ImGui::Button(reset_stage_id)) {
-                        for (auto &stage: goal.stages) stage.sort_order = 0;
+                    if (ImGui::Button("Reset Order")) {
+                        for (auto &goal: current_template_data.custom_goals) goal.sort_order = 0;
                     }
                     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                         char tooltip_buffer[128];
-                        if (!can_sort_stage) {
+                        if (!can_sort) {
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
                         } else {
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "Clear all assigned sort orders from stages.");
+                                     "Clear all assigned sort orders from custom goals.");
                         }
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
                     ImGui::EndDisabled();
+                    ImGui::NewLine();
 
+                    // Determine if search is active for this scope
+                    bool is_custom_search_active = (
+                        current_search_scope == SCOPE_CUSTOM && tc_search_buffer[0] != '\0');
 
-                    int stage_to_remove = -1;
-                    int stage_to_copy = -1;
+                    // Create a filtered list to render
+                    std::vector<EditorTrackableItem *> goals_to_render;
+                    if (is_custom_search_active) {
+                        for (auto &goal: current_template_data.custom_goals) {
+                            char goal_str[32];
+                            snprintf(goal_str, sizeof(goal_str), "%d", goal.goal);
 
-                    int stage_dnd_source_index = -1;
-                    int stage_dnd_target_index = -1;
-
-                    for (size_t j = 0; j < goal.stages.size(); ++j) {
-                        auto &stage = goal.stages[j];
-
-                        if (is_details_search_active) {
-                            char target_val_str[32];
-                            snprintf(target_val_str, sizeof(target_val_str), "%d", stage.required_progress);
-
-                            // Check standard fields
-                            bool standard_match = str_contains_insensitive(stage.display_text, tc_search_buffer) ||
-                                                  str_contains_insensitive(stage.stage_id, tc_search_buffer) ||
-                                                  str_contains_insensitive(stage.root_name, tc_search_buffer) ||
-                                                  str_contains_insensitive(stage.parent_advancement, tc_search_buffer)
-                                                  ||
-                                                  (stage.required_progress != 0 && strstr(
-                                                       target_val_str, tc_search_buffer) != nullptr);
-
-                            // Check stage icon path IF enabled
-                            bool icon_match = false;
-                            if (goal.use_stage_icons) {
-                                icon_match = str_contains_insensitive(stage.icon_path, tc_search_buffer);
-                            }
-
-                            // If neither matches, skip this stage
-                            if (!standard_match && !icon_match) {
-                                continue;
+                            if (str_contains_insensitive(goal.display_name, tc_search_buffer) ||
+                                str_contains_insensitive(goal.root_name, tc_search_buffer) ||
+                                str_contains_insensitive(goal.icon_path, tc_search_buffer) ||
+                                (goal.goal != 0 && strstr(goal_str, tc_search_buffer) != nullptr)) {
+                                goals_to_render.push_back(&goal);
                             }
                         }
+                    } else {
+                        for (auto &goal: current_template_data.custom_goals) {
+                            goals_to_render.push_back(&goal);
+                        }
+                    }
 
-                        ImGui::PushID(j);
+                    // --- Counter for the list ---
+                    char counter_text[128];
+                    size_t count = goals_to_render.size();
+                    snprintf(counter_text, sizeof(counter_text), "%zu %s", count,
+                             count == 1 ? "Custom Goal" : "Custom Goals");
+                    float text_width = ImGui::CalcTextSize(counter_text).x;
+                    ImGui::SameLine(ImGui::GetContentRegionAvail().x - text_width);
+                    ImGui::TextDisabled("%s", counter_text);
+
+                    int item_to_remove = -1;
+                    int item_to_copy = -1;
+                    int custom_dnd_source_index = -1;
+                    int custom_dnd_target_index = -1;
+
+                    for (size_t i = 0; i < goals_to_render.size(); ++i) {
+                        auto &goal = *goals_to_render[i];
+
+                        ImGui::PushID(i);
 
                         // Add some vertical spacing to create a gap
                         ImGui::Spacing();
-
-                        // Use an invisible button as a drop target between items
+                        //Create a wide, 8-pixel-high invisible button to act as our drop zone
                         ImGui::InvisibleButton("drop_target", ImVec2(-1, 8.0f));
+
+                        // Drop target for dropping between items
                         if (ImGui::BeginDragDropTarget()) {
-                            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("MS_STAGE_DND")) {
-                                stage_dnd_source_index = *(const int *) payload->Data;
-                                stage_dnd_target_index = j;
+                            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("CUSTOM_GOAL_DND")) {
+                                custom_dnd_source_index = *(const int *) payload->Data;
+                                custom_dnd_target_index = i;
                             }
                             ImGui::EndDragDropTarget();
                         }
 
+                        // Draw a separator for visual feedback after the drop zone
                         ImGui::Separator();
 
-                        // Group all stage controls to make them a single drag source
+                        // Get cursor position to overlay the invisible button later
+                        ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
+
                         ImGui::BeginGroup();
-                        if (ImGui::InputText("Stage ID", stage.stage_id, sizeof(stage.stage_id))) {
-                            ms_goal_data_changed = true;
+                        if (ImGui::InputText("Goal Root Name", goal.root_name, sizeof(goal.root_name))) {
+                            save_message_type = MSG_NONE; // Clear message on new edit
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char root_name_tooltip_buffer[256];
+                            snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
+                                     "A unique ID for this custom goal (e.g., 'fun_counter').\n"
+                                     "This is used to save progress and assign hotkeys.");
+                            ImGui::SetTooltip("%s", root_name_tooltip_buffer);
+                        }
+                        if (ImGui::InputText("Display Name", goal.display_name, sizeof(goal.display_name))) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char display_name_tooltip_buffer[256];
+                            snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
+                                     "The user-facing name for this custom goal.\n"
+                                     "If target value isn't 0 you'll find this name at the bottom\n"
+                                     "of the settings window to configure hotkeys.");
+                            ImGui::SetTooltip("%s", display_name_tooltip_buffer);
+                        }
+                        if (ImGui::InputText("Icon Path", goal.icon_path, sizeof(goal.icon_path))) {
+                            save_message_type = MSG_NONE; // Clear message on new edit
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char icon_path_tooltip_buffer[128];
+                            snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                     "Path to the icon file, relative to the 'resources/icons' directory.");
+                            ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Browse##CritIcon")) {
+                            char new_path[MAX_PATH_LENGTH];
+                            if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                strncpy(goal.icon_path, new_path, sizeof(goal.icon_path) - 1);
+                                goal.icon_path[sizeof(goal.icon_path) - 1] = '\0';
+                                save_message_type = MSG_NONE;
+                            }
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char icon_path_tooltip_buffer[1024];
+                            snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                     "The icon must be inside the 'resources/icons' folder!");
+                            ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
+                        }
+                        if (ImGui::InputInt("Target Value", &goal.goal)) {
+                            // No values below -1 allowed
+                            if (goal.goal < -1) {
+                                goal.goal = -1;
+                            }
+                            save_message_type = MSG_NONE; // Clear message on new edit
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char target_goal_tooltip_buffer[1024];
+                            snprintf(target_goal_tooltip_buffer, sizeof(target_goal_tooltip_buffer),
+                                     "Set the goal's behavior:\n"
+                                     "0 = Simple on/off toggle.\n"
+                                     "-1 = Infinite counter.\n"
+                                     ">0 = Progress-based counter that completes at this value.");
+                            ImGui::SetTooltip("%s", target_goal_tooltip_buffer);
+                        }
+                        if (ImGui::Checkbox("Hidden", &goal.is_hidden)) {
+                            save_message_type = MSG_NONE; // Clear message on new edit
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char hidden_tooltip_buffer[256];
+                            snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
+                                     "If checked, this custom goal will be fully hidden on the overlay\n"
+                                     "and hidden settings-based on the tracker.\n"
+                                     "Visibility can be toggled in the main tracker settings");
+                            ImGui::SetTooltip("%s", hidden_tooltip_buffer);
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::Checkbox("Row 2", &goal.in_2nd_row)) {
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
                             char tooltip_buffer[256];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "A unique ID for this specific stage within the goal.");
-                            ImGui::SetTooltip("%s", tooltip_buffer);
-                        }
-                        if (ImGui::InputText("Display Text", stage.display_text, sizeof(stage.display_text))) {
-                            ms_goal_data_changed = true;
-                            save_message_type = MSG_NONE;
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char tooltip_buffer[256];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                     "The text that appears on the tracker/overlay for this stage.\n"
-                                     "For the 'Final' stage, put something like 'Stages Done!'.");
-                            ImGui::SetTooltip("%s", tooltip_buffer);
-                        }
-                        // Conditional Icon Input per stage if enabled
-                        if (goal.use_stage_icons) {
-                            if (ImGui::InputText("Stage Icon", stage.icon_path, sizeof(stage.icon_path))) {
-                                ms_goal_data_changed = true;
-                                save_message_type = MSG_NONE;
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char icon_path_tooltip_buffer[256];
-                                snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                         "Path to the icon file for this specific stage,\n"
-                                         "relative to the 'resources/icons' directory.");
-                                ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
-                            }
-                            ImGui::SameLine();
-                            if (ImGui::Button("Browse##StageIcon")) {
-                                char new_path[MAX_PATH_LENGTH];
-                                if (open_icon_file_dialog(new_path, sizeof(new_path))) {
-                                    strncpy(stage.icon_path, new_path, sizeof(stage.icon_path) - 1);
-                                    stage.icon_path[sizeof(stage.icon_path) - 1] = '\0';
-                                    ms_goal_data_changed = true;
-                                    save_message_type = MSG_NONE;
-                                }
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char icon_path_tooltip_buffer[128];
-                                snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
-                                         "The icon must be inside the 'resources/icons' folder!");
-                                ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
-                            }
-                        }
-                        // --- Version-Aware Type Dropdown ---
-                        const char *current_type_name = "Unknown";
-                        switch (stage.type) {
-                            case SUBGOAL_STAT:
-                                // Use the clearer "Stat / Achievement" label for older versions
-                                current_type_name = (creator_selected_version <= MC_VERSION_1_11_2)
-                                                        ? "Stat / Achievement"
-                                                        : "Stat";
-                                break;
-                            case SUBGOAL_ADVANCEMENT: current_type_name = advancements_label_upper;
-                                break;
-                            case SUBGOAL_UNLOCK: current_type_name = "Unlock";
-                                break;
-                            case SUBGOAL_CRITERION: current_type_name = "Criterion";
-                                break;
-                            case SUBGOAL_MANUAL: current_type_name = "Final";
-                                break;
-                        }
-
-                        if (ImGui::BeginCombo("Type", current_type_name)) {
-                            // Show "Stat / Achievement" for legacy and mid-era versions
-                            if (creator_selected_version <= MC_VERSION_1_11_2) {
-                                if (ImGui::Selectable("Stat / Achievement", stage.type == SUBGOAL_STAT)) {
-                                    stage.type = SUBGOAL_STAT;
-                                    ms_goal_data_changed = true;
-                                    save_message_type = MSG_NONE;
-                                }
-                            }
-
-                            // Show plain "Stat" for modern versions
-                            if (creator_selected_version >= MC_VERSION_1_12) {
-                                if (ImGui::Selectable("Stat", stage.type == SUBGOAL_STAT)) {
-                                    stage.type = SUBGOAL_STAT;
-                                    ms_goal_data_changed = true;
-                                    save_message_type = MSG_NONE;
-                                }
-                            }
-
-                            // "Advancement" type is only available for 1.12+
-                            if (creator_selected_version >= MC_VERSION_1_12) {
-                                if (ImGui::Selectable(advancements_label_upper, stage.type == SUBGOAL_ADVANCEMENT)) {
-                                    stage.type = SUBGOAL_ADVANCEMENT;
-                                    ms_goal_data_changed = true;
-                                    save_message_type = MSG_NONE;
-                                }
-                            }
-
-                            // "Criterion" type is available from mid-era (1.7.2) onwards
-                            if (creator_selected_version >= MC_VERSION_1_7_2) {
-                                if (ImGui::Selectable("Criterion", stage.type == SUBGOAL_CRITERION)) {
-                                    stage.type = SUBGOAL_CRITERION;
-                                    ms_goal_data_changed = true;
-                                    save_message_type = MSG_NONE;
-                                }
-                            }
-
-                            // "Unlock" type is only for 25w14craftmine
-                            if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
-                                if (ImGui::Selectable("Unlock", stage.type == SUBGOAL_UNLOCK)) {
-                                    stage.type = SUBGOAL_UNLOCK;
-                                    ms_goal_data_changed = true;
-                                    save_message_type = MSG_NONE;
-                                }
-                            }
-
-                            // "Final" type is always available
-                            if (ImGui::Selectable("Final", stage.type == SUBGOAL_MANUAL)) {
-                                stage.type = SUBGOAL_MANUAL;
-                                ms_goal_data_changed = true;
-                                save_message_type = MSG_NONE;
-                            }
-                            ImGui::EndCombo();
-                        }
-                        if (ImGui::IsItemHovered()) {
-                            char type_tooltip_buffer[256];
-                            if (creator_selected_version <= MC_VERSION_1_11_2) {
-                                // not modern
-                                snprintf(type_tooltip_buffer, sizeof(type_tooltip_buffer),
-                                         "The type of event that will complete this stage.\n"
-                                         "%s count as stats.\n"
-                                         "There must be exactly one 'Final' stage ('Done!' - Stage),\n"
-                                         "and it must be the last stage.\n"
-                                         "Reaching the final stage completes the entire multi-stage goal.",
-                                         advancements_label_plural_upper);
+                            if (creator_selected_version != MC_VERSION_25W14CRAFTMINE) {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Force this stat category to display on the 2nd row of the overlay\n"
+                                         "(normally reserved for %s).", advancements_label_plural_lower);
                             } else {
-                                // modern
-                                snprintf(type_tooltip_buffer, sizeof(type_tooltip_buffer),
-                                         "The type of event that will complete this stage.\n"
-                                         "%s can also be recipes.\n"
-                                         "There must be exactly one 'Final' stage ('Done!' - Stage),\n"
-                                         "and it must be the last stage.\n"
-                                         "Reaching the final stage completes the entire multi-stage goal.",
-                                         advancements_label_plural_upper);
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Force this stat category to display on the 2nd row of the overlay\n"
+                                         "(normally reserved for %s/unlocks).", advancements_label_plural_lower);
                             }
-                            ImGui::SetTooltip("%s", type_tooltip_buffer);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
+                        ImGui::SameLine();
 
-                        if (stage.type == SUBGOAL_CRITERION) {
-                            char parent_label[64];
-                            snprintf(parent_label, sizeof(parent_label), "Parent %s", advancements_label_upper);
-                            if (ImGui::InputText(parent_label, stage.parent_advancement,
-                                                 sizeof(stage.parent_advancement))) {
-                                ms_goal_data_changed = true;
-                                save_message_type = MSG_NONE;
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char tooltip_buffer[512];
-                                if (creator_selected_version <= MC_VERSION_1_11_2) {
-                                    // Mid-era tooltip
-                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                             "The root name of the parent %s this criterion belongs to.\n"
-                                             "e.g., 'achievement.exploreAllBiomes'",
-                                             advancements_label_singular_lower);
-                                } else {
-                                    // Modern tooltip
-                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                             "The root name of the parent %s this criterion belongs to.\n"
-                                             "e.g., 'minecraft:husbandry/bred_all_animals'",
-                                             advancements_label_singular_lower);
-                                }
-                                ImGui::SetTooltip("%s", tooltip_buffer);
-                            }
-                        }
-
-                        // "Final" stages don't need a target or Root Name
-                        if (stage.type != SUBGOAL_MANUAL) {
-                            if (ImGui::InputText("Trigger Root Name", stage.root_name, sizeof(stage.root_name))) {
-                                ms_goal_data_changed = true;
-                                save_message_type = MSG_NONE;
-                            }
-                            if (ImGui::IsItemHovered()) {
-                                char tooltip_buffer[512];
-                                if (creator_selected_version <= MC_VERSION_1_6_4) {
-                                    // Legacy stage types
-                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                             "The root name of the stat (e.g., '2021' - Damage taken)\n"
-                                             "or achievement (e.g., '5242902' - The End?) that triggers this stage's completion.");
-                                } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                                    // mid-era stage types
-                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                             "The root name of the stat (e.g., 'stat.craftItem.minecraft.stick')\n"
-                                             "or achievement (e.g., 'achievement.ghast') or criterion (e.g., 'Extreme Hills+ M')\n"
-                                             "that triggers this stage's completion.");
-                                } else if (creator_selected_version <= MC_VERSION_1_12_2) {
-                                    // Mid-era stats, but modern advancements
-                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                             "The root name of the stat (e.g., 'stat.sneakTime'),\n"
-                                             "advancement (e.g., 'minecraft:story/iron_tools')\n"
-                                             "or criterion (e.g., 'cookie') that triggers this stage's completion.");
-                                } else if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
-                                    // craftmine stage types
-                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                             "The root name of the stat (e.g., 'minecraft:killed_by/minecraft:ravager'),\n"
-                                             "advancement (e.g., 'minecraft:mines/special_mine_completed'),\n"
-                                             "unlock (e.g., 'minecraft:fire_wand') or criterion (e.g., 'minecraft:runemaster')\n"
-                                             "that triggers this stage's completion.");
-                                } else {
-                                    // modern stage types without craftmine (1.13+)
-                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                             "The root name of the stat (e.g., 'minecraft:used/minecraft:acacia_boat'),\n"
-                                             "advancement (e.g., 'minecraft:adventure/trim_with_all_exclusive_armor_patterns')\n"
-                                             "or criterion (e.g., 'minecraft:lush_caves') that triggers this stage's completion.");
-                                }
-                                ImGui::SetTooltip("%s", tooltip_buffer);
-                            }
-
-                            ImGui::SameLine();
-                            if (ImGui::Button("Import##StageTrigger")) {
-                                // Reset state for a new single-select import
-                                current_import_mode = SINGLE_SELECT_STAGE; // One item selectable on import
-                                stage_to_edit = &stage; // Remember which stage we're editing
-                                import_search_buffer[0] = '\0';
-                                importable_advancements.clear();
-                                importable_stats.clear();
-                                importable_unlocks.clear();
-
-                                // Prepare to open the correct file dialog and popup
-                                char start_path[MAX_PATH_LENGTH];
-                                const char *selection = nullptr;
-
-                                switch (stage.type) {
-                                    case SUBGOAL_STAT: {
-                                        if (creator_selected_version <= MC_VERSION_1_6_4) {
-                                            if (app_settings->using_stats_per_world_legacy) {
-                                                snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
-                                                         t->world_name);
-                                            } else if (get_parent_directory(
-                                                t->saves_path, start_path, sizeof(start_path), 1)) {
-                                                // Use a temporary buffer to prevent source/destination overlap
-                                                char temp_parent_dir[MAX_PATH_LENGTH];
-                                                strncpy(temp_parent_dir, start_path, sizeof(temp_parent_dir));
-                                                temp_parent_dir[sizeof(temp_parent_dir) - 1] = '\0';
-                                                snprintf(start_path, sizeof(start_path), "%s/stats/", temp_parent_dir);
-                                            }
-                                        } else {
-                                            // Mid-era (1.7.2 - 1.12.2) AND Modern (1.13+)
-                                            snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
-                                                     t->world_name);
-                                        }
-#ifdef __APPLE__
-                                        const char *json_filter[2] = {"*.json", "public.json"};
-                                        const char *dat_filter[2] = {"*.dat", "public.data"};
-                                        int filter_count = 2;
-#else
-                                        const char *json_filter[] = {"*.json"};
-                                        const char *dat_filter[] = {"*.dat"};
-                                        int filter_count = 1;
-#endif
-                                        selection = tinyfd_openFileDialog(
-                                            "Select Player Stats File", start_path, filter_count,
-                                            (creator_selected_version <= MC_VERSION_1_6_4) ? dat_filter : json_filter,
-                                            (creator_selected_version <= MC_VERSION_1_6_4) ? "DAT files" : "JSON files",
-                                            0);
-                                        if (selection && parse_player_stats_for_import(
-                                                selection, creator_selected_version, importable_stats,
-                                                import_error_message, sizeof(import_error_message))) {
-                                            show_import_stats_popup = true;
-                                        }
-                                        break;
-                                    }
-                                    case SUBGOAL_ADVANCEMENT:
-                                    case SUBGOAL_CRITERION: {
-                                        if (creator_selected_version <= MC_VERSION_1_6_4) {
-                                            if (app_settings->using_stats_per_world_legacy) {
-                                                snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
-                                                         t->world_name);
-                                            } else if (get_parent_directory(
-                                                t->saves_path, start_path, sizeof(start_path), 1)) {
-                                                // Use a temporary buffer to prevent source/destination overlap
-                                                char temp_parent_dir[MAX_PATH_LENGTH];
-                                                strncpy(temp_parent_dir, start_path, sizeof(temp_parent_dir));
-                                                temp_parent_dir[sizeof(temp_parent_dir) - 1] = '\0';
-                                                snprintf(start_path, sizeof(start_path), "%s/stats/", temp_parent_dir);
-                                            }
-                                        } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                                            // Mid-era (1.7.2 - 1.11.2)
-                                            snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
-                                                     t->world_name);
-                                        } else {
-                                            // Criterion are 1.12+
-                                            snprintf(start_path, sizeof(start_path), "%s/%s/advancements/",
-                                                     t->saves_path, t->world_name);
-                                        }
-#ifdef __APPLE__
-                                        const char *json_filter[2] = {"*.json", "public.json"};
-                                        const char *dat_filter[2] = {"*.dat", "public.data"};
-                                        int filter_count = 2;
-#else
-                                        const char *json_filter[] = {"*.json"};
-                                        const char *dat_filter[] = {"*.dat"};
-                                        int filter_count = 1;
-#endif
-                                        selection = tinyfd_openFileDialog(
-                                            "Select Player File", start_path, filter_count,
-                                            (creator_selected_version <= MC_VERSION_1_6_4) ? dat_filter : json_filter,
-                                            (creator_selected_version <= MC_VERSION_1_6_4) ? "DAT files" : "JSON files",
-                                            0);
-                                        if (selection && parse_player_advancements_for_import(
-                                                selection, creator_selected_version, importable_advancements,
-                                                import_error_message, sizeof(import_error_message))) {
-                                            show_import_advancements_popup = true;
-                                            // Set search mode based on the type of trigger being imported
-                                            if (stage_to_edit->type == SUBGOAL_ADVANCEMENT) {
-                                                import_search_criteria_only = false; // Default to advancement search
-                                            } else if (stage_to_edit->type == SUBGOAL_CRITERION) {
-                                                import_search_criteria_only = true; // Default to criterion search
-                                            }
-                                        }
-                                        break;
-                                    }
-                                    case SUBGOAL_UNLOCK: {
-                                        snprintf(start_path, sizeof(start_path), "%s/%s/unlocks/", t->saves_path,
-                                                 t->world_name);
-#ifdef __APPLE__
-                                        const char *filter_patterns[2] = {"*.json", "public.json"};
-                                        int filter_count = 2;
-#else
-                                        const char *filter_patterns[1] = {"*.json"};
-                                        int filter_count = 1;
-#endif
-                                        selection = tinyfd_openFileDialog(
-                                            "Select Player Unlocks File", start_path, filter_count, filter_patterns,
-                                            "JSON files",
-                                            0);
-                                        if (selection && parse_player_unlocks_for_import(
-                                                selection, importable_unlocks, import_error_message,
-                                                sizeof(import_error_message))) {
-                                            show_import_unlocks_popup = true;
-                                        }
-                                        break;
-                                    }
-                                    default:
-                                        break;
-                                }
-                                if (selection && !show_import_stats_popup && !show_import_advancements_popup && !
-                                    show_import_unlocks_popup) {
-                                    save_message_type = MSG_ERROR;
-                                    strncpy(status_message, import_error_message, sizeof(status_message) - 1);
-                                }
-                            }
-
-                            // Import Stage Tooltip
-                            if (ImGui::IsItemHovered()) {
-                                char tooltip_buffer[512];
-                                switch (stage.type) {
-                                    case SUBGOAL_STAT:
-                                        if (creator_selected_version <= MC_VERSION_1_6_4) {
-                                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                                     "Select a single stat or achievement from a\n"
-                                                     "player's .dat file to use as a trigger.");
-                                        } else if (creator_selected_version <= MC_VERSION_1_11_2) {
-                                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                                     "Select a single stat or achievement from a\n"
-                                                     "player's .json file to use as a trigger.");
-                                        } else {
-                                            // mid-era stats and modern achievements (1.12+) and modern (1.13+)
-                                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                                     "Select a single stat from a\n"
-                                                     "player's .json file to use as a trigger.");
-                                        }
-                                        break;
-                                    case SUBGOAL_ADVANCEMENT:
-                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                                 "Select a single advancement or recipe from a\n"
-                                                 "player's .json file to use as a trigger.");
-                                        break;
-                                    case SUBGOAL_CRITERION:
-                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                                 "Select a single criterion from a player's file.\n"
-                                                 "The parent and criterion fields will be filled in automatically.");
-                                        break;
-                                    case SUBGOAL_UNLOCK:
-                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                                 "Select a single unlock from a\n"
-                                                 "player's .json file to use as a trigger.");
-                                        break;
-                                    default:
-                                        // This case should not be reachable as the button is not rendered for SUBGOAL_MANUAL.
-                                        strncpy(tooltip_buffer, "Import a value from a player file.",
-                                                sizeof(tooltip_buffer) - 1);
-                                        tooltip_buffer[sizeof(tooltip_buffer) - 1] = '\0';
-                                        break;
-                                }
-                                ImGui::SetTooltip("%s", tooltip_buffer);
-                            }
-
-                            // Only show target value for stat/achievements
-                            if (stage.type == SUBGOAL_STAT) {
-                                if (ImGui::InputInt("Target Value", &stage.required_progress)) {
-                                    if (stage.required_progress < 1) {
-                                        stage.required_progress = 1; // Clamp to minimum of 1
-                                    }
-                                    ms_goal_data_changed = true;
-                                    save_message_type = MSG_NONE;
-                                }
-                                if (ImGui::IsItemHovered()) {
-                                    char tooltip_buffer[256];
-                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                             "For 'Stat' type stages, this is the value the stat must reach to complete the stage.\n"
-                                             "Must be 1 or greater.");
-                                    ImGui::SetTooltip("%s", tooltip_buffer);
-                                }
-                            }
-                        }
-
+                        // "Copy" button for custom goals
                         if (ImGui::Button("Copy")) {
-                            stage_to_copy = j;
-                            ms_goal_data_changed = true;
+                            item_to_copy = i;
                             save_message_type = MSG_NONE;
                         }
-
                         if (ImGui::IsItemHovered()) {
                             char tooltip_buffer[128];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Stage:\n%s", stage.stage_id);
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Custom Goal:\n%s",
+                                     goal.root_name);
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
-
                         ImGui::SameLine();
 
                         if (ImGui::Button("Remove")) {
-                            stage_to_remove = j;
-                            ms_goal_data_changed = true;
-                            save_message_type = MSG_NONE;
+                            item_to_remove = i;
+                            save_message_type = MSG_NONE; // Clear message on new edit
                         }
-
                         if (ImGui::IsItemHovered()) {
                             char tooltip_buffer[128];
-                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Stage:\n%s", stage.stage_id);
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Custom Goal:\n%s", goal.root_name);
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
                         ImGui::SameLine();
 
-                        // --- Sort Badge (Stage) ---
-                        char stage_badge_label[64];
-                        if (stage.sort_order > 0) {
-                            snprintf(stage_badge_label, sizeof(stage_badge_label), "%d##stage_badge_%zu",
-                                     stage.sort_order, j);
+                        // --- Sort Badge ---
+                        char badge_label[32];
+                        if (goal.sort_order > 0) {
+                            snprintf(badge_label, sizeof(badge_label), "%d##badge_%zu", goal.sort_order, i);
                         } else {
-                            snprintf(stage_badge_label, sizeof(stage_badge_label), " - ##stage_badge_%zu", j);
+                            snprintf(badge_label, sizeof(badge_label), " - ##badge_%zu", i);
                         }
 
-                        const char *stage_text_end = strstr(stage_badge_label, "##");
-                        float stage_text_w = ImGui::CalcTextSize(stage_badge_label, stage_text_end).x;
-                        float stage_badge_w = std::max(28.0f, stage_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
+                        const char *text_end = strstr(badge_label, "##");
+                        float text_width = ImGui::CalcTextSize(badge_label, text_end).x;
+                        float badge_width = std::max(28.0f, text_width + ImGui::GetStyle().FramePadding.x * 4.0f);
 
-                        if (ImGui::Button(stage_badge_label, ImVec2(stage_badge_w, 0))) {
-                            if (stage.sort_order > 0)
-                                stage.sort_order = 0;
-                            else stage.sort_order = get_next_sort_order(goal.stages);
+                        if (ImGui::Button(badge_label, ImVec2(badge_width, 0))) {
+                            if (goal.sort_order > 0) goal.sort_order = 0;
+                            else goal.sort_order = get_next_sort_order(current_template_data.custom_goals);
                         }
                         if (ImGui::IsItemHovered()) {
                             char tooltip_buffer[128];
-                            if (stage.sort_order > 0) {
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to remove stage sort order");
+                            if (goal.sort_order > 0) {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Click to remove custom goal sort order");
                             } else {
-                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to assign stage sort order");
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Click to assign custom goal sort order");
                             }
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
+
+                        if (render_layout_coordinates_header("custom goal",
+                                                             force_open_header_root_name[0] != '\0' && strcmp(
+                                                                 goal.root_name, force_open_header_root_name) == 0)) {
+                            render_manual_pos_ui("cg_icon", "custom goal", "Icon Position", &goal.icon_pos,
+                                                 save_message_type);
+                            render_manual_pos_ui("cg_text", "custom goal", "Text Position", &goal.text_pos,
+                                                 save_message_type);
+
+                            // ONLY show progress pos if this Custom Goal is a counter!
+                            if (goal.goal > 0 || goal.goal == -1) {
+                                render_manual_pos_ui("cg_prog", "custom goal", "Progress Position", &goal.progress_pos,
+                                                     save_message_type);
+                            }
+                        }
+
                         ImGui::EndGroup();
 
                         ImGui::SameLine();
-                        // To make a non-interactive item a drag source we use the flag
-                        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
-                            ImGui::SetDragDropPayload("MS_STAGE_DND", &j, sizeof(int));
-                            ImGui::Text("Reorder Stage: %s", stage.stage_id);
+                        // Create an invisible button over the entire group. This is our drag handle.
+                        ImGui::SetCursorScreenPos(item_start_cursor_pos);
+                        ImGui::InvisibleButton("dnd_handle", ImGui::GetItemRectSize());
+
+                        // Add the required flag here
+                        if (ImGui::BeginDragDropSource()) {
+                            ImGui::SetDragDropPayload("CUSTOM_GOAL_DND", &i, sizeof(int));
+                            ImGui::Text("Reorder %s", goal.root_name);
                             ImGui::EndDragDropSource();
                         }
 
                         ImGui::PopID();
                     }
 
-                    // Final drop target for the end of the list
-                    ImGui::InvisibleButton("final_drop_target_stage", ImVec2(-1, 8.0f)); // Added larger drop zone
+                    // Final drop target for end of list
+                    ImGui::InvisibleButton("final_drop_target_custom", ImVec2(-1, 8.0f)); // Added larger drop zone
                     if (ImGui::BeginDragDropTarget()) {
-                        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("MS_STAGE_DND")) {
-                            stage_dnd_source_index = *(const int *) payload->Data;
-                            stage_dnd_target_index = goal.stages.size();
+                        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("CUSTOM_GOAL_DND")) {
+                            custom_dnd_source_index = *(const int *) payload->Data;
+                            custom_dnd_target_index = current_template_data.custom_goals.size();
                         }
                         ImGui::EndDragDropTarget();
                     }
 
-                    // Handle stage reordering after the loop
-                    if (stage_dnd_source_index != -1 && stage_dnd_target_index != -1 && stage_dnd_source_index !=
-                        stage_dnd_target_index) {
-                        EditorSubGoal item_to_move = goal.stages[stage_dnd_source_index];
-                        goal.stages.erase(goal.stages.begin() + stage_dnd_source_index);
-                        if (stage_dnd_target_index > stage_dnd_source_index) stage_dnd_target_index--;
-                        goal.stages.insert(goal.stages.begin() + stage_dnd_target_index, item_to_move);
-                        ms_goal_data_changed = true;
+                    if (custom_dnd_source_index != -1 && custom_dnd_target_index != -1 && custom_dnd_source_index !=
+                        custom_dnd_target_index) {
+                        EditorTrackableItem item_to_move = current_template_data.custom_goals[custom_dnd_source_index];
+                        current_template_data.custom_goals.erase(
+                            current_template_data.custom_goals.begin() + custom_dnd_source_index);
+                        if (custom_dnd_target_index > custom_dnd_source_index) custom_dnd_target_index--;
+                        current_template_data.custom_goals.insert(
+                            current_template_data.custom_goals.begin() + custom_dnd_target_index, item_to_move);
                         save_message_type = MSG_NONE;
                     }
 
-                    if (stage_to_remove != -1) {
-                        goal.stages.erase(goal.stages.begin() + stage_to_remove);
-                        ms_goal_data_changed = true;
+
+                    if (item_to_remove != -1) {
+                        current_template_data.custom_goals.erase(
+                            current_template_data.custom_goals.begin() + item_to_remove);
                         save_message_type = MSG_NONE;
                     }
 
-                    // Logic to handle stage copy action after the loop
-                    if (stage_to_copy != -1) {
-                        const auto &source_stage = goal.stages[stage_to_copy];
+                    // Logic to handle the copy action after the loop
+                    if (item_to_copy != -1) {
+                        const auto &source_item = current_template_data.custom_goals[item_to_copy];
 
                         // Perform a manual, safe copy.
-                        EditorSubGoal new_stage;
-                        strncpy(new_stage.stage_id, source_stage.stage_id, sizeof(new_stage.stage_id));
-                        new_stage.stage_id[sizeof(new_stage.stage_id) - 1] = '\0';
-                        strncpy(new_stage.display_text, source_stage.display_text, sizeof(new_stage.display_text));
-                        new_stage.display_text[sizeof(new_stage.display_text) - 1] = '\0';
-                        strncpy(new_stage.icon_path, source_stage.icon_path, sizeof(new_stage.icon_path));
-                        new_stage.icon_path[sizeof(new_stage.icon_path) - 1] = '\0';
-                        strncpy(new_stage.parent_advancement, source_stage.parent_advancement,
-                                sizeof(new_stage.parent_advancement));
-                        new_stage.parent_advancement[sizeof(new_stage.parent_advancement) - 1] = '\0';
-                        strncpy(new_stage.root_name, source_stage.root_name, sizeof(new_stage.root_name));
-                        new_stage.root_name[sizeof(new_stage.root_name) - 1] = '\0';
-                        new_stage.type = source_stage.type;
-                        new_stage.required_progress = source_stage.required_progress;
+                        EditorTrackableItem new_item;
+                        strncpy(new_item.root_name, source_item.root_name, sizeof(new_item.root_name));
+                        new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
+                        strncpy(new_item.display_name, source_item.display_name, sizeof(new_item.display_name));
+                        new_item.display_name[sizeof(new_item.display_name) - 1] = '\0';
+                        strncpy(new_item.icon_path, source_item.icon_path, sizeof(new_item.icon_path));
+                        new_item.icon_path[sizeof(new_item.icon_path) - 1] = '\0';
+                        new_item.goal = source_item.goal;
+                        new_item.is_hidden = source_item.is_hidden;
+                        new_item.icon_pos = source_item.icon_pos;
+                        new_item.text_pos = source_item.text_pos;
+                        new_item.progress_pos = source_item.progress_pos;
 
-                        new_stage.sort_order = 0;
+                        new_item.sort_order = 0;
 
-                        // If the source was the Final (SUBGOAL_MANUAL) stage, the copy cannot also be Final
-                        // Reset it to SUBGOAL_STAT
-                        if (new_stage.type == SUBGOAL_MANUAL) {
-                            new_stage.type = SUBGOAL_STAT;
-                            new_stage.required_progress = 1; // sensible default for a stat stage
+                        char base_name[192];
+                        strncpy(base_name, source_item.root_name, sizeof(base_name) - 1);
+                        base_name[sizeof(base_name) - 1] = '\0';
+                        char new_name[192];
+                        int copy_counter = 1;
+                        while (true) {
+                            if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
+                            else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
+                            bool name_exists = false;
+                            for (const auto &item: current_template_data.custom_goals) {
+                                if (strcmp(item.root_name, new_name) == 0) {
+                                    name_exists = true;
+                                    break;
+                                }
+                            }
+                            if (!name_exists) break;
+                            copy_counter++;
+                        }
+                        strncpy(new_item.root_name, new_name, sizeof(new_item.root_name) - 1);
+                        new_item.root_name[sizeof(new_item.root_name) - 1] = '\0';
+                        current_template_data.custom_goals.insert(
+                            current_template_data.custom_goals.begin() + item_to_copy + 1, new_item);
+                        save_message_type = MSG_NONE;
+                    }
+                    ImGui::EndTabItem();
+                }
+            } // end custom goals tab scope
+            {
+                ImGuiTabItemFlags ms_tab_flags = (force_select_tab == FORCE_TAB_MULTISTAGE)
+                                                     ? ImGuiTabItemFlags_SetSelected
+                                                     : 0;
+                if (force_select_tab == FORCE_TAB_MULTISTAGE) force_select_tab = FORCE_TAB_NONE;
+                if (ImGui::BeginTabItem("Multi-Stage Goals", nullptr, ms_tab_flags)) {
+                    // Flag to track changes in this version
+                    // Specifically for hidden legacy stats for multi-stage goals
+                    // This flag still tracks ALL CHANGES within multi-stage goals
+                    bool ms_goal_data_changed = false;
+
+                    // TWO-PANE LAYOUT for Multi-Stage Goals
+                    float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
+                    ImGui::BeginChild("MSGoalListPane", ImVec2(pane_width, 0), true);
+
+                    // --- Sorting Controls ---
+                    bool can_sort_ms = false;
+                    for (const auto &goal: current_template_data.multi_stage_goals) {
+                        if (goal.sort_order > 0) {
+                            can_sort_ms = true;
+                            break;
+                        }
+                    }
+
+                    float sort_btn_width = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                    float reset_btn_width = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x *
+                                            2.0f;
+                    float total_buttons_width = sort_btn_width + reset_btn_width + ImGui::GetStyle().ItemSpacing.x;
+
+                    ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_buttons_width);
+
+                    ImGui::BeginDisabled(!can_sort_ms);
+                    if (ImGui::Button("Sort##ms")) {
+                        apply_partial_sort(current_template_data.multi_stage_goals);
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tooltip_buffer[128];
+                        if (!can_sort_ms) {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Click the order badges next to goals to assign a sort order first.");
+                        } else {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Rearrange the numbered items among themselves.");
+                        }
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Reset Order##ms")) {
+                        for (auto &ms_goal: current_template_data.multi_stage_goals) ms_goal.sort_order = 0;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tooltip_buffer[128];
+                        if (!can_sort_ms) {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
+                        } else {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Clear all assigned sort orders from multi-stage goals.");
+                        }
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+                    ImGui::EndDisabled();
+
+                    if (ImGui::Button("Add New Multi-Stage Goal")) {
+                        // Before modifying the vector, store the root_name of the currently selected item.
+                        char selected_root_name_before_op[192] = {};
+                        if (selected_ms_goal) {
+                            strncpy(selected_root_name_before_op, selected_ms_goal->root_name,
+                                    sizeof(selected_root_name_before_op) - 1);
+                            selected_root_name_before_op[sizeof(selected_root_name_before_op) - 1] = '\0';
                         }
 
-                        char base_name[64];
-                        strncpy(base_name, source_stage.stage_id, sizeof(base_name) - 1);
-                        base_name[sizeof(base_name) - 1] = '\0';
+                        // Create a new multi-stage goal with default values and a final stage
+                        EditorMultiStageGoal new_goal = {};
+                        int counter = 1;
+                        while (true) {
+                            snprintf(new_goal.root_name, sizeof(new_goal.root_name), "new_ms_goal_%d", counter);
+                            bool name_exists = false;
+                            for (const auto &goal: current_template_data.multi_stage_goals) {
+                                if (strcmp(goal.root_name, new_goal.root_name) == 0) {
+                                    name_exists = true;
+                                    break;
+                                }
+                            }
+                            if (!name_exists) break;
+                            counter++;
+                        }
+                        snprintf(new_goal.display_name, sizeof(new_goal.display_name), "New Multi-Stage Goal %d",
+                                 counter);
+                        strncpy(new_goal.icon_path, "blocks/placeholder.png", sizeof(new_goal.icon_path) - 1);
+                        new_goal.icon_path[sizeof(new_goal.icon_path) - 1] = '\0';
+
+                        // Add a default "Final" stage, which is required for validation
+                        EditorSubGoal final_stage = {};
+                        strncpy(final_stage.stage_id, "final", sizeof(final_stage.stage_id) - 1);
+                        final_stage.stage_id[sizeof(final_stage.stage_id) - 1] = '\0';
+                        strncpy(final_stage.display_text, "Final Stage", sizeof(final_stage.display_text) - 1);
+                        final_stage.display_text[sizeof(final_stage.display_text) - 1] = '\0';
+                        final_stage.type = SUBGOAL_MANUAL;
+                        new_goal.stages.push_back(final_stage);
+
+                        current_template_data.multi_stage_goals.push_back(new_goal);
+
+                        // After modifying the vector, re-find the selected item to get a valid pointer.
+                        if (selected_root_name_before_op[0] != '\0') {
+                            for (auto &goal: current_template_data.multi_stage_goals) {
+                                if (strcmp(goal.root_name, selected_root_name_before_op) == 0) {
+                                    selected_ms_goal = &goal;
+                                    break;
+                                }
+                            }
+                        }
+
+                        ms_goal_data_changed = true;
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char add_ms_goal_tooltip_buffer[1024]; // Increased buffer size for detailed text
+
+                        if (creator_selected_version <= MC_VERSION_1_6_4) {
+                            // Legacy Version Tooltip
+                            snprintf(add_ms_goal_tooltip_buffer, sizeof(add_ms_goal_tooltip_buffer),
+                                     "Add a new multi-stage goal to this template.\n\n"
+                                     "Multi-Stage Goals get completed one stage at a time.\n"
+                                     "The 'Type' of each stage determines how it is completed:\n"
+                                     " • Stat / Achievement: The ID number (e.g., '2011' - Items Dropped)\n"
+                                     "   to track in the stats file.\n"
+                                     " • Final: The mandatory last stage that completes the goal.\n\n"
+                                     "Click the 'Help' button for more info.");
+                        } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                            // Mid-Era Version Tooltip
+                            snprintf(add_ms_goal_tooltip_buffer, sizeof(add_ms_goal_tooltip_buffer),
+                                     "Add a new multi-stage goal to this template.\n\n"
+                                     "Multi-Stage Goals get completed one stage at a time.\n"
+                                     "The 'Type' of each stage determines how it is completed:\n"
+                                     " • Stat / Achievement: Root name (e.g., 'stat.craftItem.minecraft.planks')\n"
+                                     "   to track in the stats file.\n"
+                                     " • Criterion: A specific criterion (e.g., 'Sunflower Plains') of a parent achievement\n"
+                                     "   (e.g., 'achievement.exploreAllBiomes').\n"
+                                     " • Final: The mandatory last stage that completes the goal.\n\n"
+                                     "Click the 'Help' button for more info.");
+                        } else if (creator_selected_version <= MC_VERSION_1_12_2) {
+                            // Modern with mid-era stats Version Tooltip
+                            snprintf(add_ms_goal_tooltip_buffer, sizeof(add_ms_goal_tooltip_buffer),
+                                     "Add a new multi-stage goal to this template.\n\n"
+                                     "Multi-Stage Goals get completed one stage at a time.\n"
+                                     "The 'Type' of each stage determines how it is completed:\n"
+                                     " • Stat: Root name (e.g., 'stat.mobKills') from the stats file.\n"
+                                     " • Advancement: Root name of an advancement (e.g., 'minecraft:husbandry/tame_an_animal')\n"
+                                     "   or recipe (e.g., 'minecraft:recipes/redstone/stone_button') from the advancements file.\n"
+                                     " • Criterion: A specific criterion (e.g., 'cave_spider')\n"
+                                     "   of a parent advancement (e.g., 'minecraft:adventure/kill_a_mob').\n"
+                                     " • Final: The mandatory last stage that completes the goal.\n\n"
+                                     "Click the 'Help' button for more info.");
+                        } else if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
+                            // 25w14craftmine Version Tooltip
+                            snprintf(add_ms_goal_tooltip_buffer, sizeof(add_ms_goal_tooltip_buffer),
+                                     "Add a new multi-stage goal to this template.\n\n"
+                                     "Multi-Stage Goals get completed one stage at a time.\n"
+                                     "The 'Type' of each stage determines how it is completed:\n"
+                                     " • Stat: Root name (e.g., 'minecraft:mined/minecraft:spawner') from the stats file.\n"
+                                     " • Advancement: Root name of an advancement (e.g., 'minecraft:end/levitate')\n"
+                                     "   or recipe (e.g., 'minecraft:recipes/redstone/tnt') from the advancements file.\n"
+                                     " • Criterion: A specific criterion (e.g., 'minecraft:wither_boss')\n"
+                                     "   of a parent advancement (e.g., 'minecraft:mines/all_special_mines_completed').\n"
+                                     " • Unlock: Root name (e.g., 'minecraft:exploration') from the unlocks file.\n"
+                                     " • Final: The mandatory last stage that completes the goal.\n\n"
+                                     "Click the 'Help' button for more info.");
+                        } else {
+                            // Modern Versions (1.13+ excluding craftmine) Tooltip
+                            snprintf(add_ms_goal_tooltip_buffer, sizeof(add_ms_goal_tooltip_buffer),
+                                     "Add a new multi-stage goal to this template.\n\n"
+                                     "Multi-Stage Goals get completed one stage at a time.\n"
+                                     "The 'Type' of each stage determines how it is completed:\n"
+                                     " • Stat: Root name (e.g., 'minecraft:killed/minecraft:blaze') from the stats file.\n"
+                                     " • Advancement: Root name of an advancement (e.g., 'minecraft:story/cure_zombie_villager')\n"
+                                     "   or recipe (e.g., 'minecraft:recipes/decorations/anvil') from the advancements file.\n"
+                                     " • Criterion: A specific criterion (e.g., 'minecraft:spotted')\n"
+                                     "   of a parent advancement (e.g., 'minecraft:husbandry/whole_pack').\n"
+                                     " • Final: The mandatory last stage that completes the goal.\n\n"
+                                     "Click the 'Help' button for more info.");
+                        }
+
+                        ImGui::SetTooltip("%s", add_ms_goal_tooltip_buffer);
+                    }
+                    ImGui::SameLine();
+
+                    ImGui::Checkbox("Show Display Names", &show_ms_goal_display_names);
+                    ImGui::Separator();
+
+                    // 1. Create a list of pointers to render from.
+                    std::vector<EditorMultiStageGoal *> goals_to_render;
+
+                    // 2. Populate the list based on search criteria.
+                    bool search_active = (tc_search_buffer[0] != '\0' && current_search_scope == SCOPE_MULTISTAGE);
+
+                    if (search_active) {
+                        for (auto &goal: current_template_data.multi_stage_goals) {
+                            bool parent_match = str_contains_insensitive(goal.display_name, tc_search_buffer) ||
+                                                str_contains_insensitive(goal.root_name, tc_search_buffer) ||
+                                                str_contains_insensitive(goal.icon_path, tc_search_buffer);
+
+                            if (parent_match) {
+                                goals_to_render.push_back(&goal);
+                                continue;
+                            }
+
+                            bool stage_match = false;
+                            for (const auto &stage: goal.stages) {
+                                // Convert target value into a string
+                                char target_val_str[32];
+                                snprintf(target_val_str, sizeof(target_val_str), "%d", stage.required_progress);
+
+                                // Check standard fields
+                                bool standard_match = str_contains_insensitive(stage.display_text, tc_search_buffer) ||
+                                                      str_contains_insensitive(stage.stage_id, tc_search_buffer) ||
+                                                      str_contains_insensitive(stage.root_name, tc_search_buffer) ||
+                                                      str_contains_insensitive(
+                                                          stage.parent_advancement, tc_search_buffer)
+                                                      ||
+                                                      strstr(target_val_str, tc_search_buffer) != nullptr;
+
+                                // Check stage icon path IF enabled, so it works with search
+                                bool icon_match = false;
+                                if (goal.use_stage_icons) {
+                                    icon_match = str_contains_insensitive(stage.icon_path, tc_search_buffer);
+                                }
+
+                                if (standard_match || icon_match) {
+                                    stage_match = true;
+                                    break;
+                                }
+                            }
+
+                            if (stage_match) {
+                                goals_to_render.push_back(&goal);
+                            }
+                        }
+                    } else {
+                        // Search is inactive, show all goals.
+                        for (auto &goal: current_template_data.multi_stage_goals) {
+                            goals_to_render.push_back(&goal);
+                        }
+                    }
+
+                    // --- Counter for the list ---
+                    char counter_text[128];
+                    snprintf(counter_text, sizeof(counter_text), "%zu %s", goals_to_render.size(),
+                             goals_to_render.size() == 1 ? "Multi-Stage Goal" : "Multi-Stage Goals");
+                    float text_width = ImGui::CalcTextSize(counter_text).x;
+                    // Center Count
+                    ImGui::SetCursorPosX(
+                        ImGui::GetCursorPosX() + (
+                            ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - text_width) *
+                        0.5f);
+                    ImGui::TextDisabled("%s", counter_text);
+
+                    // 3. Render the list using pointers.
+                    int goal_to_remove_idx = -1;
+                    int goal_to_copy_idx = -1;
+                    int ms_goal_dnd_source_index = -1;
+                    int ms_goal_dnd_target_index = -1;
+
+                    for (size_t i = 0; i < goals_to_render.size(); ++i) {
+                        auto &goal = *goals_to_render[i];
+                        ImGui::PushID(&goal);
+
+                        const char *display_name = goal.display_name;
+                        const char *root_name = goal.root_name;
+                        const char *label = show_ms_goal_display_names
+                                                ? (display_name[0] ? display_name : root_name)
+                                                : root_name;
+                        if (label[0] == '\0') {
+                            label = "[New Goal]";
+                        }
+
+                        // --- Sort Badge (Multi-Stage Goal) ---
+                        char ms_badge_label[64];
+                        if (goal.sort_order > 0) {
+                            snprintf(ms_badge_label, sizeof(ms_badge_label), "%d##ms_badge", goal.sort_order);
+                        } else {
+                            snprintf(ms_badge_label, sizeof(ms_badge_label), " - ##ms_badge");
+                        }
+
+                        const char *ms_text_end = strstr(ms_badge_label, "##");
+                        float ms_text_w = ImGui::CalcTextSize(ms_badge_label, ms_text_end).x;
+                        float ms_badge_w = std::max(28.0f, ms_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
+
+                        if (ImGui::Button(ms_badge_label, ImVec2(ms_badge_w, 0))) {
+                            if (goal.sort_order > 0)
+                                goal.sort_order = 0;
+                            else goal.sort_order = get_next_sort_order(current_template_data.multi_stage_goals);
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            if (goal.sort_order > 0) {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Click to remove multi-stage goal sort order");
+                            } else {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Click to assign multi-stage goal sort order");
+                            }
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+
+                        if (ImGui::Button("X")) { goal_to_remove_idx = i; }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s", label);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Copy")) { goal_to_copy_idx = i; }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate %s.", label);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+
+                        if (ImGui::Selectable(label, &goal == selected_ms_goal)) {
+                            if (&goal != selected_ms_goal) {
+                                selected_ms_goal = &goal;
+                            }
+                        }
+
+                        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
+                            ImGui::SetDragDropPayload("MS_GOAL_DND", &i, sizeof(int));
+                            ImGui::Text("Reorder %s", label);
+                            ImGui::EndDragDropSource();
+                        }
+                        if (ImGui::BeginDragDropTarget()) {
+                            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("MS_GOAL_DND")) {
+                                ms_goal_dnd_source_index = *(const int *) payload->Data;
+                                ms_goal_dnd_target_index = i;
+                            }
+                            ImGui::EndDragDropTarget();
+                        }
+                        ImGui::PopID();
+                    }
+
+                    // Handle Drag and Drop
+                    if (ms_goal_dnd_source_index != -1 && ms_goal_dnd_target_index != -1) {
+                        EditorMultiStageGoal *source_item_ptr = goals_to_render[ms_goal_dnd_source_index];
+                        EditorMultiStageGoal *target_item_ptr = goals_to_render[ms_goal_dnd_target_index];
+
+                        auto source_it = std::find_if(current_template_data.multi_stage_goals.begin(),
+                                                      current_template_data.multi_stage_goals.end(),
+                                                      [&](const EditorMultiStageGoal &g) {
+                                                          return &g == source_item_ptr;
+                                                      });
+
+                        EditorMultiStageGoal item_to_move = *source_item_ptr;
+                        current_template_data.multi_stage_goals.erase(source_it);
+
+                        auto target_it = std::find_if(current_template_data.multi_stage_goals.begin(),
+                                                      current_template_data.multi_stage_goals.end(),
+                                                      [&](const EditorMultiStageGoal &g) {
+                                                          return &g == target_item_ptr;
+                                                      });
+
+                        current_template_data.multi_stage_goals.insert(target_it, item_to_move);
+                        ms_goal_data_changed = true;
+                        save_message_type = MSG_NONE;
+                    }
+
+                    // Handle Copying
+                    if (goal_to_copy_idx != -1) {
+                        char selected_root_name_before_op[192] = {};
+                        if (selected_ms_goal) {
+                            strncpy(selected_root_name_before_op, selected_ms_goal->root_name,
+                                    sizeof(selected_root_name_before_op) - 1);
+                        }
+
+                        const EditorMultiStageGoal *source_goal_ptr = goals_to_render[goal_to_copy_idx];
+
+                        // Perform a manual, safe copy to prevent memory corruption.
+                        EditorMultiStageGoal new_goal = {}; // Zero-initialize to prevent garbage in unset fields
+                        strncpy(new_goal.root_name, source_goal_ptr->root_name, sizeof(new_goal.root_name));
+                        new_goal.root_name[sizeof(new_goal.root_name) - 1] = '\0';
+                        strncpy(new_goal.display_name, source_goal_ptr->display_name, sizeof(new_goal.display_name));
+                        new_goal.display_name[sizeof(new_goal.display_name) - 1] = '\0';
+                        strncpy(new_goal.icon_path, source_goal_ptr->icon_path, sizeof(new_goal.icon_path));
+                        new_goal.icon_path[sizeof(new_goal.icon_path) - 1] = '\0';
+                        new_goal.is_hidden = source_goal_ptr->is_hidden;
+                        new_goal.in_2nd_row = source_goal_ptr->in_2nd_row;
+                        new_goal.use_stage_icons = source_goal_ptr->use_stage_icons;
+                        new_goal.stages = source_goal_ptr->stages; // std::vector handles its own deep copy safely.
+                        new_goal.icon_pos = source_goal_ptr->icon_pos;
+                        new_goal.text_pos = source_goal_ptr->text_pos;
+                        new_goal.progress_pos = source_goal_ptr->progress_pos;
+
+                        new_goal.sort_order = 0;
+                        for (auto &stage: new_goal.stages) {
+                            stage.sort_order = 0;
+                        }
+
+                        // Now, generate a unique name for the new copy
+                        char base_name[192];
+                        strncpy(base_name, new_goal.root_name, sizeof(base_name));
+                        base_name[sizeof(base_name) - 1] = '\0'; // Ensure base_name is safe to use
+
+                        char new_name[192];
+                        int copy_counter = 1;
+                        while (true) {
+                            if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
+                            else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
+                            bool name_exists = false;
+                            for (const auto &g: current_template_data.multi_stage_goals) {
+                                if (strcmp(g.root_name, new_name) == 0) {
+                                    name_exists = true;
+                                    break;
+                                }
+                            }
+                            if (!name_exists) break;
+                            copy_counter++;
+                        }
+
+                        // Safely apply the new unique name
+                        strncpy(new_goal.root_name, new_name, sizeof(new_goal.root_name));
+                        new_goal.root_name[sizeof(new_goal.root_name) - 1] = '\0';
+
+
+                        auto it = std::find_if(current_template_data.multi_stage_goals.begin(),
+                                               current_template_data.multi_stage_goals.end(),
+                                               [&](const EditorMultiStageGoal &g) { return &g == source_goal_ptr; });
+
+                        if (it != current_template_data.multi_stage_goals.end()) {
+                            current_template_data.multi_stage_goals.insert(it + 1, new_goal);
+                        } else {
+                            current_template_data.multi_stage_goals.push_back(new_goal);
+                        }
+
+                        // Re-find and update the selected_ms_goal pointer
+                        if (selected_root_name_before_op[0] != '\0') {
+                            for (auto &goal: current_template_data.multi_stage_goals) {
+                                if (strcmp(goal.root_name, selected_root_name_before_op) == 0) {
+                                    selected_ms_goal = &goal;
+                                    break;
+                                }
+                            }
+                        }
+                        ms_goal_data_changed = true;
+                        save_message_type = MSG_NONE;
+                    }
+
+                    // Handle Removal
+                    if (goal_to_remove_idx != -1) {
+                        char selected_root_name_before_op[192] = {};
+                        if (selected_ms_goal) {
+                            strncpy(selected_root_name_before_op, selected_ms_goal->root_name,
+                                    sizeof(selected_root_name_before_op) - 1);
+                        }
+
+                        EditorMultiStageGoal *goal_to_remove = goals_to_render[goal_to_remove_idx];
+                        if (selected_ms_goal == goal_to_remove) {
+                            selected_ms_goal = nullptr;
+                        }
+
+                        current_template_data.multi_stage_goals.erase(
+                            std::remove_if(current_template_data.multi_stage_goals.begin(),
+                                           current_template_data.multi_stage_goals.end(),
+                                           [&](const EditorMultiStageGoal &g) { return &g == goal_to_remove; }),
+                            current_template_data.multi_stage_goals.end()
+                        );
+
+                        // Re-find pointer if it wasn't the one being deleted
+                        if (selected_ms_goal && selected_root_name_before_op[0] != '\0') {
+                            for (auto &goal: current_template_data.multi_stage_goals) {
+                                if (strcmp(goal.root_name, selected_root_name_before_op) == 0) {
+                                    selected_ms_goal = &goal;
+                                    break;
+                                }
+                            }
+                        }
+                        ms_goal_data_changed = true;
+                        save_message_type = MSG_NONE;
+                    }
+
+                    ImGui::EndChild();
+                    ImGui::SameLine();
+
+                    ImGui::BeginChild("MSGoalDetailsPane", ImVec2(0, 0), true);
+                    if (selected_ms_goal != nullptr) {
+                        auto &goal = *selected_ms_goal;
+
+                        ImGui::Text("Edit Multi-Stage Goal Details");
+
+                        // "Reset All Positions" button — only if any position is manually set
+                        {
+                            bool any_pos_set = goal.icon_pos.is_set || goal.text_pos.is_set ||
+                                               goal.progress_pos.is_set;
+                            if (any_pos_set) {
+                                const char *reset_btn = "Reset All Positions";
+                                float btn_w = ImGui::CalcTextSize(reset_btn).x + ImGui::GetStyle().FramePadding.x *
+                                              2.0f;
+                                ImGui::SameLine(ImGui::GetContentRegionAvail().x - btn_w);
+                                if (ImGui::SmallButton(reset_btn)) {
+                                    reset_manual_pos(&goal.icon_pos);
+                                    reset_manual_pos(&goal.text_pos);
+                                    reset_manual_pos(&goal.progress_pos);
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip[256];
+                                    snprintf(tooltip, sizeof(tooltip),
+                                             "Reset all manual positions for this\n"
+                                             "multi-stage goal back to the auto-layout.\n"
+                                             "Save the template for the changes to take visual effect.");
+                                    ImGui::SetTooltip("%s", tooltip);
+                                }
+                            }
+                        }
+
+                        ImGui::Separator();
+
+                        if (ImGui::InputText("Goal Root Name", goal.root_name, sizeof(goal.root_name))) {
+                            ms_goal_data_changed = true;
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char root_name_tooltip_buffer[256];
+                            snprintf(root_name_tooltip_buffer, sizeof(root_name_tooltip_buffer),
+                                     "A unique ID for this entire multi-stage goal (e.g., 'awesome_ms_goal').");
+                            ImGui::SetTooltip("%s", root_name_tooltip_buffer);
+                        }
+                        if (ImGui::InputText("Display Name", goal.display_name, sizeof(goal.display_name))) {
+                            ms_goal_data_changed = true;
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char display_name_tooltip_buffer[128];
+                            snprintf(display_name_tooltip_buffer, sizeof(display_name_tooltip_buffer),
+                                     "The user-facing name for this multi-stage goal.");
+                            ImGui::SetTooltip("%s", display_name_tooltip_buffer);
+                        }
+                        if (ImGui::InputText("Icon Path", goal.icon_path, sizeof(goal.icon_path))) {
+                            ms_goal_data_changed = true;
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char icon_path_tooltip_buffer[1024];
+                            snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                     "Path to the icon file, relative to the 'resources/icons' directory.");
+                            ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Browse##MSGoalIcon")) {
+                            char new_path[MAX_PATH_LENGTH];
+                            if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                strncpy(goal.icon_path, new_path, sizeof(goal.icon_path) - 1);
+                                goal.icon_path[sizeof(goal.icon_path) - 1] = '\0';
+
+                                ms_goal_data_changed = true;
+                                save_message_type = MSG_NONE;
+                            }
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char icon_path_tooltip_buffer[1024];
+                            snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                     "The icon must be inside the 'resources/icons' folder!");
+                            ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
+                        }
+                        if (ImGui::Checkbox("Hidden", &goal.is_hidden)) {
+                            ms_goal_data_changed = true;
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char hidden_tooltip_buffer[512];
+                            snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
+                                     "If checked, this multi-stage goal will be fully hidden on the overlay\n"
+                                     "and hidden settings-based on the tracker.\n"
+                                     "Visibility can be toggled in the main tracker settings");
+                            ImGui::SetTooltip("%s", hidden_tooltip_buffer);
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::Checkbox("Row 2", &goal.in_2nd_row)) {
+                            ms_goal_data_changed = true;
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[256];
+                            if (creator_selected_version != MC_VERSION_25W14CRAFTMINE) {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Force this stat category to display on the 2nd row of the overlay\n"
+                                         "(normally reserved for %s).", advancements_label_plural_lower);
+                            } else {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Force this stat category to display on the 2nd row of the overlay\n"
+                                         "(normally reserved for %s/unlocks).", advancements_label_plural_lower);
+                            }
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Checkbox("Per-Stage Icons", &goal.use_stage_icons)) {
+                            ms_goal_data_changed = true;
+                            save_message_type = MSG_NONE;
+
+                            // Pre-fill stage icons with main goal icon to avoid errors
+                            if (goal.use_stage_icons) {
+                                for (auto &stage: goal.stages) {
+                                    // Only pre-fill if currently empty to preserve previous edits if toggled off/on
+                                    if (stage.icon_path[0] == '\0') {
+                                        if (goal.icon_path[0] != '\0') {
+                                            strncpy(stage.icon_path, goal.icon_path, sizeof(stage.icon_path) - 1);
+                                        } else {
+                                            // Fallback just in case main icon is also empty
+                                            strncpy(stage.icon_path, "blocks/placeholder.png",
+                                                    sizeof(stage.icon_path) - 1);
+                                        }
+                                        stage.icon_path[sizeof(stage.icon_path) - 1] = '\0';
+                                    }
+                                }
+                            }
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip[256];
+                            snprintf(tooltip, sizeof(tooltip), "Enable unique icons for every stage.\n"
+                                     "If unchecked, the main goal icon is used for all stages.");
+                            ImGui::SetTooltip("%s", tooltip);
+                        }
+
+                        if (render_layout_coordinates_header("multi-stage goal",
+                                                             force_open_header_root_name[0] != '\0' && strcmp(
+                                                                 goal.root_name, force_open_header_root_name) == 0)) {
+                            render_manual_pos_ui("ms_icon", "multi-stage goal", "Icon Position", &goal.icon_pos,
+                                                 save_message_type);
+                            render_manual_pos_ui("ms_text", "multi-stage goal", "Text Position", &goal.text_pos,
+                                                 save_message_type);
+                            render_manual_pos_ui("ms_prog", "multi-stage goal", "Progress Position", &goal.progress_pos,
+                                                 save_message_type);
+                        }
+
+                        ImGui::Separator();
+                        ImGui::Text("Stages");
+
+                        // --- Counter for the stages list ---
+                        char stage_counter_text[128];
+                        bool is_details_search_active = (
+                            current_search_scope == SCOPE_MULTISTAGE_DETAILS && tc_search_buffer[0] != '\0');
+                        int visible_stages_count = 0;
+                        if (!is_details_search_active) {
+                            visible_stages_count = goal.stages.size();
+                        } else {
+                            for (const auto &stage: goal.stages) {
+                                char target_val_str[32];
+                                snprintf(target_val_str, sizeof(target_val_str), "%d", stage.required_progress);
+                                if (str_contains_insensitive(stage.display_text, tc_search_buffer) ||
+                                    str_contains_insensitive(stage.stage_id, tc_search_buffer) ||
+                                    str_contains_insensitive(stage.root_name, tc_search_buffer) ||
+                                    str_contains_insensitive(stage.parent_advancement, tc_search_buffer) ||
+                                    (stage.required_progress != 0 && strstr(target_val_str, tc_search_buffer) !=
+                                     nullptr)) {
+                                    visible_stages_count++;
+                                }
+                            }
+                        }
+                        snprintf(stage_counter_text, sizeof(stage_counter_text), "%d %s", visible_stages_count,
+                                 visible_stages_count == 1 ? "Stage" : "Stages");
+                        float stage_text_width = ImGui::CalcTextSize(stage_counter_text).x;
+                        ImGui::SameLine(ImGui::GetContentRegionAvail().x - stage_text_width);
+                        ImGui::TextDisabled("%s", stage_counter_text);
+
+
+                        if (ImGui::Button("Add New Stage")) {
+                            // Create a new stage with default values and insert it before the final stage
+                            EditorSubGoal new_stage = {};
+                            int counter = 1;
+                            while (true) {
+                                snprintf(new_stage.stage_id, sizeof(new_stage.stage_id), "new_stage_%d", counter);
+                                bool name_exists = false;
+                                for (const auto &stage: goal.stages) {
+                                    if (strcmp(stage.stage_id, new_stage.stage_id) == 0) {
+                                        name_exists = true;
+                                        break;
+                                    }
+                                }
+                                if (!name_exists) break;
+                                counter++;
+                            }
+                            snprintf(new_stage.display_text, sizeof(new_stage.display_text), "New Stage %d", counter);
+                            new_stage.type = SUBGOAL_STAT; // Default to a common type
+                            // Version-aware root name for the new stage's trigger
+                            if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                strncpy(new_stage.root_name, "0", sizeof(new_stage.root_name) - 1);
+                            } else if (creator_selected_version <= MC_VERSION_1_12_2) {
+                                // Mid-era (1.7 -1.12.2)
+                                strncpy(new_stage.root_name, "stat.cool", sizeof(new_stage.root_name) - 1);
+                            } else {
+                                // Modern (1.13+)
+                                strncpy(new_stage.root_name, "minecraft:custom/minecraft:new_stat",
+                                        sizeof(new_stage.root_name) - 1);
+                            }
+                            new_stage.root_name[sizeof(new_stage.root_name) - 1] = '\0';
+                            new_stage.required_progress = 1;
+
+                            // Insert the new stage just before the last element (which should be the "final" stage)
+                            if (!goal.stages.empty()) {
+                                goal.stages.insert(goal.stages.end() - 1, new_stage);
+                            } else {
+                                // Should not happen if new goals are created correctly, but as a fallback:
+                                goal.stages.push_back(new_stage);
+                            }
+
+                            ms_goal_data_changed = true;
+                            save_message_type = MSG_NONE;
+                        }
+
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[1024];
+
+                            if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                // Legacy Version Tooltip
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Adds a new step to this multi-stage goal.\n\n"
+                                         "Stages are completed sequentially. New stages are always added before the 'Final' stage.\n\n"
+                                         "Available Stage Types for this version:\n"
+                                         " • Stat / Achievement: Completes when a stat (e.g., 16777217 - Stone mined)\n"
+                                         "   or achievement (e.g., 5242905 - Overkill) reaches the 'Target Value'.\n\n"
+                                         "Click the 'Help' button for more info.");
+                            } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                // Mid-Era Version Tooltip
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Adds a new step to this multi-stage goal.\n\n"
+                                         "Stages are completed sequentially. New stages are always added before the 'Final' stage.\n\n"
+                                         "Available Stage Types for this version:\n"
+                                         " • Stat / Achievement: Completes when a stat (e.g., stat.fallOneCm)\n"
+                                         "   or achievement (e.g., 'achievement.buildPickaxe') reaches the 'Target Value'.\n"
+                                         " • Criterion: Completes when a specific criterion (e.g., 'Deep Ocean')\n"
+                                         "   of a parent achievement (e.g., 'achievement.exploreAllBiomes') is met.\n\n"
+                                         "Click the 'Help' button for more info.");
+                            } else if (creator_selected_version <= MC_VERSION_1_12_2) {
+                                // Mid-era stats, modern advancements
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Adds a new step to this multi-stage goal.\n\n"
+                                         "Stages are completed sequentially. New stages are always added before the 'Final' stage.\n\n"
+                                         "Available Stage Types for this version:\n"
+                                         " • Stat: Completes when a stat (e.g., 'stat.useItem.minecraft.beacon'\n"
+                                         "   reaches the 'Target Value'.\n"
+                                         " • Advancement: Completes when an advancement (e.g., 'minecraft:story/root')\n"
+                                         "   or recipe (e.g., 'minecraft:recipes/tools/stone_shovel') is obtained.\n"
+                                         " • Criterion: Completes when a specific criterion (e.g., 'bred_mooshroom')\n"
+                                         "   of a parent advancement (e.g., 'minecraft:husbandry/bred_all_animals') is met.\n\n"
+                                         "Click the 'Help' button for more info.");
+                            } else if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
+                                // 25w14craftmine Version Tooltip
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Adds a new step to this multi-stage goal.\n\n"
+                                         "Stages are completed sequentially. New stages are always added before the 'Final' stage.\n\n"
+                                         "Available Stage Types for this version:\n"
+                                         " • Stat: Completes when a stat (e.g., 'minecraft:custom/minecraft:aviate_one_cm')\n"
+                                         "   reaches the 'Target Value'.\n"
+                                         " • Advancement: Completes when an advancement (e.g., 'minecraft:feats/kuiper_world')\n"
+                                         "   or recipe (e.g., 'minecraft:recipes/misc/exit_eye') is obtained.\n"
+                                         " • Criterion: Completes when a specific criterion (e.g., 'minecraft:floating_islands_world')\n"
+                                         "   of a parent advancement (e.g., 'minecraft:mines/all_mine_ingredients') is met.\n"
+                                         " • Unlock: Completes when a specific player unlock (e.g., 'minecraft:jump_king_10') is obtained.\n\n"
+                                         "Click the 'Help' button for more info.");
+                            } else {
+                                // Modern Versions (1.13+ excluding craftmine) Tooltip
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Adds a new step to this multi-stage goal.\n\n"
+                                         "Stages are completed sequentially. New stages are always added before the 'Final' stage.\n\n"
+                                         "Available Stage Types for this version:\n"
+                                         " • Stat: Completes when a stat (e.g., 'minecraft:killed/minecraft:endermite'\n"
+                                         "   reaches the 'Target Value'.\n"
+                                         " • Advancement: Completes when an advancement (e.g., 'minecraft:nether/ride_strider')\n"
+                                         "   or recipe (e.g., 'minecraft:recipes/decorations/grindstone') is obtained.\n"
+                                         " • Criterion: Completes when a specific criterion (e.g., 'minecraft:creaking')\n"
+                                         "   of a parent advancement (e.g., 'minecraft:adventure/kill_all_mobs') is met.\n\n"
+                                         "Click the 'Help' button for more info.");
+                            }
+
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+
+                        ImGui::SameLine();
+
+                        // --- Stages Sorting Controls ---
+                        bool can_sort_stage = false;
+                        for (const auto &stage: goal.stages) {
+                            if (stage.sort_order > 0) {
+                                can_sort_stage = true;
+                                break;
+                            }
+                        }
+
+                        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_buttons_width);
+
+                        ImGui::BeginDisabled(!can_sort_stage);
+                        char sort_stage_id[256], reset_stage_id[256];
+                        snprintf(sort_stage_id, sizeof(sort_stage_id), "Sort##stage_%s", goal.root_name);
+                        snprintf(reset_stage_id, sizeof(reset_stage_id), "Reset Order##stage_%s", goal.root_name);
+
+                        if (ImGui::Button(sort_stage_id)) {
+                            apply_partial_sort(goal.stages);
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            char tooltip_buffer[128];
+                            if (!can_sort_stage) {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Click the order badges next to stages to assign a sort order first.");
+                            } else {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Rearrange the numbered stages among themselves.");
+                            }
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button(reset_stage_id)) {
+                            for (auto &stage: goal.stages) stage.sort_order = 0;
+                        }
+                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            char tooltip_buffer[128];
+                            if (!can_sort_stage) {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
+                            } else {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Clear all assigned sort orders from stages.");
+                            }
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::EndDisabled();
+
+
+                        int stage_to_remove = -1;
+                        int stage_to_copy = -1;
+
+                        int stage_dnd_source_index = -1;
+                        int stage_dnd_target_index = -1;
+
+                        for (size_t j = 0; j < goal.stages.size(); ++j) {
+                            auto &stage = goal.stages[j];
+
+                            if (is_details_search_active) {
+                                char target_val_str[32];
+                                snprintf(target_val_str, sizeof(target_val_str), "%d", stage.required_progress);
+
+                                // Check standard fields
+                                bool standard_match = str_contains_insensitive(stage.display_text, tc_search_buffer) ||
+                                                      str_contains_insensitive(stage.stage_id, tc_search_buffer) ||
+                                                      str_contains_insensitive(stage.root_name, tc_search_buffer) ||
+                                                      str_contains_insensitive(
+                                                          stage.parent_advancement, tc_search_buffer)
+                                                      ||
+                                                      (stage.required_progress != 0 && strstr(
+                                                           target_val_str, tc_search_buffer) != nullptr);
+
+                                // Check stage icon path IF enabled
+                                bool icon_match = false;
+                                if (goal.use_stage_icons) {
+                                    icon_match = str_contains_insensitive(stage.icon_path, tc_search_buffer);
+                                }
+
+                                // If neither matches, skip this stage
+                                if (!standard_match && !icon_match) {
+                                    continue;
+                                }
+                            }
+
+                            ImGui::PushID(j);
+
+                            // Add some vertical spacing to create a gap
+                            ImGui::Spacing();
+
+                            // Use an invisible button as a drop target between items
+                            ImGui::InvisibleButton("drop_target", ImVec2(-1, 8.0f));
+                            if (ImGui::BeginDragDropTarget()) {
+                                if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("MS_STAGE_DND")) {
+                                    stage_dnd_source_index = *(const int *) payload->Data;
+                                    stage_dnd_target_index = j;
+                                }
+                                ImGui::EndDragDropTarget();
+                            }
+
+                            ImGui::Separator();
+
+                            // Group all stage controls to make them a single drag source
+                            ImGui::BeginGroup();
+                            if (ImGui::InputText("Stage ID", stage.stage_id, sizeof(stage.stage_id))) {
+                                ms_goal_data_changed = true;
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buffer[256];
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "A unique ID for this specific stage within the goal.");
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
+                            if (ImGui::InputText("Display Text", stage.display_text, sizeof(stage.display_text))) {
+                                ms_goal_data_changed = true;
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buffer[256];
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "The text that appears on the tracker/overlay for this stage.\n"
+                                         "For the 'Final' stage, put something like 'Stages Done!'.");
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
+                            // Conditional Icon Input per stage if enabled
+                            if (goal.use_stage_icons) {
+                                if (ImGui::InputText("Stage Icon", stage.icon_path, sizeof(stage.icon_path))) {
+                                    ms_goal_data_changed = true;
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char icon_path_tooltip_buffer[256];
+                                    snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                             "Path to the icon file for this specific stage,\n"
+                                             "relative to the 'resources/icons' directory.");
+                                    ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
+                                }
+                                ImGui::SameLine();
+                                if (ImGui::Button("Browse##StageIcon")) {
+                                    char new_path[MAX_PATH_LENGTH];
+                                    if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                        strncpy(stage.icon_path, new_path, sizeof(stage.icon_path) - 1);
+                                        stage.icon_path[sizeof(stage.icon_path) - 1] = '\0';
+                                        ms_goal_data_changed = true;
+                                        save_message_type = MSG_NONE;
+                                    }
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char icon_path_tooltip_buffer[128];
+                                    snprintf(icon_path_tooltip_buffer, sizeof(icon_path_tooltip_buffer),
+                                             "The icon must be inside the 'resources/icons' folder!");
+                                    ImGui::SetTooltip("%s", icon_path_tooltip_buffer);
+                                }
+                            }
+                            // --- Version-Aware Type Dropdown ---
+                            const char *current_type_name = "Unknown";
+                            switch (stage.type) {
+                                case SUBGOAL_STAT:
+                                    // Use the clearer "Stat / Achievement" label for older versions
+                                    current_type_name = (creator_selected_version <= MC_VERSION_1_11_2)
+                                                            ? "Stat / Achievement"
+                                                            : "Stat";
+                                    break;
+                                case SUBGOAL_ADVANCEMENT: current_type_name = advancements_label_upper;
+                                    break;
+                                case SUBGOAL_UNLOCK: current_type_name = "Unlock";
+                                    break;
+                                case SUBGOAL_CRITERION: current_type_name = "Criterion";
+                                    break;
+                                case SUBGOAL_MANUAL: current_type_name = "Final";
+                                    break;
+                            }
+
+                            if (ImGui::BeginCombo("Type", current_type_name)) {
+                                // Show "Stat / Achievement" for legacy and mid-era versions
+                                if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                    if (ImGui::Selectable("Stat / Achievement", stage.type == SUBGOAL_STAT)) {
+                                        stage.type = SUBGOAL_STAT;
+                                        ms_goal_data_changed = true;
+                                        save_message_type = MSG_NONE;
+                                    }
+                                }
+
+                                // Show plain "Stat" for modern versions
+                                if (creator_selected_version >= MC_VERSION_1_12) {
+                                    if (ImGui::Selectable("Stat", stage.type == SUBGOAL_STAT)) {
+                                        stage.type = SUBGOAL_STAT;
+                                        ms_goal_data_changed = true;
+                                        save_message_type = MSG_NONE;
+                                    }
+                                }
+
+                                // "Advancement" type is only available for 1.12+
+                                if (creator_selected_version >= MC_VERSION_1_12) {
+                                    if (ImGui::Selectable(advancements_label_upper,
+                                                          stage.type == SUBGOAL_ADVANCEMENT)) {
+                                        stage.type = SUBGOAL_ADVANCEMENT;
+                                        ms_goal_data_changed = true;
+                                        save_message_type = MSG_NONE;
+                                    }
+                                }
+
+                                // "Criterion" type is available from mid-era (1.7.2) onwards
+                                if (creator_selected_version >= MC_VERSION_1_7_2) {
+                                    if (ImGui::Selectable("Criterion", stage.type == SUBGOAL_CRITERION)) {
+                                        stage.type = SUBGOAL_CRITERION;
+                                        ms_goal_data_changed = true;
+                                        save_message_type = MSG_NONE;
+                                    }
+                                }
+
+                                // "Unlock" type is only for 25w14craftmine
+                                if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
+                                    if (ImGui::Selectable("Unlock", stage.type == SUBGOAL_UNLOCK)) {
+                                        stage.type = SUBGOAL_UNLOCK;
+                                        ms_goal_data_changed = true;
+                                        save_message_type = MSG_NONE;
+                                    }
+                                }
+
+                                // "Final" type is always available
+                                if (ImGui::Selectable("Final", stage.type == SUBGOAL_MANUAL)) {
+                                    stage.type = SUBGOAL_MANUAL;
+                                    ms_goal_data_changed = true;
+                                    save_message_type = MSG_NONE;
+                                }
+                                ImGui::EndCombo();
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char type_tooltip_buffer[256];
+                                if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                    // not modern
+                                    snprintf(type_tooltip_buffer, sizeof(type_tooltip_buffer),
+                                             "The type of event that will complete this stage.\n"
+                                             "%s count as stats.\n"
+                                             "There must be exactly one 'Final' stage ('Done!' - Stage),\n"
+                                             "and it must be the last stage.\n"
+                                             "Reaching the final stage completes the entire multi-stage goal.",
+                                             advancements_label_plural_upper);
+                                } else {
+                                    // modern
+                                    snprintf(type_tooltip_buffer, sizeof(type_tooltip_buffer),
+                                             "The type of event that will complete this stage.\n"
+                                             "%s can also be recipes.\n"
+                                             "There must be exactly one 'Final' stage ('Done!' - Stage),\n"
+                                             "and it must be the last stage.\n"
+                                             "Reaching the final stage completes the entire multi-stage goal.",
+                                             advancements_label_plural_upper);
+                                }
+                                ImGui::SetTooltip("%s", type_tooltip_buffer);
+                            }
+
+
+                            if (stage.type == SUBGOAL_CRITERION) {
+                                char parent_label[64];
+                                snprintf(parent_label, sizeof(parent_label), "Parent %s", advancements_label_upper);
+                                if (ImGui::InputText(parent_label, stage.parent_advancement,
+                                                     sizeof(stage.parent_advancement))) {
+                                    ms_goal_data_changed = true;
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip_buffer[512];
+                                    if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                        // Mid-era tooltip
+                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                 "The root name of the parent %s this criterion belongs to.\n"
+                                                 "e.g., 'achievement.exploreAllBiomes'",
+                                                 advancements_label_singular_lower);
+                                    } else {
+                                        // Modern tooltip
+                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                 "The root name of the parent %s this criterion belongs to.\n"
+                                                 "e.g., 'minecraft:husbandry/bred_all_animals'",
+                                                 advancements_label_singular_lower);
+                                    }
+                                    ImGui::SetTooltip("%s", tooltip_buffer);
+                                }
+                            }
+
+                            // "Final" stages don't need a target or Root Name
+                            if (stage.type != SUBGOAL_MANUAL) {
+                                if (ImGui::InputText("Trigger Root Name", stage.root_name, sizeof(stage.root_name))) {
+                                    ms_goal_data_changed = true;
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip_buffer[512];
+                                    if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                        // Legacy stage types
+                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                 "The root name of the stat (e.g., '2021' - Damage taken)\n"
+                                                 "or achievement (e.g., '5242902' - The End?) that triggers this stage's completion.");
+                                    } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                        // mid-era stage types
+                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                 "The root name of the stat (e.g., 'stat.craftItem.minecraft.stick')\n"
+                                                 "or achievement (e.g., 'achievement.ghast') or criterion (e.g., 'Extreme Hills+ M')\n"
+                                                 "that triggers this stage's completion.");
+                                    } else if (creator_selected_version <= MC_VERSION_1_12_2) {
+                                        // Mid-era stats, but modern advancements
+                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                 "The root name of the stat (e.g., 'stat.sneakTime'),\n"
+                                                 "advancement (e.g., 'minecraft:story/iron_tools')\n"
+                                                 "or criterion (e.g., 'cookie') that triggers this stage's completion.");
+                                    } else if (creator_selected_version == MC_VERSION_25W14CRAFTMINE) {
+                                        // craftmine stage types
+                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                 "The root name of the stat (e.g., 'minecraft:killed_by/minecraft:ravager'),\n"
+                                                 "advancement (e.g., 'minecraft:mines/special_mine_completed'),\n"
+                                                 "unlock (e.g., 'minecraft:fire_wand') or criterion (e.g., 'minecraft:runemaster')\n"
+                                                 "that triggers this stage's completion.");
+                                    } else {
+                                        // modern stage types without craftmine (1.13+)
+                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                 "The root name of the stat (e.g., 'minecraft:used/minecraft:acacia_boat'),\n"
+                                                 "advancement (e.g., 'minecraft:adventure/trim_with_all_exclusive_armor_patterns')\n"
+                                                 "or criterion (e.g., 'minecraft:lush_caves') that triggers this stage's completion.");
+                                    }
+                                    ImGui::SetTooltip("%s", tooltip_buffer);
+                                }
+
+                                ImGui::SameLine();
+                                if (ImGui::Button("Import##StageTrigger")) {
+                                    // Reset state for a new single-select import
+                                    current_import_mode = SINGLE_SELECT_STAGE; // One item selectable on import
+                                    stage_to_edit = &stage; // Remember which stage we're editing
+                                    import_search_buffer[0] = '\0';
+                                    importable_advancements.clear();
+                                    importable_stats.clear();
+                                    importable_unlocks.clear();
+
+                                    // Prepare to open the correct file dialog and popup
+                                    char start_path[MAX_PATH_LENGTH];
+                                    const char *selection = nullptr;
+
+                                    switch (stage.type) {
+                                        case SUBGOAL_STAT: {
+                                            if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                                if (app_settings->using_stats_per_world_legacy) {
+                                                    snprintf(start_path, sizeof(start_path), "%s/%s/stats/",
+                                                             t->saves_path,
+                                                             t->world_name);
+                                                } else if (get_parent_directory(
+                                                    t->saves_path, start_path, sizeof(start_path), 1)) {
+                                                    // Use a temporary buffer to prevent source/destination overlap
+                                                    char temp_parent_dir[MAX_PATH_LENGTH];
+                                                    strncpy(temp_parent_dir, start_path, sizeof(temp_parent_dir));
+                                                    temp_parent_dir[sizeof(temp_parent_dir) - 1] = '\0';
+                                                    snprintf(start_path, sizeof(start_path), "%s/stats/",
+                                                             temp_parent_dir);
+                                                }
+                                            } else {
+                                                // Mid-era (1.7.2 - 1.12.2) AND Modern (1.13+)
+                                                snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
+                                                         t->world_name);
+                                            }
+#ifdef __APPLE__
+                                            const char *json_filter[2] = {"*.json", "public.json"};
+                                            const char *dat_filter[2] = {"*.dat", "public.data"};
+                                            int filter_count = 2;
+#else
+                                            const char *json_filter[] = {"*.json"};
+                                            const char *dat_filter[] = {"*.dat"};
+                                            int filter_count = 1;
+#endif
+                                            selection = tinyfd_openFileDialog(
+                                                "Select Player Stats File", start_path, filter_count,
+                                                (creator_selected_version <= MC_VERSION_1_6_4)
+                                                    ? dat_filter
+                                                    : json_filter,
+                                                (creator_selected_version <= MC_VERSION_1_6_4)
+                                                    ? "DAT files"
+                                                    : "JSON files",
+                                                0);
+                                            if (selection && parse_player_stats_for_import(
+                                                    selection, creator_selected_version, importable_stats,
+                                                    import_error_message, sizeof(import_error_message))) {
+                                                show_import_stats_popup = true;
+                                            }
+                                            break;
+                                        }
+                                        case SUBGOAL_ADVANCEMENT:
+                                        case SUBGOAL_CRITERION: {
+                                            if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                                if (app_settings->using_stats_per_world_legacy) {
+                                                    snprintf(start_path, sizeof(start_path), "%s/%s/stats/",
+                                                             t->saves_path,
+                                                             t->world_name);
+                                                } else if (get_parent_directory(
+                                                    t->saves_path, start_path, sizeof(start_path), 1)) {
+                                                    // Use a temporary buffer to prevent source/destination overlap
+                                                    char temp_parent_dir[MAX_PATH_LENGTH];
+                                                    strncpy(temp_parent_dir, start_path, sizeof(temp_parent_dir));
+                                                    temp_parent_dir[sizeof(temp_parent_dir) - 1] = '\0';
+                                                    snprintf(start_path, sizeof(start_path), "%s/stats/",
+                                                             temp_parent_dir);
+                                                }
+                                            } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                                // Mid-era (1.7.2 - 1.11.2)
+                                                snprintf(start_path, sizeof(start_path), "%s/%s/stats/", t->saves_path,
+                                                         t->world_name);
+                                            } else {
+                                                // Criterion are 1.12+
+                                                snprintf(start_path, sizeof(start_path), "%s/%s/advancements/",
+                                                         t->saves_path, t->world_name);
+                                            }
+#ifdef __APPLE__
+                                            const char *json_filter[2] = {"*.json", "public.json"};
+                                            const char *dat_filter[2] = {"*.dat", "public.data"};
+                                            int filter_count = 2;
+#else
+                                            const char *json_filter[] = {"*.json"};
+                                            const char *dat_filter[] = {"*.dat"};
+                                            int filter_count = 1;
+#endif
+                                            selection = tinyfd_openFileDialog(
+                                                "Select Player File", start_path, filter_count,
+                                                (creator_selected_version <= MC_VERSION_1_6_4)
+                                                    ? dat_filter
+                                                    : json_filter,
+                                                (creator_selected_version <= MC_VERSION_1_6_4)
+                                                    ? "DAT files"
+                                                    : "JSON files",
+                                                0);
+                                            if (selection && parse_player_advancements_for_import(
+                                                    selection, creator_selected_version, importable_advancements,
+                                                    import_error_message, sizeof(import_error_message))) {
+                                                show_import_advancements_popup = true;
+                                                // Set search mode based on the type of trigger being imported
+                                                if (stage_to_edit->type == SUBGOAL_ADVANCEMENT) {
+                                                    import_search_criteria_only = false;
+                                                    // Default to advancement search
+                                                } else if (stage_to_edit->type == SUBGOAL_CRITERION) {
+                                                    import_search_criteria_only = true; // Default to criterion search
+                                                }
+                                            }
+                                            break;
+                                        }
+                                        case SUBGOAL_UNLOCK: {
+                                            snprintf(start_path, sizeof(start_path), "%s/%s/unlocks/", t->saves_path,
+                                                     t->world_name);
+#ifdef __APPLE__
+                                            const char *filter_patterns[2] = {"*.json", "public.json"};
+                                            int filter_count = 2;
+#else
+                                            const char *filter_patterns[1] = {"*.json"};
+                                            int filter_count = 1;
+#endif
+                                            selection = tinyfd_openFileDialog(
+                                                "Select Player Unlocks File", start_path, filter_count, filter_patterns,
+                                                "JSON files",
+                                                0);
+                                            if (selection && parse_player_unlocks_for_import(
+                                                    selection, importable_unlocks, import_error_message,
+                                                    sizeof(import_error_message))) {
+                                                show_import_unlocks_popup = true;
+                                            }
+                                            break;
+                                        }
+                                        default:
+                                            break;
+                                    }
+                                    if (selection && !show_import_stats_popup && !show_import_advancements_popup && !
+                                        show_import_unlocks_popup) {
+                                        save_message_type = MSG_ERROR;
+                                        strncpy(status_message, import_error_message, sizeof(status_message) - 1);
+                                    }
+                                }
+
+                                // Import Stage Tooltip
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip_buffer[512];
+                                    switch (stage.type) {
+                                        case SUBGOAL_STAT:
+                                            if (creator_selected_version <= MC_VERSION_1_6_4) {
+                                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                         "Select a single stat or achievement from a\n"
+                                                         "player's .dat file to use as a trigger.");
+                                            } else if (creator_selected_version <= MC_VERSION_1_11_2) {
+                                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                         "Select a single stat or achievement from a\n"
+                                                         "player's .json file to use as a trigger.");
+                                            } else {
+                                                // mid-era stats and modern achievements (1.12+) and modern (1.13+)
+                                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                         "Select a single stat from a\n"
+                                                         "player's .json file to use as a trigger.");
+                                            }
+                                            break;
+                                        case SUBGOAL_ADVANCEMENT:
+                                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                     "Select a single advancement or recipe from a\n"
+                                                     "player's .json file to use as a trigger.");
+                                            break;
+                                        case SUBGOAL_CRITERION:
+                                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                     "Select a single criterion from a player's file.\n"
+                                                     "The parent and criterion fields will be filled in automatically.");
+                                            break;
+                                        case SUBGOAL_UNLOCK:
+                                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                     "Select a single unlock from a\n"
+                                                     "player's .json file to use as a trigger.");
+                                            break;
+                                        default:
+                                            // This case should not be reachable as the button is not rendered for SUBGOAL_MANUAL.
+                                            strncpy(tooltip_buffer, "Import a value from a player file.",
+                                                    sizeof(tooltip_buffer) - 1);
+                                            tooltip_buffer[sizeof(tooltip_buffer) - 1] = '\0';
+                                            break;
+                                    }
+                                    ImGui::SetTooltip("%s", tooltip_buffer);
+                                }
+
+                                // Only show target value for stat/achievements
+                                if (stage.type == SUBGOAL_STAT) {
+                                    if (ImGui::InputInt("Target Value", &stage.required_progress)) {
+                                        if (stage.required_progress < 1) {
+                                            stage.required_progress = 1; // Clamp to minimum of 1
+                                        }
+                                        ms_goal_data_changed = true;
+                                        save_message_type = MSG_NONE;
+                                    }
+                                    if (ImGui::IsItemHovered()) {
+                                        char tooltip_buffer[256];
+                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                 "For 'Stat' type stages, this is the value the stat must reach to complete the stage.\n"
+                                                 "Must be 1 or greater.");
+                                        ImGui::SetTooltip("%s", tooltip_buffer);
+                                    }
+                                }
+                            }
+
+                            if (ImGui::Button("Copy")) {
+                                stage_to_copy = j;
+                                ms_goal_data_changed = true;
+                                save_message_type = MSG_NONE;
+                            }
+
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buffer[128];
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Stage:\n%s",
+                                         stage.stage_id);
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
+
+                            ImGui::SameLine();
+
+                            if (ImGui::Button("Remove")) {
+                                stage_to_remove = j;
+                                ms_goal_data_changed = true;
+                                save_message_type = MSG_NONE;
+                            }
+
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buffer[128];
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Stage:\n%s", stage.stage_id);
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
+
+                            ImGui::SameLine();
+
+                            // --- Sort Badge (Stage) ---
+                            char stage_badge_label[64];
+                            if (stage.sort_order > 0) {
+                                snprintf(stage_badge_label, sizeof(stage_badge_label), "%d##stage_badge_%zu",
+                                         stage.sort_order, j);
+                            } else {
+                                snprintf(stage_badge_label, sizeof(stage_badge_label), " - ##stage_badge_%zu", j);
+                            }
+
+                            const char *stage_text_end = strstr(stage_badge_label, "##");
+                            float stage_text_w = ImGui::CalcTextSize(stage_badge_label, stage_text_end).x;
+                            float stage_badge_w = std::max(
+                                28.0f, stage_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
+
+                            if (ImGui::Button(stage_badge_label, ImVec2(stage_badge_w, 0))) {
+                                if (stage.sort_order > 0)
+                                    stage.sort_order = 0;
+                                else stage.sort_order = get_next_sort_order(goal.stages);
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buffer[128];
+                                if (stage.sort_order > 0) {
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "Click to remove stage sort order");
+                                } else {
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "Click to assign stage sort order");
+                                }
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
+                            ImGui::EndGroup();
+
+                            ImGui::SameLine();
+                            // To make a non-interactive item a drag source we use the flag
+                            if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
+                                ImGui::SetDragDropPayload("MS_STAGE_DND", &j, sizeof(int));
+                                ImGui::Text("Reorder Stage: %s", stage.stage_id);
+                                ImGui::EndDragDropSource();
+                            }
+
+                            ImGui::PopID();
+                        }
+
+                        // Final drop target for the end of the list
+                        ImGui::InvisibleButton("final_drop_target_stage", ImVec2(-1, 8.0f)); // Added larger drop zone
+                        if (ImGui::BeginDragDropTarget()) {
+                            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("MS_STAGE_DND")) {
+                                stage_dnd_source_index = *(const int *) payload->Data;
+                                stage_dnd_target_index = goal.stages.size();
+                            }
+                            ImGui::EndDragDropTarget();
+                        }
+
+                        // Handle stage reordering after the loop
+                        if (stage_dnd_source_index != -1 && stage_dnd_target_index != -1 && stage_dnd_source_index !=
+                            stage_dnd_target_index) {
+                            EditorSubGoal item_to_move = goal.stages[stage_dnd_source_index];
+                            goal.stages.erase(goal.stages.begin() + stage_dnd_source_index);
+                            if (stage_dnd_target_index > stage_dnd_source_index) stage_dnd_target_index--;
+                            goal.stages.insert(goal.stages.begin() + stage_dnd_target_index, item_to_move);
+                            ms_goal_data_changed = true;
+                            save_message_type = MSG_NONE;
+                        }
+
+                        if (stage_to_remove != -1) {
+                            goal.stages.erase(goal.stages.begin() + stage_to_remove);
+                            ms_goal_data_changed = true;
+                            save_message_type = MSG_NONE;
+                        }
+
+                        // Logic to handle stage copy action after the loop
+                        if (stage_to_copy != -1) {
+                            const auto &source_stage = goal.stages[stage_to_copy];
+
+                            // Perform a manual, safe copy.
+                            EditorSubGoal new_stage;
+                            strncpy(new_stage.stage_id, source_stage.stage_id, sizeof(new_stage.stage_id));
+                            new_stage.stage_id[sizeof(new_stage.stage_id) - 1] = '\0';
+                            strncpy(new_stage.display_text, source_stage.display_text, sizeof(new_stage.display_text));
+                            new_stage.display_text[sizeof(new_stage.display_text) - 1] = '\0';
+                            strncpy(new_stage.icon_path, source_stage.icon_path, sizeof(new_stage.icon_path));
+                            new_stage.icon_path[sizeof(new_stage.icon_path) - 1] = '\0';
+                            strncpy(new_stage.parent_advancement, source_stage.parent_advancement,
+                                    sizeof(new_stage.parent_advancement));
+                            new_stage.parent_advancement[sizeof(new_stage.parent_advancement) - 1] = '\0';
+                            strncpy(new_stage.root_name, source_stage.root_name, sizeof(new_stage.root_name));
+                            new_stage.root_name[sizeof(new_stage.root_name) - 1] = '\0';
+                            new_stage.type = source_stage.type;
+                            new_stage.required_progress = source_stage.required_progress;
+
+                            new_stage.sort_order = 0;
+
+                            // If the source was the Final (SUBGOAL_MANUAL) stage, the copy cannot also be Final
+                            // Reset it to SUBGOAL_STAT
+                            if (new_stage.type == SUBGOAL_MANUAL) {
+                                new_stage.type = SUBGOAL_STAT;
+                                new_stage.required_progress = 1; // sensible default for a stat stage
+                            }
+
+                            char base_name[64];
+                            strncpy(base_name, source_stage.stage_id, sizeof(base_name) - 1);
+                            base_name[sizeof(base_name) - 1] = '\0';
+                            char new_id[64];
+                            int copy_counter = 1;
+                            while (true) {
+                                if (copy_counter == 1) snprintf(new_id, sizeof(new_id), "%s_copy", base_name);
+                                else snprintf(new_id, sizeof(new_id), "%s_copy%d", base_name, copy_counter);
+                                bool id_exists = false;
+                                for (const auto &s: goal.stages) {
+                                    if (strcmp(s.stage_id, new_id) == 0) {
+                                        id_exists = true;
+                                        break;
+                                    }
+                                }
+                                if (!id_exists) break;
+                                copy_counter++;
+                            }
+                            strncpy(new_stage.stage_id, new_id, sizeof(new_stage.stage_id) - 1);
+                            new_stage.stage_id[sizeof(new_stage.stage_id) - 1] = '\0';
+                            goal.stages.insert(goal.stages.begin() + stage_to_copy + 1, new_stage);
+                            ms_goal_data_changed = true;
+                            save_message_type = MSG_NONE;
+                        }
+                    } else {
+                        ImGui::Text("Select a Multi-Stage Goal from the list to edit its details.");
+                    }
+                    ImGui::EndChild();
+
+                    // Call the synchronization function at the end of the tab if changes were made
+                    // Properly synchronize hidden legacy multi-stage goal stats
+                    if (ms_goal_data_changed && creator_selected_version <= MC_VERSION_1_6_4) {
+                        synchronize_legacy_ms_goal_stats(current_template_data);
+                    }
+
+                    ImGui::EndTabItem();
+                }
+            } // end multi-stage goals tab scope
+
+            // ==================== DECORATIONS TAB ====================
+            {
+                ImGuiTabItemFlags deco_tab_flags = (force_select_tab == FORCE_TAB_DECORATIONS)
+                                                       ? ImGuiTabItemFlags_SetSelected
+                                                       : 0;
+                if (force_select_tab == FORCE_TAB_DECORATIONS) force_select_tab = FORCE_TAB_NONE;
+                if (ImGui::BeginTabItem("Decorations", nullptr, deco_tab_flags)) {
+                    if (ImGui::Button("Add Text Header")) {
+                        EditorDecorationElement new_elem = {};
+                        new_elem.type = DECORATION_TEXT_HEADER;
+                        int counter = 1;
+                        while (true) {
+                            snprintf(new_elem.id, sizeof(new_elem.id), "header_%d", counter);
+                            bool id_exists = false;
+                            for (const auto &deco: current_template_data.decorations) {
+                                if (strcmp(deco.id, new_elem.id) == 0) {
+                                    id_exists = true;
+                                    break;
+                                }
+                            }
+                            if (!id_exists) break;
+                            counter++;
+                        }
+                        snprintf(new_elem.display_text, sizeof(new_elem.display_text), "Header %d", counter);
+                        current_template_data.decorations.push_back(new_elem);
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[256];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Add a text header decoration to the manual layout.\n"
+                                 "Text headers use the Tracker Font and Tracker Font Size.");
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+
+                    // --- Sorting Controls ---
+                    bool can_sort_decos = false;
+                    for (const auto &deco: current_template_data.decorations) {
+                        if (deco.sort_order > 0) {
+                            can_sort_decos = true;
+                            break;
+                        }
+                    }
+
+                    float sort_btn_width = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                    float reset_btn_width = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x *
+                                            2.0f;
+                    float total_buttons_width = sort_btn_width + reset_btn_width + ImGui::GetStyle().ItemSpacing.x;
+                    ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_buttons_width);
+
+                    ImGui::BeginDisabled(!can_sort_decos);
+                    if (ImGui::Button("Sort##decorations")) {
+                        apply_partial_sort(current_template_data.decorations);
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tooltip_buffer[128];
+                        if (!can_sort_decos) {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Click the order badges next to decorations to assign a sort order first.");
+                        } else {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Rearrange the numbered decorations among themselves.");
+                        }
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Reset Order##decorations")) {
+                        for (auto &deco: current_template_data.decorations) deco.sort_order = 0;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tooltip_buffer[128];
+                        if (!can_sort_decos) {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
+                        } else {
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Clear all assigned sort orders from decorations.");
+                        }
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+                    ImGui::EndDisabled();
+                    ImGui::NewLine();
+
+                    // --- Search filter ---
+                    bool is_deco_search_active = (
+                        current_search_scope == SCOPE_DECORATIONS && tc_search_buffer[0] != '\0');
+
+                    // --- Counter ---
+                    char counter_text[128];
+                    size_t deco_count = 0;
+                    if (!is_deco_search_active) {
+                        deco_count = current_template_data.decorations.size();
+                    } else {
+                        for (const auto &deco: current_template_data.decorations) {
+                            const char *type_str = (deco.type == DECORATION_TEXT_HEADER) ? "Text Header" : "Unknown";
+                            if (str_contains_insensitive(deco.display_text, tc_search_buffer) ||
+                                str_contains_insensitive(deco.id, tc_search_buffer) ||
+                                str_contains_insensitive(type_str, tc_search_buffer)) {
+                                deco_count++;
+                            }
+                        }
+                    }
+                    snprintf(counter_text, sizeof(counter_text), "%zu %s", deco_count,
+                             deco_count == 1 ? "Decoration" : "Decorations");
+                    float text_width = ImGui::CalcTextSize(counter_text).x;
+                    ImGui::SameLine(ImGui::GetContentRegionAvail().x - text_width);
+                    ImGui::TextDisabled("%s", counter_text);
+
+                    int deco_to_remove = -1;
+                    int deco_to_copy = -1;
+                    int deco_dnd_source_index = -1;
+                    int deco_dnd_target_index = -1;
+
+                    for (size_t i = 0; i < current_template_data.decorations.size(); i++) {
+                        auto &deco = current_template_data.decorations[i];
+
+                        // SEARCH FILTER
+                        if (is_deco_search_active) {
+                            const char *type_str = (deco.type == DECORATION_TEXT_HEADER) ? "Text Header" : "Unknown";
+                            if (!str_contains_insensitive(deco.display_text, tc_search_buffer) &&
+                                !str_contains_insensitive(deco.id, tc_search_buffer) &&
+                                !str_contains_insensitive(type_str, tc_search_buffer)) {
+                                continue;
+                            }
+                        }
+
+                        ImGui::PushID((int) i);
+
+                        // Vertical spacing gap
+                        ImGui::Spacing();
+
+                        // Drop zone between items
+                        ImGui::InvisibleButton("drop_target", ImVec2(-1, 8.0f));
+                        if (ImGui::BeginDragDropTarget()) {
+                            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("DECO_DND")) {
+                                deco_dnd_source_index = *(const int *) payload->Data;
+                                deco_dnd_target_index = (int) i;
+                            }
+                            ImGui::EndDragDropTarget();
+                        }
+
+                        ImGui::Separator();
+
+                        ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
+                        ImGui::BeginGroup();
+
+                        // Type display
+                        const char *type_str = "Unknown";
+                        switch (deco.type) {
+                            case DECORATION_TEXT_HEADER: type_str = "Text Header";
+                                break;
+                        }
+                        ImGui::TextDisabled("Type: %s", type_str);
+
+                        // ID field
+                        if (ImGui::InputText("ID", deco.id, sizeof(deco.id))) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char id_tooltip_buffer[256];
+                            snprintf(id_tooltip_buffer, sizeof(id_tooltip_buffer),
+                                     "Unique identifier for this decoration element.\n"
+                                     "Used internally and in the language file.");
+                            ImGui::SetTooltip("%s", id_tooltip_buffer);
+                        }
+
+                        // Display text (for text headers)
+                        if (deco.type == DECORATION_TEXT_HEADER) {
+                            if (ImGui::InputText("Display Text", deco.display_text, sizeof(deco.display_text))) {
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char display_text_tooltip_buffer[256];
+                                snprintf(display_text_tooltip_buffer, sizeof(display_text_tooltip_buffer),
+                                         "The text to display on the tracker map.\n"
+                                         "Uses the Tracker Font and Tracker Font Size.");
+                                ImGui::SetTooltip("%s", display_text_tooltip_buffer);
+                            }
+                        }
+
+                        // Copy button
+                        if (ImGui::Button("Copy")) {
+                            deco_to_copy = (int) i;
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate Decoration:\n%s", deco.id);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+
+                        // Remove button
+                        if (ImGui::Button("Remove")) {
+                            deco_to_remove = (int) i;
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove Decoration:\n%s", deco.id);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+
+                        ImGui::SameLine();
+
+                        // --- Sort Badge ---
+                        char badge_label[32];
+                        if (deco.sort_order > 0) {
+                            snprintf(badge_label, sizeof(badge_label), "%d##badge_%zu", deco.sort_order, i);
+                        } else {
+                            snprintf(badge_label, sizeof(badge_label), " - ##badge_%zu", i);
+                        }
+
+                        const char *text_end = strstr(badge_label, "##");
+                        float badge_text_width = ImGui::CalcTextSize(badge_label, text_end).x;
+                        float badge_width = std::max(28.0f, badge_text_width + ImGui::GetStyle().FramePadding.x * 4.0f);
+
+                        if (ImGui::Button(badge_label, ImVec2(badge_width, 0))) {
+                            if (deco.sort_order > 0) deco.sort_order = 0;
+                            else deco.sort_order = get_next_sort_order(current_template_data.decorations);
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            if (deco.sort_order > 0) {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Click to remove decoration sort order");
+                            } else {
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Click to assign decoration sort order");
+                            }
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+
+                        // Layout coordinates (collapsible)
+                        if (render_layout_coordinates_header("decoration",
+                                                             force_open_header_root_name[0] != '\0' && strcmp(
+                                                                 deco.id, force_open_header_root_name) == 0)) {
+                            render_manual_pos_ui("d_pos", "decoration", "Position", &deco.pos,
+                                                 save_message_type);
+                        }
+
+                        ImGui::EndGroup();
+
+                        // Drag-and-drop source overlay
+                        ImGui::SameLine();
+                        ImGui::SetCursorScreenPos(item_start_cursor_pos);
+                        ImGui::InvisibleButton("dnd_handle", ImGui::GetItemRectSize());
+
+                        if (ImGui::BeginDragDropSource()) {
+                            ImGui::SetDragDropPayload("DECO_DND", &i, sizeof(int));
+                            ImGui::Text("Reorder %s", deco.id);
+                            ImGui::EndDragDropSource();
+                        }
+
+                        ImGui::PopID();
+                    }
+
+                    // Final drop target at end of list
+                    ImGui::InvisibleButton("final_drop_target_decos", ImVec2(-1, 8.0f));
+                    if (ImGui::BeginDragDropTarget()) {
+                        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("DECO_DND")) {
+                            deco_dnd_source_index = *(const int *) payload->Data;
+                            deco_dnd_target_index = (int) current_template_data.decorations.size();
+                        }
+                        ImGui::EndDragDropTarget();
+                    }
+
+                    // Process drag-and-drop reorder
+                    if (deco_dnd_source_index != -1 && deco_dnd_target_index != -1 &&
+                        deco_dnd_source_index != deco_dnd_target_index) {
+                        EditorDecorationElement item_to_move = current_template_data.decorations[deco_dnd_source_index];
+                        current_template_data.decorations.erase(
+                            current_template_data.decorations.begin() + deco_dnd_source_index);
+                        if (deco_dnd_target_index > deco_dnd_source_index) deco_dnd_target_index--;
+                        current_template_data.decorations.insert(
+                            current_template_data.decorations.begin() + deco_dnd_target_index, item_to_move);
+                        save_message_type = MSG_NONE;
+                    }
+
+                    // Process removal
+                    if (deco_to_remove != -1) {
+                        current_template_data.decorations.erase(
+                            current_template_data.decorations.begin() + deco_to_remove);
+                        save_message_type = MSG_NONE;
+                    }
+
+                    // Process copy
+                    if (deco_to_copy != -1) {
+                        const auto &source = current_template_data.decorations[deco_to_copy];
+                        EditorDecorationElement new_elem = {};
+                        new_elem.type = source.type;
+                        strncpy(new_elem.display_text, source.display_text, sizeof(new_elem.display_text));
+                        new_elem.display_text[sizeof(new_elem.display_text) - 1] = '\0';
+                        new_elem.pos = source.pos;
+                        new_elem.sort_order = 0;
+
+                        // Generate unique ID
+                        char base_id[64];
+                        strncpy(base_id, source.id, sizeof(base_id) - 1);
+                        base_id[sizeof(base_id) - 1] = '\0';
                         char new_id[64];
                         int copy_counter = 1;
                         while (true) {
-                            if (copy_counter == 1) snprintf(new_id, sizeof(new_id), "%s_copy", base_name);
-                            else snprintf(new_id, sizeof(new_id), "%s_copy%d", base_name, copy_counter);
+                            if (copy_counter == 1) snprintf(new_id, sizeof(new_id), "%s_copy", base_id);
+                            else snprintf(new_id, sizeof(new_id), "%s_copy%d", base_id, copy_counter);
                             bool id_exists = false;
-                            for (const auto &s: goal.stages) {
-                                if (strcmp(s.stage_id, new_id) == 0) {
+                            for (const auto &d: current_template_data.decorations) {
+                                if (strcmp(d.id, new_id) == 0) {
                                     id_exists = true;
                                     break;
                                 }
@@ -8133,26 +8726,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (!id_exists) break;
                             copy_counter++;
                         }
-                        strncpy(new_stage.stage_id, new_id, sizeof(new_stage.stage_id) - 1);
-                        new_stage.stage_id[sizeof(new_stage.stage_id) - 1] = '\0';
-                        goal.stages.insert(goal.stages.begin() + stage_to_copy + 1, new_stage);
-                        ms_goal_data_changed = true;
+                        strncpy(new_elem.id, new_id, sizeof(new_elem.id) - 1);
+                        new_elem.id[sizeof(new_elem.id) - 1] = '\0';
+                        current_template_data.decorations.insert(
+                            current_template_data.decorations.begin() + deco_to_copy + 1, new_elem);
                         save_message_type = MSG_NONE;
                     }
-                } else {
-                    ImGui::Text("Select a Multi-Stage Goal from the list to edit its details.");
-                }
-                ImGui::EndChild();
 
-                // Call the synchronization function at the end of the tab if changes were made
-                // Properly synchronize hidden legacy multi-stage goal stats
-                if (ms_goal_data_changed && creator_selected_version <= MC_VERSION_1_6_4) {
-                    synchronize_legacy_ms_goal_stats(current_template_data);
+                    ImGui::EndTabItem();
                 }
-
-                ImGui::EndTabItem();
-            }
-            } // end multi-stage goals tab scope
+            } // end decorations tab scope
             ImGui::EndTabBar();
         }
         ImGui::PopID();
