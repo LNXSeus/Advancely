@@ -200,7 +200,10 @@ struct EditorDecorationElement {
     char id[64];
     DecorationType type;
     char display_text[192]; // For text headers
-    ManualPos pos = {};
+    ManualPos pos = {};        // Text headers and first endpoint for lines
+    ManualPos pos2 = {};       // Second endpoint for lines
+    float thickness = 2.0f;    // Line thickness in pixels (before zoom)
+    float opacity = 1.0f;      // Line opacity 0.0-1.0
     int sort_order = 0;
 };
 
@@ -975,6 +978,8 @@ static void parse_editor_decorations(cJSON *json_array, std::vector<EditorDecora
         if (cJSON_IsString(type_json)) {
             if (strcmp(type_json->valuestring, "text_header") == 0) {
                 new_elem.type = DECORATION_TEXT_HEADER;
+            } else if (strcmp(type_json->valuestring, "line") == 0) {
+                new_elem.type = DECORATION_LINE;
             }
         }
 
@@ -995,6 +1000,19 @@ static void parse_editor_decorations(cJSON *json_array, std::vector<EditorDecora
                 }
             }
             new_elem.display_text[sizeof(new_elem.display_text) - 1] = '\0';
+        }
+
+        // Line fields
+        if (new_elem.type == DECORATION_LINE) {
+            cJSON *thickness_json = cJSON_GetObjectItem(item_json, "thickness");
+            if (cJSON_IsNumber(thickness_json)) new_elem.thickness = (float) thickness_json->valuedouble;
+            else new_elem.thickness = 2.0f;
+
+            cJSON *opacity_json = cJSON_GetObjectItem(item_json, "opacity");
+            if (cJSON_IsNumber(opacity_json)) new_elem.opacity = (float) opacity_json->valuedouble;
+            else new_elem.opacity = 1.0f;
+
+            parse_editor_manual_pos(item_json, "pos2", &new_elem.pos2);
         }
 
         parse_editor_manual_pos(item_json, "pos", &new_elem.pos);
@@ -1242,7 +1260,13 @@ static void serialize_editor_decorations(cJSON *parent,
             case DECORATION_TEXT_HEADER:
                 cJSON_AddStringToObject(item_json, "type", "text_header");
                 break;
-                // Future: DECORATION_LINE, DECORATION_ARROW
+            case DECORATION_LINE:
+                cJSON_AddStringToObject(item_json, "type", "line");
+                cJSON_AddNumberToObject(item_json, "thickness", elem.thickness);
+                cJSON_AddNumberToObject(item_json, "opacity", elem.opacity);
+                save_editor_manual_pos(item_json, "pos2", elem.pos2);
+                break;
+                // Future: DECORATION_ARROW
         }
 
         save_editor_manual_pos(item_json, "pos", elem.pos);
@@ -1669,7 +1693,7 @@ static bool render_layout_coordinates_header(const char *goal_type_name, bool fo
 
 // Helper to render collapsible coordinate fields in the details panes, currently used for manual goal placement coords
 static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_name, const char *pos_type,
-                                 ManualPos *pos, SaveMessageType &save_msg) {
+                                 ManualPos *pos, SaveMessageType &save_msg, bool hide_anchor = false) {
     ImGui::PushID(label_id);
 
     bool was_set = pos->is_set;
@@ -1713,20 +1737,22 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
             ImGui::SetTooltip("%s", tooltip);
         }
 
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(110);
-        int current_anchor = (int) pos->anchor;
-        if (ImGui::Combo("Anchor", &current_anchor, anchor_point_labels, IM_ARRAYSIZE(anchor_point_labels))) {
-            pos->anchor = (AnchorPoint) current_anchor;
-            save_msg = MSG_NONE;
-        }
-        if (ImGui::IsItemHovered()) {
-            char tooltip[256];
-            snprintf(tooltip, sizeof(tooltip),
-                     "The reference point on this %s's bounding box.\n"
-                     "Coordinates are relative to this anchor point.",
-                     pos_type);
-            ImGui::SetTooltip("%s", tooltip);
+        if (!hide_anchor) {
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(110);
+            int current_anchor = (int) pos->anchor;
+            if (ImGui::Combo("Anchor", &current_anchor, anchor_point_labels, IM_ARRAYSIZE(anchor_point_labels))) {
+                pos->anchor = (AnchorPoint) current_anchor;
+                save_msg = MSG_NONE;
+            }
+            if (ImGui::IsItemHovered()) {
+                char tooltip[256];
+                snprintf(tooltip, sizeof(tooltip),
+                         "The reference point on this %s's bounding box.\n"
+                         "Coordinates are relative to this anchor point.",
+                         pos_type);
+                ImGui::SetTooltip("%s", tooltip);
+            }
         }
 
         ImGui::SameLine();
@@ -3304,6 +3330,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (t->template_data->decorations[i] && strcmp(
                             ed_deco.id, t->template_data->decorations[i]->id) == 0) {
                         sync_pos(ed_deco.pos, t->template_data->decorations[i]->pos);
+                        if (ed_deco.type == DECORATION_LINE) {
+                            sync_pos(ed_deco.pos2, t->template_data->decorations[i]->pos2);
+                            // Push editor values to runtime to prevent flickering on template reload
+                            t->template_data->decorations[i]->thickness = ed_deco.thickness;
+                            t->template_data->decorations[i]->opacity = ed_deco.opacity;
+                        }
                     }
                 }
             }
@@ -3475,6 +3507,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (t->template_data->decorations[i] && strcmp(
                             ed_deco.id, t->template_data->decorations[i]->id) == 0) {
                         reverse_sync_pos(ed_deco.pos, t->template_data->decorations[i]->pos);
+                        if (ed_deco.type == DECORATION_LINE) {
+                            reverse_sync_pos(ed_deco.pos2, t->template_data->decorations[i]->pos2);
+                            t->template_data->decorations[i]->thickness = ed_deco.thickness;
+                            t->template_data->decorations[i]->opacity = ed_deco.opacity;
+                        }
                     }
                 }
             }
@@ -8418,6 +8455,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                        : 0;
                 if (force_select_tab == FORCE_TAB_DECORATIONS) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem("Decorations", nullptr, deco_tab_flags)) {
+                    // --- Add Decoration Buttons ---
                     if (ImGui::Button("Add Text Header")) {
                         EditorDecorationElement new_elem = {};
                         new_elem.type = DECORATION_TEXT_HEADER;
@@ -8443,6 +8481,36 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                  "Add a text header decoration to the manual layout.\n"
                                  "Text headers use the Tracker Font and Tracker Font Size.");
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+
+                    ImGui::SameLine();
+                    if (ImGui::Button("Add Line")) {
+                        EditorDecorationElement new_elem = {};
+                        new_elem.type = DECORATION_LINE;
+                        new_elem.thickness = 2.0f;
+                        new_elem.opacity = 1.0f;
+                        int counter = 1;
+                        while (true) {
+                            snprintf(new_elem.id, sizeof(new_elem.id), "line_%d", counter);
+                            bool id_exists = false;
+                            for (const auto &deco: current_template_data.decorations) {
+                                if (strcmp(deco.id, new_elem.id) == 0) {
+                                    id_exists = true;
+                                    break;
+                                }
+                            }
+                            if (!id_exists) break;
+                            counter++;
+                        }
+                        current_template_data.decorations.push_back(new_elem);
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[256];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Add a line decoration to the manual layout.\n"
+                                 "Lines use the Tracker Font Color with separate opacity.");
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
 
@@ -8505,7 +8573,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         deco_count = current_template_data.decorations.size();
                     } else {
                         for (const auto &deco: current_template_data.decorations) {
-                            const char *type_str = (deco.type == DECORATION_TEXT_HEADER) ? "Text Header" : "Unknown";
+                            const char *type_str = "Unknown";
+                            if (deco.type == DECORATION_TEXT_HEADER) type_str = "Text Header";
+                            else if (deco.type == DECORATION_LINE) type_str = "Line";
                             if (str_contains_insensitive(deco.display_text, tc_search_buffer) ||
                                 str_contains_insensitive(deco.id, tc_search_buffer) ||
                                 str_contains_insensitive(type_str, tc_search_buffer)) {
@@ -8529,7 +8599,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         // SEARCH FILTER
                         if (is_deco_search_active) {
-                            const char *type_str = (deco.type == DECORATION_TEXT_HEADER) ? "Text Header" : "Unknown";
+                            const char *type_str = "Unknown";
+                            if (deco.type == DECORATION_TEXT_HEADER) type_str = "Text Header";
+                            else if (deco.type == DECORATION_LINE) type_str = "Line";
                             if (!str_contains_insensitive(deco.display_text, tc_search_buffer) &&
                                 !str_contains_insensitive(deco.id, tc_search_buffer) &&
                                 !str_contains_insensitive(type_str, tc_search_buffer)) {
@@ -8557,13 +8629,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
                         ImGui::BeginGroup();
 
-                        // Type display
-                        const char *type_str = "Unknown";
-                        switch (deco.type) {
-                            case DECORATION_TEXT_HEADER: type_str = "Text Header";
-                                break;
+                        // Type display (read-only)
+                        {
+                            const char *type_str = "Unknown";
+                            if (deco.type == DECORATION_TEXT_HEADER) type_str = "Text Header";
+                            else if (deco.type == DECORATION_LINE) type_str = "Line";
+                            ImGui::TextDisabled("Type: %s", type_str);
                         }
-                        ImGui::TextDisabled("Type: %s", type_str);
 
                         // ID field
                         if (ImGui::InputText("ID", deco.id, sizeof(deco.id))) {
@@ -8588,6 +8660,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                          "The text to display on the tracker map.\n"
                                          "Uses the Tracker Font and Tracker Font Size.");
                                 ImGui::SetTooltip("%s", display_text_tooltip_buffer);
+                            }
+                        }
+
+                        // Line-specific fields
+                        if (deco.type == DECORATION_LINE) {
+                            if (ImGui::SliderFloat("Thickness", &deco.thickness, 0.1f, 20.0f, "%.1f px")) {
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buffer[128];
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Line thickness in pixels (before zoom scaling).");
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
+                            if (ImGui::SliderFloat("Opacity", &deco.opacity, 0.0f, 1.0f, "%.2f")) {
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buffer[128];
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Line opacity. Uses the Tracker Font Color.");
+                                ImGui::SetTooltip("%s", tooltip_buffer);
                             }
                         }
 
@@ -8648,8 +8742,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (render_layout_coordinates_header("decoration",
                                                              force_open_header_root_name[0] != '\0' && strcmp(
                                                                  deco.id, force_open_header_root_name) == 0)) {
-                            render_manual_pos_ui("d_pos", "decoration", "Position", &deco.pos,
-                                                 save_message_type);
+                            if (deco.type == DECORATION_LINE) {
+                                render_manual_pos_ui("d_pos", "decoration", "Endpoint 1", &deco.pos,
+                                                     save_message_type, true);
+                                render_manual_pos_ui("d_pos2", "decoration", "Endpoint 2", &deco.pos2,
+                                                     save_message_type, true);
+                            } else {
+                                render_manual_pos_ui("d_pos", "decoration", "Position", &deco.pos,
+                                                     save_message_type);
+                            }
                         }
 
                         ImGui::EndGroup();
@@ -8705,6 +8806,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         strncpy(new_elem.display_text, source.display_text, sizeof(new_elem.display_text));
                         new_elem.display_text[sizeof(new_elem.display_text) - 1] = '\0';
                         new_elem.pos = source.pos;
+                        new_elem.pos2 = source.pos2;
+                        new_elem.thickness = source.thickness;
+                        new_elem.opacity = source.opacity;
                         new_elem.sort_order = 0;
 
                         // Generate unique ID

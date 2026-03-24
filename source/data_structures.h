@@ -330,19 +330,25 @@ struct MultiStageGoal {
 // --------- DECORATIONS (Manual Layout Elements) ---------
 
 enum DecorationType {
-    DECORATION_TEXT_HEADER = 0
-    // Future: DECORATION_LINE, DECORATION_ARROW
+    DECORATION_TEXT_HEADER = 0,
+    DECORATION_LINE
+    // Future: DECORATION_ARROW
 };
 
 // A decoration element for manual layout positioning (text headers, lines, arrows, etc.)
 struct DecorationElement {
-    char id[64]; // Unique ID, e.g., "header_1"
+    char id[64]; // Unique ID, e.g., "header_1", "line_1"
     DecorationType type;
 
     // Text Header fields
     char display_text[192]; // The user-facing text to render
 
-    ManualPos pos; // Position on the tracker map
+    ManualPos pos; // Position on the tracker map (text headers use this; lines use pos as endpoint 1)
+
+    // Line fields
+    ManualPos pos2;        // Second endpoint for lines
+    float thickness;       // Line thickness in pixels (before zoom)
+    float opacity;         // Line opacity 0.0-1.0
 };
 
 // The main container for all data loaded from the template files.

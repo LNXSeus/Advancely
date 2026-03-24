@@ -1922,8 +1922,10 @@ static void tracker_parse_decorations(cJSON *decorations_json, cJSON *lang_json,
         if (cJSON_IsString(type_json)) {
             if (strcmp(type_json->valuestring, "text_header") == 0) {
                 elem->type = DECORATION_TEXT_HEADER;
+            } else if (strcmp(type_json->valuestring, "line") == 0) {
+                elem->type = DECORATION_LINE;
             }
-            // Future: else if "line", "arrow", etc.
+            // Future: else if "arrow"
         }
 
         // Parse display text from lang file, falling back to template
@@ -1944,6 +1946,19 @@ static void tracker_parse_decorations(cJSON *decorations_json, cJSON *lang_json,
                 }
             }
             elem->display_text[sizeof(elem->display_text) - 1] = '\0';
+        }
+
+        // Line fields
+        if (elem->type == DECORATION_LINE) {
+            cJSON *thickness_json = cJSON_GetObjectItem(item_json, "thickness");
+            if (cJSON_IsNumber(thickness_json)) elem->thickness = (float) thickness_json->valuedouble;
+            else elem->thickness = 2.0f;
+
+            cJSON *opacity_json = cJSON_GetObjectItem(item_json, "opacity");
+            if (cJSON_IsNumber(opacity_json)) elem->opacity = (float) opacity_json->valuedouble;
+            else elem->opacity = 1.0f;
+
+            parse_manual_pos(item_json, "pos2", &elem->pos2);
         }
 
         // Parse position
@@ -6033,7 +6048,138 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                 }
                 break;
             }
-                // Future: case DECORATION_LINE, DECORATION_ARROW
+
+            case DECORATION_LINE: {
+                // Compute screen positions for both endpoints
+                float x1, y1, x2, y2;
+                if (elem->pos.is_set) {
+                    x1 = (elem->pos.x * t->zoom_level) + t->camera_offset.x;
+                    y1 = (elem->pos.y * t->zoom_level) + t->camera_offset.y;
+                } else {
+                    x1 = (100.0f * t->zoom_level) + t->camera_offset.x;
+                    y1 = (100.0f * t->zoom_level) + t->camera_offset.y;
+                }
+                if (elem->pos2.is_set) {
+                    x2 = (elem->pos2.x * t->zoom_level) + t->camera_offset.x;
+                    y2 = (elem->pos2.y * t->zoom_level) + t->camera_offset.y;
+                } else {
+                    x2 = (200.0f * t->zoom_level) + t->camera_offset.x;
+                    y2 = (100.0f * t->zoom_level) + t->camera_offset.y;
+                }
+
+                // Apply opacity to the tracker font color
+                ImU32 line_color = IM_COL32(settings->text_color.r, settings->text_color.g,
+                                            settings->text_color.b,
+                                            (int) (settings->text_color.a * elem->opacity));
+
+                float scaled_thickness = elem->thickness * t->zoom_level;
+                draw_list->AddLine(ImVec2(x1, y1), ImVec2(x2, y2), line_color, scaled_thickness);
+
+                // Visual layout dragging for the whole line (drag from the midpoint)
+                if (t->is_visual_layout_editing) {
+                    // Endpoint 1 drag handle
+                    float handle_size = fmaxf(8.0f, scaled_thickness * 2.0f);
+                    char drag_id_p1[128];
+                    snprintf(drag_id_p1, sizeof(drag_id_p1), "drag_deco_%s_p1", elem->id);
+                    handle_visual_layout_dragging(t, drag_id_p1,
+                                                  ImVec2(x1 - handle_size * 0.5f, y1 - handle_size * 0.5f),
+                                                  ImVec2(handle_size, handle_size),
+                                                  elem->pos, "Decoration", elem->id, "Endpoint 1",
+                                                  elem->id);
+
+                    // Endpoint 2 drag handle
+                    char drag_id_p2[128];
+                    snprintf(drag_id_p2, sizeof(drag_id_p2), "drag_deco_%s_p2", elem->id);
+                    handle_visual_layout_dragging(t, drag_id_p2,
+                                                  ImVec2(x2 - handle_size * 0.5f, y2 - handle_size * 0.5f),
+                                                  ImVec2(handle_size, handle_size),
+                                                  elem->pos2, "Decoration", elem->id, "Endpoint 2",
+                                                  elem->id);
+
+                    // Whole-line drag handle (midpoint, covers the line segment)
+                    float mid_x = (x1 + x2) * 0.5f;
+                    float mid_y = (y1 + y2) * 0.5f;
+                    float line_len = sqrtf((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
+                    float line_handle_w = fmaxf(line_len * 0.6f, handle_size);
+                    float line_handle_h = fmaxf(scaled_thickness * 3.0f, handle_size);
+
+                    char drag_id_line[128];
+                    snprintf(drag_id_line, sizeof(drag_id_line), "drag_deco_%s_line", elem->id);
+
+                    // Whole-line drag handle (custom dual-endpoint dragging)
+                    ImGui::PushID(drag_id_line);
+                    ImGui::SetCursorScreenPos(ImVec2(mid_x - line_handle_w * 0.5f,
+                                                      mid_y - line_handle_h * 0.5f));
+                    ImGui::InvisibleButton("##drag_handle", ImVec2(line_handle_w, line_handle_h));
+
+                    bool is_line_dragging = ImGui::IsItemActive() &&
+                                            ImGui::IsMouseDragging(ImGuiMouseButton_Left);
+                    bool is_line_hovered = ImGui::IsItemHovered();
+
+                    if (is_line_dragging) {
+                        ImGuiIO &io = ImGui::GetIO();
+
+                        strncpy(t->visual_drag_root_name, elem->id,
+                                sizeof(t->visual_drag_root_name) - 1);
+                        t->visual_drag_root_name[sizeof(t->visual_drag_root_name) - 1] = '\0';
+                        strncpy(t->visual_drag_goal_type, "Decoration",
+                                sizeof(t->visual_drag_goal_type) - 1);
+                        t->visual_drag_goal_type[sizeof(t->visual_drag_goal_type) - 1] = '\0';
+                        t->visual_drag_child_root_name[0] = '\0';
+
+                        // Initialize both endpoints if not set
+                        if (!elem->pos.is_set) {
+                            elem->pos.is_set = true;
+                            elem->pos.x = roundf((x1 - t->camera_offset.x) / t->zoom_level);
+                            elem->pos.y = roundf((y1 - t->camera_offset.y) / t->zoom_level);
+                        }
+                        if (!elem->pos2.is_set) {
+                            elem->pos2.is_set = true;
+                            elem->pos2.x = roundf((x2 - t->camera_offset.x) / t->zoom_level);
+                            elem->pos2.y = roundf((y2 - t->camera_offset.y) / t->zoom_level);
+                        }
+
+                        // Move both endpoints by the same delta
+                        float dx = io.MouseDelta.x / t->zoom_level;
+                        float dy = io.MouseDelta.y / t->zoom_level;
+                        elem->pos.x = fminf(fmaxf(roundf(elem->pos.x + dx), -MANUAL_POS_MAX),
+                                             MANUAL_POS_MAX);
+                        elem->pos.y = fminf(fmaxf(roundf(elem->pos.y + dy), -MANUAL_POS_MAX),
+                                             MANUAL_POS_MAX);
+                        elem->pos2.x = fminf(fmaxf(roundf(elem->pos2.x + dx), -MANUAL_POS_MAX),
+                                               MANUAL_POS_MAX);
+                        elem->pos2.y = fminf(fmaxf(roundf(elem->pos2.y + dy), -MANUAL_POS_MAX),
+                                               MANUAL_POS_MAX);
+
+                        t->visual_layout_just_dragged = true;
+                        SDL_SetAtomicInt(&g_templates_changed, 1);
+                    }
+
+                    // Tooltip showing both endpoints
+                    if (is_line_hovered || is_line_dragging) {
+                        if (is_line_hovered) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+                        char tooltip[512];
+                        if (is_line_dragging) {
+                            snprintf(tooltip, sizeof(tooltip),
+                                     "Decoration: \"%s\" - Line\n\n"
+                                     "Endpoint 1:  X: %.0f   Y: %.0f\n"
+                                     "Endpoint 2:  X: %.0f   Y: %.0f",
+                                     elem->id,
+                                     elem->pos.x, elem->pos.y,
+                                     elem->pos2.x, elem->pos2.y);
+                        } else {
+                            snprintf(tooltip, sizeof(tooltip),
+                                     "Decoration: \"%s\" - Line\n"
+                                     "Drag to reposition entire line.",
+                                     elem->id);
+                        }
+                        ImGui::SetTooltip("%s", tooltip);
+                    }
+                    ImGui::PopID();
+                }
+                break;
+            }
+                // Future: case DECORATION_ARROW
         }
     }
 }
