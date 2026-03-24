@@ -10,6 +10,7 @@
 #include "template_scanner.h"
 #include "logger.h"
 #include "path_utils.h" // For path_exists
+#include "file_utils.h" // For cJSON_from_file
 #include <vector>
 #include <string>
 #include <algorithm>
@@ -67,6 +68,54 @@ static void version_to_filename_format(const char *version_in, char *version_out
     for (char *p = version_out; *p; p++) {
         if (*p == '.') *p = '_'; // Convert dots to underscores
     }
+}
+
+// Checks if a template JSON file contains any manual layout data (position keys or decorations).
+static bool template_has_layout_data(const char *file_path) {
+    cJSON *json = cJSON_from_file(file_path);
+    if (!json) return false;
+
+    // Check for a non-empty "decorations" array
+    cJSON *decorations = cJSON_GetObjectItem(json, "decorations");
+    if (decorations && cJSON_IsArray(decorations) && cJSON_GetArraySize(decorations) > 0) {
+        cJSON_Delete(json);
+        return true;
+    }
+
+    // Helper lambda to check if a JSON object has any position keys
+    auto has_pos_keys = [](cJSON *obj) -> bool {
+        return cJSON_GetObjectItem(obj, "icon_pos") || cJSON_GetObjectItem(obj, "text_pos") ||
+               cJSON_GetObjectItem(obj, "progress_pos");
+    };
+
+    // Check trackable sections for any items (or their criteria) with position keys
+    // These can be JSON arrays or objects depending on the template format
+    const char *section_keys[] = {"advancements", "stats", "unlocks", "custom_goals", "multi_stage_goals"};
+    for (int k = 0; k < 5; k++) {
+        cJSON *section = cJSON_GetObjectItem(json, section_keys[k]);
+        if (!section || (!cJSON_IsArray(section) && !cJSON_IsObject(section))) continue;
+        cJSON *item = nullptr;
+        cJSON_ArrayForEach(item, section) {
+            if (has_pos_keys(item)) {
+                cJSON_Delete(json);
+                return true;
+            }
+            // Check nested criteria (advancements/stats have a "criteria" object with keyed entries)
+            cJSON *criteria = cJSON_GetObjectItem(item, "criteria");
+            if (criteria && cJSON_IsObject(criteria)) {
+                cJSON *criterion = nullptr;
+                cJSON_ArrayForEach(criterion, criteria) {
+                    if (has_pos_keys(criterion)) {
+                        cJSON_Delete(json);
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    cJSON_Delete(json);
+    return false;
 }
 
 void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templates, int *out_count) {
@@ -170,6 +219,12 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
                     dt.available_lang_flags.emplace_back("");
                 }
                 std::sort(dt.available_lang_flags.begin(), dt.available_lang_flags.end());
+
+                // Check if the template has manual layout data
+                char template_file_path[MAX_PATH_LENGTH];
+                snprintf(template_file_path, sizeof(template_file_path), "%s/%s", cat_path_str, filename);
+                dt.has_layout = template_has_layout_data(template_file_path);
+
                 found_templates_vec.push_back(std::move(dt));
             } while (FindNextFileA(h_find_file, &find_file_data) != 0);
             FindClose(h_find_file);
@@ -262,6 +317,12 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
                     dt.available_lang_flags.emplace_back("");
                 }
                 std::sort(dt.available_lang_flags.begin(), dt.available_lang_flags.end());
+
+                // Check if the template has manual layout data
+                char template_file_path[MAX_PATH_LENGTH];
+                snprintf(template_file_path, sizeof(template_file_path), "%s/%s", cat_path_str, filename);
+                dt.has_layout = template_has_layout_data(template_file_path);
+
                 found_templates_vec.push_back(std::move(dt));
             }
         }

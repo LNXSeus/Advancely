@@ -199,8 +199,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     static std::vector<std::string> unique_category_values;
     static std::vector<const char *> category_display_names;
+    static std::vector<std::string> category_display_strings; // Owned strings for category display
     static std::vector<std::string> flag_values;
     static std::vector<const char *> flag_display_names;
+    static std::vector<std::string> flag_display_strings; // Owned strings for flag display
 
     // State for version dropdown with counts
     static std::vector<std::string> version_display_names;
@@ -821,21 +823,40 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
             // --- CATEGORY DROPDOWN ---
             category_display_names.clear();
+            category_display_strings.clear();
             for (const auto &cat: unique_category_values) {
-                category_display_names.push_back(cat.c_str());
+                // Show "(has layout)" on the category when the no-flag template has layout data
+                bool show_layout_on_category = false;
+                for (int i = 0; i < discovered_template_count; ++i) {
+                    if (strcmp(discovered_templates[i].category, cat.c_str()) == 0 &&
+                        discovered_templates[i].optional_flag[0] == '\0' &&
+                        discovered_templates[i].has_layout) {
+                        show_layout_on_category = true;
+                        break;
+                    }
+                }
+                if (show_layout_on_category) {
+                    category_display_strings.push_back(cat + " (has layout)");
+                } else {
+                    category_display_strings.push_back(cat);
+                }
+            }
+            for (const auto &s: category_display_strings) {
+                category_display_names.push_back(s.c_str());
             }
 
             int category_idx = -1;
-            for (size_t i = 0; i < category_display_names.size(); ++i) {
-                if (strcmp(category_display_names[i], temp_settings.category) == 0) {
-                    category_idx = i;
+            for (size_t i = 0; i < unique_category_values.size(); ++i) {
+                if (strcmp(unique_category_values[i].c_str(), temp_settings.category) == 0) {
+                    category_idx = (int) i;
                     break;
                 }
             }
 
             if (ImGui::Combo("Category", &category_idx, category_display_names.data(), category_display_names.size())) {
-                if (category_idx >= 0 && (size_t) category_idx < category_display_names.size()) {
-                    strncpy(temp_settings.category, category_display_names[category_idx],
+                if (category_idx >= 0 && (size_t) category_idx < unique_category_values.size()) {
+                    // Use the raw category value, not the display name with "(has layout)"
+                    strncpy(temp_settings.category, unique_category_values[category_idx].c_str(),
                             sizeof(temp_settings.category) - 1);
                     temp_settings.category[sizeof(temp_settings.category) - 1] = '\0';
 
@@ -865,7 +886,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "Choose between available categories for the selected version.\n"
                          "If the category you're looking for isn't available you can create it\n"
                          "by clicking the 'Edit Templates' button or view the list of officially added\n"
-                         "templates by clicking the '(Learn more)' button next to the 'Template Settings'.");
+                         "templates by clicking the '(Learn more)' button next to the 'Template Settings'.\n\n"
+                         "Templates marked with '(has layout)' include pre-defined positions for goals.\n"
+                         "Enable the 'Manual Layout' checkbox to use them.");
                 ImGui::SetTooltip("%s", category_tooltip_buffer);
             }
 
@@ -873,31 +896,42 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             // --- OPTIONAL FLAG DROPDOWN ---
             flag_values.clear();
             flag_display_names.clear();
+            flag_display_strings.clear();
 
             if (temp_settings.category[0] != '\0') {
                 for (int i = 0; i < discovered_template_count; ++i) {
                     if (strcmp(discovered_templates[i].category, temp_settings.category) == 0) {
                         const char *flag = discovered_templates[i].optional_flag;
                         flag_values.push_back(flag);
+                        // Show "(has layout)" on flag entries that have layout data
+                        std::string display;
                         if (flag[0] == '\0') {
-                            flag_display_names.push_back("None");
+                            display = "None";
                         } else {
-                            flag_display_names.push_back(flag_values.back().c_str());
+                            display = flag;
                         }
+                        if (flag[0] != '\0' && discovered_templates[i].has_layout) {
+                            display += " (has layout)";
+                        }
+                        flag_display_strings.push_back(display);
                     }
                 }
+            }
+            for (const auto &s: flag_display_strings) {
+                flag_display_names.push_back(s.c_str());
             }
 
             int flag_idx = -1;
             for (size_t i = 0; i < flag_values.size(); ++i) {
                 if (strcmp(flag_values[i].c_str(), temp_settings.optional_flag) == 0) {
-                    flag_idx = i;
+                    flag_idx = (int) i;
                     break;
                 }
             }
 
             if (ImGui::Combo("Optional Flag", &flag_idx, flag_display_names.data(), flag_display_names.size())) {
                 if (flag_idx >= 0 && (size_t) flag_idx < flag_values.size()) {
+                    // Use the raw flag value, not the display name with "(has layout)"
                     strncpy(temp_settings.optional_flag, flag_values[flag_idx].c_str(),
                             sizeof(temp_settings.optional_flag) - 1);
                     temp_settings.optional_flag[sizeof(temp_settings.optional_flag) - 1] = '\0';
@@ -913,7 +947,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 char flag_tooltip_buffer[1024];
                 snprintf(flag_tooltip_buffer, sizeof(flag_tooltip_buffer),
                          "Choose between available optional flags for the selected version and category.\n"
-                         "The optional flag is used to differentiate between different alterations of the same template.\n");
+                         "The optional flag is used to differentiate between different alterations of the same template.\n\n"
+                         "Templates marked with '(has layout)' include pre-defined positions for goals.\n"
+                         "Enable the 'Manual Layout' checkbox to use them.");
                 ImGui::SetTooltip("%s", flag_tooltip_buffer);
             }
 

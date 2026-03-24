@@ -25,6 +25,7 @@ typedef struct {
     char category[MAX_PATH_LENGTH];
     char optional_flag[MAX_PATH_LENGTH];
     std::vector<std::string> available_lang_flags;
+    bool has_layout; // True if the template has any manual layout positions or decorations
 } DiscoveredTemplate;
 
 // Helper to read manual positions from JSON
