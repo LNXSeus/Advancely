@@ -6096,21 +6096,26 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                                                   elem->pos2, "Decoration", elem->id, "Endpoint 2",
                                                   elem->id);
 
-                    // Whole-line drag handle (midpoint, covers the line segment)
+                    // Whole-line drag handle at center of the line
                     float mid_x = (x1 + x2) * 0.5f;
                     float mid_y = (y1 + y2) * 0.5f;
-                    float line_len = sqrtf((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
-                    float line_handle_w = fmaxf(line_len * 0.6f, handle_size);
-                    float line_handle_h = fmaxf(scaled_thickness * 3.0f, handle_size);
+                    float line_handle_size = fmaxf(handle_size, scaled_thickness * 3.0f);
+
+                    // Draw a midpoint marker so users know where to grab
+                    float marker_radius = fmaxf(4.0f, scaled_thickness * 0.8f);
+                    draw_list->AddCircleFilled(ImVec2(mid_x, mid_y), marker_radius,
+                                               IM_COL32(255, 255, 255, 180));
+                    draw_list->AddCircle(ImVec2(mid_x, mid_y), marker_radius,
+                                          IM_COL32(0, 0, 0, 200), 0, 1.5f);
 
                     char drag_id_line[128];
                     snprintf(drag_id_line, sizeof(drag_id_line), "drag_deco_%s_line", elem->id);
 
-                    // Whole-line drag handle (custom dual-endpoint dragging)
+                    // Custom dual-endpoint dragging from the line's center
                     ImGui::PushID(drag_id_line);
-                    ImGui::SetCursorScreenPos(ImVec2(mid_x - line_handle_w * 0.5f,
-                                                      mid_y - line_handle_h * 0.5f));
-                    ImGui::InvisibleButton("##drag_handle", ImVec2(line_handle_w, line_handle_h));
+                    ImGui::SetCursorScreenPos(ImVec2(mid_x - line_handle_size * 0.5f,
+                                                      mid_y - line_handle_size * 0.5f));
+                    ImGui::InvisibleButton("##drag_handle", ImVec2(line_handle_size, line_handle_size));
 
                     bool is_line_dragging = ImGui::IsItemActive() &&
                                             ImGui::IsMouseDragging(ImGuiMouseButton_Left);
