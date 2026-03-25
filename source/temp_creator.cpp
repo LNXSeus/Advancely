@@ -9013,87 +9013,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
 
-                            // --- Bend Management ---
-                            ImGui::Separator();
-                            ImGui::Text("Bends: %d / %d", deco.bend_count, MAX_ARROW_BENDS);
-                            ImGui::SameLine();
-                            ImGui::BeginDisabled(deco.bend_count >= MAX_ARROW_BENDS);
-                            if (ImGui::Button("Add Bend")) {
-                                ManualPos ref_start = (deco.bend_count > 0) ? deco.bends[deco.bend_count - 1] : deco.pos;
-                                ManualPos ref_end = deco.pos2;
-                                ManualPos new_bend = {};
-                                if (ref_start.is_set && ref_end.is_set) {
-                                    new_bend.x = (ref_start.x + ref_end.x) * 0.5f;
-                                    new_bend.y = (ref_start.y + ref_end.y) * 0.5f;
-                                    new_bend.is_set = true;
-                                } else if (ref_start.is_set) {
-                                    new_bend.x = ref_start.x + 50.0f;
-                                    new_bend.y = ref_start.y;
-                                    new_bend.is_set = true;
-                                } else {
-                                    new_bend.x = 150.0f;
-                                    new_bend.y = 100.0f;
-                                    new_bend.is_set = true;
-                                }
-                                deco.bends[deco.bend_count] = new_bend;
-                                deco.bend_count++;
-                                save_message_type = MSG_NONE;
-                            }
-                            ImGui::EndDisabled();
-                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                                char tooltip_buffer[256];
-                                if (deco.bend_count >= MAX_ARROW_BENDS) {
-                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                             "Maximum number of bends (%d) reached.", MAX_ARROW_BENDS);
-                                } else {
-                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                             "Add a new bend point before the tip.\n"
-                                             "Bends act as intermediate waypoints the arrow passes through.");
-                                }
-                                ImGui::SetTooltip("%s", tooltip_buffer);
-                            }
-
-                            // Display each bend with coordinates and a remove button
-                            int bend_to_remove = -1;
-                            for (int b = 0; b < deco.bend_count; b++) {
-                                ImGui::PushID(b);
-                                char bend_label[64];
-                                snprintf(bend_label, sizeof(bend_label), "Bend %d", b + 1);
-                                ImGui::Text("%s", bend_label);
-                                ImGui::SameLine();
-                                ImGui::PushItemWidth(80.0f);
-                                char x_label[32], y_label[32];
-                                snprintf(x_label, sizeof(x_label), "X##bend_%d", b);
-                                snprintf(y_label, sizeof(y_label), "Y##bend_%d", b);
-                                if (ImGui::DragFloat(x_label, &deco.bends[b].x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                    deco.bends[b].is_set = true;
-                                    save_message_type = MSG_NONE;
-                                }
-                                ImGui::SameLine();
-                                if (ImGui::DragFloat(y_label, &deco.bends[b].y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
-                                    deco.bends[b].is_set = true;
-                                    save_message_type = MSG_NONE;
-                                }
-                                ImGui::PopItemWidth();
-                                ImGui::SameLine();
-                                char rm_label[32];
-                                snprintf(rm_label, sizeof(rm_label), "Remove##bend_%d", b);
-                                if (ImGui::Button(rm_label)) {
-                                    bend_to_remove = b;
-                                    save_message_type = MSG_NONE;
-                                }
-                                ImGui::PopID();
-                            }
-                            if (bend_to_remove >= 0) {
-                                for (int b = bend_to_remove; b < deco.bend_count - 1; b++) {
-                                    deco.bends[b] = deco.bends[b + 1];
-                                }
-                                deco.bends[deco.bend_count - 1] = {};
-                                deco.bend_count--;
-                            }
-
                             // --- Goal Linking ---
-                            ImGui::Separator();
                             ImGui::Text("Goal Linking");
                             if (ImGui::IsItemHovered()) {
                                 char tooltip_buffer[256];
@@ -9275,13 +9195,70 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             } else if (deco.type == DECORATION_ARROW) {
                                 render_manual_pos_ui("d_pos", "decoration", "Tail", &deco.pos,
                                                      save_message_type, true);
+
+                                // Bend counter + Add Bend button
+                                ImGui::Text("Bends: %d / %d", deco.bend_count, MAX_ARROW_BENDS);
+                                ImGui::SameLine();
+                                ImGui::BeginDisabled(deco.bend_count >= MAX_ARROW_BENDS);
+                                if (ImGui::Button("Add Bend")) {
+                                    ManualPos ref_start = (deco.bend_count > 0) ? deco.bends[deco.bend_count - 1] : deco.pos;
+                                    ManualPos ref_end = deco.pos2;
+                                    ManualPos new_bend = {};
+                                    if (ref_start.is_set && ref_end.is_set) {
+                                        new_bend.x = (ref_start.x + ref_end.x) * 0.5f;
+                                        new_bend.y = (ref_start.y + ref_end.y) * 0.5f;
+                                        new_bend.is_set = true;
+                                    } else if (ref_start.is_set) {
+                                        new_bend.x = ref_start.x + 50.0f;
+                                        new_bend.y = ref_start.y;
+                                        new_bend.is_set = true;
+                                    } else {
+                                        new_bend.x = 150.0f;
+                                        new_bend.y = 100.0f;
+                                        new_bend.is_set = true;
+                                    }
+                                    deco.bends[deco.bend_count] = new_bend;
+                                    deco.bend_count++;
+                                    save_message_type = MSG_NONE;
+                                }
+                                ImGui::EndDisabled();
+                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                    char tooltip_buffer[256];
+                                    if (deco.bend_count >= MAX_ARROW_BENDS) {
+                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                 "Maximum number of bends (%d) reached.", MAX_ARROW_BENDS);
+                                    } else {
+                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                 "Add a new bend point before the tip.\n"
+                                                 "Bends act as intermediate waypoints the arrow passes through.");
+                                    }
+                                    ImGui::SetTooltip("%s", tooltip_buffer);
+                                }
+
+                                // Bend coordinates with remove buttons
+                                int bend_to_remove = -1;
                                 for (int b = 0; b < deco.bend_count; b++) {
                                     char bend_id[32], bend_label[64];
                                     snprintf(bend_id, sizeof(bend_id), "d_bend_%d", b);
                                     snprintf(bend_label, sizeof(bend_label), "Bend %d", b + 1);
                                     render_manual_pos_ui(bend_id, "decoration", bend_label, &deco.bends[b],
                                                          save_message_type, true);
+                                    ImGui::SameLine();
+                                    char rm_label[32];
+                                    snprintf(rm_label, sizeof(rm_label), "Remove##bend_%d", b);
+                                    if (ImGui::Button(rm_label)) {
+                                        bend_to_remove = b;
+                                        save_message_type = MSG_NONE;
+                                    }
                                 }
+                                if (bend_to_remove >= 0) {
+                                    for (int b = bend_to_remove; b < deco.bend_count - 1; b++) {
+                                        deco.bends[b] = deco.bends[b + 1];
+                                    }
+                                    deco.bends[deco.bend_count - 1] = {};
+                                    deco.bend_count--;
+                                }
+
                                 render_manual_pos_ui("d_pos2", "decoration", "Tip", &deco.pos2,
                                                      save_message_type, true);
                             } else {
