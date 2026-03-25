@@ -331,24 +331,39 @@ struct MultiStageGoal {
 
 enum DecorationType {
     DECORATION_TEXT_HEADER = 0,
-    DECORATION_LINE
-    // Future: DECORATION_ARROW
+    DECORATION_LINE,
+    DECORATION_ARROW
 };
+
+#define MAX_ARROW_BENDS 16 // Max amount of bends an arrow decoration can have
 
 // A decoration element for manual layout positioning (text headers, lines, arrows, etc.)
 struct DecorationElement {
-    char id[64]; // Unique ID, e.g., "header_1", "line_1"
+    char id[64]; // Unique ID, e.g., "header_1", "line_1", "arrow_1"
     DecorationType type;
 
     // Text Header fields
     char display_text[192]; // The user-facing text to render
 
-    ManualPos pos; // Position on the tracker map (text headers use this; lines use pos as endpoint 1)
+    ManualPos pos; // Position on the tracker map (text headers use this; lines/arrows use as tail/endpoint 1)
 
     // Line fields
-    ManualPos pos2; // Second endpoint for lines
-    float thickness; // Line thickness in pixels (before zoom)
+    ManualPos pos2; // Second endpoint for lines, tip for arrows
+    float thickness; // Line/arrow thickness in pixels (before zoom)
     float opacity; // Line opacity 0.0-1.0
+
+    // Arrow fields
+    float arrowhead_size; // Arrowhead size in pixels (before zoom), default 12.0
+    int bend_count; // Number of bend points between tail (pos) and tip (pos2)
+    ManualPos bends[MAX_ARROW_BENDS]; // Intermediate bend points
+
+    // Arrow goal linking: when start_goal_root is set, arrow opacity changes based on goal completion
+    char start_goal_root[192]; // root_name of the starting goal (empty = no link)
+    char start_goal_stage[64]; // stage_id if linking to a specific multi-stage goal stage (empty = whole goal)
+    char end_goal_root[192]; // root_name of the ending goal (empty = no link)
+    char end_goal_stage[64]; // stage_id if linking to a specific multi-stage goal stage (empty = whole goal)
+    float opacity_before; // Arrow opacity before start goal is completed (default = ADVANCELY_FADED_ALPHA/255)
+    float opacity_after; // Arrow opacity after start goal is completed (default = 1.0)
 };
 
 // The main container for all data loaded from the template files.

@@ -200,11 +200,24 @@ struct EditorDecorationElement {
     char id[64];
     DecorationType type;
     char display_text[192]; // For text headers
-    ManualPos pos = {}; // Text headers and first endpoint for lines
-    ManualPos pos2 = {}; // Second endpoint for lines
-    float thickness = 2.0f; // Line thickness in pixels (before zoom)
+    ManualPos pos = {}; // Text headers and first endpoint for lines/arrows (tail)
+    ManualPos pos2 = {}; // Second endpoint for lines, tip for arrows
+    float thickness = 2.0f; // Line/arrow thickness in pixels (before zoom)
     float opacity = 1.0f; // Line opacity 0.0-1.0
     int sort_order = 0;
+
+    // Arrow fields
+    float arrowhead_size = 12.0f; // Arrowhead size in pixels (before zoom)
+    int bend_count = 0; // Number of bend points between tail and tip
+    ManualPos bends[MAX_ARROW_BENDS] = {}; // Intermediate bend points
+
+    // Arrow goal linking
+    char start_goal_root[192] = {}; // root_name of the starting goal (empty = no link)
+    char start_goal_stage[64] = {}; // stage_id for multi-stage goal stage (empty = whole goal)
+    char end_goal_root[192] = {}; // root_name of the ending goal (empty = no link)
+    char end_goal_stage[64] = {}; // stage_id for multi-stage goal stage (empty = whole goal)
+    float opacity_before = 0.392f; // Arrow opacity before start goal completed (≈ ADVANCELY_FADED_ALPHA/255)
+    float opacity_after = 1.0f; // Arrow opacity after start goal completed
 };
 
 struct EditorTemplate {
@@ -298,6 +311,23 @@ static bool are_editor_decorations_different(const EditorDecorationElement &a, c
             a.thickness != b.thickness ||
             a.opacity != b.opacity) {
             return true;
+        }
+    }
+    if (a.type == DECORATION_ARROW) {
+        if (are_manual_positions_different(a.pos2, b.pos2) ||
+            a.thickness != b.thickness ||
+            a.arrowhead_size != b.arrowhead_size ||
+            a.bend_count != b.bend_count ||
+            a.opacity_before != b.opacity_before ||
+            a.opacity_after != b.opacity_after ||
+            strcmp(a.start_goal_root, b.start_goal_root) != 0 ||
+            strcmp(a.start_goal_stage, b.start_goal_stage) != 0 ||
+            strcmp(a.end_goal_root, b.end_goal_root) != 0 ||
+            strcmp(a.end_goal_stage, b.end_goal_stage) != 0) {
+            return true;
+        }
+        for (int i = 0; i < a.bend_count; i++) {
+            if (are_manual_positions_different(a.bends[i], b.bends[i])) return true;
         }
     }
     return false;
@@ -1025,6 +1055,69 @@ static void parse_editor_decorations(cJSON *json_array, std::vector<EditorDecora
             parse_editor_manual_pos(item_json, "pos2", &new_elem.pos2);
         }
 
+        // Arrow fields
+        if (new_elem.type == DECORATION_ARROW) {
+            cJSON *thickness_json = cJSON_GetObjectItem(item_json, "thickness");
+            if (cJSON_IsNumber(thickness_json)) new_elem.thickness = (float) thickness_json->valuedouble;
+            else new_elem.thickness = 2.0f;
+
+            cJSON *arrowhead_json = cJSON_GetObjectItem(item_json, "arrowhead_size");
+            if (cJSON_IsNumber(arrowhead_json)) new_elem.arrowhead_size = (float) arrowhead_json->valuedouble;
+            else new_elem.arrowhead_size = 12.0f;
+
+            parse_editor_manual_pos(item_json, "pos2", &new_elem.pos2);
+
+            // Parse bends
+            cJSON *bends_json = cJSON_GetObjectItem(item_json, "bends");
+            new_elem.bend_count = 0;
+            if (bends_json && cJSON_IsArray(bends_json)) {
+                int bend_idx = 0;
+                cJSON *bend_item = nullptr;
+                cJSON_ArrayForEach(bend_item, bends_json) {
+                    if (bend_idx >= MAX_ARROW_BENDS) break;
+                    cJSON *bx = cJSON_GetObjectItem(bend_item, "x");
+                    cJSON *by = cJSON_GetObjectItem(bend_item, "y");
+                    if (cJSON_IsNumber(bx) && cJSON_IsNumber(by)) {
+                        new_elem.bends[bend_idx].x = fminf(fmaxf((float) bx->valuedouble, -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                        new_elem.bends[bend_idx].y = fminf(fmaxf((float) by->valuedouble, -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                        new_elem.bends[bend_idx].is_set = true;
+                        bend_idx++;
+                    }
+                }
+                new_elem.bend_count = bend_idx;
+            }
+
+            // Goal linking
+            cJSON *start_root_json = cJSON_GetObjectItem(item_json, "start_goal_root");
+            if (cJSON_IsString(start_root_json)) {
+                strncpy(new_elem.start_goal_root, start_root_json->valuestring, sizeof(new_elem.start_goal_root) - 1);
+                new_elem.start_goal_root[sizeof(new_elem.start_goal_root) - 1] = '\0';
+            }
+            cJSON *start_stage_json = cJSON_GetObjectItem(item_json, "start_goal_stage");
+            if (cJSON_IsString(start_stage_json)) {
+                strncpy(new_elem.start_goal_stage, start_stage_json->valuestring, sizeof(new_elem.start_goal_stage) - 1);
+                new_elem.start_goal_stage[sizeof(new_elem.start_goal_stage) - 1] = '\0';
+            }
+            cJSON *end_root_json = cJSON_GetObjectItem(item_json, "end_goal_root");
+            if (cJSON_IsString(end_root_json)) {
+                strncpy(new_elem.end_goal_root, end_root_json->valuestring, sizeof(new_elem.end_goal_root) - 1);
+                new_elem.end_goal_root[sizeof(new_elem.end_goal_root) - 1] = '\0';
+            }
+            cJSON *end_stage_json = cJSON_GetObjectItem(item_json, "end_goal_stage");
+            if (cJSON_IsString(end_stage_json)) {
+                strncpy(new_elem.end_goal_stage, end_stage_json->valuestring, sizeof(new_elem.end_goal_stage) - 1);
+                new_elem.end_goal_stage[sizeof(new_elem.end_goal_stage) - 1] = '\0';
+            }
+
+            cJSON *opacity_before_json = cJSON_GetObjectItem(item_json, "opacity_before");
+            if (cJSON_IsNumber(opacity_before_json)) new_elem.opacity_before = (float) opacity_before_json->valuedouble;
+            else new_elem.opacity_before = (float) ADVANCELY_FADED_ALPHA / 255.0f;
+
+            cJSON *opacity_after_json = cJSON_GetObjectItem(item_json, "opacity_after");
+            if (cJSON_IsNumber(opacity_after_json)) new_elem.opacity_after = (float) opacity_after_json->valuedouble;
+            else new_elem.opacity_after = 1.0f;
+        }
+
         parse_editor_manual_pos(item_json, "pos", &new_elem.pos);
         decorations_vector.push_back(new_elem);
     }
@@ -1276,7 +1369,38 @@ static void serialize_editor_decorations(cJSON *parent,
                 cJSON_AddNumberToObject(item_json, "opacity", elem.opacity);
                 save_editor_manual_pos(item_json, "pos2", elem.pos2);
                 break;
-                // Future: DECORATION_ARROW
+            case DECORATION_ARROW: {
+                cJSON_AddStringToObject(item_json, "type", "arrow");
+                cJSON_AddNumberToObject(item_json, "thickness", elem.thickness);
+                cJSON_AddNumberToObject(item_json, "arrowhead_size", elem.arrowhead_size);
+                save_editor_manual_pos(item_json, "pos2", elem.pos2);
+
+                // Save bends
+                if (elem.bend_count > 0) {
+                    cJSON *bends_array = cJSON_CreateArray();
+                    for (int b = 0; b < elem.bend_count; b++) {
+                        cJSON *bend_obj = cJSON_CreateObject();
+                        cJSON_AddNumberToObject(bend_obj, "x", roundf(elem.bends[b].x));
+                        cJSON_AddNumberToObject(bend_obj, "y", roundf(elem.bends[b].y));
+                        cJSON_AddItemToArray(bends_array, bend_obj);
+                    }
+                    cJSON_AddItemToObject(item_json, "bends", bends_array);
+                }
+
+                // Goal linking
+                if (elem.start_goal_root[0] != '\0')
+                    cJSON_AddStringToObject(item_json, "start_goal_root", elem.start_goal_root);
+                if (elem.start_goal_stage[0] != '\0')
+                    cJSON_AddStringToObject(item_json, "start_goal_stage", elem.start_goal_stage);
+                if (elem.end_goal_root[0] != '\0')
+                    cJSON_AddStringToObject(item_json, "end_goal_root", elem.end_goal_root);
+                if (elem.end_goal_stage[0] != '\0')
+                    cJSON_AddStringToObject(item_json, "end_goal_stage", elem.end_goal_stage);
+
+                cJSON_AddNumberToObject(item_json, "opacity_before", elem.opacity_before);
+                cJSON_AddNumberToObject(item_json, "opacity_after", elem.opacity_after);
+                break;
+            }
         }
 
         save_editor_manual_pos(item_json, "pos", elem.pos);
@@ -1937,6 +2061,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     enum ImportMode { BATCH_IMPORT, SINGLE_SELECT_STAGE };
     static ImportMode current_import_mode = BATCH_IMPORT; // Default to import multiple
     static EditorSubGoal *stage_to_edit = nullptr;
+
+    // Goal selector popup (for arrow goal linking and future features)
+    enum GoalSelectorTarget { GOAL_SELECT_START, GOAL_SELECT_END };
+    static bool show_goal_selector_popup = false;
+    static bool focus_goal_selector_search = false;
+    static char goal_selector_search_buffer[256] = "";
+    static GoalSelectorTarget goal_selector_target = GOAL_SELECT_START;
+    static int goal_selector_deco_index = -1; // Index of the decoration being edited
 
     // State for version dropdown with counts
     static std::vector<std::string> version_display_names;
@@ -3361,6 +3493,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             t->template_data->decorations[i]->thickness = ed_deco.thickness;
                             t->template_data->decorations[i]->opacity = ed_deco.opacity;
                         }
+                        if (ed_deco.type == DECORATION_ARROW) {
+                            sync_pos(ed_deco.pos2, t->template_data->decorations[i]->pos2);
+                            for (int b = 0; b < ed_deco.bend_count && b < MAX_ARROW_BENDS; b++) {
+                                sync_pos(ed_deco.bends[b], t->template_data->decorations[i]->bends[b]);
+                            }
+                            t->template_data->decorations[i]->thickness = ed_deco.thickness;
+                            t->template_data->decorations[i]->arrowhead_size = ed_deco.arrowhead_size;
+                            t->template_data->decorations[i]->bend_count = ed_deco.bend_count;
+                            t->template_data->decorations[i]->opacity_before = ed_deco.opacity_before;
+                            t->template_data->decorations[i]->opacity_after = ed_deco.opacity_after;
+                        }
                     }
                 }
             }
@@ -3536,6 +3679,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             reverse_sync_pos(ed_deco.pos2, t->template_data->decorations[i]->pos2);
                             t->template_data->decorations[i]->thickness = ed_deco.thickness;
                             t->template_data->decorations[i]->opacity = ed_deco.opacity;
+                        }
+                        if (ed_deco.type == DECORATION_ARROW) {
+                            reverse_sync_pos(ed_deco.pos2, t->template_data->decorations[i]->pos2);
+                            for (int b = 0; b < ed_deco.bend_count && b < MAX_ARROW_BENDS; b++) {
+                                reverse_sync_pos(ed_deco.bends[b], t->template_data->decorations[i]->bends[b]);
+                            }
+                            t->template_data->decorations[i]->thickness = ed_deco.thickness;
+                            t->template_data->decorations[i]->arrowhead_size = ed_deco.arrowhead_size;
+                            t->template_data->decorations[i]->bend_count = ed_deco.bend_count;
+                            t->template_data->decorations[i]->opacity_before = ed_deco.opacity_before;
+                            t->template_data->decorations[i]->opacity_after = ed_deco.opacity_after;
                         }
                     }
                 }
@@ -8621,6 +8775,41 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
 
+                    ImGui::SameLine();
+                    if (ImGui::Button("Add Arrow")) {
+                        EditorDecorationElement new_elem = {};
+                        new_elem.type = DECORATION_ARROW;
+                        new_elem.thickness = 2.0f;
+                        new_elem.arrowhead_size = 12.0f;
+                        new_elem.opacity_before = (float) ADVANCELY_FADED_ALPHA / 255.0f;
+                        new_elem.opacity_after = 1.0f;
+                        new_elem.bend_count = 0;
+                        int counter = 1;
+                        while (true) {
+                            snprintf(new_elem.id, sizeof(new_elem.id), "arrow_%d", counter);
+                            bool id_exists = false;
+                            for (const auto &deco: current_template_data.decorations) {
+                                if (strcmp(deco.id, new_elem.id) == 0) {
+                                    id_exists = true;
+                                    break;
+                                }
+                            }
+                            if (!id_exists) break;
+                            counter++;
+                        }
+                        current_template_data.decorations.push_back(new_elem);
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buffer[256];
+                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                 "Add an arrow decoration to the manual layout.\n"
+                                 "Arrows use the Tracker Font Color and can be linked to goals\n"
+                                 "to change opacity based on completion state.\n"
+                                 "An arrow may have up to 16 bends.");
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+
                     // --- Sorting Controls ---
                     bool can_sort_decos = false;
                     for (const auto &deco: current_template_data.decorations) {
@@ -8683,6 +8872,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             const char *type_str = "Unknown";
                             if (deco.type == DECORATION_TEXT_HEADER) type_str = "Text Header";
                             else if (deco.type == DECORATION_LINE) type_str = "Line";
+                            else if (deco.type == DECORATION_ARROW) type_str = "Arrow";
                             if (str_contains_insensitive(deco.display_text, tc_search_buffer) ||
                                 str_contains_insensitive(deco.id, tc_search_buffer) ||
                                 str_contains_insensitive(type_str, tc_search_buffer)) {
@@ -8709,6 +8899,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             const char *type_str = "Unknown";
                             if (deco.type == DECORATION_TEXT_HEADER) type_str = "Text Header";
                             else if (deco.type == DECORATION_LINE) type_str = "Line";
+                            else if (deco.type == DECORATION_ARROW) type_str = "Arrow";
                             if (!str_contains_insensitive(deco.display_text, tc_search_buffer) &&
                                 !str_contains_insensitive(deco.id, tc_search_buffer) &&
                                 !str_contains_insensitive(type_str, tc_search_buffer)) {
@@ -8741,6 +8932,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             const char *type_str = "Unknown";
                             if (deco.type == DECORATION_TEXT_HEADER) type_str = "Text Header";
                             else if (deco.type == DECORATION_LINE) type_str = "Line";
+                            else if (deco.type == DECORATION_ARROW) type_str = "Arrow";
                             ImGui::TextDisabled("Type: %s", type_str);
                         }
 
@@ -8770,17 +8962,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                         }
 
-                        // Line-specific fields
-                        if (deco.type == DECORATION_LINE) {
+                        // Line or Arrow thickness/size fields
+                        if (deco.type == DECORATION_LINE || deco.type == DECORATION_ARROW) {
                             if (ImGui::SliderFloat("Thickness", &deco.thickness, 0.1f, 20.0f, "%.1f px")) {
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
                                 char tooltip_buffer[128];
                                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                         "Line thickness in pixels (before zoom scaling).");
+                                         "%s thickness in pixels (before zoom scaling).",
+                                         deco.type == DECORATION_ARROW ? "Arrow" : "Line");
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
+                        }
+
+                        // Line-only opacity
+                        if (deco.type == DECORATION_LINE) {
                             if (ImGui::SliderFloat("Opacity", &deco.opacity, 0.01f, 1.0f, "%.2f")) {
                                 save_message_type = MSG_NONE;
                             }
@@ -8788,6 +8985,215 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 char tooltip_buffer[128];
                                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                          "Line opacity. Uses the Tracker Font Color.");
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
+                        }
+
+                        // Arrow-specific fields
+                        if (deco.type == DECORATION_ARROW) {
+                            if (ImGui::SliderFloat("Arrowhead Size", &deco.arrowhead_size, 2.0f, 50.0f, "%.1f px")) {
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buffer[128];
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Size of the arrowhead triangle in pixels (before zoom scaling).");
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
+
+                            // --- Bend Management ---
+                            ImGui::Separator();
+                            ImGui::Text("Bends: %d / %d", deco.bend_count, MAX_ARROW_BENDS);
+                            ImGui::SameLine();
+                            ImGui::BeginDisabled(deco.bend_count >= MAX_ARROW_BENDS);
+                            if (ImGui::Button("Add Bend")) {
+                                ManualPos ref_start = (deco.bend_count > 0) ? deco.bends[deco.bend_count - 1] : deco.pos;
+                                ManualPos ref_end = deco.pos2;
+                                ManualPos new_bend = {};
+                                if (ref_start.is_set && ref_end.is_set) {
+                                    new_bend.x = (ref_start.x + ref_end.x) * 0.5f;
+                                    new_bend.y = (ref_start.y + ref_end.y) * 0.5f;
+                                    new_bend.is_set = true;
+                                } else if (ref_start.is_set) {
+                                    new_bend.x = ref_start.x + 50.0f;
+                                    new_bend.y = ref_start.y;
+                                    new_bend.is_set = true;
+                                } else {
+                                    new_bend.x = 150.0f;
+                                    new_bend.y = 100.0f;
+                                    new_bend.is_set = true;
+                                }
+                                deco.bends[deco.bend_count] = new_bend;
+                                deco.bend_count++;
+                                save_message_type = MSG_NONE;
+                            }
+                            ImGui::EndDisabled();
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                char tooltip_buffer[256];
+                                if (deco.bend_count >= MAX_ARROW_BENDS) {
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "Maximum number of bends (%d) reached.", MAX_ARROW_BENDS);
+                                } else {
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "Add a new bend point before the tip.\n"
+                                             "Bends act as intermediate waypoints the arrow passes through.");
+                                }
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
+
+                            // Display each bend with coordinates and a remove button
+                            int bend_to_remove = -1;
+                            for (int b = 0; b < deco.bend_count; b++) {
+                                ImGui::PushID(b);
+                                char bend_label[64];
+                                snprintf(bend_label, sizeof(bend_label), "Bend %d", b + 1);
+                                ImGui::Text("%s", bend_label);
+                                ImGui::SameLine();
+                                ImGui::PushItemWidth(80.0f);
+                                char x_label[32], y_label[32];
+                                snprintf(x_label, sizeof(x_label), "X##bend_%d", b);
+                                snprintf(y_label, sizeof(y_label), "Y##bend_%d", b);
+                                if (ImGui::DragFloat(x_label, &deco.bends[b].x, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    deco.bends[b].is_set = true;
+                                    save_message_type = MSG_NONE;
+                                }
+                                ImGui::SameLine();
+                                if (ImGui::DragFloat(y_label, &deco.bends[b].y, 1.0f, -MANUAL_POS_MAX, MANUAL_POS_MAX, "%.0f")) {
+                                    deco.bends[b].is_set = true;
+                                    save_message_type = MSG_NONE;
+                                }
+                                ImGui::PopItemWidth();
+                                ImGui::SameLine();
+                                char rm_label[32];
+                                snprintf(rm_label, sizeof(rm_label), "Remove##bend_%d", b);
+                                if (ImGui::Button(rm_label)) {
+                                    bend_to_remove = b;
+                                    save_message_type = MSG_NONE;
+                                }
+                                ImGui::PopID();
+                            }
+                            if (bend_to_remove >= 0) {
+                                for (int b = bend_to_remove; b < deco.bend_count - 1; b++) {
+                                    deco.bends[b] = deco.bends[b + 1];
+                                }
+                                deco.bends[deco.bend_count - 1] = {};
+                                deco.bend_count--;
+                            }
+
+                            // --- Goal Linking ---
+                            ImGui::Separator();
+                            ImGui::Text("Goal Linking");
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buffer[256];
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Link the arrow to goals to change its opacity based on completion.\n"
+                                         "Start Goal: When completed, the arrow transitions to 'After' opacity.\n"
+                                         "End Goal: When completed AND hiding mode is 'Remove Completed',\n"
+                                         "the arrow is hidden entirely.");
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
+
+                            // Start Goal selector
+                            {
+                                char preview[256] = "(None)";
+                                if (deco.start_goal_root[0] != '\0') {
+                                    if (deco.start_goal_stage[0] != '\0')
+                                        snprintf(preview, sizeof(preview), "%s [%s]", deco.start_goal_root, deco.start_goal_stage);
+                                    else
+                                        strncpy(preview, deco.start_goal_root, sizeof(preview) - 1);
+                                }
+                                ImGui::Text("Start Goal:");
+                                ImGui::SameLine();
+                                ImGui::TextDisabled("%s", preview);
+                                ImGui::SameLine();
+                                char select_btn[64];
+                                snprintf(select_btn, sizeof(select_btn), "Select##start_goal_%zu", i);
+                                if (ImGui::Button(select_btn)) {
+                                    goal_selector_target = GOAL_SELECT_START;
+                                    goal_selector_deco_index = (int) i;
+                                    goal_selector_search_buffer[0] = '\0';
+                                    focus_goal_selector_search = true;
+                                    show_goal_selector_popup = true;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip_buffer[256];
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "Select the goal that activates this arrow.\n"
+                                             "When completed, the arrow changes to 'After' opacity.");
+                                    ImGui::SetTooltip("%s", tooltip_buffer);
+                                }
+                                if (deco.start_goal_root[0] != '\0') {
+                                    ImGui::SameLine();
+                                    char clear_btn[64];
+                                    snprintf(clear_btn, sizeof(clear_btn), "Clear##start_goal_%zu", i);
+                                    if (ImGui::Button(clear_btn)) {
+                                        deco.start_goal_root[0] = '\0';
+                                        deco.start_goal_stage[0] = '\0';
+                                        save_message_type = MSG_NONE;
+                                    }
+                                }
+                            }
+
+                            // End Goal selector
+                            {
+                                char preview[256] = "(None)";
+                                if (deco.end_goal_root[0] != '\0') {
+                                    if (deco.end_goal_stage[0] != '\0')
+                                        snprintf(preview, sizeof(preview), "%s [%s]", deco.end_goal_root, deco.end_goal_stage);
+                                    else
+                                        strncpy(preview, deco.end_goal_root, sizeof(preview) - 1);
+                                }
+                                ImGui::Text("End Goal:");
+                                ImGui::SameLine();
+                                ImGui::TextDisabled("%s", preview);
+                                ImGui::SameLine();
+                                char select_btn[64];
+                                snprintf(select_btn, sizeof(select_btn), "Select##end_goal_%zu", i);
+                                if (ImGui::Button(select_btn)) {
+                                    goal_selector_target = GOAL_SELECT_END;
+                                    goal_selector_deco_index = (int) i;
+                                    goal_selector_search_buffer[0] = '\0';
+                                    focus_goal_selector_search = true;
+                                    show_goal_selector_popup = true;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip_buffer[256];
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "Select the goal that deactivates this arrow.\n"
+                                             "When completed and hiding mode is 'Remove Completed',\n"
+                                             "the arrow is hidden entirely.");
+                                    ImGui::SetTooltip("%s", tooltip_buffer);
+                                }
+                                if (deco.end_goal_root[0] != '\0') {
+                                    ImGui::SameLine();
+                                    char clear_btn[64];
+                                    snprintf(clear_btn, sizeof(clear_btn), "Clear##end_goal_%zu", i);
+                                    if (ImGui::Button(clear_btn)) {
+                                        deco.end_goal_root[0] = '\0';
+                                        deco.end_goal_stage[0] = '\0';
+                                        save_message_type = MSG_NONE;
+                                    }
+                                }
+                            }
+
+                            // Opacity controls
+                            if (ImGui::SliderFloat("Opacity Before", &deco.opacity_before, 0.0f, 1.0f, "%.2f")) {
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buffer[256];
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Arrow opacity before the Start Goal is completed.\n"
+                                         "Default matches the faded alpha of completed goals.");
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
+                            if (ImGui::SliderFloat("Opacity After", &deco.opacity_after, 0.0f, 1.0f, "%.2f")) {
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buffer[128];
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Arrow opacity after the Start Goal is completed.");
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
                         }
@@ -8854,6 +9260,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                      save_message_type, true);
                                 render_manual_pos_ui("d_pos2", "decoration", "Endpoint 2", &deco.pos2,
                                                      save_message_type, true);
+                            } else if (deco.type == DECORATION_ARROW) {
+                                render_manual_pos_ui("d_pos", "decoration", "Tail", &deco.pos,
+                                                     save_message_type, true);
+                                for (int b = 0; b < deco.bend_count; b++) {
+                                    char bend_id[32], bend_label[64];
+                                    snprintf(bend_id, sizeof(bend_id), "d_bend_%d", b);
+                                    snprintf(bend_label, sizeof(bend_label), "Bend %d", b + 1);
+                                    render_manual_pos_ui(bend_id, "decoration", bend_label, &deco.bends[b],
+                                                         save_message_type, true);
+                                }
+                                render_manual_pos_ui("d_pos2", "decoration", "Tip", &deco.pos2,
+                                                     save_message_type, true);
                             } else {
                                 render_manual_pos_ui("d_pos", "decoration", "Position", &deco.pos,
                                                      save_message_type);
@@ -8917,6 +9335,25 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_elem.thickness = source.thickness;
                         new_elem.opacity = source.opacity;
                         new_elem.sort_order = 0;
+
+                        // Copy arrow-specific fields
+                        if (source.type == DECORATION_ARROW) {
+                            new_elem.arrowhead_size = source.arrowhead_size;
+                            new_elem.bend_count = source.bend_count;
+                            for (int b = 0; b < source.bend_count; b++) {
+                                new_elem.bends[b] = source.bends[b];
+                            }
+                            strncpy(new_elem.start_goal_root, source.start_goal_root, sizeof(new_elem.start_goal_root) - 1);
+                            new_elem.start_goal_root[sizeof(new_elem.start_goal_root) - 1] = '\0';
+                            strncpy(new_elem.start_goal_stage, source.start_goal_stage, sizeof(new_elem.start_goal_stage) - 1);
+                            new_elem.start_goal_stage[sizeof(new_elem.start_goal_stage) - 1] = '\0';
+                            strncpy(new_elem.end_goal_root, source.end_goal_root, sizeof(new_elem.end_goal_root) - 1);
+                            new_elem.end_goal_root[sizeof(new_elem.end_goal_root) - 1] = '\0';
+                            strncpy(new_elem.end_goal_stage, source.end_goal_stage, sizeof(new_elem.end_goal_stage) - 1);
+                            new_elem.end_goal_stage[sizeof(new_elem.end_goal_stage) - 1] = '\0';
+                            new_elem.opacity_before = source.opacity_before;
+                            new_elem.opacity_after = source.opacity_after;
+                        }
 
                         // Generate unique ID
                         char base_id[64];
@@ -10541,6 +10978,271 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         ImGui::EndPopup();
     } // End of import unlocks popup
+
+    // ========== Goal Selector Popup ==========
+    if (show_goal_selector_popup) {
+        ImGui::OpenPopup("Select Goal");
+    }
+    if (ImGui::BeginPopupModal("Select Goal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        // Ctrl/Cmd+F to focus search
+        if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
+            ImGui::IsKeyPressed(ImGuiKey_F)) {
+            focus_goal_selector_search = true;
+        }
+
+        // --- Search bar (right-aligned) ---
+        float clear_button_width_gs = ImGui::CalcTextSize("X").x + ImGui::GetStyle().FramePadding.x * 2;
+        float search_bar_width_gs = 200.0f;
+        float right_controls_width_gs = clear_button_width_gs + ImGui::GetStyle().ItemSpacing.x + search_bar_width_gs;
+        float right_controls_start_gs = ImGui::GetWindowWidth() - right_controls_width_gs -
+                                        ImGui::GetStyle().WindowPadding.x;
+
+        const char *target_label = (goal_selector_target == GOAL_SELECT_START) ? "Start Goal" : "End Goal";
+        ImGui::Text("Selecting: %s", target_label);
+        float left_end_gs = ImGui::GetItemRectMax().x + ImGui::GetStyle().ItemSpacing.x;
+        if (right_controls_start_gs > left_end_gs) {
+            ImGui::SameLine(right_controls_start_gs);
+        }
+
+        if (goal_selector_search_buffer[0] != '\0') {
+            if (ImGui::Button("X##ClearGoalSearch", ImVec2(clear_button_width_gs, 0))) {
+                goal_selector_search_buffer[0] = '\0';
+            }
+        } else {
+            ImGui::Dummy(ImVec2(clear_button_width_gs, 0));
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(search_bar_width_gs);
+        if (focus_goal_selector_search) {
+            ImGui::SetKeyboardFocusHere();
+            focus_goal_selector_search = false;
+        }
+        ImGui::InputTextWithHint("##GoalSelectorSearch", "Search...", goal_selector_search_buffer,
+                                 sizeof(goal_selector_search_buffer));
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[128];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Filter goals by type, ID, or display name.\n"
+                     "Press Ctrl+F or Cmd+F to focus.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+        ImGui::Separator();
+
+        // --- Scrollable goal list ---
+        ImGui::BeginChild("GoalSelectorScrollingRegion", ImVec2(500, 400), true);
+
+        // Track which goal is selected (for single-select mode)
+        char selected_root[192] = {};
+        char selected_stage[64] = {};
+        bool any_selected = false;
+
+        // Helper lambda to check if an item matches the search filter
+        auto matches_search = [&](const char *root_name, const char *display_name, const char *type_name) -> bool {
+            if (goal_selector_search_buffer[0] == '\0') return true;
+            return str_contains_insensitive(root_name, goal_selector_search_buffer) ||
+                   str_contains_insensitive(display_name, goal_selector_search_buffer) ||
+                   str_contains_insensitive(type_name, goal_selector_search_buffer);
+        };
+
+        // Helper lambda to render a selectable goal entry
+        auto render_goal_selectable = [&](const char *label, const char *root_name, const char *stage_id,
+                                          bool indent) {
+            if (indent) ImGui::Indent();
+            bool was_clicked = ImGui::Selectable(label, false, ImGuiSelectableFlags_DontClosePopups);
+            if (was_clicked) {
+                strncpy(selected_root, root_name, sizeof(selected_root) - 1);
+                selected_root[sizeof(selected_root) - 1] = '\0';
+                if (stage_id && stage_id[0] != '\0') {
+                    strncpy(selected_stage, stage_id, sizeof(selected_stage) - 1);
+                    selected_stage[sizeof(selected_stage) - 1] = '\0';
+                } else {
+                    selected_stage[0] = '\0';
+                }
+                any_selected = true;
+            }
+            if (indent) ImGui::Unindent();
+        };
+
+        // Advancements
+        {
+            bool has_visible = false;
+            for (const auto &adv: current_template_data.advancements) {
+                bool parent_match = matches_search(adv.root_name, adv.display_name, "Advancement");
+                bool any_child_match = false;
+                for (const auto &crit: adv.criteria) {
+                    if (matches_search(crit.root_name, crit.display_name, "Criterion"))
+                        any_child_match = true;
+                }
+                if (parent_match || any_child_match) { has_visible = true; break; }
+            }
+            if (has_visible) {
+                ImGui::TextDisabled("-- Advancements --");
+                for (const auto &adv: current_template_data.advancements) {
+                    bool parent_match = matches_search(adv.root_name, adv.display_name, "Advancement");
+                    bool any_child_match = false;
+                    for (const auto &crit: adv.criteria) {
+                        if (matches_search(crit.root_name, crit.display_name, "Criterion"))
+                            any_child_match = true;
+                    }
+                    if (!parent_match && !any_child_match) continue;
+
+                    char label[384];
+                    snprintf(label, sizeof(label), "%s##adv_%s", adv.root_name, adv.root_name);
+                    if (parent_match) render_goal_selectable(label, adv.root_name, nullptr, false);
+
+                    for (const auto &crit: adv.criteria) {
+                        if (!matches_search(crit.root_name, crit.display_name, "Criterion") && !parent_match) continue;
+                        char crit_label[384];
+                        snprintf(crit_label, sizeof(crit_label), "> %s##crit_%s", crit.root_name, crit.root_name);
+                        render_goal_selectable(crit_label, crit.root_name, nullptr, true);
+                    }
+                }
+            }
+        }
+
+        // Stats
+        {
+            bool has_visible = false;
+            for (const auto &stat: current_template_data.stats) {
+                bool parent_match = matches_search(stat.root_name, stat.display_name, "Stat");
+                bool any_child_match = false;
+                for (const auto &sub: stat.criteria) {
+                    if (matches_search(sub.root_name, sub.display_name, "Sub-Stat"))
+                        any_child_match = true;
+                }
+                if (parent_match || any_child_match) { has_visible = true; break; }
+            }
+            if (has_visible) {
+                ImGui::TextDisabled("-- Stats --");
+                for (const auto &stat: current_template_data.stats) {
+                    bool parent_match = matches_search(stat.root_name, stat.display_name, "Stat");
+                    bool any_child_match = false;
+                    for (const auto &sub: stat.criteria) {
+                        if (matches_search(sub.root_name, sub.display_name, "Sub-Stat"))
+                            any_child_match = true;
+                    }
+                    if (!parent_match && !any_child_match) continue;
+
+                    char label[384];
+                    snprintf(label, sizeof(label), "%s##stat_%s", stat.root_name, stat.root_name);
+                    if (parent_match) render_goal_selectable(label, stat.root_name, nullptr, false);
+
+                    for (const auto &sub: stat.criteria) {
+                        if (!matches_search(sub.root_name, sub.display_name, "Sub-Stat") && !parent_match) continue;
+                        char sub_label[384];
+                        snprintf(sub_label, sizeof(sub_label), "> %s##sub_%s", sub.root_name, sub.root_name);
+                        render_goal_selectable(sub_label, sub.root_name, nullptr, true);
+                    }
+                }
+            }
+        }
+
+        // Unlocks
+        {
+            bool has_visible = false;
+            for (const auto &unlock: current_template_data.unlocks) {
+                if (matches_search(unlock.root_name, unlock.display_name, "Unlock")) { has_visible = true; break; }
+            }
+            if (has_visible) {
+                ImGui::TextDisabled("-- Unlocks --");
+                for (const auto &unlock: current_template_data.unlocks) {
+                    if (!matches_search(unlock.root_name, unlock.display_name, "Unlock")) continue;
+                    char label[384];
+                    snprintf(label, sizeof(label), "%s##unlock_%s", unlock.root_name, unlock.root_name);
+                    render_goal_selectable(label, unlock.root_name, nullptr, false);
+                }
+            }
+        }
+
+        // Custom Goals
+        {
+            bool has_visible = false;
+            for (const auto &cg: current_template_data.custom_goals) {
+                if (matches_search(cg.root_name, cg.display_name, "Custom Goal")) { has_visible = true; break; }
+            }
+            if (has_visible) {
+                ImGui::TextDisabled("-- Custom Goals --");
+                for (const auto &cg: current_template_data.custom_goals) {
+                    if (!matches_search(cg.root_name, cg.display_name, "Custom Goal")) continue;
+                    char label[384];
+                    snprintf(label, sizeof(label), "%s##custom_%s", cg.root_name, cg.root_name);
+                    render_goal_selectable(label, cg.root_name, nullptr, false);
+                }
+            }
+        }
+
+        // Multi-Stage Goals (with individual stages)
+        {
+            bool has_visible = false;
+            for (const auto &msg: current_template_data.multi_stage_goals) {
+                if (matches_search(msg.root_name, msg.display_name, "Multi-Stage Goal")) { has_visible = true; break; }
+                for (const auto &stage: msg.stages) {
+                    if (matches_search(stage.root_name, stage.display_text, "Stage")) { has_visible = true; break; }
+                }
+                if (has_visible) break;
+            }
+            if (has_visible) {
+                ImGui::TextDisabled("-- Multi-Stage Goals --");
+                for (const auto &msg: current_template_data.multi_stage_goals) {
+                    bool parent_match = matches_search(msg.root_name, msg.display_name, "Multi-Stage Goal");
+                    bool any_stage_match = false;
+                    for (const auto &stage: msg.stages) {
+                        if (matches_search(stage.root_name, stage.display_text, "Stage"))
+                            any_stage_match = true;
+                    }
+                    if (!parent_match && !any_stage_match) continue;
+
+                    char label[384];
+                    snprintf(label, sizeof(label), "%s##ms_%s", msg.root_name, msg.root_name);
+                    if (parent_match) render_goal_selectable(label, msg.root_name, nullptr, false);
+
+                    for (const auto &stage: msg.stages) {
+                        if (!matches_search(stage.root_name, stage.display_text, "Stage") && !parent_match) continue;
+                        char stage_label[384];
+                        snprintf(stage_label, sizeof(stage_label), "> [%s] %s##stage_%s_%s",
+                                 stage.stage_id, stage.display_text, msg.root_name, stage.stage_id);
+                        render_goal_selectable(stage_label, msg.root_name, stage.stage_id, true);
+                    }
+                }
+            }
+        }
+
+        ImGui::EndChild();
+
+        // --- Apply selection if a goal was clicked ---
+        if (any_selected && goal_selector_deco_index >= 0 &&
+            goal_selector_deco_index < (int) current_template_data.decorations.size()) {
+            auto &target_deco = current_template_data.decorations[goal_selector_deco_index];
+            if (goal_selector_target == GOAL_SELECT_START) {
+                strncpy(target_deco.start_goal_root, selected_root, sizeof(target_deco.start_goal_root) - 1);
+                target_deco.start_goal_root[sizeof(target_deco.start_goal_root) - 1] = '\0';
+                strncpy(target_deco.start_goal_stage, selected_stage, sizeof(target_deco.start_goal_stage) - 1);
+                target_deco.start_goal_stage[sizeof(target_deco.start_goal_stage) - 1] = '\0';
+            } else {
+                strncpy(target_deco.end_goal_root, selected_root, sizeof(target_deco.end_goal_root) - 1);
+                target_deco.end_goal_root[sizeof(target_deco.end_goal_root) - 1] = '\0';
+                strncpy(target_deco.end_goal_stage, selected_stage, sizeof(target_deco.end_goal_stage) - 1);
+                target_deco.end_goal_stage[sizeof(target_deco.end_goal_stage) - 1] = '\0';
+            }
+            save_message_type = MSG_NONE;
+            show_goal_selector_popup = false;
+            ImGui::CloseCurrentPopup();
+        }
+
+        // --- Bottom Controls ---
+        if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            show_goal_selector_popup = false;
+            ImGui::CloseCurrentPopup();
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[128];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "Cancel the selection and close this window.\n(You can also press ESCAPE)");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
+
+        ImGui::EndPopup();
+    } // End of goal selector popup
 
     if (roboto_font) {
         ImGui::PopFont();

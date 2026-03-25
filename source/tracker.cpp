@@ -1938,8 +1938,9 @@ static void tracker_parse_decorations(cJSON *decorations_json, cJSON *lang_json,
                 elem->type = DECORATION_TEXT_HEADER;
             } else if (strcmp(type_json->valuestring, "line") == 0) {
                 elem->type = DECORATION_LINE;
+            } else if (strcmp(type_json->valuestring, "arrow") == 0) {
+                elem->type = DECORATION_ARROW;
             }
-            // Future: else if "arrow"
         }
 
         // Parse display text from lang file, falling back to template
@@ -1973,6 +1974,69 @@ static void tracker_parse_decorations(cJSON *decorations_json, cJSON *lang_json,
             else elem->opacity = 1.0f;
 
             parse_manual_pos(item_json, "pos2", &elem->pos2);
+        }
+
+        // Arrow fields
+        if (elem->type == DECORATION_ARROW) {
+            cJSON *thickness_json = cJSON_GetObjectItem(item_json, "thickness");
+            if (cJSON_IsNumber(thickness_json)) elem->thickness = (float) thickness_json->valuedouble;
+            else elem->thickness = 2.0f;
+
+            cJSON *arrowhead_json = cJSON_GetObjectItem(item_json, "arrowhead_size");
+            if (cJSON_IsNumber(arrowhead_json)) elem->arrowhead_size = (float) arrowhead_json->valuedouble;
+            else elem->arrowhead_size = 12.0f;
+
+            parse_manual_pos(item_json, "pos2", &elem->pos2);
+
+            // Parse bends
+            elem->bend_count = 0;
+            cJSON *bends_json = cJSON_GetObjectItem(item_json, "bends");
+            if (bends_json && cJSON_IsArray(bends_json)) {
+                int bend_idx = 0;
+                cJSON *bend_item = nullptr;
+                cJSON_ArrayForEach(bend_item, bends_json) {
+                    if (bend_idx >= MAX_ARROW_BENDS) break;
+                    cJSON *bx = cJSON_GetObjectItem(bend_item, "x");
+                    cJSON *by = cJSON_GetObjectItem(bend_item, "y");
+                    if (cJSON_IsNumber(bx) && cJSON_IsNumber(by)) {
+                        elem->bends[bend_idx].x = fminf(fmaxf((float) bx->valuedouble, -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                        elem->bends[bend_idx].y = fminf(fmaxf((float) by->valuedouble, -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                        elem->bends[bend_idx].is_set = true;
+                        bend_idx++;
+                    }
+                }
+                elem->bend_count = bend_idx;
+            }
+
+            // Goal linking
+            cJSON *start_root_json = cJSON_GetObjectItem(item_json, "start_goal_root");
+            if (cJSON_IsString(start_root_json)) {
+                strncpy(elem->start_goal_root, start_root_json->valuestring, sizeof(elem->start_goal_root) - 1);
+                elem->start_goal_root[sizeof(elem->start_goal_root) - 1] = '\0';
+            }
+            cJSON *start_stage_json = cJSON_GetObjectItem(item_json, "start_goal_stage");
+            if (cJSON_IsString(start_stage_json)) {
+                strncpy(elem->start_goal_stage, start_stage_json->valuestring, sizeof(elem->start_goal_stage) - 1);
+                elem->start_goal_stage[sizeof(elem->start_goal_stage) - 1] = '\0';
+            }
+            cJSON *end_root_json = cJSON_GetObjectItem(item_json, "end_goal_root");
+            if (cJSON_IsString(end_root_json)) {
+                strncpy(elem->end_goal_root, end_root_json->valuestring, sizeof(elem->end_goal_root) - 1);
+                elem->end_goal_root[sizeof(elem->end_goal_root) - 1] = '\0';
+            }
+            cJSON *end_stage_json = cJSON_GetObjectItem(item_json, "end_goal_stage");
+            if (cJSON_IsString(end_stage_json)) {
+                strncpy(elem->end_goal_stage, end_stage_json->valuestring, sizeof(elem->end_goal_stage) - 1);
+                elem->end_goal_stage[sizeof(elem->end_goal_stage) - 1] = '\0';
+            }
+
+            cJSON *opacity_before_json = cJSON_GetObjectItem(item_json, "opacity_before");
+            if (cJSON_IsNumber(opacity_before_json)) elem->opacity_before = (float) opacity_before_json->valuedouble;
+            else elem->opacity_before = (float) ADVANCELY_FADED_ALPHA / 255.0f;
+
+            cJSON *opacity_after_json = cJSON_GetObjectItem(item_json, "opacity_after");
+            if (cJSON_IsNumber(opacity_after_json)) elem->opacity_after = (float) opacity_after_json->valuedouble;
+            else elem->opacity_after = 1.0f;
         }
 
         // Parse position
@@ -6295,7 +6359,323 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                 }
                 break;
             }
-                // Future: case DECORATION_ARROW
+            case DECORATION_ARROW: {
+                // --- Determine arrow opacity based on linked goal completion ---
+                // Helper lambda to check if a goal is completed by root_name (+ optional stage_id)
+                auto is_goal_completed = [&](const char *root_name, const char *stage_id) -> bool {
+                    if (!root_name || root_name[0] == '\0') return false;
+                    TemplateData *td = t->template_data;
+
+                    // Check advancements
+                    for (int j = 0; j < td->advancement_count; j++) {
+                        if (!td->advancements[j]) continue;
+                        if (strcmp(td->advancements[j]->root_name, root_name) == 0) return td->advancements[j]->done;
+                        // Check criteria
+                        for (int k = 0; k < td->advancements[j]->criteria_count; k++) {
+                            if (td->advancements[j]->criteria[k] && strcmp(td->advancements[j]->criteria[k]->root_name, root_name) == 0)
+                                return td->advancements[j]->criteria[k]->done;
+                        }
+                    }
+                    // Check stats
+                    for (int j = 0; j < td->stat_count; j++) {
+                        if (!td->stats[j]) continue;
+                        if (strcmp(td->stats[j]->root_name, root_name) == 0) return td->stats[j]->done;
+                        for (int k = 0; k < td->stats[j]->criteria_count; k++) {
+                            if (td->stats[j]->criteria[k] && strcmp(td->stats[j]->criteria[k]->root_name, root_name) == 0)
+                                return td->stats[j]->criteria[k]->done;
+                        }
+                    }
+                    // Check unlocks
+                    for (int j = 0; j < td->unlock_count; j++) {
+                        if (td->unlocks[j] && strcmp(td->unlocks[j]->root_name, root_name) == 0)
+                            return td->unlocks[j]->done;
+                    }
+                    // Check custom goals
+                    for (int j = 0; j < td->custom_goal_count; j++) {
+                        if (td->custom_goals[j] && strcmp(td->custom_goals[j]->root_name, root_name) == 0)
+                            return td->custom_goals[j]->done;
+                    }
+                    // Check multi-stage goals
+                    for (int j = 0; j < td->multi_stage_goal_count; j++) {
+                        MultiStageGoal *msg = td->multi_stage_goals[j];
+                        if (!msg || strcmp(msg->root_name, root_name) != 0) continue;
+                        if (!stage_id || stage_id[0] == '\0') {
+                            // Whole goal completion
+                            return msg->current_stage >= msg->stage_count - 1;
+                        }
+                        // Specific stage completion
+                        for (int k = 0; k < msg->stage_count; k++) {
+                            if (msg->stages[k] && strcmp(msg->stages[k]->stage_id, stage_id) == 0) {
+                                return msg->current_stage > k;
+                            }
+                        }
+                    }
+                    return false;
+                };
+
+                bool start_completed = is_goal_completed(elem->start_goal_root, elem->start_goal_stage);
+                bool end_completed = is_goal_completed(elem->end_goal_root, elem->end_goal_stage);
+
+                // Hide arrow if end goal is completed and hiding mode is HIDE_ALL_COMPLETED
+                if (end_completed && elem->end_goal_root[0] != '\0' &&
+                    settings->goal_hiding_mode == HIDE_ALL_COMPLETED) {
+                    break;
+                }
+
+                // Determine effective opacity
+                float effective_opacity;
+                if (elem->start_goal_root[0] == '\0') {
+                    // No start goal linked - use opacity_after (fully visible)
+                    effective_opacity = elem->opacity_after;
+                } else {
+                    effective_opacity = start_completed ? elem->opacity_after : elem->opacity_before;
+                }
+
+                ImU32 arrow_color = IM_COL32(settings->text_color.r, settings->text_color.g,
+                                             settings->text_color.b,
+                                             (int) (settings->text_color.a * effective_opacity));
+
+                float scaled_thickness = elem->thickness * t->zoom_level;
+
+                // Build the full path: tail -> bends -> tip
+                // Max points = 2 (tail + tip) + MAX_ARROW_BENDS
+                float pts_x[MAX_ARROW_BENDS + 2];
+                float pts_y[MAX_ARROW_BENDS + 2];
+                int pt_count = 0;
+
+                // Tail (pos)
+                if (elem->pos.is_set) {
+                    pts_x[pt_count] = (elem->pos.x * t->zoom_level) + t->camera_offset.x;
+                    pts_y[pt_count] = (elem->pos.y * t->zoom_level) + t->camera_offset.y;
+                } else {
+                    pts_x[pt_count] = (100.0f * t->zoom_level) + t->camera_offset.x;
+                    pts_y[pt_count] = (100.0f * t->zoom_level) + t->camera_offset.y;
+                }
+                pt_count++;
+
+                // Bends
+                for (int b = 0; b < elem->bend_count; b++) {
+                    if (elem->bends[b].is_set) {
+                        pts_x[pt_count] = (elem->bends[b].x * t->zoom_level) + t->camera_offset.x;
+                        pts_y[pt_count] = (elem->bends[b].y * t->zoom_level) + t->camera_offset.y;
+                    } else {
+                        pts_x[pt_count] = (150.0f * t->zoom_level) + t->camera_offset.x;
+                        pts_y[pt_count] = (100.0f * t->zoom_level) + t->camera_offset.y;
+                    }
+                    pt_count++;
+                }
+
+                // Tip (pos2)
+                if (elem->pos2.is_set) {
+                    pts_x[pt_count] = (elem->pos2.x * t->zoom_level) + t->camera_offset.x;
+                    pts_y[pt_count] = (elem->pos2.y * t->zoom_level) + t->camera_offset.y;
+                } else {
+                    pts_x[pt_count] = (200.0f * t->zoom_level) + t->camera_offset.x;
+                    pts_y[pt_count] = (100.0f * t->zoom_level) + t->camera_offset.y;
+                }
+                pt_count++;
+
+                // Draw line segments between consecutive points
+                for (int p = 0; p < pt_count - 1; p++) {
+                    draw_list->AddLine(ImVec2(pts_x[p], pts_y[p]), ImVec2(pts_x[p + 1], pts_y[p + 1]),
+                                       arrow_color, scaled_thickness);
+                }
+
+                // Draw arrowhead at the tip
+                if (pt_count >= 2) {
+                    float tip_x = pts_x[pt_count - 1];
+                    float tip_y = pts_y[pt_count - 1];
+                    float prev_x = pts_x[pt_count - 2];
+                    float prev_y = pts_y[pt_count - 2];
+
+                    float dx = tip_x - prev_x;
+                    float dy = tip_y - prev_y;
+                    float len = sqrtf(dx * dx + dy * dy);
+                    if (len > 0.001f) {
+                        float ndx = dx / len;
+                        float ndy = dy / len;
+                        float scaled_head = elem->arrowhead_size * t->zoom_level;
+                        // Perpendicular direction
+                        float pdx = -ndy;
+                        float pdy = ndx;
+
+                        ImVec2 p1 = ImVec2(tip_x, tip_y);
+                        ImVec2 p2 = ImVec2(tip_x - ndx * scaled_head + pdx * scaled_head * 0.4f,
+                                           tip_y - ndy * scaled_head + pdy * scaled_head * 0.4f);
+                        ImVec2 p3 = ImVec2(tip_x - ndx * scaled_head - pdx * scaled_head * 0.4f,
+                                           tip_y - ndy * scaled_head - pdy * scaled_head * 0.4f);
+                        draw_list->AddTriangleFilled(p1, p2, p3, arrow_color);
+                    }
+                }
+
+                // --- Visual layout dragging ---
+                if (t->is_visual_layout_editing) {
+                    float handle_size = fmaxf(8.0f, scaled_thickness * 2.0f);
+
+                    // Tail drag handle
+                    char drag_id_tail[128];
+                    snprintf(drag_id_tail, sizeof(drag_id_tail), "drag_deco_%s_tail", elem->id);
+                    handle_visual_layout_dragging(t, drag_id_tail,
+                                                  ImVec2(pts_x[0] - handle_size * 0.5f, pts_y[0] - handle_size * 0.5f),
+                                                  ImVec2(handle_size, handle_size),
+                                                  elem->pos, "Decoration", elem->id, "Tail",
+                                                  elem->id);
+
+                    // Bend drag handles
+                    for (int b = 0; b < elem->bend_count; b++) {
+                        char drag_id_bend[128];
+                        snprintf(drag_id_bend, sizeof(drag_id_bend), "drag_deco_%s_bend%d", elem->id, b);
+                        char bend_label[32];
+                        snprintf(bend_label, sizeof(bend_label), "Bend %d", b + 1);
+                        handle_visual_layout_dragging(t, drag_id_bend,
+                                                      ImVec2(pts_x[1 + b] - handle_size * 0.5f, pts_y[1 + b] - handle_size * 0.5f),
+                                                      ImVec2(handle_size, handle_size),
+                                                      elem->bends[b], "Decoration", elem->id, bend_label,
+                                                      elem->id);
+                    }
+
+                    // Tip drag handle
+                    char drag_id_tip[128];
+                    snprintf(drag_id_tip, sizeof(drag_id_tip), "drag_deco_%s_tip", elem->id);
+                    handle_visual_layout_dragging(t, drag_id_tip,
+                                                  ImVec2(pts_x[pt_count - 1] - handle_size * 0.5f, pts_y[pt_count - 1] - handle_size * 0.5f),
+                                                  ImVec2(handle_size, handle_size),
+                                                  elem->pos2, "Decoration", elem->id, "Tip",
+                                                  elem->id);
+
+                    // Whole-arrow drag handle at center of first segment
+                    float mid_x = (pts_x[0] + pts_x[pt_count - 1]) * 0.5f;
+                    float mid_y = (pts_y[0] + pts_y[pt_count - 1]) * 0.5f;
+                    float arrow_handle_size = fmaxf(handle_size, scaled_thickness * 3.0f);
+
+                    // Draw midpoint marker
+                    float marker_radius = fmaxf(4.0f, scaled_thickness * 0.8f);
+                    draw_list->AddCircleFilled(ImVec2(mid_x, mid_y), marker_radius,
+                                               IM_COL32(255, 255, 255, 180));
+                    draw_list->AddCircle(ImVec2(mid_x, mid_y), marker_radius,
+                                         IM_COL32(0, 0, 0, 200), 0, 1.5f);
+
+                    char drag_id_arrow[128];
+                    snprintf(drag_id_arrow, sizeof(drag_id_arrow), "drag_deco_%s_arrow", elem->id);
+
+                    ImGui::PushID(drag_id_arrow);
+                    ImVec2 arrow_handle_pos = ImVec2(mid_x - arrow_handle_size * 0.5f,
+                                                      mid_y - arrow_handle_size * 0.5f);
+                    ImGui::SetCursorScreenPos(arrow_handle_pos);
+                    ImGui::InvisibleButton("##drag_handle", ImVec2(arrow_handle_size, arrow_handle_size));
+
+                    bool is_arrow_dragging = ImGui::IsItemActive() &&
+                                             ImGui::IsMouseDragging(ImGuiMouseButton_Left);
+                    bool is_arrow_hovered = ImGui::IsItemHovered();
+                    bool is_arrow_just_clicked = ImGui::IsItemActivated();
+
+                    // Register all points for selection
+                    s_visual_layout_items.push_back({arrow_handle_pos, ImVec2(arrow_handle_size, arrow_handle_size), &elem->pos});
+                    s_visual_layout_items.push_back({arrow_handle_pos, ImVec2(arrow_handle_size, arrow_handle_size), &elem->pos2});
+                    for (int b = 0; b < elem->bend_count; b++) {
+                        s_visual_layout_items.push_back({arrow_handle_pos, ImVec2(arrow_handle_size, arrow_handle_size), &elem->bends[b]});
+                    }
+
+                    if (is_arrow_hovered || ImGui::IsItemActive()) {
+                        t->visual_item_interacted_this_frame = true;
+                    }
+
+                    // Click-to-select for whole-arrow drag
+                    if (is_arrow_just_clicked) {
+                        bool any_point_selected = s_visual_selected_items.count(&elem->pos) > 0 ||
+                                                   s_visual_selected_items.count(&elem->pos2) > 0;
+                        if (!any_point_selected) {
+                            s_visual_selected_items.clear();
+                            s_visual_selected_items.insert(&elem->pos);
+                            s_visual_selected_items.insert(&elem->pos2);
+                            for (int b = 0; b < elem->bend_count; b++) {
+                                s_visual_selected_items.insert(&elem->bends[b]);
+                            }
+                        }
+                    }
+
+                    if (is_arrow_dragging) {
+                        ImGuiIO &io = ImGui::GetIO();
+
+                        strncpy(t->visual_drag_root_name, elem->id, sizeof(t->visual_drag_root_name) - 1);
+                        t->visual_drag_root_name[sizeof(t->visual_drag_root_name) - 1] = '\0';
+                        strncpy(t->visual_drag_goal_type, "Decoration", sizeof(t->visual_drag_goal_type) - 1);
+                        t->visual_drag_goal_type[sizeof(t->visual_drag_goal_type) - 1] = '\0';
+                        t->visual_drag_child_root_name[0] = '\0';
+
+                        // Init any unset positions
+                        if (!elem->pos.is_set) {
+                            elem->pos.is_set = true;
+                            elem->pos.x = roundf((pts_x[0] - t->camera_offset.x) / t->zoom_level);
+                            elem->pos.y = roundf((pts_y[0] - t->camera_offset.y) / t->zoom_level);
+                        }
+                        if (!elem->pos2.is_set) {
+                            elem->pos2.is_set = true;
+                            elem->pos2.x = roundf((pts_x[pt_count - 1] - t->camera_offset.x) / t->zoom_level);
+                            elem->pos2.y = roundf((pts_y[pt_count - 1] - t->camera_offset.y) / t->zoom_level);
+                        }
+
+                        float dxm = io.MouseDelta.x / t->zoom_level;
+                        float dym = io.MouseDelta.y / t->zoom_level;
+
+                        // Move all arrow points
+                        elem->pos.x = fminf(fmaxf(roundf(elem->pos.x + dxm), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                        elem->pos.y = fminf(fmaxf(roundf(elem->pos.y + dym), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                        elem->pos2.x = fminf(fmaxf(roundf(elem->pos2.x + dxm), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                        elem->pos2.y = fminf(fmaxf(roundf(elem->pos2.y + dym), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                        for (int b = 0; b < elem->bend_count; b++) {
+                            if (!elem->bends[b].is_set) {
+                                elem->bends[b].is_set = true;
+                            }
+                            elem->bends[b].x = fminf(fmaxf(roundf(elem->bends[b].x + dxm), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                            elem->bends[b].y = fminf(fmaxf(roundf(elem->bends[b].y + dym), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                        }
+
+                        // Multi-drag: move all other selected items
+                        bool arrow_is_selected = s_visual_selected_items.count(&elem->pos) > 0 ||
+                                                  s_visual_selected_items.count(&elem->pos2) > 0;
+                        if (arrow_is_selected) {
+                            for (ManualPos *sel_pos: s_visual_selected_items) {
+                                if (sel_pos == &elem->pos || sel_pos == &elem->pos2) continue;
+                                bool is_own_bend = false;
+                                for (int b = 0; b < elem->bend_count; b++) {
+                                    if (sel_pos == &elem->bends[b]) { is_own_bend = true; break; }
+                                }
+                                if (is_own_bend) continue;
+                                init_unset_pos_from_screen(sel_pos, t->zoom_level, t->camera_offset);
+                                sel_pos->x = fminf(fmaxf(roundf(sel_pos->x + dxm), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                                sel_pos->y = fminf(fmaxf(roundf(sel_pos->y + dym), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                            }
+                        }
+
+                        t->visual_layout_just_dragged = true;
+                        SDL_SetAtomicInt(&g_templates_changed, 1);
+                    }
+
+                    // Tooltip
+                    if (is_arrow_hovered || is_arrow_dragging) {
+                        if (is_arrow_hovered) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+                        char tooltip[512];
+                        if (is_arrow_dragging) {
+                            snprintf(tooltip, sizeof(tooltip),
+                                     "Decoration: \"%s\" - Arrow\n\n"
+                                     "Tail:  X: %.0f   Y: %.0f\n"
+                                     "Tip:   X: %.0f   Y: %.0f",
+                                     elem->id,
+                                     elem->pos.x, elem->pos.y,
+                                     elem->pos2.x, elem->pos2.y);
+                        } else {
+                            snprintf(tooltip, sizeof(tooltip),
+                                     "Decoration: \"%s\" - Arrow\n"
+                                     "Drag to reposition entire arrow.",
+                                     elem->id);
+                        }
+                        ImGui::SetTooltip("%s", tooltip);
+                    }
+                    ImGui::PopID();
+                }
+                break;
+            }
         }
     }
 }
