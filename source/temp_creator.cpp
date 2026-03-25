@@ -3716,6 +3716,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                          "Custom Goal Hotkeys are disabled while Visual Editing is active.\n"
                          "Applying settings is also disabled while active to prevent template reloads.\n"
                          "Unsaved template changes will be auto-saved when activating.\n\n"
+                         "Tip: Click and drag on empty space to draw a selection rectangle.\n"
+                         "All items inside the rectangle will be selected and can be dragged together.\n\n"
                          "WARNING:\n"
                          "Make sure you're tracking a world.\n"
                          "Official default templates get overwritten on updates.\n"
