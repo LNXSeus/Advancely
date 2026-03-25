@@ -3365,11 +3365,11 @@ static float get_global_safe_x(Tracker *t) {
                 check_pos(deco->pos, line_margin);
                 check_pos(deco->pos2, line_margin);
             } else if (deco->type == DECORATION_ARROW) {
-                float arrow_margin = fmaxf(deco->thickness * 0.5f, deco->arrowhead_size);
+                float arrow_margin = deco->thickness * 0.5f;
                 check_pos(deco->pos, arrow_margin);
                 check_pos(deco->pos2, arrow_margin);
                 for (int b = 0; b < deco->bend_count; b++) {
-                    check_pos(deco->bends[b], deco->thickness * 0.5f);
+                    check_pos(deco->bends[b], arrow_margin);
                 }
             }
         }
@@ -6509,11 +6509,12 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                         ndy_tip = dy / seg_len;
                         has_arrowhead = true;
 
-                        // Shorten the last point so the line ends at the arrowhead base
-                        // The arrowhead base is one arrowhead length back from the tip
+                        // Shorten the last point so the line ends at the arrowhead base,
+                        // but extend slightly into the triangle to prevent an anti-aliasing seam
                         float shorten = fminf(scaled_head, seg_len * 0.9f); // Don't overshoot past the previous point
-                        pts_x[pt_count - 1] = tip_x - ndx_tip * shorten;
-                        pts_y[pt_count - 1] = tip_y - ndy_tip * shorten;
+                        float overlap = fminf(0.5f, shorten * 0.1f);
+                        pts_x[pt_count - 1] = tip_x - ndx_tip * (shorten - overlap);
+                        pts_y[pt_count - 1] = tip_y - ndy_tip * (shorten - overlap);
                     }
                 }
 

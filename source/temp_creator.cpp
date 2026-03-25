@@ -9003,7 +9003,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         // Arrow-specific fields
                         if (deco.type == DECORATION_ARROW) {
-                            if (ImGui::SliderFloat("Arrowhead Size", &deco.arrowhead_size, 2.0f, 50.0f, "%.1f px")) {
+                            if (ImGui::SliderFloat("Arrowhead Size", &deco.arrowhead_size, 2.0f, 100.0f, "%.1f px")) {
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
