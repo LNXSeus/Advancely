@@ -1020,6 +1020,8 @@ static void parse_editor_decorations(cJSON *json_array, std::vector<EditorDecora
                 new_elem.type = DECORATION_TEXT_HEADER;
             } else if (strcmp(type_json->valuestring, "line") == 0) {
                 new_elem.type = DECORATION_LINE;
+            } else if (strcmp(type_json->valuestring, "arrow") == 0) {
+                new_elem.type = DECORATION_ARROW;
             }
         }
 

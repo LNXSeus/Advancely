@@ -3314,7 +3314,7 @@ static float get_global_safe_x(Tracker *t) {
     auto check_item = [&](TrackableItem *item) {
         if (!item) return;
         check_pos(item->icon_pos, 120.0f);
-        check_pos(item->text_pos, 250.0f);
+        check_pos(item->text_pos, 180.0f);
         check_pos(item->progress_pos, 150.0f); // Custom goal progress, obv. not unlocks
     };
 
@@ -3323,10 +3323,10 @@ static float get_global_safe_x(Tracker *t) {
         if (td->advancements[i]) {
             TrackableCategory *cat = td->advancements[i];
             // If parent is placed, assume a much wider width if it has children!
-            float baseline_width = (cat->criteria_count > 0) ? 450.0f : 120.0f;
+            float baseline_width = (cat->criteria_count > 0) ? 300.0f : 120.0f;
 
             check_pos(cat->icon_pos, baseline_width);
-            check_pos(cat->text_pos, 250.0f);
+            check_pos(cat->text_pos, 180.0f);
             check_pos(cat->progress_pos, 150.0f);
             for (int j = 0; j < cat->criteria_count; j++) {
                 check_item(cat->criteria[j]);
@@ -3336,10 +3336,10 @@ static float get_global_safe_x(Tracker *t) {
     for (int i = 0; i < td->stat_count; i++) {
         if (td->stats[i]) {
             TrackableCategory *cat = td->stats[i];
-            float baseline_width = (cat->criteria_count > 0 && !cat->is_single_stat_category) ? 450.0f : 120.0f;
+            float baseline_width = (cat->criteria_count > 0 && !cat->is_single_stat_category) ? 300.0f : 120.0f;
 
             check_pos(cat->icon_pos, baseline_width);
-            check_pos(cat->text_pos, 250.0f);
+            check_pos(cat->text_pos, 180.0f);
             check_pos(cat->progress_pos, 150.0f);
             for (int j = 0; j < cat->criteria_count; j++) {
                 check_item(cat->criteria[j]);
@@ -3351,13 +3351,27 @@ static float get_global_safe_x(Tracker *t) {
     for (int i = 0; i < td->multi_stage_goal_count; i++) {
         if (td->multi_stage_goals[i]) {
             check_pos(td->multi_stage_goals[i]->icon_pos, 120.0f);
-            check_pos(td->multi_stage_goals[i]->text_pos, 250.0f);
+            check_pos(td->multi_stage_goals[i]->text_pos, 180.0f);
             check_pos(td->multi_stage_goals[i]->progress_pos, 150.0f);
         }
     }
     for (int i = 0; i < td->decoration_count; i++) {
         if (td->decorations[i]) {
-            check_pos(td->decorations[i]->pos, 300.0f);
+            DecorationElement *deco = td->decorations[i];
+            if (deco->type == DECORATION_TEXT_HEADER) {
+                check_pos(deco->pos, 200.0f);
+            } else if (deco->type == DECORATION_LINE) {
+                float line_margin = deco->thickness * 0.5f;
+                check_pos(deco->pos, line_margin);
+                check_pos(deco->pos2, line_margin);
+            } else if (deco->type == DECORATION_ARROW) {
+                float arrow_margin = fmaxf(deco->thickness * 0.5f, deco->arrowhead_size);
+                check_pos(deco->pos, arrow_margin);
+                check_pos(deco->pos2, arrow_margin);
+                for (int b = 0; b < deco->bend_count; b++) {
+                    check_pos(deco->bends[b], deco->thickness * 0.5f);
+                }
+            }
         }
     }
 
@@ -6475,13 +6489,12 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                 }
                 pt_count++;
 
-                // Draw line segments between consecutive points
-                for (int p = 0; p < pt_count - 1; p++) {
-                    draw_list->AddLine(ImVec2(pts_x[p], pts_y[p]), ImVec2(pts_x[p + 1], pts_y[p + 1]),
-                                       arrow_color, scaled_thickness);
-                }
+                // Compute arrowhead geometry: the line ends at the arrowhead base,
+                // and the triangle extends beyond to the tip (drag point).
+                float scaled_head = elem->arrowhead_size * t->zoom_level;
+                float ndx_tip = 0.0f, ndy_tip = 0.0f; // Normalized direction of last segment
+                bool has_arrowhead = false;
 
-                // Draw arrowhead at the tip
                 if (pt_count >= 2) {
                     float tip_x = pts_x[pt_count - 1];
                     float tip_y = pts_y[pt_count - 1];
@@ -6490,22 +6503,54 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
 
                     float dx = tip_x - prev_x;
                     float dy = tip_y - prev_y;
-                    float len = sqrtf(dx * dx + dy * dy);
-                    if (len > 0.001f) {
-                        float ndx = dx / len;
-                        float ndy = dy / len;
-                        float scaled_head = elem->arrowhead_size * t->zoom_level;
-                        // Perpendicular direction
-                        float pdx = -ndy;
-                        float pdy = ndx;
+                    float seg_len = sqrtf(dx * dx + dy * dy);
+                    if (seg_len > 0.001f) {
+                        ndx_tip = dx / seg_len;
+                        ndy_tip = dy / seg_len;
+                        has_arrowhead = true;
 
-                        ImVec2 p1 = ImVec2(tip_x, tip_y);
-                        ImVec2 p2 = ImVec2(tip_x - ndx * scaled_head + pdx * scaled_head * 0.4f,
-                                           tip_y - ndy * scaled_head + pdy * scaled_head * 0.4f);
-                        ImVec2 p3 = ImVec2(tip_x - ndx * scaled_head - pdx * scaled_head * 0.4f,
-                                           tip_y - ndy * scaled_head - pdy * scaled_head * 0.4f);
-                        draw_list->AddTriangleFilled(p1, p2, p3, arrow_color);
+                        // Shorten the last point so the line ends at the arrowhead base
+                        // The arrowhead base is one arrowhead length back from the tip
+                        float shorten = fminf(scaled_head, seg_len * 0.9f); // Don't overshoot past the previous point
+                        pts_x[pt_count - 1] = tip_x - ndx_tip * shorten;
+                        pts_y[pt_count - 1] = tip_y - ndy_tip * shorten;
                     }
+                }
+
+                // Draw polyline (seamless joins, no overlap artifacts at bends)
+                if (pt_count >= 2) {
+                    ImVec2 polyline_pts[MAX_ARROW_BENDS + 2];
+                    for (int p = 0; p < pt_count; p++) {
+                        polyline_pts[p] = ImVec2(pts_x[p], pts_y[p]);
+                    }
+                    draw_list->AddPolyline(polyline_pts, pt_count, arrow_color, ImDrawFlags_None, scaled_thickness);
+                }
+
+                // Draw arrowhead triangle extending from the line end to the actual tip
+                if (has_arrowhead && pt_count >= 2) {
+                    // Restore the actual tip position (the drag point)
+                    float actual_tip_x, actual_tip_y;
+                    if (elem->pos2.is_set) {
+                        actual_tip_x = (elem->pos2.x * t->zoom_level) + t->camera_offset.x;
+                        actual_tip_y = (elem->pos2.y * t->zoom_level) + t->camera_offset.y;
+                    } else {
+                        actual_tip_x = (200.0f * t->zoom_level) + t->camera_offset.x;
+                        actual_tip_y = (100.0f * t->zoom_level) + t->camera_offset.y;
+                    }
+
+                    // Perpendicular direction for arrowhead width
+                    float pdx = -ndy_tip;
+                    float pdy = ndx_tip;
+
+                    // Triangle: tip point, and two base corners
+                    float base_x = actual_tip_x - ndx_tip * scaled_head;
+                    float base_y = actual_tip_y - ndy_tip * scaled_head;
+                    ImVec2 p1 = ImVec2(actual_tip_x, actual_tip_y);
+                    ImVec2 p2 = ImVec2(base_x + pdx * scaled_head * 0.4f,
+                                       base_y + pdy * scaled_head * 0.4f);
+                    ImVec2 p3 = ImVec2(base_x - pdx * scaled_head * 0.4f,
+                                       base_y - pdy * scaled_head * 0.4f);
+                    draw_list->AddTriangleFilled(p1, p2, p3, arrow_color);
                 }
 
                 // --- Visual layout dragging ---
@@ -6534,18 +6579,24 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                                                       elem->id);
                     }
 
-                    // Tip drag handle
+                    // Tip drag handle (at the actual triangle tip, not the shortened line end)
+                    float actual_tip_drag_x = elem->pos2.is_set
+                        ? (elem->pos2.x * t->zoom_level) + t->camera_offset.x
+                        : (200.0f * t->zoom_level) + t->camera_offset.x;
+                    float actual_tip_drag_y = elem->pos2.is_set
+                        ? (elem->pos2.y * t->zoom_level) + t->camera_offset.y
+                        : (100.0f * t->zoom_level) + t->camera_offset.y;
                     char drag_id_tip[128];
                     snprintf(drag_id_tip, sizeof(drag_id_tip), "drag_deco_%s_tip", elem->id);
                     handle_visual_layout_dragging(t, drag_id_tip,
-                                                  ImVec2(pts_x[pt_count - 1] - handle_size * 0.5f, pts_y[pt_count - 1] - handle_size * 0.5f),
+                                                  ImVec2(actual_tip_drag_x - handle_size * 0.5f, actual_tip_drag_y - handle_size * 0.5f),
                                                   ImVec2(handle_size, handle_size),
                                                   elem->pos2, "Decoration", elem->id, "Tip",
                                                   elem->id);
 
-                    // Whole-arrow drag handle at center of first segment
-                    float mid_x = (pts_x[0] + pts_x[pt_count - 1]) * 0.5f;
-                    float mid_y = (pts_y[0] + pts_y[pt_count - 1]) * 0.5f;
+                    // Whole-arrow drag handle at center between tail and actual tip
+                    float mid_x = (pts_x[0] + actual_tip_drag_x) * 0.5f;
+                    float mid_y = (pts_y[0] + actual_tip_drag_y) * 0.5f;
                     float arrow_handle_size = fmaxf(handle_size, scaled_thickness * 3.0f);
 
                     // Draw midpoint marker
