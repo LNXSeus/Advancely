@@ -2143,6 +2143,69 @@ int main(int argc, char *argv[]) {
             // Render the template creator window
             temp_creator_render_gui(&tracker->temp_creator_window_open, &app_settings, tracker->roboto_font, tracker);
 
+            // --- Quit Confirmation Popup ---
+            if (tracker->quit_requested) {
+                ImGui::OpenPopup("Unsaved Changes##quit");
+                tracker->quit_requested = false; // Only open once, popup stays open via ImGui state
+            }
+
+            // Center the popup on screen
+            ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+            ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+            if (ImGui::BeginPopupModal("Unsaved Changes##quit", nullptr,
+                                        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+                bool unsaved_settings = tracker->settings_has_unsaved_changes;
+                bool unsaved_template = tracker->template_editor_has_unsaved_changes;
+
+                ImGui::Text("You have unsaved changes in:");
+                ImGui::Spacing();
+                if (unsaved_settings && unsaved_template) {
+                    ImGui::BulletText("Settings");
+                    ImGui::BulletText("Template Editor");
+                } else if (unsaved_settings) {
+                    ImGui::BulletText("Settings");
+                } else if (unsaved_template) {
+                    ImGui::BulletText("Template Editor");
+                }
+                ImGui::Spacing();
+                ImGui::Text("Are you sure you want to exit without saving?");
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::Spacing();
+
+                // Exit button (Enter to confirm)
+                bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter);
+                if (ImGui::Button("Exit Without Saving") || enter_pressed) {
+                    is_running = false;
+                    ImGui::CloseCurrentPopup();
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tooltip_buf[128];
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Discard all unsaved changes and close Advancely.\n"
+                             "You can also press 'ENTER'.");
+                    ImGui::SetTooltip("%s", tooltip_buf);
+                }
+
+                ImGui::SameLine();
+
+                // Cancel button (ESC to cancel)
+                bool esc_pressed = ImGui::IsKeyPressed(ImGuiKey_Escape);
+                if (ImGui::Button("Cancel") || esc_pressed) {
+                    ImGui::CloseCurrentPopup();
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tooltip_buf[128];
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Go back and save your changes before exiting.\n"
+                             "You can also press 'ESCAPE'.");
+                    ImGui::SetTooltip("%s", tooltip_buf);
+                }
+
+                ImGui::EndPopup();
+            }
+
             ImGui::Render();
 
             SDL_SetRenderDrawColor(tracker->renderer, (Uint8) (app_settings.tracker_bg_color.r),

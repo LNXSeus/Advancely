@@ -26,7 +26,12 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
         ImGui_ImplSDL3_ProcessEvent(&event);
         // TOP LEVEL QUIT when it's not the X on the settings window
         if (event.type == SDL_EVENT_QUIT) {
-            *is_running = false;
+            // Check for unsaved changes before quitting
+            if (t && (t->settings_has_unsaved_changes || t->template_editor_has_unsaved_changes)) {
+                t->quit_requested = true;
+            } else {
+                *is_running = false;
+            }
             break;
         }
 

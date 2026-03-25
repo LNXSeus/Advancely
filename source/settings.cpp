@@ -344,6 +344,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Unsaved changes
     bool has_unsaved_changes = are_settings_different(&temp_settings, &saved_settings);
 
+    // Communicate settings unsaved state to tracker for quit confirmation popup
+    if (t) t->settings_has_unsaved_changes = has_unsaved_changes;
+
     // Revert Changes -> Ctrl+Z / Cmd+Z hotkey logic
     if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && has_unsaved_changes && !
         ImGui::IsAnyItemActive() &&

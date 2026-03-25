@@ -79,6 +79,8 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
     t->visual_drag_goal_type[0] = '\0';
     t->visual_drag_child_root_name[0] = '\0';
     t->template_editor_has_unsaved_changes = false;
+    t->settings_has_unsaved_changes = false;
+    t->quit_requested = false;
 
     log_message(LOG_INFO, "[INIT SDL] Tracker initialized!\n");
 

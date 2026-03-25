@@ -2731,12 +2731,16 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
 }
 
 void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settings_opened) {
-    (void) t; // Not directly used, but kept for consistency
 
     switch (event->type) {
         // This should be handled in the global event handler
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-            *is_running = false;
+            // Check for unsaved changes before quitting
+            if (t && (t->settings_has_unsaved_changes || t->template_editor_has_unsaved_changes)) {
+                t->quit_requested = true;
+            } else {
+                *is_running = false;
+            }
             break;
 
         case SDL_EVENT_KEY_DOWN:

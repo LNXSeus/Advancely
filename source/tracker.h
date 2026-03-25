@@ -100,6 +100,8 @@ struct Tracker {
     char visual_drag_goal_type[32]; // Type of the goal being dragged ("Advancement", "Stat", "Multi-Stage Goal", etc.)
     char visual_drag_child_root_name[192]; // Root name of the criterion/sub-stat being dragged (empty if dragging a parent)
     bool template_editor_has_unsaved_changes; // Communicated from the template editor to the settings window
+    bool settings_has_unsaved_changes; // Communicated from settings to the quit confirmation popup
+    bool quit_requested; // Set when user tries to quit with unsaved changes, triggers confirmation popup
 
     // Multi-select state for visual layout editing
     bool visual_item_interacted_this_frame; // Set when any draggable item is hovered or active
