@@ -7193,6 +7193,23 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 char target_val_str[32];
                                 snprintf(target_val_str, sizeof(target_val_str), "%d", stage.required_progress);
 
+                                // Get the version-aware type display name for this stage
+                                const char *stage_type_name = "Unknown";
+                                switch (stage.type) {
+                                    case SUBGOAL_STAT:
+                                        stage_type_name = (creator_selected_version <= MC_VERSION_1_11_2)
+                                                              ? "Stat / Achievement" : "Stat";
+                                        break;
+                                    case SUBGOAL_ADVANCEMENT: stage_type_name = advancements_label_upper;
+                                        break;
+                                    case SUBGOAL_UNLOCK: stage_type_name = "Unlock";
+                                        break;
+                                    case SUBGOAL_CRITERION: stage_type_name = "Criterion";
+                                        break;
+                                    case SUBGOAL_MANUAL: stage_type_name = "Final";
+                                        break;
+                                }
+
                                 // Check standard fields
                                 bool standard_match = str_contains_insensitive(stage.display_text, tc_search_buffer) ||
                                                       str_contains_insensitive(stage.stage_id, tc_search_buffer) ||
@@ -7202,13 +7219,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                       ||
                                                       strstr(target_val_str, tc_search_buffer) != nullptr;
 
+                                // Check the type name
+                                bool type_match = str_contains_insensitive(stage_type_name, tc_search_buffer);
+
                                 // Check stage icon path IF enabled, so it works with search
                                 bool icon_match = false;
                                 if (goal.use_stage_icons) {
                                     icon_match = str_contains_insensitive(stage.icon_path, tc_search_buffer);
                                 }
 
-                                if (standard_match || icon_match) {
+                                if (standard_match || type_match || icon_match) {
                                     stage_match = true;
                                     break;
                                 }
@@ -7629,10 +7649,29 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             for (const auto &stage: goal.stages) {
                                 char target_val_str[32];
                                 snprintf(target_val_str, sizeof(target_val_str), "%d", stage.required_progress);
+
+                                // Get the version-aware type display name
+                                const char *stage_type_name = "Unknown";
+                                switch (stage.type) {
+                                    case SUBGOAL_STAT:
+                                        stage_type_name = (creator_selected_version <= MC_VERSION_1_11_2)
+                                                              ? "Stat / Achievement" : "Stat";
+                                        break;
+                                    case SUBGOAL_ADVANCEMENT: stage_type_name = advancements_label_upper;
+                                        break;
+                                    case SUBGOAL_UNLOCK: stage_type_name = "Unlock";
+                                        break;
+                                    case SUBGOAL_CRITERION: stage_type_name = "Criterion";
+                                        break;
+                                    case SUBGOAL_MANUAL: stage_type_name = "Final";
+                                        break;
+                                }
+
                                 if (str_contains_insensitive(stage.display_text, tc_search_buffer) ||
                                     str_contains_insensitive(stage.stage_id, tc_search_buffer) ||
                                     str_contains_insensitive(stage.root_name, tc_search_buffer) ||
                                     str_contains_insensitive(stage.parent_advancement, tc_search_buffer) ||
+                                    str_contains_insensitive(stage_type_name, tc_search_buffer) ||
                                     (stage.required_progress != 0 && strstr(target_val_str, tc_search_buffer) !=
                                      nullptr)) {
                                     visible_stages_count++;
@@ -7821,6 +7860,23 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 char target_val_str[32];
                                 snprintf(target_val_str, sizeof(target_val_str), "%d", stage.required_progress);
 
+                                // Get the version-aware type display name
+                                const char *stage_type_name = "Unknown";
+                                switch (stage.type) {
+                                    case SUBGOAL_STAT:
+                                        stage_type_name = (creator_selected_version <= MC_VERSION_1_11_2)
+                                                              ? "Stat / Achievement" : "Stat";
+                                        break;
+                                    case SUBGOAL_ADVANCEMENT: stage_type_name = advancements_label_upper;
+                                        break;
+                                    case SUBGOAL_UNLOCK: stage_type_name = "Unlock";
+                                        break;
+                                    case SUBGOAL_CRITERION: stage_type_name = "Criterion";
+                                        break;
+                                    case SUBGOAL_MANUAL: stage_type_name = "Final";
+                                        break;
+                                }
+
                                 // Check standard fields
                                 bool standard_match = str_contains_insensitive(stage.display_text, tc_search_buffer) ||
                                                       str_contains_insensitive(stage.stage_id, tc_search_buffer) ||
@@ -7831,14 +7887,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                       (stage.required_progress != 0 && strstr(
                                                            target_val_str, tc_search_buffer) != nullptr);
 
+                                // Check the type name
+                                bool type_match = str_contains_insensitive(stage_type_name, tc_search_buffer);
+
                                 // Check stage icon path IF enabled
                                 bool icon_match = false;
                                 if (goal.use_stage_icons) {
                                     icon_match = str_contains_insensitive(stage.icon_path, tc_search_buffer);
                                 }
 
-                                // If neither matches, skip this stage
-                                if (!standard_match && !icon_match) {
+                                // If nothing matches, skip this stage
+                                if (!standard_match && !type_match && !icon_match) {
                                     continue;
                                 }
                             }
