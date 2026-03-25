@@ -22,6 +22,7 @@
 
 #include <set>
 #include <vector>
+#include <unordered_set>
 
 #include "init_sdl.h"
 #include "path_utils.h"
@@ -45,6 +46,19 @@ ImGui::SetWindowFontScale(scale_factor); \
 } while(0) // Use do-while(0) for macro safety
 
 #define RESET_FONT_SCALE() ImGui::SetWindowFontScale(1.0f)
+
+// --- Visual Layout Multi-Select State ---
+// Registered draggable items for selection rectangle hit-testing (rebuilt every frame)
+struct VisualLayoutItem {
+    ImVec2 screen_pos; // Top-left corner on screen
+    ImVec2 size;       // Size on screen
+    ManualPos *pos;    // Pointer to the ManualPos being controlled
+};
+static std::vector<VisualLayoutItem> s_visual_layout_items;
+static std::vector<VisualLayoutItem> s_visual_layout_items_prev; // Previous frame snapshot for lookups during rendering
+static std::unordered_set<ManualPos *> s_visual_selected_items;
+
+
 
 // Simple string hashing function (djb2) to create a safe filename from a world path
 static unsigned long hash_string(const char *str) {
@@ -2895,6 +2909,30 @@ static ImVec2 get_anchor_offset(AnchorPoint anchor, float element_width, float e
     return ImVec2(offset_x, offset_y);
 }
 
+// Initializes an unset ManualPos by reverse-engineering its world position from the registered screen rect.
+static void init_unset_pos_from_screen(ManualPos *pos, float zoom_level, ImVec2 camera_offset) {
+    if (pos->is_set) return;
+    // Search the previous frame's registration list (complete), since the current frame's
+    // list may be incomplete during rendering when items are registered incrementally.
+    for (const auto &item : s_visual_layout_items_prev) {
+        if (item.pos == pos) {
+            pos->is_set = true;
+            float world_top_left_x = (item.screen_pos.x - camera_offset.x) / zoom_level;
+            float world_top_left_y = (item.screen_pos.y - camera_offset.y) / zoom_level;
+            float element_w = item.size.x / zoom_level;
+            float element_h = item.size.y / zoom_level;
+            ImVec2 anchor_off = get_anchor_offset(pos->anchor, element_w, element_h);
+            pos->x = roundf(world_top_left_x - anchor_off.x);
+            pos->y = roundf(world_top_left_y - anchor_off.y);
+            return;
+        }
+    }
+    // Fallback if not found (shouldn't happen)
+    pos->is_set = true;
+    pos->x = 100.0f;
+    pos->y = 100.0f;
+}
+
 // Draws a contrasting crosshair (black outline + white inner) at the given screen position.
 static void draw_anchor_crosshair(ImDrawList *draw_list, ImVec2 pos, float size) {
     ImU32 outline_color = IM_COL32(0, 0, 0, 200);
@@ -2962,6 +3000,26 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
 
     bool is_dragging = ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left);
     bool is_hovered = ImGui::IsItemHovered();
+    bool is_just_clicked = ImGui::IsItemActivated();
+
+    // Register this item for selection rectangle hit-testing
+    s_visual_layout_items.push_back({item_screen_pos, hit_box_size, &target_pos});
+
+    // Mark that an item was interacted with (prevents selection rectangle from starting)
+    if (is_hovered || ImGui::IsItemActive()) {
+        t->visual_item_interacted_this_frame = true;
+    }
+
+    // Handle click-to-select/deselect
+    if (is_just_clicked) {
+        bool is_selected = s_visual_selected_items.count(&target_pos) > 0;
+        if (!is_selected) {
+            // Clicking an unselected item: clear selection, select only this one
+            s_visual_selected_items.clear();
+            s_visual_selected_items.insert(&target_pos);
+        }
+        // If already selected, keep the selection (allows multi-drag)
+    }
 
     if (is_dragging) {
         ImGuiIO &io = ImGui::GetIO();
@@ -2971,15 +3029,12 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
         if (parent_root_name && parent_root_name[0] != '\0') {
             strncpy(t->visual_drag_root_name, parent_root_name, sizeof(t->visual_drag_root_name) - 1);
             t->visual_drag_root_name[sizeof(t->visual_drag_root_name) - 1] = '\0';
-            // Store the child's own root_name for opening its collapsible header
             if (root_name && root_name[0] != '\0') {
                 strncpy(t->visual_drag_child_root_name, root_name, sizeof(t->visual_drag_child_root_name) - 1);
                 t->visual_drag_child_root_name[sizeof(t->visual_drag_child_root_name) - 1] = '\0';
             } else {
                 t->visual_drag_child_root_name[0] = '\0';
             }
-            // Map child type back to parent type
-            // "Criterion" -> "Advancement", "Achievement" -> "Achievement", "Sub-Stat" -> "Stat"
             if (strcmp(goal_type, "Sub-Stat") == 0) {
                 strncpy(t->visual_drag_goal_type, "Stat", sizeof(t->visual_drag_goal_type) - 1);
             } else if (strcmp(goal_type, "Achievement") == 0) {
@@ -2993,12 +3048,11 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
             t->visual_drag_root_name[sizeof(t->visual_drag_root_name) - 1] = '\0';
             strncpy(t->visual_drag_goal_type, goal_type, sizeof(t->visual_drag_goal_type) - 1);
             t->visual_drag_goal_type[sizeof(t->visual_drag_goal_type) - 1] = '\0';
-            t->visual_drag_child_root_name[0] = '\0'; // No child when dragging a parent
+            t->visual_drag_child_root_name[0] = '\0';
         }
 
         // If this is the very first time dragging it, reverse-engineer its current
         // procedural screen position back into World X/Y coordinates!
-        // We need to undo the anchor offset to store the anchor point, not the top-left.
         if (!target_pos.is_set) {
             target_pos.is_set = true;
             float world_top_left_x = (item_screen_pos.x - t->camera_offset.x) / t->zoom_level;
@@ -3010,11 +3064,22 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
             target_pos.y = roundf(world_top_left_y - anchor_off.y);
         }
 
-        // Apply drag delta, snap to full pixels, and clamp to safe range +- 10 Mil
-        target_pos.x = fminf(fmaxf(roundf(target_pos.x + (io.MouseDelta.x / t->zoom_level)), -MANUAL_POS_MAX),
-                             MANUAL_POS_MAX);
-        target_pos.y = fminf(fmaxf(roundf(target_pos.y + (io.MouseDelta.y / t->zoom_level)), -MANUAL_POS_MAX),
-                             MANUAL_POS_MAX);
+        float dx = io.MouseDelta.x / t->zoom_level;
+        float dy = io.MouseDelta.y / t->zoom_level;
+
+        // Apply drag delta to this item
+        target_pos.x = fminf(fmaxf(roundf(target_pos.x + dx), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+        target_pos.y = fminf(fmaxf(roundf(target_pos.y + dy), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+
+        // Multi-drag: also move all OTHER selected items by the same delta
+        if (s_visual_selected_items.count(&target_pos) > 0) {
+            for (ManualPos *sel_pos: s_visual_selected_items) {
+                if (sel_pos == &target_pos) continue;
+                init_unset_pos_from_screen(sel_pos, t->zoom_level, t->camera_offset);
+                sel_pos->x = fminf(fmaxf(roundf(sel_pos->x + dx), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                sel_pos->y = fminf(fmaxf(roundf(sel_pos->y + dy), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+            }
+        }
 
         // Signal the Editor to sync this frame!
         t->visual_layout_just_dragged = true;
@@ -6113,13 +6178,38 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
 
                     // Custom dual-endpoint dragging from the line's center
                     ImGui::PushID(drag_id_line);
-                    ImGui::SetCursorScreenPos(ImVec2(mid_x - line_handle_size * 0.5f,
-                                                      mid_y - line_handle_size * 0.5f));
+                    ImVec2 line_handle_pos = ImVec2(mid_x - line_handle_size * 0.5f,
+                                                     mid_y - line_handle_size * 0.5f);
+                    ImGui::SetCursorScreenPos(line_handle_pos);
                     ImGui::InvisibleButton("##drag_handle", ImVec2(line_handle_size, line_handle_size));
 
                     bool is_line_dragging = ImGui::IsItemActive() &&
                                             ImGui::IsMouseDragging(ImGuiMouseButton_Left);
                     bool is_line_hovered = ImGui::IsItemHovered();
+                    bool is_line_just_clicked = ImGui::IsItemActivated();
+
+                    // Register both endpoints for selection hit-testing
+                    s_visual_layout_items.push_back({line_handle_pos,
+                                                      ImVec2(line_handle_size, line_handle_size),
+                                                      &elem->pos});
+                    s_visual_layout_items.push_back({line_handle_pos,
+                                                      ImVec2(line_handle_size, line_handle_size),
+                                                      &elem->pos2});
+
+                    if (is_line_hovered || ImGui::IsItemActive()) {
+                        t->visual_item_interacted_this_frame = true;
+                    }
+
+                    // Handle click-to-select for whole-line drag
+                    if (is_line_just_clicked) {
+                        bool either_selected = s_visual_selected_items.count(&elem->pos) > 0 ||
+                                               s_visual_selected_items.count(&elem->pos2) > 0;
+                        if (!either_selected) {
+                            s_visual_selected_items.clear();
+                            s_visual_selected_items.insert(&elem->pos);
+                            s_visual_selected_items.insert(&elem->pos2);
+                        }
+                    }
 
                     if (is_line_dragging) {
                         ImGuiIO &io = ImGui::GetIO();
@@ -6132,7 +6222,6 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                         t->visual_drag_goal_type[sizeof(t->visual_drag_goal_type) - 1] = '\0';
                         t->visual_drag_child_root_name[0] = '\0';
 
-                        // Initialize both endpoints if not set
                         if (!elem->pos.is_set) {
                             elem->pos.is_set = true;
                             elem->pos.x = roundf((x1 - t->camera_offset.x) / t->zoom_level);
@@ -6144,9 +6233,10 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                             elem->pos2.y = roundf((y2 - t->camera_offset.y) / t->zoom_level);
                         }
 
-                        // Move both endpoints by the same delta
                         float dx = io.MouseDelta.x / t->zoom_level;
                         float dy = io.MouseDelta.y / t->zoom_level;
+
+                        // Move both line endpoints
                         elem->pos.x = fminf(fmaxf(roundf(elem->pos.x + dx), -MANUAL_POS_MAX),
                                              MANUAL_POS_MAX);
                         elem->pos.y = fminf(fmaxf(roundf(elem->pos.y + dy), -MANUAL_POS_MAX),
@@ -6155,6 +6245,20 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                                                MANUAL_POS_MAX);
                         elem->pos2.y = fminf(fmaxf(roundf(elem->pos2.y + dy), -MANUAL_POS_MAX),
                                                MANUAL_POS_MAX);
+
+                        // Multi-drag: move all other selected items
+                        bool line_is_selected = s_visual_selected_items.count(&elem->pos) > 0 ||
+                                                s_visual_selected_items.count(&elem->pos2) > 0;
+                        if (line_is_selected) {
+                            for (ManualPos *sel_pos: s_visual_selected_items) {
+                                if (sel_pos == &elem->pos || sel_pos == &elem->pos2) continue;
+                                init_unset_pos_from_screen(sel_pos, t->zoom_level, t->camera_offset);
+                                sel_pos->x = fminf(fmaxf(roundf(sel_pos->x + dx), -MANUAL_POS_MAX),
+                                                    MANUAL_POS_MAX);
+                                sel_pos->y = fminf(fmaxf(roundf(sel_pos->y + dy), -MANUAL_POS_MAX),
+                                                    MANUAL_POS_MAX);
+                            }
+                        }
 
                         t->visual_layout_just_dragged = true;
                         SDL_SetAtomicInt(&g_templates_changed, 1);
@@ -6214,6 +6318,12 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
     // Reset the hover flag at the START of the frame, used for scrollable lists
     t->is_hovering_scrollable_list = false;
+
+    // Snapshot the previous frame's item list (complete) for lookups during multi-drag,
+    // then clear the current list so it can be rebuilt as items render this frame.
+    s_visual_layout_items_prev.swap(s_visual_layout_items);
+    s_visual_layout_items.clear();
+    t->visual_item_interacted_this_frame = false;
 
     // This is the starting Y position for all rendering.
     // Each section will render itself and update this value for the next section.
@@ -6280,6 +6390,71 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     // Render decorations (text headers, lines, arrows) - only visible in manual layout mode
     render_decorations(t, settings);
 
+    // --- Visual Layout Multi-Select ---
+    if (t->is_visual_layout_editing && settings->use_manual_layout) {
+        ImDrawList *fg_draw_list = ImGui::GetForegroundDrawList();
+
+        // Draw highlight around selected items
+        for (const auto &item: s_visual_layout_items) {
+            if (s_visual_selected_items.count(item.pos) > 0) {
+                ImVec2 p_min = item.screen_pos;
+                ImVec2 p_max = ImVec2(p_min.x + item.size.x, p_min.y + item.size.y);
+                fg_draw_list->AddRect(p_min, p_max,
+                                       IM_COL32(settings->text_color.r, settings->text_color.g,
+                                                settings->text_color.b, 180),
+                                       2.0f, 0, 2.0f);
+            }
+        }
+
+        // Selection rectangle logic
+        if (ImGui::IsWindowHovered(ImGuiHoveredFlags_None)) {
+            // Start selection rectangle on left-click if no item was interacted with
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->visual_item_interacted_this_frame) {
+                t->visual_select_rect_active = true;
+                t->visual_select_rect_start = ImGui::GetMousePos();
+                s_visual_selected_items.clear();
+            }
+        }
+
+        // Draw and finalize selection rectangle
+        if (t->visual_select_rect_active) {
+            if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                ImVec2 mouse_pos = ImGui::GetMousePos();
+                ImVec2 rect_min = ImVec2(fminf(t->visual_select_rect_start.x, mouse_pos.x),
+                                          fminf(t->visual_select_rect_start.y, mouse_pos.y));
+                ImVec2 rect_max = ImVec2(fmaxf(t->visual_select_rect_start.x, mouse_pos.x),
+                                          fmaxf(t->visual_select_rect_start.y, mouse_pos.y));
+
+                // Draw the selection rectangle
+                fg_draw_list->AddRectFilled(rect_min, rect_max,
+                                             IM_COL32(settings->text_color.r, settings->text_color.g,
+                                                      settings->text_color.b, 40));
+                fg_draw_list->AddRect(rect_min, rect_max,
+                                       IM_COL32(settings->text_color.r, settings->text_color.g,
+                                                settings->text_color.b, 150),
+                                       0.0f, 0, 1.5f);
+
+                // Live-update selection as rectangle is drawn
+                s_visual_selected_items.clear();
+                for (const auto &item: s_visual_layout_items) {
+                    ImVec2 item_center = ImVec2(item.screen_pos.x + item.size.x * 0.5f,
+                                                 item.screen_pos.y + item.size.y * 0.5f);
+                    if (item_center.x >= rect_min.x && item_center.x <= rect_max.x &&
+                        item_center.y >= rect_min.y && item_center.y <= rect_max.y) {
+                        s_visual_selected_items.insert(item.pos);
+                    }
+                }
+            } else {
+                // Mouse released — finalize selection
+                t->visual_select_rect_active = false;
+            }
+        }
+
+        // Clear selection when visual editing is disabled
+    } else if (!t->is_visual_layout_editing && !s_visual_selected_items.empty()) {
+        s_visual_selected_items.clear();
+        t->visual_select_rect_active = false;
+    }
 
     // --- Info Bar ---
 

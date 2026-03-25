@@ -101,6 +101,11 @@ struct Tracker {
     char visual_drag_child_root_name[192]; // Root name of the criterion/sub-stat being dragged (empty if dragging a parent)
     bool template_editor_has_unsaved_changes; // Communicated from the template editor to the settings window
 
+    // Multi-select state for visual layout editing
+    bool visual_item_interacted_this_frame; // Set when any draggable item is hovered or active
+    bool visual_select_rect_active; // True while drawing a selection rectangle
+    ImVec2 visual_select_rect_start; // Screen coords where the selection rectangle started
+
 
     char notes_buffer[65536]; // 64KB buffer to hold the text for the notes.
     char notes_path[MAX_PATH_LENGTH]; // The dynamic path to the current notes file.
