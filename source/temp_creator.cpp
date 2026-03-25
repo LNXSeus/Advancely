@@ -3870,6 +3870,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
         } else {
+            static GoalHidingMode pre_visual_edit_hiding_mode = SHOW_ALL;
+
             if (ImGui::Button(vis_btn_text)) {
                 t->is_visual_layout_editing = !t->is_visual_layout_editing;
 
@@ -3884,6 +3886,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                    status_message, app_settings);
                     }
 
+                    // Remember the current hiding mode before overriding
+                    pre_visual_edit_hiding_mode = app_settings->goal_hiding_mode;
+
                     // Automatically force "Manual Layout" ON
                     app_settings->use_manual_layout = true;
 
@@ -3891,6 +3896,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     app_settings->goal_hiding_mode = SHOW_ALL;
 
                     // Save and immediately trigger a reload so the hidden items pop into view!
+                    settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
+                    SDL_SetAtomicInt(&g_settings_changed, 1);
+                } else {
+                    // Restore the hiding mode that was active before visual editing
+                    app_settings->goal_hiding_mode = pre_visual_edit_hiding_mode;
                     settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
                     SDL_SetAtomicInt(&g_settings_changed, 1);
                 }
