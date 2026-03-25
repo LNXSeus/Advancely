@@ -371,6 +371,23 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::Spacing();
     }
 
+    // --- No saves path warning ---
+    {
+        bool has_valid_saves = t && t->saves_path[0] != '\0' && path_exists(t->saves_path);
+        if (has_valid_saves) {
+            size_t sp_len = strlen(t->saves_path);
+            if (sp_len > 0 && t->saves_path[sp_len - 1] == '/') sp_len--;
+            has_valid_saves = (sp_len >= 6 && strncmp(t->saves_path + sp_len - 6, "/saves", 6) == 0);
+        }
+        if (!has_valid_saves) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.6f, 0.2f, 1.0f));
+            ImGui::TextWrapped("Warning: No valid Minecraft saves folder is currently being tracked.");
+            ImGui::PopStyleColor();
+            ImGui::Separator();
+            ImGui::Spacing();
+        }
+    }
+
     // --- Restart Warning (only applies to UI font size and fonts) ---
     bool font_settings_changed =
             strcmp(temp_settings.tracker_font_name, saved_settings.tracker_font_name) != 0 ||
