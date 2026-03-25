@@ -333,6 +333,41 @@ static bool are_editor_decorations_different(const EditorDecorationElement &a, c
     return false;
 }
 
+// Helper: clear arrow goal links that reference a removed goal.
+// If stage is nullptr or empty, clears links matching root_name with any stage.
+// If stage is provided, only clears links matching both root_name and stage.
+static void clear_arrow_goal_links(std::vector<EditorDecorationElement> &decorations,
+                                   const char *root_name, const char *stage = nullptr) {
+    for (auto &deco : decorations) {
+        if (deco.type != DECORATION_ARROW) continue;
+        bool clear_start = false;
+        bool clear_end = false;
+        if (stage && stage[0] != '\0') {
+            // Clear only if both root and stage match
+            if (strcmp(deco.start_goal_root, root_name) == 0 &&
+                strcmp(deco.start_goal_stage, stage) == 0)
+                clear_start = true;
+            if (strcmp(deco.end_goal_root, root_name) == 0 &&
+                strcmp(deco.end_goal_stage, stage) == 0)
+                clear_end = true;
+        } else {
+            // Clear any link matching root_name (regardless of stage)
+            if (strcmp(deco.start_goal_root, root_name) == 0)
+                clear_start = true;
+            if (strcmp(deco.end_goal_root, root_name) == 0)
+                clear_end = true;
+        }
+        if (clear_start) {
+            deco.start_goal_root[0] = '\0';
+            deco.start_goal_stage[0] = '\0';
+        }
+        if (clear_end) {
+            deco.end_goal_root[0] = '\0';
+            deco.end_goal_stage[0] = '\0';
+        }
+    }
+}
+
 // Main comparison function for the entire editor state
 static bool are_editor_templates_different(const EditorTemplate &a, const EditorTemplate &b) {
     if (a.unlocks.size() != b.unlocks.size() ||
@@ -4472,6 +4507,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             selected_advancement = nullptr;
                         }
 
+                        // Clear arrow links referencing this advancement or its criteria
+                        clear_arrow_goal_links(current_template_data.decorations, adv_to_remove->root_name);
+                        for (const auto &crit : adv_to_remove->criteria) {
+                            clear_arrow_goal_links(current_template_data.decorations, crit.root_name);
+                        }
+
                         current_template_data.advancements.erase(
                             std::remove_if(current_template_data.advancements.begin(),
                                            current_template_data.advancements.end(),
@@ -5061,6 +5102,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
 
                         if (criterion_to_remove != -1) {
+                            clear_arrow_goal_links(current_template_data.decorations,
+                                                   advancement.criteria[criterion_to_remove].root_name);
                             advancement.criteria.erase(advancement.criteria.begin() + criterion_to_remove);
                             save_message_type = MSG_NONE;
                         }
@@ -5628,6 +5671,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         EditorTrackableCategory *stat_to_remove = stats_to_render[stat_to_remove_idx];
                         if (selected_stat == stat_to_remove) {
                             selected_stat = nullptr;
+                        }
+
+                        // Clear arrow links referencing this stat or its sub-stats
+                        clear_arrow_goal_links(current_template_data.decorations, stat_to_remove->root_name);
+                        for (const auto &sub : stat_to_remove->criteria) {
+                            clear_arrow_goal_links(current_template_data.decorations, sub.root_name);
                         }
 
                         current_template_data.stats.erase(
@@ -6306,6 +6355,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
 
                             if (crit_to_remove != -1) {
+                                clear_arrow_goal_links(current_template_data.decorations,
+                                                       stat_cat.criteria[crit_to_remove].root_name);
                                 stat_cat.criteria.erase(stat_cat.criteria.begin() + crit_to_remove);
                                 save_message_type = MSG_NONE;
                             }
@@ -6715,6 +6766,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     if (item_to_remove != -1) {
+                        clear_arrow_goal_links(current_template_data.decorations,
+                                               current_template_data.unlocks[item_to_remove].root_name);
                         current_template_data.unlocks.erase(current_template_data.unlocks.begin() + item_to_remove);
                         save_message_type = MSG_NONE;
                     }
@@ -7127,6 +7180,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
 
                     if (item_to_remove != -1) {
+                        clear_arrow_goal_links(current_template_data.decorations,
+                                               current_template_data.custom_goals[item_to_remove].root_name);
                         current_template_data.custom_goals.erase(
                             current_template_data.custom_goals.begin() + item_to_remove);
                         save_message_type = MSG_NONE;
@@ -7659,6 +7714,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (selected_ms_goal == goal_to_remove) {
                             selected_ms_goal = nullptr;
                         }
+
+                        // Clear arrow links referencing this goal or any of its stages
+                        clear_arrow_goal_links(current_template_data.decorations, goal_to_remove->root_name);
 
                         current_template_data.multi_stage_goals.erase(
                             std::remove_if(current_template_data.multi_stage_goals.begin(),
@@ -8648,6 +8706,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         if (stage_to_remove != -1) {
+                            clear_arrow_goal_links(current_template_data.decorations,
+                                                   goal.root_name,
+                                                   goal.stages[stage_to_remove].stage_id);
                             goal.stages.erase(goal.stages.begin() + stage_to_remove);
                             ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
@@ -10997,6 +11058,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (ImGui::Button("X##ClearGoalSearch", ImVec2(clear_button_width_gs, 0))) {
                 goal_selector_search_buffer[0] = '\0';
             }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s", "Clear Search");
+            }
         } else {
             ImGui::Dummy(ImVec2(clear_button_width_gs, 0));
         }
@@ -11226,7 +11290,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[128];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Cancel the selection and close this window.\n(You can also press ESCAPE)");
+                     "Cancel the selection and close this window.\nYou can also press ESCAPE.");
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
 

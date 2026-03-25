@@ -141,7 +141,8 @@ import, create, copy, and modify any template directly within Advancely.
   Enable "Manual Layout" in settings, then use the **Visual Layout Editor** in the Template Editor to drag-and-drop
   items directly on the live tracker. Select multiple items at once with a selection rectangle and move them together.
 * **Decorations:** Add visual elements to your manual layout that aren't tied to game data. **Text Headers** display
-  custom text using the tracker font, and **Lines** connect or separate areas with configurable thickness and opacity.
+  custom text using the tracker font, **Lines** connect or separate areas with configurable thickness and opacity,
+  and **Arrows** visually link goals together with customizable arrowheads, bend points, and goal-linked opacity.
 
 This powerful and flexible system makes Advancely the ultimate tool for any Minecraft challenge, from a vanilla "All
 Advancements" run to a heavily modded playthrough with hundreds of custom milestones.
@@ -200,7 +201,9 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
   find them.
 * **Decorations**: Add purely visual elements to your manual layout. **Text Headers** render custom text using the
   tracker's font and size, perfect for labeling sections of your map. **Lines** draw between two endpoints with
-  configurable thickness and opacity, using the tracker's text color.
+  configurable thickness and opacity, using the tracker's text color. **Arrows** draw a path from a tail through
+  optional bend points to an arrowhead tip, and can be linked to a **Start Goal** and **End Goal** to change opacity
+  based on completion state, ideal for all achievement runs, where the completion order matters.
 * **Section Completion Counters**: Each section header displays dynamic counters showing completed items versus the
   total visible items for that section, respecting both the current Goal Visibility setting and any active search
   filter.
@@ -741,6 +744,16 @@ tied to any game data. These elements are only visible when "Manual Layout" mode
 * **Lines**: Draw a line between two endpoints on the map. Lines use the tracker's text color and have configurable
   **Thickness** and **Opacity** sliders. Each endpoint can be dragged independently in the Visual Layout Editor, or
   you can drag the line's midpoint marker to move the entire line at once.
+* **Arrows**: Draw a directional path from a **Tail** to an arrowhead **Tip**, optionally passing through up to 16
+  **Bend** points. Arrows use the tracker's text color and have configurable **Thickness** and **Arrowhead Size**.
+  All points (tail, bends, tip) can be dragged independently in the Visual Layout Editor, or use the midpoint marker
+  to move the entire arrow at once. Arrows support **Goal Linking**:
+    * **Start Goal**: Select any goal, sub-goal, or multi-stage goal stage from the template. Before this goal is
+      completed the arrow renders at its **Opacity Before** value (default: faded). Once completed, the arrow
+      transitions to **Opacity After** (default: fully opaque).
+    * **End Goal**: When this goal is completed and the Goal Visibility setting is set to "Remove Completed Goals",
+      the arrow is hidden entirely.
+    * Use the **Select Goal** popup (with search via `Ctrl+F` / `Cmd+F`) to pick goals from any tab in the template.
 
 ### Visual Layout Editor
 
