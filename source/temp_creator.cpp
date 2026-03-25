@@ -9088,7 +9088,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                          "Link the arrow to goals to change its opacity based on completion.\n"
                                          "Start Goal: When completed, the arrow transitions to 'After' opacity.\n"
-                                         "End Goal: When completed AND hiding mode is 'Remove Completed',\n"
+                                         "End Goal: When completed AND hiding mode is 'Hide All Completed',\n"
                                          "the arrow is hidden entirely.");
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
@@ -9160,7 +9160,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     char tooltip_buffer[256];
                                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                              "Select the goal that deactivates this arrow.\n"
-                                             "When completed and hiding mode is 'Remove Completed',\n"
+                                             "When completed and hiding mode is 'Hide All Completed',\n"
                                              "the arrow is hidden entirely.");
                                     ImGui::SetTooltip("%s", tooltip_buffer);
                                 }
@@ -11093,7 +11093,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     for (const auto &crit: adv.criteria) {
                         if (!matches_search(crit.root_name, crit.display_name, "Criterion") && !parent_match) continue;
                         char crit_label[384];
-                        snprintf(crit_label, sizeof(crit_label), "> %s##crit_%s", crit.root_name, crit.root_name);
+                        snprintf(crit_label, sizeof(crit_label), "> %s##crit_%s_%s", crit.root_name, adv.root_name, crit.root_name);
                         render_goal_selectable(crit_label, crit.root_name, nullptr, true);
                     }
                 }
@@ -11130,7 +11130,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     for (const auto &sub: stat.criteria) {
                         if (!matches_search(sub.root_name, sub.display_name, "Sub-Stat") && !parent_match) continue;
                         char sub_label[384];
-                        snprintf(sub_label, sizeof(sub_label), "> %s##sub_%s", sub.root_name, sub.root_name);
+                        snprintf(sub_label, sizeof(sub_label), "> %s##sub_%s_%s", sub.root_name, stat.root_name, sub.root_name);
                         render_goal_selectable(sub_label, sub.root_name, nullptr, true);
                     }
                 }
