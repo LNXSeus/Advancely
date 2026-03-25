@@ -56,8 +56,8 @@ class JavaRandom {
     int64_t seed_;
 
     static constexpr int64_t MULTIPLIER = 0x5DEECE66DLL;
-    static constexpr int64_t ADDEND     = 0xBLL;
-    static constexpr int64_t MASK       = (1LL << 48) - 1;
+    static constexpr int64_t ADDEND = 0xBLL;
+    static constexpr int64_t MASK = (1LL << 48) - 1;
 
 public:
     explicit JavaRandom(int64_t seed) {
@@ -67,7 +67,7 @@ public:
     // Advance the LCG and return the top `bits` bits of the new state.
     int next(int bits) {
         seed_ = (seed_ * MULTIPLIER + ADDEND) & MASK;
-        return (int)((uint64_t)seed_ >> (48 - bits));
+        return (int) ((uint64_t) seed_ >> (48 - bits));
     }
 
     // Matches java.util.Random.nextInt(int bound) exactly, including
@@ -75,22 +75,22 @@ public:
     int nextInt(int bound) {
         if (bound <= 0) return 0;
 
-        if ((bound & -bound) == bound)          // power of two
-            return (int)((bound * (int64_t)next(31)) >> 31);
+        if ((bound & -bound) == bound) // power of two
+            return (int) ((bound * (int64_t) next(31)) >> 31);
 
         int bits, val;
         do {
             bits = next(31);
-            val  = bits % bound;
+            val = bits % bound;
         } while (bits - val + (bound - 1) < 0); // reject to avoid modulo bias
         return val;
     }
 };
 
 class HermesRotator {
-    static constexpr uint8_t MIN_VAL     = 33;
-    static constexpr uint8_t MAX_VAL     = 126;
-    static constexpr int     N           = 94;
+    static constexpr uint8_t MIN_VAL = 33;
+    static constexpr uint8_t MAX_VAL = 126;
+    static constexpr int N = 94;
     static constexpr int64_t SHUFFLE_SEED = 7499203634667178692LL;
 
     uint8_t substitutionTable_[N];
@@ -98,33 +98,33 @@ class HermesRotator {
     void buildTables() {
         uint8_t chars[N];
         for (int i = 0; i < N; i++)
-            chars[i] = (uint8_t)(MIN_VAL + i);
+            chars[i] = (uint8_t) (MIN_VAL + i);
 
         JavaRandom rng(SHUFFLE_SEED);
         std::vector<uint8_t> pool(chars, chars + N);
         for (int i = 0; i < N; i++) {
-            int idx  = rng.nextInt((int)pool.size());
+            int idx = rng.nextInt((int) pool.size());
             chars[i] = pool[idx];
             pool.erase(pool.begin() + idx);
         }
 
         for (int i = 0; i < N; i++)
-            substitutionTable_[i] = (uint8_t)(MIN_VAL + i);
+            substitutionTable_[i] = (uint8_t) (MIN_VAL + i);
 
         const int shift = N / 2;
         for (int i = 0; i < N; i++)
             substitutionTable_[chars[i] - MIN_VAL] = chars[(i + shift) % N];
     }
 
-    static void halfReverse_(uint8_t* bytes, int len) {
+    static void halfReverse_(uint8_t *bytes, int len) {
         for (int i = 0; i < len / 2; i += 2) {
-            uint8_t tmp        = bytes[i];
-            bytes[i]           = bytes[len - 1 - i];
+            uint8_t tmp = bytes[i];
+            bytes[i] = bytes[len - 1 - i];
             bytes[len - 1 - i] = tmp;
         }
     }
 
-    void applySubstitution_(uint8_t* bytes, int len) const {
+    void applySubstitution_(uint8_t *bytes, int len) const {
         for (int i = 0; i < len; i++) {
             uint8_t c = bytes[i];
             if (c >= MIN_VAL && c <= MAX_VAL)
@@ -135,17 +135,17 @@ class HermesRotator {
 public:
     HermesRotator() { buildTables(); }
 
-    void processLine(uint8_t* bytes, int len) const {
+    void processLine(uint8_t *bytes, int len) const {
         halfReverse_(bytes, len);
         applySubstitution_(bytes, len);
     }
 
-    std::string processLine(const std::string& line) const {
+    std::string processLine(const std::string &line) const {
         std::string out = line;
         if (!out.empty() && out.back() == '\r')
             out.pop_back();
 
-        processLine(reinterpret_cast<uint8_t*>(out.data()), (int)out.size());
+        processLine(reinterpret_cast<uint8_t *>(out.data()), (int) out.size());
         return out;
     }
 };

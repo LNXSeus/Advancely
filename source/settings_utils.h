@@ -15,7 +15,6 @@
 #include <SDL3/SDL_stdinc.h> // Add this for Uint32
 
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -216,9 +215,9 @@ struct AppSettings {
     float overlay_row1_spacing; // Horizontal spacing between icons in Row 1.
     float overlay_row1_shared_icon_size; // Shared icon size for Row 1
     bool overlay_row2_custom_spacing_enabled; // If true, use custom spacing for row 2
-    float overlay_row2_custom_spacing;        // The custom spacing value for row 2
+    float overlay_row2_custom_spacing; // The custom spacing value for row 2
     bool overlay_row3_custom_spacing_enabled; // If true, use custom spacing for row 3
-    float overlay_row3_custom_spacing;        // The custom spacing value for row 3
+    float overlay_row3_custom_spacing; // The custom spacing value for row 3
     bool overlay_row3_remove_completed; // If true, the third row will also hide completed goals as row 2 does.
     float overlay_stat_cycle_speed; // Time in seconds between cycling sub-stats on the overlay.
 
@@ -232,20 +231,20 @@ struct AppSettings {
     float tracker_list_scroll_speed; // Configurable speed
     float tracker_vertical_spacing; // Vertical spacing in pixels between goals globally
     bool tracker_section_custom_width_enabled[SECTION_COUNT]; // An array of bools, one for each section
-    float tracker_section_custom_item_width[SECTION_COUNT];   // An array of item widths, one for each section
+    float tracker_section_custom_item_width[SECTION_COUNT]; // An array of item widths, one for each section
 
 
     bool notes_use_roboto_font; // If true, the notes window uses the Roboto font instead of the default.
     bool per_world_notes; // If true, notes are saved per world instead of per template
 
     // --- Font Settings --- (require restart)
-    char tracker_font_name[256];      // Filename of the font for the trackermap/overlay.
-    float tracker_font_size;          // Base size for the main trackermap font. Overlay is fixed.
-    float tracker_sub_font_size;      // Size for the sub-fonts (e.g., criteria) in the trackermap.
-    float tracker_ui_font_size;       // Size for the info bar and bottom controls.
-    char ui_font_name[256];           // Filename of the font for ImGui UI (settings, etc.).
-    float ui_font_size;               // Size for the UI font, may cause non-destructive overlap of buttons.
-    char overlay_font_name[256];      // Filename of the font for the overlay.
+    char tracker_font_name[256]; // Filename of the font for the trackermap/overlay.
+    float tracker_font_size; // Base size for the main trackermap font. Overlay is fixed.
+    float tracker_sub_font_size; // Size for the sub-fonts (e.g., criteria) in the trackermap.
+    float tracker_ui_font_size; // Size for the info bar and bottom controls.
+    char ui_font_name[256]; // Filename of the font for ImGui UI (settings, etc.).
+    float ui_font_size; // Size for the UI font, may cause non-destructive overlap of buttons.
+    char overlay_font_name[256]; // Filename of the font for the overlay.
     float overlay_font_size; // EXPERIMENTAL: Only changeable in settings.json directly
 
     // --- Window Geometry ---
@@ -259,9 +258,9 @@ struct AppSettings {
     ColorRGBA overlay_text_color; // Text color for the overlay window.
 
     // --- Background Texture Paths ---
-    char adv_bg_path[MAX_PATH_LENGTH];          // Relative path in resources/gui/
+    char adv_bg_path[MAX_PATH_LENGTH]; // Relative path in resources/gui/
     char adv_bg_half_done_path[MAX_PATH_LENGTH]; // Relative path in resources/gui/
-    char adv_bg_done_path[MAX_PATH_LENGTH];     // Relative path in resources/gui/
+    char adv_bg_done_path[MAX_PATH_LENGTH]; // Relative path in resources/gui/
 
     // --- UI Theme Colors (collapsible section) ---
     ColorRGBA ui_text_color; // Text color for the UI elements.

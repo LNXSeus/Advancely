@@ -326,21 +326,26 @@ bool apply_update(const char *main_executable_path) {
     // Handle double-zip: if update_temp contains a nested zip, extract it first.
     // Then locate Advancely.app (macOS) or the Advancely executable (Linux) directly,
     // regardless of how many wrapper folders the zip contains.
-    fprintf(updater_script, "NESTED_ZIP=$(find \"./%s\" -maxdepth 2 -name \"*.zip\" 2>/dev/null | head -1)\n", temp_dir);
+    fprintf(updater_script, "NESTED_ZIP=$(find \"./%s\" -maxdepth 2 -name \"*.zip\" 2>/dev/null | head -1)\n",
+            temp_dir);
     fprintf(updater_script, "if [ -n \"$NESTED_ZIP\" ]; then\n");
     fprintf(updater_script, "    echo \"Found nested zip: $NESTED_ZIP — extracting...\"\n");
     fprintf(updater_script, "    unzip -o \"$NESTED_ZIP\" -d \"./%s\"\n", temp_dir);
     fprintf(updater_script, "fi\n");
 #if defined(__APPLE__)
-    fprintf(updater_script, "APP_PATH=$(find \"./%s\" -name \"Advancely.app\" -maxdepth 4 -type d 2>/dev/null | head -1)\n", temp_dir);
+    fprintf(updater_script,
+            "APP_PATH=$(find \"./%s\" -name \"Advancely.app\" -maxdepth 4 -type d 2>/dev/null | head -1)\n", temp_dir);
     fprintf(updater_script, "if [ -n \"$APP_PATH\" ]; then SOURCE_DIR=$(dirname \"$APP_PATH\"); else\n");
-    fprintf(updater_script, "    echo \"ERROR: Could not locate Advancely.app anywhere in the update package — aborting.\"\n");
+    fprintf(updater_script,
+            "    echo \"ERROR: Could not locate Advancely.app anywhere in the update package — aborting.\"\n");
     fprintf(updater_script, "    exit 1\n");
     fprintf(updater_script, "fi\n");
 #else
-    fprintf(updater_script, "EXE_PATH=$(find \"./%s\" -name \"Advancely\" -maxdepth 4 -type f 2>/dev/null | head -1)\n", temp_dir);
+    fprintf(updater_script, "EXE_PATH=$(find \"./%s\" -name \"Advancely\" -maxdepth 4 -type f 2>/dev/null | head -1)\n",
+            temp_dir);
     fprintf(updater_script, "if [ -n \"$EXE_PATH\" ]; then SOURCE_DIR=$(dirname \"$EXE_PATH\"); else\n");
-    fprintf(updater_script, "    echo \"ERROR: Could not locate Advancely executable anywhere in the update package — aborting.\"\n");
+    fprintf(updater_script,
+            "    echo \"ERROR: Could not locate Advancely executable anywhere in the update package — aborting.\"\n");
     fprintf(updater_script, "    exit 1\n");
     fprintf(updater_script, "fi\n");
 #endif

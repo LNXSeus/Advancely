@@ -200,10 +200,10 @@ struct EditorDecorationElement {
     char id[64];
     DecorationType type;
     char display_text[192]; // For text headers
-    ManualPos pos = {};        // Text headers and first endpoint for lines
-    ManualPos pos2 = {};       // Second endpoint for lines
-    float thickness = 2.0f;    // Line thickness in pixels (before zoom)
-    float opacity = 1.0f;      // Line opacity 0.0-1.0
+    ManualPos pos = {}; // Text headers and first endpoint for lines
+    ManualPos pos2 = {}; // Second endpoint for lines
+    float thickness = 2.0f; // Line thickness in pixels (before zoom)
+    float opacity = 1.0f; // Line opacity 0.0-1.0
     int sort_order = 0;
 };
 
@@ -6099,8 +6099,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 stat_crit_dnd_source_index != stat_crit_dnd_target_index) {
                                 EditorTrackableItem item_to_move = stat_cat.criteria[stat_crit_dnd_source_index];
                                 stat_cat.criteria.erase(stat_cat.criteria.begin() + stat_crit_dnd_source_index);
-                                if (stat_crit_dnd_target_index > stat_crit_dnd_source_index) stat_crit_dnd_target_index
-                                        --;
+                                if (stat_crit_dnd_target_index > stat_crit_dnd_source_index)
+                                    stat_crit_dnd_target_index
+                                            --;
                                 stat_cat.criteria.insert(stat_cat.criteria.begin() + stat_crit_dnd_target_index,
                                                          item_to_move);
                                 save_message_type = MSG_NONE;
@@ -7198,7 +7199,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 switch (stage.type) {
                                     case SUBGOAL_STAT:
                                         stage_type_name = (creator_selected_version <= MC_VERSION_1_11_2)
-                                                              ? "Stat / Achievement" : "Stat";
+                                                              ? "Stat / Achievement"
+                                                              : "Stat";
                                         break;
                                     case SUBGOAL_ADVANCEMENT: stage_type_name = advancements_label_upper;
                                         break;
@@ -7655,7 +7657,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 switch (stage.type) {
                                     case SUBGOAL_STAT:
                                         stage_type_name = (creator_selected_version <= MC_VERSION_1_11_2)
-                                                              ? "Stat / Achievement" : "Stat";
+                                                              ? "Stat / Achievement"
+                                                              : "Stat";
                                         break;
                                     case SUBGOAL_ADVANCEMENT: stage_type_name = advancements_label_upper;
                                         break;
@@ -7865,7 +7868,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 switch (stage.type) {
                                     case SUBGOAL_STAT:
                                         stage_type_name = (creator_selected_version <= MC_VERSION_1_11_2)
-                                                              ? "Stat / Achievement" : "Stat";
+                                                              ? "Stat / Achievement"
+                                                              : "Stat";
                                         break;
                                     case SUBGOAL_ADVANCEMENT: stage_type_name = advancements_label_upper;
                                         break;

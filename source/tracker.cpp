@@ -51,13 +51,13 @@ ImGui::SetWindowFontScale(scale_factor); \
 // Registered draggable items for selection rectangle hit-testing (rebuilt every frame)
 struct VisualLayoutItem {
     ImVec2 screen_pos; // Top-left corner on screen
-    ImVec2 size;       // Size on screen
-    ManualPos *pos;    // Pointer to the ManualPos being controlled
+    ImVec2 size; // Size on screen
+    ManualPos *pos; // Pointer to the ManualPos being controlled
 };
+
 static std::vector<VisualLayoutItem> s_visual_layout_items;
 static std::vector<VisualLayoutItem> s_visual_layout_items_prev; // Previous frame snapshot for lookups during rendering
 static std::unordered_set<ManualPos *> s_visual_selected_items;
-
 
 
 // Simple string hashing function (djb2) to create a safe filename from a world path
@@ -2731,7 +2731,6 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
 }
 
 void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settings_opened) {
-
     switch (event->type) {
         // This should be handled in the global event handler
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
@@ -2918,7 +2917,7 @@ static void init_unset_pos_from_screen(ManualPos *pos, float zoom_level, ImVec2 
     if (pos->is_set) return;
     // Search the previous frame's registration list (complete), since the current frame's
     // list may be incomplete during rendering when items are registered incrementally.
-    for (const auto &item : s_visual_layout_items_prev) {
+    for (const auto &item: s_visual_layout_items_prev) {
         if (item.pos == pos) {
             pos->is_set = true;
             float world_top_left_x = (item.screen_pos.x - camera_offset.x) / zoom_level;
@@ -6175,7 +6174,7 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                     draw_list->AddCircleFilled(ImVec2(mid_x, mid_y), marker_radius,
                                                IM_COL32(255, 255, 255, 180));
                     draw_list->AddCircle(ImVec2(mid_x, mid_y), marker_radius,
-                                          IM_COL32(0, 0, 0, 200), 0, 1.5f);
+                                         IM_COL32(0, 0, 0, 200), 0, 1.5f);
 
                     char drag_id_line[128];
                     snprintf(drag_id_line, sizeof(drag_id_line), "drag_deco_%s_line", elem->id);
@@ -6183,7 +6182,7 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                     // Custom dual-endpoint dragging from the line's center
                     ImGui::PushID(drag_id_line);
                     ImVec2 line_handle_pos = ImVec2(mid_x - line_handle_size * 0.5f,
-                                                     mid_y - line_handle_size * 0.5f);
+                                                    mid_y - line_handle_size * 0.5f);
                     ImGui::SetCursorScreenPos(line_handle_pos);
                     ImGui::InvisibleButton("##drag_handle", ImVec2(line_handle_size, line_handle_size));
 
@@ -6193,12 +6192,16 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                     bool is_line_just_clicked = ImGui::IsItemActivated();
 
                     // Register both endpoints for selection hit-testing
-                    s_visual_layout_items.push_back({line_handle_pos,
-                                                      ImVec2(line_handle_size, line_handle_size),
-                                                      &elem->pos});
-                    s_visual_layout_items.push_back({line_handle_pos,
-                                                      ImVec2(line_handle_size, line_handle_size),
-                                                      &elem->pos2});
+                    s_visual_layout_items.push_back({
+                        line_handle_pos,
+                        ImVec2(line_handle_size, line_handle_size),
+                        &elem->pos
+                    });
+                    s_visual_layout_items.push_back({
+                        line_handle_pos,
+                        ImVec2(line_handle_size, line_handle_size),
+                        &elem->pos2
+                    });
 
                     if (is_line_hovered || ImGui::IsItemActive()) {
                         t->visual_item_interacted_this_frame = true;
@@ -6242,13 +6245,13 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
 
                         // Move both line endpoints
                         elem->pos.x = fminf(fmaxf(roundf(elem->pos.x + dx), -MANUAL_POS_MAX),
-                                             MANUAL_POS_MAX);
+                                            MANUAL_POS_MAX);
                         elem->pos.y = fminf(fmaxf(roundf(elem->pos.y + dy), -MANUAL_POS_MAX),
-                                             MANUAL_POS_MAX);
+                                            MANUAL_POS_MAX);
                         elem->pos2.x = fminf(fmaxf(roundf(elem->pos2.x + dx), -MANUAL_POS_MAX),
-                                               MANUAL_POS_MAX);
+                                             MANUAL_POS_MAX);
                         elem->pos2.y = fminf(fmaxf(roundf(elem->pos2.y + dy), -MANUAL_POS_MAX),
-                                               MANUAL_POS_MAX);
+                                             MANUAL_POS_MAX);
 
                         // Multi-drag: move all other selected items
                         bool line_is_selected = s_visual_selected_items.count(&elem->pos) > 0 ||
@@ -6258,9 +6261,9 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                                 if (sel_pos == &elem->pos || sel_pos == &elem->pos2) continue;
                                 init_unset_pos_from_screen(sel_pos, t->zoom_level, t->camera_offset);
                                 sel_pos->x = fminf(fmaxf(roundf(sel_pos->x + dx), -MANUAL_POS_MAX),
-                                                    MANUAL_POS_MAX);
+                                                   MANUAL_POS_MAX);
                                 sel_pos->y = fminf(fmaxf(roundf(sel_pos->y + dy), -MANUAL_POS_MAX),
-                                                    MANUAL_POS_MAX);
+                                                   MANUAL_POS_MAX);
                             }
                         }
 
@@ -6404,9 +6407,9 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                 ImVec2 p_min = item.screen_pos;
                 ImVec2 p_max = ImVec2(p_min.x + item.size.x, p_min.y + item.size.y);
                 fg_draw_list->AddRect(p_min, p_max,
-                                       IM_COL32(settings->text_color.r, settings->text_color.g,
-                                                settings->text_color.b, 180),
-                                       2.0f, 0, 2.0f);
+                                      IM_COL32(settings->text_color.r, settings->text_color.g,
+                                               settings->text_color.b, 180),
+                                      2.0f, 0, 2.0f);
             }
         }
 
@@ -6425,24 +6428,24 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
                 ImVec2 mouse_pos = ImGui::GetMousePos();
                 ImVec2 rect_min = ImVec2(fminf(t->visual_select_rect_start.x, mouse_pos.x),
-                                          fminf(t->visual_select_rect_start.y, mouse_pos.y));
+                                         fminf(t->visual_select_rect_start.y, mouse_pos.y));
                 ImVec2 rect_max = ImVec2(fmaxf(t->visual_select_rect_start.x, mouse_pos.x),
-                                          fmaxf(t->visual_select_rect_start.y, mouse_pos.y));
+                                         fmaxf(t->visual_select_rect_start.y, mouse_pos.y));
 
                 // Draw the selection rectangle
                 fg_draw_list->AddRectFilled(rect_min, rect_max,
-                                             IM_COL32(settings->text_color.r, settings->text_color.g,
-                                                      settings->text_color.b, 40));
+                                            IM_COL32(settings->text_color.r, settings->text_color.g,
+                                                     settings->text_color.b, 40));
                 fg_draw_list->AddRect(rect_min, rect_max,
-                                       IM_COL32(settings->text_color.r, settings->text_color.g,
-                                                settings->text_color.b, 150),
-                                       0.0f, 0, 1.5f);
+                                      IM_COL32(settings->text_color.r, settings->text_color.g,
+                                               settings->text_color.b, 150),
+                                      0.0f, 0, 1.5f);
 
                 // Live-update selection as rectangle is drawn
                 s_visual_selected_items.clear();
                 for (const auto &item: s_visual_layout_items) {
                     ImVec2 item_center = ImVec2(item.screen_pos.x + item.size.x * 0.5f,
-                                                 item.screen_pos.y + item.size.y * 0.5f);
+                                                item.screen_pos.y + item.size.y * 0.5f);
                     if (item_center.x >= rect_min.x && item_center.x <= rect_max.x &&
                         item_center.y >= rect_min.y && item_center.y <= rect_max.y) {
                         s_visual_selected_items.insert(item.pos);

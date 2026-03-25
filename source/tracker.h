@@ -93,12 +93,13 @@ struct Tracker {
     bool is_hovering_scrollable_list; // Prevents main map zoom when scrolling a list
     bool notes_window_open; // Flag to control the visibility of the notes window.
     bool temp_creator_window_open; // Flag to control the visibility of the template creator window.
-    bool is_temp_creator_focused;  // Flag to track if the template creator window has focus.
+    bool is_temp_creator_focused; // Flag to track if the template creator window has focus.
     bool is_visual_layout_editing; // Flag to enable drag-and-drop on the main map for manual goal placement
     bool visual_layout_just_dragged; // Track active dragging in visual layout mode
     char visual_drag_root_name[192]; // Root name of the goal currently being dragged in visual layout
     char visual_drag_goal_type[32]; // Type of the goal being dragged ("Advancement", "Stat", "Multi-Stage Goal", etc.)
-    char visual_drag_child_root_name[192]; // Root name of the criterion/sub-stat being dragged (empty if dragging a parent)
+    char visual_drag_child_root_name[192];
+    // Root name of the criterion/sub-stat being dragged (empty if dragging a parent)
     bool template_editor_has_unsaved_changes; // Communicated from the template editor to the settings window
     bool settings_has_unsaved_changes; // Communicated from settings to the quit confirmation popup
     bool quit_requested; // Set when user tries to quit with unsaved changes, triggers confirmation popup
@@ -135,11 +136,11 @@ struct Tracker {
     char snapshot_path[MAX_PATH_LENGTH]; // Full path to the snapshot file for legacy stat tracking.
 
     // Hermes live-update support
-    HermesRotator hermes_rotator;     // cipher tables, built once
-    FILE         *hermes_play_log;    // file handle for the restricted play.log.enc
-    long          hermes_file_offset; // how far we've already read
-    bool          hermes_active;      // true if Hermes was detected for this world
-    bool          hermes_wants_ipc_flush; // set when in-memory state changed; cleared by main loop after IPC write
+    HermesRotator hermes_rotator; // cipher tables, built once
+    FILE *hermes_play_log; // file handle for the restricted play.log.enc
+    long hermes_file_offset; // how far we've already read
+    bool hermes_active; // true if Hermes was detected for this world
+    bool hermes_wants_ipc_flush; // set when in-memory state changed; cleared by main loop after IPC write
 };
 
 /**

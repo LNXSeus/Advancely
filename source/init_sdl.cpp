@@ -52,7 +52,10 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
         log_message(LOG_INFO, "[INIT SDL] Tracker window icon size: %dx%d\n", icon_surface->w, icon_surface->h);
         SDL_DestroySurface(icon_surface); // Destroy surface after logging
     } else {
-        log_message(LOG_ERROR, "[INIT SDL] Failed to load tracker window icon (asure path contains only standard English (ASCII) characters): %s\n", SDL_GetError());
+        log_message(
+            LOG_ERROR,
+            "[INIT SDL] Failed to load tracker window icon (asure path contains only standard English (ASCII) characters): %s\n",
+            SDL_GetError());
     }
 
     // Set position after creation to handle multi-monitor setups better
@@ -113,7 +116,8 @@ bool overlay_init_sdl(Overlay *o, const AppSettings *settings) {
     if (icon_surface) {
         SDL_SetWindowIcon(o->window, icon_surface);
         SDL_DestroySurface(icon_surface);
-        log_message(LOG_INFO, "[INIT SDL] Overlay window icon set to %s%s\n", get_application_dir(), ADVANCELY_ICON_PATH);
+        log_message(LOG_INFO, "[INIT SDL] Overlay window icon set to %s%s\n", get_application_dir(),
+                    ADVANCELY_ICON_PATH);
     } else {
         log_message(LOG_ERROR, "[INIT SDL] Failed to load overlay window icon: %s\n", SDL_GetError());
     }

@@ -42,9 +42,7 @@ void log_init(bool is_overlay_process) {
     strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", localtime(&now));
 
     // Choose the header based on the process type
-    const char* log_header = is_overlay_process ?
-                             "Advancely Overlay Log - %s\n" :
-                             "Advancely Log - %s\n";
+    const char *log_header = is_overlay_process ? "Advancely Overlay Log - %s\n" : "Advancely Log - %s\n";
     fprintf(log_file, log_header, time_buf);
 
     fprintf(log_file, "========================================\n\n");

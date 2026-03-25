@@ -34,7 +34,6 @@
 
 // Helper to read manual positions from JSON
 void parse_manual_pos(cJSON *parent_json, const char *key, ManualPos *pos) {
-
     pos->is_set = false;
     pos->x = 0.0f;
     pos->y = 0.0f;

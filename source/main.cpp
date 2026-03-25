@@ -2154,7 +2154,7 @@ int main(int argc, char *argv[]) {
             ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
             if (ImGui::BeginPopupModal("Unsaved Changes##quit", nullptr,
-                                        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+                                       ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
                 bool unsaved_settings = tracker->settings_has_unsaved_changes;
                 bool unsaved_template = tracker->template_editor_has_unsaved_changes;
 

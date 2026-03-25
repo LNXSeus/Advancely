@@ -38,14 +38,14 @@ void parse_manual_pos(cJSON *parent_json, const char *key, ManualPos *pos);
 * @param out_templates A pointer to an array of DiscoveredTemplate structs that will be allocated.
 * @param out_count A pointer to an integer that will store the number of templates found.
 */
-void scan_for_templates(const char* version_str, DiscoveredTemplate** out_templates, int* out_count);
+void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templates, int *out_count);
 
 /**
 * @brief Frees the memory allocated by scan_for_templates().
 * @param templates The array of templates to free.
 * @param count The number of templates in the array.
 */
-void free_discovered_templates(DiscoveredTemplate** templates, int* count);
+void free_discovered_templates(DiscoveredTemplate **templates, int *count);
 
 #ifdef __cplusplus
 }

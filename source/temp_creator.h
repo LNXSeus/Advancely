@@ -31,7 +31,7 @@ struct Tracker;
 void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto_font, Tracker *t);
 
 #ifdef __cplusplus
-    }
+}
 #endif
 
 #endif //TEMP_CREATOR_H

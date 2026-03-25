@@ -104,7 +104,7 @@ void path_to_windows_native(char *path);
 * @param max_len The size of the out_path buffer.
 * @return true on success, false on failure.
 */
-bool get_executable_path(char* out_path, size_t max_len);
+bool get_executable_path(char *out_path, size_t max_len);
 
 #ifdef __cplusplus
 }

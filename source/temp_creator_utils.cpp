@@ -963,7 +963,6 @@ static bool create_zip_from_template(const char *output_zip_path, const Discover
     }
 
 
-
     bool file_added = false;
 
     // --- Lambda to add template files (platform-independent loop body) ---

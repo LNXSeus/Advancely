@@ -346,9 +346,9 @@ struct DecorationElement {
     ManualPos pos; // Position on the tracker map (text headers use this; lines use pos as endpoint 1)
 
     // Line fields
-    ManualPos pos2;        // Second endpoint for lines
-    float thickness;       // Line thickness in pixels (before zoom)
-    float opacity;         // Line opacity 0.0-1.0
+    ManualPos pos2; // Second endpoint for lines
+    float thickness; // Line thickness in pixels (before zoom)
+    float opacity; // Line opacity 0.0-1.0
 };
 
 // The main container for all data loaded from the template files.
