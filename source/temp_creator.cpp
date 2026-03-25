@@ -2948,8 +2948,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // Get the version that is currently active in the main tracker settings
     MC_Version tracker_active_version = settings_get_version_from_string(app_settings->version_str);
 
-    // Disable the button if no world is loaded
-    ImGui::BeginDisabled(t->world_name[0] == '\0');
+    // Check if the saves path is actually a valid Minecraft saves folder
+    bool has_valid_saves_path = t->saves_path[0] != '\0' && path_exists(t->saves_path);
+    if (has_valid_saves_path) {
+        // Verify the path actually ends with "/saves" (with or without trailing slash)
+        // to avoid opening unrelated folders from non-Minecraft Java processes like MSI
+        size_t sp_len = strlen(t->saves_path);
+        if (sp_len > 0 && t->saves_path[sp_len - 1] == '/') sp_len--;
+        has_valid_saves_path = (sp_len >= 6 && strncmp(t->saves_path + sp_len - 6, "/saves", 6) == 0);
+    }
+
+    // Disable the button if no world is loaded or saves path is invalid
+    bool world_folder_disabled = t->world_name[0] == '\0' || !has_valid_saves_path;
+    ImGui::BeginDisabled(world_folder_disabled);
     if (ImGui::Button(world_folder_text)) {
         char path_to_open[MAX_PATH_LENGTH] = {0};
 
@@ -2981,7 +2992,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // Version-aware tooltip logic
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         char tooltip_buffer[1024];
-        if (t->world_name[0] == '\0') {
+        if (!has_valid_saves_path) {
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                     "No valid Minecraft saves folder is currently being tracked.\n"
+                     "Make sure Minecraft is running or check your saves path in Settings.");
+        } else if (t->world_name[0] == '\0') {
             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No world is currently being tracked.");
         } else {
             if (tracker_active_version <= MC_VERSION_1_6_4) {
@@ -3670,15 +3685,32 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                    strcmp(selected_template_info.category, app_settings->category) == 0 &&
                                    strcmp(selected_template_info.optional_flag, app_settings->optional_flag) == 0);
 
-        if (!is_active_template) {
+        // Check if saves path is a valid Minecraft saves folder (not a stale/unrelated path)
+        bool vis_has_valid_saves = t->saves_path[0] != '\0' && path_exists(t->saves_path);
+        if (vis_has_valid_saves) {
+            size_t vis_sp_len = strlen(t->saves_path);
+            if (vis_sp_len > 0 && t->saves_path[vis_sp_len - 1] == '/') vis_sp_len--;
+            vis_has_valid_saves = (vis_sp_len >= 6 && strncmp(t->saves_path + vis_sp_len - 6, "/saves", 6) == 0);
+        }
+
+        bool vis_editor_disabled = !is_active_template || !vis_has_valid_saves;
+
+        if (vis_editor_disabled) {
             ImGui::BeginDisabled();
             ImGui::Button(vis_btn_text);
             ImGui::EndDisabled();
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                char tooltip_buffer[256];
-                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "You must apply this template in the main Settings window\n"
-                         "to use the visual map editor.");
+                char tooltip_buffer[512];
+                if (!is_active_template) {
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "You must apply this template in the main Settings window\n"
+                             "to use the visual map editor.");
+                } else {
+                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                             "No valid Minecraft saves folder is currently being tracked.\n"
+                             "The visual layout editor requires an active world to function properly.\n"
+                             "Make sure Minecraft is running or check your saves path in Settings.");
+                }
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
         } else {
