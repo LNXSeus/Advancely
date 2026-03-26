@@ -9347,16 +9347,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         char base_name[192];
                         strncpy(base_name, copy.root_name, sizeof(base_name) - 1);
                         base_name[sizeof(base_name) - 1] = '\0';
-                        int copy_num = 1;
+                        char new_name[192];
+                        int copy_counter = 1;
                         while (true) {
-                            snprintf(copy.root_name, sizeof(copy.root_name), "%s_copy_%d", base_name, copy_num);
+                            if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
+                            else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
                             bool exists = false;
                             for (const auto &c : current_template_data.counter_goals) {
-                                if (strcmp(c.root_name, copy.root_name) == 0) { exists = true; break; }
+                                if (strcmp(c.root_name, new_name) == 0) { exists = true; break; }
                             }
                             if (!exists) break;
-                            copy_num++;
+                            copy_counter++;
                         }
+                        strncpy(copy.root_name, new_name, sizeof(copy.root_name) - 1);
+                        copy.root_name[sizeof(copy.root_name) - 1] = '\0';
                         copy.sort_order = 0;
                         // Reset manual positions
                         copy.icon_pos = {};
