@@ -1801,7 +1801,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              " • Row 1: Sub-stats of complex stats (if not template hidden).\n"
                              "   (If two visible items share an icon, the parent's icon is overlaid.)\n"
                              " • Row 2: Main %s (Default).\n"
-                             " • Row 3: Stats, custom goals, and multi-stage goals (Default).\n"
+                             " • Row 3: Stats, custom goals, multi-stage goals, and counters (Default).\n"
                              "   (Goals can be forced from Row 3 to Row 2 in the Template Editor.)\n\n"
                              "Tips:\n"
                              " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
@@ -1821,7 +1821,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              " • Row 1: %s criteria and sub-stats of complex stats (if not template hidden).\n"
                              "   (If two visible items share an icon, the parent's icon is overlaid.)\n"
                              " • Row 2: Main %s (Default).\n"
-                             " • Row 3: Stats, custom goals, and multi-stage goals (Default).\n"
+                             " • Row 3: Stats, custom goals, multi-stage goals, and counters (Default).\n"
                              "   (Goals can be forced from Row 3 to Row 2 in the Template Editor.)\n\n"
                              "Tips:\n"
                              " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
@@ -1840,7 +1840,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              " • Row 1: %s criteria and sub-stats of complex stats (if not template hidden).\n"
                              "   (If two visible items share an icon, the parent's icon is overlaid.)\n"
                              " • Row 2: Main %s, recipes and unlocks (Default).\n"
-                             " • Row 3: Stats, custom goals, and multi-stage goals (Default).\n"
+                             " • Row 3: Stats, custom goals, multi-stage goals, and counters (Default).\n"
                              "   (Goals can be forced from Row 3 to Row 2 in the Template Editor.)\n\n"
                              "Tips:\n"
                              " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
@@ -1859,7 +1859,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              " • Row 1: %s criteria and sub-stats of complex stats.\n"
                              "   (If two items share an icon, the parent's icon is overlaid.)\n"
                              " • Row 2: Main %s and recipes (Default).\n"
-                             " • Row 3: Stats, custom goals, and multi-stage goals (Default).\n"
+                             " • Row 3: Stats, custom goals, multi-stage goals, and counters (Default).\n"
                              "   (Goals can be forced from Row 3 to Row 2 in the Template Editor.)\n\n"
                              "Tips:\n"
                              " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
@@ -1950,7 +1950,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     char overlay_text_igt_tooltip_buffer[1024];
                     snprintf(overlay_text_igt_tooltip_buffer, sizeof(overlay_text_igt_tooltip_buffer),
                              "Shows the in-game time since the start of the run.\n"
-                             "It's read from the statistics file so it's in ticks and only updated when the game saves.");
+                             "It's read from the statistics file so it's in ticks\n"
+                             "and only updated when the game saves.");
                     ImGui::SetTooltip("%s", overlay_text_igt_tooltip_buffer);
                 }
                 ImGui::SameLine();
@@ -1968,7 +1969,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 if (ImGui::IsItemHovered()) {
                     char hide_completed_row_3_tooltip_buffer[1024];
                     snprintf(hide_completed_row_3_tooltip_buffer, sizeof(hide_completed_row_3_tooltip_buffer),
-                             "If checked, goals in Row 3 (Stats, Custom Goals, Multi-Stage) will disappear when completed.\n"
+                             "If checked, goals in Row 3 (Stats, Custom Goals,\n"
+                             "Multi-Stage Goals, Counters) will disappear when completed.\n"
                              "This is independent of the main 'Goal Visibility' setting.\n\n"
                              "NOTE: Goals forced to Row 2 via the Template Editor will ALWAYS hide when completed,\n"
                              "ignoring this setting.");
@@ -2602,7 +2604,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                  "[Tracker Visuals]\n"
                  "  - Always On Top: %s; Tracker FPS Limit: %d\n"
                  "  - Goal Visibility: Hide All Completed\n"
-                 "  - Section Order: %s -> Recipes -> Unlocks -> Stats -> Custom -> Multi-Stage\n"
+                 "  - Section Order: Counters -> %s -> Recipes -> Unlocks -> Stats -> Custom -> Multi-Stage\n"
                  "  - Tracker Vertical Spacing: %.1f px; Custom Section Width: %s (%.0f px)\n"
                  "  - Level of Detail: Sub-Text: %.2f, Main-Text: %.2f, Icons: %.2f\n"
                  "  - Scrollable List Threshold: %d; List Scroll Speed: %.0f px\n"

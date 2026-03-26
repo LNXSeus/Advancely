@@ -24,7 +24,7 @@ struct AppSettings;
 struct OverlayDisplayItem {
     void *item_ptr;
 
-    enum ItemType { ADVANCEMENT, UNLOCK, STAT, CUSTOM, MULTISTAGE } type;
+    enum ItemType { ADVANCEMENT, UNLOCK, STAT, CUSTOM, MULTISTAGE, COUNTER } type;
 };
 
 // A cache entry for rendered text to avoid re-creating textures every frame

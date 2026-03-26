@@ -327,6 +327,42 @@ struct MultiStageGoal {
     ManualPos progress_pos;
 };
 
+// --------- COUNTER GOALS (Completion Counters) ---------
+
+// Represents a reference to a linked goal within a counter
+struct CounterLinkedGoal {
+    char root_name[192]; // The root_name of the linked goal
+    char stage_id[64]; // For multi-stage goal stages (empty = whole goal)
+    char parent_root[192]; // Parent root_name for sub-items (criteria, sub-stats) (empty = top-level)
+};
+
+// Represents a counter goal that tracks how many of a set of goals are completed
+struct CounterGoal {
+    char root_name[192]; // Unique ID, e.g., "counter:nether_progress"
+    char display_name[192]; // The user-facing name
+    char icon_path[256]; // Relative path to the icon
+    SDL_Texture *texture; // The loaded icon texture
+    AnimatedTexture *anim_texture; // To support .gif files
+
+    int linked_goal_count; // Number of linked goals
+    CounterLinkedGoal *linked_goals; // Dynamically allocated array of linked goals
+
+    int completed_count; // How many linked goals are currently completed
+    bool done; // True when all linked goals are completed (completed_count == linked_goal_count)
+
+    bool is_hidden; // If true, hidden unless "Remove Completed Goals" is off
+    bool in_2nd_row; // Forces this counter to the 2nd overlay row
+
+    // Animation State
+    float alpha; // Current transparency (1.0f = opaque, 0.0f = transparent)
+    bool is_visible_on_overlay; // Tracks if the item should be rendered
+
+    // Manual Layout Positions
+    ManualPos icon_pos;
+    ManualPos text_pos;
+    ManualPos progress_pos;
+};
+
 // --------- DECORATIONS (Manual Layout Elements) ---------
 
 enum DecorationType {
@@ -390,6 +426,9 @@ struct TemplateData {
 
     int multi_stage_goal_count; // Number of multi-stage goals
     MultiStageGoal **multi_stage_goals;
+
+    int counter_goal_count; // Number of counter goals
+    CounterGoal **counter_goals;
 
     int decoration_count; // Number of decoration elements (text headers, lines, arrows)
     DecorationElement **decorations;

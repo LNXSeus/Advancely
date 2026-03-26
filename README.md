@@ -194,6 +194,10 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
       you to first complete a stat, then an unlock, then a specific **advancement criterion** (e.g., visiting a specific
       biome), and finally an entire advancement in sequence. You can assign **unique icons to each stage** to visualize
       progression.
+    * **Counters**: Track how many of a selected set of goals are completed. Link any combination of advancements,
+      criteria, stats, sub-stats, unlocks, custom goals, or multi-stage goal stages to a counter. It displays a main
+      icon, a display name, and progress text (e.g., "3/10"). The background texture changes based on progress: default
+      at zero, half-done for partial progress, and done when all linked goals are completed.
 * **Manual Layout Mode**: Break free from the automatic grid and position every goal exactly where you want it. When
   enabled, each item's position is defined by coordinates stored in the template file. Use the built-in **Visual
   Layout Editor** to drag items directly on the tracker map, or set coordinates numerically in the Template Editor.
@@ -517,7 +521,7 @@ filter.
 
 * Sections with sub-items (Advancements/Recipes with criteria, Statistics with sub-stats, Multi-Stage Goals) show:
   `(Completed Main / Total Main - Completed Sub / Total Sub)`
-* Sections without sub-items (Unlocks, Custom Goals, simple Statistics) show: `(Completed Main / Total Main)`
+* Sections without sub-items (Unlocks, Custom Goals, Counters, simple Statistics) show: `(Completed Main / Total Main)`
 
 **How Goal Visibility Affects Counters:**
 
@@ -598,10 +602,10 @@ The overlay is organized into three horizontally scrolling rows, each dedicated 
 * **Row 1 (Top)**: This row displays the icons of the smallest sub-tasks. It shows the individual criteria for
   advancements/recipes and the sub-stats for complex stat goals.
 * **Row 2 (Middle)**: This row shows the main parent goals, such as primary advancements, recipes, and unlocks. **It can
-  also include Stats, Custom Goals, and Multi-Stage Goals if forced via the Template Editor.** Items in this row always
-  hide when completed.
+  also include Stats, Custom Goals, Multi-Stage Goals, and Counters if forced via the Template Editor.** Items in this
+  row always hide when completed.
 * **Row 3 (Bottom)**: This row is the standard location for all other goal types, including statistics, custom goals,
-  and multi-stage goals.
+  multi-stage goals, and counters.
 
 ### Customization
 
@@ -732,6 +736,13 @@ Opening a template reveals a tabbed interface where you can define every goal.
     * **Final**: The mandatory last stage that completes the entire multi-stage goal.
     * **Row 2 Toggle**: You can check the "Row 2" box to force a multi-stage goal to appear in the middle row of the
       overlay.
+* **Counters**: Track how many goals from a selected set are completed. Each counter has a `Root Name`, `Display Name`,
+  and `Icon Path`. Use the **Select Goals** button to open a multi-select popup where you can pick any combination of
+  advancements, criteria, stats, sub-stats, unlocks, custom goals, or multi-stage goal stages. Hold **Shift** and click
+  to select a range. The counter displays progress as "(completed / total)" and uses the default, half-done, and done
+  background textures based on progress. Only full completion (all linked goals done) contributes to the overall progress
+  percentage.
+    * **Row 2 Toggle**: You can check the "Row 2" box to force a counter to appear in the middle row of the overlay.
 
 ### Decorations Tab
 

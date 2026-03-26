@@ -33,13 +33,14 @@ enum GoalHidingMode {
 
 // Enum to identify the tracker sections
 enum TrackerSection {
+    SECTION_COUNTERS, // Counter goals (completion counters) - above other sections by default
     SECTION_ADVANCEMENTS,
     SECTION_RECIPES, // Modern advancements with is_recipe flag set to true in template
     SECTION_UNLOCKS, // Exclusive to 25w14craftmine
     SECTION_STATS,
     SECTION_CUSTOM,
     SECTION_MULTISTAGE,
-    SECTION_COUNT // Currently 5
+    SECTION_COUNT // Currently 7
 };
 
 // Helper array of names for the settings UI

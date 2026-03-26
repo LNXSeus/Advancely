@@ -368,6 +368,12 @@ static bool is_display_item_done(const OverlayDisplayItem &display_item, const A
             in_2nd_row = goal->in_2nd_row;
             break;
         }
+        case OverlayDisplayItem::COUNTER: {
+            auto *counter = static_cast<CounterGoal *>(display_item.item_ptr);
+            is_hidden = counter->is_hidden;
+            in_2nd_row = counter->in_2nd_row;
+            break;
+        }
     }
 
     // If the item is marked as hidden in the template, always hide it from the overlay.
@@ -383,6 +389,7 @@ static bool is_display_item_done(const OverlayDisplayItem &display_item, const A
         case OverlayDisplayItem::STAT:
         case OverlayDisplayItem::CUSTOM:
         case OverlayDisplayItem::MULTISTAGE:
+        case OverlayDisplayItem::COUNTER:
             // If forced to Row 2, treat as "always hide" (like Advancements).
             if (in_2nd_row) {
                 should_hide_when_done = true;
@@ -425,6 +432,8 @@ static bool is_display_item_done(const OverlayDisplayItem &display_item, const A
             auto *goal = static_cast<MultiStageGoal *>(display_item.item_ptr);
             return goal->current_stage >= goal->stage_count - 1;
         }
+        case OverlayDisplayItem::COUNTER:
+            return static_cast<CounterGoal *>(display_item.item_ptr)->done;
     }
     return true;
 }
@@ -491,6 +500,12 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
         if (goal->in_2nd_row) {
             // Add to row 2
             row2_items.push_back({goal, OverlayDisplayItem::MULTISTAGE});
+        }
+    }
+    for (int i = 0; i < t->template_data->counter_goal_count; i++) {
+        CounterGoal *counter = t->template_data->counter_goals[i];
+        if (counter->in_2nd_row) {
+            row2_items.push_back({counter, OverlayDisplayItem::COUNTER});
         }
     }
 
@@ -979,6 +994,12 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     row2_items.push_back({goal, OverlayDisplayItem::MULTISTAGE});
                 }
             }
+            for (int i = 0; i < t->template_data->counter_goal_count; i++) {
+                CounterGoal *counter = t->template_data->counter_goals[i];
+                if (counter->in_2nd_row) {
+                    row2_items.push_back({counter, OverlayDisplayItem::COUNTER});
+                }
+            }
 
             // --- 1. Calculate Max Text Width ---
             float max_text_width_row2 = 0.0f;
@@ -996,6 +1017,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     is_template_hidden = static_cast<TrackableItem *>(display_item.item_ptr)->is_hidden;
                 else if (display_item.type == OverlayDisplayItem::MULTISTAGE)
                     is_template_hidden = static_cast<MultiStageGoal *>(display_item.item_ptr)->is_hidden;
+                else if (display_item.type == OverlayDisplayItem::COUNTER)
+                    is_template_hidden = static_cast<CounterGoal *>(display_item.item_ptr)->is_hidden;
 
                 if (is_template_hidden) continue;
 
@@ -1101,6 +1124,13 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             strcpy(longest_criterion_buf, temp_stage_buf);
                         }
                     }
+                } else if (display_item.type == OverlayDisplayItem::COUNTER) {
+                    auto *counter = static_cast<CounterGoal *>(display_item.item_ptr);
+                    strncpy(name_buf, counter->display_name, sizeof(name_buf) - 1);
+                    name_buf[sizeof(name_buf) - 1] = '\0';
+                    TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
+                    snprintf(potential_progress_buf, sizeof(potential_progress_buf), "(%d / %d)",
+                             counter->linked_goal_count, counter->linked_goal_count);
                 }
 
                 if (potential_progress_buf[0] != '\0')
@@ -1333,6 +1363,24 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 }
                                 break;
                             }
+                            case OverlayDisplayItem::COUNTER: {
+                                auto *counter = static_cast<CounterGoal *>(display_item.item_ptr);
+                                static_bg = o->adv_bg;
+                                anim_bg = o->adv_bg_anim;
+                                if (counter->done) {
+                                    static_bg = o->adv_bg_done;
+                                    anim_bg = o->adv_bg_done_anim;
+                                } else if (counter->completed_count > 0) {
+                                    static_bg = o->adv_bg_half_done;
+                                    anim_bg = o->adv_bg_half_done_anim;
+                                }
+                                icon_path = counter->icon_path;
+                                strncpy(name_buf, counter->display_name, sizeof(name_buf) - 1);
+                                name_buf[sizeof(name_buf) - 1] = '\0';
+                                snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
+                                         counter->completed_count, counter->linked_goal_count);
+                                break;
+                            }
 
                             default: break;
                         }
@@ -1420,6 +1468,12 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 t->template_data->multi_stage_goals[i], OverlayDisplayItem::MULTISTAGE
             });
         }
+        for (int i = 0; i < t->template_data->counter_goal_count; ++i) {
+            if (t->template_data->counter_goals[i]->in_2nd_row) continue;
+            row3_items.push_back({
+                t->template_data->counter_goals[i], OverlayDisplayItem::COUNTER
+            });
+        }
 
         float max_text_width_row3 = 0.0f;
 
@@ -1440,6 +1494,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 is_template_hidden = static_cast<TrackableItem *>(display_item.item_ptr)->is_hidden;
             } else if (display_item.type == OverlayDisplayItem::MULTISTAGE) {
                 is_template_hidden = static_cast<MultiStageGoal *>(display_item.item_ptr)->is_hidden;
+            } else if (display_item.type == OverlayDisplayItem::COUNTER) {
+                is_template_hidden = static_cast<CounterGoal *>(display_item.item_ptr)->is_hidden;
             }
             if (is_template_hidden) continue;
 
@@ -1522,6 +1578,15 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             strcpy(longest_progress_buf, temp_stage_buf);
                         }
                     }
+                    break;
+                }
+                case OverlayDisplayItem::COUNTER: {
+                    auto *counter = static_cast<CounterGoal *>(display_item.item_ptr);
+                    strncpy(name_buf, counter->display_name, sizeof(name_buf) - 1);
+                    name_buf[sizeof(name_buf) - 1] = '\0';
+                    TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
+                    snprintf(longest_progress_buf, sizeof(longest_progress_buf), "(%d / %d)",
+                             counter->linked_goal_count, counter->linked_goal_count);
                     break;
                 }
                 default: break;
@@ -1724,6 +1789,24 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                     snprintf(progress_buf, sizeof(progress_buf), "%s", active_stage->display_text);
                                 }
                             }
+                            break;
+                        }
+                        case OverlayDisplayItem::COUNTER: {
+                            auto *counter = static_cast<CounterGoal *>(display_item.item_ptr);
+                            static_bg = o->adv_bg;
+                            anim_bg = o->adv_bg_anim;
+                            if (counter->done) {
+                                static_bg = o->adv_bg_done;
+                                anim_bg = o->adv_bg_done_anim;
+                            } else if (counter->completed_count > 0) {
+                                static_bg = o->adv_bg_half_done;
+                                anim_bg = o->adv_bg_half_done_anim;
+                            }
+                            icon_path = counter->icon_path;
+                            strncpy(name_buf, counter->display_name, sizeof(name_buf) - 1);
+                            name_buf[sizeof(name_buf) - 1] = '\0';
+                            snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
+                                     counter->completed_count, counter->linked_goal_count);
                             break;
                         }
                         default: break;

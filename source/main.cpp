@@ -231,6 +231,16 @@ static size_t serialize_template_data(TemplateData *td, char *buffer) {
         head += sizeof(TrackableItem);
     }
 
+    // 7. Copy counter goals and their linked goals.
+    for (int i = 0; i < td->counter_goal_count; i++) {
+        memcpy(head, td->counter_goals[i], sizeof(CounterGoal));
+        head += sizeof(CounterGoal);
+        for (int j = 0; j < td->counter_goals[i]->linked_goal_count; j++) {
+            memcpy(head, &td->counter_goals[i]->linked_goals[j], sizeof(CounterLinkedGoal));
+            head += sizeof(CounterLinkedGoal);
+        }
+    }
+
     return head - buffer; // Return the total size of the serialized data.
 }
 
@@ -255,6 +265,7 @@ static void deserialize_template_data(char *buffer, TemplateData *target_td) {
                                                               sizeof(MultiStageGoal *));
     target_td->unlocks = (TrackableItem **) calloc(target_td->unlock_count, sizeof(TrackableItem *));
     target_td->custom_goals = (TrackableItem **) calloc(target_td->custom_goal_count, sizeof(TrackableItem *));
+    target_td->counter_goals = (CounterGoal **) calloc(target_td->counter_goal_count, sizeof(CounterGoal *));
 
     // 3. Read advancements and their criteria.
     for (int i = 0; i < target_td->advancement_count; i++) {
@@ -310,6 +321,19 @@ static void deserialize_template_data(char *buffer, TemplateData *target_td) {
         target_td->custom_goals[i] = (TrackableItem *) calloc(1, sizeof(TrackableItem));
         memcpy(target_td->custom_goals[i], head, sizeof(TrackableItem));
         head += sizeof(TrackableItem);
+    }
+
+    // 8. Read counter goals and their linked goals.
+    for (int i = 0; i < target_td->counter_goal_count; i++) {
+        target_td->counter_goals[i] = (CounterGoal *) calloc(1, sizeof(CounterGoal));
+        memcpy(target_td->counter_goals[i], head, sizeof(CounterGoal));
+        head += sizeof(CounterGoal);
+        target_td->counter_goals[i]->linked_goals = (CounterLinkedGoal *) calloc(
+            target_td->counter_goals[i]->linked_goal_count, sizeof(CounterLinkedGoal));
+        for (int j = 0; j < target_td->counter_goals[i]->linked_goal_count; j++) {
+            memcpy(&target_td->counter_goals[i]->linked_goals[j], head, sizeof(CounterLinkedGoal));
+            head += sizeof(CounterLinkedGoal);
+        }
     }
 }
 
@@ -374,6 +398,16 @@ static void free_deserialized_data(TemplateData *td) {
             free(td->custom_goals[i]);
         }
         free(td->custom_goals);
+    }
+
+    if (td->counter_goals) {
+        for (int i = 0; i < td->counter_goal_count; i++) {
+            if (td->counter_goals[i]) {
+                free(td->counter_goals[i]->linked_goals);
+                free(td->counter_goals[i]);
+            }
+        }
+        free(td->counter_goals);
     }
 
     // Set pointers to nullptr after freeing to prevent double-freeing

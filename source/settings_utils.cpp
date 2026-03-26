@@ -41,6 +41,7 @@ const ColorRGBA DEFAULT_UI_CHECK_MARK_COLOR = {66, 150, 250, 255}; // ImGuiCol_C
 
 // Define the array of section names
 const char *TRACKER_SECTION_NAMES[SECTION_COUNT] = {
+    "Counters",
     "Advancements",
     "Recipes",
     "Unlocks",

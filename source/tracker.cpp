@@ -1895,6 +1895,117 @@ static void tracker_parse_multi_stage_goals(Tracker *t, cJSON *goals_json, cJSON
 
 
 /**
+ * @brief Parses counter goals from the template file.
+ * Counter goals track how many of a set of linked goals are completed.
+ */
+static void tracker_parse_counter_goals(Tracker *t, cJSON *counters_json, cJSON *lang_json,
+                                        CounterGoal ***goals_array, int *count,
+                                        const AppSettings *settings) {
+    (void) settings;
+    if (!counters_json) {
+        *count = 0;
+        return;
+    }
+
+    *count = cJSON_GetArraySize(counters_json);
+    if (*count == 0) return;
+
+    *goals_array = (CounterGoal **) calloc(*count, sizeof(CounterGoal *));
+    if (!*goals_array) {
+        log_message(LOG_ERROR, "[TRACKER] Failed to allocate memory for CounterGoal array.\n");
+        *count = 0;
+        return;
+    }
+
+    cJSON *goal_item_json = nullptr;
+    int i = 0;
+    cJSON_ArrayForEach(goal_item_json, counters_json) {
+        CounterGoal *new_goal = (CounterGoal *) calloc(1, sizeof(CounterGoal));
+        if (!new_goal) continue;
+
+        new_goal->alpha = 1.0f;
+        new_goal->is_visible_on_overlay = true;
+
+        new_goal->is_hidden = cJSON_IsTrue(cJSON_GetObjectItem(goal_item_json, "hidden"));
+        new_goal->in_2nd_row = cJSON_IsTrue(cJSON_GetObjectItem(goal_item_json, "in_2nd_row"));
+
+        parse_manual_pos(goal_item_json, "icon_pos", &new_goal->icon_pos);
+        parse_manual_pos(goal_item_json, "text_pos", &new_goal->text_pos);
+        parse_manual_pos(goal_item_json, "progress_pos", &new_goal->progress_pos);
+
+        cJSON *root_name = cJSON_GetObjectItem(goal_item_json, "root_name");
+        cJSON *icon = cJSON_GetObjectItem(goal_item_json, "icon");
+
+        if (cJSON_IsString(root_name)) {
+            strncpy(new_goal->root_name, root_name->valuestring, sizeof(new_goal->root_name) - 1);
+            new_goal->root_name[sizeof(new_goal->root_name) - 1] = '\0';
+        }
+        if (cJSON_IsString(icon)) {
+            char full_icon_path[sizeof(new_goal->icon_path)];
+            snprintf(full_icon_path, sizeof(full_icon_path), "%s/icons/%s", get_application_dir(), icon->valuestring);
+            strncpy(new_goal->icon_path, full_icon_path, sizeof(new_goal->icon_path) - 1);
+            new_goal->icon_path[sizeof(new_goal->icon_path) - 1] = '\0';
+
+            if (strstr(full_icon_path, ".gif")) {
+                new_goal->anim_texture = get_animated_texture_from_cache(
+                    t->renderer, &t->anim_cache, &t->anim_cache_count, &t->anim_cache_capacity, new_goal->icon_path,
+                    SDL_SCALEMODE_NEAREST);
+            } else {
+                new_goal->texture = get_texture_from_cache(t->renderer, &t->texture_cache, &t->texture_cache_count,
+                                                           &t->texture_cache_capacity, new_goal->icon_path,
+                                                           SDL_SCALEMODE_NEAREST);
+            }
+        }
+
+        // Look up display name from lang file: "counter.<root_name>"
+        char goal_lang_key[256];
+        snprintf(goal_lang_key, sizeof(goal_lang_key), "counter.%s", new_goal->root_name);
+        cJSON *goal_lang_entry = cJSON_GetObjectItem(lang_json, goal_lang_key);
+        if (cJSON_IsString(goal_lang_entry)) {
+            strncpy(new_goal->display_name, goal_lang_entry->valuestring, sizeof(new_goal->display_name) - 1);
+            new_goal->display_name[sizeof(new_goal->display_name) - 1] = '\0';
+        } else {
+            strncpy(new_goal->display_name, new_goal->root_name, sizeof(new_goal->display_name) - 1);
+            new_goal->display_name[sizeof(new_goal->display_name) - 1] = '\0';
+        }
+
+        // Parse linked goals
+        cJSON *linked_json = cJSON_GetObjectItem(goal_item_json, "linked_goals");
+        int linked_count = cJSON_GetArraySize(linked_json);
+        if (linked_count > 0) {
+            new_goal->linked_goals = (CounterLinkedGoal *) calloc(linked_count, sizeof(CounterLinkedGoal));
+            if (new_goal->linked_goals) {
+                new_goal->linked_goal_count = linked_count;
+                cJSON *link_json = nullptr;
+                int li = 0;
+                cJSON_ArrayForEach(link_json, linked_json) {
+                    CounterLinkedGoal *lg = &new_goal->linked_goals[li];
+                    cJSON *lr = cJSON_GetObjectItem(link_json, "root_name");
+                    cJSON *ls = cJSON_GetObjectItem(link_json, "stage_id");
+                    cJSON *lp = cJSON_GetObjectItem(link_json, "parent_root");
+                    if (cJSON_IsString(lr)) {
+                        strncpy(lg->root_name, lr->valuestring, sizeof(lg->root_name) - 1);
+                        lg->root_name[sizeof(lg->root_name) - 1] = '\0';
+                    }
+                    if (cJSON_IsString(ls)) {
+                        strncpy(lg->stage_id, ls->valuestring, sizeof(lg->stage_id) - 1);
+                        lg->stage_id[sizeof(lg->stage_id) - 1] = '\0';
+                    }
+                    if (cJSON_IsString(lp)) {
+                        strncpy(lg->parent_root, lp->valuestring, sizeof(lg->parent_root) - 1);
+                        lg->parent_root[sizeof(lg->parent_root) - 1] = '\0';
+                    }
+                    li++;
+                }
+            }
+        }
+
+        (*goals_array)[i++] = new_goal;
+    }
+    *count = i;
+}
+
+/**
  * @brief Parses the "decorations" array from the template JSON file.
  *
  * Decorations are manual layout elements like text headers, lines, and arrows.
@@ -2321,6 +2432,101 @@ static void tracker_update_multi_stage_progress(Tracker *t, const cJSON *player_
     }
 }
 
+/**
+ * @brief Checks if a goal is completed by root_name, optional stage_id, and optional parent_root.
+ * Used by arrow goal linking, counter goals and automatic stat completion (soon).
+ */
+static bool is_goal_completed_by_root(const TemplateData *td, const char *root_name,
+                                      const char *stage_id, const char *parent_root) {
+    if (!td || !root_name || root_name[0] == '\0') return false;
+
+    // Check advancements
+    for (int j = 0; j < td->advancement_count; j++) {
+        if (!td->advancements[j]) continue;
+        if (strcmp(td->advancements[j]->root_name, root_name) == 0 &&
+            (!parent_root || parent_root[0] == '\0'))
+            return td->advancements[j]->done;
+        // Check criteria
+        for (int k = 0; k < td->advancements[j]->criteria_count; k++) {
+            if (td->advancements[j]->criteria[k] &&
+                strcmp(td->advancements[j]->criteria[k]->root_name, root_name) == 0) {
+                // If parent_root is specified, match the parent advancement
+                if (parent_root && parent_root[0] != '\0') {
+                    if (strcmp(td->advancements[j]->root_name, parent_root) != 0) continue;
+                }
+                return td->advancements[j]->criteria[k]->done;
+            }
+        }
+    }
+    // Check stats
+    for (int j = 0; j < td->stat_count; j++) {
+        if (!td->stats[j]) continue;
+        if (strcmp(td->stats[j]->root_name, root_name) == 0 &&
+            (!parent_root || parent_root[0] == '\0'))
+            return td->stats[j]->done;
+        for (int k = 0; k < td->stats[j]->criteria_count; k++) {
+            if (td->stats[j]->criteria[k] &&
+                strcmp(td->stats[j]->criteria[k]->root_name, root_name) == 0) {
+                if (parent_root && parent_root[0] != '\0') {
+                    if (strcmp(td->stats[j]->root_name, parent_root) != 0) continue;
+                }
+                return td->stats[j]->criteria[k]->done;
+            }
+        }
+    }
+    // Check unlocks
+    for (int j = 0; j < td->unlock_count; j++) {
+        if (td->unlocks[j] && strcmp(td->unlocks[j]->root_name, root_name) == 0)
+            return td->unlocks[j]->done;
+    }
+    // Check custom goals
+    for (int j = 0; j < td->custom_goal_count; j++) {
+        if (td->custom_goals[j] && strcmp(td->custom_goals[j]->root_name, root_name) == 0)
+            return td->custom_goals[j]->done;
+    }
+    // Check multi-stage goals
+    for (int j = 0; j < td->multi_stage_goal_count; j++) {
+        MultiStageGoal *msg = td->multi_stage_goals[j];
+        if (!msg || strcmp(msg->root_name, root_name) != 0) continue;
+        if (!stage_id || stage_id[0] == '\0') {
+            return msg->current_stage >= msg->stage_count - 1;
+        }
+        for (int k = 0; k < msg->stage_count; k++) {
+            if (msg->stages[k] && strcmp(msg->stages[k]->stage_id, stage_id) == 0) {
+                return msg->current_stage > k;
+            }
+        }
+    }
+    // Check counter goals
+    for (int j = 0; j < td->counter_goal_count; j++) {
+        if (td->counter_goals[j] && strcmp(td->counter_goals[j]->root_name, root_name) == 0)
+            return td->counter_goals[j]->done;
+    }
+    return false;
+}
+
+/**
+ * @brief Updates completion state of all counter goals by checking their linked goals.
+ * Must be called before tracker_calculate_overall_progress.
+ */
+static void tracker_update_counter_goals(Tracker *t) {
+    if (!t || !t->template_data) return;
+    TemplateData *td = t->template_data;
+    for (int i = 0; i < td->counter_goal_count; i++) {
+        CounterGoal *counter = td->counter_goals[i];
+        if (!counter) continue;
+        int completed = 0;
+        for (int j = 0; j < counter->linked_goal_count; j++) {
+            CounterLinkedGoal *lg = &counter->linked_goals[j];
+            if (is_goal_completed_by_root(td, lg->root_name, lg->stage_id, lg->parent_root)) {
+                completed++;
+            }
+        }
+        counter->completed_count = completed;
+        counter->done = (counter->linked_goal_count > 0 && completed >= counter->linked_goal_count);
+    }
+}
+
 void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const AppSettings *settings) {
     (void) version;
     (void) settings;
@@ -2373,6 +2579,12 @@ void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const Ap
     for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
         total_steps += (t->template_data->multi_stage_goals[i]->stage_count - 1); // Final stage is not counted
         completed_steps += t->template_data->multi_stage_goals[i]->current_stage;
+    }
+
+    // Counter Goals: only full completion (all linked goals done) counts as one step
+    total_steps += t->template_data->counter_goal_count;
+    for (int i = 0; i < t->template_data->counter_goal_count; i++) {
+        if (t->template_data->counter_goals[i]->done) completed_steps++;
     }
 
     log_message(LOG_INFO, "Total steps: %d, completed steps: %d\n", total_steps, completed_steps);
@@ -2501,6 +2713,17 @@ static void tracker_free_template_data(TemplateData *td) {
         free_multi_stage_goals(td->multi_stage_goals, td->multi_stage_goal_count);
     }
 
+    // Free counter goals data
+    if (td->counter_goals) {
+        for (int i = 0; i < td->counter_goal_count; i++) {
+            if (td->counter_goals[i]) {
+                free(td->counter_goals[i]->linked_goals);
+                free(td->counter_goals[i]);
+            }
+        }
+        free(td->counter_goals);
+    }
+
     // Free decoration elements
     if (td->decorations) {
         for (int i = 0; i < td->decoration_count; i++) {
@@ -2514,6 +2737,7 @@ static void tracker_free_template_data(TemplateData *td) {
     td->unlocks = nullptr;
     td->custom_goals = nullptr;
     td->multi_stage_goals = nullptr;
+    td->counter_goals = nullptr;
     td->decorations = nullptr;
 
     // Zero out the entire struct to reset all pointers and counts safely.
@@ -2921,6 +3145,7 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
     // Pass the parsed data to the update functions
     tracker_update_custom_progress(t, settings_json, settings);
     tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json, player_unlocks_json, version, settings);
+    tracker_update_counter_goals(t); // Update counter completion state based on linked goals
     tracker_calculate_overall_progress(t, version, settings); //THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
 
     // Clean up the parsed JSON objects
@@ -5606,6 +5831,360 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 }
 
 /**
+ * @brief Renders the Counter Goals section.
+ * Displays big icon, display name, and progress (completed/total) with bg textures based on state.
+ */
+static void render_counter_goals_section(Tracker *t, const AppSettings *settings, float &current_y,
+                                         const char *section_title) {
+    const float LOD_TEXT_SUB_THRESHOLD = settings->lod_text_sub_threshold;
+    const float LOD_TEXT_MAIN_THRESHOLD = settings->lod_text_main_threshold;
+
+    const float main_text_line_height = settings->tracker_font_size;
+    const float sub_text_line_height = settings->tracker_sub_font_size;
+    float scale_factor = 1.0f;
+
+    int count = t->template_data->counter_goal_count;
+
+    // --- Pre-computation ---
+    int total_visible_count = 0;
+    int completed_count = 0;
+
+    for (int i = 0; i < count; ++i) {
+        CounterGoal *goal = t->template_data->counter_goals[i];
+        if (!goal) continue;
+
+        bool should_hide_based_on_mode = false;
+        switch (settings->goal_hiding_mode) {
+            case HIDE_ALL_COMPLETED:
+                should_hide_based_on_mode = goal->is_hidden || goal->done;
+                break;
+            case HIDE_ONLY_TEMPLATE_HIDDEN:
+                should_hide_based_on_mode = goal->is_hidden;
+                break;
+            case SHOW_ALL:
+                should_hide_based_on_mode = false;
+                break;
+        }
+
+        bool matches_search = str_contains_insensitive(goal->display_name, t->search_buffer);
+        if (!should_hide_based_on_mode && matches_search) {
+            total_visible_count++;
+            if (goal->done) completed_count++;
+        }
+    }
+
+    // Check if section has renderable content
+    bool section_has_renderable_content = false;
+    for (int i = 0; i < count; ++i) {
+        CounterGoal *goal = t->template_data->counter_goals[i];
+        if (!goal) continue;
+
+        bool should_hide_render = false;
+        switch (settings->goal_hiding_mode) {
+            case HIDE_ALL_COMPLETED:
+                should_hide_render = goal->is_hidden || goal->done;
+                break;
+            case HIDE_ONLY_TEMPLATE_HIDDEN:
+                should_hide_render = goal->is_hidden;
+                break;
+            case SHOW_ALL:
+                should_hide_render = false;
+                break;
+        }
+
+        if (!should_hide_render && str_contains_insensitive(goal->display_name, t->search_buffer)) {
+            section_has_renderable_content = true;
+            break;
+        }
+    }
+
+    if (!section_has_renderable_content) return;
+
+    ImGuiIO &io = ImGui::GetIO();
+    float wrapping_width = t->layout_locked ? t->locked_layout_width : (io.DisplaySize.x / t->zoom_level);
+
+    ImDrawList *draw_list = ImGui::GetWindowDrawList();
+    ImU32 text_color = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
+                                settings->text_color.a);
+    ImU32 text_color_faded = IM_COL32(settings->text_color.r, settings->text_color.g, settings->text_color.b,
+                                      ADVANCELY_FADED_ALPHA);
+
+    if (!settings->use_manual_layout) {
+        render_section_separator(t, settings, current_y, section_title, text_color,
+                                 completed_count, total_visible_count, -1, -1);
+    }
+
+    // --- Width Calculation ---
+    float uniform_item_width = 0.0f;
+    const float horizontal_spacing = 8.0f;
+
+    TrackerSection section_id = SECTION_COUNTERS;
+    if (settings->tracker_section_custom_width_enabled[section_id]) {
+        uniform_item_width = settings->tracker_section_custom_item_width[section_id];
+        if (uniform_item_width < 96.0f) uniform_item_width = 96.0f;
+    } else {
+        for (int i = 0; i < count; i++) {
+            CounterGoal *goal = t->template_data->counter_goals[i];
+            if (!goal) continue;
+
+            bool should_hide_width = false;
+            switch (settings->goal_hiding_mode) {
+                case HIDE_ALL_COMPLETED:
+                    should_hide_width = goal->is_hidden || goal->done;
+                    break;
+                case HIDE_ONLY_TEMPLATE_HIDDEN:
+                    should_hide_width = goal->is_hidden;
+                    break;
+                case SHOW_ALL:
+                    should_hide_width = false;
+                    break;
+            }
+            if (should_hide_width || !str_contains_insensitive(goal->display_name, t->search_buffer)) continue;
+
+            SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
+            float text_width = ImGui::CalcTextSize(goal->display_name).x;
+            RESET_FONT_SCALE();
+
+            char progress_text_calc[32];
+            snprintf(progress_text_calc, sizeof(progress_text_calc), "(%d / %d)",
+                     goal->completed_count, goal->linked_goal_count);
+            SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
+            float progress_width = ImGui::CalcTextSize(progress_text_calc).x;
+            RESET_FONT_SCALE();
+
+            float required_text_width = fmaxf(text_width, progress_width);
+            uniform_item_width = fmaxf(uniform_item_width, fmaxf(96.0f, required_text_width));
+        }
+        uniform_item_width += horizontal_spacing;
+    }
+
+    // --- Layout ---
+    float padding = 50.0f;
+    if (settings->use_manual_layout) {
+        padding = get_global_safe_x(t);
+        float min_wrapping_width = padding + (uniform_item_width * 3.0f);
+        if (wrapping_width < min_wrapping_width) wrapping_width = min_wrapping_width;
+    }
+    float current_x = padding, row_max_height = 0.0f;
+    const float vertical_spacing = settings->tracker_vertical_spacing;
+
+    // --- Rendering Loop ---
+    for (int i = 0; i < count; i++) {
+        CounterGoal *goal = t->template_data->counter_goals[i];
+        if (!goal) continue;
+
+        bool should_hide_render = false;
+        switch (settings->goal_hiding_mode) {
+            case HIDE_ALL_COMPLETED:
+                should_hide_render = goal->is_hidden || goal->done;
+                break;
+            case HIDE_ONLY_TEMPLATE_HIDDEN:
+                should_hide_render = goal->is_hidden;
+                break;
+            case SHOW_ALL:
+                should_hide_render = false;
+                break;
+        }
+        if (should_hide_render || !str_contains_insensitive(goal->display_name, t->search_buffer)) continue;
+
+        // Progress text
+        char progress_text[32];
+        snprintf(progress_text, sizeof(progress_text), "(%d / %d)",
+                 goal->completed_count, goal->linked_goal_count);
+
+        float item_height = 96.0f + main_text_line_height + 4.0f + sub_text_line_height + 4.0f;
+
+        float item_x = current_x;
+        float item_y = current_y;
+
+        if (settings->use_manual_layout && goal->icon_pos.is_set) {
+            ImVec2 anchor_off = get_anchor_offset(goal->icon_pos.anchor, 96.0f, 96.0f);
+            item_x = goal->icon_pos.x + anchor_off.x;
+            item_y = goal->icon_pos.y + anchor_off.y;
+        } else {
+            if (current_x > padding && (current_x + uniform_item_width) > wrapping_width - padding) {
+                current_x = padding;
+                current_y += row_max_height;
+                row_max_height = 0.0f;
+                item_x = current_x;
+                item_y = current_y;
+            }
+            current_x += uniform_item_width;
+            row_max_height = fmaxf(row_max_height, item_height + vertical_spacing);
+        }
+
+        ImVec2 screen_pos = ImVec2((item_x * t->zoom_level) + t->camera_offset.x,
+                                   (item_y * t->zoom_level) + t->camera_offset.y);
+
+        ImVec2 item_size_on_screen = ImVec2(uniform_item_width * t->zoom_level, item_height * t->zoom_level);
+        bool is_visible_on_screen = !(screen_pos.x > io.DisplaySize.x || (screen_pos.x + item_size_on_screen.x) < 0 ||
+                                      screen_pos.y > io.DisplaySize.y || (screen_pos.y + item_size_on_screen.y) < 0);
+        if (settings->use_manual_layout) is_visible_on_screen = true;
+
+        if (is_visible_on_screen) {
+            SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
+            ImVec2 text_size = ImGui::CalcTextSize(goal->display_name);
+            RESET_FONT_SCALE();
+
+            SET_FONT_SCALE(settings->tracker_sub_font_size, t->tracker_font->LegacySize);
+            ImVec2 progress_text_size = ImGui::CalcTextSize(progress_text);
+            RESET_FONT_SCALE();
+
+            ImVec2 bg_size = ImVec2(96.0f, 96.0f);
+
+            // Select background texture based on completion state:
+            // - Default (no progress): adv_bg
+            // - Partially done (some linked goals completed): adv_bg_half_done
+            // - Fully done (all linked goals completed): adv_bg_done
+            SDL_Texture *static_bg = t->adv_bg;
+            AnimatedTexture *anim_bg = t->adv_bg_anim;
+
+            if (goal->done) {
+                static_bg = t->adv_bg_done;
+                anim_bg = t->adv_bg_done_anim;
+            } else if (goal->completed_count > 0) {
+                static_bg = t->adv_bg_half_done;
+                anim_bg = t->adv_bg_half_done_anim;
+            }
+
+            SDL_Texture *texture_to_draw = static_bg;
+            if (anim_bg && anim_bg->frame_count > 0) {
+                if (anim_bg->delays && anim_bg->total_duration > 0) {
+                    Uint32 current_ticks = SDL_GetTicks();
+                    Uint32 elapsed_time = current_ticks % anim_bg->total_duration;
+                    int current_frame = 0;
+                    Uint32 time_sum = 0;
+                    for (int frame_idx = 0; frame_idx < anim_bg->frame_count; ++frame_idx) {
+                        time_sum += anim_bg->delays[frame_idx];
+                        if (elapsed_time < time_sum) {
+                            current_frame = frame_idx;
+                            break;
+                        }
+                    }
+                    texture_to_draw = anim_bg->frames[current_frame];
+                } else {
+                    texture_to_draw = anim_bg->frames[0];
+                }
+            }
+
+            // Render Background
+            if (texture_to_draw)
+                draw_list->AddImage((void *) texture_to_draw, screen_pos,
+                                    ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
+                                           screen_pos.y + bg_size.y * t->zoom_level));
+
+            // Render Icon (Animated or Static)
+            SDL_Texture *icon_texture = nullptr;
+            if (goal->anim_texture && goal->anim_texture->frame_count > 0) {
+                if (goal->anim_texture->delays && goal->anim_texture->total_duration > 0) {
+                    Uint32 current_ticks = SDL_GetTicks();
+                    Uint32 elapsed_time = current_ticks % goal->anim_texture->total_duration;
+                    int current_frame = 0;
+                    Uint32 time_sum = 0;
+                    for (int frame_idx = 0; frame_idx < goal->anim_texture->frame_count; ++frame_idx) {
+                        time_sum += goal->anim_texture->delays[frame_idx];
+                        if (elapsed_time < time_sum) {
+                            current_frame = frame_idx;
+                            break;
+                        }
+                    }
+                    icon_texture = goal->anim_texture->frames[current_frame];
+                } else {
+                    icon_texture = goal->anim_texture->frames[0];
+                }
+            } else if (goal->texture) {
+                icon_texture = goal->texture;
+            }
+
+            if (icon_texture) {
+                float tex_w = 0.0f, tex_h = 0.0f;
+                SDL_GetTextureSize(icon_texture, &tex_w, &tex_h);
+                ImVec2 target_box_size = ImVec2(64.0f * t->zoom_level, 64.0f * t->zoom_level);
+                float scale_factor = 1.0f;
+                if (tex_w > 0 && tex_h > 0) {
+                    scale_factor = fminf(target_box_size.x / tex_w, target_box_size.y / tex_h);
+                }
+                ImVec2 scaled_size = ImVec2(tex_w * scale_factor, tex_h * scale_factor);
+                ImVec2 box_p_min = ImVec2(screen_pos.x + 16.0f * t->zoom_level, screen_pos.y + 16.0f * t->zoom_level);
+                ImVec2 icon_padding = ImVec2((target_box_size.x - scaled_size.x) * 0.5f,
+                                             (target_box_size.y - scaled_size.y) * 0.5f);
+                ImVec2 p_min = ImVec2(box_p_min.x + icon_padding.x, box_p_min.y + icon_padding.y);
+                ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
+                draw_list->AddImage((void *) icon_texture, p_min, p_max);
+            }
+
+            // --- VISUAL LAYOUT DRAGGING (ICON) ---
+            char drag_id[256];
+            snprintf(drag_id, sizeof(drag_id), "drag_counter_icon_%s", goal->root_name);
+            handle_visual_layout_dragging(t, drag_id, screen_pos,
+                                          ImVec2(bg_size.x * t->zoom_level, bg_size.y * t->zoom_level),
+                                          goal->icon_pos, "Counter", goal->display_name, "Icon",
+                                          goal->root_name);
+
+            // Render Text
+            if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
+                float main_text_size = settings->tracker_font_size;
+                float sub_font_size = settings->tracker_sub_font_size;
+                ImU32 current_text_color = goal->done ? text_color_faded : text_color;
+
+                float text_x_center = screen_pos.x + (bg_size.x * t->zoom_level) * 0.5f;
+                float text_y_pos = screen_pos.y + bg_size.y * t->zoom_level + (4.0f * t->zoom_level);
+
+                if (settings->use_manual_layout && goal->text_pos.is_set) {
+                    ImVec2 text_anchor_off = get_anchor_offset(goal->text_pos.anchor, text_size.x, text_size.y);
+                    text_x_center = ((goal->text_pos.x + text_anchor_off.x) * t->zoom_level) + t->camera_offset.x + (
+                                        text_size.x * t->zoom_level) * 0.5f;
+                    text_y_pos = ((goal->text_pos.y + text_anchor_off.y) * t->zoom_level) + t->camera_offset.y;
+                }
+
+                // Draw Main Name (centered)
+                draw_list->AddText(nullptr, main_text_size * t->zoom_level,
+                                   ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos),
+                                   current_text_color, goal->display_name);
+
+                // --- VISUAL LAYOUT DRAGGING (TEXT) ---
+                snprintf(drag_id, sizeof(drag_id), "drag_counter_text_%s", goal->root_name);
+                handle_visual_layout_dragging(t, drag_id,
+                                              ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos),
+                                              ImVec2(text_size.x * t->zoom_level, text_size.y * t->zoom_level),
+                                              goal->text_pos, "Counter", goal->display_name, "Text",
+                                              goal->root_name);
+
+                // Draw Progress Text
+                float prog_x_center = text_x_center;
+                float prog_y = text_y_pos + text_size.y * t->zoom_level + 4.0f * t->zoom_level;
+
+                if (settings->use_manual_layout && goal->progress_pos.is_set) {
+                    ImVec2 prog_anchor_off = get_anchor_offset(goal->progress_pos.anchor, progress_text_size.x,
+                                                               progress_text_size.y);
+                    prog_x_center = ((goal->progress_pos.x + prog_anchor_off.x) * t->zoom_level) + t->camera_offset.x + (
+                                        progress_text_size.x * t->zoom_level) * 0.5f;
+                    prog_y = ((goal->progress_pos.y + prog_anchor_off.y) * t->zoom_level) + t->camera_offset.y;
+                }
+
+                if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
+                    draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
+                                       ImVec2(prog_x_center - (progress_text_size.x * t->zoom_level) * 0.5f, prog_y),
+                                       current_text_color, progress_text);
+
+                    // --- VISUAL LAYOUT DRAGGING (PROGRESS) ---
+                    snprintf(drag_id, sizeof(drag_id), "drag_counter_prog_%s", goal->root_name);
+                    handle_visual_layout_dragging(t, drag_id,
+                                                  ImVec2(prog_x_center - (progress_text_size.x * t->zoom_level) * 0.5f,
+                                                         prog_y),
+                                                  ImVec2(progress_text_size.x * t->zoom_level,
+                                                         progress_text_size.y * t->zoom_level),
+                                                  goal->progress_pos, "Counter", goal->display_name, "Progress",
+                                                  goal->root_name);
+                }
+            }
+        } // End if (is_visible_on_screen)
+    }
+
+    current_y += row_max_height;
+}
+
+/**
  * @brief Renders the Multi-Stage Goals section.
  * Calculates and displays completion counters based on visibility settings.
  */
@@ -6138,6 +6717,7 @@ static int NotesEditCallback(ImGuiInputTextCallbackData *data) {
 }
 
 
+
 /**
  * @brief Renders decoration elements (text headers, lines, arrows) on the tracker map.
  * Only renders when manual layout mode is active.
@@ -6375,60 +6955,8 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
             }
             case DECORATION_ARROW: {
                 // --- Determine arrow opacity based on linked goal completion ---
-                // Helper lambda to check if a goal is completed by root_name (+ optional stage_id)
-                auto is_goal_completed = [&](const char *root_name, const char *stage_id) -> bool {
-                    if (!root_name || root_name[0] == '\0') return false;
-                    TemplateData *td = t->template_data;
-
-                    // Check advancements
-                    for (int j = 0; j < td->advancement_count; j++) {
-                        if (!td->advancements[j]) continue;
-                        if (strcmp(td->advancements[j]->root_name, root_name) == 0) return td->advancements[j]->done;
-                        // Check criteria
-                        for (int k = 0; k < td->advancements[j]->criteria_count; k++) {
-                            if (td->advancements[j]->criteria[k] && strcmp(td->advancements[j]->criteria[k]->root_name, root_name) == 0)
-                                return td->advancements[j]->criteria[k]->done;
-                        }
-                    }
-                    // Check stats
-                    for (int j = 0; j < td->stat_count; j++) {
-                        if (!td->stats[j]) continue;
-                        if (strcmp(td->stats[j]->root_name, root_name) == 0) return td->stats[j]->done;
-                        for (int k = 0; k < td->stats[j]->criteria_count; k++) {
-                            if (td->stats[j]->criteria[k] && strcmp(td->stats[j]->criteria[k]->root_name, root_name) == 0)
-                                return td->stats[j]->criteria[k]->done;
-                        }
-                    }
-                    // Check unlocks
-                    for (int j = 0; j < td->unlock_count; j++) {
-                        if (td->unlocks[j] && strcmp(td->unlocks[j]->root_name, root_name) == 0)
-                            return td->unlocks[j]->done;
-                    }
-                    // Check custom goals
-                    for (int j = 0; j < td->custom_goal_count; j++) {
-                        if (td->custom_goals[j] && strcmp(td->custom_goals[j]->root_name, root_name) == 0)
-                            return td->custom_goals[j]->done;
-                    }
-                    // Check multi-stage goals
-                    for (int j = 0; j < td->multi_stage_goal_count; j++) {
-                        MultiStageGoal *msg = td->multi_stage_goals[j];
-                        if (!msg || strcmp(msg->root_name, root_name) != 0) continue;
-                        if (!stage_id || stage_id[0] == '\0') {
-                            // Whole goal completion
-                            return msg->current_stage >= msg->stage_count - 1;
-                        }
-                        // Specific stage completion
-                        for (int k = 0; k < msg->stage_count; k++) {
-                            if (msg->stages[k] && strcmp(msg->stages[k]->stage_id, stage_id) == 0) {
-                                return msg->current_stage > k;
-                            }
-                        }
-                    }
-                    return false;
-                };
-
-                bool start_completed = is_goal_completed(elem->start_goal_root, elem->start_goal_stage);
-                bool end_completed = is_goal_completed(elem->end_goal_root, elem->end_goal_stage);
+                bool start_completed = is_goal_completed_by_root(t->template_data, elem->start_goal_root, elem->start_goal_stage, nullptr);
+                bool end_completed = is_goal_completed_by_root(t->template_data, elem->end_goal_root, elem->end_goal_stage, nullptr);
 
                 // Hide arrow if end goal is completed and hiding mode is HIDE_ALL_COMPLETED
                 if (end_completed && elem->end_goal_root[0] != '\0' &&
@@ -6791,6 +7319,9 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     for (int i = 0; i < SECTION_COUNT; ++i) {
         auto section_id = (TrackerSection) settings->section_order[i];
         switch (section_id) {
+            case SECTION_COUNTERS:
+                render_counter_goals_section(t, settings, current_y, "Counters");
+                break;
             case SECTION_ADVANCEMENTS: {
                 const char *title = (version <= MC_VERSION_1_11_2) ? "Achievements" : "Advancements";
                 render_trackable_category_section(t, settings, current_y, advancements_only.data(),
@@ -7924,6 +8455,7 @@ static bool hermes_apply_advancement_event(Tracker *t, const cJSON *data) {
 void tracker_recalculate_progress(Tracker *t, const AppSettings *settings) {
     if (!t || !t->template_data) return;
     MC_Version version = settings_get_version_from_string(settings->version_str);
+    tracker_update_counter_goals(t);
     tracker_calculate_overall_progress(t, version, settings);
 }
 
@@ -8104,12 +8636,13 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     cJSON *unlocks_json = cJSON_GetObjectItem(template_json, "unlocks");
     cJSON *custom_json = cJSON_GetObjectItem(template_json, "custom"); // Custom goals, manually checked of by user
     cJSON *multi_stage_goals_json = cJSON_GetObjectItem(template_json, "multi_stage_goals");
+    cJSON *counter_goals_json = cJSON_GetObjectItem(template_json, "counter_goals");
     cJSON *decorations_json = cJSON_GetObjectItem(template_json, "decorations");
 
 
     MC_Version version = settings_get_version_from_string(settings->version_str);
 
-    // Parse the 5 main categories
+    // Parse the main categories
     // False as it's for advancements
     tracker_parse_categories(t, advancements_json, lang_json, &t->template_data->advancements,
                              &t->template_data->advancement_count, &t->template_data->total_criteria_count,
@@ -8143,6 +8676,10 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     tracker_parse_multi_stage_goals(t, multi_stage_goals_json, lang_json,
                                     &t->template_data->multi_stage_goals,
                                     &t->template_data->multi_stage_goal_count, settings);
+
+    tracker_parse_counter_goals(t, counter_goals_json, lang_json,
+                                &t->template_data->counter_goals,
+                                &t->template_data->counter_goal_count, settings);
 
     tracker_parse_decorations(decorations_json, lang_json,
                               &t->template_data->decorations,
