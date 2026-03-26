@@ -444,7 +444,6 @@ static bool are_editor_counter_goals_different(const EditorCounterGoal &a, const
         strcmp(a.icon_path, b.icon_path) != 0 ||
         a.is_hidden != b.is_hidden ||
         a.in_2nd_row != b.in_2nd_row ||
-        a.sort_order != b.sort_order ||
         are_manual_positions_different(a.icon_pos, b.icon_pos) ||
         are_manual_positions_different(a.text_pos, b.text_pos) ||
         are_manual_positions_different(a.progress_pos, b.progress_pos) ||
@@ -9250,7 +9249,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         snprintf(new_counter.display_name, sizeof(new_counter.display_name), "New Counter %d", ctr_num);
                         strncpy(new_counter.icon_path, "blocks/placeholder.png", sizeof(new_counter.icon_path) - 1);
                         new_counter.icon_path[sizeof(new_counter.icon_path) - 1] = '\0';
-                        new_counter.sort_order = get_next_sort_order(current_template_data.counter_goals);
                         current_template_data.counter_goals.push_back(new_counter);
                         selected_counter_index = (int) current_template_data.counter_goals.size() - 1;
                         save_message_type = MSG_NONE;
@@ -9298,6 +9296,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // --- Render the list ---
                     int ctr_to_remove_idx = -1;
                     int ctr_to_copy_idx = -1;
+                    int ctr_dnd_source_index = -1;
+                    int ctr_dnd_target_index = -1;
 
                     for (size_t i = 0; i < counters_to_render.size(); ++i) {
                         auto &counter = *counters_to_render[i];
@@ -9361,7 +9361,52 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             selected_counter_index = actual_idx;
                         }
 
+                        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
+                            ImGui::SetDragDropPayload("COUNTER_DND", &i, sizeof(int));
+                            ImGui::Text("Reorder %s", label);
+                            ImGui::EndDragDropSource();
+                        }
+                        if (ImGui::BeginDragDropTarget()) {
+                            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("COUNTER_DND")) {
+                                ctr_dnd_source_index = *(const int *) payload->Data;
+                                ctr_dnd_target_index = (int)i;
+                            }
+                            ImGui::EndDragDropTarget();
+                        }
+
                         ImGui::PopID();
+                    }
+
+                    // Handle Drag and Drop
+                    if (ctr_dnd_source_index != -1 && ctr_dnd_target_index != -1) {
+                        EditorCounterGoal *source_item_ptr = counters_to_render[ctr_dnd_source_index];
+                        EditorCounterGoal *target_item_ptr = counters_to_render[ctr_dnd_target_index];
+
+                        auto source_it = std::find_if(current_template_data.counter_goals.begin(),
+                                                      current_template_data.counter_goals.end(),
+                                                      [&](const EditorCounterGoal &g) {
+                                                          return &g == source_item_ptr;
+                                                      });
+
+                        EditorCounterGoal item_to_move = *source_item_ptr;
+                        current_template_data.counter_goals.erase(source_it);
+
+                        auto target_it = std::find_if(current_template_data.counter_goals.begin(),
+                                                      current_template_data.counter_goals.end(),
+                                                      [&](const EditorCounterGoal &g) {
+                                                          return &g == target_item_ptr;
+                                                      });
+
+                        current_template_data.counter_goals.insert(target_it, item_to_move);
+                        save_message_type = MSG_NONE;
+
+                        // Update selected index to follow the moved item
+                        for (int ci = 0; ci < (int)current_template_data.counter_goals.size(); ci++) {
+                            if (strcmp(current_template_data.counter_goals[ci].root_name, item_to_move.root_name) == 0) {
+                                selected_counter_index = ci;
+                                break;
+                            }
+                        }
                     }
 
                     // Handle remove
