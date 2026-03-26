@@ -254,7 +254,8 @@ struct EditorTemplate {
 // Helper: when a goal's root_name is renamed, propagate the change to all arrow links and counter linked goals
 static void propagate_goal_rename(std::vector<EditorDecorationElement> &decorations,
                                   std::vector<EditorCounterGoal> &counter_goals,
-                                  const char *old_name, const char *new_name) {
+                                  const char *old_name, const char *new_name,
+                                  const char *parent_root = nullptr) {
     if (old_name[0] == '\0' || strcmp(old_name, new_name) == 0) return;
     for (auto &deco: decorations) {
         if (deco.type != DECORATION_ARROW) continue;
@@ -270,11 +271,17 @@ static void propagate_goal_rename(std::vector<EditorDecorationElement> &decorati
     // Also update counter linked goals
     for (auto &counter: counter_goals) {
         for (auto &lg: counter.linked_goals) {
+            // When parent_root is provided (child goal rename like criterion/sub-stat),
+            // only update linked goals that match BOTH the root_name AND the parent.
+            // When parent_root is null (top-level goal rename), update all matches.
             if (strcmp(lg.root_name, old_name) == 0) {
-                strncpy(lg.root_name, new_name, sizeof(lg.root_name) - 1);
-                lg.root_name[sizeof(lg.root_name) - 1] = '\0';
+                if (!parent_root || (lg.parent_root[0] != '\0' && strcmp(lg.parent_root, parent_root) == 0)) {
+                    strncpy(lg.root_name, new_name, sizeof(lg.root_name) - 1);
+                    lg.root_name[sizeof(lg.root_name) - 1] = '\0';
+                }
             }
-            if (strcmp(lg.parent_root, old_name) == 0) {
+            // When a top-level goal (parent) is renamed, update parent_root references too
+            if (!parent_root && strcmp(lg.parent_root, old_name) == 0) {
                 strncpy(lg.parent_root, new_name, sizeof(lg.parent_root) - 1);
                 lg.parent_root[sizeof(lg.parent_root) - 1] = '\0';
             }
@@ -616,6 +623,29 @@ static bool has_duplicate_ms_goal_root_names(const std::vector<EditorMultiStageG
         if (!seen_names.insert(goal.root_name).second) {
             snprintf(error_message_buffer, 256, "Error: Duplicate multi-stage goal root name found: '%s'",
                      goal.root_name);
+            return true;
+        }
+    }
+    return false;
+}
+
+// Helper to check for duplicate root_names and zero linked goals in counter goals
+static bool has_duplicate_counter_root_names(const std::vector<EditorCounterGoal> &goals,
+                                             char *error_message_buffer) {
+    std::unordered_set<std::string> seen_names;
+    for (const auto &goal: goals) {
+        if (goal.root_name[0] == '\0') {
+            snprintf(error_message_buffer, 256, "Error: A counter goal has an empty root name.");
+            return true;
+        }
+        if (!seen_names.insert(goal.root_name).second) {
+            snprintf(error_message_buffer, 256, "Error: Duplicate counter goal root name found: '%s'",
+                     goal.root_name);
+            return true;
+        }
+        if (goal.linked_goals.empty()) {
+            snprintf(error_message_buffer, 256,
+                     "Error: Counter '%s' has 0 linked goals. Link at least one goal.", goal.root_name);
             return true;
         }
     }
@@ -1978,6 +2008,13 @@ static bool validate_and_save_template(const char *creator_version_str,
         }
     }
 
+    // --- Counter Goals Validation ---
+    if (validation_passed) {
+        if (has_duplicate_counter_root_names(current_template_data.counter_goals, status_message)) {
+            validation_passed = false;
+        }
+    }
+
     // --- Decorations Validation ---
     if (validation_passed) {
         if (has_duplicate_decoration_ids(current_template_data.decorations, status_message)) {
@@ -2248,6 +2285,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static bool show_advancement_display_names = true;
     static bool show_stat_display_names = true;
     static bool show_ms_goal_display_names = true;
+    static bool show_counter_display_names = true;
     static EditorTrackableCategory *selected_advancement = nullptr;
     static EditorTrackableCategory *selected_stat = nullptr;
     static EditorMultiStageGoal *selected_ms_goal = nullptr;
@@ -3775,6 +3813,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
             }
 
+            // Sync Counters
+            for (auto &ed_counter: current_template_data.counter_goals) {
+                for (int i = 0; i < t->template_data->counter_goal_count; i++) {
+                    if (t->template_data->counter_goals[i] && strcmp(
+                            ed_counter.root_name, t->template_data->counter_goals[i]->root_name) == 0) {
+                        CounterGoal *tr_counter = t->template_data->counter_goals[i];
+                        sync_pos(ed_counter.icon_pos, tr_counter->icon_pos);
+                        sync_pos(ed_counter.text_pos, tr_counter->text_pos);
+                        sync_pos(ed_counter.progress_pos, tr_counter->progress_pos);
+                    }
+                }
+            }
+
             // Sync Decorations
             for (auto &ed_deco: current_template_data.decorations) {
                 for (int i = 0; i < t->template_data->decoration_count; i++) {
@@ -3851,6 +3902,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     force_select_tab = FORCE_TAB_UNLOCKS;
                 } else if (strcmp(t->visual_drag_goal_type, "Custom Goal") == 0) {
                     force_select_tab = FORCE_TAB_CUSTOM;
+                } else if (strcmp(t->visual_drag_goal_type, "Counter") == 0) {
+                    force_select_tab = FORCE_TAB_COUNTERS;
                 } else if (strcmp(t->visual_drag_goal_type, "Decoration") == 0) {
                     force_select_tab = FORCE_TAB_DECORATIONS;
                 }
@@ -3959,6 +4012,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         reverse_sync_pos(ed_msg.icon_pos, tr_msg->icon_pos);
                         reverse_sync_pos(ed_msg.text_pos, tr_msg->text_pos);
                         reverse_sync_pos(ed_msg.progress_pos, tr_msg->progress_pos);
+                    }
+                }
+            }
+
+            // Reverse Sync Counters
+            for (const auto &ed_counter: current_template_data.counter_goals) {
+                for (int i = 0; i < t->template_data->counter_goal_count; i++) {
+                    if (t->template_data->counter_goals[i] && strcmp(
+                            ed_counter.root_name, t->template_data->counter_goals[i]->root_name) == 0) {
+                        CounterGoal *tr_counter = t->template_data->counter_goals[i];
+                        reverse_sync_pos(ed_counter.icon_pos, tr_counter->icon_pos);
+                        reverse_sync_pos(ed_counter.text_pos, tr_counter->text_pos);
+                        reverse_sync_pos(ed_counter.progress_pos, tr_counter->progress_pos);
                     }
                 }
             }
@@ -5192,7 +5258,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             old_crit_root[sizeof(old_crit_root) - 1] = '\0';
                             if (ImGui::InputText("Criterion Root Name", criterion.root_name,
                                                  sizeof(criterion.root_name))) {
-                                propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_crit_root, criterion.root_name);
+                                propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_crit_root, criterion.root_name, advancement.root_name);
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
@@ -6167,7 +6233,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             old_simple_stat_root[sizeof(old_simple_stat_root) - 1] = '\0';
                             if (ImGui::InputText("Stat Root Name", simple_crit.root_name,
                                                  sizeof(simple_crit.root_name))) {
-                                propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_simple_stat_root, simple_crit.root_name);
+                                propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_simple_stat_root, simple_crit.root_name, stat_cat.root_name);
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
@@ -6442,7 +6508,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 strncpy(old_sub_stat_root, crit.root_name, sizeof(old_sub_stat_root));
                                 old_sub_stat_root[sizeof(old_sub_stat_root) - 1] = '\0';
                                 if (ImGui::InputText("Sub-Stat Root Name", crit.root_name, sizeof(crit.root_name))) {
-                                    propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_sub_stat_root, crit.root_name);
+                                    propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_sub_stat_root, crit.root_name, stat_cat.root_name);
                                     save_message_type = MSG_NONE;
                                 }
                                 if (ImGui::IsItemHovered()) {
@@ -9085,13 +9151,67 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     static int selected_counter_index = -1;
 
+                    // --- Two-Pane Layout ---
+                    float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
+                    ImGui::BeginChild("CounterListPane", ImVec2(pane_width, 0), true);
+
+                    // --- Sorting Controls (right-aligned) ---
+                    bool can_sort_ctr = false;
+                    for (const auto &c : current_template_data.counter_goals) {
+                        if (c.sort_order > 0) { can_sort_ctr = true; break; }
+                    }
+
+                    float sort_btn_w = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                    float reset_btn_w = ImGui::CalcTextSize("Reset Order").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                    float total_btns_w = sort_btn_w + reset_btn_w + ImGui::GetStyle().ItemSpacing.x;
+                    ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - total_btns_w);
+
+                    ImGui::BeginDisabled(!can_sort_ctr);
+                    if (ImGui::Button("Sort##ctr")) {
+                        apply_partial_sort(current_template_data.counter_goals);
+                        save_message_type = MSG_NONE;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tooltip_buffer[128];
+                        if (!can_sort_ctr)
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Click the order badges next to counters to assign a sort order first.");
+                        else
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Rearrange the numbered items among themselves.");
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Reset Order##ctr")) {
+                        for (auto &c : current_template_data.counter_goals) c.sort_order = 0;
+                    }
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tooltip_buffer[128];
+                        if (!can_sort_ctr)
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "No sort orders assigned yet.");
+                        else
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Clear all assigned sort orders from counters.");
+                        ImGui::SetTooltip("%s", tooltip_buffer);
+                    }
+                    ImGui::EndDisabled();
+
                     // --- Add New Counter Button ---
                     if (ImGui::Button("Add New Counter")) {
                         EditorCounterGoal new_counter = {};
-                        snprintf(new_counter.root_name, sizeof(new_counter.root_name), "counter_%d",
-                                 (int) current_template_data.counter_goals.size());
-                        snprintf(new_counter.display_name, sizeof(new_counter.display_name), "New Counter %d",
-                                 (int) current_template_data.counter_goals.size());
+                        int ctr_num = 1;
+                        while (true) {
+                            snprintf(new_counter.root_name, sizeof(new_counter.root_name), "counter_%d", ctr_num);
+                            bool exists = false;
+                            for (const auto &c : current_template_data.counter_goals) {
+                                if (strcmp(c.root_name, new_counter.root_name) == 0) { exists = true; break; }
+                            }
+                            if (!exists) break;
+                            ctr_num++;
+                        }
+                        snprintf(new_counter.display_name, sizeof(new_counter.display_name), "New Counter %d", ctr_num);
+                        strncpy(new_counter.icon_path, "blocks/placeholder.png", sizeof(new_counter.icon_path) - 1);
+                        new_counter.icon_path[sizeof(new_counter.icon_path) - 1] = '\0';
                         new_counter.sort_order = get_next_sort_order(current_template_data.counter_goals);
                         current_template_data.counter_goals.push_back(new_counter);
                         selected_counter_index = (int) current_template_data.counter_goals.size() - 1;
@@ -9103,86 +9223,290 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  "Add a new counter goal.\n\n"
                                  "Counters track how many of a selected set of goals are completed.\n"
                                  "They display a big icon, a name, and progress (e.g., 3/10).\n"
-                                 "Only the full completion (all linked goals done) adds towards the overall progress.");
+                                 "Only full completion (all linked goals done) adds to the overall progress.");
                         ImGui::SetTooltip("%s", tooltip_buffer);
                     }
-
                     ImGui::SameLine();
-                    if (ImGui::Button("Sort##Counters")) {
-                        apply_partial_sort(current_template_data.counter_goals);
-                        save_message_type = MSG_NONE;
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("Reset Order##Counters")) {
-                        for (auto &c: current_template_data.counter_goals) c.sort_order = 0;
-                        save_message_type = MSG_NONE;
-                    }
-
+                    ImGui::Checkbox("Show Display Names##ctr", &show_counter_display_names);
                     ImGui::Separator();
 
-                    // --- Two-Pane Layout ---
-                    float pane_width = ImGui::GetContentRegionAvail().x * 0.35f;
-
-                    // Left Pane: List of counters
-                    ImGui::BeginChild("CounterListPane", ImVec2(pane_width, 0), true);
-                    for (int i = 0; i < (int) current_template_data.counter_goals.size(); i++) {
-                        auto &counter = current_template_data.counter_goals[i];
-
-                        // Search filter
-                        if (tc_search_buffer[0] != '\0' &&
-                            !str_contains_insensitive(counter.root_name, tc_search_buffer) &&
-                            !str_contains_insensitive(counter.display_name, tc_search_buffer)) {
-                            continue;
+                    // --- Build render list with search filtering ---
+                    std::vector<EditorCounterGoal *> counters_to_render;
+                    bool ctr_search_active = (tc_search_buffer[0] != '\0' && current_search_scope == SCOPE_COUNTERS);
+                    if (ctr_search_active) {
+                        for (auto &c : current_template_data.counter_goals) {
+                            if (str_contains_insensitive(c.root_name, tc_search_buffer) ||
+                                str_contains_insensitive(c.display_name, tc_search_buffer) ||
+                                str_contains_insensitive(c.icon_path, tc_search_buffer)) {
+                                counters_to_render.push_back(&c);
+                            }
                         }
-
-                        char label[384];
-                        snprintf(label, sizeof(label), "%s##counter_%d", counter.display_name, i);
-                        if (ImGui::Selectable(label, selected_counter_index == i)) {
-                            selected_counter_index = i;
+                    } else {
+                        for (auto &c : current_template_data.counter_goals) {
+                            counters_to_render.push_back(&c);
                         }
                     }
+
+                    // --- Counter text (centered) ---
+                    char ctr_count_text[128];
+                    snprintf(ctr_count_text, sizeof(ctr_count_text), "%zu %s", counters_to_render.size(),
+                             counters_to_render.size() == 1 ? "Counter" : "Counters");
+                    float ctr_text_w = ImGui::CalcTextSize(ctr_count_text).x;
+                    ImGui::SetCursorPosX(
+                        ImGui::GetCursorPosX() + (
+                            ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - ctr_text_w) * 0.5f);
+                    ImGui::TextDisabled("%s", ctr_count_text);
+
+                    // --- Render the list ---
+                    int ctr_to_remove_idx = -1;
+                    int ctr_to_copy_idx = -1;
+
+                    for (size_t i = 0; i < counters_to_render.size(); ++i) {
+                        auto &counter = *counters_to_render[i];
+                        ImGui::PushID(&counter);
+
+                        const char *display_name = counter.display_name;
+                        const char *root_name = counter.root_name;
+                        const char *label = show_counter_display_names
+                                                ? (display_name[0] ? display_name : root_name)
+                                                : root_name;
+                        if (label[0] == '\0') label = "[New Counter]";
+
+                        // Sort Badge
+                        char ctr_badge_label[64];
+                        if (counter.sort_order > 0)
+                            snprintf(ctr_badge_label, sizeof(ctr_badge_label), "%d##ctr_badge", counter.sort_order);
+                        else
+                            snprintf(ctr_badge_label, sizeof(ctr_badge_label), " - ##ctr_badge");
+
+                        const char *ctr_text_end = strstr(ctr_badge_label, "##");
+                        float ctr_badge_text_w = ImGui::CalcTextSize(ctr_badge_label, ctr_text_end).x;
+                        float ctr_badge_w = std::max(28.0f, ctr_badge_text_w + ImGui::GetStyle().FramePadding.x * 4.0f);
+
+                        if (ImGui::Button(ctr_badge_label, ImVec2(ctr_badge_w, 0))) {
+                            if (counter.sort_order > 0)
+                                counter.sort_order = 0;
+                            else counter.sort_order = get_next_sort_order(current_template_data.counter_goals);
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            if (counter.sort_order > 0)
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to remove counter sort order");
+                            else
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Click to assign counter sort order");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+
+                        // X (Remove) button
+                        if (ImGui::Button("X")) { ctr_to_remove_idx = (int)i; }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s", label);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+
+                        // Copy button
+                        if (ImGui::Button("Copy")) { ctr_to_copy_idx = (int)i; }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate %s.", label);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+
+                        // Selectable
+                        // Find actual index in the source vector
+                        int actual_idx = (int)(&counter - &current_template_data.counter_goals[0]);
+                        if (ImGui::Selectable(label, selected_counter_index == actual_idx)) {
+                            selected_counter_index = actual_idx;
+                        }
+
+                        ImGui::PopID();
+                    }
+
+                    // Handle remove
+                    if (ctr_to_remove_idx >= 0 && ctr_to_remove_idx < (int)counters_to_render.size()) {
+                        auto *ptr = counters_to_render[ctr_to_remove_idx];
+                        int actual_idx = (int)(ptr - &current_template_data.counter_goals[0]);
+                        clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
+                                         ptr->root_name);
+                        current_template_data.counter_goals.erase(
+                            current_template_data.counter_goals.begin() + actual_idx);
+                        if (selected_counter_index == actual_idx) selected_counter_index = -1;
+                        else if (selected_counter_index > actual_idx) selected_counter_index--;
+                        save_message_type = MSG_NONE;
+                    }
+
+                    // Handle copy
+                    if (ctr_to_copy_idx >= 0 && ctr_to_copy_idx < (int)counters_to_render.size()) {
+                        auto *ptr = counters_to_render[ctr_to_copy_idx];
+                        EditorCounterGoal copy = *ptr;
+                        // Generate unique root name
+                        char base_name[192];
+                        strncpy(base_name, copy.root_name, sizeof(base_name) - 1);
+                        base_name[sizeof(base_name) - 1] = '\0';
+                        int copy_num = 1;
+                        while (true) {
+                            snprintf(copy.root_name, sizeof(copy.root_name), "%s_copy_%d", base_name, copy_num);
+                            bool exists = false;
+                            for (const auto &c : current_template_data.counter_goals) {
+                                if (strcmp(c.root_name, copy.root_name) == 0) { exists = true; break; }
+                            }
+                            if (!exists) break;
+                            copy_num++;
+                        }
+                        copy.sort_order = 0;
+                        // Reset manual positions
+                        copy.icon_pos = {};
+                        copy.text_pos = {};
+                        copy.progress_pos = {};
+                        current_template_data.counter_goals.push_back(copy);
+                        selected_counter_index = (int)current_template_data.counter_goals.size() - 1;
+                        save_message_type = MSG_NONE;
+                    }
+
                     ImGui::EndChild();
 
                     ImGui::SameLine();
 
-                    // Right Pane: Details of selected counter
+                    // ===== Right Pane: Details =====
                     ImGui::BeginChild("CounterDetailPane", ImVec2(0, 0), true);
                     if (selected_counter_index >= 0 &&
                         selected_counter_index < (int) current_template_data.counter_goals.size()) {
                         auto &counter = current_template_data.counter_goals[selected_counter_index];
 
-                        // Root name
+                        ImGui::Text("Edit Counter Details");
+
+                        // "Reset All Positions" button
+                        {
+                            bool any_pos_set = counter.icon_pos.is_set || counter.text_pos.is_set ||
+                                               counter.progress_pos.is_set;
+                            if (any_pos_set) {
+                                const char *reset_btn = "Reset All Positions";
+                                float btn_w = ImGui::CalcTextSize(reset_btn).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                                ImGui::SameLine(ImGui::GetContentRegionAvail().x - btn_w);
+                                if (ImGui::SmallButton(reset_btn)) {
+                                    reset_manual_pos(&counter.icon_pos);
+                                    reset_manual_pos(&counter.text_pos);
+                                    reset_manual_pos(&counter.progress_pos);
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip[256];
+                                    snprintf(tooltip, sizeof(tooltip),
+                                             "Reset all manual positions for this\n"
+                                             "counter back to the auto-layout.\n"
+                                             "Save the template for the changes to take visual effect.");
+                                    ImGui::SetTooltip("%s", tooltip);
+                                }
+                            }
+                        }
+
+                        ImGui::Separator();
+
+                        // Root Name
                         char old_counter_root[192];
                         strncpy(old_counter_root, counter.root_name, sizeof(old_counter_root) - 1);
                         old_counter_root[sizeof(old_counter_root) - 1] = '\0';
-                        ImGui::InputText("Root Name##Counter", counter.root_name, sizeof(counter.root_name));
-                        if (strcmp(old_counter_root, counter.root_name) != 0) {
-                            propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals,
-                                                  old_counter_root, counter.root_name);
-                            save_message_type = MSG_NONE;
+                        if (ImGui::InputText("Root Name##Counter", counter.root_name, sizeof(counter.root_name))) {
+                            if (counter.root_name[0] == '\0') {
+                                strncpy(counter.root_name, old_counter_root, sizeof(counter.root_name) - 1);
+                                counter.root_name[sizeof(counter.root_name) - 1] = '\0';
+                            } else {
+                                propagate_goal_rename(current_template_data.decorations,
+                                                      current_template_data.counter_goals,
+                                                      old_counter_root, counter.root_name);
+                                save_message_type = MSG_NONE;
+                            }
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[256];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "A unique ID for this counter (e.g., 'biome_counter').");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
-                        ImGui::InputText("Display Name##Counter", counter.display_name, sizeof(counter.display_name));
-                        ImGui::InputText("Icon Path##Counter", counter.icon_path, sizeof(counter.icon_path));
-                        ImGui::Checkbox("Hidden##Counter", &counter.is_hidden);
+                        // Display Name
+                        if (ImGui::InputText("Display Name##Counter", counter.display_name,
+                                             sizeof(counter.display_name))) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "The user-facing name for this counter.");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+
+                        // Icon Path + Browse
+                        if (ImGui::InputText("Icon Path##Counter", counter.icon_path, sizeof(counter.icon_path))) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[256];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Path to the icon file, relative to the 'resources/icons' directory.");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
                         ImGui::SameLine();
-                        ImGui::Checkbox("Force to Row 2##Counter", &counter.in_2nd_row);
+                        if (ImGui::Button("Browse##CounterIcon")) {
+                            char new_path[MAX_PATH_LENGTH];
+                            if (open_icon_file_dialog(new_path, sizeof(new_path))) {
+                                strncpy(counter.icon_path, new_path, sizeof(counter.icon_path) - 1);
+                                counter.icon_path[sizeof(counter.icon_path) - 1] = '\0';
+                                save_message_type = MSG_NONE;
+                            }
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[128];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "The icon must be inside the 'resources/icons' folder!");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+
+                        // Hidden + Row 2
+                        if (ImGui::Checkbox("Hidden##Counter", &counter.is_hidden)) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[256];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "If checked, this counter will be fully hidden on the overlay\n"
+                                     "and hidden settings-based on the tracker.\n"
+                                     "Visibility can be toggled in the main tracker settings.");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Checkbox("Row 2##Counter", &counter.in_2nd_row)) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[256];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Force this counter to display on the 2nd row of the overlay\n"
+                                     "(normally reserved for %s).", advancements_label_plural_lower);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
 
                         ImGui::Separator();
 
                         // --- Linked Goals ---
                         ImGui::Text("Linked Goals: %d", (int) counter.linked_goals.size());
+                        if (counter.linked_goals.empty()) {
+                            ImGui::SameLine();
+                            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "(requires at least 1)");
+                        }
                         ImGui::SameLine();
                         if (ImGui::Button("Select Goals##Counter")) {
-                            // Open the goal selector in multi-select mode
                             show_goal_selector_popup = true;
                             focus_goal_selector_search = true;
                             goal_selector_search_buffer[0] = '\0';
-                            goal_selector_max_selection = 0; // 0 = unlimited for counters
+                            goal_selector_max_selection = 0;
                             goal_selector_counter_index = selected_counter_index;
-                            goal_selector_deco_index = -1; // Not editing a decoration
+                            goal_selector_deco_index = -1;
                             goal_selector_last_clicked_flat_index = -1;
-                            // Pre-populate selections from existing linked goals
                             goal_selector_multi_selections.clear();
                             for (const auto &lg : counter.linked_goals) {
                                 goal_selector_multi_selections.push_back(lg);
@@ -9203,20 +9527,28 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             int remove_idx = -1;
                             for (int li = 0; li < (int) counter.linked_goals.size(); li++) {
                                 auto &lg = counter.linked_goals[li];
-                                char lg_label[512];
+                                // Build display text with numbering and full disambiguation
+                                char lg_display[512];
                                 if (lg.stage_id[0] != '\0') {
-                                    snprintf(lg_label, sizeof(lg_label), "%s [%s]##lg_%d", lg.root_name, lg.stage_id, li);
+                                    snprintf(lg_display, sizeof(lg_display), "%d. %s [%s]", li + 1,
+                                             lg.root_name, lg.stage_id);
                                 } else if (lg.parent_root[0] != '\0') {
-                                    snprintf(lg_label, sizeof(lg_label), "%s > %s##lg_%d", lg.parent_root, lg.root_name, li);
+                                    snprintf(lg_display, sizeof(lg_display), "%d. %s > %s", li + 1,
+                                             lg.parent_root, lg.root_name);
                                 } else {
-                                    snprintf(lg_label, sizeof(lg_label), "%s##lg_%d", lg.root_name, li);
+                                    snprintf(lg_display, sizeof(lg_display), "%d. %s", li + 1, lg.root_name);
                                 }
-                                ImGui::Text("%s", lg_label);
+                                ImGui::Text("%s", lg_display);
                                 ImGui::SameLine();
                                 char remove_btn[64];
                                 snprintf(remove_btn, sizeof(remove_btn), "X##remove_lg_%d", li);
                                 if (ImGui::SmallButton(remove_btn)) {
                                     remove_idx = li;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip_buffer[128];
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove this linked goal");
+                                    ImGui::SetTooltip("%s", tooltip_buffer);
                                 }
                             }
                             if (remove_idx >= 0) {
@@ -9237,20 +9569,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             render_manual_pos_ui("ctr_prog", "counter", "Progress Position",
                                                  &counter.progress_pos, save_message_type);
                         }
-
-                        ImGui::Separator();
-
-                        // Delete button
-                        if (ImGui::Button("Delete Counter")) {
-                            clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
-                                             counter.root_name);
-                            current_template_data.counter_goals.erase(
-                                current_template_data.counter_goals.begin() + selected_counter_index);
-                            selected_counter_index = -1;
-                            save_message_type = MSG_NONE;
-                        }
                     } else {
-                        ImGui::TextDisabled("Select a counter from the list to edit its properties.");
+                        ImGui::Text("Select a Counter from the list to edit its details.");
                     }
                     ImGui::EndChild();
 
