@@ -5601,6 +5601,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         strncpy(new_stat.icon_path, source_stat_ptr->icon_path, sizeof(new_stat.icon_path));
                         new_stat.icon_path[sizeof(new_stat.icon_path) - 1] = '\0';
                         new_stat.is_hidden = source_stat_ptr->is_hidden;
+                        new_stat.in_2nd_row = source_stat_ptr->in_2nd_row;
                         new_stat.is_recipe = source_stat_ptr->is_recipe;
                         new_stat.is_simple_stat = source_stat_ptr->is_simple_stat;
                         new_stat.criteria = source_stat_ptr->criteria; // std::vector handles its own deep copy safely.
@@ -5880,12 +5881,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             render_manual_pos_ui("s_text", "stat category", "Text Position", &stat_cat.text_pos,
                                                  save_message_type);
 
-                            // ONLY show progress pos if this is a Multi-Stat Category!
-                            if (!stat_cat.is_simple_stat) {
-                                render_manual_pos_ui("s_prog", "stat category", "Progress Position",
-                                                     &stat_cat.progress_pos,
-                                                     save_message_type);
-                            }
+                            render_manual_pos_ui("s_prog", "stat category", "Progress Position",
+                                                 &stat_cat.progress_pos,
+                                                 save_message_type);
                         }
 
                         ImGui::Separator();
@@ -7201,6 +7199,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_item.icon_path[sizeof(new_item.icon_path) - 1] = '\0';
                         new_item.goal = source_item.goal;
                         new_item.is_hidden = source_item.is_hidden;
+                        new_item.in_2nd_row = source_item.in_2nd_row;
                         new_item.icon_pos = source_item.icon_pos;
                         new_item.text_pos = source_item.text_pos;
                         new_item.progress_pos = source_item.progress_pos;
