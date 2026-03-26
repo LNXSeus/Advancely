@@ -1153,6 +1153,54 @@ static void tracker_update_stats_modern(Tracker *t, const cJSON *player_stats_js
     }
 }
 
+/**
+ * @brief Parses linked goals and mode from a JSON object into C arrays.
+ * Used for stat auto-completion. Allocates linked_goals array with calloc.
+ */
+static void parse_runtime_linked_goals(cJSON *json_obj, int *out_count, CounterLinkedGoal **out_goals,
+                                       LinkedGoalMode *out_mode) {
+    *out_count = 0;
+    *out_goals = nullptr;
+    *out_mode = LINKED_GOAL_AND;
+
+    cJSON *linked_json = cJSON_GetObjectItem(json_obj, "linked_goals");
+    if (!linked_json) return;
+
+    int count = cJSON_GetArraySize(linked_json);
+    if (count <= 0) return;
+
+    *out_goals = (CounterLinkedGoal *) calloc(count, sizeof(CounterLinkedGoal));
+    if (!*out_goals) return;
+    *out_count = count;
+
+    int idx = 0;
+    cJSON *lg_json;
+    cJSON_ArrayForEach(lg_json, linked_json) {
+        CounterLinkedGoal *lg = &(*out_goals)[idx];
+        cJSON *lr = cJSON_GetObjectItem(lg_json, "root_name");
+        cJSON *ls = cJSON_GetObjectItem(lg_json, "stage_id");
+        cJSON *lp = cJSON_GetObjectItem(lg_json, "parent_root");
+        if (cJSON_IsString(lr)) {
+            strncpy(lg->root_name, lr->valuestring, sizeof(lg->root_name) - 1);
+            lg->root_name[sizeof(lg->root_name) - 1] = '\0';
+        }
+        if (cJSON_IsString(ls)) {
+            strncpy(lg->stage_id, ls->valuestring, sizeof(lg->stage_id) - 1);
+            lg->stage_id[sizeof(lg->stage_id) - 1] = '\0';
+        }
+        if (cJSON_IsString(lp)) {
+            strncpy(lg->parent_root, lp->valuestring, sizeof(lg->parent_root) - 1);
+            lg->parent_root[sizeof(lg->parent_root) - 1] = '\0';
+        }
+        idx++;
+    }
+
+    cJSON *mode_json = cJSON_GetObjectItem(json_obj, "linked_goal_mode");
+    if (cJSON_IsString(mode_json) && strcmp(mode_json->valuestring, "or") == 0) {
+        *out_mode = LINKED_GOAL_OR;
+    }
+}
+
 // HELPER FUNCTION FOR PARSING
 /**
  * @brief Parses advancement or stat categories and their criteria from the template, supporting modded advancements/stats.
@@ -1355,6 +1403,12 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                             }
                         }
 
+                        // Parse sub-stat linked goals for auto-completion
+                        if (is_stat_category) {
+                            parse_runtime_linked_goals(crit_item, &new_crit->linked_goal_count,
+                                                       &new_crit->linked_goals, &new_crit->linked_goal_mode);
+                        }
+
                         new_cat->criteria[k++] = new_crit;
                     }
                 }
@@ -1402,6 +1456,12 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                     new_cat->criteria[0] = the_criterion;
                 }
             }
+        }
+
+        // Parse stat category linked goals for auto-completion
+        if (is_stat_category) {
+            parse_runtime_linked_goals(cat_json, &new_cat->linked_goal_count,
+                                       &new_cat->linked_goals, &new_cat->linked_goal_mode);
         }
 
         // Implicitly, if criteria_obj exists but is empty, we do nothing.
@@ -2527,6 +2587,95 @@ static void tracker_update_counter_goals(Tracker *t) {
     }
 }
 
+/**
+ * @brief Checks if linked goals are satisfied based on mode (AND/OR).
+ * Returns true if auto-completion should trigger.
+ */
+static bool check_linked_goals_satisfied(const TemplateData *td, const CounterLinkedGoal *linked_goals,
+                                         int linked_goal_count, LinkedGoalMode mode) {
+    if (linked_goal_count <= 0 || !linked_goals) return false;
+
+    if (mode == LINKED_GOAL_AND) {
+        // All linked goals must be completed
+        for (int j = 0; j < linked_goal_count; j++) {
+            if (!is_goal_completed_by_root(td, linked_goals[j].root_name,
+                                           linked_goals[j].stage_id, linked_goals[j].parent_root)) {
+                return false; // any goal not completed
+            }
+        }
+        return true; // all completed
+    } else {
+        // At least one linked goal must be completed (OR mode)
+        for (int j = 0; j < linked_goal_count; j++) {
+            if (is_goal_completed_by_root(td, linked_goals[j].root_name,
+                                          linked_goals[j].stage_id, linked_goals[j].parent_root)) {
+                return true; // any goal completed
+            }
+        }
+        return false; // none completed
+    }
+}
+
+/**
+ * @brief Updates stat completion based on linked goals (auto-completion).
+ * Must be called after tracker_update_counter_goals and the stat update functions,
+ * so that all other goal states are already determined.
+ */
+static void tracker_update_stat_linked_goals(Tracker *t) {
+    if (!t || !t->template_data) return;
+    TemplateData *td = t->template_data;
+
+    // Reset stat completion counts to recalculate with linked goals
+    td->stats_completed_count = 0;
+    td->stats_completed_criteria_count = 0;
+
+    for (int i = 0; i < td->stat_count; i++) {
+        TrackableCategory *stat_cat = td->stats[i];
+        if (!stat_cat) continue;
+
+        // Check sub-stat linked goals
+        stat_cat->completed_criteria_count = 0;
+        for (int j = 0; j < stat_cat->criteria_count; j++) {
+            TrackableItem *sub_stat = stat_cat->criteria[j];
+            if (!sub_stat) continue;
+
+            // If sub-stat has linked goals and they are satisfied, auto-complete it
+            if (sub_stat->linked_goal_count > 0 && !sub_stat->done) {
+                if (check_linked_goals_satisfied(td, sub_stat->linked_goals,
+                                                 sub_stat->linked_goal_count, sub_stat->linked_goal_mode)) {
+                    sub_stat->done = true;
+                }
+            }
+            if (sub_stat->done) stat_cat->completed_criteria_count++;
+        }
+
+        // Check stat category linked goals
+        if (stat_cat->linked_goal_count > 0 && !stat_cat->done) {
+            if (check_linked_goals_satisfied(td, stat_cat->linked_goals,
+                                             stat_cat->linked_goal_count, stat_cat->linked_goal_mode)) {
+                stat_cat->done = true;
+                // When the category is auto-completed, mark all children done too
+                for (int j = 0; j < stat_cat->criteria_count; j++) {
+                    if (stat_cat->criteria[j] && !stat_cat->criteria[j]->done) {
+                        stat_cat->criteria[j]->done = true;
+                    }
+                }
+                stat_cat->completed_criteria_count = stat_cat->criteria_count;
+            }
+        }
+
+        // Recalculate parent done if all children are now done (might have changed from sub-stat linked goals)
+        bool all_children_done = (stat_cat->criteria_count > 0 &&
+                                  stat_cat->completed_criteria_count >= stat_cat->criteria_count);
+        if (all_children_done && !stat_cat->done) {
+            stat_cat->done = true;
+        }
+
+        if (stat_cat->done) td->stats_completed_count++;
+        td->stats_completed_criteria_count += stat_cat->completed_criteria_count;
+    }
+}
+
 void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const AppSettings *settings) {
     (void) version;
     (void) settings;
@@ -2613,8 +2762,12 @@ void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const Ap
 static void free_trackable_items(TrackableItem **items, int count) {
     if (!items) return;
     for (int i = 0; i < count; i++) {
-        // Cleanup for animated textures
         if (items[i]) {
+            // Free linked goals for stat auto-completion
+            if (items[i]->linked_goals) {
+                free(items[i]->linked_goals);
+                items[i]->linked_goals = nullptr;
+            }
             free(items[i]);
             items[i] = nullptr;
         }
@@ -2637,6 +2790,12 @@ static void free_trackable_categories(TrackableCategory **categories, int count)
         if (categories[i]) {
             // First, free the inner criteria array using the other helper
             free_trackable_items(categories[i]->criteria, categories[i]->criteria_count);
+
+            // Free linked goals for stat auto-completion
+            if (categories[i]->linked_goals) {
+                free(categories[i]->linked_goals);
+                categories[i]->linked_goals = nullptr;
+            }
 
             // Then free the category itself
             free(categories[i]);
@@ -3146,6 +3305,7 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
     tracker_update_custom_progress(t, settings_json, settings);
     tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json, player_unlocks_json, version, settings);
     tracker_update_counter_goals(t); // Update counter completion state based on linked goals
+    tracker_update_stat_linked_goals(t); // Update stat completion based on linked goals (auto-completion)
     tracker_calculate_overall_progress(t, version, settings); //THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
 
     // Clean up the parsed JSON objects
@@ -8456,6 +8616,7 @@ void tracker_recalculate_progress(Tracker *t, const AppSettings *settings) {
     if (!t || !t->template_data) return;
     MC_Version version = settings_get_version_from_string(settings->version_str);
     tracker_update_counter_goals(t);
+    tracker_update_stat_linked_goals(t);
     tracker_calculate_overall_progress(t, version, settings);
 }
 

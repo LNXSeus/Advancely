@@ -182,7 +182,8 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
       vanilla, mods, or datapacks.
     * **Statistics**: Monitors any in-game statistic (e.g., blocks mined, distance flown) against a target value.
       Supports nested "sub-stats" under a single category and allows for manual completion overrides via an in-app
-      checkbox.
+      checkbox. Stats and sub-stats can also be auto-completed by linking them to other goals (advancements, unlocks,
+      counters, etc.) with an `AND` (all must be completed) or `OR` (at least one) mode.
     * **Unlocks**: Fully tracks the unique "unlocks" progression system from the `25w14craftmine` snapshot.
 * **Advanced Goal Types**:
     * **Custom Counters & Manual Goals**: For objectives that can't be automatically tracked (like counting structures
@@ -714,6 +715,12 @@ Opening a template reveals a tabbed interface where you can define every goal.
       reached).
     * **Multi-Stat Categories**: Group related stats under one parent icon. Each `Sub-Stat` has its own name, icon, and
       target, and will cycle on the stream overlay.
+    * **Auto-Complete via Linked Goals**: Both stat categories and individual sub-stats support automatic completion
+      through linked goals. Use the `Select Goals` button to pick any combination of advancements, criteria, stats,
+      sub-stats, unlocks, custom goals, or multi-stage goal stages. Choose between `AND` mode (all selected goals must
+      be completed) or `OR` mode (at least one selected goal must be completed) using the dropdown next to the goal
+      list. When the condition is met, the stat is automatically marked as done — in addition to natural progress-based
+      completion and manual checkbox overrides.
     * **Row 2 Toggle**: You can check the "Row 2" box to force a stat category to appear in the middle row of the
       overlay instead of the bottom row.
 * **Unlocks**: For the `25w14craftmine` snapshot, this tab allows you to track the completion of player unlocks like

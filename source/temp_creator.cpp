@@ -137,6 +137,13 @@ static bool are_manual_positions_different(const ManualPos &a, const ManualPos &
 
 // End of local helpers for manual positioning
 
+// A linked goal reference for counter goals and stat auto-completion in the editor
+struct EditorCounterLinkedGoal {
+    char root_name[192] = {};
+    char stage_id[64] = {};
+    char parent_root[192] = {};
+};
+
 // In-memory representation of a template for editing
 struct EditorTrackableItem {
     char root_name[192];
@@ -146,6 +153,10 @@ struct EditorTrackableItem {
     bool is_hidden;
     bool in_2nd_row;
     int sort_order = 0;
+
+    // Stat auto-completion via linked goals (only used for sub-stats)
+    std::vector<EditorCounterLinkedGoal> linked_goals;
+    LinkedGoalMode linked_goal_mode = LINKED_GOAL_AND;
 
     ManualPos icon_pos = {};
     ManualPos text_pos = {};
@@ -163,6 +174,10 @@ struct EditorTrackableCategory {
     bool is_simple_stat; // UI flag to distinguish simple vs complex stats
     std::vector<EditorTrackableItem> criteria; // Criteria then are trackable items
     int sort_order = 0;
+
+    // Stat auto-completion via linked goals (only used for stat categories)
+    std::vector<EditorCounterLinkedGoal> linked_goals;
+    LinkedGoalMode linked_goal_mode = LINKED_GOAL_AND;
 
     ManualPos icon_pos = {};
     ManualPos text_pos = {};
@@ -194,13 +209,6 @@ struct EditorMultiStageGoal {
     ManualPos icon_pos = {};
     ManualPos text_pos = {};
     ManualPos progress_pos = {};
-};
-
-// A linked goal reference for counter goals in the editor
-struct EditorCounterLinkedGoal {
-    char root_name[192] = {};
-    char stage_id[64] = {};
-    char parent_root[192] = {};
 };
 
 struct EditorCounterGoal {
@@ -251,11 +259,30 @@ struct EditorTemplate {
     std::vector<EditorDecorationElement> decorations;
 };
 
-// Helper: when a goal's root_name is renamed, propagate the change to all arrow links and counter linked goals
+// Helper: propagate a rename through a vector of EditorCounterLinkedGoal
+static void propagate_rename_in_linked_goals(std::vector<EditorCounterLinkedGoal> &linked_goals,
+                                             const char *old_name, const char *new_name,
+                                             const char *parent_root) {
+    for (auto &lg: linked_goals) {
+        if (strcmp(lg.root_name, old_name) == 0) {
+            if (!parent_root || (lg.parent_root[0] != '\0' && strcmp(lg.parent_root, parent_root) == 0)) {
+                strncpy(lg.root_name, new_name, sizeof(lg.root_name) - 1);
+                lg.root_name[sizeof(lg.root_name) - 1] = '\0';
+            }
+        }
+        if (!parent_root && strcmp(lg.parent_root, old_name) == 0) {
+            strncpy(lg.parent_root, new_name, sizeof(lg.parent_root) - 1);
+            lg.parent_root[sizeof(lg.parent_root) - 1] = '\0';
+        }
+    }
+}
+
+// Helper: when a goal's root_name is renamed, propagate the change to all arrow links, counter linked goals, and stat linked goals
 static void propagate_goal_rename(std::vector<EditorDecorationElement> &decorations,
                                   std::vector<EditorCounterGoal> &counter_goals,
                                   const char *old_name, const char *new_name,
-                                  const char *parent_root = nullptr) {
+                                  const char *parent_root = nullptr,
+                                  std::vector<EditorTrackableCategory> *stats = nullptr) {
     if (old_name[0] == '\0' || strcmp(old_name, new_name) == 0) return;
     for (auto &deco: decorations) {
         if (deco.type != DECORATION_ARROW) continue;
@@ -270,20 +297,14 @@ static void propagate_goal_rename(std::vector<EditorDecorationElement> &decorati
     }
     // Also update counter linked goals
     for (auto &counter: counter_goals) {
-        for (auto &lg: counter.linked_goals) {
-            // When parent_root is provided (child goal rename like criterion/sub-stat),
-            // only update linked goals that match BOTH the root_name AND the parent.
-            // When parent_root is null (top-level goal rename), update all matches.
-            if (strcmp(lg.root_name, old_name) == 0) {
-                if (!parent_root || (lg.parent_root[0] != '\0' && strcmp(lg.parent_root, parent_root) == 0)) {
-                    strncpy(lg.root_name, new_name, sizeof(lg.root_name) - 1);
-                    lg.root_name[sizeof(lg.root_name) - 1] = '\0';
-                }
-            }
-            // When a top-level goal (parent) is renamed, update parent_root references too
-            if (!parent_root && strcmp(lg.parent_root, old_name) == 0) {
-                strncpy(lg.parent_root, new_name, sizeof(lg.parent_root) - 1);
-                lg.parent_root[sizeof(lg.parent_root) - 1] = '\0';
+        propagate_rename_in_linked_goals(counter.linked_goals, old_name, new_name, parent_root);
+    }
+    // Also update stat linked goals (category and sub-stat level)
+    if (stats) {
+        for (auto &stat: *stats) {
+            propagate_rename_in_linked_goals(stat.linked_goals, old_name, new_name, parent_root);
+            for (auto &crit: stat.criteria) {
+                propagate_rename_in_linked_goals(crit.linked_goals, old_name, new_name, parent_root);
             }
         }
     }
@@ -368,6 +389,20 @@ static void build_goal_display_label(const EditorTemplate &data, const char *roo
     out[out_size - 1] = '\0';
 }
 
+// Helper to compare two linked goal vectors
+static bool are_linked_goals_different(const std::vector<EditorCounterLinkedGoal> &a,
+                                       const std::vector<EditorCounterLinkedGoal> &b) {
+    if (a.size() != b.size()) return true;
+    for (size_t i = 0; i < a.size(); ++i) {
+        if (strcmp(a[i].root_name, b[i].root_name) != 0 ||
+            strcmp(a[i].stage_id, b[i].stage_id) != 0 ||
+            strcmp(a[i].parent_root, b[i].parent_root) != 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Helper function to compare two EditorTrackableItem structs, custom goals and unlocks
 static bool are_editor_items_different(const EditorTrackableItem &a, const EditorTrackableItem &b) {
     return strcmp(a.root_name, b.root_name) != 0 ||
@@ -376,6 +411,8 @@ static bool are_editor_items_different(const EditorTrackableItem &a, const Edito
            a.goal != b.goal ||
            a.is_hidden != b.is_hidden ||
            a.in_2nd_row != b.in_2nd_row ||
+           a.linked_goal_mode != b.linked_goal_mode ||
+           are_linked_goals_different(a.linked_goals, b.linked_goals) ||
            are_manual_positions_different(a.icon_pos, b.icon_pos) ||
            are_manual_positions_different(a.text_pos, b.text_pos);
 }
@@ -389,6 +426,8 @@ static bool are_editor_categories_different(const EditorTrackableCategory &a, co
         a.in_2nd_row != b.in_2nd_row ||
         a.is_recipe != b.is_recipe ||
         a.is_simple_stat != b.is_simple_stat ||
+        a.linked_goal_mode != b.linked_goal_mode ||
+        are_linked_goals_different(a.linked_goals, b.linked_goals) ||
         are_manual_positions_different(a.icon_pos, b.icon_pos) ||
         are_manual_positions_different(a.text_pos, b.text_pos) ||
         are_manual_positions_different(a.progress_pos, b.progress_pos) ||
@@ -1022,6 +1061,40 @@ static void parse_editor_trackable_categories(cJSON *json_object,
 }
 
 
+// Helper to parse linked goals and mode from a JSON object
+static void parse_linked_goals(cJSON *json_obj, std::vector<EditorCounterLinkedGoal> &linked_goals,
+                               LinkedGoalMode &mode) {
+    linked_goals.clear();
+    mode = LINKED_GOAL_AND;
+    cJSON *linked_json = cJSON_GetObjectItem(json_obj, "linked_goals");
+    if (linked_json) {
+        cJSON *lg_json;
+        cJSON_ArrayForEach(lg_json, linked_json) {
+            EditorCounterLinkedGoal lg = {};
+            cJSON *lr = cJSON_GetObjectItem(lg_json, "root_name");
+            cJSON *ls = cJSON_GetObjectItem(lg_json, "stage_id");
+            cJSON *lp = cJSON_GetObjectItem(lg_json, "parent_root");
+            if (cJSON_IsString(lr)) {
+                strncpy(lg.root_name, lr->valuestring, sizeof(lg.root_name) - 1);
+                lg.root_name[sizeof(lg.root_name) - 1] = '\0';
+            }
+            if (cJSON_IsString(ls)) {
+                strncpy(lg.stage_id, ls->valuestring, sizeof(lg.stage_id) - 1);
+                lg.stage_id[sizeof(lg.stage_id) - 1] = '\0';
+            }
+            if (cJSON_IsString(lp)) {
+                strncpy(lg.parent_root, lp->valuestring, sizeof(lg.parent_root) - 1);
+                lg.parent_root[sizeof(lg.parent_root) - 1] = '\0';
+            }
+            linked_goals.push_back(lg);
+        }
+    }
+    cJSON *mode_json = cJSON_GetObjectItem(json_obj, "linked_goal_mode");
+    if (cJSON_IsString(mode_json) && strcmp(mode_json->valuestring, "or") == 0) {
+        mode = LINKED_GOAL_OR;
+    }
+}
+
 // Specific parser for stats to handle simple vs complex structures
 static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCategory> &category_vector,
                                cJSON *lang_json) {
@@ -1101,6 +1174,9 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
                 parse_editor_manual_pos(criterion_json, "icon_pos", &new_crit.icon_pos);
                 parse_editor_manual_pos(criterion_json, "text_pos", &new_crit.text_pos);
 
+                // Parse sub-stat linked goals
+                parse_linked_goals(criterion_json, new_crit.linked_goals, new_crit.linked_goal_mode);
+
                 new_cat.criteria.push_back(new_crit);
             }
         } else {
@@ -1124,6 +1200,10 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
             // For simple stats, the criterion's display name is the same as the category's
             new_cat.criteria.push_back(new_crit);
         }
+
+        // Parse stat category linked goals
+        parse_linked_goals(category_json, new_cat.linked_goals, new_cat.linked_goal_mode);
+
         category_vector.push_back(new_cat);
     }
 }
@@ -1536,6 +1616,28 @@ static void serialize_editor_trackable_categories(cJSON *parent, const char *key
 }
 
 // Specific serializer for stats
+// Helper to serialize linked goals array to a JSON object
+static void serialize_linked_goals(cJSON *parent_json, const std::vector<EditorCounterLinkedGoal> &linked_goals,
+                                   LinkedGoalMode mode) {
+    if (linked_goals.empty()) return;
+    cJSON *linked_array = cJSON_CreateArray();
+    for (const auto &lg: linked_goals) {
+        cJSON *lg_json = cJSON_CreateObject();
+        cJSON_AddStringToObject(lg_json, "root_name", lg.root_name);
+        if (lg.stage_id[0] != '\0') {
+            cJSON_AddStringToObject(lg_json, "stage_id", lg.stage_id);
+        }
+        if (lg.parent_root[0] != '\0') {
+            cJSON_AddStringToObject(lg_json, "parent_root", lg.parent_root);
+        }
+        cJSON_AddItemToArray(linked_array, lg_json);
+    }
+    cJSON_AddItemToObject(parent_json, "linked_goals", linked_array);
+    if (mode == LINKED_GOAL_OR) {
+        cJSON_AddStringToObject(parent_json, "linked_goal_mode", "or");
+    }
+}
+
 static void serialize_editor_stats(cJSON *parent, const std::vector<EditorTrackableCategory> &category_vector) {
     cJSON *cat_object = cJSON_CreateObject();
     for (const auto &cat: category_vector) {
@@ -1566,12 +1668,17 @@ static void serialize_editor_stats(cJSON *parent, const std::vector<EditorTracka
                 if (crit.goal != 0) {
                     cJSON_AddNumberToObject(crit_json, "target", crit.goal);
                 }
+                // Serialize sub-stat linked goals
+                serialize_linked_goals(crit_json, crit.linked_goals, crit.linked_goal_mode);
                 save_editor_manual_pos(crit_json, "icon_pos", crit.icon_pos);
                 save_editor_manual_pos(crit_json, "text_pos", crit.text_pos);
                 cJSON_AddItemToObject(criteria_object, crit.root_name, crit_json);
             }
             cJSON_AddItemToObject(cat_json, "criteria", criteria_object);
         }
+
+        // Serialize stat category linked goals
+        serialize_linked_goals(cat_json, cat.linked_goals, cat.linked_goal_mode);
 
         save_editor_manual_pos(cat_json, "icon_pos", cat.icon_pos);
         save_editor_manual_pos(cat_json, "text_pos", cat.text_pos);
@@ -1658,22 +1765,8 @@ static void serialize_editor_counter_goals(cJSON *parent, const std::vector<Edit
             cJSON_AddBoolToObject(goal_json, "in_2nd_row", true);
         }
 
-        // Serialize linked goals
-        if (!goal.linked_goals.empty()) {
-            cJSON *linked_array = cJSON_CreateArray();
-            for (const auto &lg: goal.linked_goals) {
-                cJSON *lg_json = cJSON_CreateObject();
-                cJSON_AddStringToObject(lg_json, "root_name", lg.root_name);
-                if (lg.stage_id[0] != '\0') {
-                    cJSON_AddStringToObject(lg_json, "stage_id", lg.stage_id);
-                }
-                if (lg.parent_root[0] != '\0') {
-                    cJSON_AddStringToObject(lg_json, "parent_root", lg.parent_root);
-                }
-                cJSON_AddItemToArray(linked_array, lg_json);
-            }
-            cJSON_AddItemToObject(goal_json, "linked_goals", linked_array);
-        }
+        // Serialize linked goals (counters always use AND mode implicitly)
+        serialize_linked_goals(goal_json, goal.linked_goals, LINKED_GOAL_AND);
 
         save_editor_manual_pos(goal_json, "icon_pos", goal.icon_pos);
         save_editor_manual_pos(goal_json, "text_pos", goal.text_pos);
@@ -2425,6 +2518,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static char goal_selector_selected_parent[192] = ""; // Parent root_name for sub-items (criteria, sub-stats)
     static int goal_selector_max_selection = 1; // Max selectable goals (1 for arrows, 0 = unlimited for counters)
     static int goal_selector_counter_index = -1; // Index of the counter being edited (multi-select mode)
+    static int goal_selector_stat_cat_index = -1; // Index of the stat category being edited (multi-select mode)
+    static int goal_selector_stat_crit_index = -1; // Index of the sub-stat being edited (-1 = category level)
     static std::vector<EditorCounterLinkedGoal> goal_selector_multi_selections; // Multi-select state
     static int goal_selector_last_clicked_flat_index = -1; // For shift-click range selection
 
@@ -4956,7 +5051,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         strncpy(old_adv_root, advancement.root_name, sizeof(old_adv_root));
                         old_adv_root[sizeof(old_adv_root) - 1] = '\0';
                         if (ImGui::InputText("Root Name", advancement.root_name, sizeof(advancement.root_name))) {
-                            propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_adv_root, advancement.root_name);
+                            propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_adv_root, advancement.root_name, nullptr, &current_template_data.stats);
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
@@ -5299,7 +5394,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             old_crit_root[sizeof(old_crit_root) - 1] = '\0';
                             if (ImGui::InputText("Criterion Root Name", criterion.root_name,
                                                  sizeof(criterion.root_name))) {
-                                propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_crit_root, criterion.root_name, advancement.root_name);
+                                propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_crit_root, criterion.root_name, advancement.root_name, &current_template_data.stats);
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
@@ -6124,7 +6219,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         strncpy(old_stat_root, stat_cat.root_name, sizeof(old_stat_root));
                         old_stat_root[sizeof(old_stat_root) - 1] = '\0';
                         if (ImGui::InputText("Category Key", stat_cat.root_name, sizeof(stat_cat.root_name))) {
-                            propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_stat_root, stat_cat.root_name);
+                            propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_stat_root, stat_cat.root_name, nullptr, &current_template_data.stats);
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
@@ -6248,6 +6343,100 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::SetTooltip("%s", multi_stat_tooltip_buffer);
                         }
 
+                        // --- Stat Category Linked Goals (Auto-Completion) ---
+                        {
+                            ImGui::Text("Auto-Complete Goals: %d", (int) stat_cat.linked_goals.size());
+                            ImGui::SameLine();
+                            char select_btn_id[64];
+                            snprintf(select_btn_id, sizeof(select_btn_id), "Select Goals##StatCat_%s", stat_cat.root_name);
+                            if (ImGui::Button(select_btn_id)) {
+                                show_goal_selector_popup = true;
+                                focus_goal_selector_search = true;
+                                goal_selector_search_buffer[0] = '\0';
+                                goal_selector_max_selection = 0;
+                                goal_selector_counter_index = -1;
+                                goal_selector_deco_index = -1;
+                                goal_selector_last_clicked_flat_index = -1;
+                                // Find the index of this stat category
+                                goal_selector_stat_cat_index = -1;
+                                for (int si = 0; si < (int) current_template_data.stats.size(); si++) {
+                                    if (&current_template_data.stats[si] == &stat_cat) {
+                                        goal_selector_stat_cat_index = si;
+                                        break;
+                                    }
+                                }
+                                goal_selector_stat_crit_index = -1; // Category level
+                                goal_selector_multi_selections.clear();
+                                for (const auto &lg : stat_cat.linked_goals) {
+                                    goal_selector_multi_selections.push_back(lg);
+                                }
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buffer[256];
+                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                         "Select goals that will auto-complete this entire stat category\n"
+                                         "when the condition (AND/OR) is met.\n"
+                                         "Hold Shift and click to select a range.");
+                                ImGui::SetTooltip("%s", tooltip_buffer);
+                            }
+
+                            if (!stat_cat.linked_goals.empty()) {
+                                // AND/OR mode toggle
+                                ImGui::SameLine();
+                                int mode_int = (int) stat_cat.linked_goal_mode;
+                                ImGui::SetNextItemWidth(60);
+                                char combo_id[64];
+                                snprintf(combo_id, sizeof(combo_id), "##stat_cat_mode_%s", stat_cat.root_name);
+                                if (ImGui::Combo(combo_id, &mode_int, "AND\0OR\0")) {
+                                    stat_cat.linked_goal_mode = (LinkedGoalMode) mode_int;
+                                    save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip_buffer[256];
+                                    snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                             "AND = All selected goals must be completed.\n"
+                                             "OR = At least one selected goal must be completed.");
+                                    ImGui::SetTooltip("%s", tooltip_buffer);
+                                }
+
+                                // Show linked goals list
+                                char child_id[64];
+                                snprintf(child_id, sizeof(child_id), "StatCatLinkedGoals_%s", stat_cat.root_name);
+                                ImGui::BeginChild(child_id, ImVec2(0, 100), true);
+                                int remove_idx = -1;
+                                for (int li = 0; li < (int) stat_cat.linked_goals.size(); li++) {
+                                    auto &lg = stat_cat.linked_goals[li];
+                                    char lg_display[512];
+                                    if (lg.stage_id[0] != '\0') {
+                                        snprintf(lg_display, sizeof(lg_display), "%d. %s [%s]", li + 1,
+                                                 lg.root_name, lg.stage_id);
+                                    } else if (lg.parent_root[0] != '\0') {
+                                        snprintf(lg_display, sizeof(lg_display), "%d. %s > %s", li + 1,
+                                                 lg.parent_root, lg.root_name);
+                                    } else {
+                                        snprintf(lg_display, sizeof(lg_display), "%d. %s", li + 1, lg.root_name);
+                                    }
+                                    ImGui::Text("%s", lg_display);
+                                    ImGui::SameLine();
+                                    char remove_btn[64];
+                                    snprintf(remove_btn, sizeof(remove_btn), "X##remove_stat_cat_lg_%d", li);
+                                    if (ImGui::SmallButton(remove_btn)) {
+                                        remove_idx = li;
+                                    }
+                                    if (ImGui::IsItemHovered()) {
+                                        char tooltip_buffer[128];
+                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove this linked goal");
+                                        ImGui::SetTooltip("%s", tooltip_buffer);
+                                    }
+                                }
+                                if (remove_idx >= 0) {
+                                    stat_cat.linked_goals.erase(stat_cat.linked_goals.begin() + remove_idx);
+                                    save_message_type = MSG_NONE;
+                                }
+                                ImGui::EndChild();
+                            }
+                        }
+
                         if (render_layout_coordinates_header("stat category",
                                                              force_open_header_root_name[0] != '\0' && strcmp(
                                                                  stat_cat.root_name,
@@ -6274,7 +6463,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             old_simple_stat_root[sizeof(old_simple_stat_root) - 1] = '\0';
                             if (ImGui::InputText("Stat Root Name", simple_crit.root_name,
                                                  sizeof(simple_crit.root_name))) {
-                                propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_simple_stat_root, simple_crit.root_name, stat_cat.root_name);
+                                propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_simple_stat_root, simple_crit.root_name, stat_cat.root_name, &current_template_data.stats);
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
@@ -6549,7 +6738,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 strncpy(old_sub_stat_root, crit.root_name, sizeof(old_sub_stat_root));
                                 old_sub_stat_root[sizeof(old_sub_stat_root) - 1] = '\0';
                                 if (ImGui::InputText("Sub-Stat Root Name", crit.root_name, sizeof(crit.root_name))) {
-                                    propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_sub_stat_root, crit.root_name, stat_cat.root_name);
+                                    propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_sub_stat_root, crit.root_name, stat_cat.root_name, &current_template_data.stats);
                                     save_message_type = MSG_NONE;
                                 }
                                 if (ImGui::IsItemHovered()) {
@@ -6687,6 +6876,105 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                  "Click to assign sub-stat sort order");
                                     }
                                     ImGui::SetTooltip("%s", tooltip_buffer);
+                                }
+
+                                // --- Sub-Stat Linked Goals (Auto-Completion) ---
+                                {
+                                    ImGui::Text("Auto-Complete Goals: %d", (int) crit.linked_goals.size());
+                                    ImGui::SameLine();
+                                    char crit_select_btn_id[128];
+                                    snprintf(crit_select_btn_id, sizeof(crit_select_btn_id),
+                                             "Select Goals##SubStat_%s_%zu", stat_cat.root_name, j);
+                                    if (ImGui::Button(crit_select_btn_id)) {
+                                        show_goal_selector_popup = true;
+                                        focus_goal_selector_search = true;
+                                        goal_selector_search_buffer[0] = '\0';
+                                        goal_selector_max_selection = 0;
+                                        goal_selector_counter_index = -1;
+                                        goal_selector_deco_index = -1;
+                                        goal_selector_last_clicked_flat_index = -1;
+                                        // Find the index of this stat category
+                                        goal_selector_stat_cat_index = -1;
+                                        for (int si = 0; si < (int) current_template_data.stats.size(); si++) {
+                                            if (&current_template_data.stats[si] == &stat_cat) {
+                                                goal_selector_stat_cat_index = si;
+                                                break;
+                                            }
+                                        }
+                                        goal_selector_stat_crit_index = (int) j;
+                                        goal_selector_multi_selections.clear();
+                                        for (const auto &lg : crit.linked_goals) {
+                                            goal_selector_multi_selections.push_back(lg);
+                                        }
+                                    }
+                                    if (ImGui::IsItemHovered()) {
+                                        char tooltip_buffer[256];
+                                        snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                 "Select goals that will auto-complete this sub-stat\n"
+                                                 "when the condition (AND/OR) is met.\n"
+                                                 "Hold Shift and click to select a range.");
+                                        ImGui::SetTooltip("%s", tooltip_buffer);
+                                    }
+
+                                    if (!crit.linked_goals.empty()) {
+                                        // AND/OR mode toggle
+                                        ImGui::SameLine();
+                                        int crit_mode_int = (int) crit.linked_goal_mode;
+                                        ImGui::SetNextItemWidth(60);
+                                        char crit_combo_id[128];
+                                        snprintf(crit_combo_id, sizeof(crit_combo_id),
+                                                 "##sub_stat_mode_%s_%zu", stat_cat.root_name, j);
+                                        if (ImGui::Combo(crit_combo_id, &crit_mode_int, "AND\0OR\0")) {
+                                            crit.linked_goal_mode = (LinkedGoalMode) crit_mode_int;
+                                            save_message_type = MSG_NONE;
+                                        }
+                                        if (ImGui::IsItemHovered()) {
+                                            char tooltip_buffer[256];
+                                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                     "AND = All selected goals must be completed.\n"
+                                                     "OR = At least one selected goal must be completed.");
+                                            ImGui::SetTooltip("%s", tooltip_buffer);
+                                        }
+
+                                        // Show linked goals list
+                                        char crit_child_id[128];
+                                        snprintf(crit_child_id, sizeof(crit_child_id),
+                                                 "SubStatLinkedGoals_%s_%zu", stat_cat.root_name, j);
+                                        ImGui::BeginChild(crit_child_id, ImVec2(0, 100), true);
+                                        int crit_remove_idx = -1;
+                                        for (int li = 0; li < (int) crit.linked_goals.size(); li++) {
+                                            auto &lg = crit.linked_goals[li];
+                                            char lg_display[512];
+                                            if (lg.stage_id[0] != '\0') {
+                                                snprintf(lg_display, sizeof(lg_display), "%d. %s [%s]", li + 1,
+                                                         lg.root_name, lg.stage_id);
+                                            } else if (lg.parent_root[0] != '\0') {
+                                                snprintf(lg_display, sizeof(lg_display), "%d. %s > %s", li + 1,
+                                                         lg.parent_root, lg.root_name);
+                                            } else {
+                                                snprintf(lg_display, sizeof(lg_display), "%d. %s", li + 1, lg.root_name);
+                                            }
+                                            ImGui::Text("%s", lg_display);
+                                            ImGui::SameLine();
+                                            char crit_remove_btn[64];
+                                            snprintf(crit_remove_btn, sizeof(crit_remove_btn),
+                                                     "X##remove_sub_stat_lg_%zu_%d", j, li);
+                                            if (ImGui::SmallButton(crit_remove_btn)) {
+                                                crit_remove_idx = li;
+                                            }
+                                            if (ImGui::IsItemHovered()) {
+                                                char tooltip_buffer[128];
+                                                snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                                         "Remove this linked goal");
+                                                ImGui::SetTooltip("%s", tooltip_buffer);
+                                            }
+                                        }
+                                        if (crit_remove_idx >= 0) {
+                                            crit.linked_goals.erase(crit.linked_goals.begin() + crit_remove_idx);
+                                            save_message_type = MSG_NONE;
+                                        }
+                                        ImGui::EndChild();
+                                    }
                                 }
 
                                 if (render_layout_coordinates_header("sub-stat",
@@ -7001,7 +7289,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         strncpy(old_unlock_root, unlock.root_name, sizeof(old_unlock_root));
                         old_unlock_root[sizeof(old_unlock_root) - 1] = '\0';
                         if (ImGui::InputText("Root Name", unlock.root_name, sizeof(unlock.root_name))) {
-                            propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_unlock_root, unlock.root_name);
+                            propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_unlock_root, unlock.root_name, nullptr, &current_template_data.stats);
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
                         if (ImGui::IsItemHovered()) {
@@ -7369,7 +7657,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         strncpy(old_cg_root, goal.root_name, sizeof(old_cg_root));
                         old_cg_root[sizeof(old_cg_root) - 1] = '\0';
                         if (ImGui::InputText("Goal Root Name", goal.root_name, sizeof(goal.root_name))) {
-                            propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_cg_root, goal.root_name);
+                            propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_cg_root, goal.root_name, nullptr, &current_template_data.stats);
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
                         if (ImGui::IsItemHovered()) {
@@ -8170,7 +8458,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         strncpy(old_msg_root, goal.root_name, sizeof(old_msg_root));
                         old_msg_root[sizeof(old_msg_root) - 1] = '\0';
                         if (ImGui::InputText("Goal Root Name", goal.root_name, sizeof(goal.root_name))) {
-                            propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_msg_root, goal.root_name);
+                            propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_msg_root, goal.root_name, nullptr, &current_template_data.stats);
                             ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
                         }
@@ -9504,7 +9792,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             } else {
                                 propagate_goal_rename(current_template_data.decorations,
                                                       current_template_data.counter_goals,
-                                                      old_counter_root, counter.root_name);
+                                                      old_counter_root, counter.root_name,
+                                                      nullptr, &current_template_data.stats);
                                 save_message_type = MSG_NONE;
                             }
                         }
@@ -12333,6 +12622,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     goal_selector_counter_index < (int)current_template_data.counter_goals.size()) {
                     auto &target_counter = current_template_data.counter_goals[goal_selector_counter_index];
                     target_counter.linked_goals = goal_selector_multi_selections;
+                    save_message_type = MSG_NONE;
+                }
+                // Multi-select: write selections back to a stat category or sub-stat
+                if (goal_selector_stat_cat_index >= 0 &&
+                    goal_selector_stat_cat_index < (int)current_template_data.stats.size()) {
+                    auto &target_stat = current_template_data.stats[goal_selector_stat_cat_index];
+                    if (goal_selector_stat_crit_index >= 0 &&
+                        goal_selector_stat_crit_index < (int)target_stat.criteria.size()) {
+                        // Sub-stat level
+                        target_stat.criteria[goal_selector_stat_crit_index].linked_goals = goal_selector_multi_selections;
+                    } else {
+                        // Category level
+                        target_stat.linked_goals = goal_selector_multi_selections;
+                    }
                     save_message_type = MSG_NONE;
                 }
             } else {
