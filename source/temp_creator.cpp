@@ -437,6 +437,30 @@ static bool are_editor_multi_stage_goals_different(const EditorMultiStageGoal &a
 }
 
 
+// Counters
+static bool are_editor_counter_goals_different(const EditorCounterGoal &a, const EditorCounterGoal &b) {
+    if (strcmp(a.root_name, b.root_name) != 0 ||
+        strcmp(a.display_name, b.display_name) != 0 ||
+        strcmp(a.icon_path, b.icon_path) != 0 ||
+        a.is_hidden != b.is_hidden ||
+        a.in_2nd_row != b.in_2nd_row ||
+        a.sort_order != b.sort_order ||
+        are_manual_positions_different(a.icon_pos, b.icon_pos) ||
+        are_manual_positions_different(a.text_pos, b.text_pos) ||
+        are_manual_positions_different(a.progress_pos, b.progress_pos) ||
+        a.linked_goals.size() != b.linked_goals.size()) {
+        return true;
+    }
+    for (size_t i = 0; i < a.linked_goals.size(); ++i) {
+        if (strcmp(a.linked_goals[i].root_name, b.linked_goals[i].root_name) != 0 ||
+            strcmp(a.linked_goals[i].stage_id, b.linked_goals[i].stage_id) != 0 ||
+            strcmp(a.linked_goals[i].parent_root, b.linked_goals[i].parent_root) != 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Decorations
 static bool are_editor_decorations_different(const EditorDecorationElement &a, const EditorDecorationElement &b) {
     if (strcmp(a.id, b.id) != 0 ||
@@ -526,6 +550,7 @@ static bool are_editor_templates_different(const EditorTemplate &a, const Editor
         a.advancements.size() != b.advancements.size() ||
         a.stats.size() != b.stats.size() ||
         a.multi_stage_goals.size() != b.multi_stage_goals.size() ||
+        a.counter_goals.size() != b.counter_goals.size() ||
         a.decorations.size() != b.decorations.size()) {
         return true;
     }
@@ -543,6 +568,9 @@ static bool are_editor_templates_different(const EditorTemplate &a, const Editor
     }
     for (size_t i = 0; i < a.multi_stage_goals.size(); ++i) {
         if (are_editor_multi_stage_goals_different(a.multi_stage_goals[i], b.multi_stage_goals[i])) return true;
+    }
+    for (size_t i = 0; i < a.counter_goals.size(); ++i) {
+        if (are_editor_counter_goals_different(a.counter_goals[i], b.counter_goals[i])) return true;
     }
     for (size_t i = 0; i < a.decorations.size(); ++i) {
         if (are_editor_decorations_different(a.decorations[i], b.decorations[i])) return true;
