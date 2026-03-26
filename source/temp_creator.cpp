@@ -2289,6 +2289,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static EditorTrackableCategory *selected_advancement = nullptr;
     static EditorTrackableCategory *selected_stat = nullptr;
     static EditorMultiStageGoal *selected_ms_goal = nullptr;
+    static int selected_counter_index = -1;
     // Visual drag auto-select: which tab to force-select and which goal's header to force-open
     enum ForceSelectTab {
         FORCE_TAB_NONE = 0, FORCE_TAB_ADVANCEMENTS, FORCE_TAB_STATS, FORCE_TAB_UNLOCKS, FORCE_TAB_CUSTOM,
@@ -2737,6 +2738,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 if (ImGui::Selectable(scope_names[SCOPE_MULTISTAGE], current_search_scope == SCOPE_MULTISTAGE)) {
                     current_search_scope = SCOPE_MULTISTAGE;
+                    tc_search_buffer[0] = '\0'; // Clear search on change
+                }
+                if (ImGui::Selectable(scope_names[SCOPE_COUNTERS], current_search_scope == SCOPE_COUNTERS)) {
+                    current_search_scope = SCOPE_COUNTERS;
                     tc_search_buffer[0] = '\0'; // Clear search on change
                 }
                 if (ImGui::Selectable(scope_names[SCOPE_DECORATIONS], current_search_scope == SCOPE_DECORATIONS)) {
@@ -3903,7 +3908,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 } else if (strcmp(t->visual_drag_goal_type, "Custom Goal") == 0) {
                     force_select_tab = FORCE_TAB_CUSTOM;
                 } else if (strcmp(t->visual_drag_goal_type, "Counter") == 0) {
-                    force_select_tab = FORCE_TAB_COUNTERS;
+                    for (int ci = 0; ci < (int)current_template_data.counter_goals.size(); ci++) {
+                        if (strcmp(current_template_data.counter_goals[ci].root_name, t->visual_drag_root_name) == 0) {
+                            selected_counter_index = ci;
+                            selected_advancement = nullptr;
+                            selected_stat = nullptr;
+                            selected_ms_goal = nullptr;
+                            force_select_tab = FORCE_TAB_COUNTERS;
+                            break;
+                        }
+                    }
                 } else if (strcmp(t->visual_drag_goal_type, "Decoration") == 0) {
                     force_select_tab = FORCE_TAB_DECORATIONS;
                 }
@@ -9147,10 +9161,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                           : 0;
                 if (force_select_tab == FORCE_TAB_COUNTERS) force_select_tab = FORCE_TAB_NONE;
                 if (ImGui::BeginTabItem("Counters", nullptr, counter_tab_flags)) {
-                    current_search_scope = SCOPE_COUNTERS;
-
-                    static int selected_counter_index = -1;
-
                     // --- Two-Pane Layout ---
                     float pane_width = ImGui::GetContentRegionAvail().x * 0.4f;
                     ImGui::BeginChild("CounterListPane", ImVec2(pane_width, 0), true);
@@ -9565,7 +9575,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::Separator();
 
                         // Layout Coordinates
-                        if (ImGui::CollapsingHeader("Layout Coordinates##Counter")) {
+                        if (render_layout_coordinates_header("counter",
+                                                             force_open_header_root_name[0] != '\0' && strcmp(
+                                                                 counter.root_name, force_open_header_root_name) == 0)) {
                             render_manual_pos_ui("ctr_icon", "counter", "Icon Position",
                                                  &counter.icon_pos, save_message_type);
                             render_manual_pos_ui("ctr_text", "counter", "Text Position",
