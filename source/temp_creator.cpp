@@ -2106,6 +2106,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static char goal_selector_search_buffer[256] = "";
     static GoalSelectorTarget goal_selector_target = GOAL_SELECT_START;
     static int goal_selector_deco_index = -1; // Index of the decoration being edited
+    static char goal_selector_selected_root[192] = "";
+    static char goal_selector_selected_stage[64] = "";
+    static int goal_selector_max_selection = 1; // Max selectable goals (1 for arrows)
 
     // State for version dropdown with counts
     static std::vector<std::string> version_display_names;
@@ -9105,6 +9108,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     goal_selector_deco_index = (int) i;
                                     goal_selector_search_buffer[0] = '\0';
                                     focus_goal_selector_search = true;
+                                    goal_selector_max_selection = 1;
+                                    strncpy(goal_selector_selected_root, deco.start_goal_root, sizeof(goal_selector_selected_root) - 1);
+                                    goal_selector_selected_root[sizeof(goal_selector_selected_root) - 1] = '\0';
+                                    strncpy(goal_selector_selected_stage, deco.start_goal_stage, sizeof(goal_selector_selected_stage) - 1);
+                                    goal_selector_selected_stage[sizeof(goal_selector_selected_stage) - 1] = '\0';
                                     show_goal_selector_popup = true;
                                 }
                                 if (ImGui::IsItemHovered()) {
@@ -9146,6 +9154,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     goal_selector_deco_index = (int) i;
                                     goal_selector_search_buffer[0] = '\0';
                                     focus_goal_selector_search = true;
+                                    goal_selector_max_selection = 1;
+                                    strncpy(goal_selector_selected_root, deco.end_goal_root, sizeof(goal_selector_selected_root) - 1);
+                                    goal_selector_selected_root[sizeof(goal_selector_selected_root) - 1] = '\0';
+                                    strncpy(goal_selector_selected_stage, deco.end_goal_stage, sizeof(goal_selector_selected_stage) - 1);
+                                    goal_selector_selected_stage[sizeof(goal_selector_selected_stage) - 1] = '\0';
                                     show_goal_selector_popup = true;
                                 }
                                 if (ImGui::IsItemHovered()) {
@@ -11083,11 +11096,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // --- Scrollable goal list ---
         ImGui::BeginChild("GoalSelectorScrollingRegion", ImVec2(500, 400), true);
 
-        // Track which goal is selected (for single-select mode)
-        char selected_root[192] = {};
-        char selected_stage[64] = {};
-        bool any_selected = false;
-
         // Helper lambda to check if an item matches the search filter
         auto matches_search = [&](const char *root_name, const char *display_name, const char *type_name) -> bool {
             if (goal_selector_search_buffer[0] == '\0') return true;
@@ -11096,21 +11104,40 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                    str_contains_insensitive(type_name, goal_selector_search_buffer);
         };
 
-        // Helper lambda to render a selectable goal entry
-        auto render_goal_selectable = [&](const char *label, const char *root_name, const char *stage_id,
-                                          bool indent) {
-            if (indent) ImGui::Indent();
-            bool was_clicked = ImGui::Selectable(label, false, ImGuiSelectableFlags_DontClosePopups);
-            if (was_clicked) {
-                strncpy(selected_root, root_name, sizeof(selected_root) - 1);
-                selected_root[sizeof(selected_root) - 1] = '\0';
+        // Helper: check if a given root+stage matches the current selection
+        auto is_goal_selected = [&](const char *root_name, const char *stage_id) -> bool {
+            if (goal_selector_selected_root[0] == '\0') return false;
+            if (strcmp(goal_selector_selected_root, root_name) != 0) return false;
+            if (stage_id && stage_id[0] != '\0')
+                return strcmp(goal_selector_selected_stage, stage_id) == 0;
+            return goal_selector_selected_stage[0] == '\0';
+        };
+
+        // Helper: select a goal (for single-select, this replaces any prior selection)
+        auto select_goal = [&](const char *root_name, const char *stage_id, bool checked) {
+            if (checked) {
+                strncpy(goal_selector_selected_root, root_name, sizeof(goal_selector_selected_root) - 1);
+                goal_selector_selected_root[sizeof(goal_selector_selected_root) - 1] = '\0';
                 if (stage_id && stage_id[0] != '\0') {
-                    strncpy(selected_stage, stage_id, sizeof(selected_stage) - 1);
-                    selected_stage[sizeof(selected_stage) - 1] = '\0';
+                    strncpy(goal_selector_selected_stage, stage_id, sizeof(goal_selector_selected_stage) - 1);
+                    goal_selector_selected_stage[sizeof(goal_selector_selected_stage) - 1] = '\0';
                 } else {
-                    selected_stage[0] = '\0';
+                    goal_selector_selected_stage[0] = '\0';
                 }
-                any_selected = true;
+            } else {
+                // Unchecked — clear selection
+                goal_selector_selected_root[0] = '\0';
+                goal_selector_selected_stage[0] = '\0';
+            }
+        };
+
+        // Helper lambda to render a checkbox goal entry
+        auto render_goal_checkbox = [&](const char *label, const char *root_name, const char *stage_id,
+                                        bool indent) {
+            if (indent) ImGui::Indent();
+            bool checked = is_goal_selected(root_name, stage_id);
+            if (ImGui::Checkbox(label, &checked)) {
+                select_goal(root_name, stage_id, checked);
             }
             if (indent) ImGui::Unindent();
         };
@@ -11140,13 +11167,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     char label[384];
                     snprintf(label, sizeof(label), "%s##adv_%s", adv.root_name, adv.root_name);
-                    if (parent_match) render_goal_selectable(label, adv.root_name, nullptr, false);
+                    if (parent_match) render_goal_checkbox(label, adv.root_name, nullptr, false);
 
                     for (const auto &crit: adv.criteria) {
                         if (!matches_search(crit.root_name, crit.display_name, "Criterion") && !parent_match) continue;
                         char crit_label[384];
-                        snprintf(crit_label, sizeof(crit_label), "> %s##crit_%s_%s", crit.root_name, adv.root_name, crit.root_name);
-                        render_goal_selectable(crit_label, crit.root_name, nullptr, true);
+                        snprintf(crit_label, sizeof(crit_label), "%s##crit_%s_%s", crit.root_name, adv.root_name, crit.root_name);
+                        render_goal_checkbox(crit_label, crit.root_name, nullptr, true);
                     }
                 }
             }
@@ -11177,13 +11204,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     char label[384];
                     snprintf(label, sizeof(label), "%s##stat_%s", stat.root_name, stat.root_name);
-                    if (parent_match) render_goal_selectable(label, stat.root_name, nullptr, false);
+                    if (parent_match) render_goal_checkbox(label, stat.root_name, nullptr, false);
 
                     for (const auto &sub: stat.criteria) {
                         if (!matches_search(sub.root_name, sub.display_name, "Sub-Stat") && !parent_match) continue;
                         char sub_label[384];
-                        snprintf(sub_label, sizeof(sub_label), "> %s##sub_%s_%s", sub.root_name, stat.root_name, sub.root_name);
-                        render_goal_selectable(sub_label, sub.root_name, nullptr, true);
+                        snprintf(sub_label, sizeof(sub_label), "%s##sub_%s_%s", sub.root_name, stat.root_name, sub.root_name);
+                        render_goal_checkbox(sub_label, sub.root_name, nullptr, true);
                     }
                 }
             }
@@ -11201,7 +11228,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (!matches_search(unlock.root_name, unlock.display_name, "Unlock")) continue;
                     char label[384];
                     snprintf(label, sizeof(label), "%s##unlock_%s", unlock.root_name, unlock.root_name);
-                    render_goal_selectable(label, unlock.root_name, nullptr, false);
+                    render_goal_checkbox(label, unlock.root_name, nullptr, false);
                 }
             }
         }
@@ -11218,7 +11245,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (!matches_search(cg.root_name, cg.display_name, "Custom Goal")) continue;
                     char label[384];
                     snprintf(label, sizeof(label), "%s##custom_%s", cg.root_name, cg.root_name);
-                    render_goal_selectable(label, cg.root_name, nullptr, false);
+                    render_goal_checkbox(label, cg.root_name, nullptr, false);
                 }
             }
         }
@@ -11246,14 +11273,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     char label[384];
                     snprintf(label, sizeof(label), "%s##ms_%s", msg.root_name, msg.root_name);
-                    if (parent_match) render_goal_selectable(label, msg.root_name, nullptr, false);
+                    if (parent_match) render_goal_checkbox(label, msg.root_name, nullptr, false);
 
                     for (const auto &stage: msg.stages) {
                         if (!matches_search(stage.root_name, stage.display_text, "Stage") && !parent_match) continue;
                         char stage_label[384];
-                        snprintf(stage_label, sizeof(stage_label), "> [%s] %s##stage_%s_%s",
+                        snprintf(stage_label, sizeof(stage_label), "[%s] %s##stage_%s_%s",
                                  stage.stage_id, stage.display_text, msg.root_name, stage.stage_id);
-                        render_goal_selectable(stage_label, msg.root_name, stage.stage_id, true);
+                        render_goal_checkbox(stage_label, msg.root_name, stage.stage_id, true);
                     }
                 }
             }
@@ -11261,27 +11288,46 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         ImGui::EndChild();
 
-        // --- Apply selection if a goal was clicked ---
-        if (any_selected && goal_selector_deco_index >= 0 &&
-            goal_selector_deco_index < (int) current_template_data.decorations.size()) {
-            auto &target_deco = current_template_data.decorations[goal_selector_deco_index];
-            if (goal_selector_target == GOAL_SELECT_START) {
-                strncpy(target_deco.start_goal_root, selected_root, sizeof(target_deco.start_goal_root) - 1);
-                target_deco.start_goal_root[sizeof(target_deco.start_goal_root) - 1] = '\0';
-                strncpy(target_deco.start_goal_stage, selected_stage, sizeof(target_deco.start_goal_stage) - 1);
-                target_deco.start_goal_stage[sizeof(target_deco.start_goal_stage) - 1] = '\0';
-            } else {
-                strncpy(target_deco.end_goal_root, selected_root, sizeof(target_deco.end_goal_root) - 1);
-                target_deco.end_goal_root[sizeof(target_deco.end_goal_root) - 1] = '\0';
-                strncpy(target_deco.end_goal_stage, selected_stage, sizeof(target_deco.end_goal_stage) - 1);
-                target_deco.end_goal_stage[sizeof(target_deco.end_goal_stage) - 1] = '\0';
+        // --- Bottom Controls ---
+        int selected_count = (goal_selector_selected_root[0] != '\0') ? 1 : 0;
+
+        // Confirm button
+        bool can_confirm = selected_count > 0;
+        if (!can_confirm) ImGui::BeginDisabled();
+        if (ImGui::Button("Select", ImVec2(120, 0)) ||
+            (can_confirm && ImGui::IsKeyPressed(ImGuiKey_Enter) && !ImGui::GetIO().WantTextInput)) {
+            if (goal_selector_deco_index >= 0 &&
+                goal_selector_deco_index < (int) current_template_data.decorations.size()) {
+                auto &target_deco = current_template_data.decorations[goal_selector_deco_index];
+                if (goal_selector_target == GOAL_SELECT_START) {
+                    strncpy(target_deco.start_goal_root, goal_selector_selected_root, sizeof(target_deco.start_goal_root) - 1);
+                    target_deco.start_goal_root[sizeof(target_deco.start_goal_root) - 1] = '\0';
+                    strncpy(target_deco.start_goal_stage, goal_selector_selected_stage, sizeof(target_deco.start_goal_stage) - 1);
+                    target_deco.start_goal_stage[sizeof(target_deco.start_goal_stage) - 1] = '\0';
+                } else {
+                    strncpy(target_deco.end_goal_root, goal_selector_selected_root, sizeof(target_deco.end_goal_root) - 1);
+                    target_deco.end_goal_root[sizeof(target_deco.end_goal_root) - 1] = '\0';
+                    strncpy(target_deco.end_goal_stage, goal_selector_selected_stage, sizeof(target_deco.end_goal_stage) - 1);
+                    target_deco.end_goal_stage[sizeof(target_deco.end_goal_stage) - 1] = '\0';
+                }
+                save_message_type = MSG_NONE;
             }
-            save_message_type = MSG_NONE;
             show_goal_selector_popup = false;
             ImGui::CloseCurrentPopup();
         }
+        if (!can_confirm) ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            char tooltip_buffer[128];
+            if (can_confirm)
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Confirm selection.\n"
+                                                                 "(You can also press ENTER)");
+            else
+                snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a goal first.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
 
-        // --- Bottom Controls ---
+        // Cancel button
+        ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(120, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             show_goal_selector_popup = false;
             ImGui::CloseCurrentPopup();
@@ -11289,9 +11335,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (ImGui::IsItemHovered()) {
             char tooltip_buffer[128];
             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                     "Cancel the selection and close this window.\nYou can also press ESCAPE.");
+                     "Cancel the selection and close this window.\n"
+                     "(You can also press ESCAPE)");
             ImGui::SetTooltip("%s", tooltip_buffer);
         }
+
+        // Selected count (right-aligned)
+        ImGui::SameLine();
+        char counter_text[64];
+        snprintf(counter_text, sizeof(counter_text), "Selected: %d / %d", selected_count, goal_selector_max_selection);
+        float gs_text_width = ImGui::CalcTextSize(counter_text).x;
+        ImGui::SetCursorPosX(ImGui::GetWindowWidth() - gs_text_width - ImGui::GetStyle().WindowPadding.x);
+        ImGui::Text("%s", counter_text);
 
         ImGui::EndPopup();
     } // End of goal selector popup
