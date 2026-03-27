@@ -497,7 +497,7 @@ You can manipulate the view using several intuitive controls:
   instead of zooming the map. You can also left-click and drag the scrollbar.
 * **Lock Layout**: Press the `SPACE` key to lock the grid layout. This prevents goals from rearranging when you resize
   the window, giving you precise control over how many items appear in each row.
-* **Reset Layout**: Click the "Reset Layout" button in the bottom-right corner to instantly reset the pan and zoom to
+* **Reset Camera**: Click the `Reset Camera` button in the bottom-right corner to instantly reset the pan and zoom to
   their default positions.
 
 ### Searching & Filtering
