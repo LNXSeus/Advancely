@@ -12432,6 +12432,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 flat_goal_list.push_back({msg.root_name, stage.stage_id, nullptr});
             }
         }
+        // Counters (only for single-select / arrow mode to avoid circular references)
+        if (!is_multi_select) {
+            for (const auto &counter : current_template_data.counter_goals) {
+                if (!matches_search(counter.root_name, counter.display_name, "Counter")) continue;
+                flat_goal_list.push_back({counter.root_name, nullptr, nullptr});
+            }
+        }
 
         int current_flat_index = 0; // Tracks position in flat list during rendering
 
@@ -12601,6 +12608,23 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                  stage.stage_id, stage.display_text, msg.root_name, stage.stage_id);
                         render_goal_checkbox(stage_label, msg.root_name, stage.stage_id, nullptr, true);
                     }
+                }
+            }
+        }
+
+        // Counters (only for single-select / arrow mode)
+        if (!is_multi_select) {
+            bool has_visible = false;
+            for (const auto &counter: current_template_data.counter_goals) {
+                if (matches_search(counter.root_name, counter.display_name, "Counter")) { has_visible = true; break; }
+            }
+            if (has_visible) {
+                ImGui::TextDisabled("-- Counters --");
+                for (const auto &counter: current_template_data.counter_goals) {
+                    if (!matches_search(counter.root_name, counter.display_name, "Counter")) continue;
+                    char label[384];
+                    snprintf(label, sizeof(label), "%s##counter_%s", counter.root_name, counter.root_name);
+                    render_goal_checkbox(label, counter.root_name, nullptr, nullptr, false);
                 }
             }
         }

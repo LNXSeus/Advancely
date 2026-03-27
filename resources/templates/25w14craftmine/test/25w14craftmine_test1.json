@@ -235,44 +235,7 @@
 			"root_name":	"counter_0_yayy",
 			"icon":	"blocks/conduit_unoptimized.gif",
 			"linked_goals":	[{
-					"root_name":	"minecraft:story/deflect_arrow"
-				}, {
-					"root_name":	"minecraft:kuiper_belt",
-					"parent_root":	"minecraft:mines/all_special_mines_completed"
-				}, {
-					"root_name":	"minecraft:mines/all_special_mines_completed"
-				}, {
-					"root_name":	"minecraft:feats/wither"
-				}, {
-					"root_name":	"completed_event",
-					"parent_root":	"minecraft:feats/wither"
-				}, {
-					"root_name":	"completed_event",
-					"parent_root":	"minecraft:feats/kuiper_world"
-				}, {
-					"root_name":	"minecraft:recipes/misc/charcoal"
-				}, {
-					"root_name":	"stat_category:3_armor_trims"
-				}, {
-					"root_name":	"minecraft:used/minecraft:vex_armor_trim_smithing_template",
-					"parent_root":	"stat_category:3_armor_trims"
-				}, {
-					"root_name":	"minecraft:used/minecraft:vex_armor_trim_smithing_template",
-					"parent_root":	"stat_category:2_armor_trims"
-				}, {
-					"root_name":	"minecraft:mined/minecraft:oak_log",
-					"parent_root":	"stat_category:log_collection"
-				}, {
-					"root_name":	"stat_category:inf_dirt_collection"
-				}, {
-					"root_name":	"minecraft:exploration"
-				}, {
 					"root_name":	"custom:unbreaking_3_book"
-				}, {
-					"root_name":	"ms_goal:getting_started"
-				}, {
-					"root_name":	"ms_goal:getting_started",
-					"stage_id":	"2"
 				}]
 		}],
 	"decorations":	[{
@@ -368,7 +331,7 @@
 					"x":	1224,
 					"y":	709
 				}],
-			"start_goal_root":	"custom:unbreaking_3_book",
+			"start_goal_root":	"counter_0_yayy",
 			"end_goal_root":	"minecraft:used/minecraft:sentry_armor_trim_smithing_template",
 			"opacity_before":	0.39215686917305,
 			"opacity_after":	1,
