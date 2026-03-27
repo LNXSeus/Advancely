@@ -3471,6 +3471,33 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
             s_visual_selected_items.insert(&target_pos);
         }
         // If already selected, keep the selection (allows multi-drag)
+
+        // Signal the editor to select this goal (without opening Layout Coordinates)
+        if (parent_root_name && parent_root_name[0] != '\0') {
+            strncpy(t->visual_drag_root_name, parent_root_name, sizeof(t->visual_drag_root_name) - 1);
+            t->visual_drag_root_name[sizeof(t->visual_drag_root_name) - 1] = '\0';
+            if (root_name && root_name[0] != '\0') {
+                strncpy(t->visual_drag_child_root_name, root_name, sizeof(t->visual_drag_child_root_name) - 1);
+                t->visual_drag_child_root_name[sizeof(t->visual_drag_child_root_name) - 1] = '\0';
+            } else {
+                t->visual_drag_child_root_name[0] = '\0';
+            }
+            if (strcmp(goal_type, "Sub-Stat") == 0) {
+                strncpy(t->visual_drag_goal_type, "Stat", sizeof(t->visual_drag_goal_type) - 1);
+            } else if (strcmp(goal_type, "Achievement") == 0) {
+                strncpy(t->visual_drag_goal_type, "Achievement", sizeof(t->visual_drag_goal_type) - 1);
+            } else {
+                strncpy(t->visual_drag_goal_type, "Advancement", sizeof(t->visual_drag_goal_type) - 1);
+            }
+            t->visual_drag_goal_type[sizeof(t->visual_drag_goal_type) - 1] = '\0';
+        } else if (root_name && root_name[0] != '\0') {
+            strncpy(t->visual_drag_root_name, root_name, sizeof(t->visual_drag_root_name) - 1);
+            t->visual_drag_root_name[sizeof(t->visual_drag_root_name) - 1] = '\0';
+            strncpy(t->visual_drag_goal_type, goal_type, sizeof(t->visual_drag_goal_type) - 1);
+            t->visual_drag_goal_type[sizeof(t->visual_drag_goal_type) - 1] = '\0';
+            t->visual_drag_child_root_name[0] = '\0';
+        }
+        t->visual_layout_just_clicked = true;
     }
 
     if (is_dragging) {
@@ -7034,6 +7061,14 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                             s_visual_selected_items.insert(&elem->pos);
                             s_visual_selected_items.insert(&elem->pos2);
                         }
+
+                        // Signal the editor to select this decoration
+                        strncpy(t->visual_drag_root_name, elem->id, sizeof(t->visual_drag_root_name) - 1);
+                        t->visual_drag_root_name[sizeof(t->visual_drag_root_name) - 1] = '\0';
+                        strncpy(t->visual_drag_goal_type, "Decoration", sizeof(t->visual_drag_goal_type) - 1);
+                        t->visual_drag_goal_type[sizeof(t->visual_drag_goal_type) - 1] = '\0';
+                        t->visual_drag_child_root_name[0] = '\0';
+                        t->visual_layout_just_clicked = true;
                     }
 
                     if (is_line_dragging) {
@@ -7332,6 +7367,14 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                                 s_visual_selected_items.insert(&elem->bends[b]);
                             }
                         }
+
+                        // Signal the editor to select this decoration
+                        strncpy(t->visual_drag_root_name, elem->id, sizeof(t->visual_drag_root_name) - 1);
+                        t->visual_drag_root_name[sizeof(t->visual_drag_root_name) - 1] = '\0';
+                        strncpy(t->visual_drag_goal_type, "Decoration", sizeof(t->visual_drag_goal_type) - 1);
+                        t->visual_drag_goal_type[sizeof(t->visual_drag_goal_type) - 1] = '\0';
+                        t->visual_drag_child_root_name[0] = '\0';
+                        t->visual_layout_just_clicked = true;
                     }
 
                     if (is_arrow_dragging) {

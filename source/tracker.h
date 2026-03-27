@@ -96,6 +96,7 @@ struct Tracker {
     bool is_temp_creator_focused; // Flag to track if the template creator window has focus.
     bool is_visual_layout_editing; // Flag to enable drag-and-drop on the main map for manual goal placement
     bool visual_layout_just_dragged; // Track active dragging in visual layout mode
+    bool visual_layout_just_clicked; // Track click-to-select in visual layout mode (no drag)
     char visual_drag_root_name[192]; // Root name of the goal currently being dragged in visual layout
     char visual_drag_goal_type[32]; // Type of the goal being dragged ("Advancement", "Stat", "Multi-Stage Goal", etc.)
     char visual_drag_child_root_name[192];

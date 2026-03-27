@@ -2420,6 +2420,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // Root name of goal whose Layout Coordinates header to force-open
     static char force_open_child_header_root_name[192] = "";
     // Root name of criterion/sub-stat whose Layout Coordinates header to force-open
+    static char scroll_to_goal_root_name[192] = "";
+    // Root name of goal to scroll to (set on click-to-select in visual layout)
 
     // Helper to dynamically calculate the next sort order per list
     auto get_next_sort_order = [](const auto &list) -> int {
@@ -3847,6 +3849,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         // --- REAL-TIME MEMORY SYNC FOR VISUAL EDITING ---
         // Only when the user is dragging items on the map, copy the coordinates from Tracker memory to Editor memory!
+        bool was_just_dragged = false;
         if (t && t->is_visual_layout_editing && t->template_data && t->visual_layout_just_dragged) {
             auto sync_pos = [](ManualPos &editor_pos, const ManualPos &tracker_pos) {
                 if (tracker_pos.is_set) {
@@ -3985,70 +3988,85 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 // Clear search so the dragged item's collapsible section is visible
                 tc_search_buffer[0] = '\0';
 
-                // Store root name for force-opening the Layout Coordinates header
+                // Only force-open Layout Coordinates when dragging (not on click-to-select)
                 strncpy(force_open_header_root_name, t->visual_drag_root_name, sizeof(force_open_header_root_name) - 1);
                 force_open_header_root_name[sizeof(force_open_header_root_name) - 1] = '\0';
 
-                // Store child root name for force-opening criterion/sub-stat header
                 strncpy(force_open_child_header_root_name, t->visual_drag_child_root_name,
                         sizeof(force_open_child_header_root_name) - 1);
                 force_open_child_header_root_name[sizeof(force_open_child_header_root_name) - 1] = '\0';
-
-                if (strcmp(t->visual_drag_goal_type, "Advancement") == 0 ||
-                    strcmp(t->visual_drag_goal_type, "Achievement") == 0) {
-                    for (auto &adv: current_template_data.advancements) {
-                        if (strcmp(adv.root_name, t->visual_drag_root_name) == 0) {
-                            selected_advancement = &adv;
-                            selected_stat = nullptr;
-                            selected_ms_goal = nullptr;
-                            force_select_tab = FORCE_TAB_ADVANCEMENTS;
-                            break;
-                        }
-                    }
-                } else if (strcmp(t->visual_drag_goal_type, "Stat") == 0) {
-                    for (auto &stat: current_template_data.stats) {
-                        if (strcmp(stat.root_name, t->visual_drag_root_name) == 0) {
-                            selected_stat = &stat;
-                            selected_advancement = nullptr;
-                            selected_ms_goal = nullptr;
-                            force_select_tab = FORCE_TAB_STATS;
-                            break;
-                        }
-                    }
-                } else if (strcmp(t->visual_drag_goal_type, "Multi-Stage Goal") == 0) {
-                    for (auto &goal: current_template_data.multi_stage_goals) {
-                        if (strcmp(goal.root_name, t->visual_drag_root_name) == 0) {
-                            selected_ms_goal = &goal;
-                            selected_advancement = nullptr;
-                            selected_stat = nullptr;
-                            force_select_tab = FORCE_TAB_MULTISTAGE;
-                            break;
-                        }
-                    }
-                } else if (strcmp(t->visual_drag_goal_type, "Unlock") == 0) {
-                    force_select_tab = FORCE_TAB_UNLOCKS;
-                } else if (strcmp(t->visual_drag_goal_type, "Custom Goal") == 0) {
-                    force_select_tab = FORCE_TAB_CUSTOM;
-                } else if (strcmp(t->visual_drag_goal_type, "Counter") == 0) {
-                    for (int ci = 0; ci < (int)current_template_data.counter_goals.size(); ci++) {
-                        if (strcmp(current_template_data.counter_goals[ci].root_name, t->visual_drag_root_name) == 0) {
-                            selected_counter_index = ci;
-                            selected_advancement = nullptr;
-                            selected_stat = nullptr;
-                            selected_ms_goal = nullptr;
-                            force_select_tab = FORCE_TAB_COUNTERS;
-                            break;
-                        }
-                    }
-                } else if (strcmp(t->visual_drag_goal_type, "Decoration") == 0) {
-                    force_select_tab = FORCE_TAB_DECORATIONS;
-                }
             }
 
             // We caught the drag, so turn off the sync until the mouse moves again
+            was_just_dragged = true;
             t->visual_layout_just_dragged = false;
         }
         // --- END SYNC BLOCK ---
+
+        // --- CLICK/DRAG GOAL SELECTION ---
+        // Select the clicked or dragged goal in the template editor and switch to its tab.
+        // Clicks just select; drags also force-open Layout Coordinates (handled above).
+        bool just_interacted = was_just_dragged || (t && t->visual_layout_just_clicked);
+        if (just_interacted && t->visual_drag_root_name[0] != '\0') {
+            tc_search_buffer[0] = '\0';
+
+            if (strcmp(t->visual_drag_goal_type, "Advancement") == 0 ||
+                strcmp(t->visual_drag_goal_type, "Achievement") == 0) {
+                for (auto &adv: current_template_data.advancements) {
+                    if (strcmp(adv.root_name, t->visual_drag_root_name) == 0) {
+                        selected_advancement = &adv;
+                        selected_stat = nullptr;
+                        selected_ms_goal = nullptr;
+                        force_select_tab = FORCE_TAB_ADVANCEMENTS;
+                        break;
+                    }
+                }
+            } else if (strcmp(t->visual_drag_goal_type, "Stat") == 0) {
+                for (auto &stat: current_template_data.stats) {
+                    if (strcmp(stat.root_name, t->visual_drag_root_name) == 0) {
+                        selected_stat = &stat;
+                        selected_advancement = nullptr;
+                        selected_ms_goal = nullptr;
+                        force_select_tab = FORCE_TAB_STATS;
+                        break;
+                    }
+                }
+            } else if (strcmp(t->visual_drag_goal_type, "Multi-Stage Goal") == 0) {
+                for (auto &goal: current_template_data.multi_stage_goals) {
+                    if (strcmp(goal.root_name, t->visual_drag_root_name) == 0) {
+                        selected_ms_goal = &goal;
+                        selected_advancement = nullptr;
+                        selected_stat = nullptr;
+                        force_select_tab = FORCE_TAB_MULTISTAGE;
+                        break;
+                    }
+                }
+            } else if (strcmp(t->visual_drag_goal_type, "Unlock") == 0) {
+                force_select_tab = FORCE_TAB_UNLOCKS;
+            } else if (strcmp(t->visual_drag_goal_type, "Custom Goal") == 0) {
+                force_select_tab = FORCE_TAB_CUSTOM;
+            } else if (strcmp(t->visual_drag_goal_type, "Counter") == 0) {
+                for (int ci = 0; ci < (int)current_template_data.counter_goals.size(); ci++) {
+                    if (strcmp(current_template_data.counter_goals[ci].root_name, t->visual_drag_root_name) == 0) {
+                        selected_counter_index = ci;
+                        selected_advancement = nullptr;
+                        selected_stat = nullptr;
+                        selected_ms_goal = nullptr;
+                        force_select_tab = FORCE_TAB_COUNTERS;
+                        break;
+                    }
+                }
+            } else if (strcmp(t->visual_drag_goal_type, "Decoration") == 0) {
+                force_select_tab = FORCE_TAB_DECORATIONS;
+            }
+
+            if (t->visual_layout_just_clicked) {
+                // Scroll to the clicked goal in the editor list
+                strncpy(scroll_to_goal_root_name, t->visual_drag_root_name, sizeof(scroll_to_goal_root_name) - 1);
+                scroll_to_goal_root_name[sizeof(scroll_to_goal_root_name) - 1] = '\0';
+                t->visual_layout_just_clicked = false;
+            }
+        }
 
         // --- REVERSE SYNC: EDITOR → RUNTIME (every frame when editing the active template) ---
         // Pushes ManualPos changes made in the template editor (coordinates, is_set, anchor)
@@ -4814,6 +4832,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (&advancement != selected_advancement) {
                                 selected_advancement = &advancement;
                             }
+                        }
+
+                        // Scroll to this item when clicked in visual layout
+                        if (scroll_to_goal_root_name[0] != '\0' &&
+                            strcmp(advancement.root_name, scroll_to_goal_root_name) == 0) {
+                            ImGui::SetScrollHereY(0.3f);
+                            selected_advancement = &advancement;
+                            scroll_to_goal_root_name[0] = '\0';
                         }
 
                         // DRAG AND DROP LOGIC
@@ -6009,6 +6035,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (&stat != selected_stat) {
                                 selected_stat = &stat;
                             }
+                        }
+
+                        // Scroll to this item when clicked in visual layout
+                        if (scroll_to_goal_root_name[0] != '\0' &&
+                            strcmp(stat.root_name, scroll_to_goal_root_name) == 0) {
+                            ImGui::SetScrollHereY(0.3f);
+                            selected_stat = &stat;
+                            scroll_to_goal_root_name[0] = '\0';
                         }
 
                         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
@@ -7284,6 +7318,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // Make the whole item group a drag-drop source and target
                         ImGui::BeginGroup();
 
+                        // Scroll to this item when clicked in visual layout
+                        if (scroll_to_goal_root_name[0] != '\0' &&
+                            strcmp(unlock.root_name, scroll_to_goal_root_name) == 0) {
+                            ImGui::SetScrollHereY(0.3f);
+                            scroll_to_goal_root_name[0] = '\0';
+                        }
 
                         char old_unlock_root[192];
                         strncpy(old_unlock_root, unlock.root_name, sizeof(old_unlock_root));
@@ -7653,6 +7693,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
 
                         ImGui::BeginGroup();
+
+                        // Scroll to this item when clicked in visual layout
+                        if (scroll_to_goal_root_name[0] != '\0' &&
+                            strcmp(goal.root_name, scroll_to_goal_root_name) == 0) {
+                            ImGui::SetScrollHereY(0.3f);
+                            scroll_to_goal_root_name[0] = '\0';
+                        }
+
                         char old_cg_root[192];
                         strncpy(old_cg_root, goal.root_name, sizeof(old_cg_root));
                         old_cg_root[sizeof(old_cg_root) - 1] = '\0';
@@ -8259,6 +8307,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (&goal != selected_ms_goal) {
                                 selected_ms_goal = &goal;
                             }
+                        }
+
+                        // Scroll to this item when clicked in visual layout
+                        if (scroll_to_goal_root_name[0] != '\0' &&
+                            strcmp(goal.root_name, scroll_to_goal_root_name) == 0) {
+                            ImGui::SetScrollHereY(0.3f);
+                            selected_ms_goal = &goal;
+                            scroll_to_goal_root_name[0] = '\0';
                         }
 
                         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
@@ -9649,6 +9705,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             selected_counter_index = actual_idx;
                         }
 
+                        // Scroll to this item when clicked in visual layout
+                        if (scroll_to_goal_root_name[0] != '\0' &&
+                            strcmp(counter.root_name, scroll_to_goal_root_name) == 0) {
+                            ImGui::SetScrollHereY(0.3f);
+                            selected_counter_index = actual_idx;
+                            scroll_to_goal_root_name[0] = '\0';
+                        }
+
                         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
                             ImGui::SetDragDropPayload("COUNTER_DND", &i, sizeof(int));
                             ImGui::Text("Reorder %s", label);
@@ -10173,6 +10237,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
                         ImGui::BeginGroup();
+
+                        // Scroll to this item when clicked in visual layout
+                        if (scroll_to_goal_root_name[0] != '\0' &&
+                            strcmp(deco.id, scroll_to_goal_root_name) == 0) {
+                            ImGui::SetScrollHereY(0.3f);
+                            scroll_to_goal_root_name[0] = '\0';
+                        }
 
                         // Type display (read-only)
                         {
