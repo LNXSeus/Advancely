@@ -2422,6 +2422,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     // Root name of criterion/sub-stat whose Layout Coordinates header to force-open
     static char scroll_to_goal_root_name[192] = "";
     // Root name of goal to scroll to (set on click-to-select in visual layout)
+    static char scroll_to_child_root_name[192] = "";
+    // Root name of criterion/sub-stat to scroll to within the details pane (set on click-to-select)
 
     // Helper to dynamically calculate the next sort order per list
     auto get_next_sort_order = [](const auto &list) -> int {
@@ -4061,9 +4063,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
 
             if (t->visual_layout_just_clicked) {
-                // Scroll to the clicked goal in the editor list
+                // Scroll to the clicked goal in the editor list.
+                // Always use the parent root name — criteria/sub-stats are not top-level list items.
                 strncpy(scroll_to_goal_root_name, t->visual_drag_root_name, sizeof(scroll_to_goal_root_name) - 1);
                 scroll_to_goal_root_name[sizeof(scroll_to_goal_root_name) - 1] = '\0';
+                // If a criterion/sub-stat was clicked, also scroll to it within the details pane.
+                strncpy(scroll_to_child_root_name, t->visual_drag_child_root_name, sizeof(scroll_to_child_root_name) - 1);
+                scroll_to_child_root_name[sizeof(scroll_to_child_root_name) - 1] = '\0';
                 t->visual_layout_just_clicked = false;
             }
         }
@@ -5414,6 +5420,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             // Use an invisible button overlaying the group as a drag handle
                             ImVec2 item_start_cursor_pos = ImGui::GetCursorScreenPos();
                             ImGui::BeginGroup();
+
+                            // Scroll to this criterion when clicked in visual layout
+                            if (scroll_to_child_root_name[0] != '\0' &&
+                                strcmp(criterion.root_name, scroll_to_child_root_name) == 0) {
+                                ImGui::SetScrollHereY(0.0f);
+                                scroll_to_child_root_name[0] = '\0';
+                            }
 
                             char old_crit_root[192];
                             strncpy(old_crit_root, criterion.root_name, sizeof(old_crit_root));
@@ -6768,6 +6781,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::BeginGroup();
 
                                 ImGui::Separator();
+
+                                // Scroll to this sub-stat when clicked in visual layout
+                                if (scroll_to_child_root_name[0] != '\0' &&
+                                    strcmp(crit.root_name, scroll_to_child_root_name) == 0) {
+                                    ImGui::SetScrollHereY(0.0f);
+                                    scroll_to_child_root_name[0] = '\0';
+                                }
+
                                 char old_sub_stat_root[192];
                                 strncpy(old_sub_stat_root, crit.root_name, sizeof(old_sub_stat_root));
                                 old_sub_stat_root[sizeof(old_sub_stat_root) - 1] = '\0';
