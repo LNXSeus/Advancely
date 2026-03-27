@@ -6416,9 +6416,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     } else {
                                         snprintf(lg_display, sizeof(lg_display), "%d. %s", li + 1, lg.root_name);
                                     }
-                                    ImGui::Text("%s", lg_display);
-                                    ImGui::SameLine();
-                                    char remove_btn[64];
+                                        char remove_btn[64];
                                     snprintf(remove_btn, sizeof(remove_btn), "X##remove_stat_cat_lg_%d", li);
                                     if (ImGui::SmallButton(remove_btn)) {
                                         remove_idx = li;
@@ -6428,6 +6426,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove this linked goal");
                                         ImGui::SetTooltip("%s", tooltip_buffer);
                                     }
+                                    ImGui::SameLine();
+                                    ImGui::Text("%s", lg_display);
                                 }
                                 if (remove_idx >= 0) {
                                     stat_cat.linked_goals.erase(stat_cat.linked_goals.begin() + remove_idx);
@@ -6954,8 +6954,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                             } else {
                                                 snprintf(lg_display, sizeof(lg_display), "%d. %s", li + 1, lg.root_name);
                                             }
-                                            ImGui::Text("%s", lg_display);
-                                            ImGui::SameLine();
                                             char crit_remove_btn[64];
                                             snprintf(crit_remove_btn, sizeof(crit_remove_btn),
                                                      "X##remove_sub_stat_lg_%zu_%d", j, li);
@@ -6968,6 +6966,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                          "Remove this linked goal");
                                                 ImGui::SetTooltip("%s", tooltip_buffer);
                                             }
+                                            ImGui::SameLine();
+                                            ImGui::Text("%s", lg_display);
                                         }
                                         if (crit_remove_idx >= 0) {
                                             crit.linked_goals.erase(crit.linked_goals.begin() + crit_remove_idx);
@@ -9914,8 +9914,6 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 } else {
                                     snprintf(lg_display, sizeof(lg_display), "%d. %s", li + 1, lg.root_name);
                                 }
-                                ImGui::Text("%s", lg_display);
-                                ImGui::SameLine();
                                 char remove_btn[64];
                                 snprintf(remove_btn, sizeof(remove_btn), "X##remove_lg_%d", li);
                                 if (ImGui::SmallButton(remove_btn)) {
@@ -9926,6 +9924,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove this linked goal");
                                     ImGui::SetTooltip("%s", tooltip_buffer);
                                 }
+                                ImGui::SameLine();
+                                ImGui::Text("%s", lg_display);
                             }
                             if (remove_idx >= 0) {
                                 counter.linked_goals.erase(counter.linked_goals.begin() + remove_idx);
