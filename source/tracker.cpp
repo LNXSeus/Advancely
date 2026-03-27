@@ -2282,6 +2282,7 @@ static void tracker_update_custom_progress(Tracker *t, cJSON *settings_json, con
 
         // Reset state before each update
         item->done = false;
+        item->is_manually_completed = false;
         item->progress = 0;
 
         if (item->goal == -1) {
@@ -2289,6 +2290,7 @@ static void tracker_update_custom_progress(Tracker *t, cJSON *settings_json, con
             if (cJSON_IsTrue(item_progress_json)) {
                 // Manually overridden to be complete
                 item->done = true;
+                item->is_manually_completed = true;
                 item->progress = 1; // Set progress to 1 for consistency
             } else if (cJSON_IsNumber(item_progress_json)) {
                 // It's a counter, but can't be completed manually
@@ -2305,6 +2307,7 @@ static void tracker_update_custom_progress(Tracker *t, cJSON *settings_json, con
             // Simple toggle (target 0 or not set)
             if (cJSON_IsTrue(item_progress_json)) {
                 item->done = true;
+                item->is_manually_completed = true;
                 item->progress = 1;
             }
         }
@@ -2603,11 +2606,12 @@ static bool check_linked_goals_satisfied(const TemplateData *td, const CounterLi
 
 /**
  * @brief Updates completion of manual custom goals (goal <= 0) via linked goals.
- * Must be called after tracker_update_stat_linked_goals and before tracker_update_counter_goals.
+ * Returns true if any goal was newly completed this call (used for fixed-point iteration).
  */
-static void tracker_update_custom_goal_linked_goals(Tracker *t) {
-    if (!t || !t->template_data) return;
+static bool tracker_update_custom_goal_linked_goals(Tracker *t) {
+    if (!t || !t->template_data) return false;
     TemplateData *td = t->template_data;
+    bool any_changed = false;
 
     for (int i = 0; i < td->custom_goal_count; i++) {
         TrackableItem *cg = td->custom_goals[i];
@@ -2616,9 +2620,11 @@ static void tracker_update_custom_goal_linked_goals(Tracker *t) {
             if (check_linked_goals_satisfied(td, cg->linked_goals,
                                              cg->linked_goal_count, cg->linked_goal_mode)) {
                 cg->done = true;
+                any_changed = true;
             }
         }
     }
+    return any_changed;
 }
 
 /**
@@ -2645,12 +2651,14 @@ static void tracker_update_counter_goals(Tracker *t) {
 
 /**
  * @brief Updates stat completion based on linked goals (auto-completion).
+ * Returns true if any stat or sub-stat was newly completed this call (used for fixed-point iteration).
  * Must be called before tracker_update_counter_goals so that counters see
  * the correct done state of any stats that auto-complete via linked goals.
  */
-static void tracker_update_stat_linked_goals(Tracker *t) {
-    if (!t || !t->template_data) return;
+static bool tracker_update_stat_linked_goals(Tracker *t) {
+    if (!t || !t->template_data) return false;
     TemplateData *td = t->template_data;
+    bool any_changed = false;
 
     // Reset stat completion counts to recalculate with linked goals
     td->stats_completed_count = 0;
@@ -2671,6 +2679,7 @@ static void tracker_update_stat_linked_goals(Tracker *t) {
                 if (check_linked_goals_satisfied(td, sub_stat->linked_goals,
                                                  sub_stat->linked_goal_count, sub_stat->linked_goal_mode)) {
                     sub_stat->done = true;
+                    any_changed = true;
                 }
             }
             if (sub_stat->done) stat_cat->completed_criteria_count++;
@@ -2681,6 +2690,7 @@ static void tracker_update_stat_linked_goals(Tracker *t) {
             if (check_linked_goals_satisfied(td, stat_cat->linked_goals,
                                              stat_cat->linked_goal_count, stat_cat->linked_goal_mode)) {
                 stat_cat->done = true;
+                any_changed = true;
                 // When the category is auto-completed, mark all children done too
                 for (int j = 0; j < stat_cat->criteria_count; j++) {
                     if (stat_cat->criteria[j] && !stat_cat->criteria[j]->done) {
@@ -2696,11 +2706,13 @@ static void tracker_update_stat_linked_goals(Tracker *t) {
                                   stat_cat->completed_criteria_count >= stat_cat->criteria_count);
         if (all_children_done && !stat_cat->done) {
             stat_cat->done = true;
+            any_changed = true;
         }
 
         if (stat_cat->done) td->stats_completed_count++;
         td->stats_completed_criteria_count += stat_cat->completed_criteria_count;
     }
+    return any_changed;
 }
 
 void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const AppSettings *settings) {
@@ -3331,8 +3343,12 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
     // Pass the parsed data to the update functions
     tracker_update_custom_progress(t, settings_json, settings);
     tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json, player_unlocks_json, version, settings);
-    tracker_update_stat_linked_goals(t); // Update stat completion based on linked goals (auto-completion)
-    tracker_update_custom_goal_linked_goals(t); // Update manual custom goal completion based on linked goals
+    // Fixed-point iteration: run until no new completions occur (handles arbitrary-depth chains).
+    // Safety cap of 32 iterations prevents infinite loops from unexpected circular references.
+    { bool changed; int guard = 0;
+      do { changed  = tracker_update_custom_goal_linked_goals(t);
+           changed |= tracker_update_stat_linked_goals(t);
+      } while (changed && ++guard < 32); }
     tracker_update_counter_goals(t); // Update counter completion state based on linked goals (LAST UPDATE CALL HERE)
     tracker_calculate_overall_progress(t, version, settings); //THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
 
@@ -6014,8 +6030,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, text_color,
                                    3.0f * t->zoom_level);
 
-                if (item->done) {
-                    // Draw checkmark if done
+                if (item->is_manually_completed) {
+                    // Draw checkmark only when manually completed; auto-completion via linked goals does not place it
                     ImVec2 p1 = ImVec2(check_pos.x + 5 * t->zoom_level, check_pos.y + 10 * t->zoom_level);
                     ImVec2 p2 = ImVec2(check_pos.x + 9 * t->zoom_level, check_pos.y + 15 * t->zoom_level);
                     ImVec2 p3 = ImVec2(check_pos.x + 15 * t->zoom_level, check_pos.y + 6 * t->zoom_level);
@@ -6026,12 +6042,17 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 // Handle click interaction
                 // Deactivating when in visual layout editor mode
                 if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->is_visual_layout_editing) {
-                    item->done = !item->done; // Toggle done state
-                    // Update progress for consistency (1 if done, 0 otherwise) for simple toggles/overridden counters
-                    if (item->goal <= 0 || item->goal == -1) {
-                        item->progress = item->done ? 1 : 0;
+                    item->is_manually_completed = !item->is_manually_completed;
+                    if (item->is_manually_completed) {
+                        // Placing checkmark: goal is done regardless of auto-completion state
+                        item->done = true;
+                    } else {
+                        // Removing checkmark: done only if linked goals are still satisfied
+                        item->done = (item->linked_goal_count > 0 &&
+                                      check_linked_goals_satisfied(t->template_data, item->linked_goals,
+                                                                    item->linked_goal_count, item->linked_goal_mode));
                     }
-                    item->is_manually_completed = true; // Mark as manually changed (though less relevant here)
+                    item->progress = item->done ? 1 : 0;
                     settings_save(settings, t->template_data, SAVE_CONTEXT_ALL); // Save change immediately
                     SDL_SetAtomicInt(&g_needs_update, 1); // Trigger data refresh
                     SDL_SetAtomicInt(&g_game_data_changed, 1); // Indicate change wasn't from game file
@@ -8686,8 +8707,10 @@ static bool hermes_apply_advancement_event(Tracker *t, const cJSON *data) {
 void tracker_recalculate_progress(Tracker *t, const AppSettings *settings) {
     if (!t || !t->template_data) return;
     MC_Version version = settings_get_version_from_string(settings->version_str);
-    tracker_update_stat_linked_goals(t);
-    tracker_update_custom_goal_linked_goals(t);
+    { bool changed; int guard = 0;
+      do { changed  = tracker_update_custom_goal_linked_goals(t);
+           changed |= tracker_update_stat_linked_goals(t);
+      } while (changed && ++guard < 32); }
     tracker_update_counter_goals(t); // Should be LAST CALL before the overall progress calculation
     tracker_calculate_overall_progress(t, version, settings);
 }

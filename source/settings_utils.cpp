@@ -1335,8 +1335,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
 
             // 3-way logic for custom progress, -1, greater than 0, or 0 and not set
             if (item->goal == -1) {
-                // Infinite Counter: Save 'true' if done, otherwise save the number.
-                if (item->done) {
+                // Infinite Counter: Save 'true' only if manually completed; auto-completion must not persist.
+                if (item->is_manually_completed) {
                     cJSON_AddItemToObject(progress_obj, item->root_name, cJSON_CreateBool(true));
                 } else {
                     cJSON_AddItemToObject(progress_obj, item->root_name, cJSON_CreateNumber(item->progress));
@@ -1345,8 +1345,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
                 // Normal Counter: Always save the number.
                 cJSON_AddItemToObject(progress_obj, item->root_name, cJSON_CreateNumber(item->progress));
             } else {
-                // Simple Toggle: Always save the boolean 'done' status.
-                cJSON_AddItemToObject(progress_obj, item->root_name, cJSON_CreateBool(item->done));
+                // Simple Toggle: Save manual state only; auto-completion must not persist.
+                cJSON_AddItemToObject(progress_obj, item->root_name, cJSON_CreateBool(item->is_manually_completed));
             }
         }
 

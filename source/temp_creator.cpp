@@ -6429,11 +6429,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                             if (ImGui::IsItemHovered()) {
-                                char tooltip_buffer[256];
+                                char tooltip_buffer[512];
                                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                          "Select goals that will auto-complete this entire stat category\n"
                                          "when the condition (AND/OR) is met.\n"
-                                         "Hold Shift and click to select a range.");
+                                         "Hold Shift and click to select a range.\n"
+                                         "Chains of linked goals fail beyond a depth of 32.");
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
 
@@ -6973,11 +6974,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         }
                                     }
                                     if (ImGui::IsItemHovered()) {
-                                        char tooltip_buffer[256];
+                                        char tooltip_buffer[512];
                                         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                                  "Select goals that will auto-complete this sub-stat\n"
                                                  "when the condition (AND/OR) is met.\n"
-                                                 "Hold Shift and click to select a range.");
+                                                 "Hold Shift and click to select a range.\n"
+                                                 "Chains of linked goals fail beyond a depth of 32.");
                                         ImGui::SetTooltip("%s", tooltip_buffer);
                                     }
 
@@ -7825,9 +7827,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                             }
                             if (ImGui::IsItemHovered()) {
-                                char tooltip_buffer[256];
+                                char tooltip_buffer[512];
                                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                                         "Select goals that, when completed, will auto-complete this custom goal.");
+                                         "Select goals that, when completed, will auto-complete this custom goal.\n"
+                                         "Chains of linked goals fail beyond a depth of 32.");
                                 ImGui::SetTooltip("%s", tooltip_buffer);
                             }
                             if (!goal.linked_goals.empty()) {
