@@ -6412,6 +6412,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 goal_selector_search_buffer[0] = '\0';
                                 goal_selector_max_selection = 0;
                                 goal_selector_counter_index = -1;
+                                goal_selector_custom_goal_index = -1;
                                 goal_selector_deco_index = -1;
                                 goal_selector_last_clicked_flat_index = -1;
                                 // Find the index of this stat category
@@ -6957,6 +6958,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         goal_selector_search_buffer[0] = '\0';
                                         goal_selector_max_selection = 0;
                                         goal_selector_counter_index = -1;
+                                        goal_selector_custom_goal_index = -1;
                                         goal_selector_deco_index = -1;
                                         goal_selector_last_clicked_flat_index = -1;
                                         // Find the index of this stat category
@@ -10067,6 +10069,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             goal_selector_search_buffer[0] = '\0';
                             goal_selector_max_selection = 0;
                             goal_selector_counter_index = selected_counter_index;
+                            goal_selector_stat_cat_index = -1;
+                            goal_selector_stat_crit_index = -1;
+                            goal_selector_custom_goal_index = -1;
                             goal_selector_deco_index = -1;
                             goal_selector_last_clicked_flat_index = -1;
                             goal_selector_multi_selections.clear();
