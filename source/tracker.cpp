@@ -2618,8 +2618,8 @@ static bool check_linked_goals_satisfied(const TemplateData *td, const CounterLi
 
 /**
  * @brief Updates stat completion based on linked goals (auto-completion).
- * Must be called after tracker_update_counter_goals and the stat update functions,
- * so that all other goal states are already determined.
+ * Must be called before tracker_update_counter_goals so that counters see
+ * the correct done state of any stats that auto-complete via linked goals.
  */
 static void tracker_update_stat_linked_goals(Tracker *t) {
     if (!t || !t->template_data) return;
@@ -3304,8 +3304,8 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
     // Pass the parsed data to the update functions
     tracker_update_custom_progress(t, settings_json, settings);
     tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json, player_unlocks_json, version, settings);
-    tracker_update_counter_goals(t); // Update counter completion state based on linked goals
     tracker_update_stat_linked_goals(t); // Update stat completion based on linked goals (auto-completion)
+    tracker_update_counter_goals(t); // Update counter completion state based on linked goals (LAST UPDATE CALL HERE)
     tracker_calculate_overall_progress(t, version, settings); //THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
 
     // Clean up the parsed JSON objects
@@ -8658,8 +8658,8 @@ static bool hermes_apply_advancement_event(Tracker *t, const cJSON *data) {
 void tracker_recalculate_progress(Tracker *t, const AppSettings *settings) {
     if (!t || !t->template_data) return;
     MC_Version version = settings_get_version_from_string(settings->version_str);
-    tracker_update_counter_goals(t);
     tracker_update_stat_linked_goals(t);
+    tracker_update_counter_goals(t); // Should be LAST CALL before the overall progress calculation
     tracker_calculate_overall_progress(t, version, settings);
 }
 
