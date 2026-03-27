@@ -1651,7 +1651,8 @@ static void tracker_detect_shared_icons(Tracker *t, const AppSettings *settings)
  */
 static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJSON *lang_json,
                                             TrackableItem ***items_array,
-                                            int *count, const char *lang_key_prefix, const AppSettings *settings) {
+                                            int *count, const char *lang_key_prefix, const AppSettings *settings,
+                                            bool parse_linked) {
     (void) settings;
     (void) t;
     if (!category_json) {
@@ -1735,6 +1736,12 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
             cJSON *target = cJSON_GetObjectItem(item_json, "target");
             if (cJSON_IsNumber(target)) {
                 new_item->goal = target->valueint;
+            }
+
+            // Parse linked goals for manual custom goals (goal <= 0)
+            if (parse_linked && new_item->goal <= 0) {
+                parse_runtime_linked_goals(item_json, &new_item->linked_goal_count,
+                                           &new_item->linked_goals, &new_item->linked_goal_mode);
             }
 
             (*items_array)[i++] = new_item;
@@ -2566,28 +2573,6 @@ static bool is_goal_completed_by_root(const TemplateData *td, const char *root_n
 }
 
 /**
- * @brief Updates completion state of all counter goals by checking their linked goals.
- * Must be called before tracker_calculate_overall_progress.
- */
-static void tracker_update_counter_goals(Tracker *t) {
-    if (!t || !t->template_data) return;
-    TemplateData *td = t->template_data;
-    for (int i = 0; i < td->counter_goal_count; i++) {
-        CounterGoal *counter = td->counter_goals[i];
-        if (!counter) continue;
-        int completed = 0;
-        for (int j = 0; j < counter->linked_goal_count; j++) {
-            CounterLinkedGoal *lg = &counter->linked_goals[j];
-            if (is_goal_completed_by_root(td, lg->root_name, lg->stage_id, lg->parent_root)) {
-                completed++;
-            }
-        }
-        counter->completed_count = completed;
-        counter->done = (counter->linked_goal_count > 0 && completed >= counter->linked_goal_count);
-    }
-}
-
-/**
  * @brief Checks if linked goals are satisfied based on mode (AND/OR).
  * Returns true if auto-completion should trigger.
  */
@@ -2613,6 +2598,48 @@ static bool check_linked_goals_satisfied(const TemplateData *td, const CounterLi
             }
         }
         return false; // none completed
+    }
+}
+
+/**
+ * @brief Updates completion of manual custom goals (goal <= 0) via linked goals.
+ * Must be called after tracker_update_stat_linked_goals and before tracker_update_counter_goals.
+ */
+static void tracker_update_custom_goal_linked_goals(Tracker *t) {
+    if (!t || !t->template_data) return;
+    TemplateData *td = t->template_data;
+
+    for (int i = 0; i < td->custom_goal_count; i++) {
+        TrackableItem *cg = td->custom_goals[i];
+        if (!cg || cg->goal > 0) continue; // Only manual goals (toggle / infinite counter)
+        if (cg->linked_goal_count > 0 && !cg->done) {
+            if (check_linked_goals_satisfied(td, cg->linked_goals,
+                                             cg->linked_goal_count, cg->linked_goal_mode)) {
+                cg->done = true;
+            }
+        }
+    }
+}
+
+/**
+ * @brief Updates completion state of all counter goals by checking their linked goals.
+ * Must be called before tracker_calculate_overall_progress.
+ */
+static void tracker_update_counter_goals(Tracker *t) {
+    if (!t || !t->template_data) return;
+    TemplateData *td = t->template_data;
+    for (int i = 0; i < td->counter_goal_count; i++) {
+        CounterGoal *counter = td->counter_goals[i];
+        if (!counter) continue;
+        int completed = 0;
+        for (int j = 0; j < counter->linked_goal_count; j++) {
+            CounterLinkedGoal *lg = &counter->linked_goals[j];
+            if (is_goal_completed_by_root(td, lg->root_name, lg->stage_id, lg->parent_root)) {
+                completed++;
+            }
+        }
+        counter->completed_count = completed;
+        counter->done = (counter->linked_goal_count > 0 && completed >= counter->linked_goal_count);
     }
 }
 
@@ -3305,6 +3332,7 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
     tracker_update_custom_progress(t, settings_json, settings);
     tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json, player_unlocks_json, version, settings);
     tracker_update_stat_linked_goals(t); // Update stat completion based on linked goals (auto-completion)
+    tracker_update_custom_goal_linked_goals(t); // Update manual custom goal completion based on linked goals
     tracker_update_counter_goals(t); // Update counter completion state based on linked goals (LAST UPDATE CALL HERE)
     tracker_calculate_overall_progress(t, version, settings); //THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
 
@@ -8659,6 +8687,7 @@ void tracker_recalculate_progress(Tracker *t, const AppSettings *settings) {
     if (!t || !t->template_data) return;
     MC_Version version = settings_get_version_from_string(settings->version_str);
     tracker_update_stat_linked_goals(t);
+    tracker_update_custom_goal_linked_goals(t);
     tracker_update_counter_goals(t); // Should be LAST CALL before the overall progress calculation
     tracker_calculate_overall_progress(t, version, settings);
 }
@@ -8871,11 +8900,11 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
 
     // Parse "unlock." prefix for unlocks
     tracker_parse_simple_trackables(t, unlocks_json, lang_json, &t->template_data->unlocks,
-                                    &t->template_data->unlock_count, "unlock.", settings);
+                                    &t->template_data->unlock_count, "unlock.", settings, false);
 
     // Parse "custom." prefix for custom goals
     tracker_parse_simple_trackables(t, custom_json, lang_json, &t->template_data->custom_goals,
-                                    &t->template_data->custom_goal_count, "custom.", settings);
+                                    &t->template_data->custom_goal_count, "custom.", settings, true);
 
     tracker_parse_multi_stage_goals(t, multi_stage_goals_json, lang_json,
                                     &t->template_data->multi_stage_goals,

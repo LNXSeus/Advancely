@@ -219,7 +219,7 @@ struct TrackableItem {
     bool is_hidden; // If true, this item is hidden unless "Remove Completed Goals" is off
     bool in_2nd_row; // Forces custom goals (or potentially stats) to the 2nd overlay row
 
-    // Stat auto-completion via linked goals (only used for sub-stats)
+    // Auto-completion via linked goals (used for sub-stats and manual custom goals)
     int linked_goal_count;
     CounterLinkedGoal *linked_goals; // Dynamically allocated array of linked goals
     LinkedGoalMode linked_goal_mode; // AND (all) or OR (any) for auto-completion
