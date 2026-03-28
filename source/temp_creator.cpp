@@ -2359,6 +2359,7 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
             char tooltip[512];
             snprintf(tooltip, sizeof(tooltip),
                      "Hide the %s of this %s in the manual layout only.\n"
+                     "The \"Show All\" goal hiding mode still makes it visible.\n."
                      "This does not affect the automatic layout or the overlay.\n"
                      "The separate \"Hidden\" checkbox controls visibility in\n"
                      "the automatic layout and overlay.",
