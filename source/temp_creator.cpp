@@ -2256,7 +2256,6 @@ static void synchronize_legacy_ms_goal_stats(EditorTemplate &editor_data) {
 // Helper to reset a single ManualPos back to its default state
 static void reset_manual_pos(ManualPos *pos) {
     pos->is_set = false;
-    pos->is_hidden_in_layout = false;
     pos->x = 0.0f;
     pos->y = 0.0f;
     pos->anchor = ANCHOR_TOP_LEFT; // Top left is default
@@ -2308,6 +2307,22 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
         ImGui::SetTooltip("%s", tooltip);
     }
 
+    ImGui::SameLine();
+    if (ImGui::Checkbox("Hide", &pos->is_hidden_in_layout)) {
+        save_msg = MSG_NONE;
+    }
+    if (ImGui::IsItemHovered()) {
+        char tooltip[512];
+        snprintf(tooltip, sizeof(tooltip),
+                 "Hide the %s of this %s in the manual layout only.\n"
+                 "The \"Show All\" goal hiding mode still makes it visible.\n."
+                 "This does not affect the automatic layout or the overlay.\n"
+                 "The separate \"Hidden\" checkbox controls visibility in\n"
+                 "the automatic layout and overlay.",
+                 pos_type, tooltip_item_name);
+        ImGui::SetTooltip("%s", tooltip);
+    }
+
     if (pos->is_set) {
         ImGui::SameLine();
         ImGui::SetNextItemWidth(80);
@@ -2349,22 +2364,6 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
                          pos_type);
                 ImGui::SetTooltip("%s", tooltip);
             }
-        }
-
-        ImGui::SameLine();
-        if (ImGui::Checkbox("Hide", &pos->is_hidden_in_layout)) {
-            save_msg = MSG_NONE;
-        }
-        if (ImGui::IsItemHovered()) {
-            char tooltip[512];
-            snprintf(tooltip, sizeof(tooltip),
-                     "Hide the %s of this %s in the manual layout only.\n"
-                     "The \"Show All\" goal hiding mode still makes it visible.\n."
-                     "This does not affect the automatic layout or the overlay.\n"
-                     "The separate \"Hidden\" checkbox controls visibility in\n"
-                     "the automatic layout and overlay.",
-                     pos_type, tooltip_item_name);
-            ImGui::SetTooltip("%s", tooltip);
         }
 
         ImGui::SameLine();
