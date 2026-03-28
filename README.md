@@ -198,7 +198,8 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
     * **Counters**: Track how many of a selected set of goals are completed. Link any combination of advancements,
       criteria, stats, sub-stats, unlocks, custom goals, or multi-stage goal stages to a counter. It displays a main
       icon, a display name, and progress text (e.g., "3/10"). The background texture changes based on progress: default
-      at zero, half-done for partial progress, and done when all linked goals are completed.
+      at zero, half-done for partial progress, and done when all linked goals are completed. Searching for a counter's
+      display name also shows its exact linked goals in the search results.
 * **Manual Layout Mode**: Break free from the automatic grid and position every goal exactly where you want it. When
   enabled, each item's position is defined by coordinates stored in the template file. Use the built-in **Visual
   Layout Editor** to drag items directly on the tracker map, or set coordinates numerically in the Template Editor.
@@ -206,10 +207,12 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
   find them. Each position (icon, text, progress) can be individually hidden using per-position `Hide` checkboxes
   in the Template Editor, giving you fine-grained control over what appears on your layout.
 * **Decorations**: Add purely visual elements to your manual layout. **Text Headers** render custom text using the
-  tracker's font and size, perfect for labeling sections of your map. **Lines** draw between two endpoints with
-  configurable thickness and opacity, using the tracker's text color. **Arrows** draw a path from a tail through
-  optional bend points to an arrowhead tip, and can be linked to a **Start Goal** and **End Goal** to change opacity
-  based on completion state, ideal for all achievement runs, where the completion order matters.
+  tracker's font and size, perfect for labeling sections of your map. Text headers can also have **Linked Goals** (any
+  combination of goals and counters) so that searching for the header's text keeps all linked items visible, allowing
+  you to categorize your search. **Lines** draw between two endpoints with configurable thickness and opacity, using
+  the tracker's text color. **Arrows** draw a path from a tail through optional bend points to an arrowhead tip, and
+  can be linked to a **Start Goal** and **End Goal** to change opacity based on completion state, ideal for all
+  achievement runs, where the completion order matters.
 * **Section Completion Counters**: Each section header displays dynamic counters showing completed items versus the
   total visible items for that section, respecting both the current Goal Visibility setting and any active search
   filter.
@@ -512,6 +515,12 @@ also dynamically updates the completion counters in the section headers.
 * **Unlocks & Custom Goals**: Shows the goal if its name matches the search term.
 * **Multi-Stage Goals**: Shows the goal if its main title or the text of its *currently active stage* matches the search
   term.
+* **Counters**: Shows the counter if its name matches. Additionally, all goals linked to a matching counter are shown
+  as exact matches; linking to an advancement shows only the advancement itself (not its criteria), and linking to a
+  specific criterion shows only that criterion under its parent.
+* **Text Headers**: Searching for a text header's display text shows all goals and counters directly linked to that
+  header. Like counters, this uses exact matching and is one layer deep so a linked counter will show up, but the
+  counter's own linked goals will not.
 
 ### Section Completion Counters
 

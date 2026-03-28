@@ -421,6 +421,10 @@ struct DecorationElement {
     char end_goal_stage[64]; // stage_id if linking to a specific multi-stage goal stage (empty = whole goal)
     float opacity_before; // Arrow opacity before start goal is completed (default = ADVANCELY_FADED_ALPHA/255)
     float opacity_after; // Arrow opacity after start goal is completed (default = 1.0)
+
+    // Text header goal linking: linked items remain visible when searching for the header's display text
+    int linked_goal_count; // Number of linked goals (text headers only)
+    CounterLinkedGoal *linked_goals; // Dynamically allocated array of linked goals (text headers only)
 };
 
 // The main container for all data loaded from the template files.
