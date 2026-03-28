@@ -92,6 +92,7 @@ static bool is_valid_filename_part_for_ui(const char *part) {
 // Local helpers for manual positions in the editor
 static void parse_editor_manual_pos(cJSON *parent_json, const char *key, ManualPos *pos) {
     pos->is_set = false;
+    pos->is_hidden_in_layout = false;
     pos->x = 0.0f;
     pos->y = 0.0f;
     pos->anchor = ANCHOR_TOP_LEFT;
@@ -111,6 +112,7 @@ static void parse_editor_manual_pos(cJSON *parent_json, const char *key, ManualP
                 pos->anchor = (AnchorPoint) a;
             }
         }
+        pos->is_hidden_in_layout = cJSON_IsTrue(cJSON_GetObjectItem(pos_obj, "hidden"));
     }
 }
 
@@ -122,6 +124,9 @@ static void save_editor_manual_pos(cJSON *parent_json, const char *key, const Ma
         if (pos.anchor != ANCHOR_TOP_LEFT) {
             cJSON_AddNumberToObject(pos_obj, "anchor", pos.anchor);
         }
+        if (pos.is_hidden_in_layout) {
+            cJSON_AddBoolToObject(pos_obj, "hidden", true);
+        }
         cJSON_AddItemToObject(parent_json, key, pos_obj);
     }
 }
@@ -131,6 +136,7 @@ static bool are_manual_positions_different(const ManualPos &a, const ManualPos &
     if (a.is_set) {
         if (a.x != b.x || a.y != b.y) return true;
         if (a.anchor != b.anchor) return true;
+        if (a.is_hidden_in_layout != b.is_hidden_in_layout) return true;
     }
     return false;
 }
@@ -538,9 +544,9 @@ static bool are_editor_decorations_different(const EditorDecorationElement &a, c
 // If stage is nullptr or empty, clears links matching root_name with any stage.
 // If stage is provided, only clears links matching both root_name and stage.
 static void clear_goal_links(std::vector<EditorDecorationElement> &decorations,
-                              std::vector<EditorCounterGoal> &counter_goals,
-                              const char *root_name, const char *stage = nullptr) {
-    for (auto &deco : decorations) {
+                             std::vector<EditorCounterGoal> &counter_goals,
+                             const char *root_name, const char *stage = nullptr) {
+    for (auto &deco: decorations) {
         if (deco.type != DECORATION_ARROW) continue;
         bool clear_start = false;
         bool clear_end = false;
@@ -567,16 +573,16 @@ static void clear_goal_links(std::vector<EditorDecorationElement> &decorations,
         }
     }
     // Also remove matching linked goals from counters
-    for (auto &counter : counter_goals) {
+    for (auto &counter: counter_goals) {
         counter.linked_goals.erase(
             std::remove_if(counter.linked_goals.begin(), counter.linked_goals.end(),
-                [&](const EditorCounterLinkedGoal &lg) {
-                    if (strcmp(lg.root_name, root_name) != 0) return false;
-                    if (stage && stage[0] != '\0') {
-                        return strcmp(lg.stage_id, stage) == 0;
-                    }
-                    return true;
-                }),
+                           [&](const EditorCounterLinkedGoal &lg) {
+                               if (strcmp(lg.root_name, root_name) != 0) return false;
+                               if (stage && stage[0] != '\0') {
+                                   return strcmp(lg.stage_id, stage) == 0;
+                               }
+                               return true;
+                           }),
             counter.linked_goals.end());
     }
 }
@@ -1455,8 +1461,10 @@ static void parse_editor_decorations(cJSON *json_array, std::vector<EditorDecora
                     cJSON *bx = cJSON_GetObjectItem(bend_item, "x");
                     cJSON *by = cJSON_GetObjectItem(bend_item, "y");
                     if (cJSON_IsNumber(bx) && cJSON_IsNumber(by)) {
-                        new_elem.bends[bend_idx].x = fminf(fmaxf((float) bx->valuedouble, -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                        new_elem.bends[bend_idx].y = fminf(fmaxf((float) by->valuedouble, -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                        new_elem.bends[bend_idx].x = fminf(fmaxf((float) bx->valuedouble, -MANUAL_POS_MAX),
+                                                           MANUAL_POS_MAX);
+                        new_elem.bends[bend_idx].y = fminf(fmaxf((float) by->valuedouble, -MANUAL_POS_MAX),
+                                                           MANUAL_POS_MAX);
                         new_elem.bends[bend_idx].is_set = true;
                         bend_idx++;
                     }
@@ -1472,7 +1480,8 @@ static void parse_editor_decorations(cJSON *json_array, std::vector<EditorDecora
             }
             cJSON *start_stage_json = cJSON_GetObjectItem(item_json, "start_goal_stage");
             if (cJSON_IsString(start_stage_json)) {
-                strncpy(new_elem.start_goal_stage, start_stage_json->valuestring, sizeof(new_elem.start_goal_stage) - 1);
+                strncpy(new_elem.start_goal_stage, start_stage_json->valuestring,
+                        sizeof(new_elem.start_goal_stage) - 1);
                 new_elem.start_goal_stage[sizeof(new_elem.start_goal_stage) - 1] = '\0';
             }
             cJSON *end_root_json = cJSON_GetObjectItem(item_json, "end_goal_root");
@@ -1545,8 +1554,10 @@ static bool load_template_for_editing(const char *version, const DiscoveredTempl
 
     parse_editor_trackable_categories(cJSON_GetObjectItem(root, "advancements"), editor_data.advancements, lang_json);
     parse_editor_stats(cJSON_GetObjectItem(root, "stats"), editor_data.stats, lang_json);
-    parse_editor_trackable_items(cJSON_GetObjectItem(root, "unlocks"), editor_data.unlocks, lang_json, "unlock.", false);
-    parse_editor_trackable_items(cJSON_GetObjectItem(root, "custom"), editor_data.custom_goals, lang_json, "custom.", true);
+    parse_editor_trackable_items(cJSON_GetObjectItem(root, "unlocks"), editor_data.unlocks, lang_json, "unlock.",
+                                 false);
+    parse_editor_trackable_items(cJSON_GetObjectItem(root, "custom"), editor_data.custom_goals, lang_json, "custom.",
+                                 true);
     parse_editor_multi_stage_goals(cJSON_GetObjectItem(root, "multi_stage_goals"), editor_data.multi_stage_goals,
                                    lang_json);
     parse_editor_counter_goals(cJSON_GetObjectItem(root, "counter_goals"), editor_data.counter_goals, lang_json);
@@ -2245,6 +2256,7 @@ static void synchronize_legacy_ms_goal_stats(EditorTemplate &editor_data) {
 // Helper to reset a single ManualPos back to its default state
 static void reset_manual_pos(ManualPos *pos) {
     pos->is_set = false;
+    pos->is_hidden_in_layout = false;
     pos->x = 0.0f;
     pos->y = 0.0f;
     pos->anchor = ANCHOR_TOP_LEFT; // Top left is default
@@ -2337,6 +2349,21 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
                          pos_type);
                 ImGui::SetTooltip("%s", tooltip);
             }
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Checkbox("Hide", &pos->is_hidden_in_layout)) {
+            save_msg = MSG_NONE;
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip[512];
+            snprintf(tooltip, sizeof(tooltip),
+                     "Hide the %s of this %s in the manual layout only.\n"
+                     "This does not affect the automatic layout or the overlay.\n"
+                     "The separate \"Hidden\" checkbox controls visibility in\n"
+                     "the automatic layout and overlay.",
+                     pos_type, tooltip_item_name);
+            ImGui::SetTooltip("%s", tooltip);
         }
 
         ImGui::SameLine();
@@ -4058,7 +4085,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             } else if (strcmp(t->visual_drag_goal_type, "Custom Goal") == 0) {
                 force_select_tab = FORCE_TAB_CUSTOM;
             } else if (strcmp(t->visual_drag_goal_type, "Counter") == 0) {
-                for (int ci = 0; ci < (int)current_template_data.counter_goals.size(); ci++) {
+                for (int ci = 0; ci < (int) current_template_data.counter_goals.size(); ci++) {
                     if (strcmp(current_template_data.counter_goals[ci].root_name, t->visual_drag_root_name) == 0) {
                         selected_counter_index = ci;
                         selected_advancement = nullptr;
@@ -4078,7 +4105,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 strncpy(scroll_to_goal_root_name, t->visual_drag_root_name, sizeof(scroll_to_goal_root_name) - 1);
                 scroll_to_goal_root_name[sizeof(scroll_to_goal_root_name) - 1] = '\0';
                 // If a criterion/sub-stat was clicked, also scroll to it within the details pane.
-                strncpy(scroll_to_child_root_name, t->visual_drag_child_root_name, sizeof(scroll_to_child_root_name) - 1);
+                strncpy(scroll_to_child_root_name, t->visual_drag_child_root_name,
+                        sizeof(scroll_to_child_root_name) - 1);
                 scroll_to_child_root_name[sizeof(scroll_to_child_root_name) - 1] = '\0';
                 t->visual_layout_just_clicked = false;
             }
@@ -5009,9 +5037,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         // Clear arrow links referencing this advancement or its criteria
-                        clear_goal_links(current_template_data.decorations, current_template_data.counter_goals, adv_to_remove->root_name);
-                        for (const auto &crit : adv_to_remove->criteria) {
-                            clear_goal_links(current_template_data.decorations, current_template_data.counter_goals, crit.root_name);
+                        clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
+                                         adv_to_remove->root_name);
+                        for (const auto &crit: adv_to_remove->criteria) {
+                            clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
+                                             crit.root_name);
                         }
 
                         current_template_data.advancements.erase(
@@ -5093,7 +5123,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         strncpy(old_adv_root, advancement.root_name, sizeof(old_adv_root));
                         old_adv_root[sizeof(old_adv_root) - 1] = '\0';
                         if (ImGui::InputText("Root Name", advancement.root_name, sizeof(advancement.root_name))) {
-                            propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_adv_root, advancement.root_name, nullptr, &current_template_data.stats);
+                            propagate_goal_rename(current_template_data.decorations,
+                                                  current_template_data.counter_goals, old_adv_root,
+                                                  advancement.root_name, nullptr, &current_template_data.stats);
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
@@ -5170,11 +5202,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
-                            char hidden_tooltip_buffer[256];
+                            char hidden_tooltip_buffer[512];
                             snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
                                      "If checked, this %s will be fully hidden on the overlay\n"
-                                     "and hidden settings-based on the tracker.\n"
-                                     "Visibility can be toggled in the main tracker settings.\n",
+                                     "and hidden settings-based on the automatic layout.\n"
+                                     "Does not affect the manual layout. Use the per-position\n"
+                                     "\"Hide\" checkboxes to control manual layout visibility.\n"
+                                     "Visibility can be toggled in the main tracker settings.",
                                      advancements_label_singular_lower);
                             ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                         }
@@ -5183,14 +5217,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                              force_open_header_root_name[0] != '\0' && strcmp(
                                                                  advancement.root_name,
                                                                  force_open_header_root_name) == 0)) {
-                            render_manual_pos_ui("icon", advancements_label_singular_lower, "Icon Position",
+                            render_manual_pos_ui("icon", advancements_label_singular_lower, "Icon Pos.",
                                                  &advancement.icon_pos, save_message_type);
-                            render_manual_pos_ui("text", advancements_label_singular_lower, "Text Position",
+                            render_manual_pos_ui("text", advancements_label_singular_lower, "Text Pos.",
                                                  &advancement.text_pos, save_message_type);
 
                             // ONLY show progress pos if this advancement has criteria!
                             if (!advancement.criteria.empty()) {
-                                render_manual_pos_ui("prog", advancements_label_singular_lower, "Progress Position",
+                                render_manual_pos_ui("prog", advancements_label_singular_lower, "Progress Pos.",
                                                      &advancement.progress_pos, save_message_type);
                             }
                         }
@@ -5443,7 +5477,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             old_crit_root[sizeof(old_crit_root) - 1] = '\0';
                             if (ImGui::InputText("Criterion Root Name", criterion.root_name,
                                                  sizeof(criterion.root_name))) {
-                                propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_crit_root, criterion.root_name, advancement.root_name, &current_template_data.stats);
+                                propagate_goal_rename(current_template_data.decorations,
+                                                      current_template_data.counter_goals, old_crit_root,
+                                                      criterion.root_name, advancement.root_name,
+                                                      &current_template_data.stats);
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
@@ -5500,11 +5537,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 char hidden_tooltip_buffer[1024];
                                 snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
                                          "If checked, the icon of the criterion will be fully hidden on the overlay\n"
-                                         "(within 1st row) and hidden settings-based on the tracker.\n"
+                                         "(within 1st row) and hidden settings-based on the automatic layout.\n"
                                          "The criterion name will still display below the %s name\n"
                                          "on the overlay if it's the last one remaining.\n"
                                          "This means it will still contribute to the horizontal spacing\n"
                                          "of the second row unless the advancement is hidden.\n"
+                                         "Does not affect the manual layout. Use the per-position\n"
+                                         "\"Hide\" checkboxes to control manual layout visibility.\n"
                                          "Visibility can be toggled in the main tracker settings.",
                                          advancements_label_singular_lower);
                                 ImGui::SetTooltip("%s", hidden_tooltip_buffer);
@@ -5572,9 +5611,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                                  force_open_child_header_root_name[0] != '\0' && strcmp(
                                                                      criterion.root_name,
                                                                      force_open_child_header_root_name) == 0)) {
-                                render_manual_pos_ui("c_icon", "criterion", "Icon Position", &criterion.icon_pos,
+                                render_manual_pos_ui("c_icon", "criterion", "Icon Pos.", &criterion.icon_pos,
                                                      save_message_type);
-                                render_manual_pos_ui("c_text", "criterion", "Text Position", &criterion.text_pos,
+                                render_manual_pos_ui("c_text", "criterion", "Text Pos.", &criterion.text_pos,
                                                      save_message_type);
                             }
 
@@ -5619,7 +5658,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (criterion_to_remove != -1) {
                             clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
-                                                   advancement.criteria[criterion_to_remove].root_name);
+                                             advancement.criteria[criterion_to_remove].root_name);
                             advancement.criteria.erase(advancement.criteria.begin() + criterion_to_remove);
                             save_message_type = MSG_NONE;
                         }
@@ -6199,9 +6238,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         // Clear arrow links referencing this stat or its sub-stats
-                        clear_goal_links(current_template_data.decorations, current_template_data.counter_goals, stat_to_remove->root_name);
-                        for (const auto &sub : stat_to_remove->criteria) {
-                            clear_goal_links(current_template_data.decorations, current_template_data.counter_goals, sub.root_name);
+                        clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
+                                         stat_to_remove->root_name);
+                        for (const auto &sub: stat_to_remove->criteria) {
+                            clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
+                                             sub.root_name);
                         }
 
                         current_template_data.stats.erase(
@@ -6276,7 +6317,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         strncpy(old_stat_root, stat_cat.root_name, sizeof(old_stat_root));
                         old_stat_root[sizeof(old_stat_root) - 1] = '\0';
                         if (ImGui::InputText("Category Key", stat_cat.root_name, sizeof(stat_cat.root_name))) {
-                            propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_stat_root, stat_cat.root_name, nullptr, &current_template_data.stats);
+                            propagate_goal_rename(current_template_data.decorations,
+                                                  current_template_data.counter_goals, old_stat_root,
+                                                  stat_cat.root_name, nullptr, &current_template_data.stats);
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
@@ -6322,11 +6365,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
-                            char hidden_tooltip_buffer[256];
+                            char hidden_tooltip_buffer[512];
                             snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
                                      "If checked, this stat (and all sub-stats) will be fully hidden on the overlay\n"
-                                     "and hidden settings-based on the tracker.\n"
-                                     "Visibility can be toggled in the main tracker settings");
+                                     "and hidden settings-based on the automatic layout.\n"
+                                     "Does not affect the manual layout. Use the per-position\n"
+                                     "\"Hide\" checkboxes to control manual layout visibility.\n"
+                                     "Visibility can be toggled in the main tracker settings.");
                             ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                         }
 
@@ -6405,7 +6450,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::Text("Auto-Complete Goals: %d", (int) stat_cat.linked_goals.size());
                             ImGui::SameLine();
                             char select_btn_id[64];
-                            snprintf(select_btn_id, sizeof(select_btn_id), "Select Goals##StatCat_%s", stat_cat.root_name);
+                            snprintf(select_btn_id, sizeof(select_btn_id), "Select Goals##StatCat_%s",
+                                     stat_cat.root_name);
                             if (ImGui::Button(select_btn_id)) {
                                 show_goal_selector_popup = true;
                                 focus_goal_selector_search = true;
@@ -6425,7 +6471,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                                 goal_selector_stat_crit_index = -1; // Category level
                                 goal_selector_multi_selections.clear();
-                                for (const auto &lg : stat_cat.linked_goals) {
+                                for (const auto &lg: stat_cat.linked_goals) {
                                     goal_selector_multi_selections.push_back(lg);
                                 }
                             }
@@ -6475,7 +6521,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     } else {
                                         snprintf(lg_display, sizeof(lg_display), "%d. %s", li + 1, lg.root_name);
                                     }
-                                        char remove_btn[64];
+                                    char remove_btn[64];
                                     snprintf(remove_btn, sizeof(remove_btn), "X##remove_stat_cat_lg_%d", li);
                                     if (ImGui::SmallButton(remove_btn)) {
                                         remove_idx = li;
@@ -6500,12 +6546,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                              force_open_header_root_name[0] != '\0' && strcmp(
                                                                  stat_cat.root_name,
                                                                  force_open_header_root_name) == 0)) {
-                            render_manual_pos_ui("s_icon", "stat category", "Icon Position", &stat_cat.icon_pos,
+                            render_manual_pos_ui("s_icon", "stat category", "Icon Pos.", &stat_cat.icon_pos,
                                                  save_message_type);
-                            render_manual_pos_ui("s_text", "stat category", "Text Position", &stat_cat.text_pos,
+                            render_manual_pos_ui("s_text", "stat category", "Text Pos.", &stat_cat.text_pos,
                                                  save_message_type);
 
-                            render_manual_pos_ui("s_prog", "stat category", "Progress Position",
+                            render_manual_pos_ui("s_prog", "stat category", "Progress Pos.",
                                                  &stat_cat.progress_pos,
                                                  save_message_type);
                         }
@@ -6522,7 +6568,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             old_simple_stat_root[sizeof(old_simple_stat_root) - 1] = '\0';
                             if (ImGui::InputText("Stat Root Name", simple_crit.root_name,
                                                  sizeof(simple_crit.root_name))) {
-                                propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_simple_stat_root, simple_crit.root_name, stat_cat.root_name, &current_template_data.stats);
+                                propagate_goal_rename(current_template_data.decorations,
+                                                      current_template_data.counter_goals, old_simple_stat_root,
+                                                      simple_crit.root_name, stat_cat.root_name,
+                                                      &current_template_data.stats);
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemHovered()) {
@@ -6805,7 +6854,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 strncpy(old_sub_stat_root, crit.root_name, sizeof(old_sub_stat_root));
                                 old_sub_stat_root[sizeof(old_sub_stat_root) - 1] = '\0';
                                 if (ImGui::InputText("Sub-Stat Root Name", crit.root_name, sizeof(crit.root_name))) {
-                                    propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_sub_stat_root, crit.root_name, stat_cat.root_name, &current_template_data.stats);
+                                    propagate_goal_rename(current_template_data.decorations,
+                                                          current_template_data.counter_goals, old_sub_stat_root,
+                                                          crit.root_name, stat_cat.root_name,
+                                                          &current_template_data.stats);
                                     save_message_type = MSG_NONE;
                                 }
                                 if (ImGui::IsItemHovered()) {
@@ -6879,10 +6931,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     save_message_type = MSG_NONE;
                                 }
                                 if (ImGui::IsItemHovered()) {
-                                    char hidden_tooltip_buffer[256];
+                                    char hidden_tooltip_buffer[512];
                                     snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
                                              "If checked, this sub-stat will be fully hidden on the overlay\n"
-                                             "and hidden settings-based on the tracker.\n"
+                                             "and hidden settings-based on the automatic layout.\n"
+                                             "Does not affect the manual layout. Use the per-position\n"
+                                             "\"Hide\" checkboxes to control manual layout visibility.\n"
                                              "Visibility can be toggled in the main tracker settings.\n\n"
                                              "NOTE: Hidden sub-stats are also excluded from the cycle rotation\n"
                                              "on the overlay.");
@@ -6971,7 +7025,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         }
                                         goal_selector_stat_crit_index = (int) j;
                                         goal_selector_multi_selections.clear();
-                                        for (const auto &lg : crit.linked_goals) {
+                                        for (const auto &lg: crit.linked_goals) {
                                             goal_selector_multi_selections.push_back(lg);
                                         }
                                     }
@@ -7021,7 +7075,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                 snprintf(lg_display, sizeof(lg_display), "%d. %s > %s", li + 1,
                                                          lg.parent_root, lg.root_name);
                                             } else {
-                                                snprintf(lg_display, sizeof(lg_display), "%d. %s", li + 1, lg.root_name);
+                                                snprintf(lg_display, sizeof(lg_display), "%d. %s", li + 1,
+                                                         lg.root_name);
                                             }
                                             char crit_remove_btn[64];
                                             snprintf(crit_remove_btn, sizeof(crit_remove_btn),
@@ -7050,9 +7105,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                                      force_open_child_header_root_name[0] != '\0' &&
                                                                      strcmp(crit.root_name,
                                                                             force_open_child_header_root_name) == 0)) {
-                                    render_manual_pos_ui("sc_icon", "sub-stat", "Icon Position", &crit.icon_pos,
+                                    render_manual_pos_ui("sc_icon", "sub-stat", "Icon Pos.", &crit.icon_pos,
                                                          save_message_type);
-                                    render_manual_pos_ui("sc_text", "sub-stat", "Text Position", &crit.text_pos,
+                                    render_manual_pos_ui("sc_text", "sub-stat", "Text Pos.", &crit.text_pos,
                                                          save_message_type);
                                 }
 
@@ -7095,7 +7150,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                             if (crit_to_remove != -1) {
                                 clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
-                                                       stat_cat.criteria[crit_to_remove].root_name);
+                                                 stat_cat.criteria[crit_to_remove].root_name);
                                 stat_cat.criteria.erase(stat_cat.criteria.begin() + crit_to_remove);
                                 save_message_type = MSG_NONE;
                             }
@@ -7364,7 +7419,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         strncpy(old_unlock_root, unlock.root_name, sizeof(old_unlock_root));
                         old_unlock_root[sizeof(old_unlock_root) - 1] = '\0';
                         if (ImGui::InputText("Root Name", unlock.root_name, sizeof(unlock.root_name))) {
-                            propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_unlock_root, unlock.root_name, nullptr, &current_template_data.stats);
+                            propagate_goal_rename(current_template_data.decorations,
+                                                  current_template_data.counter_goals, old_unlock_root,
+                                                  unlock.root_name, nullptr, &current_template_data.stats);
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
                         if (ImGui::IsItemHovered()) {
@@ -7410,11 +7467,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
                         if (ImGui::IsItemHovered()) {
-                            char hidden_tooltip_buffer[256];
+                            char hidden_tooltip_buffer[512];
                             snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
                                      "If checked, this unlock will be fully hidden on the overlay\n"
-                                     "and hidden settings-based on the tracker.\n"
-                                     "Visibility can be toggled in the main tracker settings");
+                                     "and hidden settings-based on the automatic layout.\n"
+                                     "Does not affect the manual layout. Use the per-position\n"
+                                     "\"Hide\" checkboxes to control manual layout visibility.\n"
+                                     "Visibility can be toggled in the main tracker settings.");
                             ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                         }
 
@@ -7471,9 +7530,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (render_layout_coordinates_header("unlock",
                                                              force_open_header_root_name[0] != '\0' && strcmp(
                                                                  unlock.root_name, force_open_header_root_name) == 0)) {
-                            render_manual_pos_ui("u_icon", "unlock", "Icon Position", &unlock.icon_pos,
+                            render_manual_pos_ui("u_icon", "unlock", "Icon Pos.", &unlock.icon_pos,
                                                  save_message_type);
-                            render_manual_pos_ui("u_text", "unlock", "Text Position", &unlock.text_pos,
+                            render_manual_pos_ui("u_text", "unlock", "Text Pos.", &unlock.text_pos,
                                                  save_message_type);
                         }
 
@@ -7516,7 +7575,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     if (item_to_remove != -1) {
                         clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
-                                               current_template_data.unlocks[item_to_remove].root_name);
+                                         current_template_data.unlocks[item_to_remove].root_name);
                         current_template_data.unlocks.erase(current_template_data.unlocks.begin() + item_to_remove);
                         save_message_type = MSG_NONE;
                     }
@@ -7740,7 +7799,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         strncpy(old_cg_root, goal.root_name, sizeof(old_cg_root));
                         old_cg_root[sizeof(old_cg_root) - 1] = '\0';
                         if (ImGui::InputText("Goal Root Name", goal.root_name, sizeof(goal.root_name))) {
-                            propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_cg_root, goal.root_name, nullptr, &current_template_data.stats);
+                            propagate_goal_rename(current_template_data.decorations,
+                                                  current_template_data.counter_goals, old_cg_root, goal.root_name,
+                                                  nullptr, &current_template_data.stats);
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
                         if (ImGui::IsItemHovered()) {
@@ -7824,7 +7885,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 goal_selector_last_clicked_flat_index = -1;
                                 goal_selector_custom_goal_index = (int) i;
                                 goal_selector_multi_selections.clear();
-                                for (const auto &lg : goal.linked_goals) {
+                                for (const auto &lg: goal.linked_goals) {
                                     goal_selector_multi_selections.push_back(lg);
                                 }
                             }
@@ -7894,11 +7955,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE; // Clear message on new edit
                         }
                         if (ImGui::IsItemHovered()) {
-                            char hidden_tooltip_buffer[256];
+                            char hidden_tooltip_buffer[512];
                             snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
                                      "If checked, this custom goal will be fully hidden on the overlay\n"
-                                     "and hidden settings-based on the tracker.\n"
-                                     "Visibility can be toggled in the main tracker settings");
+                                     "and hidden settings-based on the automatic layout.\n"
+                                     "Does not affect the manual layout. Use the per-position\n"
+                                     "\"Hide\" checkboxes to control manual layout visibility.\n"
+                                     "Visibility can be toggled in the main tracker settings.");
                             ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                         }
 
@@ -7978,14 +8041,14 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (render_layout_coordinates_header("custom goal",
                                                              force_open_header_root_name[0] != '\0' && strcmp(
                                                                  goal.root_name, force_open_header_root_name) == 0)) {
-                            render_manual_pos_ui("cg_icon", "custom goal", "Icon Position", &goal.icon_pos,
+                            render_manual_pos_ui("cg_icon", "custom goal", "Icon Pos.", &goal.icon_pos,
                                                  save_message_type);
-                            render_manual_pos_ui("cg_text", "custom goal", "Text Position", &goal.text_pos,
+                            render_manual_pos_ui("cg_text", "custom goal", "Text Pos.", &goal.text_pos,
                                                  save_message_type);
 
                             // ONLY show progress pos if this Custom Goal is a counter!
                             if (goal.goal > 0 || goal.goal == -1) {
-                                render_manual_pos_ui("cg_prog", "custom goal", "Progress Position", &goal.progress_pos,
+                                render_manual_pos_ui("cg_prog", "custom goal", "Progress Pos.", &goal.progress_pos,
                                                      save_message_type);
                             }
                         }
@@ -8031,7 +8094,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     if (item_to_remove != -1) {
                         clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
-                                               current_template_data.custom_goals[item_to_remove].root_name);
+                                         current_template_data.custom_goals[item_to_remove].root_name);
                         current_template_data.custom_goals.erase(
                             current_template_data.custom_goals.begin() + item_to_remove);
                         save_message_type = MSG_NONE;
@@ -8575,7 +8638,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         // Clear arrow links referencing this goal or any of its stages
-                        clear_goal_links(current_template_data.decorations, current_template_data.counter_goals, goal_to_remove->root_name);
+                        clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
+                                         goal_to_remove->root_name);
 
                         current_template_data.multi_stage_goals.erase(
                             std::remove_if(current_template_data.multi_stage_goals.begin(),
@@ -8638,7 +8702,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         strncpy(old_msg_root, goal.root_name, sizeof(old_msg_root));
                         old_msg_root[sizeof(old_msg_root) - 1] = '\0';
                         if (ImGui::InputText("Goal Root Name", goal.root_name, sizeof(goal.root_name))) {
-                            propagate_goal_rename(current_template_data.decorations, current_template_data.counter_goals, old_msg_root, goal.root_name, nullptr, &current_template_data.stats);
+                            propagate_goal_rename(current_template_data.decorations,
+                                                  current_template_data.counter_goals, old_msg_root, goal.root_name,
+                                                  nullptr, &current_template_data.stats);
                             ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
                         }
@@ -8693,8 +8759,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             char hidden_tooltip_buffer[512];
                             snprintf(hidden_tooltip_buffer, sizeof(hidden_tooltip_buffer),
                                      "If checked, this multi-stage goal will be fully hidden on the overlay\n"
-                                     "and hidden settings-based on the tracker.\n"
-                                     "Visibility can be toggled in the main tracker settings");
+                                     "and hidden settings-based on the automatic layout.\n"
+                                     "Does not affect the manual layout. Use the per-position\n"
+                                     "\"Hide\" checkboxes to control manual layout visibility.\n"
+                                     "Visibility can be toggled in the main tracker settings.");
                             ImGui::SetTooltip("%s", hidden_tooltip_buffer);
                         }
 
@@ -8748,11 +8816,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (render_layout_coordinates_header("multi-stage goal",
                                                              force_open_header_root_name[0] != '\0' && strcmp(
                                                                  goal.root_name, force_open_header_root_name) == 0)) {
-                            render_manual_pos_ui("ms_icon", "multi-stage goal", "Icon Position", &goal.icon_pos,
+                            render_manual_pos_ui("ms_icon", "multi-stage goal", "Icon Pos.", &goal.icon_pos,
                                                  save_message_type);
-                            render_manual_pos_ui("ms_text", "multi-stage goal", "Text Position", &goal.text_pos,
+                            render_manual_pos_ui("ms_text", "multi-stage goal", "Text Pos.", &goal.text_pos,
                                                  save_message_type);
-                            render_manual_pos_ui("ms_prog", "multi-stage goal", "Progress Position", &goal.progress_pos,
+                            render_manual_pos_ui("ms_prog", "multi-stage goal", "Progress Pos.", &goal.progress_pos,
                                                  save_message_type);
                         }
 
@@ -9048,7 +9116,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             strncpy(old_stage_id, stage.stage_id, sizeof(old_stage_id));
                             old_stage_id[sizeof(old_stage_id) - 1] = '\0';
                             if (ImGui::InputText("Stage ID", stage.stage_id, sizeof(stage.stage_id))) {
-                                propagate_stage_rename(current_template_data.decorations, goal.root_name, old_stage_id, stage.stage_id);
+                                propagate_stage_rename(current_template_data.decorations, goal.root_name, old_stage_id,
+                                                       stage.stage_id);
                                 ms_goal_data_changed = true;
                                 save_message_type = MSG_NONE;
                             }
@@ -9574,8 +9643,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         if (stage_to_remove != -1) {
                             clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
-                                                   goal.root_name,
-                                                   goal.stages[stage_to_remove].stage_id);
+                                             goal.root_name,
+                                             goal.stages[stage_to_remove].stage_id);
                             goal.stages.erase(goal.stages.begin() + stage_to_remove);
                             ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
@@ -9662,8 +9731,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                     // --- Sorting Controls (right-aligned) ---
                     bool can_sort_ctr = false;
-                    for (const auto &c : current_template_data.counter_goals) {
-                        if (c.sort_order > 0) { can_sort_ctr = true; break; }
+                    for (const auto &c: current_template_data.counter_goals) {
+                        if (c.sort_order > 0) {
+                            can_sort_ctr = true;
+                            break;
+                        }
                     }
 
                     float sort_btn_w = ImGui::CalcTextSize("Sort").x + ImGui::GetStyle().FramePadding.x * 2.0f;
@@ -9688,7 +9760,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
                     ImGui::SameLine();
                     if (ImGui::Button("Reset Order##ctr")) {
-                        for (auto &c : current_template_data.counter_goals) c.sort_order = 0;
+                        for (auto &c: current_template_data.counter_goals) c.sort_order = 0;
                     }
                     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                         char tooltip_buffer[128];
@@ -9708,8 +9780,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         while (true) {
                             snprintf(new_counter.root_name, sizeof(new_counter.root_name), "counter_%d", ctr_num);
                             bool exists = false;
-                            for (const auto &c : current_template_data.counter_goals) {
-                                if (strcmp(c.root_name, new_counter.root_name) == 0) { exists = true; break; }
+                            for (const auto &c: current_template_data.counter_goals) {
+                                if (strcmp(c.root_name, new_counter.root_name) == 0) {
+                                    exists = true;
+                                    break;
+                                }
                             }
                             if (!exists) break;
                             ctr_num++;
@@ -9738,7 +9813,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     std::vector<EditorCounterGoal *> counters_to_render;
                     bool ctr_search_active = (tc_search_buffer[0] != '\0' && current_search_scope == SCOPE_COUNTERS);
                     if (ctr_search_active) {
-                        for (auto &c : current_template_data.counter_goals) {
+                        for (auto &c: current_template_data.counter_goals) {
                             if (str_contains_insensitive(c.root_name, tc_search_buffer) ||
                                 str_contains_insensitive(c.display_name, tc_search_buffer) ||
                                 str_contains_insensitive(c.icon_path, tc_search_buffer)) {
@@ -9746,7 +9821,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                         }
                     } else {
-                        for (auto &c : current_template_data.counter_goals) {
+                        for (auto &c: current_template_data.counter_goals) {
                             counters_to_render.push_back(&c);
                         }
                     }
@@ -9805,7 +9880,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SameLine();
 
                         // X (Remove) button
-                        if (ImGui::Button("X")) { ctr_to_remove_idx = (int)i; }
+                        if (ImGui::Button("X")) { ctr_to_remove_idx = (int) i; }
                         if (ImGui::IsItemHovered()) {
                             char tooltip_buffer[128];
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Remove %s", label);
@@ -9814,7 +9889,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::SameLine();
 
                         // Copy button
-                        if (ImGui::Button("Copy")) { ctr_to_copy_idx = (int)i; }
+                        if (ImGui::Button("Copy")) { ctr_to_copy_idx = (int) i; }
                         if (ImGui::IsItemHovered()) {
                             char tooltip_buffer[128];
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Duplicate %s.", label);
@@ -9824,7 +9899,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         // Selectable
                         // Find actual index in the source vector
-                        int actual_idx = (int)(&counter - &current_template_data.counter_goals[0]);
+                        int actual_idx = (int) (&counter - &current_template_data.counter_goals[0]);
                         if (ImGui::Selectable(label, selected_counter_index == actual_idx)) {
                             selected_counter_index = actual_idx;
                         }
@@ -9845,7 +9920,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         if (ImGui::BeginDragDropTarget()) {
                             if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("COUNTER_DND")) {
                                 ctr_dnd_source_index = *(const int *) payload->Data;
-                                ctr_dnd_target_index = (int)i;
+                                ctr_dnd_target_index = (int) i;
                             }
                             ImGui::EndDragDropTarget();
                         }
@@ -9877,8 +9952,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         save_message_type = MSG_NONE;
 
                         // Update selected index to follow the moved item
-                        for (int ci = 0; ci < (int)current_template_data.counter_goals.size(); ci++) {
-                            if (strcmp(current_template_data.counter_goals[ci].root_name, item_to_move.root_name) == 0) {
+                        for (int ci = 0; ci < (int) current_template_data.counter_goals.size(); ci++) {
+                            if (strcmp(current_template_data.counter_goals[ci].root_name,
+                                       item_to_move.root_name) == 0) {
                                 selected_counter_index = ci;
                                 break;
                             }
@@ -9886,9 +9962,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     // Handle remove
-                    if (ctr_to_remove_idx >= 0 && ctr_to_remove_idx < (int)counters_to_render.size()) {
+                    if (ctr_to_remove_idx >= 0 && ctr_to_remove_idx < (int) counters_to_render.size()) {
                         auto *ptr = counters_to_render[ctr_to_remove_idx];
-                        int actual_idx = (int)(ptr - &current_template_data.counter_goals[0]);
+                        int actual_idx = (int) (ptr - &current_template_data.counter_goals[0]);
                         clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
                                          ptr->root_name);
                         current_template_data.counter_goals.erase(
@@ -9899,7 +9975,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     }
 
                     // Handle copy
-                    if (ctr_to_copy_idx >= 0 && ctr_to_copy_idx < (int)counters_to_render.size()) {
+                    if (ctr_to_copy_idx >= 0 && ctr_to_copy_idx < (int) counters_to_render.size()) {
                         auto *ptr = counters_to_render[ctr_to_copy_idx];
                         EditorCounterGoal copy = *ptr;
                         // Generate unique root name
@@ -9912,8 +9988,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (copy_counter == 1) snprintf(new_name, sizeof(new_name), "%s_copy", base_name);
                             else snprintf(new_name, sizeof(new_name), "%s_copy%d", base_name, copy_counter);
                             bool exists = false;
-                            for (const auto &c : current_template_data.counter_goals) {
-                                if (strcmp(c.root_name, new_name) == 0) { exists = true; break; }
+                            for (const auto &c: current_template_data.counter_goals) {
+                                if (strcmp(c.root_name, new_name) == 0) {
+                                    exists = true;
+                                    break;
+                                }
                             }
                             if (!exists) break;
                             copy_counter++;
@@ -9926,7 +10005,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         copy.text_pos = {};
                         copy.progress_pos = {};
                         current_template_data.counter_goals.push_back(copy);
-                        selected_counter_index = (int)current_template_data.counter_goals.size() - 1;
+                        selected_counter_index = (int) current_template_data.counter_goals.size() - 1;
                         save_message_type = MSG_NONE;
                     }
 
@@ -9948,7 +10027,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                counter.progress_pos.is_set;
                             if (any_pos_set) {
                                 const char *reset_btn = "Reset All Positions";
-                                float btn_w = ImGui::CalcTextSize(reset_btn).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                                float btn_w = ImGui::CalcTextSize(reset_btn).x + ImGui::GetStyle().FramePadding.x *
+                                              2.0f;
                                 ImGui::SameLine(ImGui::GetContentRegionAvail().x - btn_w);
                                 if (ImGui::SmallButton(reset_btn)) {
                                     reset_manual_pos(&counter.icon_pos);
@@ -10038,7 +10118,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             char tooltip_buffer[256];
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                      "If checked, this counter will be fully hidden on the overlay\n"
-                                     "and hidden settings-based on the tracker.\n"
+                                     "and hidden settings-based on the automatic layout.\n"
+                                     "Does not affect the manual layout. Use the per-position\n"
+                                     "\"Hide\" checkboxes to control manual layout visibility.\n"
                                      "Visibility can be toggled in the main tracker settings.");
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
@@ -10075,7 +10157,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             goal_selector_deco_index = -1;
                             goal_selector_last_clicked_flat_index = -1;
                             goal_selector_multi_selections.clear();
-                            for (const auto &lg : counter.linked_goals) {
+                            for (const auto &lg: counter.linked_goals) {
                                 goal_selector_multi_selections.push_back(lg);
                             }
                         }
@@ -10130,12 +10212,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         // Layout Coordinates
                         if (render_layout_coordinates_header("counter",
                                                              force_open_header_root_name[0] != '\0' && strcmp(
-                                                                 counter.root_name, force_open_header_root_name) == 0)) {
-                            render_manual_pos_ui("ctr_icon", "counter", "Icon Position",
+                                                                 counter.root_name,
+                                                                 force_open_header_root_name) == 0)) {
+                            render_manual_pos_ui("ctr_icon", "counter", "Icon Pos.",
                                                  &counter.icon_pos, save_message_type);
-                            render_manual_pos_ui("ctr_text", "counter", "Text Position",
+                            render_manual_pos_ui("ctr_text", "counter", "Text Pos.",
                                                  &counter.text_pos, save_message_type);
-                            render_manual_pos_ui("ctr_prog", "counter", "Progress Position",
+                            render_manual_pos_ui("ctr_prog", "counter", "Progress Pos.",
                                                  &counter.progress_pos, save_message_type);
                         }
                     } else {
@@ -10476,9 +10559,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     goal_selector_search_buffer[0] = '\0';
                                     focus_goal_selector_search = true;
                                     goal_selector_max_selection = 1;
-                                    strncpy(goal_selector_selected_root, deco.start_goal_root, sizeof(goal_selector_selected_root) - 1);
+                                    strncpy(goal_selector_selected_root, deco.start_goal_root,
+                                            sizeof(goal_selector_selected_root) - 1);
                                     goal_selector_selected_root[sizeof(goal_selector_selected_root) - 1] = '\0';
-                                    strncpy(goal_selector_selected_stage, deco.start_goal_stage, sizeof(goal_selector_selected_stage) - 1);
+                                    strncpy(goal_selector_selected_stage, deco.start_goal_stage,
+                                            sizeof(goal_selector_selected_stage) - 1);
                                     goal_selector_selected_stage[sizeof(goal_selector_selected_stage) - 1] = '\0';
                                     goal_selector_selected_parent[0] = '\0';
                                     show_goal_selector_popup = true;
@@ -10520,9 +10605,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     goal_selector_search_buffer[0] = '\0';
                                     focus_goal_selector_search = true;
                                     goal_selector_max_selection = 1;
-                                    strncpy(goal_selector_selected_root, deco.end_goal_root, sizeof(goal_selector_selected_root) - 1);
+                                    strncpy(goal_selector_selected_root, deco.end_goal_root,
+                                            sizeof(goal_selector_selected_root) - 1);
                                     goal_selector_selected_root[sizeof(goal_selector_selected_root) - 1] = '\0';
-                                    strncpy(goal_selector_selected_stage, deco.end_goal_stage, sizeof(goal_selector_selected_stage) - 1);
+                                    strncpy(goal_selector_selected_stage, deco.end_goal_stage,
+                                            sizeof(goal_selector_selected_stage) - 1);
                                     goal_selector_selected_stage[sizeof(goal_selector_selected_stage) - 1] = '\0';
                                     goal_selector_selected_parent[0] = '\0';
                                     show_goal_selector_popup = true;
@@ -10640,7 +10727,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 ImGui::SameLine();
                                 ImGui::BeginDisabled(deco.bend_count >= MAX_ARROW_BENDS);
                                 if (ImGui::Button("Add Bend")) {
-                                    ManualPos ref_start = (deco.bend_count > 0) ? deco.bends[deco.bend_count - 1] : deco.pos;
+                                    ManualPos ref_start = (deco.bend_count > 0)
+                                                              ? deco.bends[deco.bend_count - 1]
+                                                              : deco.pos;
                                     ManualPos ref_end = deco.pos2;
                                     ManualPos new_bend = {};
                                     if (ref_start.is_set && ref_end.is_set) {
@@ -10771,13 +10860,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             for (int b = 0; b < source.bend_count; b++) {
                                 new_elem.bends[b] = source.bends[b];
                             }
-                            strncpy(new_elem.start_goal_root, source.start_goal_root, sizeof(new_elem.start_goal_root) - 1);
+                            strncpy(new_elem.start_goal_root, source.start_goal_root,
+                                    sizeof(new_elem.start_goal_root) - 1);
                             new_elem.start_goal_root[sizeof(new_elem.start_goal_root) - 1] = '\0';
-                            strncpy(new_elem.start_goal_stage, source.start_goal_stage, sizeof(new_elem.start_goal_stage) - 1);
+                            strncpy(new_elem.start_goal_stage, source.start_goal_stage,
+                                    sizeof(new_elem.start_goal_stage) - 1);
                             new_elem.start_goal_stage[sizeof(new_elem.start_goal_stage) - 1] = '\0';
                             strncpy(new_elem.end_goal_root, source.end_goal_root, sizeof(new_elem.end_goal_root) - 1);
                             new_elem.end_goal_root[sizeof(new_elem.end_goal_root) - 1] = '\0';
-                            strncpy(new_elem.end_goal_stage, source.end_goal_stage, sizeof(new_elem.end_goal_stage) - 1);
+                            strncpy(new_elem.end_goal_stage, source.end_goal_stage,
+                                    sizeof(new_elem.end_goal_stage) - 1);
                             new_elem.end_goal_stage[sizeof(new_elem.end_goal_stage) - 1] = '\0';
                             new_elem.opacity_before = source.opacity_before;
                             new_elem.opacity_after = source.opacity_after;
@@ -12487,7 +12579,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         auto is_goal_selected = [&](const char *root_name, const char *stage_id,
                                     const char *parent_root) -> bool {
             if (is_multi_select) {
-                for (const auto &sel : goal_selector_multi_selections) {
+                for (const auto &sel: goal_selector_multi_selections) {
                     if (strcmp(sel.root_name, root_name) != 0) continue;
                     const char *sel_parent = sel.parent_root[0] != '\0' ? sel.parent_root : nullptr;
                     const char *chk_parent = (parent_root && parent_root[0] != '\0') ? parent_root : nullptr;
@@ -12535,13 +12627,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                        goal_selector_multi_selections.end(),
                                        [&](const EditorCounterLinkedGoal &sel) {
                                            if (strcmp(sel.root_name, root_name) != 0) return false;
-                                           const char *sel_parent = sel.parent_root[0] != '\0' ? sel.parent_root : nullptr;
-                                           const char *chk_parent = (parent_root && parent_root[0] != '\0') ? parent_root : nullptr;
+                                           const char *sel_parent = sel.parent_root[0] != '\0'
+                                                                        ? sel.parent_root
+                                                                        : nullptr;
+                                           const char *chk_parent = (parent_root && parent_root[0] != '\0')
+                                                                        ? parent_root
+                                                                        : nullptr;
                                            if (sel_parent && chk_parent) {
                                                if (strcmp(sel_parent, chk_parent) != 0) return false;
                                            } else if (sel_parent != chk_parent) return false;
                                            const char *sel_stage = sel.stage_id[0] != '\0' ? sel.stage_id : nullptr;
-                                           const char *chk_stage = (stage_id && stage_id[0] != '\0') ? stage_id : nullptr;
+                                           const char *chk_stage = (stage_id && stage_id[0] != '\0')
+                                                                       ? stage_id
+                                                                       : nullptr;
                                            if (sel_stage && chk_stage) return strcmp(sel_stage, chk_stage) == 0;
                                            return !sel_stage && !chk_stage;
                                        }),
@@ -12582,57 +12680,57 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
         // Pre-build flat list (must match the rendering order exactly)
         // Advancements
-        for (const auto &adv : current_template_data.advancements) {
+        for (const auto &adv: current_template_data.advancements) {
             bool parent_match = matches_search(adv.root_name, adv.display_name, "Advancement");
             bool any_child = false;
-            for (const auto &crit : adv.criteria)
+            for (const auto &crit: adv.criteria)
                 if (matches_search(crit.root_name, crit.display_name, "Criterion")) any_child = true;
             if (!parent_match && !any_child) continue;
             if (parent_match) flat_goal_list.push_back({adv.root_name, nullptr, nullptr});
-            for (const auto &crit : adv.criteria) {
+            for (const auto &crit: adv.criteria) {
                 if (!matches_search(crit.root_name, crit.display_name, "Criterion") && !parent_match) continue;
                 flat_goal_list.push_back({crit.root_name, nullptr, adv.root_name});
             }
         }
         // Stats
-        for (const auto &stat : current_template_data.stats) {
+        for (const auto &stat: current_template_data.stats) {
             bool parent_match = matches_search(stat.root_name, stat.display_name, "Stat");
             bool any_child = false;
-            for (const auto &sub : stat.criteria)
+            for (const auto &sub: stat.criteria)
                 if (matches_search(sub.root_name, sub.display_name, "Sub-Stat")) any_child = true;
             if (!parent_match && !any_child) continue;
             if (parent_match) flat_goal_list.push_back({stat.root_name, nullptr, nullptr});
-            for (const auto &sub : stat.criteria) {
+            for (const auto &sub: stat.criteria) {
                 if (!matches_search(sub.root_name, sub.display_name, "Sub-Stat") && !parent_match) continue;
                 flat_goal_list.push_back({sub.root_name, nullptr, stat.root_name});
             }
         }
         // Unlocks
-        for (const auto &unlock : current_template_data.unlocks) {
+        for (const auto &unlock: current_template_data.unlocks) {
             if (!matches_search(unlock.root_name, unlock.display_name, "Unlock")) continue;
             flat_goal_list.push_back({unlock.root_name, nullptr, nullptr});
         }
         // Custom Goals
-        for (const auto &cg : current_template_data.custom_goals) {
+        for (const auto &cg: current_template_data.custom_goals) {
             if (!matches_search(cg.root_name, cg.display_name, "Custom Goal")) continue;
             flat_goal_list.push_back({cg.root_name, nullptr, nullptr});
         }
         // Multi-Stage Goals
-        for (const auto &msg : current_template_data.multi_stage_goals) {
+        for (const auto &msg: current_template_data.multi_stage_goals) {
             bool parent_match = matches_search(msg.root_name, msg.display_name, "Multi-Stage Goal");
             bool any_stage = false;
-            for (const auto &stage : msg.stages)
+            for (const auto &stage: msg.stages)
                 if (matches_search(stage.root_name, stage.display_text, "Stage")) any_stage = true;
             if (!parent_match && !any_stage) continue;
             if (parent_match) flat_goal_list.push_back({msg.root_name, nullptr, nullptr});
-            for (const auto &stage : msg.stages) {
+            for (const auto &stage: msg.stages) {
                 if (!matches_search(stage.root_name, stage.display_text, "Stage") && !parent_match) continue;
                 flat_goal_list.push_back({msg.root_name, stage.stage_id, nullptr});
             }
         }
         // Counters (only for single-select / arrow mode to avoid circular references)
         if (!is_multi_select) {
-            for (const auto &counter : current_template_data.counter_goals) {
+            for (const auto &counter: current_template_data.counter_goals) {
                 if (!matches_search(counter.root_name, counter.display_name, "Counter")) continue;
                 flat_goal_list.push_back({counter.root_name, nullptr, nullptr});
             }
@@ -12651,7 +12749,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     // Shift-click range selection: toggle all between last clicked and this one to match new state
                     int range_start = std::min(goal_selector_last_clicked_flat_index, my_flat_index);
                     int range_end = std::max(goal_selector_last_clicked_flat_index, my_flat_index);
-                    for (int ri = range_start; ri <= range_end && ri < (int)flat_goal_list.size(); ri++) {
+                    for (int ri = range_start; ri <= range_end && ri < (int) flat_goal_list.size(); ri++) {
                         auto &entry = flat_goal_list[ri];
                         bool already = is_goal_selected(entry.root_name, entry.stage_id, entry.parent_root);
                         if (already != checked) {
@@ -12676,7 +12774,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (matches_search(crit.root_name, crit.display_name, "Criterion"))
                         any_child_match = true;
                 }
-                if (parent_match || any_child_match) { has_visible = true; break; }
+                if (parent_match || any_child_match) {
+                    has_visible = true;
+                    break;
+                }
             }
             if (has_visible) {
                 ImGui::TextDisabled("-- Advancements --");
@@ -12696,7 +12797,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     for (const auto &crit: adv.criteria) {
                         if (!matches_search(crit.root_name, crit.display_name, "Criterion") && !parent_match) continue;
                         char crit_label[384];
-                        snprintf(crit_label, sizeof(crit_label), "%s##crit_%s_%s", crit.root_name, adv.root_name, crit.root_name);
+                        snprintf(crit_label, sizeof(crit_label), "%s##crit_%s_%s", crit.root_name, adv.root_name,
+                                 crit.root_name);
                         render_goal_checkbox(crit_label, crit.root_name, nullptr, adv.root_name, true);
                     }
                 }
@@ -12713,7 +12815,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     if (matches_search(sub.root_name, sub.display_name, "Sub-Stat"))
                         any_child_match = true;
                 }
-                if (parent_match || any_child_match) { has_visible = true; break; }
+                if (parent_match || any_child_match) {
+                    has_visible = true;
+                    break;
+                }
             }
             if (has_visible) {
                 ImGui::TextDisabled("-- Stats --");
@@ -12733,7 +12838,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     for (const auto &sub: stat.criteria) {
                         if (!matches_search(sub.root_name, sub.display_name, "Sub-Stat") && !parent_match) continue;
                         char sub_label[384];
-                        snprintf(sub_label, sizeof(sub_label), "%s##sub_%s_%s", sub.root_name, stat.root_name, sub.root_name);
+                        snprintf(sub_label, sizeof(sub_label), "%s##sub_%s_%s", sub.root_name, stat.root_name,
+                                 sub.root_name);
                         render_goal_checkbox(sub_label, sub.root_name, nullptr, stat.root_name, true);
                     }
                 }
@@ -12744,7 +12850,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         {
             bool has_visible = false;
             for (const auto &unlock: current_template_data.unlocks) {
-                if (matches_search(unlock.root_name, unlock.display_name, "Unlock")) { has_visible = true; break; }
+                if (matches_search(unlock.root_name, unlock.display_name, "Unlock")) {
+                    has_visible = true;
+                    break;
+                }
             }
             if (has_visible) {
                 ImGui::TextDisabled("-- Unlocks --");
@@ -12761,7 +12870,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         {
             bool has_visible = false;
             for (const auto &cg: current_template_data.custom_goals) {
-                if (matches_search(cg.root_name, cg.display_name, "Custom Goal")) { has_visible = true; break; }
+                if (matches_search(cg.root_name, cg.display_name, "Custom Goal")) {
+                    has_visible = true;
+                    break;
+                }
             }
             if (has_visible) {
                 ImGui::TextDisabled("-- Custom Goals --");
@@ -12778,9 +12890,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         {
             bool has_visible = false;
             for (const auto &msg: current_template_data.multi_stage_goals) {
-                if (matches_search(msg.root_name, msg.display_name, "Multi-Stage Goal")) { has_visible = true; break; }
+                if (matches_search(msg.root_name, msg.display_name, "Multi-Stage Goal")) {
+                    has_visible = true;
+                    break;
+                }
                 for (const auto &stage: msg.stages) {
-                    if (matches_search(stage.root_name, stage.display_text, "Stage")) { has_visible = true; break; }
+                    if (matches_search(stage.root_name, stage.display_text, "Stage")) {
+                        has_visible = true;
+                        break;
+                    }
                 }
                 if (has_visible) break;
             }
@@ -12814,7 +12932,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (!is_multi_select) {
             bool has_visible = false;
             for (const auto &counter: current_template_data.counter_goals) {
-                if (matches_search(counter.root_name, counter.display_name, "Counter")) { has_visible = true; break; }
+                if (matches_search(counter.root_name, counter.display_name, "Counter")) {
+                    has_visible = true;
+                    break;
+                }
             }
             if (has_visible) {
                 ImGui::TextDisabled("-- Counters --");
@@ -12830,25 +12951,27 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         ImGui::EndChild();
 
         // --- Bottom Controls ---
-        int selected_count = is_multi_select ? (int)goal_selector_multi_selections.size()
-                                             : ((goal_selector_selected_root[0] != '\0') ? 1 : 0);
+        int selected_count = is_multi_select
+                                 ? (int) goal_selector_multi_selections.size()
+                                 : ((goal_selector_selected_root[0] != '\0') ? 1 : 0);
 
         // Confirm button
-        bool can_confirm = is_multi_select ? true : (selected_count > 0); // Multi-select allows confirming with 0 (clear all)
+        bool can_confirm = is_multi_select ? true : (selected_count > 0);
+        // Multi-select allows confirming with 0 (clear all)
         if (!can_confirm) ImGui::BeginDisabled();
         if (ImGui::Button("Select", ImVec2(120, 0)) ||
             (can_confirm && ImGui::IsKeyPressed(ImGuiKey_Enter) && !ImGui::GetIO().WantTextInput)) {
             if (is_multi_select) {
                 // Multi-select: write selections back to the counter
                 if (goal_selector_counter_index >= 0 &&
-                    goal_selector_counter_index < (int)current_template_data.counter_goals.size()) {
+                    goal_selector_counter_index < (int) current_template_data.counter_goals.size()) {
                     auto &target_counter = current_template_data.counter_goals[goal_selector_counter_index];
                     target_counter.linked_goals = goal_selector_multi_selections;
                     save_message_type = MSG_NONE;
                 }
                 // Multi-select: write selections back to a custom goal
                 if (goal_selector_custom_goal_index >= 0 &&
-                    goal_selector_custom_goal_index < (int)current_template_data.custom_goals.size()) {
+                    goal_selector_custom_goal_index < (int) current_template_data.custom_goals.size()) {
                     auto &target_cg = current_template_data.custom_goals[goal_selector_custom_goal_index];
                     target_cg.linked_goals = goal_selector_multi_selections;
                     goal_selector_custom_goal_index = -1;
@@ -12856,12 +12979,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 }
                 // Multi-select: write selections back to a stat category or sub-stat
                 if (goal_selector_stat_cat_index >= 0 &&
-                    goal_selector_stat_cat_index < (int)current_template_data.stats.size()) {
+                    goal_selector_stat_cat_index < (int) current_template_data.stats.size()) {
                     auto &target_stat = current_template_data.stats[goal_selector_stat_cat_index];
                     if (goal_selector_stat_crit_index >= 0 &&
-                        goal_selector_stat_crit_index < (int)target_stat.criteria.size()) {
+                        goal_selector_stat_crit_index < (int) target_stat.criteria.size()) {
                         // Sub-stat level
-                        target_stat.criteria[goal_selector_stat_crit_index].linked_goals = goal_selector_multi_selections;
+                        target_stat.criteria[goal_selector_stat_crit_index].linked_goals =
+                                goal_selector_multi_selections;
                     } else {
                         // Category level
                         target_stat.linked_goals = goal_selector_multi_selections;
@@ -12871,17 +12995,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             } else {
                 // Single-select: write to decoration
                 if (goal_selector_deco_index >= 0 &&
-                    goal_selector_deco_index < (int)current_template_data.decorations.size()) {
+                    goal_selector_deco_index < (int) current_template_data.decorations.size()) {
                     auto &target_deco = current_template_data.decorations[goal_selector_deco_index];
                     if (goal_selector_target == GOAL_SELECT_START) {
-                        strncpy(target_deco.start_goal_root, goal_selector_selected_root, sizeof(target_deco.start_goal_root) - 1);
+                        strncpy(target_deco.start_goal_root, goal_selector_selected_root,
+                                sizeof(target_deco.start_goal_root) - 1);
                         target_deco.start_goal_root[sizeof(target_deco.start_goal_root) - 1] = '\0';
-                        strncpy(target_deco.start_goal_stage, goal_selector_selected_stage, sizeof(target_deco.start_goal_stage) - 1);
+                        strncpy(target_deco.start_goal_stage, goal_selector_selected_stage,
+                                sizeof(target_deco.start_goal_stage) - 1);
                         target_deco.start_goal_stage[sizeof(target_deco.start_goal_stage) - 1] = '\0';
                     } else {
-                        strncpy(target_deco.end_goal_root, goal_selector_selected_root, sizeof(target_deco.end_goal_root) - 1);
+                        strncpy(target_deco.end_goal_root, goal_selector_selected_root,
+                                sizeof(target_deco.end_goal_root) - 1);
                         target_deco.end_goal_root[sizeof(target_deco.end_goal_root) - 1] = '\0';
-                        strncpy(target_deco.end_goal_stage, goal_selector_selected_stage, sizeof(target_deco.end_goal_stage) - 1);
+                        strncpy(target_deco.end_goal_stage, goal_selector_selected_stage,
+                                sizeof(target_deco.end_goal_stage) - 1);
                         target_deco.end_goal_stage[sizeof(target_deco.end_goal_stage) - 1] = '\0';
                     }
                     save_message_type = MSG_NONE;
@@ -12895,7 +13023,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             char tooltip_buffer[128];
             if (can_confirm)
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Confirm selection.\n"
-                                                                 "(You can also press ENTER)");
+                         "(You can also press ENTER)");
             else
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer), "Select a goal first.");
             ImGui::SetTooltip("%s", tooltip_buffer);
@@ -12921,7 +13049,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         if (is_multi_select)
             snprintf(counter_text, sizeof(counter_text), "Selected: %d", selected_count);
         else
-            snprintf(counter_text, sizeof(counter_text), "Selected: %d / %d", selected_count, goal_selector_max_selection);
+            snprintf(counter_text, sizeof(counter_text), "Selected: %d / %d", selected_count,
+                     goal_selector_max_selection);
         float gs_text_width = ImGui::CalcTextSize(counter_text).x;
         ImGui::SetCursorPosX(ImGui::GetWindowWidth() - gs_text_width - ImGui::GetStyle().WindowPadding.x);
         ImGui::Text("%s", counter_text);

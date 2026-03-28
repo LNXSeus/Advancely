@@ -1142,8 +1142,11 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             if (ImGui::IsItemHovered()) {
                 char tooltip_buffer[1024];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "Strictest hiding. Hides goals when they are completed AND hides goals marked as \"hidden\" in the template file.\n"
-                         "Section counters will only display the total number of remaining (visible) items, e.g., (5 - 12) or (5).");
+                         "Strictest hiding. Hides goals when they are completed AND hides goals marked as \"Hidden\" in the template.\n"
+                         "Section counters will only display the total number of remaining (visible) items, e.g., (5 - 12) or (5).\n\n"
+                         "Automatic layout & overlay: The \"Hidden\" checkbox in the template editor controls visibility.\n"
+                         "Manual layout: The per-position \"Hide\" checkboxes control visibility instead.\n"
+                         "Completed goals fully disappear from the manual layout in this mode.");
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
 
@@ -1153,9 +1156,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             if (ImGui::IsItemHovered()) {
                 char tooltip_buffer[1024];
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
-                         "Hides goals marked as \"hidden\" in the template file, but keeps all other completed goals visible.\n"
+                         "Hides goals marked as \"Hidden\" in the template, but keeps all other completed goals visible.\n"
                          "Section counters will count all items NOT marked as hidden in the template,\n"
-                         "regardless of completion e.g., (5/10 - 12/20) or (5/10).");
+                         "regardless of completion e.g., (5/10 - 12/20) or (5/10).\n\n"
+                         "Automatic layout & overlay: The \"Hidden\" checkbox in the template editor controls visibility.\n"
+                         "Manual layout: The per-position \"Hide\" checkboxes control visibility instead.\n"
+                         "Completed goals are greyed out but remain visible in the manual layout in this mode.");
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
 
@@ -1166,7 +1172,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                          "Shows everything. No goals will be hidden, regardless of their completion or template status.\n"
                          "Section counters will count every single item defined in the template\n"
-                         "for that section e.g., (5/10 - 12/20) or (5/10).");
+                         "for that section e.g., (5/10 - 12/20) or (5/10).\n\n"
+                         "Both \"Hidden\" checkboxes and per-position \"Hide\" checkboxes are ignored in this mode.");
                 ImGui::SetTooltip("%s", tooltip_buffer);
             }
 
@@ -2674,6 +2681,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         temp_settings.use_manual_layout = app_settings->use_manual_layout;
         memcpy(app_settings, &temp_settings, sizeof(AppSettings));
         settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
+        saved_settings = temp_settings; // Sync so has_unsaved_changes stays false on future frames
+        if (t) t->settings_has_unsaved_changes = false; // Clear immediately so the quit event skips the unsaved popup
 
         // 2. Initiate the restart process.
         if (application_restart()) {

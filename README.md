@@ -203,7 +203,8 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
   enabled, each item's position is defined by coordinates stored in the template file. Use the built-in **Visual
   Layout Editor** to drag items directly on the tracker map, or set coordinates numerically in the Template Editor.
   Templates with existing layout data are marked with **(has layout)** in the settings dropdowns so you can easily
-  find them.
+  find them. Each position (icon, text, progress) can be individually hidden using per-position `Hide` checkboxes
+  in the Template Editor, giving you fine-grained control over what appears on your layout.
 * **Decorations**: Add purely visual elements to your manual layout. **Text Headers** render custom text using the
   tracker's font and size, perfect for labeling sections of your map. **Lines** draw between two endpoints with
   configurable thickness and opacity, using the tracker's text color. **Arrows** draw a path from a tail through
@@ -535,6 +536,19 @@ filter.
 * **Show All**: Counts show completed vs. total for every single item defined in the template for that section,
   including hidden ones (e.g., `(Completed Main / Total Main)`).
 
+**Hiding in Manual Layout vs. Automatic Layout:**
+
+Advancely has two separate hiding systems that target different layout modes:
+
+* **`Hidden` checkbox** (per goal, in the Template Editor): Controls visibility on the **automatic layout** and the
+  **stream overlay**. This checkbox is completely ignored when using the manual layout.
+* **Per-position `Hide` checkboxes** (per icon/text/progress position, in the Template Editor): Controls visibility
+  on the **manual layout** only. Each position (icon, text, progress) can be hidden independently. These checkboxes
+  only take effect in `Hide All Completed` and `Hide Template-Hidden Only` modes; `Show All` ignores them.
+
+In `Hide All Completed` mode, completed goals fully disappear from the manual layout. In `Hide Template-Hidden Only`
+mode, completed goals are greyed out but remain visible.
+
 ### The Info Bar
 
 A transparent info bar at the top of the window provides a live summary of your run. It includes:
@@ -706,6 +720,11 @@ Opening a template reveals a tabbed interface where you can define every goal.
 > and exporting the result.
 
 * **Sorting & Reordering**: You can easily rearrange any goals, categories, criteria, or stages. Click the small badge next to an item to assign it a sequential sort order. Once you've numbered the items you want to move, click the **Sort** button to instantly reorder them, or use **Reset Order** to clear your selections. Combine the search feature with the badge sorting for efficient template creation!
+* **Visibility Controls**: Each goal has a `Hidden` checkbox that controls visibility on the **automatic layout** and
+  the **stream overlay**. Separately, when a goal has manual positions set (for use with Manual Layout mode), each
+  position (icon, text, progress) gains its own `Hide` checkbox that controls visibility on the **manual layout**
+  only. This lets you, for example, hide a goal's progress text in the manual layout while still showing it on the
+  overlay.
 * **Advancements & Recipes**: List all achievements or advancements you want to track. Each entry has a `Root Name` (the
   in-game ID, e.g., `minecraft:story/mine_stone`), a `Display Name`, and an `Icon Path`. You can also import or add
   `Criteria` to track sub-tasks, and a checkbox designates an entry as a `Recipe` to sort it into its own section and

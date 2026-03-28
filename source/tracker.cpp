@@ -2177,8 +2177,10 @@ static void tracker_parse_decorations(cJSON *decorations_json, cJSON *lang_json,
                     cJSON *bx = cJSON_GetObjectItem(bend_item, "x");
                     cJSON *by = cJSON_GetObjectItem(bend_item, "y");
                     if (cJSON_IsNumber(bx) && cJSON_IsNumber(by)) {
-                        elem->bends[bend_idx].x = fminf(fmaxf((float) bx->valuedouble, -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                        elem->bends[bend_idx].y = fminf(fmaxf((float) by->valuedouble, -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                        elem->bends[bend_idx].x =
+                                fminf(fmaxf((float) bx->valuedouble, -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                        elem->bends[bend_idx].y =
+                                fminf(fmaxf((float) by->valuedouble, -MANUAL_POS_MAX), MANUAL_POS_MAX);
                         elem->bends[bend_idx].is_set = true;
                         bend_idx++;
                     }
@@ -3345,10 +3347,14 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
     tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json, player_unlocks_json, version, settings);
     // Fixed-point iteration: run until no new completions occur (handles arbitrary-depth chains).
     // Safety cap of 32 iterations prevents infinite loops from unexpected circular references.
-    { bool changed; int guard = 0;
-      do { changed  = tracker_update_custom_goal_linked_goals(t);
-           changed |= tracker_update_stat_linked_goals(t);
-      } while (changed && ++guard < 32); }
+    {
+        bool changed;
+        int guard = 0;
+        do {
+            changed = tracker_update_custom_goal_linked_goals(t);
+            changed |= tracker_update_stat_linked_goals(t);
+        } while (changed && ++guard < 32);
+    }
     tracker_update_counter_goals(t); // Update counter completion state based on linked goals (LAST UPDATE CALL HERE)
     tracker_calculate_overall_progress(t, version, settings); //THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
 
@@ -3893,10 +3899,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         bool should_hide_parent_based_on_mode = false;
         switch (settings->goal_hiding_mode) {
             case HIDE_ALL_COMPLETED:
-                should_hide_parent_based_on_mode = cat->is_hidden || is_category_considered_complete;
+                should_hide_parent_based_on_mode =
+                        (!settings->use_manual_layout && cat->is_hidden) || is_category_considered_complete;
                 break;
             case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_parent_based_on_mode = cat->is_hidden;
+                should_hide_parent_based_on_mode = !settings->use_manual_layout && cat->is_hidden;
                 break;
             case SHOW_ALL:
                 should_hide_parent_based_on_mode = false;
@@ -3921,10 +3928,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 bool should_hide_child_based_on_mode = false;
                 switch (settings->goal_hiding_mode) {
                     case HIDE_ALL_COMPLETED:
-                        should_hide_child_based_on_mode = crit->is_hidden || crit->done;
+                        should_hide_child_based_on_mode =
+                                (!settings->use_manual_layout && crit->is_hidden) || crit->done;
                         break;
                     case HIDE_ONLY_TEMPLATE_HIDDEN:
-                        should_hide_child_based_on_mode = crit->is_hidden;
+                        should_hide_child_based_on_mode = !settings->use_manual_layout && crit->is_hidden;
                         break;
                     case SHOW_ALL:
                         should_hide_child_based_on_mode = false;
@@ -3984,10 +3992,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         bool should_hide_parent_render = false;
         switch (settings->goal_hiding_mode) {
             case HIDE_ALL_COMPLETED:
-                should_hide_parent_render = cat->is_hidden || is_considered_complete_render;
+                should_hide_parent_render = (!settings->use_manual_layout && cat->is_hidden) ||
+                                            is_considered_complete_render;
                 break;
             case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_parent_render = cat->is_hidden;
+                should_hide_parent_render = !settings->use_manual_layout && cat->is_hidden;
                 break;
             case SHOW_ALL:
                 should_hide_parent_render = false;
@@ -4006,9 +4015,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                 bool should_hide_crit_render = false;
                 switch (settings->goal_hiding_mode) {
-                    case HIDE_ALL_COMPLETED: should_hide_crit_render = crit->is_hidden || crit->done;
+                    case HIDE_ALL_COMPLETED: should_hide_crit_render =
+                                             (!settings->use_manual_layout && crit->is_hidden) || crit->done;
                         break;
-                    case HIDE_ONLY_TEMPLATE_HIDDEN: should_hide_crit_render = crit->is_hidden;
+                    case HIDE_ONLY_TEMPLATE_HIDDEN:
+                        should_hide_crit_render = !settings->use_manual_layout && crit->is_hidden;
                         break;
                     case SHOW_ALL: should_hide_crit_render = false;
                         break;
@@ -4098,10 +4109,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             bool parent_should_hide_render = false;
             switch (settings->goal_hiding_mode) {
                 case HIDE_ALL_COMPLETED:
-                    parent_should_hide_render = cat->is_hidden || is_considered_complete_render;
+                    parent_should_hide_render = (!settings->use_manual_layout && cat->is_hidden) ||
+                                                is_considered_complete_render;
                     break;
                 case HIDE_ONLY_TEMPLATE_HIDDEN:
-                    parent_should_hide_render = cat->is_hidden;
+                    parent_should_hide_render = !settings->use_manual_layout && cat->is_hidden;
                     break;
                 case SHOW_ALL:
                     parent_should_hide_render = false;
@@ -4121,10 +4133,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     bool crit_should_hide_render = false;
                     switch (settings->goal_hiding_mode) {
                         case HIDE_ALL_COMPLETED:
-                            crit_should_hide_render = crit->is_hidden || crit->done;
+                            crit_should_hide_render = (!settings->use_manual_layout && crit->is_hidden) || crit->done;
                             break;
                         case HIDE_ONLY_TEMPLATE_HIDDEN:
-                            crit_should_hide_render = crit->is_hidden;
+                            crit_should_hide_render = !settings->use_manual_layout && crit->is_hidden;
                             break;
                         case SHOW_ALL:
                             crit_should_hide_render = false;
@@ -4187,10 +4199,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     bool crit_should_hide_width = false;
                     switch (settings->goal_hiding_mode) {
                         case HIDE_ALL_COMPLETED:
-                            crit_should_hide_width = crit->is_hidden || crit->done;
+                            crit_should_hide_width = (!settings->use_manual_layout && crit->is_hidden) || crit->done;
                             break;
                         case HIDE_ONLY_TEMPLATE_HIDDEN:
-                            crit_should_hide_width = crit->is_hidden;
+                            crit_should_hide_width = !settings->use_manual_layout && crit->is_hidden;
                             break;
                         case SHOW_ALL:
                             crit_should_hide_width = false;
@@ -4297,10 +4309,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             bool should_hide_parent_render = false;
             switch (settings->goal_hiding_mode) {
                 case HIDE_ALL_COMPLETED:
-                    should_hide_parent_render = cat->is_hidden || is_considered_complete_render;
+                    should_hide_parent_render = (!settings->use_manual_layout && cat->is_hidden) ||
+                                                is_considered_complete_render;
                     break;
                 case HIDE_ONLY_TEMPLATE_HIDDEN:
-                    should_hide_parent_render = cat->is_hidden;
+                    should_hide_parent_render = !settings->use_manual_layout && cat->is_hidden;
                     break;
                 case SHOW_ALL:
                     should_hide_parent_render = false;
@@ -4319,9 +4332,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                     bool should_hide_crit_render = false;
                     switch (settings->goal_hiding_mode) {
-                        case HIDE_ALL_COMPLETED: should_hide_crit_render = crit->is_hidden || crit->done;
+                        case HIDE_ALL_COMPLETED:
+                            should_hide_crit_render = (!settings->use_manual_layout && crit->is_hidden) || crit->done;
                             break;
-                        case HIDE_ONLY_TEMPLATE_HIDDEN: should_hide_crit_render = crit->is_hidden;
+                        case HIDE_ONLY_TEMPLATE_HIDDEN:
+                            should_hide_crit_render = !settings->use_manual_layout && crit->is_hidden;
                             break;
                         case SHOW_ALL: should_hide_crit_render = false;
                             break;
@@ -4344,9 +4359,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     if (!crit) continue;
                     bool should_hide_crit_render = false;
                     switch (settings->goal_hiding_mode) {
-                        case HIDE_ALL_COMPLETED: should_hide_crit_render = crit->is_hidden || crit->done;
+                        case HIDE_ALL_COMPLETED:
+                            should_hide_crit_render = (!settings->use_manual_layout && crit->is_hidden) || crit->done;
                             break;
-                        case HIDE_ONLY_TEMPLATE_HIDDEN: should_hide_crit_render = crit->is_hidden;
+                        case HIDE_ONLY_TEMPLATE_HIDDEN:
+                            should_hide_crit_render = !settings->use_manual_layout && crit->is_hidden;
                             break;
                         case SHOW_ALL: should_hide_crit_render = false;
                             break;
@@ -4460,6 +4477,14 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             }
 
 
+            // Per-position hiding for manual layout
+            bool hide_icon_in_layout = settings->use_manual_layout && cat->icon_pos.is_hidden_in_layout && settings->
+                                       goal_hiding_mode != SHOW_ALL;
+            bool hide_text_in_layout = settings->use_manual_layout && cat->text_pos.is_hidden_in_layout && settings->
+                                       goal_hiding_mode != SHOW_ALL;
+            bool hide_progress_in_layout = settings->use_manual_layout && cat->progress_pos.is_hidden_in_layout &&
+                                           settings->goal_hiding_mode != SHOW_ALL;
+
             // --- Rendering Core Logic (Only if visible) ---
             if (is_visible_on_screen) {
                 // --- Text String Construction (Only needed if visible) ---
@@ -4546,7 +4571,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 }
 
                 // Render Background (Always Visible)
-                if (texture_to_draw)
+                if (!hide_icon_in_layout && texture_to_draw)
                     draw_list->AddImage((void *) texture_to_draw, screen_pos,
                                         ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
                                                screen_pos.y + bg_size.y * t->zoom_level));
@@ -4597,7 +4622,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     // Final top-left for drawing
                     ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
                     // Final bottom-right for drawing
-                    draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
+                    if (!hide_icon_in_layout)
+                        draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
                     // --- End Icon Scaling and Centering Logic (Main Icon) ---
                 }
 
@@ -4632,7 +4658,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 }
 
                 // Main Name
-                if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
+                if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD && !hide_text_in_layout) {
                     draw_list->AddText(nullptr, main_font_size * t->zoom_level,
                                        ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, current_text_y),
                                        current_text_color, cat->display_name);
@@ -4650,7 +4676,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 current_text_y += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // ADVANCE LAYOUT
 
                 // Snapshot Text
-                if (has_snapshot_text) {
+                if (has_snapshot_text && !hide_text_in_layout) {
                     if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
                         draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
                                            ImVec2(text_x_center - (snapshot_text_size.x * t->zoom_level) * 0.5f,
@@ -4661,7 +4687,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 }
 
                 // Progress Text
-                if (has_progress_text) {
+                if (has_progress_text && !hide_progress_in_layout) {
                     float prog_x_center = text_x_center;
                     float prog_y = current_text_y;
 
@@ -4731,6 +4757,12 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                         bool is_manually_placed =
                                 settings->use_manual_layout && crit->icon_pos.is_set;
+                        bool hide_crit_icon_in_layout =
+                                settings->use_manual_layout && crit->icon_pos.is_hidden_in_layout && settings->
+                                goal_hiding_mode != SHOW_ALL;
+                        bool hide_crit_text_in_layout =
+                                settings->use_manual_layout && crit->text_pos.is_hidden_in_layout && settings->
+                                goal_hiding_mode != SHOW_ALL;
 
                         float item_screen_y = 0.0f;
                         if (!is_manually_placed) {
@@ -4764,7 +4796,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         // LOD for Sub-Item Icon
 
                         // LOD for Sub-Item Icon
-                        if (t->zoom_level > LOD_ICON_DETAIL_THRESHOLD) {
+                        if (t->zoom_level > LOD_ICON_DETAIL_THRESHOLD && !hide_crit_icon_in_layout) {
                             // RENDER ACTUAL ICON
                             SDL_Texture *crit_texture_to_draw = nullptr;
                             // --- Start GIF Frame Selection Logic (Child Icon) ---
@@ -4820,7 +4852,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                     icon_tint);
                                 // --- End Icon Scaling and Centering Logic (Child Icon) ---
                             }
-                        } else {
+                        } else if (!hide_crit_icon_in_layout) {
                             // RENDER SIMPLIFIED SQUARE (Average Color Placeholder)
                             // Since we don't have the exact average color calculated, use a generic color
                             // A faded text color works well to represent "something is here"
@@ -4901,7 +4933,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         // Render Child Text and Progress
                         // LOD: Check if zoom level is sufficient for sub-text
                         // Render Child Text and Progress
-                        if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
+                        if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD && !hide_crit_text_in_layout) {
                             ImU32 current_child_text_color = crit->done ? text_color_faded : text_color;
 
                             float scale_factor = (settings->tracker_font_size > 0.0f)
@@ -5169,10 +5201,11 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         bool should_hide_based_on_mode = false;
         switch (settings->goal_hiding_mode) {
             case HIDE_ALL_COMPLETED:
-                should_hide_based_on_mode = item->is_hidden || is_item_considered_complete;
+                should_hide_based_on_mode = (!settings->use_manual_layout && item->is_hidden) ||
+                                            is_item_considered_complete;
                 break;
             case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_based_on_mode = item->is_hidden;
+                should_hide_based_on_mode = !settings->use_manual_layout && item->is_hidden;
                 break;
             case SHOW_ALL:
                 should_hide_based_on_mode = false;
@@ -5204,10 +5237,10 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         bool should_hide_render = false;
         switch (settings->goal_hiding_mode) {
             case HIDE_ALL_COMPLETED:
-                should_hide_render = item->is_hidden || item->done;
+                should_hide_render = (!settings->use_manual_layout && item->is_hidden) || item->done;
                 break;
             case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_render = item->is_hidden;
+                should_hide_render = !settings->use_manual_layout && item->is_hidden;
                 break;
             case SHOW_ALL:
                 should_hide_render = false;
@@ -5266,10 +5299,10 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
             bool should_hide_width = false;
             switch (settings->goal_hiding_mode) {
                 case HIDE_ALL_COMPLETED:
-                    should_hide_width = item->is_hidden || item->done;
+                    should_hide_width = (!settings->use_manual_layout && item->is_hidden) || item->done;
                     break;
                 case HIDE_ONLY_TEMPLATE_HIDDEN:
-                    should_hide_width = item->is_hidden;
+                    should_hide_width = !settings->use_manual_layout && item->is_hidden;
                     break;
                 case SHOW_ALL:
                     should_hide_width = false;
@@ -5319,10 +5352,10 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         bool should_hide_render = false;
         switch (settings->goal_hiding_mode) {
             case HIDE_ALL_COMPLETED:
-                should_hide_render = item->is_hidden || item->done;
+                should_hide_render = (!settings->use_manual_layout && item->is_hidden) || item->done;
                 break;
             case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_render = item->is_hidden;
+                should_hide_render = !settings->use_manual_layout && item->is_hidden;
                 break;
             case SHOW_ALL:
                 should_hide_render = false;
@@ -5393,6 +5426,14 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         }
 
 
+        // Per-position hiding for manual layout
+        bool hide_item_icon_in_layout = settings->use_manual_layout && item->icon_pos.is_hidden_in_layout && settings->
+                                        goal_hiding_mode != SHOW_ALL;
+        bool hide_item_text_in_layout = settings->use_manual_layout && item->text_pos.is_hidden_in_layout && settings->
+                                        goal_hiding_mode != SHOW_ALL;
+        bool hide_item_progress_in_layout = settings->use_manual_layout && item->progress_pos.is_hidden_in_layout &&
+                                            settings->goal_hiding_mode != SHOW_ALL;
+
         // --- Rendering Core Logic ---
         if (is_visible_on_screen) {
             // --- Calculate Text Sizes for Centering (Only if visible) ---
@@ -5435,7 +5476,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
             }
 
             // Render Background
-            if (texture_to_draw)
+            if (!hide_item_icon_in_layout && texture_to_draw)
                 draw_list->AddImage((void *) texture_to_draw, screen_pos,
                                     ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
                                            screen_pos.y + bg_size.y * t->zoom_level));
@@ -5487,7 +5528,8 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                 // Final top-left for drawing
                 ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
                 // Final bottom-right for drawing
-                draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
+                if (!hide_item_icon_in_layout)
+                    draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
                 // --- End Icon Scaling and Centering Logic ---
             }
 
@@ -5501,7 +5543,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
 
             // Render Text
             // LOD: Check if zoom level is sufficient for text
-            if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
+            if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD && !hide_item_text_in_layout) {
                 float main_text_size = settings->tracker_font_size;
                 float sub_font_size = settings->tracker_sub_font_size;
                 ImU32 current_text_color = item->done ? text_color_faded : text_color; // Fade if done
@@ -5531,7 +5573,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
                                               item->root_name);
 
                 // Draw Progress Text below main name (if applicable, centered)
-                if (has_progress_text) {
+                if (has_progress_text && !hide_item_progress_in_layout) {
                     text_y_pos += text_size.y * t->zoom_level + 4.0f * t->zoom_level; // Move Y down
 
                     // LOD: Hide progress text if zoomed out
@@ -5583,10 +5625,11 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         bool should_hide_based_on_mode = false;
         switch (settings->goal_hiding_mode) {
             case HIDE_ALL_COMPLETED:
-                should_hide_based_on_mode = item->is_hidden || is_item_considered_complete;
+                should_hide_based_on_mode = (!settings->use_manual_layout && item->is_hidden) ||
+                                            is_item_considered_complete;
                 break;
             case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_based_on_mode = item->is_hidden;
+                should_hide_based_on_mode = !settings->use_manual_layout && item->is_hidden;
                 break;
             case SHOW_ALL:
                 should_hide_based_on_mode = false;
@@ -5618,10 +5661,10 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         bool should_hide_render = false;
         switch (settings->goal_hiding_mode) {
             case HIDE_ALL_COMPLETED:
-                should_hide_render = item->is_hidden || item->done;
+                should_hide_render = (!settings->use_manual_layout && item->is_hidden) || item->done;
                 break;
             case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_render = item->is_hidden;
+                should_hide_render = !settings->use_manual_layout && item->is_hidden;
                 break;
             case SHOW_ALL:
                 should_hide_render = false;
@@ -5687,10 +5730,10 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             bool should_hide_width = false;
             switch (settings->goal_hiding_mode) {
                 case HIDE_ALL_COMPLETED:
-                    should_hide_width = item->is_hidden || item->done;
+                    should_hide_width = (!settings->use_manual_layout && item->is_hidden) || item->done;
                     break;
                 case HIDE_ONLY_TEMPLATE_HIDDEN:
-                    should_hide_width = item->is_hidden;
+                    should_hide_width = !settings->use_manual_layout && item->is_hidden;
                     break;
                 case SHOW_ALL:
                     should_hide_width = false;
@@ -5758,10 +5801,10 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         bool should_hide_render = false;
         switch (settings->goal_hiding_mode) {
             case HIDE_ALL_COMPLETED:
-                should_hide_render = item->is_hidden || item->done;
+                should_hide_render = (!settings->use_manual_layout && item->is_hidden) || item->done;
                 break;
             case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_render = item->is_hidden;
+                should_hide_render = !settings->use_manual_layout && item->is_hidden;
                 break;
             case SHOW_ALL:
                 should_hide_render = false;
@@ -5830,6 +5873,14 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         }
 
 
+        // Per-position hiding for manual layout
+        bool hide_item_icon_in_layout = settings->use_manual_layout && item->icon_pos.is_hidden_in_layout && settings->
+                                        goal_hiding_mode != SHOW_ALL;
+        bool hide_item_text_in_layout = settings->use_manual_layout && item->text_pos.is_hidden_in_layout && settings->
+                                        goal_hiding_mode != SHOW_ALL;
+        bool hide_item_progress_in_layout = settings->use_manual_layout && item->progress_pos.is_hidden_in_layout &&
+                                            settings->goal_hiding_mode != SHOW_ALL;
+
         // --- Rendering Core Logic ---
         if (is_visible_on_screen) {
             // --- Calculate Text Sizes for Centering (Only if visible) ---
@@ -5880,7 +5931,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             }
 
             // Render Background (Always Visible)
-            if (texture_to_draw)
+            if (!hide_item_icon_in_layout && texture_to_draw)
                 draw_list->AddImage((void *) texture_to_draw, screen_pos,
                                     ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
                                            screen_pos.y + bg_size.y * t->zoom_level));
@@ -5932,7 +5983,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 // Final top-left for drawing
                 ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
                 // Final bottom-right for drawing
-                draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
+                if (!hide_item_icon_in_layout)
+                    draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
                 // --- End Icon Scaling and Centering Logic ---
             }
 
@@ -5946,7 +5998,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
             // Render Text
             // LOD: Check if zoom level is sufficient for text
-            if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
+            if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD && !hide_item_text_in_layout) {
                 float main_text_size = settings->tracker_font_size;
                 float sub_font_size = settings->tracker_sub_font_size;
                 ImU32 current_text_color = item->done ? text_color_faded : text_color; // Fade if done
@@ -5976,7 +6028,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                                               item->root_name);
 
                 // Draw Progress Text below main name (if applicable, centered)
-                if (has_progress_text) {
+                if (has_progress_text && !hide_item_progress_in_layout) {
                     float prog_x_center = text_x_center;
                     float prog_y = text_y_pos + text_size.y * t->zoom_level + 4.0f * t->zoom_level;
 
@@ -6050,7 +6102,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                         // Removing checkmark: done only if linked goals are still satisfied
                         item->done = (item->linked_goal_count > 0 &&
                                       check_linked_goals_satisfied(t->template_data, item->linked_goals,
-                                                                    item->linked_goal_count, item->linked_goal_mode));
+                                                                   item->linked_goal_count, item->linked_goal_mode));
                     }
                     item->progress = item->done ? 1 : 0;
                     settings_save(settings, t->template_data, SAVE_CONTEXT_ALL); // Save change immediately
@@ -6092,10 +6144,10 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
         bool should_hide_based_on_mode = false;
         switch (settings->goal_hiding_mode) {
             case HIDE_ALL_COMPLETED:
-                should_hide_based_on_mode = goal->is_hidden || goal->done;
+                should_hide_based_on_mode = (!settings->use_manual_layout && goal->is_hidden) || goal->done;
                 break;
             case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_based_on_mode = goal->is_hidden;
+                should_hide_based_on_mode = !settings->use_manual_layout && goal->is_hidden;
                 break;
             case SHOW_ALL:
                 should_hide_based_on_mode = false;
@@ -6118,10 +6170,10 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
         bool should_hide_render = false;
         switch (settings->goal_hiding_mode) {
             case HIDE_ALL_COMPLETED:
-                should_hide_render = goal->is_hidden || goal->done;
+                should_hide_render = (!settings->use_manual_layout && goal->is_hidden) || goal->done;
                 break;
             case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_render = goal->is_hidden;
+                should_hide_render = !settings->use_manual_layout && goal->is_hidden;
                 break;
             case SHOW_ALL:
                 should_hide_render = false;
@@ -6166,10 +6218,10 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
             bool should_hide_width = false;
             switch (settings->goal_hiding_mode) {
                 case HIDE_ALL_COMPLETED:
-                    should_hide_width = goal->is_hidden || goal->done;
+                    should_hide_width = (!settings->use_manual_layout && goal->is_hidden) || goal->done;
                     break;
                 case HIDE_ONLY_TEMPLATE_HIDDEN:
-                    should_hide_width = goal->is_hidden;
+                    should_hide_width = !settings->use_manual_layout && goal->is_hidden;
                     break;
                 case SHOW_ALL:
                     should_hide_width = false;
@@ -6212,10 +6264,10 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
         bool should_hide_render = false;
         switch (settings->goal_hiding_mode) {
             case HIDE_ALL_COMPLETED:
-                should_hide_render = goal->is_hidden || goal->done;
+                should_hide_render = (!settings->use_manual_layout && goal->is_hidden) || goal->done;
                 break;
             case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_render = goal->is_hidden;
+                should_hide_render = !settings->use_manual_layout && goal->is_hidden;
                 break;
             case SHOW_ALL:
                 should_hide_render = false;
@@ -6256,6 +6308,14 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
         bool is_visible_on_screen = !(screen_pos.x > io.DisplaySize.x || (screen_pos.x + item_size_on_screen.x) < 0 ||
                                       screen_pos.y > io.DisplaySize.y || (screen_pos.y + item_size_on_screen.y) < 0);
         if (settings->use_manual_layout) is_visible_on_screen = true;
+
+        // Per-position hiding for manual layout (multi-stage goals)
+        bool hide_goal_icon_in_layout = settings->use_manual_layout && goal->icon_pos.is_hidden_in_layout && settings->
+                                        goal_hiding_mode != SHOW_ALL;
+        bool hide_goal_text_in_layout = settings->use_manual_layout && goal->text_pos.is_hidden_in_layout && settings->
+                                        goal_hiding_mode != SHOW_ALL;
+        bool hide_goal_progress_in_layout = settings->use_manual_layout && goal->progress_pos.is_hidden_in_layout &&
+                                            settings->goal_hiding_mode != SHOW_ALL;
 
         if (is_visible_on_screen) {
             SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
@@ -6304,7 +6364,7 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
             }
 
             // Render Background
-            if (texture_to_draw)
+            if (!hide_goal_icon_in_layout && texture_to_draw)
                 draw_list->AddImage((void *) texture_to_draw, screen_pos,
                                     ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
                                            screen_pos.y + bg_size.y * t->zoom_level));
@@ -6346,7 +6406,8 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                                              (target_box_size.y - scaled_size.y) * 0.5f);
                 ImVec2 p_min = ImVec2(box_p_min.x + icon_padding.x, box_p_min.y + icon_padding.y);
                 ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
-                draw_list->AddImage((void *) icon_texture, p_min, p_max);
+                if (!hide_goal_icon_in_layout)
+                    draw_list->AddImage((void *) icon_texture, p_min, p_max);
             }
 
             // --- VISUAL LAYOUT DRAGGING (ICON) ---
@@ -6358,7 +6419,7 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                                           goal->root_name);
 
             // Render Text
-            if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
+            if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD && !hide_goal_text_in_layout) {
                 float main_text_size = settings->tracker_font_size;
                 float sub_font_size = settings->tracker_sub_font_size;
                 ImU32 current_text_color = goal->done ? text_color_faded : text_color;
@@ -6387,32 +6448,37 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                                               goal->root_name);
 
                 // Draw Progress Text
-                float prog_x_center = text_x_center;
-                float prog_y = text_y_pos + text_size.y * t->zoom_level + 4.0f * t->zoom_level;
+                if (!hide_goal_progress_in_layout) {
+                    float prog_x_center = text_x_center;
+                    float prog_y = text_y_pos + text_size.y * t->zoom_level + 4.0f * t->zoom_level;
 
-                if (settings->use_manual_layout && goal->progress_pos.is_set) {
-                    ImVec2 prog_anchor_off = get_anchor_offset(goal->progress_pos.anchor, progress_text_size.x,
-                                                               progress_text_size.y);
-                    prog_x_center = ((goal->progress_pos.x + prog_anchor_off.x) * t->zoom_level) + t->camera_offset.x + (
-                                        progress_text_size.x * t->zoom_level) * 0.5f;
-                    prog_y = ((goal->progress_pos.y + prog_anchor_off.y) * t->zoom_level) + t->camera_offset.y;
-                }
+                    if (settings->use_manual_layout && goal->progress_pos.is_set) {
+                        ImVec2 prog_anchor_off = get_anchor_offset(goal->progress_pos.anchor, progress_text_size.x,
+                                                                   progress_text_size.y);
+                        prog_x_center = ((goal->progress_pos.x + prog_anchor_off.x) * t->zoom_level) + t->camera_offset.
+                                        x + (
+                                            progress_text_size.x * t->zoom_level) * 0.5f;
+                        prog_y = ((goal->progress_pos.y + prog_anchor_off.y) * t->zoom_level) + t->camera_offset.y;
+                    }
 
-                if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
-                    draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
-                                       ImVec2(prog_x_center - (progress_text_size.x * t->zoom_level) * 0.5f, prog_y),
-                                       current_text_color, progress_text);
+                    if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
+                        draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
+                                           ImVec2(prog_x_center - (progress_text_size.x * t->zoom_level) * 0.5f,
+                                                  prog_y),
+                                           current_text_color, progress_text);
 
-                    // --- VISUAL LAYOUT DRAGGING (PROGRESS) ---
-                    snprintf(drag_id, sizeof(drag_id), "drag_counter_prog_%s", goal->root_name);
-                    handle_visual_layout_dragging(t, drag_id,
-                                                  ImVec2(prog_x_center - (progress_text_size.x * t->zoom_level) * 0.5f,
-                                                         prog_y),
-                                                  ImVec2(progress_text_size.x * t->zoom_level,
-                                                         progress_text_size.y * t->zoom_level),
-                                                  goal->progress_pos, "Counter", goal->display_name, "Progress",
-                                                  goal->root_name);
-                }
+                        // --- VISUAL LAYOUT DRAGGING (PROGRESS) ---
+                        snprintf(drag_id, sizeof(drag_id), "drag_counter_prog_%s", goal->root_name);
+                        handle_visual_layout_dragging(t, drag_id,
+                                                      ImVec2(
+                                                          prog_x_center - (progress_text_size.x * t->zoom_level) * 0.5f,
+                                                          prog_y),
+                                                      ImVec2(progress_text_size.x * t->zoom_level,
+                                                             progress_text_size.y * t->zoom_level),
+                                                      goal->progress_pos, "Counter", goal->display_name, "Progress",
+                                                      goal->root_name);
+                    }
+                } // End hide_goal_progress_in_layout
             }
         } // End if (is_visible_on_screen)
     }
@@ -6453,10 +6519,11 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         bool should_hide_based_on_mode = false;
         switch (settings->goal_hiding_mode) {
             case HIDE_ALL_COMPLETED:
-                should_hide_based_on_mode = goal->is_hidden || is_goal_considered_complete;
+                should_hide_based_on_mode = (!settings->use_manual_layout && goal->is_hidden) ||
+                                            is_goal_considered_complete;
                 break;
             case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_based_on_mode = goal->is_hidden;
+                should_hide_based_on_mode = !settings->use_manual_layout && goal->is_hidden;
                 break;
             case SHOW_ALL:
                 should_hide_based_on_mode = false;
@@ -6512,10 +6579,10 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         bool should_hide_render = false;
         switch (settings->goal_hiding_mode) {
             case HIDE_ALL_COMPLETED:
-                should_hide_render = goal->is_hidden || is_done_render;
+                should_hide_render = (!settings->use_manual_layout && goal->is_hidden) || is_done_render;
                 break;
             case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_render = goal->is_hidden;
+                should_hide_render = !settings->use_manual_layout && goal->is_hidden;
                 break;
             case SHOW_ALL:
                 should_hide_render = false;
@@ -6582,10 +6649,10 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             bool should_hide_width = false;
             switch (settings->goal_hiding_mode) {
                 case HIDE_ALL_COMPLETED:
-                    should_hide_width = goal->is_hidden || is_done_width;
+                    should_hide_width = (!settings->use_manual_layout && goal->is_hidden) || is_done_width;
                     break;
                 case HIDE_ONLY_TEMPLATE_HIDDEN:
-                    should_hide_width = goal->is_hidden;
+                    should_hide_width = !settings->use_manual_layout && goal->is_hidden;
                     break;
                 case SHOW_ALL:
                     should_hide_width = false;
@@ -6659,10 +6726,10 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         bool should_hide_render = false;
         switch (settings->goal_hiding_mode) {
             case HIDE_ALL_COMPLETED:
-                should_hide_render = goal->is_hidden || is_done_render;
+                should_hide_render = (!settings->use_manual_layout && goal->is_hidden) || is_done_render;
                 break;
             case HIDE_ONLY_TEMPLATE_HIDDEN:
-                should_hide_render = goal->is_hidden;
+                should_hide_render = !settings->use_manual_layout && goal->is_hidden;
                 break;
             case SHOW_ALL:
                 should_hide_render = false;
@@ -6716,6 +6783,13 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             is_visible_on_screen = true;
         }
 
+        // Per-position hiding for manual layout (multi-stage goals)
+        bool hide_goal_icon_in_layout = settings->use_manual_layout && goal->icon_pos.is_hidden_in_layout && settings->
+                                        goal_hiding_mode != SHOW_ALL;
+        bool hide_goal_text_in_layout = settings->use_manual_layout && goal->text_pos.is_hidden_in_layout && settings->
+                                        goal_hiding_mode != SHOW_ALL;
+        bool hide_goal_progress_in_layout = settings->use_manual_layout && goal->progress_pos.is_hidden_in_layout &&
+                                            settings->goal_hiding_mode != SHOW_ALL;
 
         // --- Rendering Core Logic ---
         if (is_visible_on_screen) {
@@ -6775,7 +6849,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             }
 
             // Render Background
-            if (texture_to_draw)
+            if (!hide_goal_icon_in_layout && texture_to_draw)
                 draw_list->AddImage((void *) texture_to_draw, screen_pos,
                                     ImVec2(screen_pos.x + bg_size.x * t->zoom_level,
                                            screen_pos.y + bg_size.y * t->zoom_level));
@@ -6845,7 +6919,8 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
                 // Final top-left for drawing
                 ImVec2 p_max = ImVec2(p_min.x + scaled_size.x, p_min.y + scaled_size.y);
                 // Final bottom-right for drawing
-                draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
+                if (!hide_goal_icon_in_layout)
+                    draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
                 // --- End Icon Scaling and Centering Logic ---
             }
 
@@ -6877,9 +6952,10 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             // Draw Main Name (centered)
             // LOD: Hide main name if zoomed out too far
             if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD) {
-                draw_list->AddText(nullptr, main_font_size * t->zoom_level,
-                                   ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos),
-                                   current_text_color, goal->display_name);
+                if (!hide_goal_text_in_layout)
+                    draw_list->AddText(nullptr, main_font_size * t->zoom_level,
+                                       ImVec2(text_x_center - (text_size.x * t->zoom_level) * 0.5f, text_y_pos),
+                                       current_text_color, goal->display_name);
 
                 // --- VISUAL LAYOUT DRAGGING (TEXT) ---
                 snprintf(drag_id, sizeof(drag_id), "drag_ms_text_%s", goal->root_name);
@@ -6906,10 +6982,11 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
             // LOD: Hide stage text if zoomed out
             if (t->zoom_level > LOD_TEXT_SUB_THRESHOLD) {
-                draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
-                                   ImVec2(stage_text_x_center - (stage_text_size.x * t->zoom_level) * 0.5f,
-                                          stage_text_y),
-                                   current_text_color, stage_text); // Use formatted stage text
+                if (!hide_goal_progress_in_layout)
+                    draw_list->AddText(nullptr, sub_font_size * t->zoom_level,
+                                       ImVec2(stage_text_x_center - (stage_text_size.x * t->zoom_level) * 0.5f,
+                                              stage_text_y),
+                                       current_text_color, stage_text); // Use formatted stage text
 
                 // --- VISUAL LAYOUT DRAGGING (PROGRESS) ---
                 snprintf(drag_id, sizeof(drag_id), "drag_ms_prog_%s", goal->root_name);
@@ -6951,7 +7028,6 @@ static int NotesEditCallback(ImGuiInputTextCallbackData *data) {
 
     return 0;
 }
-
 
 
 /**
@@ -7199,8 +7275,10 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
             }
             case DECORATION_ARROW: {
                 // --- Determine arrow opacity based on linked goal completion ---
-                bool start_completed = is_goal_completed_by_root(t->template_data, elem->start_goal_root, elem->start_goal_stage, nullptr);
-                bool end_completed = is_goal_completed_by_root(t->template_data, elem->end_goal_root, elem->end_goal_stage, nullptr);
+                bool start_completed = is_goal_completed_by_root(t->template_data, elem->start_goal_root,
+                                                                 elem->start_goal_stage, nullptr);
+                bool end_completed = is_goal_completed_by_root(t->template_data, elem->end_goal_root,
+                                                               elem->end_goal_stage, nullptr);
 
                 // Hide arrow if end goal is completed and hiding mode is HIDE_ALL_COMPLETED
                 if (end_completed && elem->end_goal_root[0] != '\0' &&
@@ -7346,7 +7424,8 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                         char bend_label[32];
                         snprintf(bend_label, sizeof(bend_label), "Bend %d", b + 1);
                         handle_visual_layout_dragging(t, drag_id_bend,
-                                                      ImVec2(pts_x[1 + b] - handle_size * 0.5f, pts_y[1 + b] - handle_size * 0.5f),
+                                                      ImVec2(pts_x[1 + b] - handle_size * 0.5f,
+                                                             pts_y[1 + b] - handle_size * 0.5f),
                                                       ImVec2(handle_size, handle_size),
                                                       elem->bends[b], "Decoration", elem->id, bend_label,
                                                       elem->id);
@@ -7354,15 +7433,16 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
 
                     // Tip drag handle (at the actual triangle tip, not the shortened line end)
                     float actual_tip_drag_x = elem->pos2.is_set
-                        ? (elem->pos2.x * t->zoom_level) + t->camera_offset.x
-                        : (200.0f * t->zoom_level) + t->camera_offset.x;
+                                                  ? (elem->pos2.x * t->zoom_level) + t->camera_offset.x
+                                                  : (200.0f * t->zoom_level) + t->camera_offset.x;
                     float actual_tip_drag_y = elem->pos2.is_set
-                        ? (elem->pos2.y * t->zoom_level) + t->camera_offset.y
-                        : (100.0f * t->zoom_level) + t->camera_offset.y;
+                                                  ? (elem->pos2.y * t->zoom_level) + t->camera_offset.y
+                                                  : (100.0f * t->zoom_level) + t->camera_offset.y;
                     char drag_id_tip[128];
                     snprintf(drag_id_tip, sizeof(drag_id_tip), "drag_deco_%s_tip", elem->id);
                     handle_visual_layout_dragging(t, drag_id_tip,
-                                                  ImVec2(actual_tip_drag_x - handle_size * 0.5f, actual_tip_drag_y - handle_size * 0.5f),
+                                                  ImVec2(actual_tip_drag_x - handle_size * 0.5f,
+                                                         actual_tip_drag_y - handle_size * 0.5f),
                                                   ImVec2(handle_size, handle_size),
                                                   elem->pos2, "Decoration", elem->id, "Tip",
                                                   elem->id);
@@ -7384,7 +7464,7 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
 
                     ImGui::PushID(drag_id_arrow);
                     ImVec2 arrow_handle_pos = ImVec2(mid_x - arrow_handle_size * 0.5f,
-                                                      mid_y - arrow_handle_size * 0.5f);
+                                                     mid_y - arrow_handle_size * 0.5f);
                     ImGui::SetCursorScreenPos(arrow_handle_pos);
                     ImGui::InvisibleButton("##drag_handle", ImVec2(arrow_handle_size, arrow_handle_size));
 
@@ -7394,10 +7474,16 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                     bool is_arrow_just_clicked = ImGui::IsItemActivated();
 
                     // Register all points for selection
-                    s_visual_layout_items.push_back({arrow_handle_pos, ImVec2(arrow_handle_size, arrow_handle_size), &elem->pos});
-                    s_visual_layout_items.push_back({arrow_handle_pos, ImVec2(arrow_handle_size, arrow_handle_size), &elem->pos2});
+                    s_visual_layout_items.push_back({
+                        arrow_handle_pos, ImVec2(arrow_handle_size, arrow_handle_size), &elem->pos
+                    });
+                    s_visual_layout_items.push_back({
+                        arrow_handle_pos, ImVec2(arrow_handle_size, arrow_handle_size), &elem->pos2
+                    });
                     for (int b = 0; b < elem->bend_count; b++) {
-                        s_visual_layout_items.push_back({arrow_handle_pos, ImVec2(arrow_handle_size, arrow_handle_size), &elem->bends[b]});
+                        s_visual_layout_items.push_back({
+                            arrow_handle_pos, ImVec2(arrow_handle_size, arrow_handle_size), &elem->bends[b]
+                        });
                     }
 
                     if (is_arrow_hovered || ImGui::IsItemActive()) {
@@ -7407,7 +7493,7 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                     // Click-to-select for whole-arrow drag
                     if (is_arrow_just_clicked) {
                         bool any_point_selected = s_visual_selected_items.count(&elem->pos) > 0 ||
-                                                   s_visual_selected_items.count(&elem->pos2) > 0;
+                                                  s_visual_selected_items.count(&elem->pos2) > 0;
                         if (!any_point_selected) {
                             s_visual_selected_items.clear();
                             s_visual_selected_items.insert(&elem->pos);
@@ -7459,19 +7545,24 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                             if (!elem->bends[b].is_set) {
                                 elem->bends[b].is_set = true;
                             }
-                            elem->bends[b].x = fminf(fmaxf(roundf(elem->bends[b].x + dxm), -MANUAL_POS_MAX), MANUAL_POS_MAX);
-                            elem->bends[b].y = fminf(fmaxf(roundf(elem->bends[b].y + dym), -MANUAL_POS_MAX), MANUAL_POS_MAX);
+                            elem->bends[b].x = fminf(fmaxf(roundf(elem->bends[b].x + dxm), -MANUAL_POS_MAX),
+                                                     MANUAL_POS_MAX);
+                            elem->bends[b].y = fminf(fmaxf(roundf(elem->bends[b].y + dym), -MANUAL_POS_MAX),
+                                                     MANUAL_POS_MAX);
                         }
 
                         // Multi-drag: move all other selected items
                         bool arrow_is_selected = s_visual_selected_items.count(&elem->pos) > 0 ||
-                                                  s_visual_selected_items.count(&elem->pos2) > 0;
+                                                 s_visual_selected_items.count(&elem->pos2) > 0;
                         if (arrow_is_selected) {
                             for (ManualPos *sel_pos: s_visual_selected_items) {
                                 if (sel_pos == &elem->pos || sel_pos == &elem->pos2) continue;
                                 bool is_own_bend = false;
                                 for (int b = 0; b < elem->bend_count; b++) {
-                                    if (sel_pos == &elem->bends[b]) { is_own_bend = true; break; }
+                                    if (sel_pos == &elem->bends[b]) {
+                                        is_own_bend = true;
+                                        break;
+                                    }
                                 }
                                 if (is_own_bend) continue;
                                 init_unset_pos_from_screen(sel_pos, t->zoom_level, t->camera_offset);
@@ -8706,11 +8797,14 @@ static bool hermes_apply_advancement_event(Tracker *t, const cJSON *data) {
 
 void tracker_recalculate_progress(Tracker *t, const AppSettings *settings) {
     if (!t || !t->template_data) return;
-    MC_Version version = settings_get_version_from_string(settings->version_str);
-    { bool changed; int guard = 0;
-      do { changed  = tracker_update_custom_goal_linked_goals(t);
-           changed |= tracker_update_stat_linked_goals(t);
-      } while (changed && ++guard < 32); }
+    MC_Version version = settings_get_version_from_string(settings->version_str); {
+        bool changed;
+        int guard = 0;
+        do {
+            changed = tracker_update_custom_goal_linked_goals(t);
+            changed |= tracker_update_stat_linked_goals(t);
+        } while (changed && ++guard < 32);
+    }
     tracker_update_counter_goals(t); // Should be LAST CALL before the overall progress calculation
     tracker_calculate_overall_progress(t, version, settings);
 }

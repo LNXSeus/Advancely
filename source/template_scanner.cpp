@@ -35,6 +35,7 @@
 // Helper to read manual positions from JSON
 void parse_manual_pos(cJSON *parent_json, const char *key, ManualPos *pos) {
     pos->is_set = false;
+    pos->is_hidden_in_layout = false;
     pos->x = 0.0f;
     pos->y = 0.0f;
     pos->anchor = ANCHOR_TOP_LEFT; // Top left as default
@@ -57,6 +58,8 @@ void parse_manual_pos(cJSON *parent_json, const char *key, ManualPos *pos) {
                 pos->anchor = (AnchorPoint) a;
             }
         }
+
+        pos->is_hidden_in_layout = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(pos_obj, "hidden"));
     }
 }
 

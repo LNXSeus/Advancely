@@ -178,6 +178,7 @@ struct ManualPos {
     float x;
     float y;
     bool is_set; // True if the user has manually placed this, false to fallback to auto-layout
+    bool is_hidden_in_layout; // If true, this element is hidden in the manual layout (does not affect auto layout)
     AnchorPoint anchor = ANCHOR_TOP_LEFT; // The reference point for the coordinates
 };
 
