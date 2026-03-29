@@ -104,9 +104,15 @@ Thank you for supporting the project!
 > 📺 **Video Guide:** [Intro (0:00)](https://youtu.be/Rxd1RJqg2WQ?t=0m00s) • [The Basics (1:50)](https://youtu.be/Rxd1RJqg2WQ?t=1m50s)
 
 <p align="center">
-  <img src="readme_assets/Advancely_v0.9.413_Preview.png" alt="Advancely Preview v0.9.413">
+  <img src="readme_assets/Advancely_v1.3.0_Preview.png" alt="Advancely Automatic Layout Preview">
   <br>
-  <em>This screenshot has the <code>Tracker Font Size</code> set to <code>24</code>.</em>
+  <em>This screenshot shows the automatic layout.</em>
+</p>
+
+<p align="center">
+  <img src="readme_assets/Advancely_v1.3.0_Preview2.png" alt="Advancely Manual Layout Preview">
+  <br>
+  <em>This screenshot shows a fully custom manual layout built with the Visual Layout Editor.</em>
 </p>
 
 Advancely is a sophisticated, data-driven progress tracker (just like [AATool](https://github.com/DarwinBaker/AATool)) -
@@ -114,6 +120,10 @@ that works on Windows, Linux and macOS - designed for Minecraft speedrunners, co
 content creators. Unlike other tools that only track vanilla advancements (e.g., AATool by Darwin Baker), Advancely can
 be configured to monitor virtually any goal imaginable. It operates in real-time by watching your singleplayer save
 files for changes, meaning your progress is always up-to-date without any manual intervention.
+
+With the `Manual Layout` mode and the built-in `Visual Layout Editor`, you have full control over where every goal,
+stat, and decoration appears on the tracker. Drag and drop items directly on the live tracker, select multiple goals at
+once, and arrange everything exactly how you want it — no config file editing required.
 
 The tracker's true power lies in its `.json` template system, which allows you to define exactly what you want to track
 for any version, mod, or playstyle. A template isn't just a list of advancements; it's a complete ruleset that can
