@@ -541,7 +541,8 @@ static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker 
     ImGui::Text("Getting Started:");
     ImGui::BulletText("Pan the View: Hold Right-Click or Middle-Click and drag.");
     ImGui::BulletText("Zoom: Use the Mouse Wheel.");
-    ImGui::BulletText("Lock Layout: Press SPACE to prevent items from rearranging.");
+    ImGui::BulletText("Toggle Layout: Use the Manual Layout checkbox to switch between auto and manual layout.");
+    ImGui::BulletText("Lock Layout: Press SPACE to prevent items from rearranging (automatic layout only).");
     ImGui::BulletText("Open Settings: Press ESC to configure everything.");
     ImGui::BulletText("A lot more info can be found when hovering over certain elements.");
     ImGui::Separator();
