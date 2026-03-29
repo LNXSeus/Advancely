@@ -8098,6 +8098,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             "The Progress %% shows your total completion across all individual sub-tasks from all categories.\n"
             "Each of the following tasks has an equal weight in the calculation:");
         ImGui::Indent();
+        ImGui::BulletText("Counter Goals");
         if (version > MC_VERSION_1_6_4 && version <= MC_VERSION_1_11_2) {
             // Achievement Criteria
             ImGui::BulletText("Achievement Criteria");

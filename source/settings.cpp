@@ -1945,6 +1945,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::BulletText("Unlocks (exclusive to 25w14craftmine)");
                     ImGui::BulletText("Individual Sub-Stats");
                     ImGui::BulletText("Custom Goals");
+                    ImGui::BulletText("Counter Goals");
                     ImGui::BulletText("Multi-Stage Goal Stages");
                     ImGui::Unindent();
 

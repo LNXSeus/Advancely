@@ -964,6 +964,7 @@ This way templates don't need to be copied for each subversion.
 | `all_achievements` | 1.11                                        |                  | Default             |
 | `all_advancements` | 1.12, 1.13, 25w14craftmine                  |                  | Default             |
 | `all_advancements` | 1.16.1, 1.21.3, 1.21.6, 1.21.11, 26.1       |                  | Default, ger, zh_cn |
+| `all_advancements` | 1.16.1                                      | `_categorical`   | Default, ger, zh_cn |
 | `all_advancements` | 1.21.3, 1.21.6, 1.21.11, 26.1               | `_optimized`     | Default, ger, zh_cn |
 | `miku%`            | 1.21                                        |                  | Default             |
 | `all_trims`        | 1.21                                        |                  | Default             |
@@ -973,11 +974,10 @@ _The `test1` templates are for you to learn and understand how templates work. T
 functionalities of all goal types. The `Default` language is the standard english template (`_lang.json`). Any
 non-default languages are appended after `lang_`._
 
-Credits to creators of templates):
+Full credits to creators of templates displayed [here](#contributors).
 
 - @towardstars and @yumekotism on dc: `zh_cn` translations for `all_advancements` templates. _Make sure you use
   the `SourceHanSansCN-Normal.otf` font in all places (tracker, overlay and UI)._
-- [MoreTrident](https://www.twitch.tv/moretrident): `all_trims` template.
 
 _(Submit your template through the [official discord](https://discord.gg/TyNgXDz)._
 </details>
@@ -1103,6 +1103,7 @@ Massive thanks to all people involved in improving and shaping Advancely:
 * **ethansplace98**: Early interest in Advancely. Helped bringing ideas for early development. Advancely supporter.
 * **Yumeko**: Many feature suggestions, also mainly responsible for chinese translations of templates.
 * **zurtleTif**: Has used my tracker more than anyone else. Suggested features, provided background textures and is Advancelys first supporter.
+* **[MoreTrident](https://www.twitch.tv/MoreTrident)**: Made the `all_trims` template.
 * **[TowardStars](https://github.com/towardstars)**: Helped with Chinese translations.
 * **[InFectDilu](https://github.com/InFectDilu)**: Feature suggestions along with help on chinese translations, also
   provided custom background textures.
@@ -1116,6 +1117,7 @@ Massive thanks to all people involved in improving and shaping Advancely:
   on Linux w/ nikander100.
 * **[nikander100](https://github.com/nikander100)**: Helped fixing Segmentation fault on Linux.
 * **[uku](https://git.uku3lig.net/uku)**: NixOS package via mcsr-nixos.
+* **[ScrambledMC](https://www.youtube.com/@scrambledmc3772)**: Made the fantastic `_categorical` `all_advancements` template for 1.16.
 
 </details>
 
