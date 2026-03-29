@@ -2385,7 +2385,7 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
     if (ImGui::IsItemHovered()) {
         char tooltip[512];
         snprintf(tooltip, sizeof(tooltip),
-                 "Hide the %s of this %s in the manual layout only.\n"
+                 "Hide the %s of this %s in the manual layout only if position is set.\n"
                  "The \"Show All\" goal hiding mode still makes it visible.\n."
                  "This does not affect the automatic layout or the overlay.\n"
                  "The separate \"Hidden\" checkbox controls visibility in\n"
@@ -4542,8 +4542,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                          "Custom Goal Hotkeys are disabled while Visual Editing is active.\n"
                          "Applying settings is also disabled while active to prevent template reloads.\n"
                          "Unsaved template changes will be auto-saved when activating.\n\n"
-                         "Tip: Click and drag on empty space to draw a selection rectangle.\n"
-                         "All items inside the rectangle will be selected and can be dragged together.\n\n"
+                         "Multi-Select:\n"
+                         " - Click and drag on empty space to draw a selection rectangle.\n"
+                         " - Hold Ctrl (Cmd on macOS) and click items to add/remove them individually.\n"
+                         " - Ctrl + drag on empty space adds the rectangle selection to existing.\n"
+                         "All selected items can be dragged together.\n\n"
                          "WARNING:\n"
                          "Make sure you're tracking a world.\n"
                          "Official default templates get overwritten on updates.\n"

@@ -3608,13 +3608,22 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
 
     // Handle click-to-select/deselect
     if (is_just_clicked) {
+        ImGuiIO &click_io = ImGui::GetIO();
+        bool ctrl_held = click_io.KeyCtrl; // Ctrl on Windows/Linux, Cmd on macOS
         bool is_selected = s_visual_selected_items.count(&target_pos) > 0;
-        if (!is_selected) {
-            // Clicking an unselected item: clear selection, select only this one
+        if (ctrl_held) {
+            // Ctrl+Click: toggle this item in the selection
+            if (is_selected) {
+                s_visual_selected_items.erase(&target_pos);
+            } else {
+                s_visual_selected_items.insert(&target_pos);
+            }
+        } else if (!is_selected) {
+            // Normal click on unselected item: clear selection, select only this one
             s_visual_selected_items.clear();
             s_visual_selected_items.insert(&target_pos);
         }
-        // If already selected, keep the selection (allows multi-drag)
+        // If already selected (without Ctrl), keep the selection (allows multi-drag)
 
         // Signal the editor to select this goal (without opening Layout Coordinates)
         if (parent_root_name && parent_root_name[0] != '\0') {
@@ -7350,9 +7359,20 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
 
                     // Handle click-to-select for whole-line drag
                     if (is_line_just_clicked) {
+                        ImGuiIO &click_io = ImGui::GetIO();
+                        bool ctrl_held = click_io.KeyCtrl;
                         bool either_selected = s_visual_selected_items.count(&elem->pos) > 0 ||
                                                s_visual_selected_items.count(&elem->pos2) > 0;
-                        if (!either_selected) {
+                        if (ctrl_held) {
+                            // Ctrl+Click: toggle both endpoints in the selection
+                            if (either_selected) {
+                                s_visual_selected_items.erase(&elem->pos);
+                                s_visual_selected_items.erase(&elem->pos2);
+                            } else {
+                                s_visual_selected_items.insert(&elem->pos);
+                                s_visual_selected_items.insert(&elem->pos2);
+                            }
+                        } else if (!either_selected) {
                             s_visual_selected_items.clear();
                             s_visual_selected_items.insert(&elem->pos);
                             s_visual_selected_items.insert(&elem->pos2);
@@ -7667,9 +7687,26 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
 
                     // Click-to-select for whole-arrow drag
                     if (is_arrow_just_clicked) {
+                        ImGuiIO &click_io = ImGui::GetIO();
+                        bool ctrl_held = click_io.KeyCtrl;
                         bool any_point_selected = s_visual_selected_items.count(&elem->pos) > 0 ||
                                                   s_visual_selected_items.count(&elem->pos2) > 0;
-                        if (!any_point_selected) {
+                        if (ctrl_held) {
+                            // Ctrl+Click: toggle all arrow points in the selection
+                            if (any_point_selected) {
+                                s_visual_selected_items.erase(&elem->pos);
+                                s_visual_selected_items.erase(&elem->pos2);
+                                for (int b = 0; b < elem->bend_count; b++) {
+                                    s_visual_selected_items.erase(&elem->bends[b]);
+                                }
+                            } else {
+                                s_visual_selected_items.insert(&elem->pos);
+                                s_visual_selected_items.insert(&elem->pos2);
+                                for (int b = 0; b < elem->bend_count; b++) {
+                                    s_visual_selected_items.insert(&elem->bends[b]);
+                                }
+                            }
+                        } else if (!any_point_selected) {
                             s_visual_selected_items.clear();
                             s_visual_selected_items.insert(&elem->pos);
                             s_visual_selected_items.insert(&elem->pos2);
@@ -7901,13 +7938,20 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
             }
         }
 
+        // Snapshot items that were selected before the rectangle started (for Ctrl+Drag additive mode)
+        static std::unordered_set<ManualPos *> s_pre_rect_selected_items;
+
         // Selection rectangle logic
         if (ImGui::IsWindowHovered(ImGuiHoveredFlags_None)) {
             // Start selection rectangle on left-click if no item was interacted with
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->visual_item_interacted_this_frame) {
                 t->visual_select_rect_active = true;
                 t->visual_select_rect_start = ImGui::GetMousePos();
-                s_visual_selected_items.clear();
+                // Ctrl+Drag: keep existing selection to add to it; normal drag: clear
+                if (!ImGui::GetIO().KeyCtrl) {
+                    s_visual_selected_items.clear();
+                }
+                s_pre_rect_selected_items = s_visual_selected_items;
             }
         }
 
@@ -7930,7 +7974,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                                       0.0f, 0, 1.5f);
 
                 // Live-update selection as rectangle is drawn
-                s_visual_selected_items.clear();
+                // Start from the pre-rect snapshot (preserves Ctrl+Drag additive selection)
+                s_visual_selected_items = s_pre_rect_selected_items;
                 for (const auto &item: s_visual_layout_items) {
                     ImVec2 item_center = ImVec2(item.screen_pos.x + item.size.x * 0.5f,
                                                 item.screen_pos.y + item.size.y * 0.5f);

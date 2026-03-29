@@ -139,7 +139,8 @@ import, create, copy, and modify any template directly within Advancely.
   share with the Advancely community. Likewise, you can import (`.zip`) templates created by others.
 * **Manual Layout & Visual Layout Editor:** Position every goal, criterion, and decoration precisely on the tracker map.
   Enable "Manual Layout" in settings, then use the **Visual Layout Editor** in the Template Editor to drag-and-drop
-  items directly on the live tracker. Select multiple items at once with a selection rectangle and move them together.
+  items directly on the live tracker. Select multiple items at once with a selection rectangle or `Ctrl`/`Cmd`+Click and
+  move them together.
 * **Decorations:** Add visual elements to your manual layout that aren't tied to game data. **Text Headers** display
   custom text using the tracker font, **Lines** connect or separate areas with configurable thickness and opacity,
   and **Arrows** visually link goals together with customizable arrowheads, bend points, and goal-linked opacity.
@@ -187,7 +188,8 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
     * **Unlocks**: Fully tracks the unique "unlocks" progression system from the `25w14craftmine` snapshot.
 * **Advanced Goal Types**:
     * **Custom Counters & Manual Goals**: For objectives that can't be automatically tracked (like counting structures
-      visited), you can create manual checklist goals or counters with target values. All progress is saved
+      visited), you can create manual checklist goals or counters with target values. You may link other goals to these
+      custom goals with an `AND` (all must be completed) or `OR` (at least one) mode to have them auto-complete. All progress is saved
       automatically into `settings.json`. _Switching templates will thus ERASE the progress of these custom goals._
         * **Hotkeys**: Use configurable hotkeys to increment or decrement your custom counters. Up to 32 hotkeys are
           supported. Hotkeys only work when the tracker window is in focus.
@@ -758,7 +760,7 @@ Opening a template reveals a tabbed interface where you can define every goal.
   `minecraft:exploration`.
     * **Row 3 Toggle**: You can check the `Row 3` box to force an unlock to appear in the bottom row of the overlay
       instead of the middle row.
-* **Custom Goals & Counters**: Create goals for things that can't be automatically tracked. The "Target Goal" value
+* **Custom Goals**: Create goals for things that can't be automatically tracked (you may add linked goals similar to stats). The "Target Goal" value
   defines its behavior:
     * `0`: A simple on/off toggle (manual checklist item).
     * `>0`: A progress-based counter that completes when the target is reached.
@@ -819,7 +821,9 @@ the live tracker map instead of typing coordinates by hand.
   it. A crosshair appears at the item's anchor point while dragging, and a tooltip shows the current coordinates.
 * **Multi-Select**: Click and drag on empty space to draw a **selection rectangle**. All items whose center falls
   inside the rectangle are selected and highlighted. You can then drag any selected item to move the entire group
-  together. Click on empty space to deselect.
+  together. Hold `Ctrl` (`Cmd` on macOS) and click individual items to add or remove them from the selection without
+  clearing it. `Ctrl`+drag on empty space draws a selection rectangle that adds to the existing selection. Click on
+  empty space without `Ctrl` to deselect.
 * **Saving**: Changes made in the Visual Layout Editor are synced back to the Template Editor in real-time. Click
   **"Stop Visual Editing"** when finished, then click **"Save"** in the Template Editor to persist your layout to
   disk.
@@ -961,19 +965,21 @@ This way templates don't need to be copied for each subversion.
 <summary><strong>View Template List</strong></summary>
 <br>
 
-| Category           | Template Version(s)                         | Optional Flag(s) | Languages           |
-|--------------------|---------------------------------------------|------------------|---------------------|
-| `any%`             | 25w14craftmine                              |                  | Default             |
-| `AMI`              | 25w14craftmine                              |                  | Default             |
-| `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4 |                  | Default, ger        |
-| `all_achievements` | 1.11                                        |                  | Default             |
-| `all_advancements` | 1.12, 1.13, 25w14craftmine                  |                  | Default             |
-| `all_advancements` | 1.16.1, 1.21.3, 1.21.6, 1.21.11, 26.1       |                  | Default, ger, zh_cn |
-| `all_advancements` | 1.16.1                                      | `_categorical`   | Default, ger, zh_cn |
-| `all_advancements` | 1.21.3, 1.21.6, 1.21.11, 26.1               | `_optimized`     | Default, ger, zh_cn |
-| `miku%`            | 1.21                                        |                  | Default             |
-| `all_trims`        | 1.21                                        |                  | Default             |
-| `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 25w14craftmine  | `1`              | Default             |
+| Category           | Template Version(s)                         | Optional Flag(s)                    | Languages           |
+|--------------------|---------------------------------------------|-------------------------------------|---------------------|
+| `any%`             | 25w14craftmine                              |                                     | Default             |
+| `AMI`              | 25w14craftmine                              |                                     | Default             |
+| `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4 |                                     | Default, ger        |
+| `all_achievements` | 1.11                                        |                                     | Default             |
+| `all_advancements` | 1.12, 1.13, 25w14craftmine                  |                                     | Default             |
+| `all_advancements` | 1.16.1, 1.21.3, 1.21.6, 1.21.11, 26.1       |                                     | Default, ger, zh_cn |
+| `all_advancements` | 1.16.1                                      | `_categorical`, `_aatool_optimized` | Default, ger, zh_cn |
+| `all_advancements` | 1.21.3, 1.21.6, 1.21.11, 26.1               | `_optimized`                        | Default, ger, zh_cn |
+| `miku%`            | 1.21                                        |                                     | Default             |
+| `all_trims`        | 1.21                                        |                                     | Default             |
+| `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 25w14craftmine  | `1`                                 | Default             |
+
+If a `Template Version` or `Optional Flag` shows `(has layout)` then you must enable the `Manual Layout` in the bottom right of the tracker.
 
 _The `test1` templates are for you to learn and understand how templates work. These test templates include all the core
 functionalities of all goal types. The `Default` language is the standard english template (`_lang.json`). Any
@@ -1115,7 +1121,7 @@ Massive thanks to all people involved in improving and shaping Advancely:
 * **[Slackow](https://github.com/Slackow)**: Massive help with optimizing the macOS implementation and making the
   automatic instance detection possible.
 * **[DesktopFolder](https://github.com/DesktopFolder)**: Crucial macOS tester.
-* **[Zesskyo](https://github.com/zesskyo)**: Advancely supporter. Many feature suggestions. Important macOS tester.
+* **[Zesskyo](https://github.com/zesskyo)**: Advancely supporter. Many feature suggestions. Important macOS tester. Made `_aatool_optimized` 1.16 template.
 * **me_nx**: Help with Linux implementation.
 * **[amathew4538](https://github.com/amathew4538)**: Important contribution to fixing macOS imports and building.
 * **[R0dn3yS](https://github.com/R0dn3yS)**: Helped fixing renaming issue for 1.16 all_advancements templates and crash
