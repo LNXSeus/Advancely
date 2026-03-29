@@ -3734,16 +3734,33 @@ static void handle_visual_layout_dragging(Tracker *t, const char *id, ImVec2 ite
                          target_pos.x, target_pos.y);
             }
         } else {
+            float display_x, display_y;
+            if (target_pos.is_set) {
+                display_x = target_pos.x;
+                display_y = target_pos.y;
+            } else {
+                float world_top_left_x = (item_screen_pos.x - t->camera_offset.x) / t->zoom_level;
+                float world_top_left_y = (item_screen_pos.y - t->camera_offset.y) / t->zoom_level;
+                float element_w = hit_box_size.x / t->zoom_level;
+                float element_h = hit_box_size.y / t->zoom_level;
+                ImVec2 anchor_off = get_anchor_offset(target_pos.anchor, element_w, element_h);
+                display_x = roundf(world_top_left_x - anchor_off.x);
+                display_y = roundf(world_top_left_y - anchor_off.y);
+            }
             if (parent_display_name) {
                 snprintf(tooltip, sizeof(tooltip),
-                         "%s: \"%s\" - %s\nPart of \"%s\"\n"
+                         "%s: \"%s\" - %s\nPart of \"%s\"\n\n"
+                         "X: %.0f   Y: %.0f\n"
                          "Drag to reposition.",
-                         goal_type, display_name, element_type, parent_display_name);
+                         goal_type, display_name, element_type, parent_display_name,
+                         display_x, display_y);
             } else {
                 snprintf(tooltip, sizeof(tooltip),
-                         "%s: \"%s\" - %s\n"
+                         "%s: \"%s\" - %s\n\n"
+                         "X: %.0f   Y: %.0f\n"
                          "Drag to reposition.",
-                         goal_type, display_name, element_type);
+                         goal_type, display_name, element_type,
+                         display_x, display_y);
             }
         }
         ImGui::SetTooltip("%s", tooltip);
@@ -7415,9 +7432,13 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                                      elem->pos2.x, elem->pos2.y);
                         } else {
                             snprintf(tooltip, sizeof(tooltip),
-                                     "Decoration: \"%s\" - Line\n"
+                                     "Decoration: \"%s\" - Line\n\n"
+                                     "Endpoint 1:  X: %.0f   Y: %.0f\n"
+                                     "Endpoint 2:  X: %.0f   Y: %.0f\n"
                                      "Drag to reposition entire line.",
-                                     elem->id);
+                                     elem->id,
+                                     elem->pos.x, elem->pos.y,
+                                     elem->pos2.x, elem->pos2.y);
                         }
                         ImGui::SetTooltip("%s", tooltip);
                     }
@@ -7741,9 +7762,13 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
                                      elem->pos2.x, elem->pos2.y);
                         } else {
                             snprintf(tooltip, sizeof(tooltip),
-                                     "Decoration: \"%s\" - Arrow\n"
+                                     "Decoration: \"%s\" - Arrow\n\n"
+                                     "Tail:  X: %.0f   Y: %.0f\n"
+                                     "Tip:   X: %.0f   Y: %.0f\n"
                                      "Drag to reposition entire arrow.",
-                                     elem->id);
+                                     elem->id,
+                                     elem->pos.x, elem->pos.y,
+                                     elem->pos2.x, elem->pos2.y);
                         }
                         ImGui::SetTooltip("%s", tooltip);
                     }
