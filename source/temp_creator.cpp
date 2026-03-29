@@ -12753,9 +12753,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
         // Helper lambda to check if an item matches the search filter
         auto matches_search = [&](const char *root_name, const char *display_name, const char *type_name) -> bool {
             if (goal_selector_search_buffer[0] == '\0') return true;
-            return str_contains_insensitive(root_name, goal_selector_search_buffer) ||
-                   str_contains_insensitive(display_name, goal_selector_search_buffer) ||
-                   str_contains_insensitive(type_name, goal_selector_search_buffer);
+            if (str_contains_insensitive(root_name, goal_selector_search_buffer) ||
+                str_contains_insensitive(display_name, goal_selector_search_buffer) ||
+                str_contains_insensitive(type_name, goal_selector_search_buffer))
+                return true;
+            // Match against section names so searching e.g. "Advancements" filters by section
+            const char *section_name = nullptr;
+            if (strcmp(type_name, "Advancement") == 0 || strcmp(type_name, "Criterion") == 0) section_name = "Advancements";
+            else if (strcmp(type_name, "Stat") == 0 || strcmp(type_name, "Sub-Stat") == 0) section_name = "Stats";
+            else if (strcmp(type_name, "Unlock") == 0) section_name = "Unlocks";
+            else if (strcmp(type_name, "Custom Goal") == 0) section_name = "Custom Goals";
+            else if (strcmp(type_name, "Multi-Stage Goal") == 0 || strcmp(type_name, "Stage") == 0) section_name = "Multi-Stage Goals";
+            else if (strcmp(type_name, "Counter") == 0) section_name = "Counters";
+            return section_name && str_contains_insensitive(section_name, goal_selector_search_buffer);
         };
 
         // Helper: check if a given root+stage+parent matches the current selection
