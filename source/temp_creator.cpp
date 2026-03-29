@@ -12994,9 +12994,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             for (const auto &stat: current_template_data.stats) {
                 bool parent_match = matches_search(stat.root_name, stat.display_name, "Stat");
                 bool any_child_match = false;
-                for (const auto &sub: stat.criteria) {
-                    if (matches_search(sub.root_name, sub.display_name, "Sub-Stat"))
-                        any_child_match = true;
+                if (!stat.is_simple_stat) {
+                    for (const auto &sub: stat.criteria) {
+                        if (matches_search(sub.root_name, sub.display_name, "Sub-Stat"))
+                            any_child_match = true;
+                    }
                 }
                 if (parent_match || any_child_match) {
                     has_visible = true;
@@ -13008,9 +13010,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 for (const auto &stat: current_template_data.stats) {
                     bool parent_match = matches_search(stat.root_name, stat.display_name, "Stat");
                     bool any_child_match = false;
-                    for (const auto &sub: stat.criteria) {
-                        if (matches_search(sub.root_name, sub.display_name, "Sub-Stat"))
-                            any_child_match = true;
+                    if (!stat.is_simple_stat) {
+                        for (const auto &sub: stat.criteria) {
+                            if (matches_search(sub.root_name, sub.display_name, "Sub-Stat"))
+                                any_child_match = true;
+                        }
                     }
                     if (!parent_match && !any_child_match) continue;
 
@@ -13018,12 +13022,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     snprintf(label, sizeof(label), "%s##stat_%s", stat.root_name, stat.root_name);
                     if (parent_match) render_goal_checkbox(label, stat.root_name, nullptr, nullptr, false);
 
-                    for (const auto &sub: stat.criteria) {
-                        if (!matches_search(sub.root_name, sub.display_name, "Sub-Stat") && !parent_match) continue;
-                        char sub_label[384];
-                        snprintf(sub_label, sizeof(sub_label), "%s##sub_%s_%s", sub.root_name, stat.root_name,
-                                 sub.root_name);
-                        render_goal_checkbox(sub_label, sub.root_name, nullptr, stat.root_name, true);
+                    // Only show sub-stats for complex (multi-stat) categories
+                    if (!stat.is_simple_stat) {
+                        for (const auto &sub: stat.criteria) {
+                            if (!matches_search(sub.root_name, sub.display_name, "Sub-Stat") && !parent_match) continue;
+                            char sub_label[384];
+                            snprintf(sub_label, sizeof(sub_label), "%s##sub_%s_%s", sub.root_name, stat.root_name,
+                                     sub.root_name);
+                            render_goal_checkbox(sub_label, sub.root_name, nullptr, stat.root_name, true);
+                        }
                     }
                 }
             }
