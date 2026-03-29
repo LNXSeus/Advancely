@@ -12923,15 +12923,16 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             if (!matches_search(cg.root_name, cg.display_name, "Custom Goal")) continue;
             flat_goal_list.push_back({cg.root_name, nullptr, nullptr});
         }
-        // Multi-Stage Goals
+        // Multi-Stage Goals (skip final stage — it doesn't get completed, so linking against it is invalid)
         for (const auto &msg: current_template_data.multi_stage_goals) {
             bool parent_match = matches_search(msg.root_name, msg.display_name, "Multi-Stage Goal");
             bool any_stage = false;
-            for (const auto &stage: msg.stages)
-                if (matches_search(stage.root_name, stage.display_text, "Stage")) any_stage = true;
+            for (size_t si = 0; si + 1 < msg.stages.size(); si++)
+                if (matches_search(msg.stages[si].root_name, msg.stages[si].display_text, "Stage")) any_stage = true;
             if (!parent_match && !any_stage) continue;
             if (parent_match) flat_goal_list.push_back({msg.root_name, nullptr, nullptr});
-            for (const auto &stage: msg.stages) {
+            for (size_t si = 0; si + 1 < msg.stages.size(); si++) {
+                const auto &stage = msg.stages[si];
                 if (!matches_search(stage.root_name, stage.display_text, "Stage") && !parent_match) continue;
                 flat_goal_list.push_back({msg.root_name, stage.stage_id, nullptr});
             }
@@ -13101,7 +13102,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
         }
 
-        // Multi-Stage Goals (with individual stages)
+        // Multi-Stage Goals (with individual stages, skip final stage — it doesn't get completed)
         {
             bool has_visible = false;
             for (const auto &msg: current_template_data.multi_stage_goals) {
@@ -13109,8 +13110,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     has_visible = true;
                     break;
                 }
-                for (const auto &stage: msg.stages) {
-                    if (matches_search(stage.root_name, stage.display_text, "Stage")) {
+                for (size_t si = 0; si + 1 < msg.stages.size(); si++) {
+                    if (matches_search(msg.stages[si].root_name, msg.stages[si].display_text, "Stage")) {
                         has_visible = true;
                         break;
                     }
@@ -13122,8 +13123,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 for (const auto &msg: current_template_data.multi_stage_goals) {
                     bool parent_match = matches_search(msg.root_name, msg.display_name, "Multi-Stage Goal");
                     bool any_stage_match = false;
-                    for (const auto &stage: msg.stages) {
-                        if (matches_search(stage.root_name, stage.display_text, "Stage"))
+                    for (size_t si = 0; si + 1 < msg.stages.size(); si++) {
+                        if (matches_search(msg.stages[si].root_name, msg.stages[si].display_text, "Stage"))
                             any_stage_match = true;
                     }
                     if (!parent_match && !any_stage_match) continue;
@@ -13132,7 +13133,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                     snprintf(label, sizeof(label), "%s##ms_%s", msg.root_name, msg.root_name);
                     if (parent_match) render_goal_checkbox(label, msg.root_name, nullptr, nullptr, false);
 
-                    for (const auto &stage: msg.stages) {
+                    for (size_t si = 0; si + 1 < msg.stages.size(); si++) {
+                        const auto &stage = msg.stages[si];
                         if (!matches_search(stage.root_name, stage.display_text, "Stage") && !parent_match) continue;
                         char stage_label[384];
                         snprintf(stage_label, sizeof(stage_label), "[%s] %s##stage_%s_%s",

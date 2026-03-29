@@ -972,7 +972,7 @@ This way templates don't need to be copied for each subversion.
 | `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4 |                                     | Default, ger        |
 | `all_achievements` | 1.11                                        |                                     | Default             |
 | `all_advancements` | 1.12, 1.13, 25w14craftmine                  |                                     | Default             |
-| `all_advancements` | 1.16.1, 1.21.3, 1.21.6, 1.21.11, 26.1       |                                     | Default, ger, zh_cn |
+| `all_advancements` | 1.14, 1.16.1, 1.21.3, 1.21.6, 1.21.11, 26.1 |                                     | Default, ger, zh_cn |
 | `all_advancements` | 1.16.1                                      | `_categorical`, `_aatool_optimized` | Default, ger, zh_cn |
 | `all_advancements` | 1.21.3, 1.21.6, 1.21.11, 26.1               | `_optimized`                        | Default, ger, zh_cn |
 | `miku%`            | 1.21                                        |                                     | Default             |
@@ -1121,7 +1121,7 @@ Massive thanks to all people involved in improving and shaping Advancely:
 * **[Slackow](https://github.com/Slackow)**: Massive help with optimizing the macOS implementation and making the
   automatic instance detection possible.
 * **[DesktopFolder](https://github.com/DesktopFolder)**: Crucial macOS tester.
-* **[Zesskyo](https://github.com/zesskyo)**: Advancely supporter. Many feature suggestions. Important macOS tester. Made `_aatool_optimized` 1.16 template.
+* **[Zesskyo](https://github.com/zesskyo)**: Advancely supporter. Many feature suggestions. Important macOS tester. Made `_aatool_optimized` 1.16 template alongside the 1.14 `all_advancements` template.
 * **me_nx**: Help with Linux implementation.
 * **[amathew4538](https://github.com/amathew4538)**: Important contribution to fixing macOS imports and building.
 * **[R0dn3yS](https://github.com/R0dn3yS)**: Helped fixing renaming issue for 1.16 all_advancements templates and crash
