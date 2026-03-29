@@ -2635,6 +2635,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     static int goal_selector_header_deco_index = -1; // Index of the text header being edited (multi-select mode)
     static std::vector<EditorCounterLinkedGoal> goal_selector_multi_selections; // Multi-select state
     static int goal_selector_last_clicked_flat_index = -1; // For shift-click range selection
+    static char goal_selector_target_id[256] = ""; // ID of the goal/decoration being edited, shown in popup title
 
     // State for version dropdown with counts
     static std::vector<std::string> version_display_names;
@@ -6551,6 +6552,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 goal_selector_custom_goal_index = -1;
                                 goal_selector_deco_index = -1;
                                 goal_selector_last_clicked_flat_index = -1;
+                                snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s", stat_cat.root_name);
                                 // Find the index of this stat category
                                 goal_selector_stat_cat_index = -1;
                                 for (int si = 0; si < (int) current_template_data.stats.size(); si++) {
@@ -7105,6 +7107,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         goal_selector_custom_goal_index = -1;
                                         goal_selector_deco_index = -1;
                                         goal_selector_last_clicked_flat_index = -1;
+                                        snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s", crit.root_name);
                                         // Find the index of this stat category
                                         goal_selector_stat_cat_index = -1;
                                         for (int si = 0; si < (int) current_template_data.stats.size(); si++) {
@@ -7987,6 +7990,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 goal_selector_deco_index = -1;
                                 goal_selector_last_clicked_flat_index = -1;
                                 goal_selector_custom_goal_index = (int) i;
+                                snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s", goal.root_name);
                                 goal_selector_multi_selections.clear();
                                 for (const auto &lg: goal.linked_goals) {
                                     goal_selector_multi_selections.push_back(lg);
@@ -10260,6 +10264,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             goal_selector_custom_goal_index = -1;
                             goal_selector_deco_index = -1;
                             goal_selector_last_clicked_flat_index = -1;
+                            snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s", counter.root_name);
                             goal_selector_multi_selections.clear();
                             for (const auto &lg: counter.linked_goals) {
                                 goal_selector_multi_selections.push_back(lg);
@@ -10616,6 +10621,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 goal_selector_custom_goal_index = -1;
                                 goal_selector_deco_index = -1;
                                 goal_selector_last_clicked_flat_index = -1;
+                                snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s", deco.id);
                                 goal_selector_multi_selections.clear();
                                 for (const auto &lg: deco.linked_goals) {
                                     goal_selector_multi_selections.push_back(lg);
@@ -10742,6 +10748,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     goal_selector_search_buffer[0] = '\0';
                                     focus_goal_selector_search = true;
                                     goal_selector_max_selection = 1;
+                                    snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s", deco.id);
                                     strncpy(goal_selector_selected_root, deco.start_goal_root,
                                             sizeof(goal_selector_selected_root) - 1);
                                     goal_selector_selected_root[sizeof(goal_selector_selected_root) - 1] = '\0';
@@ -10788,6 +10795,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     goal_selector_search_buffer[0] = '\0';
                                     focus_goal_selector_search = true;
                                     goal_selector_max_selection = 1;
+                                    snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s", deco.id);
                                     strncpy(goal_selector_selected_root, deco.end_goal_root,
                                             sizeof(goal_selector_selected_root) - 1);
                                     goal_selector_selected_root[sizeof(goal_selector_selected_root) - 1] = '\0';
@@ -12683,10 +12691,17 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     } // End of import unlocks popup
 
     // ========== Goal Selector Popup ==========
-    if (show_goal_selector_popup) {
-        ImGui::OpenPopup("Select Goal");
+    char goal_selector_popup_title[512];
+    if (goal_selector_target_id[0] != '\0') {
+        snprintf(goal_selector_popup_title, sizeof(goal_selector_popup_title),
+                 "Select Goal for %s###SelectGoalPopup", goal_selector_target_id);
+    } else {
+        snprintf(goal_selector_popup_title, sizeof(goal_selector_popup_title), "Select Goal###SelectGoalPopup");
     }
-    if (ImGui::BeginPopupModal("Select Goal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (show_goal_selector_popup) {
+        ImGui::OpenPopup("###SelectGoalPopup");
+    }
+    if (ImGui::BeginPopupModal(goal_selector_popup_title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         // Ctrl/Cmd+F to focus search
         if ((ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
             ImGui::IsKeyPressed(ImGuiKey_F)) {
