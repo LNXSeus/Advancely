@@ -1258,50 +1258,103 @@
     }
   },
   "stats": {
-    "stat:times_brushed": {
-      "icon": "items/brush_1.20.2.png",
-      "root_name": "minecraft:used/minecraft:brush",
-      "target": -1
+    "stat:times_brushed":	{
+      "icon":	"items/brush_1.20.2.png",
+      "root_name":	"minecraft:used/minecraft:brush",
+      "target":	-1,
+      "linked_goals":	[{
+        "root_name":	"minecraft:adventure/brush_armadillo"
+      }, {
+        "root_name":	"minecraft:adventure/craft_decorated_pot_using_only_sherds"
+      }, {
+        "root_name":	"minecraft:husbandry/remove_wolf_armor"
+      }, {
+        "root_name":	"minecraft:husbandry/repair_wolf_armor"
+      }, {
+        "root_name":	"ms_goal:wayfinder"
+      }, {
+        "root_name":	"ms_goal:sniffers"
+      }]
     },
-    "stat:gold_blocks_picked_up": {
-      "icon": "blocks/Block_of_Gold_JE6_BE3.png",
-      "root_name": "minecraft:picked_up/minecraft:gold_block",
-      "target": 164
+    "stat:gold_blocks_picked_up":	{
+      "icon":	"blocks/Block_of_Gold_JE6_BE3.png",
+      "root_name":	"minecraft:picked_up/minecraft:gold_block",
+      "target":	164,
+      "linked_goals":	[{
+        "root_name":	"minecraft:nether/create_full_beacon"
+      }]
     },
-    "stat:drowneds_killed": {
-      "icon": "monsters/Drowned_mob.png",
-      "root_name": "minecraft:killed/minecraft:drowned",
-      "target": -1
+    "stat:drowneds_killed":	{
+      "icon":	"monsters/Drowned_mob.png",
+      "root_name":	"minecraft:killed/minecraft:drowned",
+      "target":	-1,
+      "linked_goals":	[{
+        "root_name":	"ms_goal:hdwgh",
+        "stage_id":	"2"
+      }]
     },
-    "stat:wither_skeletons_killed": {
-      "icon": "blocks/Wither_Skeleton_Skull.png",
-      "root_name": "minecraft:killed/minecraft:wither_skeleton",
-      "target": -1
+    "stat:wither_skeletons_killed":	{
+      "icon":	"blocks/Wither_Skeleton_Skull.png",
+      "root_name":	"minecraft:killed/minecraft:wither_skeleton",
+      "target":	-1,
+      "linked_goals":	[{
+        "root_name":	"ms_goal:beacon",
+        "stage_id":	"4"
+      }]
     },
-    "stat:tnt_picked_up": {
-      "icon": "blocks/TNT_JE3_BE2.png",
-      "root_name": "minecraft:picked_up/minecraft:tnt",
-      "target": -1
+    "stat:tnt_picked_up":	{
+      "icon":	"blocks/TNT_JE3_BE2.png",
+      "root_name":	"minecraft:picked_up/minecraft:tnt",
+      "target":	-1,
+      "linked_goals":	[{
+        "root_name":	"ms_goal:netherite"
+      }]
     },
-    "stat:debris_picked_up": {
-      "icon": "blocks/Ancient_Debris_JE1_BE1.png",
-      "root_name": "minecraft:picked_up/minecraft:ancient_debris",
-      "target": -1
+    "stat:debris_picked_up":	{
+      "icon":	"blocks/Ancient_Debris_JE1_BE1.png",
+      "root_name":	"minecraft:picked_up/minecraft:ancient_debris",
+      "target":	-1,
+      "linked_goals":	[{
+        "root_name":	"ms_goal:netherite"
+      }]
     },
-    "stat:bee_nests_picked_up": {
-      "icon": "blocks/Bee_Nest_(S)_JE1.png",
-      "root_name": "minecraft:picked_up/minecraft:bee_nest",
-      "target": -1
+    "stat:bee_nests_picked_up":	{
+      "icon":	"blocks/Bee_Nest_(S)_JE1.png",
+      "root_name":	"minecraft:picked_up/minecraft:bee_nest",
+      "target":	-1,
+      "linked_goals":	[{
+        "root_name":	"ms_goal:bees"
+      }, {
+        "root_name":	"minecraft:bee",
+        "parent_root":	"minecraft:husbandry/bred_all_animals"
+      }]
     },
-    "stat:vaults_opened": {
-      "icon": "blocks/Ominous_Vault_(ejecting)_JE2_BE2.png",
-      "root_name": "minecraft:used/minecraft:ominous_trial_key",
-      "target": -1
+    "stat:vaults_opened":	{
+      "icon":	"blocks/Ominous_Vault_(ejecting)_JE2_BE2.png",
+      "root_name":	"minecraft:used/minecraft:ominous_trial_key",
+      "target":	-1,
+      "linked_goals":	[{
+        "root_name":	"ms_goal:mace",
+        "stage_id":	"3"
+      }]
     },
-    "stat:chests_opened": {
-      "icon": "blocks/Chest_(S)_JE2.png",
-      "root_name": "minecraft:custom/minecraft:open_chest",
-      "target": -1
+    "stat:chests_opened":	{
+      "icon":	"blocks/Chest_(S)_JE2.png",
+      "root_name":	"minecraft:custom/minecraft:open_chest",
+      "target":	-1,
+      "linked_goals":	[{
+        "root_name":	"ms_goal:snout"
+      }, {
+        "root_name":	"ms_goal:rib"
+      }, {
+        "root_name":	"ms_goal:ward"
+      }, {
+        "root_name":	"ms_goal:silence"
+      }, {
+        "root_name":	"ms_goal:vex"
+      }, {
+        "root_name":	"ms_goal:spire"
+      }]
     }
   },
   "unlocks": [],
