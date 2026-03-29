@@ -629,7 +629,8 @@ The overlay is organized into three horizontally scrolling rows, each dedicated 
   also include Stats, Custom Goals, Multi-Stage Goals, and Counters if forced via the Template Editor.** Items in this
   row always hide when completed.
 * **Row 3 (Bottom)**: This row is the standard location for all other goal types, including statistics, custom goals,
-  multi-stage goals, and counters.
+  multi-stage goals, and counters. **It can also include Advancements, Recipes, and Unlocks if forced via the Template
+  Editor's `Row 3` checkbox.**
 
 ### Customization
 
@@ -642,8 +643,8 @@ Nearly every aspect of the overlay can be tailored to your liking from the setti
 * **Stat Cycling**: For multi-stat goals, you can set the `Sub-Stat Cycle Interval` to control how frequently the
   overlay cycles through displaying each sub-stat. **Note:** Sub-stats marked as "Hidden" in the template will be
   skipped during this cycle.
-* **Visibility**: Choose whether to hide completed goals from Row 3 (items in Row 1 & 2 always hide), and toggle the
-  visibility of each section of the
+* **Visibility**: Choose whether to hide completed goals from Row 3 (items in Row 1 & 2 always hide unless forced to
+  Row 3), and toggle the visibility of each section of the
   top info bar (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`).
 * **Alignment**: The main progress text at the top of the overlay can be aligned to the `Left`, `Center`, or `Right`.
 * **Spacing**: You can fully adjust the `spacing` between each row to either be dynamic based on the longest text width
@@ -738,6 +739,8 @@ Opening a template reveals a tabbed interface where you can define every goal.
   in-game ID, e.g., `minecraft:story/mine_stone`), a `Display Name`, and an `Icon Path`. You can also import or add
   `Criteria` to track sub-tasks, and a checkbox designates an entry as a `Recipe` to sort it into its own section and
   move it to the percentage progress calculation instead.
+    * **Row 3 Toggle**: You can check the `Row 3` box to force an advancement or recipe to appear in the bottom row of
+      the overlay instead of the middle row.
 * **Statistics**: Track any in-game statistic.
     * **Simple Stats**: A single goal with a `Target` value (e.g., track "Blocks Mined" until a goal of 10,000 is
       reached).
@@ -753,6 +756,8 @@ Opening a template reveals a tabbed interface where you can define every goal.
       overlay instead of the bottom row.
 * **Unlocks**: For the `25w14craftmine` snapshot, this tab allows you to track the completion of player unlocks like
   `minecraft:exploration`.
+    * **Row 3 Toggle**: You can check the `Row 3` box to force an unlock to appear in the bottom row of the overlay
+      instead of the middle row.
 * **Custom Goals & Counters**: Create goals for things that can't be automatically tracked. The "Target Goal" value
   defines its behavior:
     * `0`: A simple on/off toggle (manual checklist item).

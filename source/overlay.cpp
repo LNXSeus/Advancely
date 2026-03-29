@@ -346,6 +346,7 @@ static bool is_display_item_done(const OverlayDisplayItem &display_item, const A
     // --- Step 1 & 2: Incorporate the "hidden" check from the new code ---
     bool is_hidden = false;
     bool in_2nd_row = false; // Track if this item is forced to row 2
+    bool in_3rd_row = false; // Track if this item is forced to row 3
 
     switch (display_item.type) {
         case OverlayDisplayItem::ADVANCEMENT:
@@ -353,6 +354,7 @@ static bool is_display_item_done(const OverlayDisplayItem &display_item, const A
             auto *cat = static_cast<TrackableCategory *>(display_item.item_ptr);
             is_hidden = cat->is_hidden;
             in_2nd_row = cat->in_2nd_row;
+            in_3rd_row = cat->in_3rd_row;
             break;
         }
         case OverlayDisplayItem::UNLOCK:
@@ -360,6 +362,7 @@ static bool is_display_item_done(const OverlayDisplayItem &display_item, const A
             auto *item = static_cast<TrackableItem *>(display_item.item_ptr);
             is_hidden = item->is_hidden;
             in_2nd_row = item->in_2nd_row;
+            in_3rd_row = item->in_3rd_row;
             break;
         }
         case OverlayDisplayItem::MULTISTAGE: {
@@ -402,8 +405,13 @@ static bool is_display_item_done(const OverlayDisplayItem &display_item, const A
         case OverlayDisplayItem::ADVANCEMENT:
         case OverlayDisplayItem::UNLOCK:
         default:
-            // These types belong to Row 2, ALWAYS HIDE THEM
-            should_hide_when_done = true;
+            // If forced to Row 3, respect the Row 3 setting.
+            if (in_3rd_row) {
+                should_hide_when_done = settings->overlay_row3_remove_completed;
+            } else {
+                // These types belong to Row 2, ALWAYS HIDE THEM
+                should_hide_when_done = true;
+            }
             break;
     }
 
@@ -467,14 +475,18 @@ void overlay_update(Overlay *o, float *deltaTime, const Tracker *t, const AppSet
     }
 
     std::vector<OverlayDisplayItem> row2_items; // Advancements & Unlocks
-    for (int i = 0; i < t->template_data->advancement_count; ++i)
+    for (int i = 0; i < t->template_data->advancement_count; ++i) {
+        if (t->template_data->advancements[i]->in_3rd_row) continue; // SKIP if forced to Row 3 ("in_3rd_row")
         row2_items.push_back({
             t->template_data->advancements[i], OverlayDisplayItem::ADVANCEMENT
         });
-    for (int i = 0; i < t->template_data->unlock_count; ++i)
+    }
+    for (int i = 0; i < t->template_data->unlock_count; ++i) {
+        if (t->template_data->unlocks[i]->in_3rd_row) continue; // SKIP if forced to Row 3 ("in_3rd_row")
         row2_items.push_back({
             t->template_data->unlocks[i], OverlayDisplayItem::UNLOCK
         });
+    }
 
     // Add forced items to Row 2 (custom goals, ms goals, and stats can be forced using "in_2nd_row")
     for (int i = 0; i < t->template_data->stat_count; i++) {
@@ -962,14 +974,18 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             AnimatedTexture *anim_bg = nullptr;
 
             std::vector<OverlayDisplayItem> row2_items;
-            for (int i = 0; i < t->template_data->advancement_count; ++i)
+            for (int i = 0; i < t->template_data->advancement_count; ++i) {
+                if (t->template_data->advancements[i]->in_3rd_row) continue; // SKIP if forced to Row 3
                 row2_items.push_back({
                     t->template_data->advancements[i], OverlayDisplayItem::ADVANCEMENT
                 });
-            for (int i = 0; i < t->template_data->unlock_count; ++i)
+            }
+            for (int i = 0; i < t->template_data->unlock_count; ++i) {
+                if (t->template_data->unlocks[i]->in_3rd_row) continue; // SKIP if forced to Row 3
                 row2_items.push_back({
                     t->template_data->unlocks[i], OverlayDisplayItem::UNLOCK
                 });
+            }
 
             // Add forced items to Row 2
             for (int i = 0; i < t->template_data->stat_count; i++) {
@@ -1446,6 +1462,16 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
         // Gather items for this row
         std::vector<OverlayDisplayItem> row3_items;
+        // Add advancements forced to Row 3 via "in_3rd_row"
+        for (int i = 0; i < t->template_data->advancement_count; ++i) {
+            if (!t->template_data->advancements[i]->in_3rd_row) continue;
+            row3_items.push_back({t->template_data->advancements[i], OverlayDisplayItem::ADVANCEMENT});
+        }
+        // Add unlocks forced to Row 3 via "in_3rd_row"
+        for (int i = 0; i < t->template_data->unlock_count; ++i) {
+            if (!t->template_data->unlocks[i]->in_3rd_row) continue;
+            row3_items.push_back({t->template_data->unlocks[i], OverlayDisplayItem::UNLOCK});
+        }
         for (int i = 0; i < t->template_data->stat_count; ++i) {
             TrackableCategory *stat_cat = t->template_data->stats[i];
             if (stat_cat->in_2nd_row) continue; // SKIP if forced to Row 2 ("in_2nd_row")
@@ -1481,7 +1507,11 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         for (const auto &display_item: row3_items) {
             // Skip items hidden *in the template*
             bool is_template_hidden = false;
-            if (display_item.type == OverlayDisplayItem::STAT) {
+            if (display_item.type == OverlayDisplayItem::ADVANCEMENT) {
+                is_template_hidden = static_cast<TrackableCategory *>(display_item.item_ptr)->is_hidden;
+            } else if (display_item.type == OverlayDisplayItem::UNLOCK) {
+                is_template_hidden = static_cast<TrackableItem *>(display_item.item_ptr)->is_hidden;
+            } else if (display_item.type == OverlayDisplayItem::STAT) {
                 TrackableCategory *stat_cat = static_cast<TrackableCategory *>(display_item.item_ptr);
                 // Skip hidden legacy helper stats during width calculation
                 if (version <= MC_VERSION_1_6_4 && stat_cat->is_single_stat_category && stat_cat->criteria_count > 0
@@ -1504,6 +1534,24 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             int w_name = 0, w_progress = 0;
 
             switch (display_item.type) {
+                case OverlayDisplayItem::ADVANCEMENT: {
+                    auto *adv = static_cast<TrackableCategory *>(display_item.item_ptr);
+                    strncpy(name_buf, adv->display_name, sizeof(name_buf) - 1);
+                    name_buf[sizeof(name_buf) - 1] = '\0';
+                    TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
+                    if (adv->criteria_count > 0) {
+                        snprintf(longest_progress_buf, sizeof(longest_progress_buf), "(%d / %d)",
+                                 adv->criteria_count, adv->criteria_count);
+                    }
+                    break;
+                }
+                case OverlayDisplayItem::UNLOCK: {
+                    auto *unlock = static_cast<TrackableItem *>(display_item.item_ptr);
+                    strncpy(name_buf, unlock->display_name, sizeof(name_buf) - 1);
+                    name_buf[sizeof(name_buf) - 1] = '\0';
+                    TTF_MeasureString(o->font, name_buf, 0, 0, &w_name, nullptr);
+                    break;
+                }
                 case OverlayDisplayItem::STAT: {
                     auto *stat = static_cast<TrackableCategory *>(display_item.item_ptr);
                     strncpy(name_buf, stat->display_name, sizeof(name_buf) - 1);
@@ -1670,6 +1718,49 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                     char progress_buf[256] = {0}; // Renamed and increased size
 
                     switch (display_item.type) {
+                        case OverlayDisplayItem::ADVANCEMENT: {
+                            auto *adv = static_cast<TrackableCategory *>(display_item.item_ptr);
+                            static_bg = o->adv_bg;
+                            anim_bg = o->adv_bg_anim;
+                            if (adv->done) {
+                                static_bg = o->adv_bg_done;
+                                anim_bg = o->adv_bg_done_anim;
+                            } else if (adv->completed_criteria_count > 0) {
+                                static_bg = o->adv_bg_half_done;
+                                anim_bg = o->adv_bg_half_done_anim;
+                            }
+                            icon_path = adv->icon_path;
+                            strncpy(name_buf, adv->display_name, sizeof(name_buf) - 1);
+                            name_buf[sizeof(name_buf) - 1] = '\0';
+
+                            if (adv->criteria_count > 0 && adv->completed_criteria_count == adv->criteria_count - 1) {
+                                for (int j = 0; j < adv->criteria_count; ++j) {
+                                    if (!adv->criteria[j]->done) {
+                                        strncpy(progress_buf, adv->criteria[j]->display_name,
+                                                sizeof(progress_buf) - 1);
+                                        progress_buf[sizeof(progress_buf) - 1] = '\0';
+                                        break;
+                                    }
+                                }
+                            } else if (adv->criteria_count > 0) {
+                                snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
+                                         adv->completed_criteria_count, adv->criteria_count);
+                            }
+                            break;
+                        }
+                        case OverlayDisplayItem::UNLOCK: {
+                            auto *unlock = static_cast<TrackableItem *>(display_item.item_ptr);
+                            static_bg = o->adv_bg;
+                            anim_bg = o->adv_bg_anim;
+                            if (unlock->done) {
+                                static_bg = o->adv_bg_done;
+                                anim_bg = o->adv_bg_done_anim;
+                            }
+                            icon_path = unlock->icon_path;
+                            strncpy(name_buf, unlock->display_name, sizeof(name_buf) - 1);
+                            name_buf[sizeof(name_buf) - 1] = '\0';
+                            break;
+                        }
                         case OverlayDisplayItem::STAT: {
                             auto *stat = static_cast<TrackableCategory *>(display_item.item_ptr);
                             static_bg = o->adv_bg;

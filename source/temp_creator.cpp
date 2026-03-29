@@ -158,6 +158,7 @@ struct EditorTrackableItem {
     int goal;
     bool is_hidden;
     bool in_2nd_row;
+    bool in_3rd_row; // Forces unlocks from Row 2 to Row 3
     int sort_order = 0;
 
     // Stat auto-completion via linked goals (only used for sub-stats)
@@ -176,6 +177,7 @@ struct EditorTrackableCategory {
     char icon_path[256];
     bool is_hidden;
     bool in_2nd_row;
+    bool in_3rd_row; // Forces advancements/recipes from Row 2 to Row 3
     bool is_recipe; // UI flag to distinguish recipes from advancements -> count towards progress percentage instead
     bool is_simple_stat; // UI flag to distinguish simple vs complex stats
     std::vector<EditorTrackableItem> criteria; // Criteria then are trackable items
@@ -434,6 +436,7 @@ static bool are_editor_items_different(const EditorTrackableItem &a, const Edito
            a.goal != b.goal ||
            a.is_hidden != b.is_hidden ||
            a.in_2nd_row != b.in_2nd_row ||
+           a.in_3rd_row != b.in_3rd_row ||
            a.linked_goal_mode != b.linked_goal_mode ||
            are_linked_goals_different(a.linked_goals, b.linked_goals) ||
            are_manual_positions_different(a.icon_pos, b.icon_pos) ||
@@ -447,6 +450,7 @@ static bool are_editor_categories_different(const EditorTrackableCategory &a, co
         strcmp(a.icon_path, b.icon_path) != 0 ||
         a.is_hidden != b.is_hidden ||
         a.in_2nd_row != b.in_2nd_row ||
+        a.in_3rd_row != b.in_3rd_row ||
         a.is_recipe != b.is_recipe ||
         a.is_simple_stat != b.is_simple_stat ||
         a.linked_goal_mode != b.linked_goal_mode ||
@@ -1012,6 +1016,7 @@ static void parse_editor_trackable_items(cJSON *json_array, std::vector<EditorTr
         cJSON *target = cJSON_GetObjectItem(item_json, "target");
         cJSON *hidden = cJSON_GetObjectItem(item_json, "hidden");
         cJSON *in_2nd_row = cJSON_GetObjectItem(item_json, "in_2nd_row");
+        cJSON *in_3rd_row = cJSON_GetObjectItem(item_json, "in_3rd_row");
 
         if (cJSON_IsString(root_name)) {
             strncpy(new_item.root_name, root_name->valuestring, sizeof(new_item.root_name) - 1);
@@ -1024,6 +1029,7 @@ static void parse_editor_trackable_items(cJSON *json_array, std::vector<EditorTr
         if (cJSON_IsNumber(target)) new_item.goal = target->valueint;
         if (cJSON_IsBool(hidden)) new_item.is_hidden = cJSON_IsTrue(hidden);
         if (cJSON_IsBool(in_2nd_row)) new_item.in_2nd_row = cJSON_IsTrue(in_2nd_row);
+        if (cJSON_IsBool(in_3rd_row)) new_item.in_3rd_row = cJSON_IsTrue(in_3rd_row);
 
         // Load display_name from lang file
         char lang_key[256];
@@ -1162,6 +1168,7 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
         cJSON *icon = cJSON_GetObjectItem(category_json, "icon");
         cJSON *hidden = cJSON_GetObjectItem(category_json, "hidden");
         cJSON *in_2nd_row = cJSON_GetObjectItem(category_json, "in_2nd_row");
+        cJSON *in_3rd_row = cJSON_GetObjectItem(category_json, "in_3rd_row");
 
         if (cJSON_IsString(icon)) {
             strncpy(new_cat.icon_path, icon->valuestring, sizeof(new_cat.icon_path) - 1);
@@ -1169,6 +1176,7 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
         }
         if (cJSON_IsBool(hidden)) new_cat.is_hidden = cJSON_IsTrue(hidden);
         if (cJSON_IsBool(in_2nd_row)) new_cat.in_2nd_row = cJSON_IsTrue(in_2nd_row); // Only for main stat not sub-stats
+        if (cJSON_IsBool(in_3rd_row)) new_cat.in_3rd_row = cJSON_IsTrue(in_3rd_row);
 
         // Parse manual positions for the parent
         parse_editor_manual_pos(category_json, "icon_pos", &new_cat.icon_pos);
@@ -1665,6 +1673,9 @@ static void serialize_editor_trackable_items(cJSON *parent, const char *key,
         if (item.in_2nd_row) {
             cJSON_AddBoolToObject(item_json, "in_2nd_row", true);
         }
+        if (item.in_3rd_row) {
+            cJSON_AddBoolToObject(item_json, "in_3rd_row", true);
+        }
         save_editor_manual_pos(item_json, "icon_pos", item.icon_pos);
         save_editor_manual_pos(item_json, "text_pos", item.text_pos);
         save_editor_manual_pos(item_json, "progress_pos", item.progress_pos); // For custom goals
@@ -1689,6 +1700,9 @@ static void serialize_editor_trackable_categories(cJSON *parent, const char *key
         // Save the is_recipe flag if it's true
         if (cat.is_recipe) {
             cJSON_AddBoolToObject(cat_json, "is_recipe", true);
+        }
+        if (cat.in_3rd_row) {
+            cJSON_AddBoolToObject(cat_json, "in_3rd_row", true);
         }
 
         // Create the nested criteria object
@@ -5016,6 +5030,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 sizeof(new_advancement.icon_path));
                         new_advancement.icon_path[sizeof(new_advancement.icon_path) - 1] = '\0';
                         new_advancement.is_hidden = source_adv_ptr->is_hidden;
+                        new_advancement.in_3rd_row = source_adv_ptr->in_3rd_row;
                         new_advancement.is_recipe = source_adv_ptr->is_recipe;
                         new_advancement.is_simple_stat = source_adv_ptr->is_simple_stat;
                         new_advancement.criteria = source_adv_ptr->criteria; // std::vector handles its own deep copy.
@@ -5269,6 +5284,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                      "Visibility can be toggled in the main tracker settings.",
                                      advancements_label_singular_lower);
                             ImGui::SetTooltip("%s", hidden_tooltip_buffer);
+                        }
+
+                        ImGui::SameLine();
+                        if (ImGui::Checkbox("Row 3", &advancement.in_3rd_row)) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[256];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Force this %s to display on the 3rd row of the overlay\n"
+                                     "(normally reserved for stats, custom goals, etc.).",
+                                     advancements_label_singular_lower);
+                            ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
                         if (render_layout_coordinates_header(advancements_label_singular_lower,
@@ -6223,6 +6251,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_stat.icon_path[sizeof(new_stat.icon_path) - 1] = '\0';
                         new_stat.is_hidden = source_stat_ptr->is_hidden;
                         new_stat.in_2nd_row = source_stat_ptr->in_2nd_row;
+                        new_stat.in_3rd_row = source_stat_ptr->in_3rd_row;
                         new_stat.is_recipe = source_stat_ptr->is_recipe;
                         new_stat.is_simple_stat = source_stat_ptr->is_simple_stat;
                         new_stat.criteria = source_stat_ptr->criteria; // std::vector handles its own deep copy safely.
@@ -7536,6 +7565,18 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         }
 
                         ImGui::SameLine();
+                        if (ImGui::Checkbox("Row 3##Unlock", &unlock.in_3rd_row)) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buffer[256];
+                            snprintf(tooltip_buffer, sizeof(tooltip_buffer),
+                                     "Force this unlock to display on the 3rd row of the overlay\n"
+                                     "(normally reserved for stats, custom goals, etc.).");
+                            ImGui::SetTooltip("%s", tooltip_buffer);
+                        }
+
+                        ImGui::SameLine();
 
                         if (ImGui::Button("Copy")) {
                             item_to_copy = i;
@@ -7652,6 +7693,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_item.icon_path[sizeof(new_item.icon_path) - 1] = '\0';
                         new_item.goal = source_item.goal;
                         new_item.is_hidden = source_item.is_hidden;
+                        new_item.in_3rd_row = source_item.in_3rd_row;
                         new_item.icon_pos = source_item.icon_pos;
                         new_item.text_pos = source_item.text_pos;
                         new_item.progress_pos = source_item.progress_pos;

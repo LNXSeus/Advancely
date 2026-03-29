@@ -1809,7 +1809,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "   (If two visible items share an icon, the parent's icon is overlaid.)\n"
                              " • Row 2: Main %s (Default).\n"
                              " • Row 3: Stats, custom goals, multi-stage goals, and counters (Default).\n"
-                             "   (Goals can be forced from Row 3 to Row 2 in the Template Editor.)\n\n"
+                             "   (Goals can be forced between Row 2 and Row 3 in the Template Editor.)\n\n"
                              "Tips:\n"
                              " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
                              " • A negative scroll speed animates items from right to left.\n"
@@ -1829,7 +1829,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "   (If two visible items share an icon, the parent's icon is overlaid.)\n"
                              " • Row 2: Main %s (Default).\n"
                              " • Row 3: Stats, custom goals, multi-stage goals, and counters (Default).\n"
-                             "   (Goals can be forced from Row 3 to Row 2 in the Template Editor.)\n\n"
+                             "   (Goals can be forced between Row 2 and Row 3 in the Template Editor.)\n\n"
                              "Tips:\n"
                              " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
                              " • A negative scroll speed animates items from right to left.\n"
@@ -1848,7 +1848,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "   (If two visible items share an icon, the parent's icon is overlaid.)\n"
                              " • Row 2: Main %s, recipes and unlocks (Default).\n"
                              " • Row 3: Stats, custom goals, multi-stage goals, and counters (Default).\n"
-                             "   (Goals can be forced from Row 3 to Row 2 in the Template Editor.)\n\n"
+                             "   (Goals can be forced between Row 2 and Row 3 in the Template Editor.)\n\n"
                              "Tips:\n"
                              " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
                              " • A negative scroll speed animates items from right to left.\n"
@@ -1867,7 +1867,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "   (If two items share an icon, the parent's icon is overlaid.)\n"
                              " • Row 2: Main %s and recipes (Default).\n"
                              " • Row 3: Stats, custom goals, multi-stage goals, and counters (Default).\n"
-                             "   (Goals can be forced from Row 3 to Row 2 in the Template Editor.)\n\n"
+                             "   (Goals can be forced between Row 2 and Row 3 in the Template Editor.)\n\n"
                              "Tips:\n"
                              " • Use a color key filter in your streaming software on the 'Overlay Background Color'.\n"
                              " • A negative scroll speed animates items from right to left.\n"
@@ -1978,10 +1978,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     char hide_completed_row_3_tooltip_buffer[1024];
                     snprintf(hide_completed_row_3_tooltip_buffer, sizeof(hide_completed_row_3_tooltip_buffer),
                              "If checked, goals in Row 3 (Stats, Custom Goals,\n"
-                             "Multi-Stage Goals, Counters) will disappear when completed.\n"
+                             "Multi-Stage Goals, Counters, and any %s/Unlocks\n"
+                             "forced to Row 3) will disappear when completed.\n"
                              "This is independent of the main 'Goal Visibility' setting.\n\n"
                              "NOTE: Goals forced to Row 2 via the Template Editor will ALWAYS hide when completed,\n"
-                             "ignoring this setting.");
+                             "ignoring this setting.", advancements_label_plural_uppercase);
 
                     ImGui::SetTooltip("%s", hide_completed_row_3_tooltip_buffer);
                 }
@@ -2097,7 +2098,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                              "Check this to override the dynamic width calculation for Row 2 items.\n"
                              "This allows you to set a fixed, uniform width for all items in this row.\n"
-                             "Applies to %s, Unlocks, and any Stats/Goals forced to Row 2.",
+                             "Applies to %s, Unlocks (unless forced to Row 3),\n"
+                             "and any Stats/Goals forced to Row 2.",
                              advancements_label_plural_uppercase);
                     ImGui::SetTooltip("%s", tooltip_buffer);
                 }
@@ -2130,7 +2132,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     char tooltip_buffer[512];
                     snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                              "Check this to override the dynamic width calculation for Row 3 items.\n"
-                             "This allows you to set a fixed, uniform width for all items in this row.");
+                             "This allows you to set a fixed, uniform width for all items in this row.\n"
+                             "Applies to Stats, Custom Goals, Multi-Stage Goals, Counters,\n"
+                             "and any %s/Unlocks forced to Row 3.",
+                             advancements_label_plural_uppercase);
                     ImGui::SetTooltip("%s", tooltip_buffer);
                 }
 

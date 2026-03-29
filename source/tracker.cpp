@@ -1309,6 +1309,7 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
         new_cat->is_hidden = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "hidden")); // Hide if hidden in template
         new_cat->is_recipe = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "is_recipe"));
         new_cat->in_2nd_row = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "in_2nd_row")); // 2nd row of overlay
+        new_cat->in_3rd_row = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "in_3rd_row")); // 3rd row of overlay
 
         parse_manual_pos(cat_json, "icon_pos", &new_cat->icon_pos);
         parse_manual_pos(cat_json, "text_pos", &new_cat->text_pos);
@@ -1739,6 +1740,7 @@ static void tracker_parse_simple_trackables(Tracker *t, cJSON *category_json, cJ
             // When hidden is true in template
             new_item->is_hidden = cJSON_IsTrue(cJSON_GetObjectItem(item_json, "hidden"));
             new_item->in_2nd_row = cJSON_IsTrue(cJSON_GetObjectItem(item_json, "in_2nd_row")); // 2nd row of overlay
+            new_item->in_3rd_row = cJSON_IsTrue(cJSON_GetObjectItem(item_json, "in_3rd_row")); // 3rd row of overlay
 
             parse_manual_pos(item_json, "icon_pos", &new_item->icon_pos);
             parse_manual_pos(item_json, "text_pos", &new_item->text_pos);
