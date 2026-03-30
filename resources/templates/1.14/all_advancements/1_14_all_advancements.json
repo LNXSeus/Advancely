@@ -68,7 +68,7 @@
 			}
 		},
 		"minecraft:story/deflect_arrow":	{
-			"icon":	"items/Shield_JE2_BE1.png",
+			"icon":	"items/Invicon_Shield.png",
 			"criteria":	{
 			}
 		},
@@ -478,7 +478,7 @@
 			}
 		},
 		"minecraft:adventure/sleep_in_bed":	{
-			"icon":	"blocks/Red_Bed_(N).png",
+			"icon":	"blocks/red_bed_3d.png",
 			"criteria":	{
 			}
 		},
