@@ -3480,6 +3480,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             show_export_options_popup = false;
             ImGui::CloseCurrentPopup();
         }
+        if (ImGui::IsItemHovered()) {
+            char tooltip_buffer[64];
+            snprintf(tooltip_buffer, sizeof(tooltip_buffer), "You can also press ESCAPE.");
+            ImGui::SetTooltip("%s", tooltip_buffer);
+        }
 
         ImGui::EndPopup();
     }
