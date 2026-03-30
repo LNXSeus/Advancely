@@ -112,7 +112,7 @@ Thank you for supporting the project!
 <p align="center">
   <img src="readme_assets/Advancely_v1.3.0_Preview2.png" alt="Advancely Manual Layout Preview">
   <br>
-  <em>This screenshot shows a fully custom manual layout built with the Visual Layout Editor. Templates with a manual layout are marked with <code>(has layout)</code> within the template selection dropdowns.</em>
+  <em>This screenshot shows a fully custom manual layout built with the Visual Layout Editor. Templates with a manual layout are marked with <code>(has layout)</code> within the template selection dropdowns. Then you must turn on <code>Manual Layout</code> on the tracker.</em>
 </p>
 
 Advancely is a sophisticated, data-driven progress tracker (just like [AATool](https://github.com/DarwinBaker/AATool)) -
@@ -123,7 +123,7 @@ files for changes, meaning your progress is always up-to-date without any manual
 
 With the `Manual Layout` mode and the built-in `Visual Layout Editor`, you have full control over where every goal,
 stat, and decoration appears on the tracker. Drag and drop items directly on the live tracker, select multiple goals at
-once, and arrange everything exactly how you want it — no config file editing required.
+once, and arrange everything exactly how you want it; no config file editing required.
 
 The tracker's true power lies in its `.json` template system, which allows you to define exactly what you want to track
 for any version, mod, or playstyle. A template isn't just a list of advancements; it's a complete ruleset that can
@@ -1023,8 +1023,8 @@ _(Submit your template through the [official discord](https://discord.gg/TyNgXDz
   player file that has most recently been modified. This means Advancely doesn't `combine` progress of multiple
   players. (e.g., each player completes different advancements). If you're playing on a server then the required player
   files are not saved locally so Advancely can't read them.
-* **Overlay Recording**: Especially on a Windows machine and OBS you must use Gamecapture to capture the overlay. A
-  window capture can cause weird issues.
+* **Overlay Recording**: Especially on a Windows machine and OBS you must use Gamecapture to capture the overlay.
+  Window capture can cause weird issues.
 * **PNG Image Compatibility**: On Linux and macOS, custom icons must be standard **8-bit per channel (32-bit RGBA)**
   PNG files. Files with 16-bit depth, interlacing, or complex color profiles may fail to load (showing as pink squares
   on the overlay within the first row or being invisible on the tracker). Checking the `advancely_log.txt` or
