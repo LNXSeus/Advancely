@@ -31,12 +31,12 @@
 			}
 		},
 		"minecraft:story/form_obsidian":	{
-			"icon":	"blocks/Obsidian_JE3_BE2.png",
+			"icon":	"blocks/Obsidian_JE1_BE1_OLD.png",
 			"criteria":	{
 			}
 		},
 		"minecraft:story/enter_the_nether":	{
-			"icon":	"blocks/Nether_Bricks_JE4_BE5.png",
+			"icon":	"items/flint_and_steel_1.0.png",
 			"criteria":	{
 			}
 		},
@@ -56,12 +56,12 @@
 			}
 		},
 		"minecraft:story/root":	{
-			"icon":	"blocks/Grass_Block_JE7_BE6.png",
+			"icon":	"blocks/Grass_Block_JE6_BE5_OLD.png",
 			"criteria":	{
 			}
 		},
 		"minecraft:story/deflect_arrow":	{
-			"icon":	"items/Shield_JE2_BE1.png",
+			"icon":	"items/Shield_JE1_OLD.png",
 			"criteria":	{
 			}
 		},
@@ -71,12 +71,12 @@
 			}
 		},
 		"minecraft:story/enter_the_end":	{
-			"icon":	"blocks/End_Stone_JE3_BE2.png",
+			"icon":	"blocks/End_Stone_JE1_BE1_OLD.png",
 			"criteria":	{
 			}
 		},
 		"minecraft:story/enchant_item":	{
-			"icon":	"blocks/Enchanting_Table_JE4_BE2.png",
+			"icon":	"blocks/Enchanting_Table_JE1_BE1_OLD.png",
 			"criteria":	{
 			}
 		},
@@ -86,12 +86,12 @@
 			}
 		},
 		"minecraft:nether/find_fortress":	{
-			"icon":	"blocks/Nether_Bricks_JE4_BE5.png",
+			"icon":	"blocks/Nether_Bricks_JE1_BE1_OLD.png",
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/root":	{
-			"icon":	"blocks/Red_Nether_Bricks_JE4_BE3.png",
+			"icon":	"blocks/Red_Nether_Bricks_JE1_BE1_OLD.png",
 			"criteria":	{
 			}
 		},
@@ -126,12 +126,12 @@
 			}
 		},
 		"minecraft:nether/create_full_beacon":	{
-			"icon":	"blocks/Beacon_JE6_BE2.png",
+			"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
 			"criteria":	{
 			}
 		},
 		"minecraft:nether/create_beacon":	{
-			"icon":	"blocks/Beacon_JE6_BE2.png",
+			"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
 			"criteria":	{
 			}
 		},
@@ -146,7 +146,7 @@
 			}
 		},
 		"minecraft:end/root":	{
-			"icon":	"blocks/End_Stone_JE3_BE2.png",
+			"icon":	"blocks/End_Stone_JE1_BE1_OLD.png",
 			"criteria":	{
 			}
 		},
@@ -166,7 +166,7 @@
 			}
 		},
 		"minecraft:end/find_end_city":	{
-			"icon":	"blocks/Purpur_Block_JE2_BE2.png",
+			"icon":	"blocks/Purpur_Block_JE1_BE1_OLD.png",
 			"criteria":	{
 			}
 		},
@@ -191,7 +191,7 @@
 			}
 		},
 		"minecraft:husbandry/root":	{
-			"icon":	"blocks/Hay_Bale_(UD)_JE2_BE2.png",
+			"icon":	"blocks/Hay_Bale_(UD)_JE1_BE1_OLD.png",
 			"criteria":	{
 			}
 		},
@@ -371,7 +371,7 @@
 			}
 		},
 		"minecraft:adventure/sleep_in_bed":	{
-			"icon":	"blocks/Red_Bed_(N).png",
+			"icon":	"blocks/White_Bed_(N)_JE1_1.12.png",
 			"criteria":	{
 			}
 		},
@@ -391,7 +391,7 @@
 			}
 		},
 		"minecraft:adventure/summon_iron_golem":	{
-			"icon":	"blocks/Carved_Pumpkin_(S)_JE5.png",
+			"icon":	"blocks/Carved_Pumpkin_(E)_JE1_BE1_OLD.png",
 			"criteria":	{
 			}
 		},
@@ -596,7 +596,7 @@
 				}]
 		},
 		"gold_blocks":	{
-			"icon":	"blocks/Block_of_Gold_JE6_BE3.png",
+			"icon":	"blocks/Block_of_Gold_JE4_BE2_OLD.png",
 			"root_name":	"stat.pickup.minecraft.gold_block",
 			"target":	164,
 			"linked_goals":	[{
@@ -614,7 +614,7 @@
 		}],
 	"multi_stage_goals":	[{
 			"root_name":	"ms_goal:beacon",
-			"icon":	"blocks/Beacon_JE6_BE2.png",
+			"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
 			"use_stage_icons":	true,
 			"stages":	[{
 					"stage_id":	"1",
@@ -636,25 +636,25 @@
 					"target":	1
 				}, {
 					"stage_id":	"4",
-					"icon":	"blocks/Beacon_JE6_BE2.png",
+					"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
 					"type":	"stat",
 					"root_name":	"stat.craftItem.minecraft.beacon",
 					"target":	1
 				}, {
 					"stage_id":	"5",
-					"icon":	"blocks/Beacon_JE6_BE2.png",
+					"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
 					"type":	"stat",
 					"root_name":	"stat.useItem.minecraft.beacon",
 					"target":	1
 				}, {
 					"stage_id":	"6",
-					"icon":	"blocks/Beacon_JE6_BE2.png",
+					"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
 					"type":	"advancement",
 					"root_name":	"minecraft:nether/create_full_beacon",
 					"target":	1
 				}, {
 					"stage_id":	"final",
-					"icon":	"blocks/Beacon_JE6_BE2.png",
+					"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
 					"type":	"final",
 					"root_name":	""
 				}]

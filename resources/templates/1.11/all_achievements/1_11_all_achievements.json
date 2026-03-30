@@ -3,313 +3,876 @@
 		"achievement.openInventory":	{
 			"icon":	"items/book_normal_1.0.png",
 			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	38,
+				"y":	600
+			},
+			"text_pos":	{
+				"x":	20,
+				"y":	700
 			}
 		},
 		"achievement.mineWood":	{
-			"icon":	"blocks/Oak_Log_(UD)_JE8_BE3.png",
+			"icon":	"blocks/Oak_Log_(UD)_JE5_BE2_OLD.png",
 			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	250,
+				"y":	600
+			},
+			"text_pos":	{
+				"x":	250,
+				"y":	700
 			}
 		},
 		"achievement.buildWorkBench":	{
-			"icon":	"blocks/Crafting_Table_JE4_BE3.png",
+			"icon":	"blocks/Crafting_Table_JE1_BE1_OLD.png",
 			"criteria":	{
-			}
-		},
-		"achievement.buildHoe":	{
-			"icon":	"items/wood_hoe_1.0.png",
-			"criteria":	{
-			}
-		},
-		"achievement.makeBread":	{
-			"icon":	"items/bread_1.0.png",
-			"criteria":	{
-			}
-		},
-		"achievement.bakeCake":	{
-			"icon":	"items/cake_1.0.png",
-			"criteria":	{
-			}
-		},
-		"achievement.buildSword":	{
-			"icon":	"items/wood_sword_1.0.png",
-			"criteria":	{
-			}
-		},
-		"achievement.killCow":	{
-			"icon":	"items/leather_1.0.png",
-			"criteria":	{
-			}
-		},
-		"achievement.breedCow":	{
-			"icon":	"items/wheat_1.0.png",
-			"criteria":	{
-			}
-		},
-		"achievement.flyPig":	{
-			"icon":	"items/saddle_1.0.png",
-			"criteria":	{
-			}
-		},
-		"achievement.killEnemy":	{
-			"icon":	"items/bone_1.0.png",
-			"criteria":	{
-			}
-		},
-		"achievement.snipeSkeleton":	{
-			"icon":	"items/bow_standby_1.0.png",
-			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	460,
+				"y":	600
+			},
+			"text_pos":	{
+				"x":	452,
+				"y":	700
 			}
 		},
 		"achievement.buildPickaxe":	{
 			"icon":	"items/wood_pickaxe_1.0.png",
 			"criteria":	{
-			}
-		},
-		"achievement.buildBetterPickaxe":	{
-			"icon":	"items/stone_pickaxe_1.0.png",
-			"criteria":	{
-			}
-		},
-		"achievement.overpowered":	{
-			"icon":	"items/Enchanted_Golden_Apple_unoptimized.gif",
-			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	670,
+				"y":	600
+			},
+			"text_pos":	{
+				"x":	670,
+				"y":	700
 			}
 		},
 		"achievement.buildFurnace":	{
-			"icon":	"blocks/Furnace_(S)_JE4.png",
+			"icon":	"blocks/Furnace_(E)_JE3_OLD.png",
 			"criteria":	{
-			}
-		},
-		"achievement.cookFish":	{
-			"icon":	"items/fish_cooked_1.0.png",
-			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	880,
+				"y":	600
+			},
+			"text_pos":	{
+				"x":	890,
+				"y":	700
 			}
 		},
 		"achievement.acquireIron":	{
 			"icon":	"items/iron_ingot_1.0.png",
 			"criteria":	{
-			}
-		},
-		"achievement.onARail":	{
-			"icon":	"blocks/Rail_(NS)_JE3_BE2.png",
-			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	1090,
+				"y":	600
+			},
+			"text_pos":	{
+				"x":	1075,
+				"y":	700
 			}
 		},
 		"achievement.diamonds":	{
-			"icon":	"blocks/Diamond_Ore_JE5_BE5.png",
+			"icon":	"blocks/Diamond_Ore_JE1_BE1_OLD.png",
 			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	1300,
+				"y":	600
+			},
+			"text_pos":	{
+				"x":	1307,
+				"y":	702
 			}
 		},
 		"achievement.portal":	{
-			"icon":	"blocks/Obsidian_JE3_BE2.png",
+			"icon":	"blocks/Obsidian_JE1_BE1_OLD.png",
 			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	1510,
+				"y":	600
+			},
+			"text_pos":	{
+				"x":	1477,
+				"y":	700
 			}
 		},
 		"achievement.blazeRod":	{
 			"icon":	"items/blaze_rod_1.0.png",
 			"criteria":	{
-			}
-		},
-		"achievement.potion":	{
-			"icon":	"items/Potion_of_Regeneration_JE1_BE1.png",
-			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	1720,
+				"y":	600
+			},
+			"text_pos":	{
+				"x":	1735,
+				"y":	700
 			}
 		},
 		"achievement.theEnd":	{
 			"icon":	"items/ender_eye_1.0.png",
 			"criteria":	{
-			}
-		},
-		"achievement.exploreAllBiomes":	{
-			"icon":	"items/diamond_boots_1.0.png",
-			"criteria":	{
-				"Plains":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/plains.png"
-				},
-				"Forest":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/forest.png"
-				},
-				"ForestHills":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/foresthills.png"
-				},
-				"Birch Forest":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/birch_forest.png"
-				},
-				"Birch Forest Hills":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/birch_forest_hills.png"
-				},
-				"Swampland":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/swampland.png"
-				},
-				"Roofed Forest":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/roofed_forest.png"
-				},
-				"Taiga":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/taiga.png"
-				},
-				"TaigaHills":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/taigahills.png"
-				},
-				"Mega Taiga":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/mega_taiga.png"
-				},
-				"Mega Taiga Hills":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/mega_taiga_hills.png"
-				},
-				"Cold Taiga":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/cold_taiga.png"
-				},
-				"Cold Taiga Hills":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/cold_taiga_hills.png"
-				},
-				"Ice Plains":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/ice_plains.png"
-				},
-				"Ice Mountains":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/ice_mountains.png"
-				},
-				"Cold Beach":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/cold_beach.png"
-				},
-				"Desert":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/desert.png"
-				},
-				"DesertHills":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/deserthills.png"
-				},
-				"Savanna":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/savanna.png"
-				},
-				"Savanna Plateau":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/savanna_plateau.png"
-				},
-				"Jungle":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/jungle.png"
-				},
-				"JungleEdge":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/jungleedge.png"
-				},
-				"JungleHills":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/junglehills.png"
-				},
-				"Extreme Hills":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/extreme_hills.png"
-				},
-				"Extreme Hills+":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/extreme_hills+.png"
-				},
-				"Stone Beach":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/stone_beach.png"
-				},
-				"Beach":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/beach.png"
-				},
-				"MushroomIsland":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/mushroomisland.png"
-				},
-				"MushroomIslandShore":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/mushroomislandshore.png"
-				},
-				"Mesa":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/mesa.png"
-				},
-				"Mesa Plateau":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/mesa_plateau.png"
-				},
-				"Mesa Plateau F":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/mesa_plateau_f.png"
-				},
-				"River":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/river.png"
-				},
-				"FrozenRiver":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/frozenriver.png"
-				},
-				"Ocean":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/ocean.png"
-				},
-				"Deep Ocean":	{
-					"icon":	"ovBiomes/1.7.2-1.11.2/deep_ocean.png"
-				}
+			},
+			"icon_pos":	{
+				"x":	1930,
+				"y":	600
+			},
+			"text_pos":	{
+				"x":	1942,
+				"y":	700
 			}
 		},
 		"achievement.theEnd2":	{
 			"icon":	"blocks/Dragon_Egg_JE5.png",
 			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	2140,
+				"y":	600
+			},
+			"text_pos":	{
+				"x":	2156,
+				"y":	700
 			}
 		},
 		"achievement.spawnWither":	{
-			"icon":	"items/skull_wither_1.0.png",
+			"icon":	"blocks/Wither_Skeleton_Skull.png",
 			"criteria":	{
-			}
-		},
-		"achievement.diamondsToYou":	{
-			"icon":	"items/diamond_1.0.png",
-			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	2350,
+				"y":	600
+			},
+			"text_pos":	{
+				"x":	2340,
+				"y":	700
 			}
 		},
 		"achievement.killWither":	{
 			"icon":	"items/nether_star_1.0.png",
 			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	2560,
+				"y":	600
+			},
+			"text_pos":	{
+				"x":	2554,
+				"y":	700
 			}
 		},
 		"achievement.fullBeacon":	{
-			"icon":	"blocks/Beacon_JE6_BE2.png",
+			"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
 			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	2770,
+				"y":	600
+			},
+			"text_pos":	{
+				"x":	2774,
+				"y":	700
 			}
 		},
-		"achievement.ghast":	{
-			"icon":	"items/ghast_tear_1.0.png",
+		"achievement.buildSword":	{
+			"icon":	"items/wood_sword_1.0.png",
 			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	460,
+				"y":	810
+			},
+			"text_pos":	{
+				"x":	452,
+				"y":	910
+			}
+		},
+		"achievement.killEnemy":	{
+			"icon":	"items/bone_1.0.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	250,
+				"y":	810
+			},
+			"text_pos":	{
+				"x":	240,
+				"y":	910
+			}
+		},
+		"achievement.snipeSkeleton":	{
+			"icon":	"items/bow_standby_1.0.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	40,
+				"y":	810
+			},
+			"text_pos":	{
+				"x":	44,
+				"y":	910
+			}
+		},
+		"achievement.killCow":	{
+			"icon":	"items/leather_1.0.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	460,
+				"y":	1022
+			},
+			"text_pos":	{
+				"x":	462,
+				"y":	1122
+			}
+		},
+		"achievement.flyPig":	{
+			"icon":	"items/saddle_1.0.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	250,
+				"y":	1022
+			},
+			"text_pos":	{
+				"x":	248,
+				"y":	1124
+			}
+		},
+		"achievement.breedCow":	{
+			"icon":	"items/wheat_1.0.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	460,
+				"y":	1224
+			},
+			"text_pos":	{
+				"x":	458,
+				"y":	1322
+			}
+		},
+		"achievement.bakeCake":	{
+			"icon":	"items/cake_1.0.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	336,
+				"y":	245
+			}
+		},
+		"achievement.makeBread":	{
+			"icon":	"items/bread_1.0.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	592,
+				"y":	245
+			},
+			"text_pos":	{
+				"x":	593,
+				"y":	345
+			}
+		},
+		"achievement.buildBetterPickaxe":	{
+			"icon":	"items/stone_pickaxe_1.0.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	670,
+				"y":	811
+			},
+			"text_pos":	{
+				"x":	643,
+				"y":	912
+			}
+		},
+		"achievement.overpowered":	{
+			"icon":	"items/Enchanted_Golden_Apple_unoptimized.gif",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	670,
+				"y":	1022
+			}
+		},
+		"achievement.buildHoe":	{
+			"icon":	"items/wood_hoe_1.0.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	463,
+				"y":	400
+			},
+			"text_pos":	{
+				"x":	457,
+				"y":	503
+			}
+		},
+		"achievement.diamondsToYou":	{
+			"icon":	"items/diamond_1.0.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	1300,
+				"y":	400
+			}
+		},
+		"achievement.exploreAllBiomes":	{
+			"icon":	"items/diamond_boots_1.0.png",
+			"criteria":	{
+				"Beach":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/beach.png",
+					"icon_pos":	{
+						"x":	1600,
+						"y":	1034
+					},
+					"text_pos":	{
+						"x":	1636,
+						"y":	1040
+					}
+				},
+				"Birch Forest":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/birch_forest.png",
+					"icon_pos":	{
+						"x":	1965,
+						"y":	1274
+					},
+					"text_pos":	{
+						"x":	2001,
+						"y":	1280
+					}
+				},
+				"Birch Forest Hills":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/birch_forest_hills.png",
+					"icon_pos":	{
+						"x":	1965,
+						"y":	1314
+					},
+					"text_pos":	{
+						"x":	2001,
+						"y":	1320
+					}
+				},
+				"Cold Beach":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/cold_beach.png",
+					"icon_pos":	{
+						"x":	2290,
+						"y":	954
+					},
+					"text_pos":	{
+						"x":	2326,
+						"y":	960
+					}
+				},
+				"Cold Taiga":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/cold_taiga.png",
+					"icon_pos":	{
+						"x":	2290,
+						"y":	994
+					},
+					"text_pos":	{
+						"x":	2326,
+						"y":	1000
+					}
+				},
+				"Cold Taiga Hills":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/cold_taiga_hills.png",
+					"icon_pos":	{
+						"x":	2290,
+						"y":	1034
+					},
+					"text_pos":	{
+						"x":	2326,
+						"y":	1040
+					}
+				},
+				"Deep Ocean":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/deep_ocean.png",
+					"icon_pos":	{
+						"x":	1600,
+						"y":	1154
+					},
+					"text_pos":	{
+						"x":	1636,
+						"y":	1160
+					}
+				},
+				"Desert":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/desert.png",
+					"icon_pos":	{
+						"x":	1800,
+						"y":	1074
+					},
+					"text_pos":	{
+						"x":	1836,
+						"y":	1080
+					}
+				},
+				"DesertHills":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/deserthills.png",
+					"icon_pos":	{
+						"x":	1800,
+						"y":	1114
+					},
+					"text_pos":	{
+						"x":	1836,
+						"y":	1120
+					}
+				},
+				"Extreme Hills":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/extreme_hills.png",
+					"icon_pos":	{
+						"x":	2125,
+						"y":	1114
+					},
+					"text_pos":	{
+						"x":	2161,
+						"y":	1120
+					}
+				},
+				"Extreme Hills+":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/extreme_hills+.png",
+					"icon_pos":	{
+						"x":	2125,
+						"y":	1154
+					},
+					"text_pos":	{
+						"x":	2161,
+						"y":	1160
+					}
+				},
+				"Forest":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/forest.png",
+					"icon_pos":	{
+						"x":	1965,
+						"y":	1114
+					},
+					"text_pos":	{
+						"x":	2001,
+						"y":	1120
+					}
+				},
+				"ForestHills":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/foresthills.png",
+					"icon_pos":	{
+						"x":	1965,
+						"y":	1154
+					},
+					"text_pos":	{
+						"x":	2001,
+						"y":	1160
+					}
+				},
+				"FrozenRiver":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/frozenriver.png",
+					"icon_pos":	{
+						"x":	2290,
+						"y":	1154
+					},
+					"text_pos":	{
+						"x":	2326,
+						"y":	1160
+					}
+				},
+				"Ice Mountains":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/ice_mountains.png",
+					"icon_pos":	{
+						"x":	2290,
+						"y":	1114
+					},
+					"text_pos":	{
+						"x":	2326,
+						"y":	1120
+					}
+				},
+				"Ice Plains":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/ice_plains.png",
+					"icon_pos":	{
+						"x":	2290,
+						"y":	1074
+					},
+					"text_pos":	{
+						"x":	2326,
+						"y":	1080
+					}
+				},
+				"Jungle":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/jungle.png",
+					"icon_pos":	{
+						"x":	1965,
+						"y":	954
+					},
+					"text_pos":	{
+						"x":	2001,
+						"y":	960
+					}
+				},
+				"JungleEdge":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/jungleedge.png",
+					"icon_pos":	{
+						"x":	1965,
+						"y":	994
+					},
+					"text_pos":	{
+						"x":	2001,
+						"y":	1000
+					}
+				},
+				"JungleHills":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/junglehills.png",
+					"icon_pos":	{
+						"x":	1965,
+						"y":	1034
+					},
+					"text_pos":	{
+						"x":	2001,
+						"y":	1040
+					}
+				},
+				"Mega Taiga":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/mega_taiga.png",
+					"icon_pos":	{
+						"x":	2125,
+						"y":	954
+					},
+					"text_pos":	{
+						"x":	2161,
+						"y":	960
+					}
+				},
+				"Mega Taiga Hills":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/mega_taiga_hills.png",
+					"icon_pos":	{
+						"x":	2125,
+						"y":	994
+					},
+					"text_pos":	{
+						"x":	2161,
+						"y":	1000
+					}
+				},
+				"Mesa":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/mesa.png",
+					"icon_pos":	{
+						"x":	1800,
+						"y":	954
+					},
+					"text_pos":	{
+						"x":	1836,
+						"y":	960
+					}
+				},
+				"Mesa Plateau":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/mesa_plateau.png",
+					"icon_pos":	{
+						"x":	1800,
+						"y":	994
+					},
+					"text_pos":	{
+						"x":	1836,
+						"y":	1000
+					}
+				},
+				"Mesa Plateau F":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/mesa_plateau_f.png",
+					"icon_pos":	{
+						"x":	1800,
+						"y":	1034
+					},
+					"text_pos":	{
+						"x":	1836,
+						"y":	1040
+					}
+				},
+				"MushroomIsland":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/mushroomisland.png",
+					"icon_pos":	{
+						"x":	1600,
+						"y":	954
+					},
+					"text_pos":	{
+						"x":	1636,
+						"y":	960
+					}
+				},
+				"MushroomIslandShore":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/mushroomislandshore.png",
+					"icon_pos":	{
+						"x":	1600,
+						"y":	994
+					},
+					"text_pos":	{
+						"x":	1636,
+						"y":	1000
+					}
+				},
+				"Ocean":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/ocean.png",
+					"icon_pos":	{
+						"x":	1600,
+						"y":	1114
+					},
+					"text_pos":	{
+						"x":	1636,
+						"y":	1120
+					}
+				},
+				"Plains":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/plains.png",
+					"icon_pos":	{
+						"x":	1965,
+						"y":	1074
+					},
+					"text_pos":	{
+						"x":	2001,
+						"y":	1080
+					}
+				},
+				"River":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/river.png",
+					"icon_pos":	{
+						"x":	1600,
+						"y":	1074
+					},
+					"text_pos":	{
+						"x":	1636,
+						"y":	1080
+					}
+				},
+				"Roofed Forest":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/roofed_forest.png",
+					"icon_pos":	{
+						"x":	1965,
+						"y":	1234
+					},
+					"text_pos":	{
+						"x":	2001,
+						"y":	1240
+					}
+				},
+				"Savanna":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/savanna.png",
+					"icon_pos":	{
+						"x":	1800,
+						"y":	1154
+					},
+					"text_pos":	{
+						"x":	1836,
+						"y":	1160
+					}
+				},
+				"Savanna Plateau":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/savanna_plateau.png",
+					"icon_pos":	{
+						"x":	1800,
+						"y":	1194
+					},
+					"text_pos":	{
+						"x":	1836,
+						"y":	1200
+					}
+				},
+				"Stone Beach":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/stone_beach.png",
+					"icon_pos":	{
+						"x":	2125,
+						"y":	1194
+					},
+					"text_pos":	{
+						"x":	2161,
+						"y":	1200
+					}
+				},
+				"Swampland":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/swampland.png",
+					"icon_pos":	{
+						"x":	1965,
+						"y":	1194
+					},
+					"text_pos":	{
+						"x":	2001,
+						"y":	1200
+					}
+				},
+				"Taiga":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/taiga.png",
+					"icon_pos":	{
+						"x":	2125,
+						"y":	1034
+					},
+					"text_pos":	{
+						"x":	2161,
+						"y":	1040
+					}
+				},
+				"TaigaHills":	{
+					"icon":	"ovBiomes/1.7.2-1.11.2/taigahills.png",
+					"icon_pos":	{
+						"x":	2125,
+						"y":	1074
+					},
+					"text_pos":	{
+						"x":	2161,
+						"y":	1080
+					}
+				}
+			},
+			"icon_pos":	{
+				"x":	1934,
+				"y":	811
+			}
+		},
+		"achievement.onARail":	{
+			"icon":	"blocks/Rail_(NS)_JE3_BE2.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	1094,
+				"y":	400
 			}
 		},
 		"achievement.enchantments":	{
-			"icon":	"blocks/Enchanting_Table_JE4_BE2.png",
+			"icon":	"blocks/Enchanting_Table_JE1_BE1_OLD.png",
 			"criteria":	{
-			}
-		},
-		"achievement.bookcase":	{
-			"icon":	"blocks/Bookshelf_JE4_BE2.png",
-			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	1300,
+				"y":	811
 			}
 		},
 		"achievement.overkill":	{
 			"icon":	"items/diamond_sword_1.0.png",
 			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	1405,
+				"y":	980
+			}
+		},
+		"achievement.ghast":	{
+			"icon":	"items/ghast_tear_1.0.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	1511,
+				"y":	400
+			}
+		},
+		"achievement.bookcase":	{
+			"icon":	"blocks/Bookshelf_JE2_BE1_OLD.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	1205,
+				"y":	980
+			}
+		},
+		"achievement.cookFish":	{
+			"icon":	"items/fish_cooked_1.0.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	880,
+				"y":	400
+			}
+		},
+		"achievement.potion":	{
+			"icon":	"items/Potion_of_Regeneration_JE1_BE1.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	1719,
+				"y":	400
 			}
 		}
 	},
 	"stats":	{
 		"gold_blocks":	{
-			"icon":	"blocks/Block_of_Gold_JE6_BE3.png",
+			"icon":	"blocks/Block_of_Gold_JE4_BE2_OLD.png",
 			"root_name":	"stat.pickup.minecraft.gold_block",
 			"target":	164,
 			"linked_goals":	[{
-					"root_name":	"ms_goal:beacon",
-					"stage_id":	"7"
-				}]
+					"root_name":	"achievement.fullBeacon"
+				}],
+			"icon_pos":	{
+				"x":	2200,
+				"y":	-50
+			}
 		},
-		"kill_wither_skeletons":	{
-			"icon":	"monsters/wither_skeleton.png",
+		"kill_wither_skeleton":	{
+			"icon":	"monsters/wither_skeleton_1.12.png",
 			"root_name":	"stat.killEntity.WitherSkeleton",
 			"target":	-1,
 			"linked_goals":	[{
 					"root_name":	"ms_goal:beacon",
 					"stage_id":	"4"
-				}]
+				}],
+			"icon_pos":	{
+				"x":	2200,
+				"y":	90
+			}
+		},
+		"kill_zombie":	{
+			"icon":	"monsters/zombie.png",
+			"root_name":	"stat.killEntity.Zombie",
+			"target":	-1,
+			"linked_goals":	[{
+					"root_name":	"achievement.diamondsToYou"
+				}],
+			"icon_pos":	{
+				"x":	1300,
+				"y":	120
+			}
+		},
+		"kill_husk":	{
+			"icon":	"monsters/husk.png",
+			"root_name":	"stat.killEntity.Husk",
+			"target":	-1,
+			"linked_goals":	[{
+					"root_name":	"achievement.diamondsToYou"
+				}],
+			"icon_pos":	{
+				"x":	1300,
+				"y":	-20
+			}
+		},
+		"kill_zombie_villager":	{
+			"icon":	"monsters/zombie_villager_1.12.png",
+			"root_name":	"stat.killEntity.ZombieVillager",
+			"target":	-1,
+			"linked_goals":	[{
+					"root_name":	"achievement.diamondsToYou"
+				}],
+			"icon_pos":	{
+				"x":	1300,
+				"y":	260
+			}
 		}
 	},
 	"unlocks":	[],
 	"custom":	[{
-			"root_name":	"god_apple",
+			"root_name":	"god_apple_obtained",
 			"icon":	"items/Enchanted_Golden_Apple_unoptimized.gif",
+			"icon_pos":	{
+				"x":	2310,
+				"y":	90
+			},
 			"linked_goals":	[{
 					"root_name":	"achievement.overpowered"
 				}]
 		}],
 	"multi_stage_goals":	[{
 			"root_name":	"ms_goal:beacon",
-			"icon":	"blocks/Beacon_JE6_BE2.png",
+			"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
 			"use_stage_icons":	true,
 			"stages":	[{
 					"stage_id":	"1",
@@ -325,41 +888,624 @@
 					"target":	1
 				}, {
 					"stage_id":	"3",
-					"icon":	"monsters/wither.png",
-					"type":	"stat",
-					"root_name":	"achievement.killWither",
-					"target":	1
-				}, {
-					"stage_id":	"4",
 					"icon":	"items/nether_star_1.0.png",
 					"type":	"stat",
 					"root_name":	"stat.pickup.minecraft.nether_star",
 					"target":	1
 				}, {
-					"stage_id":	"5",
-					"icon":	"blocks/Beacon_JE6_BE2.png",
+					"stage_id":	"4",
+					"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
 					"type":	"stat",
-					"root_name":	"stat.craftItem.minecraft.beacon",
+					"root_name":	"stat.craftitem.minecraft.beacon",
 					"target":	1
 				}, {
-					"stage_id":	"6",
-					"icon":	"blocks/Beacon_JE6_BE2.png",
+					"stage_id":	"5",
+					"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
 					"type":	"stat",
 					"root_name":	"stat.useItem.minecraft.beacon",
 					"target":	1
 				}, {
-					"stage_id":	"7",
-					"icon":	"blocks/Beacon_JE6_BE2.png",
+					"stage_id":	"6",
+					"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
 					"type":	"stat",
 					"root_name":	"achievement.fullBeacon",
 					"target":	1
 				}, {
 					"stage_id":	"final",
-					"icon":	"blocks/Beacon_JE6_BE2.png",
+					"icon":	"blocks/Beacon_JE4_BE1_OLD.png",
 					"type":	"final",
-					"root_name":	""
-				}]
+					"root_name":	"stat.cool"
+				}],
+			"icon_pos":	{
+				"x":	2310,
+				"y":	-50
+			}
 		}],
 	"counter_goals":	[],
-	"decorations":	[]
+	"decorations":	[{
+			"id":	"getting_wood",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	250,
+				"y":	650
+			},
+			"start_goal_root":	"achievement.openInventory",
+			"end_goal_root":	"achievement.mineWood",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	140,
+				"y":	650
+			}
+		}, {
+			"id":	"benchmarking",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	460,
+				"y":	650
+			},
+			"start_goal_root":	"achievement.mineWood",
+			"end_goal_root":	"achievement.buildWorkBench",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	350,
+				"y":	650
+			}
+		}, {
+			"id":	"time_to_mine",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	670,
+				"y":	650
+			},
+			"start_goal_root":	"achievement.buildWorkBench",
+			"end_goal_root":	"achievement.buildPickaxe",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	560,
+				"y":	650
+			}
+		}, {
+			"id":	"hot_topic",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	880,
+				"y":	650
+			},
+			"start_goal_root":	"achievement.buildPickaxe",
+			"end_goal_root":	"achievement.buildFurnace",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	770,
+				"y":	650
+			}
+		}, {
+			"id":	"acquire_hardware",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	1090,
+				"y":	650
+			},
+			"start_goal_root":	"achievement.buildFurnace",
+			"end_goal_root":	"achievement.acquireIron",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	980,
+				"y":	650
+			}
+		}, {
+			"id":	"diamonds",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	1300,
+				"y":	650
+			},
+			"start_goal_root":	"achievement.acquireIron",
+			"end_goal_root":	"achievement.diamonds",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	1190,
+				"y":	650
+			}
+		}, {
+			"id":	"we_need_to_go_deeper",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	1510,
+				"y":	650
+			},
+			"start_goal_root":	"achievement.diamonds",
+			"end_goal_root":	"achievement.portal",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	1400,
+				"y":	650
+			}
+		}, {
+			"id":	"into_fire",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	1720,
+				"y":	650
+			},
+			"start_goal_root":	"achievement.portal",
+			"end_goal_root":	"achievement.blazeRod",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	1610,
+				"y":	650
+			}
+		}, {
+			"id":	"the_end?",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	1930,
+				"y":	650
+			},
+			"start_goal_root":	"achievement.blazeRod",
+			"end_goal_root":	"achievement.theEnd",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	1820,
+				"y":	650
+			}
+		}, {
+			"id":	"the_end.",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	2140,
+				"y":	650
+			},
+			"start_goal_root":	"achievement.theEnd",
+			"end_goal_root":	"achievement.theEnd2",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	2030,
+				"y":	650
+			}
+		}, {
+			"id":	"the_beginning?",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	2350,
+				"y":	650
+			},
+			"start_goal_root":	"achievement.theEnd2",
+			"end_goal_root":	"achievement.spawnWither",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	2240,
+				"y":	650
+			}
+		}, {
+			"id":	"the_beginning.",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	2560,
+				"y":	650
+			},
+			"start_goal_root":	"achievement.spawnWither",
+			"end_goal_root":	"achievement.killWither",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	2450,
+				"y":	650
+			}
+		}, {
+			"id":	"beaconator",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	2770,
+				"y":	650
+			},
+			"start_goal_root":	"achievement.killWither",
+			"end_goal_root":	"achievement.fullBeacon",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	2660,
+				"y":	650
+			}
+		}, {
+			"id":	"time_to_strike",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	510,
+				"y":	810
+			},
+			"start_goal_root":	"achievement.buildWorkBench",
+			"end_goal_root":	"achievement.buildSword",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	510,
+				"y":	718
+			}
+		}, {
+			"id":	"monster_hunter",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	350,
+				"y":	860
+			},
+			"start_goal_root":	"achievement.buildSword",
+			"end_goal_root":	"achievement.killEnemy",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	450,
+				"y":	860
+			}
+		}, {
+			"id":	"Sniper Duel",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	140,
+				"y":	860
+			},
+			"start_goal_root":	"achievement.killEnemy",
+			"end_goal_root":	"achievement.snipeSkeleton",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	245,
+				"y":	860
+			}
+		}, {
+			"id":	"cow_tipper",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	510,
+				"y":	1020
+			},
+			"start_goal_root":	"achievement.buildSword",
+			"end_goal_root":	"achievement.killCow",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	510,
+				"y":	930
+			}
+		}, {
+			"id":	"when_pigs_fly",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	350,
+				"y":	1075
+			},
+			"start_goal_root":	"achievement.killCow",
+			"end_goal_root":	"achievement.flyPig",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	450,
+				"y":	1075
+			}
+		}, {
+			"id":	"repopulation",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	508,
+				"y":	1220
+			},
+			"start_goal_root":	"achievement.killCow",
+			"end_goal_root":	"achievement.breedCow",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	508,
+				"y":	1140
+			}
+		}, {
+			"id":	"time_to_farm",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	509,
+				"y":	520
+			},
+			"start_goal_root":	"achievement.buildWorkBench",
+			"end_goal_root":	"achievement.buildHoe",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	509,
+				"y":	599
+			}
+		}, {
+			"id":	"the_lie",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	386,
+				"y":	360
+			},
+			"bends":	[{
+					"x":	385,
+					"y":	454
+				}],
+			"start_goal_root":	"achievement.buildHoe",
+			"end_goal_root":	"achievement.bakeCake",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	461,
+				"y":	454
+			}
+		}, {
+			"id":	"bake_bread",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	638,
+				"y":	360
+			},
+			"bends":	[{
+					"x":	639,
+					"y":	454
+				}],
+			"start_goal_root":	"achievement.buildHoe",
+			"end_goal_root":	"achievement.makeBread",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	560,
+				"y":	454
+			}
+		}, {
+			"id":	"getting_an_upgrade",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	718,
+				"y":	810
+			},
+			"start_goal_root":	"achievement.buildPickaxe",
+			"end_goal_root":	"achievement.buildBetterPickaxe",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	718,
+				"y":	718
+			}
+		}, {
+			"id":	"overpowered",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	718,
+				"y":	1020
+			},
+			"start_goal_root":	"achievement.buildBetterPickaxe",
+			"end_goal_root":	"achievement.overpowered",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	718,
+				"y":	930
+			}
+		}, {
+			"id":	"delicious_fish",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	929,
+				"y":	520
+			},
+			"start_goal_root":	"achievement.buildFurnace",
+			"end_goal_root":	"achievement.cookFish",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	929,
+				"y":	599
+			}
+		}, {
+			"id":	"on_a_rail",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	1140,
+				"y":	518
+			},
+			"start_goal_root":	"achievement.acquireIron",
+			"end_goal_root":	"achievement.onARail",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	1140,
+				"y":	597
+			}
+		}, {
+			"id":	"diamonds_to_you",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	1350,
+				"y":	518
+			},
+			"start_goal_root":	"achievement.diamonds",
+			"end_goal_root":	"achievement.diamondsToYou",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	1350,
+				"y":	597
+			}
+		}, {
+			"id":	"enchanter",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	1348,
+				"y":	810
+			},
+			"start_goal_root":	"achievement.diamonds",
+			"end_goal_root":	"achievement.enchantments",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	1348,
+				"y":	718
+			}
+		}, {
+			"id":	"librarian",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	1250,
+				"y":	976
+			},
+			"bends":	[{
+					"x":	1249,
+					"y":	860
+				}],
+			"start_goal_root":	"achievement.enchantments",
+			"end_goal_root":	"achievement.bookcase",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	1297,
+				"y":	860
+			}
+		}, {
+			"id":	"overkill",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	1450,
+				"y":	975
+			},
+			"bends":	[{
+					"x":	1449,
+					"y":	860
+				}],
+			"start_goal_root":	"achievement.enchantments",
+			"end_goal_root":	"achievement.overkill",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	1400,
+				"y":	860
+			}
+		}, {
+			"id":	"return_to_sender",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	1560,
+				"y":	518
+			},
+			"start_goal_root":	"achievement.portal",
+			"end_goal_root":	"achievement.ghast",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	1560,
+				"y":	597
+			}
+		}, {
+			"id":	"local_brewery",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	1770,
+				"y":	518
+			},
+			"start_goal_root":	"achievement.blazeRod",
+			"end_goal_root":	"achievement.potion",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	1770,
+				"y":	597
+			}
+		}, {
+			"id":	"adventuring_time",
+			"type":	"arrow",
+			"thickness":	5.6999998092651367,
+			"arrowhead_size":	25.700000762939453,
+			"pos2":	{
+				"x":	1978,
+				"y":	810
+			},
+			"start_goal_root":	"achievement.theEnd",
+			"end_goal_root":	"achievement.exploreAllBiomes",
+			"opacity_before":	0.600000023841858,
+			"opacity_after":	0.949999988079071,
+			"pos":	{
+				"x":	1978,
+				"y":	718
+			}
+		}, {
+			"id":	"credits",
+			"type":	"text_header",
+			"pos":	{
+				"x":	1348,
+				"y":	-25,
+				"anchor":	7
+			}
+		}]
 }

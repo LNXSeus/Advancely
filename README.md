@@ -112,7 +112,7 @@ Thank you for supporting the project!
 <p align="center">
   <img src="readme_assets/Advancely_v1.3.0_Preview2.png" alt="Advancely Manual Layout Preview">
   <br>
-  <em>This screenshot shows a fully custom manual layout built with the Visual Layout Editor.</em>
+  <em>This screenshot shows a fully custom manual layout built with the Visual Layout Editor. Templates with a manual layout are marked with <code>(has layout)</code> within the template selection dropdowns.</em>
 </p>
 
 Advancely is a sophisticated, data-driven progress tracker (just like [AATool](https://github.com/DarwinBaker/AATool)) -
@@ -1121,9 +1121,9 @@ Massive thanks to all the beta testers who tested Advancely before its full rele
 Massive thanks to all people involved in improving and shaping Advancely:
 
 * **Oskar33**: Initial inspiration to even start work on Advancely.
-* **ethansplace98**: Early interest in Advancely. Helped bringing ideas for early development. Advancely supporter.
+* **[ethansplace98](https://www.twitch.tv/ethansplace98)**: Early interest in Advancely. Helped bringing ideas for early development. Advancely supporter.
 * **Yumeko**: Many feature suggestions, also mainly responsible for chinese translations of templates.
-* **zurtleTif**: Has used my tracker more than anyone else. Suggested features, provided background textures and is Advancelys first supporter.
+* **[zurtleTif](https://www.twitch.tv/zurtleTif)**: Has used my tracker more than anyone else. Suggested features, provided background textures and is Advancelys first supporter.
 * **[MoreTrident](https://www.twitch.tv/MoreTrident)**: Made the `all_trims` template.
 * **[TowardStars](https://github.com/towardstars)**: Helped with Chinese translations.
 * **[InFectDilu](https://github.com/InFectDilu)**: Feature suggestions along with help on chinese translations, also
@@ -1139,6 +1139,7 @@ Massive thanks to all people involved in improving and shaping Advancely:
 * **[nikander100](https://github.com/nikander100)**: Helped fixing Segmentation fault on Linux.
 * **[uku](https://git.uku3lig.net/uku)**: NixOS package via mcsr-nixos.
 * **[ScrambledMC](https://www.youtube.com/@scrambledmc3772)**: Made the fantastic `_categorical` `all_advancements` template for 1.16.
+* **[3emis](https://www.twitch.tv/3emis)**: Made the 1.11 `all_achievements` template and optimized the 1.12 and 1.13 `all_advancements` templates.
 
 </details>
 
