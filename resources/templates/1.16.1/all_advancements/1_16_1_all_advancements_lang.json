@@ -248,7 +248,7 @@
 	"multi_stage_goal.ms_goal:hdwgh.stage.3":	"Place Conduit",
 	"multi_stage_goal.ms_goal:hdwgh.stage.4":	"Defeat Raid",
 	"multi_stage_goal.ms_goal:hdwgh.stage.5":	"Get HDWGH",
-	"multi_stage_goal.ms_goal:hdwgh.stage.final":	"final",
+	"multi_stage_goal.ms_goal:hdwgh.stage.final":	"HDWGH Done!",
 	"multi_stage_goal.ms_goal:netherite.display_name":	"Netherite",
 	"multi_stage_goal.ms_goal:netherite.stage.1":	"Use Lodestone",
 	"multi_stage_goal.ms_goal:netherite.stage.2":	"Craft Neth. Hoe",
