@@ -112,7 +112,7 @@ Thank you for supporting the project!
 <p align="center">
   <img src="readme_assets/Advancely_v1.3.0_Preview2.png" alt="Advancely Manual Layout Preview">
   <br>
-  <em>This screenshot shows a fully custom manual layout built with the Visual Layout Editor. Templates with a manual layout are marked with <code>(has layout)</code> within the template selection dropdowns. Then you must turn on <code>Manual Layout</code> on the tracker.</em>
+  <em>This screenshot shows a fully custom manual layout (<code>1.16</code> <code>all_advancements</code> <code>_categorical</code>) built with the Visual Layout Editor. Templates with a manual layout are marked with <code>(has layout)</code> within the template selection dropdowns. Then you must turn on <code>Manual Layout</code> on the tracker.</em>
 </p>
 
 Advancely is a sophisticated, data-driven progress tracker (just like [AATool](https://github.com/DarwinBaker/AATool)) -
