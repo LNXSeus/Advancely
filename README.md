@@ -1131,7 +1131,7 @@ Massive thanks to all people involved in improving and shaping Advancely:
 * **[Slackow](https://github.com/Slackow)**: Massive help with optimizing the macOS implementation and making the
   automatic instance detection possible.
 * **[DesktopFolder](https://github.com/DesktopFolder)**: Crucial macOS tester.
-* **[Zesskyo](https://github.com/zesskyo)**: Advancely supporter. Many feature suggestions. Important macOS tester. Made `_aatool_optimized` 1.16 template alongside the 1.14 `all_advancements` template.
+* **[Zesskyo](https://www.twitch.tv/Zesskyo)**: Advancely supporter. Many feature suggestions. Important macOS tester. Made `_aatool_optimized` 1.16 template alongside the 1.14 `all_advancements` template.
 * **me_nx**: Help with Linux implementation.
 * **[amathew4538](https://github.com/amathew4538)**: Important contribution to fixing macOS imports and building.
 * **[R0dn3yS](https://github.com/R0dn3yS)**: Helped fixing renaming issue for 1.16 all_advancements templates and crash
