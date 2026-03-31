@@ -77,7 +77,7 @@ const char *get_notes_manifest_path();
 #define OVERLAY_TITLE "Advancely Overlay"
 #define OVERLAY_FIXED_HEIGHT 420
 #define OVERLAY_DEFAULT_WIDTH 1440
-#define OVERLAY_SPEEDUP_FACTOR 5.0f // Both the setting and SPACEBAR use this value
+#define OVERLAY_SPEEDUP_FACTOR 5.0f // SPACEBAR uses this value
 #define OVERLAY_FADE_DURATION 0.5f // Duration of the fade-out animation in seconds
 
 #define MAX_PATH_LENGTH 1024
