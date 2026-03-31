@@ -2361,7 +2361,8 @@ static bool render_layout_coordinates_header(const char *goal_type_name, bool fo
 
 // Helper to render collapsible coordinate fields in the details panes, currently used for manual goal placement coords
 static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_name, const char *pos_type,
-                                 ManualPos *pos, SaveMessageType &save_msg, bool hide_anchor = false) {
+                                 ManualPos *pos, SaveMessageType &save_msg, bool hide_anchor = false,
+                                 bool show_hide_checkbox = true) {
     ImGui::PushID(label_id);
 
     bool was_set = pos->is_set;
@@ -2380,20 +2381,22 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
         ImGui::SetTooltip("%s", tooltip);
     }
 
-    ImGui::SameLine();
-    if (ImGui::Checkbox("Hide", &pos->is_hidden_in_layout)) {
-        save_msg = MSG_NONE;
-    }
-    if (ImGui::IsItemHovered()) {
-        char tooltip[512];
-        snprintf(tooltip, sizeof(tooltip),
-                 "Hide the %s of this %s in the manual layout.\n"
-                 "The \"Show All\" goal hiding mode still makes it visible.\n"
-                 "This does not affect the automatic layout or the overlay.\n"
-                 "The separate \"Hidden\" checkbox controls visibility in\n"
-                 "the automatic layout and overlay.",
-                 pos_type, tooltip_item_name);
-        ImGui::SetTooltip("%s", tooltip);
+    if (show_hide_checkbox) {
+        ImGui::SameLine();
+        if (ImGui::Checkbox("Hide", &pos->is_hidden_in_layout)) {
+            save_msg = MSG_NONE;
+        }
+        if (ImGui::IsItemHovered()) {
+            char tooltip[512];
+            snprintf(tooltip, sizeof(tooltip),
+                     "Hide the %s of this %s in the manual layout.\n"
+                     "The \"Show All\" goal hiding mode still makes it visible.\n"
+                     "This does not affect the automatic layout or the overlay.\n"
+                     "The separate \"Hidden\" checkbox controls visibility in\n"
+                     "the automatic layout and overlay.",
+                     pos_type, tooltip_item_name);
+            ImGui::SetTooltip("%s", tooltip);
+        }
     }
 
     if (pos->is_set) {
@@ -10913,12 +10916,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                                                  deco.id, force_open_header_root_name) == 0)) {
                             if (deco.type == DECORATION_LINE) {
                                 render_manual_pos_ui("d_pos", "decoration", "Endpoint 1", &deco.pos,
-                                                     save_message_type, true);
+                                                     save_message_type, true, false);
                                 render_manual_pos_ui("d_pos2", "decoration", "Endpoint 2", &deco.pos2,
-                                                     save_message_type, true);
+                                                     save_message_type, true, false);
                             } else if (deco.type == DECORATION_ARROW) {
                                 render_manual_pos_ui("d_pos", "decoration", "Tail", &deco.pos,
-                                                     save_message_type, true);
+                                                     save_message_type, true, false);
 
                                 // Bend counter + Add Bend button
                                 ImGui::Text("Bends: %d / %d", deco.bend_count, MAX_ARROW_BENDS);
@@ -10968,7 +10971,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     snprintf(bend_id, sizeof(bend_id), "d_bend_%d", b);
                                     snprintf(bend_label, sizeof(bend_label), "Bend %d", b + 1);
                                     render_manual_pos_ui(bend_id, "decoration", bend_label, &deco.bends[b],
-                                                         save_message_type, true);
+                                                         save_message_type, true, false);
                                     ImGui::SameLine();
                                     char rm_label[32];
                                     snprintf(rm_label, sizeof(rm_label), "Remove##bend_%d", b);
@@ -10986,7 +10989,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
 
                                 render_manual_pos_ui("d_pos2", "decoration", "Tip", &deco.pos2,
-                                                     save_message_type, true);
+                                                     save_message_type, true, false);
                             } else {
                                 render_manual_pos_ui("d_pos", "decoration", "Position", &deco.pos,
                                                      save_message_type);

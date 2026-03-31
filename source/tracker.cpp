@@ -7266,6 +7266,9 @@ static void render_decorations(Tracker *t, const AppSettings *settings) {
             case DECORATION_TEXT_HEADER: {
                 if (elem->display_text[0] == '\0') continue;
 
+                // Check if hidden in manual layout
+                if (elem->pos.is_hidden_in_layout && settings->goal_hiding_mode != SHOW_ALL) continue;
+
                 // Measure text
                 float scale_factor;
                 SET_FONT_SCALE(main_font_size, t->tracker_font->LegacySize);
