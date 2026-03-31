@@ -687,6 +687,7 @@ Nearly every aspect of the overlay can be tailored to your liking from the setti
 * [6.5 Search Bar](https://youtu.be/Rxd1RJqg2WQ?t=30m46s)
 * [6.6 Legacy Versions](https://youtu.be/Rxd1RJqg2WQ?t=31m23s)
 * [6.7 Testing](https://youtu.be/Rxd1RJqg2WQ?t=32m42s)
+* [**7. Manual Layout & Visual Layout Editor**](https://youtu.be/lJtLpCAGrFc)
 
 </details>
 
