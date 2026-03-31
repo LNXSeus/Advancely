@@ -117,12 +117,14 @@ static void parse_editor_manual_pos(cJSON *parent_json, const char *key, ManualP
 }
 
 static void save_editor_manual_pos(cJSON *parent_json, const char *key, const ManualPos &pos) {
-    if (pos.is_set) {
+    if (pos.is_set || pos.is_hidden_in_layout) {
         cJSON *pos_obj = cJSON_CreateObject();
-        cJSON_AddNumberToObject(pos_obj, "x", roundf(pos.x));
-        cJSON_AddNumberToObject(pos_obj, "y", roundf(pos.y));
-        if (pos.anchor != ANCHOR_TOP_LEFT) {
-            cJSON_AddNumberToObject(pos_obj, "anchor", pos.anchor);
+        if (pos.is_set) {
+            cJSON_AddNumberToObject(pos_obj, "x", roundf(pos.x));
+            cJSON_AddNumberToObject(pos_obj, "y", roundf(pos.y));
+            if (pos.anchor != ANCHOR_TOP_LEFT) {
+                cJSON_AddNumberToObject(pos_obj, "anchor", pos.anchor);
+            }
         }
         if (pos.is_hidden_in_layout) {
             cJSON_AddBoolToObject(pos_obj, "hidden", true);
@@ -133,10 +135,10 @@ static void save_editor_manual_pos(cJSON *parent_json, const char *key, const Ma
 
 static bool are_manual_positions_different(const ManualPos &a, const ManualPos &b) {
     if (a.is_set != b.is_set) return true;
+    if (a.is_hidden_in_layout != b.is_hidden_in_layout) return true;
     if (a.is_set) {
         if (a.x != b.x || a.y != b.y) return true;
         if (a.anchor != b.anchor) return true;
-        if (a.is_hidden_in_layout != b.is_hidden_in_layout) return true;
     }
     return false;
 }
@@ -2385,8 +2387,8 @@ static void render_manual_pos_ui(const char *label_id, const char *tooltip_item_
     if (ImGui::IsItemHovered()) {
         char tooltip[512];
         snprintf(tooltip, sizeof(tooltip),
-                 "Hide the %s of this %s in the manual layout only if position is set.\n"
-                 "The \"Show All\" goal hiding mode still makes it visible.\n."
+                 "Hide the %s of this %s in the manual layout.\n"
+                 "The \"Show All\" goal hiding mode still makes it visible.\n"
                  "This does not affect the automatic layout or the overlay.\n"
                  "The separate \"Hidden\" checkbox controls visibility in\n"
                  "the automatic layout and overlay.",

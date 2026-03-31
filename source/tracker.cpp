@@ -4602,6 +4602,13 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
 
             // --- Layout and Culling ---
+            // Skip auto-layout items that are fully hidden in manual layout
+            if (settings->use_manual_layout && !cat->icon_pos.is_set &&
+                cat->icon_pos.is_hidden_in_layout && cat->text_pos.is_hidden_in_layout &&
+                (!has_progress_text || cat->progress_pos.is_hidden_in_layout) && settings->goal_hiding_mode != SHOW_ALL) {
+                continue;
+            }
+
             float item_x = current_x;
             float item_y = current_y;
 
@@ -5559,6 +5566,13 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
             item_height += sub_text_line_height + 4.0f;
         }
 
+        // Skip auto-layout items that are fully hidden in manual layout
+        if (settings->use_manual_layout && !item->icon_pos.is_set &&
+            item->icon_pos.is_hidden_in_layout && item->text_pos.is_hidden_in_layout &&
+            (!has_progress_text || item->progress_pos.is_hidden_in_layout) && settings->goal_hiding_mode != SHOW_ALL) {
+            continue;
+        }
+
         float item_x = current_x;
         float item_y = current_y;
 
@@ -6010,6 +6024,13 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             item_height += sub_text_line_height + 4.0f;
         }
 
+        // Skip auto-layout items that are fully hidden in manual layout
+        if (settings->use_manual_layout && !item->icon_pos.is_set &&
+            item->icon_pos.is_hidden_in_layout && item->text_pos.is_hidden_in_layout &&
+            (!has_progress_text || item->progress_pos.is_hidden_in_layout) && settings->goal_hiding_mode != SHOW_ALL) {
+            continue;
+        }
+
         float item_x = current_x;
         float item_y = current_y;
 
@@ -6457,6 +6478,13 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                  goal->completed_count, goal->linked_goal_count);
 
         float item_height = 96.0f + main_text_line_height + 4.0f + sub_text_line_height + 4.0f;
+
+        // Skip auto-layout items that are fully hidden in manual layout
+        if (settings->use_manual_layout && !goal->icon_pos.is_set &&
+            goal->icon_pos.is_hidden_in_layout && goal->text_pos.is_hidden_in_layout &&
+            goal->progress_pos.is_hidden_in_layout && settings->goal_hiding_mode != SHOW_ALL) {
+            continue;
+        }
 
         float item_x = current_x;
         float item_y = current_y;
@@ -6931,6 +6959,13 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
         // Calculate height using Math: Icon bg (96) + main name height + padding (4) + stage text height + padding (4)
         // Multi-Stage goals always have both lines of text
         float item_height = 96.0f + main_text_line_height + 4.0f + sub_text_line_height + 4.0f;
+
+        // Skip auto-layout items that are fully hidden in manual layout
+        if (settings->use_manual_layout && !goal->icon_pos.is_set &&
+            goal->icon_pos.is_hidden_in_layout && goal->text_pos.is_hidden_in_layout &&
+            goal->progress_pos.is_hidden_in_layout && settings->goal_hiding_mode != SHOW_ALL) {
+            continue;
+        }
 
         float item_x = current_x;
         float item_y = current_y;
