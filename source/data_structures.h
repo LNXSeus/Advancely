@@ -137,6 +137,8 @@ extern "C" {
     X(MC_VERSION_1_21_11, "1.21.11") \
     /* year.big_release.minor_hotfix, `players/advancements` and `players/stats` */ \
     X(MC_VERSION_26_1, "26.1") \
+    /* 2026 April Fools Version HERDCRAFT */ \
+    X(MC_VERSION_26W14A, "26w14a") \
     X(MC_VERSION_26_2, "26.2")
 
 #ifdef __cplusplus

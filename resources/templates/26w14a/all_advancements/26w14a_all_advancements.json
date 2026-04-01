@@ -1,0 +1,1389 @@
+{
+	"advancements":	{
+		"minecraft:adventure/root":	{
+			"icon":	"items/paper_25w14craftmine.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-1010,
+				"y":	107
+			},
+			"text_pos":	{
+				"x":	-1002,
+				"y":	207
+			}
+		},
+		"minecraft:adventure/mine_a_block":	{
+			"icon":	"items/punch_action_26w14a.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-874,
+				"y":	107
+			},
+			"text_pos":	{
+				"x":	-874,
+				"y":	207
+			}
+		},
+		"minecraft:adventure/craft_table":	{
+			"icon":	"blocks/Crafting_Table_JE4_BE3.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-741,
+				"y":	105
+			},
+			"text_pos":	{
+				"x":	-762,
+				"y":	205
+			}
+		},
+		"minecraft:adventure/craft_sword":	{
+			"icon":	"items/wooden_sword_25w14craftmine.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-607,
+				"y":	109
+			},
+			"text_pos":	{
+				"x":	-610,
+				"y":	209
+			}
+		},
+		"minecraft:adventure/kill_a_mob":	{
+			"icon":	"items/iron_sword_25w14craftmine.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-473,
+				"y":	113
+			},
+			"text_pos":	{
+				"x":	-452,
+				"y":	213
+			}
+		},
+		"minecraft:adventure/kill_all_mobs":	{
+			"icon":	"items/diamond_sword_20w14infinite.png",
+			"criteria":	{
+				"minecraft:creeper":	{
+					"icon":	"monsters/creeper.png",
+					"icon_pos":	{
+						"x":	-502,
+						"y":	510
+					},
+					"text_pos":	{
+						"x":	-466,
+						"y":	519
+					}
+				},
+				"minecraft:zombie":	{
+					"icon":	"monsters/zombie.png",
+					"icon_pos":	{
+						"x":	-502,
+						"y":	546
+					},
+					"text_pos":	{
+						"x":	-466,
+						"y":	555
+					}
+				},
+				"minecraft:zombie_horse":	{
+					"icon":	"monsters/zombie_horse.png",
+					"icon_pos":	{
+						"x":	-502,
+						"y":	582
+					},
+					"text_pos":	{
+						"x":	-466,
+						"y":	591
+					}
+				},
+				"minecraft:skeleton":	{
+					"icon":	"monsters/skeleton.png",
+					"icon_pos":	{
+						"x":	-502,
+						"y":	618
+					},
+					"text_pos":	{
+						"x":	-466,
+						"y":	627
+					}
+				},
+				"minecraft:husk":	{
+					"icon":	"monsters/husk.png",
+					"icon_pos":	{
+						"x":	-502,
+						"y":	654
+					},
+					"text_pos":	{
+						"x":	-466,
+						"y":	663
+					}
+				},
+				"minecraft:parched":	{
+					"icon":	"monsters/parched.png",
+					"icon_pos":	{
+						"x":	-502,
+						"y":	690
+					},
+					"text_pos":	{
+						"x":	-466,
+						"y":	699
+					}
+				},
+				"minecraft:camel_husk":	{
+					"icon":	"monsters/camel_husk.png",
+					"icon_pos":	{
+						"x":	-502,
+						"y":	726
+					},
+					"text_pos":	{
+						"x":	-466,
+						"y":	735
+					}
+				},
+				"minecraft:drowned":	{
+					"icon":	"monsters/drowned.png",
+					"icon_pos":	{
+						"x":	-502,
+						"y":	762
+					},
+					"text_pos":	{
+						"x":	-466,
+						"y":	771
+					}
+				},
+				"minecraft:zombie_nautilus":	{
+					"icon":	"monsters/zombie_nautilus.png",
+					"icon_pos":	{
+						"x":	-359,
+						"y":	511
+					},
+					"text_pos":	{
+						"x":	-323,
+						"y":	520
+					}
+				},
+				"minecraft:stray":	{
+					"icon":	"monsters/stray.png",
+					"icon_pos":	{
+						"x":	-359,
+						"y":	547
+					},
+					"text_pos":	{
+						"x":	-323,
+						"y":	556
+					}
+				},
+				"minecraft:bogged":	{
+					"icon":	"monsters/bogged.png",
+					"icon_pos":	{
+						"x":	-359,
+						"y":	583
+					},
+					"text_pos":	{
+						"x":	-323,
+						"y":	592
+					}
+				},
+				"minecraft:spider":	{
+					"icon":	"monsters/spider.png",
+					"icon_pos":	{
+						"x":	-359,
+						"y":	619
+					},
+					"text_pos":	{
+						"x":	-323,
+						"y":	628
+					}
+				},
+				"minecraft:cave_spider":	{
+					"icon":	"monsters/cave_spider.png",
+					"icon_pos":	{
+						"x":	-359,
+						"y":	655
+					},
+					"text_pos":	{
+						"x":	-323,
+						"y":	664
+					}
+				},
+				"minecraft:enderman":	{
+					"icon":	"monsters/enderman.png",
+					"icon_pos":	{
+						"x":	-359,
+						"y":	691
+					},
+					"text_pos":	{
+						"x":	-323,
+						"y":	700
+					}
+				},
+				"minecraft:slime":	{
+					"icon":	"monsters/slime.png",
+					"icon_pos":	{
+						"x":	-359,
+						"y":	727
+					},
+					"text_pos":	{
+						"x":	-323,
+						"y":	736
+					}
+				},
+				"minecraft:magma_cube":	{
+					"icon":	"monsters/magma_cube.png",
+					"icon_pos":	{
+						"x":	-359,
+						"y":	763
+					},
+					"text_pos":	{
+						"x":	-323,
+						"y":	772
+					}
+				},
+				"minecraft:ghast":	{
+					"icon":	"monsters/ghast.png",
+					"icon_pos":	{
+						"x":	-176,
+						"y":	509
+					},
+					"text_pos":	{
+						"x":	-140,
+						"y":	518
+					}
+				},
+				"minecraft:blaze":	{
+					"icon":	"monsters/blaze.png",
+					"icon_pos":	{
+						"x":	-176,
+						"y":	545
+					},
+					"text_pos":	{
+						"x":	-140,
+						"y":	554
+					}
+				},
+				"minecraft:wither_skeleton":	{
+					"icon":	"monsters/wither_skeleton.png",
+					"icon_pos":	{
+						"x":	-176,
+						"y":	581
+					},
+					"text_pos":	{
+						"x":	-140,
+						"y":	590
+					}
+				},
+				"minecraft:piglin":	{
+					"icon":	"monsters/piglin.png",
+					"icon_pos":	{
+						"x":	-176,
+						"y":	617
+					},
+					"text_pos":	{
+						"x":	-140,
+						"y":	626
+					}
+				},
+				"minecraft:piglin_brute":	{
+					"icon":	"monsters/piglin_brute.png",
+					"icon_pos":	{
+						"x":	-176,
+						"y":	653
+					},
+					"text_pos":	{
+						"x":	-140,
+						"y":	662
+					}
+				},
+				"minecraft:zombified_piglin":	{
+					"icon":	"monsters/zombified_piglin.png",
+					"icon_pos":	{
+						"x":	-176,
+						"y":	689
+					},
+					"text_pos":	{
+						"x":	-140,
+						"y":	698
+					}
+				},
+				"minecraft:hoglin":	{
+					"icon":	"monsters/hoglin.png",
+					"icon_pos":	{
+						"x":	-176,
+						"y":	725
+					},
+					"text_pos":	{
+						"x":	-140,
+						"y":	734
+					}
+				},
+				"minecraft:zoglin":	{
+					"icon":	"monsters/zoglin.png",
+					"icon_pos":	{
+						"x":	-176,
+						"y":	761
+					},
+					"text_pos":	{
+						"x":	-140,
+						"y":	770
+					}
+				},
+				"minecraft:silverfish":	{
+					"icon":	"monsters/silverfish.png",
+					"icon_pos":	{
+						"x":	-45,
+						"y":	512
+					},
+					"text_pos":	{
+						"x":	-9,
+						"y":	521
+					}
+				},
+				"minecraft:ender_dragon":	{
+					"icon":	"monsters/ender_dragon.png",
+					"icon_pos":	{
+						"x":	-45,
+						"y":	548
+					},
+					"text_pos":	{
+						"x":	-9,
+						"y":	557
+					}
+				},
+				"minecraft:endermite":	{
+					"icon":	"monsters/endermite.png",
+					"icon_pos":	{
+						"x":	-45,
+						"y":	584
+					},
+					"text_pos":	{
+						"x":	-9,
+						"y":	593
+					}
+				},
+				"minecraft:shulker":	{
+					"icon":	"monsters/shulker.png",
+					"icon_pos":	{
+						"x":	-45,
+						"y":	620
+					},
+					"text_pos":	{
+						"x":	-9,
+						"y":	629
+					}
+				},
+				"minecraft:wither":	{
+					"icon":	"monsters/wither.png",
+					"icon_pos":	{
+						"x":	-45,
+						"y":	656
+					},
+					"text_pos":	{
+						"x":	-9,
+						"y":	665
+					}
+				},
+				"minecraft:phantom":	{
+					"icon":	"monsters/phantom.png",
+					"icon_pos":	{
+						"x":	-45,
+						"y":	692
+					},
+					"text_pos":	{
+						"x":	-9,
+						"y":	701
+					}
+				},
+				"minecraft:guardian":	{
+					"icon":	"monsters/guardian.png",
+					"icon_pos":	{
+						"x":	-45,
+						"y":	728
+					},
+					"text_pos":	{
+						"x":	-9,
+						"y":	737
+					}
+				},
+				"minecraft:elder_guardian":	{
+					"icon":	"monsters/elder_guardian.png",
+					"icon_pos":	{
+						"x":	-45,
+						"y":	764
+					},
+					"text_pos":	{
+						"x":	-9,
+						"y":	773
+					}
+				},
+				"minecraft:breeze":	{
+					"icon":	"monsters/breeze.png",
+					"icon_pos":	{
+						"x":	87,
+						"y":	512
+					},
+					"text_pos":	{
+						"x":	123,
+						"y":	521
+					}
+				},
+				"minecraft:creaking":	{
+					"icon":	"monsters/creaking.png",
+					"icon_pos":	{
+						"x":	87,
+						"y":	548
+					},
+					"text_pos":	{
+						"x":	123,
+						"y":	557
+					}
+				},
+				"minecraft:zombie_villager":	{
+					"icon":	"monsters/zombie_villager.png",
+					"icon_pos":	{
+						"x":	87,
+						"y":	584
+					},
+					"text_pos":	{
+						"x":	123,
+						"y":	593
+					}
+				},
+				"minecraft:witch":	{
+					"icon":	"monsters/witch.png",
+					"icon_pos":	{
+						"x":	87,
+						"y":	620
+					},
+					"text_pos":	{
+						"x":	123,
+						"y":	629
+					}
+				},
+				"minecraft:pillager":	{
+					"icon":	"monsters/pillager.png",
+					"icon_pos":	{
+						"x":	87,
+						"y":	656
+					},
+					"text_pos":	{
+						"x":	123,
+						"y":	665
+					}
+				},
+				"minecraft:vindicator":	{
+					"icon":	"monsters/vindicator.png",
+					"icon_pos":	{
+						"x":	87,
+						"y":	692
+					},
+					"text_pos":	{
+						"x":	123,
+						"y":	701
+					}
+				},
+				"minecraft:evoker":	{
+					"icon":	"monsters/evoker.png",
+					"icon_pos":	{
+						"x":	87,
+						"y":	728
+					},
+					"text_pos":	{
+						"x":	123,
+						"y":	737
+					}
+				},
+				"minecraft:vex":	{
+					"icon":	"monsters/vex.png",
+					"icon_pos":	{
+						"x":	87,
+						"y":	764
+					},
+					"text_pos":	{
+						"x":	123,
+						"y":	773
+					}
+				},
+				"minecraft:ravager":	{
+					"icon":	"monsters/ravager.png",
+					"icon_pos":	{
+						"x":	87,
+						"y":	800
+					},
+					"text_pos":	{
+						"x":	123,
+						"y":	809
+					}
+				}
+			},
+			"icon_pos":	{
+				"x":	-209,
+				"y":	369
+			},
+			"text_pos":	{
+				"x":	-196,
+				"y":	469
+			},
+			"progress_pos":	{
+				"x":	-187,
+				"y":	489
+			}
+		},
+		"minecraft:adventure/wooden_pickaxe":	{
+			"icon":	"items/wooden_pickaxe_25w14craftmine.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-343,
+				"y":	114
+			},
+			"text_pos":	{
+				"x":	-341,
+				"y":	214
+			}
+		},
+		"minecraft:adventure/furnace":	{
+			"icon":	"blocks/Furnace_(S)_JE4.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-211,
+				"y":	119
+			},
+			"text_pos":	{
+				"x":	-190,
+				"y":	219
+			}
+		},
+		"minecraft:adventure/iron_ingot":	{
+			"icon":	"items/iron_ingot_25w14craftmine.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-79,
+				"y":	121
+			},
+			"text_pos":	{
+				"x":	-61,
+				"y":	221
+			}
+		},
+		"minecraft:adventure/build_trap":	{
+			"icon":	"blocks/Iron_Bars_(EW)_JE7.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	51,
+				"y":	127
+			},
+			"text_pos":	{
+				"x":	38,
+				"y":	227
+			}
+		},
+		"minecraft:adventure/obtain_armor":	{
+			"icon":	"items/iron_chestplate_25w14craftmine.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	178,
+				"y":	127
+			},
+			"text_pos":	{
+				"x":	199,
+				"y":	227
+			}
+		},
+		"minecraft:adventure/crafter":	{
+			"icon":	"blocks/Crafter_Triggered_JE4_BE3.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-1010,
+				"y":	231
+			},
+			"text_pos":	{
+				"x":	-1008,
+				"y":	331
+			}
+		},
+		"minecraft:adventure/obsidian":	{
+			"icon":	"blocks/Obsidian_JE3_BE2.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-874,
+				"y":	231
+			},
+			"text_pos":	{
+				"x":	-899,
+				"y":	331
+			}
+		},
+		"minecraft:adventure/craft_nether_portal":	{
+			"icon":	"items/flint_and_steel_25w14craftmine.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-741,
+				"y":	229
+			},
+			"text_pos":	{
+				"x":	-739,
+				"y":	329
+			}
+		},
+		"minecraft:adventure/find_fortress":	{
+			"icon":	"blocks/Nether_Bricks_JE4_BE5.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-607,
+				"y":	233
+			},
+			"text_pos":	{
+				"x":	-592,
+				"y":	333
+			}
+		},
+		"minecraft:adventure/obtain_blaze_rod":	{
+			"icon":	"items/blaze_rod_25w14craftmine.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-473,
+				"y":	237
+			},
+			"text_pos":	{
+				"x":	-458,
+				"y":	337
+			}
+		},
+		"minecraft:adventure/follow_ender_eye":	{
+			"icon":	"items/ender_eye_1.21.6.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-343,
+				"y":	238
+			},
+			"text_pos":	{
+				"x":	-326,
+				"y":	338
+			}
+		},
+		"minecraft:adventure/eye_frame_combination":	{
+			"icon":	"blocks/End_Portal_Frame_(S)_JE7.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-211,
+				"y":	243
+			}
+		},
+		"minecraft:adventure/craft_end_portal":	{
+			"icon":	"items/ender_dragon_spawn_egg_25w14craftmine.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-79,
+				"y":	245
+			},
+			"text_pos":	{
+				"x":	-76,
+				"y":	345
+			}
+		},
+		"minecraft:adventure/enter_the_end":	{
+			"icon":	"blocks/End_Stone_JE3_BE2.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	51,
+				"y":	251
+			},
+			"text_pos":	{
+				"x":	80,
+				"y":	351
+			}
+		},
+		"minecraft:adventure/kill_dragon":	{
+			"icon":	"blocks/Dragon_Head.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	178,
+				"y":	251
+			},
+			"text_pos":	{
+				"x":	176,
+				"y":	351
+			}
+		},
+		"minecraft:adventure/door":	{
+			"icon":	"items/oak_door_25w14craftmine.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-1010,
+				"y":	355
+			},
+			"text_pos":	{
+				"x":	-1010,
+				"y":	455
+			}
+		},
+		"minecraft:adventure/build_house":	{
+			"icon":	"items/pale_oak_door_1.21.2.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-874,
+				"y":	355
+			},
+			"text_pos":	{
+				"x":	-868,
+				"y":	455
+			}
+		},
+		"minecraft:adventure/craft_chest":	{
+			"icon":	"blocks/Chest_(S)_JE2.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-741,
+				"y":	353
+			},
+			"text_pos":	{
+				"x":	-746,
+				"y":	453
+			}
+		},
+		"minecraft:adventure/barrel_roll":	{
+			"icon":	"blocks/Barrel_(U)_JE1_BE1.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-607,
+				"y":	357
+			},
+			"text_pos":	{
+				"x":	-600,
+				"y":	457
+			}
+		},
+		"minecraft:adventure/nether_barrel_roll":	{
+			"icon":	"blocks/Barrel_(U)_JE1_BE1.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-473,
+				"y":	361
+			},
+			"text_pos":	{
+				"x":	-468,
+				"y":	461
+			}
+		},
+		"minecraft:adventure/end_barrel_roll":	{
+			"icon":	"blocks/Barrel_(U)_JE1_BE1.png",
+			"criteria":	{
+			},
+			"icon_pos":	{
+				"x":	-343,
+				"y":	362
+			},
+			"text_pos":	{
+				"x":	-326,
+				"y":	462
+			}
+		}
+	},
+	"stats":	{
+		"punch_action":	{
+			"icon":	"items/punch_action_26w14a.png",
+			"root_name":	"minecraft:used/minecraft:punch_action",
+			"target":	-1,
+			"linked_goals":	[{
+					"root_name":	"minecraft:adventure/root"
+				}, {
+					"root_name":	"minecraft:adventure/mine_a_block"
+				}, {
+					"root_name":	"minecraft:adventure/craft_table"
+				}, {
+					"root_name":	"minecraft:adventure/craft_sword"
+				}, {
+					"root_name":	"minecraft:adventure/kill_a_mob"
+				}, {
+					"root_name":	"minecraft:adventure/kill_all_mobs"
+				}, {
+					"root_name":	"minecraft:adventure/wooden_pickaxe"
+				}, {
+					"root_name":	"minecraft:adventure/furnace"
+				}, {
+					"root_name":	"minecraft:adventure/iron_ingot"
+				}, {
+					"root_name":	"minecraft:adventure/build_trap"
+				}, {
+					"root_name":	"minecraft:adventure/obtain_armor"
+				}, {
+					"root_name":	"minecraft:adventure/crafter"
+				}, {
+					"root_name":	"minecraft:adventure/obsidian"
+				}, {
+					"root_name":	"minecraft:adventure/craft_nether_portal"
+				}, {
+					"root_name":	"minecraft:adventure/find_fortress"
+				}, {
+					"root_name":	"minecraft:adventure/obtain_blaze_rod"
+				}, {
+					"root_name":	"minecraft:adventure/follow_ender_eye"
+				}, {
+					"root_name":	"minecraft:adventure/eye_frame_combination"
+				}, {
+					"root_name":	"minecraft:adventure/craft_end_portal"
+				}, {
+					"root_name":	"minecraft:adventure/enter_the_end"
+				}, {
+					"root_name":	"minecraft:adventure/kill_dragon"
+				}, {
+					"root_name":	"minecraft:adventure/door"
+				}, {
+					"root_name":	"minecraft:adventure/build_house"
+				}, {
+					"root_name":	"minecraft:adventure/craft_chest"
+				}, {
+					"root_name":	"minecraft:adventure/barrel_roll"
+				}, {
+					"root_name":	"minecraft:adventure/nether_barrel_roll"
+				}, {
+					"root_name":	"minecraft:adventure/end_barrel_roll"
+				}],
+			"icon_pos":	{
+				"x":	-1006,
+				"y":	512
+			},
+			"text_pos":	{
+				"x":	-982,
+				"y":	612
+			},
+			"progress_pos":	{
+				"x":	-968,
+				"y":	632
+			}
+		},
+		"follow_action":	{
+			"icon":	"items/follow_action_26w14a.png",
+			"root_name":	"minecraft:used/minecraft:follow_action",
+			"target":	-1,
+			"linked_goals":	[{
+					"root_name":	"minecraft:adventure/root"
+				}, {
+					"root_name":	"minecraft:adventure/mine_a_block"
+				}, {
+					"root_name":	"minecraft:adventure/craft_table"
+				}, {
+					"root_name":	"minecraft:adventure/craft_sword"
+				}, {
+					"root_name":	"minecraft:adventure/kill_a_mob"
+				}, {
+					"root_name":	"minecraft:adventure/kill_all_mobs"
+				}, {
+					"root_name":	"minecraft:adventure/wooden_pickaxe"
+				}, {
+					"root_name":	"minecraft:adventure/furnace"
+				}, {
+					"root_name":	"minecraft:adventure/iron_ingot"
+				}, {
+					"root_name":	"minecraft:adventure/build_trap"
+				}, {
+					"root_name":	"minecraft:adventure/obtain_armor"
+				}, {
+					"root_name":	"minecraft:adventure/crafter"
+				}, {
+					"root_name":	"minecraft:adventure/obsidian"
+				}, {
+					"root_name":	"minecraft:adventure/craft_nether_portal"
+				}, {
+					"root_name":	"minecraft:adventure/find_fortress"
+				}, {
+					"root_name":	"minecraft:adventure/obtain_blaze_rod"
+				}, {
+					"root_name":	"minecraft:adventure/follow_ender_eye"
+				}, {
+					"root_name":	"minecraft:adventure/eye_frame_combination"
+				}, {
+					"root_name":	"minecraft:adventure/craft_end_portal"
+				}, {
+					"root_name":	"minecraft:adventure/enter_the_end"
+				}, {
+					"root_name":	"minecraft:adventure/kill_dragon"
+				}, {
+					"root_name":	"minecraft:adventure/door"
+				}, {
+					"root_name":	"minecraft:adventure/build_house"
+				}, {
+					"root_name":	"minecraft:adventure/craft_chest"
+				}, {
+					"root_name":	"minecraft:adventure/barrel_roll"
+				}, {
+					"root_name":	"minecraft:adventure/nether_barrel_roll"
+				}, {
+					"root_name":	"minecraft:adventure/end_barrel_roll"
+				}],
+			"icon_pos":	{
+				"x":	-902,
+				"y":	512
+			},
+			"text_pos":	{
+				"x":	-877,
+				"y":	612
+			},
+			"progress_pos":	{
+				"x":	-864,
+				"y":	632
+			}
+		},
+		"move_action":	{
+			"icon":	"items/move_action_26w14a.png",
+			"root_name":	"minecraft:used/minecraft:move_action",
+			"target":	-1,
+			"linked_goals":	[{
+					"root_name":	"minecraft:adventure/end_barrel_roll"
+				}, {
+					"root_name":	"minecraft:adventure/root"
+				}, {
+					"root_name":	"minecraft:adventure/mine_a_block"
+				}, {
+					"root_name":	"minecraft:adventure/craft_table"
+				}, {
+					"root_name":	"minecraft:adventure/craft_sword"
+				}, {
+					"root_name":	"minecraft:adventure/kill_a_mob"
+				}, {
+					"root_name":	"minecraft:adventure/kill_all_mobs"
+				}, {
+					"root_name":	"minecraft:adventure/wooden_pickaxe"
+				}, {
+					"root_name":	"minecraft:adventure/furnace"
+				}, {
+					"root_name":	"minecraft:adventure/iron_ingot"
+				}, {
+					"root_name":	"minecraft:adventure/build_trap"
+				}, {
+					"root_name":	"minecraft:adventure/obtain_armor"
+				}, {
+					"root_name":	"minecraft:adventure/crafter"
+				}, {
+					"root_name":	"minecraft:adventure/obsidian"
+				}, {
+					"root_name":	"minecraft:adventure/craft_nether_portal"
+				}, {
+					"root_name":	"minecraft:adventure/find_fortress"
+				}, {
+					"root_name":	"minecraft:adventure/obtain_blaze_rod"
+				}, {
+					"root_name":	"minecraft:adventure/follow_ender_eye"
+				}, {
+					"root_name":	"minecraft:adventure/eye_frame_combination"
+				}, {
+					"root_name":	"minecraft:adventure/craft_end_portal"
+				}, {
+					"root_name":	"minecraft:adventure/enter_the_end"
+				}, {
+					"root_name":	"minecraft:adventure/kill_dragon"
+				}, {
+					"root_name":	"minecraft:adventure/door"
+				}, {
+					"root_name":	"minecraft:adventure/build_house"
+				}, {
+					"root_name":	"minecraft:adventure/craft_chest"
+				}, {
+					"root_name":	"minecraft:adventure/barrel_roll"
+				}, {
+					"root_name":	"minecraft:adventure/nether_barrel_roll"
+				}],
+			"icon_pos":	{
+				"x":	-798,
+				"y":	512
+			},
+			"text_pos":	{
+				"x":	-770,
+				"y":	612
+			},
+			"progress_pos":	{
+				"x":	-760,
+				"y":	632
+			}
+		},
+		"attack_action":	{
+			"icon":	"items/attack_action_26w14a.png",
+			"root_name":	"minecraft:used/minecraft:attack_action",
+			"target":	-1,
+			"linked_goals":	[{
+					"root_name":	"minecraft:adventure/root"
+				}, {
+					"root_name":	"minecraft:adventure/mine_a_block"
+				}, {
+					"root_name":	"minecraft:adventure/craft_table"
+				}, {
+					"root_name":	"minecraft:adventure/craft_sword"
+				}, {
+					"root_name":	"minecraft:adventure/kill_a_mob"
+				}, {
+					"root_name":	"minecraft:adventure/kill_all_mobs"
+				}, {
+					"root_name":	"minecraft:adventure/wooden_pickaxe"
+				}, {
+					"root_name":	"minecraft:adventure/furnace"
+				}, {
+					"root_name":	"minecraft:adventure/iron_ingot"
+				}, {
+					"root_name":	"minecraft:adventure/build_trap"
+				}, {
+					"root_name":	"minecraft:adventure/obtain_armor"
+				}, {
+					"root_name":	"minecraft:adventure/crafter"
+				}, {
+					"root_name":	"minecraft:adventure/obsidian"
+				}, {
+					"root_name":	"minecraft:adventure/craft_nether_portal"
+				}, {
+					"root_name":	"minecraft:adventure/find_fortress"
+				}, {
+					"root_name":	"minecraft:adventure/obtain_blaze_rod"
+				}, {
+					"root_name":	"minecraft:adventure/follow_ender_eye"
+				}, {
+					"root_name":	"minecraft:adventure/eye_frame_combination"
+				}, {
+					"root_name":	"minecraft:adventure/craft_end_portal"
+				}, {
+					"root_name":	"minecraft:adventure/enter_the_end"
+				}, {
+					"root_name":	"minecraft:adventure/kill_dragon"
+				}, {
+					"root_name":	"minecraft:adventure/door"
+				}, {
+					"root_name":	"minecraft:adventure/build_house"
+				}, {
+					"root_name":	"minecraft:adventure/craft_chest"
+				}, {
+					"root_name":	"minecraft:adventure/barrel_roll"
+				}, {
+					"root_name":	"minecraft:adventure/nether_barrel_roll"
+				}, {
+					"root_name":	"minecraft:adventure/end_barrel_roll"
+				}],
+			"icon_pos":	{
+				"x":	-694,
+				"y":	512
+			},
+			"text_pos":	{
+				"x":	-671,
+				"y":	612
+			},
+			"progress_pos":	{
+				"x":	-656,
+				"y":	632
+			}
+		},
+		"crafting_action":	{
+			"icon":	"items/crafting_action_26w14a.png",
+			"root_name":	"minecraft:used/minecraft:crafting_action",
+			"target":	-1,
+			"linked_goals":	[{
+					"root_name":	"minecraft:adventure/end_barrel_roll"
+				}, {
+					"root_name":	"minecraft:adventure/root"
+				}, {
+					"root_name":	"minecraft:adventure/mine_a_block"
+				}, {
+					"root_name":	"minecraft:adventure/craft_table"
+				}, {
+					"root_name":	"minecraft:adventure/craft_sword"
+				}, {
+					"root_name":	"minecraft:adventure/kill_a_mob"
+				}, {
+					"root_name":	"minecraft:adventure/kill_all_mobs"
+				}, {
+					"root_name":	"minecraft:adventure/wooden_pickaxe"
+				}, {
+					"root_name":	"minecraft:adventure/furnace"
+				}, {
+					"root_name":	"minecraft:adventure/iron_ingot"
+				}, {
+					"root_name":	"minecraft:adventure/build_trap"
+				}, {
+					"root_name":	"minecraft:adventure/obtain_armor"
+				}, {
+					"root_name":	"minecraft:adventure/crafter"
+				}, {
+					"root_name":	"minecraft:adventure/obsidian"
+				}, {
+					"root_name":	"minecraft:adventure/craft_nether_portal"
+				}, {
+					"root_name":	"minecraft:adventure/find_fortress"
+				}, {
+					"root_name":	"minecraft:adventure/obtain_blaze_rod"
+				}, {
+					"root_name":	"minecraft:adventure/follow_ender_eye"
+				}, {
+					"root_name":	"minecraft:adventure/eye_frame_combination"
+				}, {
+					"root_name":	"minecraft:adventure/craft_end_portal"
+				}, {
+					"root_name":	"minecraft:adventure/enter_the_end"
+				}, {
+					"root_name":	"minecraft:adventure/kill_dragon"
+				}, {
+					"root_name":	"minecraft:adventure/door"
+				}, {
+					"root_name":	"minecraft:adventure/build_house"
+				}, {
+					"root_name":	"minecraft:adventure/craft_chest"
+				}, {
+					"root_name":	"minecraft:adventure/barrel_roll"
+				}, {
+					"root_name":	"minecraft:adventure/nether_barrel_roll"
+				}],
+			"icon_pos":	{
+				"x":	-1012,
+				"y":	653
+			},
+			"text_pos":	{
+				"x":	-997,
+				"y":	753
+			},
+			"progress_pos":	{
+				"x":	-975,
+				"y":	773
+			}
+		},
+		"build_action":	{
+			"icon":	"items/build_action_26w14a.png",
+			"root_name":	"minecraft:used/minecraft:build_action",
+			"target":	-1,
+			"linked_goals":	[{
+					"root_name":	"minecraft:adventure/root"
+				}, {
+					"root_name":	"minecraft:adventure/mine_a_block"
+				}, {
+					"root_name":	"minecraft:adventure/craft_table"
+				}, {
+					"root_name":	"minecraft:adventure/craft_sword"
+				}, {
+					"root_name":	"minecraft:adventure/kill_a_mob"
+				}, {
+					"root_name":	"minecraft:adventure/kill_all_mobs"
+				}, {
+					"root_name":	"minecraft:adventure/wooden_pickaxe"
+				}, {
+					"root_name":	"minecraft:adventure/furnace"
+				}, {
+					"root_name":	"minecraft:adventure/iron_ingot"
+				}, {
+					"root_name":	"minecraft:adventure/build_trap"
+				}, {
+					"root_name":	"minecraft:adventure/obtain_armor"
+				}, {
+					"root_name":	"minecraft:adventure/crafter"
+				}, {
+					"root_name":	"minecraft:adventure/obsidian"
+				}, {
+					"root_name":	"minecraft:adventure/craft_nether_portal"
+				}, {
+					"root_name":	"minecraft:adventure/find_fortress"
+				}, {
+					"root_name":	"minecraft:adventure/obtain_blaze_rod"
+				}, {
+					"root_name":	"minecraft:adventure/follow_ender_eye"
+				}, {
+					"root_name":	"minecraft:adventure/eye_frame_combination"
+				}, {
+					"root_name":	"minecraft:adventure/craft_end_portal"
+				}, {
+					"root_name":	"minecraft:adventure/enter_the_end"
+				}, {
+					"root_name":	"minecraft:adventure/kill_dragon"
+				}, {
+					"root_name":	"minecraft:adventure/door"
+				}, {
+					"root_name":	"minecraft:adventure/build_house"
+				}, {
+					"root_name":	"minecraft:adventure/craft_chest"
+				}, {
+					"root_name":	"minecraft:adventure/barrel_roll"
+				}, {
+					"root_name":	"minecraft:adventure/nether_barrel_roll"
+				}, {
+					"root_name":	"minecraft:adventure/end_barrel_roll"
+				}],
+			"icon_pos":	{
+				"x":	-908,
+				"y":	653
+			},
+			"text_pos":	{
+				"x":	-878,
+				"y":	753
+			},
+			"progress_pos":	{
+				"x":	-871,
+				"y":	773
+			}
+		},
+		"group_action":	{
+			"icon":	"items/group_action_overlay_26w14a.png",
+			"root_name":	"minecraft:used/minecraft:group_action",
+			"target":	-1,
+			"linked_goals":	[{
+					"root_name":	"minecraft:adventure/root"
+				}, {
+					"root_name":	"minecraft:adventure/mine_a_block"
+				}, {
+					"root_name":	"minecraft:adventure/craft_table"
+				}, {
+					"root_name":	"minecraft:adventure/craft_sword"
+				}, {
+					"root_name":	"minecraft:adventure/kill_a_mob"
+				}, {
+					"root_name":	"minecraft:adventure/kill_all_mobs"
+				}, {
+					"root_name":	"minecraft:adventure/wooden_pickaxe"
+				}, {
+					"root_name":	"minecraft:adventure/furnace"
+				}, {
+					"root_name":	"minecraft:adventure/iron_ingot"
+				}, {
+					"root_name":	"minecraft:adventure/build_trap"
+				}, {
+					"root_name":	"minecraft:adventure/obtain_armor"
+				}, {
+					"root_name":	"minecraft:adventure/crafter"
+				}, {
+					"root_name":	"minecraft:adventure/obsidian"
+				}, {
+					"root_name":	"minecraft:adventure/craft_nether_portal"
+				}, {
+					"root_name":	"minecraft:adventure/find_fortress"
+				}, {
+					"root_name":	"minecraft:adventure/obtain_blaze_rod"
+				}, {
+					"root_name":	"minecraft:adventure/follow_ender_eye"
+				}, {
+					"root_name":	"minecraft:adventure/eye_frame_combination"
+				}, {
+					"root_name":	"minecraft:adventure/craft_end_portal"
+				}, {
+					"root_name":	"minecraft:adventure/enter_the_end"
+				}, {
+					"root_name":	"minecraft:adventure/kill_dragon"
+				}, {
+					"root_name":	"minecraft:adventure/door"
+				}, {
+					"root_name":	"minecraft:adventure/build_house"
+				}, {
+					"root_name":	"minecraft:adventure/craft_chest"
+				}, {
+					"root_name":	"minecraft:adventure/barrel_roll"
+				}, {
+					"root_name":	"minecraft:adventure/nether_barrel_roll"
+				}, {
+					"root_name":	"minecraft:adventure/end_barrel_roll"
+				}],
+			"icon_pos":	{
+				"x":	-804,
+				"y":	653
+			},
+			"text_pos":	{
+				"x":	-780,
+				"y":	753
+			},
+			"progress_pos":	{
+				"x":	-767,
+				"y":	773
+			}
+		},
+		"highlight_action":	{
+			"icon":	"items/highlight_action_26w14a.png",
+			"root_name":	"minecraft:used/minecraft:highlight_action",
+			"target":	-1,
+			"linked_goals":	[{
+					"root_name":	"minecraft:adventure/root"
+				}, {
+					"root_name":	"minecraft:adventure/mine_a_block"
+				}, {
+					"root_name":	"minecraft:adventure/craft_table"
+				}, {
+					"root_name":	"minecraft:adventure/craft_sword"
+				}, {
+					"root_name":	"minecraft:adventure/kill_a_mob"
+				}, {
+					"root_name":	"minecraft:adventure/kill_all_mobs"
+				}, {
+					"root_name":	"minecraft:adventure/wooden_pickaxe"
+				}, {
+					"root_name":	"minecraft:adventure/furnace"
+				}, {
+					"root_name":	"minecraft:adventure/iron_ingot"
+				}, {
+					"root_name":	"minecraft:adventure/build_trap"
+				}, {
+					"root_name":	"minecraft:adventure/obtain_armor"
+				}, {
+					"root_name":	"minecraft:adventure/crafter"
+				}, {
+					"root_name":	"minecraft:adventure/obsidian"
+				}, {
+					"root_name":	"minecraft:adventure/craft_nether_portal"
+				}, {
+					"root_name":	"minecraft:adventure/find_fortress"
+				}, {
+					"root_name":	"minecraft:adventure/obtain_blaze_rod"
+				}, {
+					"root_name":	"minecraft:adventure/follow_ender_eye"
+				}, {
+					"root_name":	"minecraft:adventure/eye_frame_combination"
+				}, {
+					"root_name":	"minecraft:adventure/craft_end_portal"
+				}, {
+					"root_name":	"minecraft:adventure/enter_the_end"
+				}, {
+					"root_name":	"minecraft:adventure/kill_dragon"
+				}, {
+					"root_name":	"minecraft:adventure/door"
+				}, {
+					"root_name":	"minecraft:adventure/build_house"
+				}, {
+					"root_name":	"minecraft:adventure/craft_chest"
+				}, {
+					"root_name":	"minecraft:adventure/barrel_roll"
+				}, {
+					"root_name":	"minecraft:adventure/nether_barrel_roll"
+				}, {
+					"root_name":	"minecraft:adventure/end_barrel_roll"
+				}],
+			"icon_pos":	{
+				"x":	-700,
+				"y":	653
+			},
+			"text_pos":	{
+				"x":	-683,
+				"y":	753
+			},
+			"progress_pos":	{
+				"x":	-663,
+				"y":	773
+			}
+		}
+	},
+	"unlocks":	[],
+	"custom":	[],
+	"multi_stage_goals":	[],
+	"counter_goals":	[],
+	"decorations":	[]
+}
