@@ -2470,6 +2470,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
     }
 
     if (!*p_open) {
+        if (t) t->is_temp_creator_focused = false;
         return;
     }
 
