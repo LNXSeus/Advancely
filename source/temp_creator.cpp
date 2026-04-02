@@ -12948,12 +12948,10 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 flat_goal_list.push_back({msg.root_name, stage.stage_id, nullptr});
             }
         }
-        // Counters: shown for single-select (arrows) and header linking, but not counter linking (circular refs)
-        if (!is_multi_select || goal_selector_header_deco_index >= 0) {
-            for (const auto &counter: current_template_data.counter_goals) {
-                if (!matches_search(counter.root_name, counter.display_name, "Counter")) continue;
-                flat_goal_list.push_back({counter.root_name, nullptr, nullptr});
-            }
+        // Counters
+        for (const auto &counter: current_template_data.counter_goals) {
+            if (!matches_search(counter.root_name, counter.display_name, "Counter")) continue;
+            flat_goal_list.push_back({counter.root_name, nullptr, nullptr});
         }
 
         int current_flat_index = 0; // Tracks position in flat list during rendering
@@ -13156,8 +13154,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
             }
         }
 
-        // Counters: shown for single-select (arrows) and header linking, but not counter linking (circular refs)
-        if (!is_multi_select || goal_selector_header_deco_index >= 0) {
+        // Counters
+        {
             bool has_visible = false;
             for (const auto &counter: current_template_data.counter_goals) {
                 if (matches_search(counter.root_name, counter.display_name, "Counter")) {

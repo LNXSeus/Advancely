@@ -2722,11 +2722,13 @@ static bool tracker_update_custom_goal_linked_goals(Tracker *t) {
 
 /**
  * @brief Updates completion state of all counter goals by checking their linked goals.
+ * Returns true if any counter changed state (used for fixed-point iteration).
  * Must be called before tracker_calculate_overall_progress.
  */
-static void tracker_update_counter_goals(Tracker *t) {
-    if (!t || !t->template_data) return;
+static bool tracker_update_counter_goals(Tracker *t) {
+    if (!t || !t->template_data) return false;
     TemplateData *td = t->template_data;
+    bool any_changed = false;
     for (int i = 0; i < td->counter_goal_count; i++) {
         CounterGoal *counter = td->counter_goals[i];
         if (!counter) continue;
@@ -2737,16 +2739,17 @@ static void tracker_update_counter_goals(Tracker *t) {
                 completed++;
             }
         }
+        bool new_done = (counter->linked_goal_count > 0 && completed >= counter->linked_goal_count);
+        if (counter->completed_count != completed || counter->done != new_done) any_changed = true;
         counter->completed_count = completed;
-        counter->done = (counter->linked_goal_count > 0 && completed >= counter->linked_goal_count);
+        counter->done = new_done;
     }
+    return any_changed;
 }
 
 /**
  * @brief Updates stat completion based on linked goals (auto-completion).
  * Returns true if any stat or sub-stat was newly completed this call (used for fixed-point iteration).
- * Must be called before tracker_update_counter_goals so that counters see
- * the correct done state of any stats that auto-complete via linked goals.
  */
 static bool tracker_update_stat_linked_goals(Tracker *t) {
     if (!t || !t->template_data) return false;
@@ -3440,6 +3443,7 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
     tracker_update_custom_progress(t, settings_json, settings);
     tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json, player_unlocks_json, version, settings);
     // Fixed-point iteration: run until no new completions occur (handles arbitrary-depth chains).
+    // Counters participate so that stats/custom goals/counters can all link to counters.
     // Safety cap of 32 iterations prevents infinite loops from unexpected circular references.
     {
         bool changed;
@@ -3447,9 +3451,9 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
         do {
             changed = tracker_update_custom_goal_linked_goals(t);
             changed |= tracker_update_stat_linked_goals(t);
+            changed |= tracker_update_counter_goals(t);
         } while (changed && ++guard < 32);
     }
-    tracker_update_counter_goals(t); // Update counter completion state based on linked goals (LAST UPDATE CALL HERE)
     tracker_calculate_overall_progress(t, version, settings); //THIS TRACKS SUB-ADVANCEMENTS AND EVERYTHING ELSE
 
     // Clean up the parsed JSON objects
@@ -9069,9 +9073,9 @@ void tracker_recalculate_progress(Tracker *t, const AppSettings *settings) {
         do {
             changed = tracker_update_custom_goal_linked_goals(t);
             changed |= tracker_update_stat_linked_goals(t);
+            changed |= tracker_update_counter_goals(t);
         } while (changed && ++guard < 32);
     }
-    tracker_update_counter_goals(t); // Should be LAST CALL before the overall progress calculation
     tracker_calculate_overall_progress(t, version, settings);
 }
 
