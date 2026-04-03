@@ -471,6 +471,8 @@ struct TemplateData {
     // Percentage score of everything BUT ADVANCEMENTS (have their own advancements_completed_count)
 
     long long play_time_ticks; // Store the player's total playtime in ticks
+    long long frozen_play_time_ticks; // IGT frozen at the moment of run completion
+    bool run_completed; // True once the run hits 100%; latches until reset
 
     // Taking snapshot for legacy versions when world is changed to track changes per world
     long long playtime_snapshot; // Stores playtime at world load for legacy versions

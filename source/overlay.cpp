@@ -592,7 +592,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
         if (is_run_complete) {
             char formatted_time[64];
-            format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
+            // Use frozen IGT so the final time doesn't keep ticking
+            format_time(t->template_data->frozen_play_time_ticks, formatted_time, sizeof(formatted_time));
             snprintf(info_buffer, sizeof(info_buffer),
                      "*** RUN COMPLETED! *** | Final Time: %s | Donate (mentioning 'Advancely') to be featured!",
                      formatted_time);

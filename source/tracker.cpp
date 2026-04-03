@@ -768,6 +768,8 @@ static void tracker_update_stats_legacy(Tracker *t, const cJSON *player_stats_js
     cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : nullptr;
 
     t->template_data->play_time_ticks = 0;
+    t->template_data->frozen_play_time_ticks = 0;
+    t->template_data->run_completed = false;
     t->template_data->stats_completed_count = 0;
     t->template_data->stats_completed_criteria_count = 0;
 
@@ -861,6 +863,8 @@ static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *p
     t->template_data->advancements_completed_count = 0;
     t->template_data->completed_criteria_count = 0;
     t->template_data->play_time_ticks = 0;
+    t->template_data->frozen_play_time_ticks = 0;
+    t->template_data->run_completed = false;
 
     for (int i = 0; i < t->template_data->advancement_count; i++) {
         TrackableCategory *ach = t->template_data->advancements[i];
@@ -2883,6 +2887,14 @@ void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const Ap
     } else {
         // Default to 100% if no criteria, stats, unlocks, custom goals or stages
         t->template_data->overall_progress_percentage = 100.0f;
+    }
+
+    // Freeze the IGT the first time the run reaches 100% completion
+    bool is_complete = t->template_data->advancements_completed_count >= t->template_data->advancement_count &&
+                       t->template_data->overall_progress_percentage >= 100.0f;
+    if (is_complete && !t->template_data->run_completed) {
+        t->template_data->run_completed = true;
+        t->template_data->frozen_play_time_ticks = t->template_data->play_time_ticks;
     }
 }
 
@@ -8095,11 +8107,15 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
     char info_buffer[512];
     char formatted_time[64];
-    format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
 
     // Check if the run is 100% complete.
     bool is_run_complete = t->template_data->advancements_completed_count >= t->template_data->advancement_count &&
                            t->template_data->overall_progress_percentage >= 100.0f;
+
+    // Use frozen IGT for the info window when the run is completed
+    long long display_ticks = is_run_complete ? t->template_data->frozen_play_time_ticks
+                                              : t->template_data->play_time_ticks;
+    format_time(display_ticks, formatted_time, sizeof(formatted_time));
 
     if (is_run_complete) {
         snprintf(info_buffer, sizeof(info_buffer),
@@ -9640,9 +9656,15 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
     // Also load the current game version used
     MC_Version version = settings_get_version_from_string(settings->version_str);
 
-    // Format the time to DD:HH:MM:SS.MS
+    // Check if the run is completed, check both advancement and overall progress
+    bool is_run_complete = t->template_data->advancements_completed_count >= t->template_data->advancement_count &&
+                           t->template_data->overall_progress_percentage >= 100.0f;
+
+    // Format the time to DD:HH:MM:SS.MS — use frozen time when the run is completed
     char formatted_time[128];
-    format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
+    long long display_ticks = is_run_complete ? t->template_data->frozen_play_time_ticks
+                                              : t->template_data->play_time_ticks;
+    format_time(display_ticks, formatted_time, sizeof(formatted_time));
 
 
     log_message(LOG_INFO, "============================================================\n");
@@ -9658,9 +9680,7 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
     log_message(LOG_INFO, "============================================================\n");
 
 
-    // Check if the run is completed, check both advancement and overall progress
-    if (t->template_data->advancements_completed_count >= t->template_data->advancement_count && t->template_data->
-        overall_progress_percentage >= 100.0f) {
+    if (is_run_complete) {
         log_message(LOG_INFO, "\n                  *** RUN COMPLETED! ***\n\n");
         log_message(LOG_INFO, "                  Final Time: %s\n\n", formatted_time);
         log_message(LOG_INFO, "============================================================\n");
