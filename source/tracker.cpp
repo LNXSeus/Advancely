@@ -63,6 +63,38 @@ static std::unordered_set<ManualPos *> s_visual_selected_items;
 static std::unordered_set<std::string> s_linked_top; // Top-level items (root_name, no parent_root)
 static std::unordered_set<std::string> s_linked_sub; // Sub-items: composite key "parent_root\troot_name"
 
+// Search helpers: match display_name, root_name, and icon_path against the search buffer
+static bool item_matches_search(const TrackableItem *item, const char *search) {
+    return str_contains_insensitive(item->display_name, search)
+           || str_contains_insensitive(item->root_name, search)
+           || str_contains_insensitive(item->icon_path, search);
+}
+
+static bool category_matches_search(const TrackableCategory *cat, const char *search) {
+    return str_contains_insensitive(cat->display_name, search)
+           || str_contains_insensitive(cat->root_name, search)
+           || str_contains_insensitive(cat->icon_path, search);
+}
+
+static bool counter_matches_search(const CounterGoal *goal, const char *search) {
+    return str_contains_insensitive(goal->display_name, search)
+           || str_contains_insensitive(goal->root_name, search)
+           || str_contains_insensitive(goal->icon_path, search);
+}
+
+static bool ms_goal_matches_search(const MultiStageGoal *goal, const char *search) {
+    return str_contains_insensitive(goal->display_name, search)
+           || str_contains_insensitive(goal->root_name, search)
+           || str_contains_insensitive(goal->icon_path, search);
+}
+
+// For multi-stage goals: match the active stage's display_text, stage_id, and icon_path (only if stage icons are in use)
+static bool stage_matches_search(const MultiStageGoal *goal, const SubGoal *stage, const char *search) {
+    return str_contains_insensitive(stage->display_text, search)
+           || str_contains_insensitive(stage->stage_id, search)
+           || (goal->use_stage_icons && str_contains_insensitive(stage->icon_path, search));
+}
+
 
 // Simple string hashing function (djb2) to create a safe filename from a world path
 static unsigned long hash_string(const char *str) {
@@ -245,7 +277,7 @@ static void build_search_linked_sets(const Tracker *t) {
     // Counters: if counter matches search, add its linked goals
     for (int i = 0; i < td->counter_goal_count; i++) {
         CounterGoal *counter = td->counter_goals[i];
-        if (str_contains_insensitive(counter->display_name, t->search_buffer)) {
+        if (counter_matches_search(counter, t->search_buffer)) {
             add_linked(counter->linked_goals, counter->linked_goal_count);
         }
     }
@@ -4050,7 +4082,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         if (should_hide_parent_based_on_mode) continue;
 
         // Apply Search Filter for counting
-        bool parent_matches_search = str_contains_insensitive(cat->display_name, t->search_buffer);
+        bool parent_matches_search = category_matches_search(cat, t->search_buffer);
         bool parent_is_linked = s_linked_top.count(cat->root_name) > 0;
         bool any_visible_child_matches_search = false;
         bool any_child_is_linked = false;
@@ -4085,7 +4117,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                 if (child_linked) any_child_is_linked = true;
 
                 // Now check search filter for this visible child
-                if (str_contains_insensitive(crit->display_name, t->search_buffer)) {
+                if (item_matches_search(crit, t->search_buffer)) {
                     any_visible_child_matches_search = true;
                     // Count this child towards sub-totals if it matches search
                     total_visible_sub_count++;
@@ -4155,7 +4187,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
         if (should_hide_parent_render) continue; // Skip if parent hidden based on mode
 
         // Check search filter
-        bool parent_matches = str_contains_insensitive(cat->display_name, t->search_buffer);
+        bool parent_matches = category_matches_search(cat, t->search_buffer);
         bool parent_is_linked = s_linked_top.count(cat->root_name) > 0;
         bool child_matches_render = false;
         bool child_is_linked_render = false;
@@ -4178,7 +4210,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                 if (should_hide_crit_render) continue;
 
-                if (str_contains_insensitive(crit->display_name, t->search_buffer)) {
+                if (item_matches_search(crit, t->search_buffer)) {
                     child_matches_render = true;
                     break;
                 }
@@ -4279,7 +4311,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             if (parent_should_hide_render) continue;
 
             // Search Filter (for rendering visibility)
-            bool parent_matches = str_contains_insensitive(cat->display_name, t->search_buffer);
+            bool parent_matches = category_matches_search(cat, t->search_buffer);
             bool parent_is_linked = s_linked_top.count(cat->root_name) > 0;
             bool child_matches_render = false;
             bool child_is_linked_width = false;
@@ -4305,7 +4337,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     if (crit_should_hide_render) continue;
 
                     // Now, check both hiding status AND the search term
-                    if (str_contains_insensitive(crit->display_name, t->search_buffer)) {
+                    if (item_matches_search(crit, t->search_buffer)) {
                         child_matches_render = true;
                         break;
                     }
@@ -4378,8 +4410,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     // Also check if this specific child matches search if parent didn't
                     std::string crit_link_key = std::string(cat->root_name) + "\t" + crit->root_name;
                     bool crit_matches_search = parent_matches
-                                               || (child_matches_render && str_contains_insensitive(
-                                                       crit->display_name, t->search_buffer))
+                                               || (child_matches_render && item_matches_search(crit, t->search_buffer))
                                                || s_linked_sub.count(crit_link_key);
 
                     if (crit && !crit_should_hide_width && crit_matches_search) {
@@ -4491,7 +4522,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             if (should_hide_parent_render) continue;
 
             // --- Search Filtering (for rendering) ---
-            bool parent_matches = str_contains_insensitive(cat->display_name, t->search_buffer);
+            bool parent_matches = category_matches_search(cat, t->search_buffer);
             bool parent_is_linked = s_linked_top.count(cat->root_name) > 0;
             std::vector<TrackableItem *> matching_children; // Children that match search or are linked
             bool child_matches_search = false; // Flag if any child matches search
@@ -4515,7 +4546,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
 
                     if (should_hide_crit_render) continue;
 
-                    bool crit_search = str_contains_insensitive(crit->display_name, t->search_buffer);
+                    bool crit_search = item_matches_search(crit, t->search_buffer);
                     std::string crit_link_key = std::string(cat->root_name) + "\t" + crit->root_name;
                     bool crit_linked = s_linked_sub.count(crit_link_key) > 0;
 
@@ -5400,7 +5431,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         }
 
         // Apply Search Filter for counting
-        bool matches_search = str_contains_insensitive(item->display_name, t->search_buffer)
+        bool matches_search = item_matches_search(item, t->search_buffer)
                               || s_linked_top.count(item->root_name);
 
         // Count items only if they are not hidden by mode AND match the search
@@ -5436,7 +5467,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         }
 
         // Combine hiding and search filter
-        if (!should_hide_render && (str_contains_insensitive(item->display_name, t->search_buffer)
+        if (!should_hide_render && (item_matches_search(item, t->search_buffer)
                                     || s_linked_top.count(item->root_name))) {
             section_has_renderable_content = true;
             break; // Found at least one item to render
@@ -5499,7 +5530,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
             }
 
             // Apply search filter
-            bool matches_search_width = str_contains_insensitive(item->display_name, t->search_buffer)
+            bool matches_search_width = item_matches_search(item, t->search_buffer)
                                         || s_linked_top.count(item->root_name);
 
             // Only consider items that will actually be rendered for width calculation
@@ -5553,7 +5584,7 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
         }
 
         // Apply search filter
-        bool matches_search_render = str_contains_insensitive(item->display_name, t->search_buffer)
+        bool matches_search_render = item_matches_search(item, t->search_buffer)
                                      || s_linked_top.count(item->root_name);
 
         // Skip rendering if hidden or doesn't match search
@@ -5835,7 +5866,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         }
 
         // Apply Search Filter for counting
-        bool matches_search = str_contains_insensitive(item->display_name, t->search_buffer)
+        bool matches_search = item_matches_search(item, t->search_buffer)
                               || s_linked_top.count(item->root_name);
 
         // Count items only if they are not hidden by mode AND match the search
@@ -5871,7 +5902,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         }
 
         // Combine hiding and search filter
-        if (!should_hide_render && (str_contains_insensitive(item->display_name, t->search_buffer)
+        if (!should_hide_render && (item_matches_search(item, t->search_buffer)
                                     || s_linked_top.count(item->root_name))) {
             section_has_renderable_content = true;
             break; // Found at least one item to render
@@ -5941,7 +5972,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             }
 
             // Apply search filter
-            bool matches_search_width = str_contains_insensitive(item->display_name, t->search_buffer)
+            bool matches_search_width = item_matches_search(item, t->search_buffer)
                                         || s_linked_top.count(item->root_name);
 
             // Only consider items that will actually be rendered for width calculation
@@ -6013,7 +6044,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         }
 
         // Apply search filter
-        bool matches_search_render = str_contains_insensitive(item->display_name, t->search_buffer)
+        bool matches_search_render = item_matches_search(item, t->search_buffer)
                                      || s_linked_top.count(item->root_name);
 
         // Skip rendering if hidden or doesn't match search
@@ -6363,7 +6394,7 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                 break;
         }
 
-        bool matches_search = str_contains_insensitive(goal->display_name, t->search_buffer)
+        bool matches_search = counter_matches_search(goal, t->search_buffer)
                               || s_linked_top.count(goal->root_name);
         if (!should_hide_based_on_mode && matches_search) {
             total_visible_count++;
@@ -6390,7 +6421,7 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                 break;
         }
 
-        if (!should_hide_render && (str_contains_insensitive(goal->display_name, t->search_buffer)
+        if (!should_hide_render && (counter_matches_search(goal, t->search_buffer)
                                     || s_linked_top.count(goal->root_name))) {
             section_has_renderable_content = true;
             break;
@@ -6438,7 +6469,7 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                     should_hide_width = false;
                     break;
             }
-            if (should_hide_width || !(str_contains_insensitive(goal->display_name, t->search_buffer)
+            if (should_hide_width || !(counter_matches_search(goal, t->search_buffer)
                                        || s_linked_top.count(goal->root_name))) continue;
 
             SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
@@ -6485,7 +6516,7 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                 should_hide_render = false;
                 break;
         }
-        if (should_hide_render || !(str_contains_insensitive(goal->display_name, t->search_buffer)
+        if (should_hide_render || !(counter_matches_search(goal, t->search_buffer)
                                     || s_linked_top.count(goal->root_name))) continue;
 
         // Progress text
@@ -6752,10 +6783,10 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
         // Apply Search Filter for counting (check main name AND active stage)
         SubGoal *active_stage_count = goal->stages[goal->current_stage];
-        bool name_matches_search = str_contains_insensitive(goal->display_name, t->search_buffer)
-                                   || s_linked_top.count(goal->root_name);
-        bool stage_matches_search = str_contains_insensitive(active_stage_count->display_text, t->search_buffer);
-        bool goal_matches_search = name_matches_search || stage_matches_search;
+        bool name_matches = ms_goal_matches_search(goal, t->search_buffer)
+                            || s_linked_top.count(goal->root_name);
+        bool stage_matches = stage_matches_search(goal, active_stage_count, t->search_buffer);
+        bool goal_matches_search = name_matches || stage_matches;
 
         // Skip entire goal if hidden by mode OR doesn't match search
         if (should_hide_based_on_mode || !goal_matches_search) continue;
@@ -6812,9 +6843,9 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
         // Apply search filter (check main name and current stage text)
         SubGoal *active_stage_render = goal->stages[goal->current_stage];
-        bool name_matches_render = str_contains_insensitive(goal->display_name, t->search_buffer)
+        bool name_matches_render = ms_goal_matches_search(goal, t->search_buffer)
                                    || s_linked_top.count(goal->root_name);
-        bool stage_matches_render = str_contains_insensitive(active_stage_render->display_text, t->search_buffer);
+        bool stage_matches_render = stage_matches_search(goal, active_stage_render, t->search_buffer);
 
         // Combine hiding and search filter
         if (!should_hide_render && (name_matches_render || stage_matches_render)) {
@@ -6883,9 +6914,9 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
             // Apply search filter for width calculation
             SubGoal *active_stage_width = goal->stages[goal->current_stage];
-            bool name_matches_width = str_contains_insensitive(goal->display_name, t->search_buffer)
+            bool name_matches_width = ms_goal_matches_search(goal, t->search_buffer)
                                        || s_linked_top.count(goal->root_name);
-            bool stage_matches_width = str_contains_insensitive(active_stage_width->display_text, t->search_buffer);
+            bool stage_matches_width = stage_matches_search(goal, active_stage_width, t->search_buffer);
 
             // Only consider items that will actually be rendered for width calculation
             if (!should_hide_width && (name_matches_width || stage_matches_width)) {
@@ -6961,9 +6992,9 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
 
         // Apply search filter
         SubGoal *active_stage_render = goal->stages[goal->current_stage];
-        bool name_matches_render = str_contains_insensitive(goal->display_name, t->search_buffer)
+        bool name_matches_render = ms_goal_matches_search(goal, t->search_buffer)
                                    || s_linked_top.count(goal->root_name);
-        bool stage_matches_render = str_contains_insensitive(active_stage_render->display_text, t->search_buffer);
+        bool stage_matches_render = stage_matches_search(goal, active_stage_render, t->search_buffer);
 
         // Skip rendering if hidden or doesn't match search
         if (should_hide_render || (!name_matches_render && !stage_matches_render)) {
@@ -8364,7 +8395,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         ImGui::PushTextWrapPos(ImGui::GetFontSize() * 50.0f); // Helps the text wrap nicely
 
         ImGui::TextUnformatted(
-            "Search for goals by name (case-insensitive). You can also use Ctrl + F (or Cmd + F on macOS).\n"
+            "Search for goals by name, root name, or icon path (case-insensitive).\n"
+            "You can also use Ctrl + F (or Cmd + F on macOS).\n"
             "Using the search filter also dynamically updates the completion counters in the section headers.");
         ImGui::Separator();
         ImGui::TextUnformatted("It applies the filter to anything currently visible in the following way:");
@@ -8396,8 +8428,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         }
 
         ImGui::BulletText(
-            "Multi-Stage Goals: Shows the goal if its main title or the text of its currently\n"
-            "active stage matches the search term.");
+            "Multi-Stage Goals: Shows the goal if its main title, root name, icon path, or the text,\n"
+            "stage ID, or icon path of its currently active stage matches the search term.");
 
         ImGui::PopTextWrapPos();
         ImGui::EndTooltip();
