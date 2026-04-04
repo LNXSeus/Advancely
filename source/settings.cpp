@@ -2243,7 +2243,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
             // --- Network Mode ---
             ImGui::Text("Network Mode");
-            int mode = app_settings->network_mode;
+            int mode = temp_settings.network_mode;
             ImGui::RadioButton("Singleplayer", &mode, NETWORK_SINGLEPLAYER);
             if (ImGui::IsItemHovered()) {
                 char tooltip_buf[256];
@@ -2270,18 +2270,17 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                          "Connects to a Host and receives progress updates.");
                 ImGui::SetTooltip("%s", tooltip_buf);
             }
-            app_settings->network_mode = (NetworkMode) mode;
-
-            ImGui::Separator();
-            ImGui::Spacing();
+            temp_settings.network_mode = (NetworkMode) mode;
 
             // --- Host Settings ---
-            if (app_settings->network_mode == NETWORK_HOST) {
+            if (temp_settings.network_mode == NETWORK_HOST) {
+                ImGui::Separator();
+                ImGui::Spacing();
                 ImGui::Text("Host Settings");
                 ImGui::Spacing();
 
                 ImGui::SetNextItemWidth(120.0f);
-                ImGui::InputText("Port", app_settings->host_port, sizeof(app_settings->host_port),
+                ImGui::InputText("Port", temp_settings.host_port, sizeof(temp_settings.host_port),
                                  ImGuiInputTextFlags_CharsDecimal);
                 if (ImGui::IsItemHovered()) {
                     char tooltip_buf[256];
@@ -2292,30 +2291,52 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 }
 
                 ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::Spacing();
+
+                // --- Goal Merging Logic (per goal type) ---
                 ImGui::Text("Goal Merging Logic");
-                int logic = app_settings->coop_goal_logic;
-                ImGui::RadioButton("Max Progress", &logic, COOP_TRACK_MAX_PROGRESS);
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buf[256];
-                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                             "Use whichever player has the most criteria completed for each goal.");
-                    ImGui::SetTooltip("%s", tooltip_buf);
+                ImGui::TextDisabled("Controls how progress is combined when multiple players track the same goals.");
+                ImGui::Spacing();
+
+                // Global merging logic (will become per-section in the future)
+                const char *goal_type_labels[] = {
+                    advancements_label_plural_uppercase, "Statistics", "Custom Goals", "Multi-Stage Goals"
+                };
+                int logic = temp_settings.coop_goal_logic;
+                for (int i = 0; i < 4; i++) {
+                    if (i > 0) ImGui::Spacing();
+                    ImGui::PushID(i);
+                    ImGui::BeginDisabled(i > 0); // Only Advancements editable for now, rest follows
+                    ImGui::Text("%s:", goal_type_labels[i]);
+                    ImGui::SameLine();
+                    ImGui::RadioButton("Max Progress", &logic, COOP_TRACK_MAX_PROGRESS);
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tooltip_buf[256];
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Use whichever player has the most criteria completed for each goal.");
+                        ImGui::SetTooltip("%s", tooltip_buf);
+                    }
+                    ImGui::SameLine();
+                    ImGui::RadioButton("First to Start", &logic, COOP_TRACK_FIRST_START);
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tooltip_buf[256];
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Track whoever triggered the first criterion of each goal (by timestamp).");
+                        ImGui::SetTooltip("%s", tooltip_buf);
+                    }
+                    ImGui::SameLine();
+                    ImGui::RadioButton("Any Completion", &logic, COOP_TRACK_ANY_COMPLETION);
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tooltip_buf[256];
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "A goal is complete if any player has finished it.");
+                        ImGui::SetTooltip("%s", tooltip_buf);
+                    }
+                    ImGui::EndDisabled();
+                    ImGui::PopID();
                 }
-                ImGui::RadioButton("First to Start", &logic, COOP_TRACK_FIRST_START);
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buf[256];
-                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                             "Track whoever triggered the first criterion of each goal (by timestamp).");
-                    ImGui::SetTooltip("%s", tooltip_buf);
-                }
-                ImGui::RadioButton("Any Completion", &logic, COOP_TRACK_ANY_COMPLETION);
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buf[256];
-                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                             "A goal is complete if any player has finished it.");
-                    ImGui::SetTooltip("%s", tooltip_buf);
-                }
-                app_settings->coop_goal_logic = (CoopGoalLogic) logic;
+                temp_settings.coop_goal_logic = (CoopGoalLogic) logic;
 
                 ImGui::Spacing();
                 ImGui::Separator();
@@ -2324,43 +2345,41 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 // Invite Code Generation (placeholder - will be functional with networking)
                 ImGui::Text("Invite Code");
                 ImGui::TextDisabled("Generate an invite code to share with receivers.");
-                if (ImGui::Button("Generate Invite Code")) {
-                    // TODO: Generate Base64 invite code from public IP + port
+                if (ImGui::Button("Generate & Copy Invite Code")) {
+                    // TODO: Generate Base64 invite code from public IP + port, copy to clipboard
                 }
                 if (ImGui::IsItemHovered()) {
                     char tooltip_buf[256];
                     snprintf(tooltip_buf, sizeof(tooltip_buf),
-                             "Generates a Base64 invite code encoding your IP and port.\n"
+                             "Generates a Base64 invite code encoding your IP and port,\n"
+                             "and copies it to your clipboard.\n"
                              "Share this privately with receivers.");
                     ImGui::SetTooltip("%s", tooltip_buf);
                 }
             }
 
             // --- Receiver Settings ---
-            if (app_settings->network_mode == NETWORK_RECEIVER) {
+            if (temp_settings.network_mode == NETWORK_RECEIVER) {
+                ImGui::Separator();
+                ImGui::Spacing();
                 ImGui::Text("Receiver Settings");
                 ImGui::Spacing();
 
-                ImGui::SetNextItemWidth(400.0f);
-                ImGui::InputText("Invite Code", app_settings->receiver_invite_code,
-                                 sizeof(app_settings->receiver_invite_code),
-                                 ImGuiInputTextFlags_Password);
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buf[256];
-                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                             "Paste the invite code from the Host.\n"
-                             "Input is masked to protect the Host's IP.");
-                    ImGui::SetTooltip("%s", tooltip_buf);
-                }
-
-                ImGui::Spacing();
-                if (ImGui::Button("Connect")) {
-                    // TODO: Decode invite code and connect to host
+                if (ImGui::Button("Paste Invite Code & Connect")) {
+                    const char *clipboard = SDL_GetClipboardText();
+                    if (clipboard && clipboard[0] != '\0') {
+                        strncpy(temp_settings.receiver_invite_code, clipboard,
+                                sizeof(temp_settings.receiver_invite_code) - 1);
+                        temp_settings.receiver_invite_code[sizeof(temp_settings.receiver_invite_code) - 1] = '\0';
+                        SDL_SetClipboardText("");
+                        // TODO: Decode invite code and connect to host
+                    }
                 }
                 if (ImGui::IsItemHovered()) {
                     char tooltip_buf[256];
                     snprintf(tooltip_buf, sizeof(tooltip_buf),
-                             "Decode the invite code and connect to the Host's co-op session.");
+                             "Pastes the invite code from your clipboard, clears the clipboard\n"
+                             "to prevent leaking the Host's connection info, and connects to the session.");
                     ImGui::SetTooltip("%s", tooltip_buf);
                 }
             }
