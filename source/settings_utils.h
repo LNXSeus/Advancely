@@ -31,6 +31,20 @@ enum GoalHidingMode {
     SHOW_ALL // Shows hidden and completed
 };
 
+// Co-op networking mode
+enum NetworkMode {
+    NETWORK_SINGLEPLAYER, // Default: no networking, local tracking only
+    NETWORK_HOST,         // Host: reads game files, broadcasts co-op state
+    NETWORK_RECEIVER      // Receiver: connects to host, receives co-op state
+};
+
+// Co-op goal merging logic
+enum CoopGoalLogic {
+    COOP_TRACK_MAX_PROGRESS,  // Use whichever player has the most criteria completed
+    COOP_TRACK_FIRST_START,   // Track whoever triggered the first criterion (by timestamp)
+    COOP_TRACK_ANY_COMPLETION // Check off globally if any player completes it
+};
+
 // Enum to identify the tracker sections
 enum TrackerSection {
     SECTION_COUNTERS, // Counter goals (completion counters) - above other sections by default
@@ -87,6 +101,11 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_PER_WORLD_NOTES true // When true the notes are per world, otherwise per template
 #define DEFAULT_CHECK_FOR_UPDATES true
 #define DEFAULT_SHOW_WELCOME_ON_STARTUP true
+
+// Co-op Defaults
+#define DEFAULT_NETWORK_MODE NETWORK_SINGLEPLAYER
+#define DEFAULT_COOP_GOAL_LOGIC COOP_TRACK_MAX_PROGRESS
+#define DEFAULT_HOST_PORT "25565"
 
 // DEFINE DEFAULT SETTINGS
 #define DEFAULT_VERSION "1.16.1"  // Also needs to be changed in settings_load()
@@ -294,6 +313,12 @@ struct AppSettings {
     bool overlay_show_update_timer; // If true, the update timer is shown in the overlay.
     bool check_for_updates; // If true, checks for new versions on startup
     bool show_welcome_on_startup; // If true, shows the welcome message on startup
+
+    // --- Co-op Settings ---
+    NetworkMode network_mode; // Singleplayer, Host, or Receiver
+    CoopGoalLogic coop_goal_logic; // How to merge progress from multiple players
+    char host_port[16]; // The port the host listens on (default "25565" - Force Port Mod)
+    char receiver_invite_code[512]; // Base64-encoded connection string pasted by receivers
 };
 
 

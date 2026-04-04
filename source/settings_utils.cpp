@@ -73,6 +73,38 @@ static OverlayProgressTextAlignment string_to_overlay_text_align(const char *str
     return OVERLAY_PROGRESS_TEXT_ALIGN_LEFT;
 }
 
+static const char *network_mode_to_string(NetworkMode mode) {
+    switch (mode) {
+        case NETWORK_HOST: return "host";
+        case NETWORK_RECEIVER: return "receiver";
+        case NETWORK_SINGLEPLAYER:
+        default: return "singleplayer"; // Singleplayer is default
+    }
+}
+
+static NetworkMode string_to_network_mode(const char *str) {
+    if (!str) return NETWORK_SINGLEPLAYER;
+    if (strcmp(str, "host") == 0) return NETWORK_HOST;
+    if (strcmp(str, "receiver") == 0) return NETWORK_RECEIVER;
+    return NETWORK_SINGLEPLAYER; // Fallback
+}
+
+static const char *coop_goal_logic_to_string(CoopGoalLogic logic) {
+    switch (logic) {
+        case COOP_TRACK_FIRST_START: return "first_start";
+        case COOP_TRACK_ANY_COMPLETION: return "any_completion";
+        case COOP_TRACK_MAX_PROGRESS:
+        default: return "max_progress"; // Default
+    }
+}
+
+static CoopGoalLogic string_to_coop_goal_logic(const char *str) {
+    if (!str) return COOP_TRACK_MAX_PROGRESS;
+    if (strcmp(str, "first_start") == 0) return COOP_TRACK_FIRST_START;
+    if (strcmp(str, "any_completion") == 0) return COOP_TRACK_ANY_COMPLETION;
+    return COOP_TRACK_MAX_PROGRESS; // Default
+}
+
 // Helper Prototypes for Loading/Saving
 static cJSON *get_or_create_object(cJSON *parent, const char *key) {
     cJSON *obj = cJSON_GetObjectItem(parent, key);
@@ -398,6 +430,13 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_show_progress = true;
     settings->overlay_show_igt = true;
     settings->overlay_show_update_timer = true;
+
+    // Co-op Defaults
+    settings->network_mode = DEFAULT_NETWORK_MODE;
+    settings->coop_goal_logic = DEFAULT_COOP_GOAL_LOGIC;
+    strncpy(settings->host_port, DEFAULT_HOST_PORT, sizeof(settings->host_port) - 1);
+    settings->host_port[sizeof(settings->host_port) - 1] = '\0';
+    settings->receiver_invite_code[0] = '\0';
 }
 
 bool settings_load(AppSettings *settings) {
@@ -1035,6 +1074,46 @@ bool settings_load(AppSettings *settings) {
         settings->adv_bg_done_path[sizeof(settings->adv_bg_done_path) - 1] = '\0';
     }
 
+    // Load Co-op Settings
+    cJSON *coop_settings = cJSON_GetObjectItem(json, "coop");
+    if (coop_settings) {
+        const cJSON *net_mode = cJSON_GetObjectItem(coop_settings, "network_mode");
+        if (net_mode && cJSON_IsString(net_mode))
+            settings->network_mode = string_to_network_mode(net_mode->valuestring);
+        else {
+            settings->network_mode = DEFAULT_NETWORK_MODE;
+            defaults_were_used = true;
+        }
+
+        const cJSON *goal_logic = cJSON_GetObjectItem(coop_settings, "goal_logic");
+        if (goal_logic && cJSON_IsString(goal_logic))
+            settings->coop_goal_logic = string_to_coop_goal_logic(goal_logic->valuestring);
+        else {
+            settings->coop_goal_logic = DEFAULT_COOP_GOAL_LOGIC;
+            defaults_were_used = true;
+        }
+
+        const cJSON *port = cJSON_GetObjectItem(coop_settings, "host_port");
+        if (port && cJSON_IsString(port)) {
+            strncpy(settings->host_port, port->valuestring, sizeof(settings->host_port) - 1);
+            settings->host_port[sizeof(settings->host_port) - 1] = '\0';
+        } else {
+            strncpy(settings->host_port, DEFAULT_HOST_PORT, sizeof(settings->host_port) - 1);
+            settings->host_port[sizeof(settings->host_port) - 1] = '\0';
+            defaults_were_used = true;
+        }
+
+        const cJSON *invite = cJSON_GetObjectItem(coop_settings, "receiver_invite_code");
+        if (invite && cJSON_IsString(invite)) {
+            strncpy(settings->receiver_invite_code, invite->valuestring, sizeof(settings->receiver_invite_code) - 1);
+            settings->receiver_invite_code[sizeof(settings->receiver_invite_code) - 1] = '\0';
+        } else {
+            settings->receiver_invite_code[0] = '\0';
+        }
+    } else {
+        defaults_were_used = true;
+    }
+
     // Parse hotkeys
     const cJSON *hotkeys_json = cJSON_GetObjectItem(json, "hotkeys");
     if (cJSON_IsArray(hotkeys_json)) {
@@ -1220,6 +1299,19 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(general_obj, "overlay_show_update_timer");
         cJSON_AddItemToObject(general_obj, "overlay_show_update_timer",
                               cJSON_CreateBool(settings->overlay_show_update_timer));
+
+        // --- Save Co-op Settings ---
+        cJSON *coop_obj = get_or_create_object(root, "coop");
+        cJSON_DeleteItemFromObject(coop_obj, "network_mode");
+        cJSON_AddItemToObject(coop_obj, "network_mode",
+                              cJSON_CreateString(network_mode_to_string(settings->network_mode)));
+        cJSON_DeleteItemFromObject(coop_obj, "goal_logic");
+        cJSON_AddItemToObject(coop_obj, "goal_logic",
+                              cJSON_CreateString(coop_goal_logic_to_string(settings->coop_goal_logic)));
+        cJSON_DeleteItemFromObject(coop_obj, "host_port");
+        cJSON_AddItemToObject(coop_obj, "host_port", cJSON_CreateString(settings->host_port));
+        cJSON_DeleteItemFromObject(coop_obj, "receiver_invite_code");
+        cJSON_AddItemToObject(coop_obj, "receiver_invite_code", cJSON_CreateString(settings->receiver_invite_code));
     }
 
 
