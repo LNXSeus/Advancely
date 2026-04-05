@@ -117,19 +117,6 @@ typedef struct {
     float time_since_last_update;
 } OverlayIPCHeader;
 
-#ifdef _WIN32
-// Warning the user with a popup window if file path contains non-ascii characters
-// Especially a problem on windows
-static bool path_contains_non_ascii(const char *path) {
-    for (const char *p = path; *p; ++p) {
-        // Check if the character has a value outside the standard ASCII range
-        if ((unsigned char) *p > 127) {
-            return true;
-        }
-    }
-    return false;
-}
-#endif
 
 // All builds now have the resources folder on the same level as the executable or .app bundle
 static void find_and_set_resource_path(char *path_buffer, size_t buffer_size) {
@@ -801,28 +788,6 @@ int main(int argc, char *argv[]) {
     // As we're not only using SDL_main() as our entry point
     SDL_SetMainReady();
 
-    // --- Non-ASCII Path Check (Windows-specific) ---
-#ifdef _WIN32
-    char exe_path_check[MAX_PATH_LENGTH];
-    if (get_executable_path(exe_path_check, sizeof(exe_path_check))) {
-        if (path_contains_non_ascii(exe_path_check)) {
-            // Initialize SDL video subsystem just to be able to show a message box
-            if (!SDL_Init(SDL_INIT_VIDEO)) {
-                // Fallback if SDL can't even initialize
-                log_message(
-                    LOG_ERROR, "Critical Path Error: Advancely cannot run from a path with special characters.\n");
-                return EXIT_FAILURE;
-            }
-            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,
-                                     "Invalid Path Error",
-                                     "Advancely cannot run from a folder path that contains special or non-English characters (e.g., ü, ö, ß).\n\n"
-                                     "Please move the application to a simple path (e.g., C:\\Users\\YourName\\Desktop\\Advancely) and run it again.",
-                                     nullptr);
-            SDL_Quit();
-            return EXIT_FAILURE;
-        }
-    }
-#endif
 
     bool should_exit_after_update_check = false; // To signal exit after updating
 

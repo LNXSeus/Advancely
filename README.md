@@ -355,11 +355,6 @@ _Massive thanks to [uku3lig](https://git.uku3lig.net/uku) for the NixOS package!
 
 To ensure the application works correctly, please follow the instructions for your operating system.
 
-> **✔️ Important: Use English-Only (ASCII) File Paths**
->
-> To prevent errors, please make sure the **entire folder path** to your Advancely application contains **only standard
-English (ASCII) characters**.
-
 <details>
 <summary><strong>🍎 macOS Instructions</strong></summary>
 <br>
@@ -1056,9 +1051,6 @@ Suggest it in the [Official Advancely Discord](https://discord.gg/TyNgXDz) withi
   detect Advancely.exe as a virus. So make sure your Windows Defender version is up to date. Get the latest
   version [here](https://docs.microsoft.com/microsoft-365/security/defender-endpoint/manage-updates-baselines-microsoft-defender-antivirus).
   Also **don't** open Advancely using **Jingle**.
-* **Is the tracker in a path with special characters?**: Ensure the full folder path to `Advancely.exe` (e.g.,
-  `C:\Users\Jörg\...`) contains only standard English letters and numbers. Special characters can cause errors when
-  loading files.
 * **Multiple Advancely Windows**: If for whatever reason you have Advancely open multiple times the Overlay will most
   likely glitch out as it's a separate process and it then doesn't know from which main Advancely process to read
   from. So make sure to only ever have `ONE Advancely window` open at all times.

@@ -54,7 +54,7 @@ bool tracker_init_sdl(Tracker *t, const AppSettings *settings) {
     } else {
         log_message(
             LOG_ERROR,
-            "[INIT SDL] Failed to load tracker window icon (asure path contains only standard English (ASCII) characters): %s\n",
+            "[INIT SDL] Failed to load tracker window icon: %s\n",
             SDL_GetError());
     }
 

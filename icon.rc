@@ -4,3 +4,9 @@
 // IDI_ICON1 is a standard name for the main application icon.
 // The path must be relative to the project's root directory.
 IDI_ICON1 ICON "resources/gui/Advancely_Icon.ico"
+
+// Embed the application manifest to enable UTF-8 as the process code page.
+// This allows all char*-based APIs (fopen, FindFirstFileA, etc.) to handle
+// Unicode paths natively without needing wide-string (W) API variants.
+// Requires Windows 10 version 1903 or later.
+1 24 "Advancely.manifest"

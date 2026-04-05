@@ -69,7 +69,7 @@ static bool get_auto_saves_path(char *out_path, size_t max_len) {
     PWSTR appdata_path_wide = nullptr;
     if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &appdata_path_wide))) {
         char appdata_path[MAX_PATH];
-        wcstombs(appdata_path, appdata_path_wide, MAX_PATH);
+        WideCharToMultiByte(CP_UTF8, 0, appdata_path_wide, -1, appdata_path, MAX_PATH, nullptr, nullptr);
         CoTaskMemFree(appdata_path_wide);
         snprintf(out_path, max_len, "%s/.minecraft/saves", appdata_path);
         return true;
@@ -289,7 +289,7 @@ static bool get_active_instance_saves_path(char *out_path, size_t max_len) {
                             }
 
                             if (extracted_path_w[0] != L'\0') {
-                                wcstombs(instance_path_mbs, extracted_path_w, sizeof(instance_path_mbs));
+                                WideCharToMultiByte(CP_UTF8, 0, extracted_path_w, -1, instance_path_mbs, sizeof(instance_path_mbs), nullptr, nullptr);
 
                                 // Trim /natives if the path came from Djava.library.path
                                 if (wcsstr(cmd_line, keys[0])) {

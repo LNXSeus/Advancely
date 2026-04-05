@@ -3317,7 +3317,7 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     if (!t->minecraft_font) {
         log_message(
             LOG_ERROR,
-            "[TRACKER] Failed to load Minecraft font (asure path contains only standard English (ASCII) characters): %s\n",
+            "[TRACKER] Failed to load Minecraft font: %s\n",
             SDL_GetError());
         tracker_free(tracker, settings);
         return false;

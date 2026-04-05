@@ -468,8 +468,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "Lock the tracker to one specific world folder.\n"
                          "Unlike other modes, the tracker stays on the chosen world\n"
                          "regardless of which world you open next in Minecraft.\n"
-                         "Useful for long-form playthroughs, modded runs, or setups\n"
-                         "where you always want to track a specific save.\n"
                          "This is Path Mode: %d", PATH_MODE_FIXED_WORLD);
                 ImGui::SetTooltip("%s", tooltip);
             }
