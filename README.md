@@ -980,7 +980,7 @@ This way templates don't need to be copied for each subversion.
 | `all_advancements` | 1.12, 1.13, 25w14craftmine                        |                                     | Default             |
 | `all_advancements` | 1.14, 1.15, 1.16.1, 1.21.3, 1.21.6, 1.21.11, 26.1 |                                     | Default, ger, zh_cn |
 | `all_advancements` | 1.16.1                                            | `_categorical`, `_aatool_optimized` | Default, ger, zh_cn |
-| `all_advancements` | 1.17                                              | `_aatool_optimized`                 | Default, ger, zh_cn |
+| `all_advancements` | 1.17                                              | `_aatool_optimized`                 | Default, ger, zh_cn |/
 | `all_advancements` | 1.21.3, 1.21.6, 1.21.11, 26.1                     | `_optimized`                        | Default, ger, zh_cn |
 | `miku%`            | 1.21                                              |                                     | Default             |
 | `all_trims`        | 1.21                                              |                                     | Default             |

@@ -273,9 +273,22 @@ struct EditorTemplate {
 };
 
 // Helper: propagate a rename through a vector of EditorCounterLinkedGoal
+// If new_name is empty, matching linked goals are removed instead of updated.
 static void propagate_rename_in_linked_goals(std::vector<EditorCounterLinkedGoal> &linked_goals,
                                              const char *old_name, const char *new_name,
                                              const char *parent_root) {
+    if (new_name[0] == '\0') {
+        // Remove linked goals whose root_name matches old_name (with optional parent_root filter)
+        linked_goals.erase(
+            std::remove_if(linked_goals.begin(), linked_goals.end(), [&](const EditorCounterLinkedGoal &lg) {
+                if (strcmp(lg.root_name, old_name) != 0) return false;
+                if (parent_root && (lg.parent_root[0] == '\0' || strcmp(lg.parent_root, parent_root) != 0))
+                    return false;
+                return true;
+            }),
+            linked_goals.end());
+        return;
+    }
     for (auto &lg: linked_goals) {
         if (strcmp(lg.root_name, old_name) == 0) {
             if (!parent_root || (lg.parent_root[0] != '\0' && strcmp(lg.parent_root, parent_root) == 0)) {
@@ -290,12 +303,13 @@ static void propagate_rename_in_linked_goals(std::vector<EditorCounterLinkedGoal
     }
 }
 
-// Helper: when a goal's root_name is renamed, propagate the change to all arrow links, counter linked goals, and stat linked goals
+// Helper: when a goal's root_name is renamed, propagate the change to all arrow links, counter linked goals, custom goal linked goals, and stat linked goals
 static void propagate_goal_rename(std::vector<EditorDecorationElement> &decorations,
                                   std::vector<EditorCounterGoal> &counter_goals,
                                   const char *old_name, const char *new_name,
                                   const char *parent_root = nullptr,
-                                  std::vector<EditorTrackableCategory> *stats = nullptr) {
+                                  std::vector<EditorTrackableCategory> *stats = nullptr,
+                                  std::vector<EditorTrackableItem> *custom_goals = nullptr) {
     if (old_name[0] == '\0' || strcmp(old_name, new_name) == 0) return;
     for (auto &deco: decorations) {
         if (deco.type == DECORATION_ARROW) {
@@ -325,12 +339,21 @@ static void propagate_goal_rename(std::vector<EditorDecorationElement> &decorati
             }
         }
     }
+    // Also update custom goal linked goals
+    if (custom_goals) {
+        for (auto &cg: *custom_goals) {
+            propagate_rename_in_linked_goals(cg.linked_goals, old_name, new_name, parent_root);
+        }
+    }
 }
 
-// Helper: when a multi-stage goal's stage_id is renamed, propagate to arrow links
+// Helper: when a multi-stage goal's stage_id is renamed, propagate to arrow links, counter linked goals, custom goal linked goals, and stat linked goals
 static void propagate_stage_rename(std::vector<EditorDecorationElement> &decorations,
+                                   std::vector<EditorCounterGoal> &counter_goals,
                                    const char *parent_root, const char *old_stage_id,
-                                   const char *new_stage_id) {
+                                   const char *new_stage_id,
+                                   std::vector<EditorTrackableCategory> *stats = nullptr,
+                                   std::vector<EditorTrackableItem> *custom_goals = nullptr) {
     if (old_stage_id[0] == '\0' || strcmp(old_stage_id, new_stage_id) == 0) return;
     for (auto &deco: decorations) {
         if (deco.type == DECORATION_ARROW) {
@@ -347,6 +370,49 @@ static void propagate_stage_rename(std::vector<EditorDecorationElement> &decorat
         }
         if (deco.type == DECORATION_TEXT_HEADER) {
             for (auto &lg: deco.linked_goals) {
+                if (strcmp(lg.root_name, parent_root) == 0 &&
+                    strcmp(lg.stage_id, old_stage_id) == 0) {
+                    strncpy(lg.stage_id, new_stage_id, sizeof(lg.stage_id) - 1);
+                    lg.stage_id[sizeof(lg.stage_id) - 1] = '\0';
+                }
+            }
+        }
+    }
+    // Also update counter linked goals
+    for (auto &counter: counter_goals) {
+        for (auto &lg: counter.linked_goals) {
+            if (strcmp(lg.root_name, parent_root) == 0 &&
+                strcmp(lg.stage_id, old_stage_id) == 0) {
+                strncpy(lg.stage_id, new_stage_id, sizeof(lg.stage_id) - 1);
+                lg.stage_id[sizeof(lg.stage_id) - 1] = '\0';
+            }
+        }
+    }
+    // Also update stat linked goals
+    if (stats) {
+        for (auto &stat: *stats) {
+            for (auto &lg: stat.linked_goals) {
+                if (strcmp(lg.root_name, parent_root) == 0 &&
+                    strcmp(lg.stage_id, old_stage_id) == 0) {
+                    strncpy(lg.stage_id, new_stage_id, sizeof(lg.stage_id) - 1);
+                    lg.stage_id[sizeof(lg.stage_id) - 1] = '\0';
+                }
+            }
+            for (auto &crit: stat.criteria) {
+                for (auto &lg: crit.linked_goals) {
+                    if (strcmp(lg.root_name, parent_root) == 0 &&
+                        strcmp(lg.stage_id, old_stage_id) == 0) {
+                        strncpy(lg.stage_id, new_stage_id, sizeof(lg.stage_id) - 1);
+                        lg.stage_id[sizeof(lg.stage_id) - 1] = '\0';
+                    }
+                }
+            }
+        }
+    }
+    // Also update custom goal linked goals
+    if (custom_goals) {
+        for (auto &cg: *custom_goals) {
+            for (auto &lg: cg.linked_goals) {
                 if (strcmp(lg.root_name, parent_root) == 0 &&
                     strcmp(lg.stage_id, old_stage_id) == 0) {
                     strncpy(lg.stage_id, new_stage_id, sizeof(lg.stage_id) - 1);
@@ -5207,14 +5273,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         ImGui::Separator();
 
-                        char old_adv_root[192];
-                        strncpy(old_adv_root, advancement.root_name, sizeof(old_adv_root));
-                        old_adv_root[sizeof(old_adv_root) - 1] = '\0';
+                        static char focused_adv_root[192] = {};
                         if (ImGui::InputText("Root Name", advancement.root_name, sizeof(advancement.root_name))) {
-                            propagate_goal_rename(current_template_data.decorations,
-                                                  current_template_data.counter_goals, old_adv_root,
-                                                  advancement.root_name, nullptr, &current_template_data.stats);
                             save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemActivated()) {
+                            strncpy(focused_adv_root, advancement.root_name, sizeof(focused_adv_root));
+                            focused_adv_root[sizeof(focused_adv_root) - 1] = '\0';
+                        }
+                        if (ImGui::IsItemDeactivatedAfterEdit()) {
+                            propagate_goal_rename(current_template_data.decorations,
+                                                  current_template_data.counter_goals, focused_adv_root,
+                                                  advancement.root_name, nullptr, &current_template_data.stats,
+                                                  &current_template_data.custom_goals);
                         }
                         if (ImGui::IsItemHovered()) {
                             char root_name_tooltip_buffer[128];
@@ -5573,16 +5644,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 scroll_to_child_root_name[0] = '\0';
                             }
 
-                            char old_crit_root[192];
-                            strncpy(old_crit_root, criterion.root_name, sizeof(old_crit_root));
-                            old_crit_root[sizeof(old_crit_root) - 1] = '\0';
+                            static char focused_crit_root[192] = {};
                             if (ImGui::InputText("Criterion Root Name", criterion.root_name,
-                                                 sizeof(criterion.root_name))) {
-                                propagate_goal_rename(current_template_data.decorations,
-                                                      current_template_data.counter_goals, old_crit_root,
-                                                      criterion.root_name, advancement.root_name,
-                                                      &current_template_data.stats);
+                                             sizeof(criterion.root_name))) {
                                 save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemActivated()) {
+                                strncpy(focused_crit_root, criterion.root_name, sizeof(focused_crit_root));
+                                focused_crit_root[sizeof(focused_crit_root) - 1] = '\0';
+                            }
+                            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                                propagate_goal_rename(current_template_data.decorations,
+                                                      current_template_data.counter_goals, focused_crit_root,
+                                                      criterion.root_name, advancement.root_name,
+                                                      &current_template_data.stats,
+                                                      &current_template_data.custom_goals);
                             }
                             if (ImGui::IsItemHovered()) {
                                 char root_name_tooltip_buffer[128];
@@ -6415,14 +6491,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         ImGui::Separator();
 
-                        char old_stat_root[192];
-                        strncpy(old_stat_root, stat_cat.root_name, sizeof(old_stat_root));
-                        old_stat_root[sizeof(old_stat_root) - 1] = '\0';
+                        static char focused_stat_root[192] = {};
                         if (ImGui::InputText("Category Key", stat_cat.root_name, sizeof(stat_cat.root_name))) {
-                            propagate_goal_rename(current_template_data.decorations,
-                                                  current_template_data.counter_goals, old_stat_root,
-                                                  stat_cat.root_name, nullptr, &current_template_data.stats);
                             save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemActivated()) {
+                            strncpy(focused_stat_root, stat_cat.root_name, sizeof(focused_stat_root));
+                            focused_stat_root[sizeof(focused_stat_root) - 1] = '\0';
+                        }
+                        if (ImGui::IsItemDeactivatedAfterEdit()) {
+                            propagate_goal_rename(current_template_data.decorations,
+                                                  current_template_data.counter_goals, focused_stat_root,
+                                                  stat_cat.root_name, nullptr, &current_template_data.stats,
+                                                  &current_template_data.custom_goals);
                         }
                         if (ImGui::IsItemHovered()) {
                             char root_name_tooltip_buffer[128];
@@ -6666,16 +6747,21 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (stat_cat.criteria.empty()) stat_cat.criteria.push_back({}); // Ensure one exists
 
                             auto &simple_crit = stat_cat.criteria[0];
-                            char old_simple_stat_root[192];
-                            strncpy(old_simple_stat_root, simple_crit.root_name, sizeof(old_simple_stat_root));
-                            old_simple_stat_root[sizeof(old_simple_stat_root) - 1] = '\0';
+                            static char focused_simple_stat_root[192] = {};
                             if (ImGui::InputText("Stat Root Name", simple_crit.root_name,
-                                                 sizeof(simple_crit.root_name))) {
-                                propagate_goal_rename(current_template_data.decorations,
-                                                      current_template_data.counter_goals, old_simple_stat_root,
-                                                      simple_crit.root_name, stat_cat.root_name,
-                                                      &current_template_data.stats);
+                                             sizeof(simple_crit.root_name))) {
                                 save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemActivated()) {
+                                strncpy(focused_simple_stat_root, simple_crit.root_name, sizeof(focused_simple_stat_root));
+                                focused_simple_stat_root[sizeof(focused_simple_stat_root) - 1] = '\0';
+                            }
+                            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                                propagate_goal_rename(current_template_data.decorations,
+                                                      current_template_data.counter_goals, focused_simple_stat_root,
+                                                      simple_crit.root_name, stat_cat.root_name,
+                                                      &current_template_data.stats,
+                                                      &current_template_data.custom_goals);
                             }
                             if (ImGui::IsItemHovered()) {
                                 char stat_root_name_tooltip_buffer[256];
@@ -6953,15 +7039,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     scroll_to_child_root_name[0] = '\0';
                                 }
 
-                                char old_sub_stat_root[192];
-                                strncpy(old_sub_stat_root, crit.root_name, sizeof(old_sub_stat_root));
-                                old_sub_stat_root[sizeof(old_sub_stat_root) - 1] = '\0';
+                                static char focused_sub_stat_root[192] = {};
                                 if (ImGui::InputText("Sub-Stat Root Name", crit.root_name, sizeof(crit.root_name))) {
-                                    propagate_goal_rename(current_template_data.decorations,
-                                                          current_template_data.counter_goals, old_sub_stat_root,
-                                                          crit.root_name, stat_cat.root_name,
-                                                          &current_template_data.stats);
                                     save_message_type = MSG_NONE;
+                                }
+                                if (ImGui::IsItemActivated()) {
+                                    strncpy(focused_sub_stat_root, crit.root_name, sizeof(focused_sub_stat_root));
+                                    focused_sub_stat_root[sizeof(focused_sub_stat_root) - 1] = '\0';
+                                }
+                                if (ImGui::IsItemDeactivatedAfterEdit()) {
+                                    propagate_goal_rename(current_template_data.decorations,
+                                                          current_template_data.counter_goals, focused_sub_stat_root,
+                                                          crit.root_name, stat_cat.root_name,
+                                                          &current_template_data.stats,
+                                                          &current_template_data.custom_goals);
                                 }
                                 if (ImGui::IsItemHovered()) {
                                     char stat_root_name_tooltip_buffer[256];
@@ -7519,14 +7610,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             scroll_to_goal_root_name[0] = '\0';
                         }
 
-                        char old_unlock_root[192];
-                        strncpy(old_unlock_root, unlock.root_name, sizeof(old_unlock_root));
-                        old_unlock_root[sizeof(old_unlock_root) - 1] = '\0';
+                        static char focused_unlock_root[192] = {};
                         if (ImGui::InputText("Root Name", unlock.root_name, sizeof(unlock.root_name))) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemActivated()) {
+                            strncpy(focused_unlock_root, unlock.root_name, sizeof(focused_unlock_root));
+                            focused_unlock_root[sizeof(focused_unlock_root) - 1] = '\0';
+                        }
+                        if (ImGui::IsItemDeactivatedAfterEdit()) {
                             propagate_goal_rename(current_template_data.decorations,
-                                                  current_template_data.counter_goals, old_unlock_root,
-                                                  unlock.root_name, nullptr, &current_template_data.stats);
-                            save_message_type = MSG_NONE; // Clear message on new edit
+                                                  current_template_data.counter_goals, focused_unlock_root,
+                                                  unlock.root_name, nullptr, &current_template_data.stats,
+                                                  &current_template_data.custom_goals);
                         }
                         if (ImGui::IsItemHovered()) {
                             char root_name_tooltip_buffer[256];
@@ -7912,14 +8008,19 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             scroll_to_goal_root_name[0] = '\0';
                         }
 
-                        char old_cg_root[192];
-                        strncpy(old_cg_root, goal.root_name, sizeof(old_cg_root));
-                        old_cg_root[sizeof(old_cg_root) - 1] = '\0';
+                        static char focused_cg_root[192] = {};
                         if (ImGui::InputText("Goal Root Name", goal.root_name, sizeof(goal.root_name))) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemActivated()) {
+                            strncpy(focused_cg_root, goal.root_name, sizeof(focused_cg_root));
+                            focused_cg_root[sizeof(focused_cg_root) - 1] = '\0';
+                        }
+                        if (ImGui::IsItemDeactivatedAfterEdit()) {
                             propagate_goal_rename(current_template_data.decorations,
-                                                  current_template_data.counter_goals, old_cg_root, goal.root_name,
-                                                  nullptr, &current_template_data.stats);
-                            save_message_type = MSG_NONE; // Clear message on new edit
+                                                  current_template_data.counter_goals, focused_cg_root, goal.root_name,
+                                                  nullptr, &current_template_data.stats,
+                                                  &current_template_data.custom_goals);
                         }
                         if (ImGui::IsItemHovered()) {
                             char root_name_tooltip_buffer[256];
@@ -8816,15 +8917,20 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         ImGui::Separator();
 
-                        char old_msg_root[192];
-                        strncpy(old_msg_root, goal.root_name, sizeof(old_msg_root));
-                        old_msg_root[sizeof(old_msg_root) - 1] = '\0';
+                        static char focused_msg_root[192] = {};
                         if (ImGui::InputText("Goal Root Name", goal.root_name, sizeof(goal.root_name))) {
-                            propagate_goal_rename(current_template_data.decorations,
-                                                  current_template_data.counter_goals, old_msg_root, goal.root_name,
-                                                  nullptr, &current_template_data.stats);
                             ms_goal_data_changed = true;
                             save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemActivated()) {
+                            strncpy(focused_msg_root, goal.root_name, sizeof(focused_msg_root));
+                            focused_msg_root[sizeof(focused_msg_root) - 1] = '\0';
+                        }
+                        if (ImGui::IsItemDeactivatedAfterEdit()) {
+                            propagate_goal_rename(current_template_data.decorations,
+                                                  current_template_data.counter_goals, focused_msg_root, goal.root_name,
+                                                  nullptr, &current_template_data.stats,
+                                                  &current_template_data.custom_goals);
                         }
                         if (ImGui::IsItemHovered()) {
                             char root_name_tooltip_buffer[256];
@@ -9230,14 +9336,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                             // Group all stage controls to make them a single drag source
                             ImGui::BeginGroup();
-                            char old_stage_id[64];
-                            strncpy(old_stage_id, stage.stage_id, sizeof(old_stage_id));
-                            old_stage_id[sizeof(old_stage_id) - 1] = '\0';
+                            static char focused_stage_id[64] = {};
                             if (ImGui::InputText("Stage ID", stage.stage_id, sizeof(stage.stage_id))) {
-                                propagate_stage_rename(current_template_data.decorations, goal.root_name, old_stage_id,
-                                                       stage.stage_id);
                                 ms_goal_data_changed = true;
                                 save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemActivated()) {
+                                strncpy(focused_stage_id, stage.stage_id, sizeof(focused_stage_id));
+                                focused_stage_id[sizeof(focused_stage_id) - 1] = '\0';
+                            }
+                            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                                propagate_stage_rename(current_template_data.decorations,
+                                                       current_template_data.counter_goals,
+                                                       goal.root_name, focused_stage_id,
+                                                       stage.stage_id,
+                                                       &current_template_data.stats,
+                                                       &current_template_data.custom_goals);
                             }
                             if (ImGui::IsItemHovered()) {
                                 char tooltip_buffer[256];
@@ -10169,19 +10283,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         ImGui::Separator();
 
                         // Root Name
-                        char old_counter_root[192];
-                        strncpy(old_counter_root, counter.root_name, sizeof(old_counter_root) - 1);
-                        old_counter_root[sizeof(old_counter_root) - 1] = '\0';
+                        static char focused_counter_root[192] = {};
                         if (ImGui::InputText("Root Name##Counter", counter.root_name, sizeof(counter.root_name))) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemActivated()) {
+                            strncpy(focused_counter_root, counter.root_name, sizeof(focused_counter_root));
+                            focused_counter_root[sizeof(focused_counter_root) - 1] = '\0';
+                        }
+                        if (ImGui::IsItemDeactivatedAfterEdit()) {
                             if (counter.root_name[0] == '\0') {
-                                strncpy(counter.root_name, old_counter_root, sizeof(counter.root_name) - 1);
+                                strncpy(counter.root_name, focused_counter_root, sizeof(counter.root_name) - 1);
                                 counter.root_name[sizeof(counter.root_name) - 1] = '\0';
                             } else {
                                 propagate_goal_rename(current_template_data.decorations,
                                                       current_template_data.counter_goals,
-                                                      old_counter_root, counter.root_name,
-                                                      nullptr, &current_template_data.stats);
-                                save_message_type = MSG_NONE;
+                                                      focused_counter_root, counter.root_name,
+                                                      nullptr, &current_template_data.stats,
+                                                      &current_template_data.custom_goals);
                             }
                         }
                         if (ImGui::IsItemHovered()) {

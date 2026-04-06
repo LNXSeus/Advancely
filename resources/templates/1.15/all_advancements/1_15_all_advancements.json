@@ -2113,6 +2113,9 @@
 			"linked_goals":	[{
 					"root_name":	"ms_goal:thunder",
 					"stage_id":	"1"
+				}, {
+					"root_name":	"ms_goal:hdwgh",
+					"stage_id":	"1"
 				}],
 			"icon_pos":	{
 				"x":	1020,
@@ -2137,10 +2140,10 @@
 			"root_name":	"minecraft:picked_up/minecraft:bee_nest",
 			"target":	-1,
 			"linked_goals":	[{
-					"root_name":	"ms_goal:bees",
-					"stage_id":	"new_stage_2"
-				}, {
 					"root_name":	"minecraft:husbandry/silk_touch_nest"
+				}, {
+					"root_name":	"ms_goal:bees",
+					"stage_id":	"2"
 				}],
 			"icon_pos":	{
 				"x":	1020,
