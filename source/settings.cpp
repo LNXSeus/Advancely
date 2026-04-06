@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "dialog_utils.h"
+#include "mojang_api.h"
 #include "settings_utils.h" // ImGui imported through this
 #include "global_event_handler.h" // For global variables
 #include "path_utils.h" // For path_exists()
@@ -124,8 +125,18 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->network_mode != b->network_mode ||
         a->coop_goal_logic != b->coop_goal_logic ||
         strcmp(a->host_port, b->host_port) != 0 ||
-        strcmp(a->receiver_invite_code, b->receiver_invite_code) != 0) {
+        strcmp(a->receiver_invite_code, b->receiver_invite_code) != 0 ||
+        a->coop_player_count != b->coop_player_count) {
         return true;
+    }
+
+    // Compare player roster
+    for (int i = 0; i < a->coop_player_count; ++i) {
+        if (strcmp(a->coop_players[i].username, b->coop_players[i].username) != 0 ||
+            strcmp(a->coop_players[i].uuid, b->coop_players[i].uuid) != 0 ||
+            strcmp(a->coop_players[i].display_name, b->coop_players[i].display_name) != 0) {
+            return true;
+        }
     }
 
     // Compare hotkeys separately
@@ -2335,6 +2346,125 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::PopID();
                 }
                 temp_settings.coop_goal_logic = (CoopGoalLogic) logic;
+
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::Spacing();
+
+                // --- Player Roster ---
+                ImGui::Text("Player Roster");
+                ImGui::TextDisabled("Add Minecraft usernames to track. UUIDs are fetched automatically.");
+                ImGui::Spacing();
+
+                // Add player input
+                static char new_username[64] = "";
+                static char roster_status_msg[256] = "";
+                static bool roster_status_is_error = false;
+
+                ImGui::SetNextItemWidth(200.0f);
+                ImGui::InputText("##new_username", new_username, sizeof(new_username));
+                ImGui::SameLine();
+                bool can_add = new_username[0] != '\0' && temp_settings.coop_player_count < MAX_COOP_PLAYERS;
+                if (!can_add) ImGui::BeginDisabled();
+                if (ImGui::Button("Add Player")) {
+                    // Check for duplicate username
+                    bool duplicate = false;
+                    for (int i = 0; i < temp_settings.coop_player_count; i++) {
+                        if (strcmp(temp_settings.coop_players[i].username, new_username) == 0) {
+                            duplicate = true;
+                            break;
+                        }
+                    }
+                    if (duplicate) {
+                        snprintf(roster_status_msg, sizeof(roster_status_msg),
+                                 "Player '%s' is already in the roster.", new_username);
+                        roster_status_is_error = true;
+                    } else {
+                        char fetched_uuid[48] = "";
+                        bool fetched = mojang_fetch_uuid(new_username, fetched_uuid, sizeof(fetched_uuid));
+                        if (fetched) {
+                            CoopPlayer *p = &temp_settings.coop_players[temp_settings.coop_player_count];
+                            memset(p, 0, sizeof(CoopPlayer));
+                            strncpy(p->username, new_username, sizeof(p->username) - 1);
+                            strncpy(p->uuid, fetched_uuid, sizeof(p->uuid) - 1);
+                            p->display_name[0] = '\0';
+                            temp_settings.coop_player_count++;
+                            snprintf(roster_status_msg, sizeof(roster_status_msg),
+                                     "Added '%s' (UUID: %s)", new_username, fetched_uuid);
+                            roster_status_is_error = false;
+                            new_username[0] = '\0';
+                        } else {
+                            snprintf(roster_status_msg, sizeof(roster_status_msg),
+                                     "Could not find player '%s'.\n"
+                                     "Check the username.", new_username);
+                            roster_status_is_error = true;
+                        }
+                    }
+                }
+                if (!can_add) ImGui::EndDisabled();
+
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                    char tooltip_buf[256];
+                    if (temp_settings.coop_player_count >= MAX_COOP_PLAYERS) {
+                        snprintf(tooltip_buf, sizeof(tooltip_buf), "Roster is full (%d players max).", MAX_COOP_PLAYERS);
+                    } else {
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Type a Minecraft username and click to fetch their UUID\n"
+                                 "from the Mojang API and add them to the roster.");
+                    }
+                    ImGui::SetTooltip("%s", tooltip_buf);
+                }
+
+                // Status message
+                if (roster_status_msg[0] != '\0') {
+                    if (roster_status_is_error)
+                        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", roster_status_msg);
+                    else
+                        ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "%s", roster_status_msg);
+                }
+
+                ImGui::Spacing();
+
+                // Player list
+                int remove_index = -1;
+                for (int i = 0; i < temp_settings.coop_player_count; i++) {
+                    ImGui::PushID(i + 1000); // Offset to avoid ID conflicts with goal logic
+                    CoopPlayer *p = &temp_settings.coop_players[i];
+
+                    // Display name (editable)
+                    ImGui::SetNextItemWidth(120.0f);
+                    char display_label[128];
+                    snprintf(display_label, sizeof(display_label), "##display_%d", i);
+                    ImGui::InputTextWithHint(display_label, "Display Name", p->display_name, sizeof(p->display_name));
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buf[256];
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Custom display name (leave empty to use '%s').\n"
+                                 "UUID: %s",
+                                 p->username, p->uuid);
+                        ImGui::SetTooltip("%s", tooltip_buf);
+                    }
+
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("%s", p->username);
+
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Remove")) {
+                        remove_index = i;
+                    }
+
+                    ImGui::PopID();
+                }
+
+                // Handle removal
+                if (remove_index >= 0) {
+                    for (int i = remove_index; i < temp_settings.coop_player_count - 1; i++) {
+                        temp_settings.coop_players[i] = temp_settings.coop_players[i + 1];
+                    }
+                    temp_settings.coop_player_count--;
+                    memset(&temp_settings.coop_players[temp_settings.coop_player_count], 0, sizeof(CoopPlayer));
+                    roster_status_msg[0] = '\0';
+                }
 
                 ImGui::Spacing();
                 ImGui::Separator();

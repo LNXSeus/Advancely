@@ -64,6 +64,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 
 #define MAX_WORLD_NOTES 32 // Limit for amount of per-world notes until they delete itself
 #define MAX_HOTKEYS 32 // Limit for amount of hotkeys
+#define MAX_COOP_PLAYERS 32 // Maximum number of players in a co-op session
 
 // DEFAULT values
 #define DEFAULT_ENABLE_OVERLAY false // Stream overlay will be off by default
@@ -146,6 +147,13 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 
 
 struct TemplateData;
+
+// A player in the co-op roster (Host tracks these)
+typedef struct {
+    char username[64];      // Minecraft username e.g., Notch
+    char uuid[48];          // UUID from Mojang API (with hyphens, e.g., "069a79f4-44e9-4726-a5be-fca90e38aaf5")
+    char display_name[64];  // Optional custom display name (empty = use username)
+} CoopPlayer;
 
 typedef struct {
     char target_goal[192];
@@ -319,6 +327,10 @@ struct AppSettings {
     CoopGoalLogic coop_goal_logic; // How to merge progress from multiple players
     char host_port[16]; // The port the host listens on (default "25565" - Force Port Mod)
     char receiver_invite_code[512]; // Base64-encoded connection string pasted by receivers
+
+    // --- Player Roster (Host only) ---
+    int coop_player_count; // Number of players in the roster
+    CoopPlayer coop_players[MAX_COOP_PLAYERS]; // The player roster
 };
 
 

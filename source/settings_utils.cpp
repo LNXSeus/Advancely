@@ -437,6 +437,8 @@ void settings_set_defaults(AppSettings *settings) {
     strncpy(settings->host_port, DEFAULT_HOST_PORT, sizeof(settings->host_port) - 1);
     settings->host_port[sizeof(settings->host_port) - 1] = '\0';
     settings->receiver_invite_code[0] = '\0';
+    settings->coop_player_count = 0;
+    memset(settings->coop_players, 0, sizeof(settings->coop_players));
 }
 
 bool settings_load(AppSettings *settings) {
@@ -1110,6 +1112,32 @@ bool settings_load(AppSettings *settings) {
         } else {
             settings->receiver_invite_code[0] = '\0';
         }
+
+        // Load player roster
+        const cJSON *roster_json = cJSON_GetObjectItem(coop_settings, "player_roster");
+        settings->coop_player_count = 0;
+        if (cJSON_IsArray(roster_json)) {
+            cJSON *player_item;
+            cJSON_ArrayForEach(player_item, roster_json) {
+                if (settings->coop_player_count >= MAX_COOP_PLAYERS) break;
+                CoopPlayer *p = &settings->coop_players[settings->coop_player_count];
+                memset(p, 0, sizeof(CoopPlayer));
+
+                const cJSON *uname = cJSON_GetObjectItem(player_item, "username");
+                if (uname && cJSON_IsString(uname)) {
+                    strncpy(p->username, uname->valuestring, sizeof(p->username) - 1);
+                }
+                const cJSON *uid = cJSON_GetObjectItem(player_item, "uuid");
+                if (uid && cJSON_IsString(uid)) {
+                    strncpy(p->uuid, uid->valuestring, sizeof(p->uuid) - 1);
+                }
+                const cJSON *dname = cJSON_GetObjectItem(player_item, "display_name");
+                if (dname && cJSON_IsString(dname)) {
+                    strncpy(p->display_name, dname->valuestring, sizeof(p->display_name) - 1);
+                }
+                settings->coop_player_count++;
+            }
+        }
     } else {
         defaults_were_used = true;
     }
@@ -1312,6 +1340,18 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(coop_obj, "host_port", cJSON_CreateString(settings->host_port));
         cJSON_DeleteItemFromObject(coop_obj, "receiver_invite_code");
         cJSON_AddItemToObject(coop_obj, "receiver_invite_code", cJSON_CreateString(settings->receiver_invite_code));
+
+        // Save player roster
+        cJSON_DeleteItemFromObject(coop_obj, "player_roster");
+        cJSON *roster_arr = cJSON_CreateArray();
+        for (int i = 0; i < settings->coop_player_count && i < MAX_COOP_PLAYERS; i++) {
+            cJSON *player_obj = cJSON_CreateObject();
+            cJSON_AddItemToObject(player_obj, "username", cJSON_CreateString(settings->coop_players[i].username));
+            cJSON_AddItemToObject(player_obj, "uuid", cJSON_CreateString(settings->coop_players[i].uuid));
+            cJSON_AddItemToObject(player_obj, "display_name", cJSON_CreateString(settings->coop_players[i].display_name));
+            cJSON_AddItemToArray(roster_arr, player_obj);
+        }
+        cJSON_AddItemToObject(coop_obj, "player_roster", roster_arr);
     }
 
 

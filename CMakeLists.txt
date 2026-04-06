@@ -62,6 +62,7 @@ set(SOURCE_FILES
         "source/temp_creator.cpp"
         "source/temp_creator_utils.cpp"
         "source/template_scanner.cpp"
+        "source/mojang_api.cpp"
         "source/update_checker.cpp"
         "source/logger.cpp"
         "source/dialog_utils.cpp"
