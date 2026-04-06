@@ -286,7 +286,8 @@ static void build_search_linked_sets(const Tracker *t) {
     for (int i = 0; i < td->decoration_count; i++) {
         DecorationElement *deco = td->decorations[i];
         if (deco->type != DECORATION_TEXT_HEADER) continue;
-        if (str_contains_insensitive(deco->display_text, t->search_buffer)) {
+        if (str_contains_insensitive(deco->display_text, t->search_buffer) ||
+            str_contains_insensitive(deco->id, t->search_buffer)) {
             add_linked(deco->linked_goals, deco->linked_goal_count);
         }
     }
