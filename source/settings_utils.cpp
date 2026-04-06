@@ -437,7 +437,9 @@ void settings_set_defaults(AppSettings *settings) {
     settings->host_ip[0] = '\0';
     strncpy(settings->host_port, DEFAULT_HOST_PORT, sizeof(settings->host_port) - 1);
     settings->host_port[sizeof(settings->host_port) - 1] = '\0';
-    settings->receiver_invite_code[0] = '\0';
+    settings->receiver_ip[0] = '\0';
+    strncpy(settings->receiver_port, DEFAULT_HOST_PORT, sizeof(settings->receiver_port) - 1);
+    settings->receiver_port[sizeof(settings->receiver_port) - 1] = '\0';
     settings->coop_player_count = 0;
     memset(settings->coop_players, 0, sizeof(settings->coop_players));
 }
@@ -1114,12 +1116,21 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
-        const cJSON *invite = cJSON_GetObjectItem(coop_settings, "receiver_invite_code");
-        if (invite && cJSON_IsString(invite)) {
-            strncpy(settings->receiver_invite_code, invite->valuestring, sizeof(settings->receiver_invite_code) - 1);
-            settings->receiver_invite_code[sizeof(settings->receiver_invite_code) - 1] = '\0';
+        const cJSON *recv_ip = cJSON_GetObjectItem(coop_settings, "receiver_ip");
+        if (recv_ip && cJSON_IsString(recv_ip)) {
+            strncpy(settings->receiver_ip, recv_ip->valuestring, sizeof(settings->receiver_ip) - 1);
+            settings->receiver_ip[sizeof(settings->receiver_ip) - 1] = '\0';
         } else {
-            settings->receiver_invite_code[0] = '\0';
+            settings->receiver_ip[0] = '\0';
+        }
+
+        const cJSON *recv_port = cJSON_GetObjectItem(coop_settings, "receiver_port");
+        if (recv_port && cJSON_IsString(recv_port)) {
+            strncpy(settings->receiver_port, recv_port->valuestring, sizeof(settings->receiver_port) - 1);
+            settings->receiver_port[sizeof(settings->receiver_port) - 1] = '\0';
+        } else {
+            strncpy(settings->receiver_port, DEFAULT_HOST_PORT, sizeof(settings->receiver_port) - 1);
+            settings->receiver_port[sizeof(settings->receiver_port) - 1] = '\0';
         }
 
         // Load player roster
@@ -1349,8 +1360,10 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(coop_obj, "host_ip", cJSON_CreateString(settings->host_ip));
         cJSON_DeleteItemFromObject(coop_obj, "host_port");
         cJSON_AddItemToObject(coop_obj, "host_port", cJSON_CreateString(settings->host_port));
-        cJSON_DeleteItemFromObject(coop_obj, "receiver_invite_code");
-        cJSON_AddItemToObject(coop_obj, "receiver_invite_code", cJSON_CreateString(settings->receiver_invite_code));
+        cJSON_DeleteItemFromObject(coop_obj, "receiver_ip");
+        cJSON_AddItemToObject(coop_obj, "receiver_ip", cJSON_CreateString(settings->receiver_ip));
+        cJSON_DeleteItemFromObject(coop_obj, "receiver_port");
+        cJSON_AddItemToObject(coop_obj, "receiver_port", cJSON_CreateString(settings->receiver_port));
 
         // Save player roster
         cJSON_DeleteItemFromObject(coop_obj, "player_roster");

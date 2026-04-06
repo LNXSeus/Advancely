@@ -327,7 +327,8 @@ struct AppSettings {
     CoopGoalLogic coop_goal_logic; // How to merge progress from multiple players
     char host_ip[64]; // The host's LAN/Hamachi IP address (entered manually by the host)
     char host_port[16]; // The port the host listens on (default "25565" - Force Port Mod)
-    char receiver_invite_code[512]; // Base64-encoded connection string pasted by receivers
+    char receiver_ip[64]; // The host's IP address as entered by the receiver
+    char receiver_port[16]; // The host's port as entered by the receiver
 
     // --- Player Roster (Host only) ---
     int coop_player_count; // Number of players in the roster
