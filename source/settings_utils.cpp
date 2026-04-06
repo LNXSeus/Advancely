@@ -434,6 +434,7 @@ void settings_set_defaults(AppSettings *settings) {
     // Co-op Defaults
     settings->network_mode = DEFAULT_NETWORK_MODE;
     settings->coop_goal_logic = DEFAULT_COOP_GOAL_LOGIC;
+    settings->host_ip[0] = '\0';
     strncpy(settings->host_port, DEFAULT_HOST_PORT, sizeof(settings->host_port) - 1);
     settings->host_port[sizeof(settings->host_port) - 1] = '\0';
     settings->receiver_invite_code[0] = '\0';
@@ -1095,6 +1096,14 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
+        const cJSON *ip = cJSON_GetObjectItem(coop_settings, "host_ip");
+        if (ip && cJSON_IsString(ip)) {
+            strncpy(settings->host_ip, ip->valuestring, sizeof(settings->host_ip) - 1);
+            settings->host_ip[sizeof(settings->host_ip) - 1] = '\0';
+        } else {
+            settings->host_ip[0] = '\0';
+        }
+
         const cJSON *port = cJSON_GetObjectItem(coop_settings, "host_port");
         if (port && cJSON_IsString(port)) {
             strncpy(settings->host_port, port->valuestring, sizeof(settings->host_port) - 1);
@@ -1336,6 +1345,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(coop_obj, "goal_logic");
         cJSON_AddItemToObject(coop_obj, "goal_logic",
                               cJSON_CreateString(coop_goal_logic_to_string(settings->coop_goal_logic)));
+        cJSON_DeleteItemFromObject(coop_obj, "host_ip");
+        cJSON_AddItemToObject(coop_obj, "host_ip", cJSON_CreateString(settings->host_ip));
         cJSON_DeleteItemFromObject(coop_obj, "host_port");
         cJSON_AddItemToObject(coop_obj, "host_port", cJSON_CreateString(settings->host_port));
         cJSON_DeleteItemFromObject(coop_obj, "receiver_invite_code");

@@ -9,12 +9,8 @@
 
 #include "invite_code.h"
 #include "logger.h"
-#include <curl/curl.h>
-#include <string>
 #include <cstring>
 #include <cstdio>
-
-#define CERT_BUNDLE_PATH "resources/ca_certificates/cacert.pem"
 
 // --- Base64 encode/decode (RFC 4648) ---
 
@@ -81,67 +77,12 @@ static bool base64_decode(const char *input, char *output, size_t output_len, si
     return true;
 }
 
-// --- Public IP fetch via api.ipify.org ---
-
-static size_t ip_write_callback(void *contents, size_t size, size_t nmemb, std::string *s) {
-    size_t new_length = size * nmemb;
-    try {
-        s->append((char *)contents, new_length);
-    } catch (std::bad_alloc &) {
-        return 0;
-    }
-    return new_length;
-}
-
-static bool fetch_public_ip(char *out_ip, size_t ip_len) {
-    CURL *curl = curl_easy_init();
-    if (!curl) {
-        log_message(LOG_ERROR, "[INVITE CODE] Failed to initialize curl.\n");
-        return false;
-    }
-
-    std::string read_buffer;
-    bool success = false;
-
-    curl_easy_setopt(curl, CURLOPT_URL, "https://api.ipify.org");
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "Advancely/1.0");
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, ip_write_callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &read_buffer);
-    curl_easy_setopt(curl, CURLOPT_CAINFO, CERT_BUNDLE_PATH);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
-
-    CURLcode res = curl_easy_perform(curl);
-    if (res == CURLE_OK) {
-        long http_code = 0;
-        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-
-        if (http_code == 200 && !read_buffer.empty() && read_buffer.size() < ip_len) {
-            strncpy(out_ip, read_buffer.c_str(), ip_len - 1);
-            out_ip[ip_len - 1] = '\0';
-            log_message(LOG_INFO, "[INVITE CODE] Fetched public IP: %s\n", out_ip);
-            success = true;
-        } else {
-            log_message(LOG_ERROR, "[INVITE CODE] Unexpected response (HTTP %ld, len %zu).\n",
-                        http_code, read_buffer.size());
-        }
-    } else {
-        log_message(LOG_ERROR, "[INVITE CODE] curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
-    }
-
-    curl_easy_cleanup(curl);
-    return success;
-}
-
 // --- Public API ---
 
-bool invite_code_generate(const char *port, const char *host_name, char *out_code, size_t out_code_len) {
-    if (!port || port[0] == '\0' || !host_name || host_name[0] == '\0' || !out_code || out_code_len < 32) {
-        return false;
-    }
-
-    char ip[64];
-    if (!fetch_public_ip(ip, sizeof(ip))) {
+bool invite_code_generate(const char *ip, const char *port, const char *host_name,
+                          char *out_code, size_t out_code_len) {
+    if (!ip || ip[0] == '\0' || !port || port[0] == '\0' ||
+        !host_name || host_name[0] == '\0' || !out_code || out_code_len < 32) {
         return false;
     }
 

@@ -17,18 +17,20 @@ extern "C" {
 #endif
 
 /**
- * @brief Generates a Base64 invite code from the host's public IP, port, and display name.
+ * @brief Generates a Base64 invite code from the host's IP, port, and display name.
  *
- * Fetches the public IP via api.ipify.org, combines it with the given port and
- * host name as "IP\nPort\nHostName", and Base64-encodes the result.
+ * Combines the given IP, port, and host name as "IP\nPort\nHostName"
+ * and Base64-encodes the result.
  *
+ * @param ip The host's LAN/Hamachi IP address.
  * @param port The host port string (e.g., "25565").
  * @param host_name The host's display name (shown to receivers on decode).
  * @param out_code Buffer to write the Base64 invite code into.
  * @param out_code_len Size of the out_code buffer.
- * @return true on success, false if the public IP could not be fetched.
+ * @return true on success, false if any input is empty or encoding fails.
  */
-bool invite_code_generate(const char *port, const char *host_name, char *out_code, size_t out_code_len);
+bool invite_code_generate(const char *ip, const char *port, const char *host_name,
+                          char *out_code, size_t out_code_len);
 
 /**
  * @brief Decodes a Base64 invite code back into IP, port, and host name.

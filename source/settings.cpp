@@ -125,6 +125,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         // Co-op settings
         a->network_mode != b->network_mode ||
         a->coop_goal_logic != b->coop_goal_logic ||
+        strcmp(a->host_ip, b->host_ip) != 0 ||
         strcmp(a->host_port, b->host_port) != 0 ||
         strcmp(a->receiver_invite_code, b->receiver_invite_code) != 0 ||
         a->coop_player_count != b->coop_player_count) {
@@ -205,8 +206,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Flag to show a warning about hotkeys needing a settings window restart
     static bool show_hotkey_warning_message = false;
 
-    // Co-op invite code error flags (block Apply when true)
+    // Co-op error flags (block Apply when true)
     static bool coop_invite_error = false;
+    static bool coop_host_input_error = false;
 
     // Holds temporary copy of the settings for editing
     static AppSettings temp_settings;
@@ -2285,6 +2287,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             }
             if ((NetworkMode) mode != temp_settings.network_mode) {
                 coop_invite_error = false;
+                coop_host_input_error = false;
             }
             temp_settings.network_mode = (NetworkMode) mode;
 
@@ -2294,6 +2297,60 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 ImGui::Spacing();
                 ImGui::Text("Host Settings");
                 ImGui::Spacing();
+
+                // Validate IP address (IPv4: four octets 0-255)
+                auto is_valid_ipv4 = [](const char *ip) -> bool {
+                    if (!ip || ip[0] == '\0') return false;
+                    int octets = 0;
+                    int value = -1;
+                    for (const char *p = ip; ; p++) {
+                        if (*p >= '0' && *p <= '9') {
+                            if (value < 0) value = 0;
+                            value = value * 10 + (*p - '0');
+                            if (value > 255) return false;
+                        } else if (*p == '.' || *p == '\0') {
+                            if (value < 0) return false;
+                            octets++;
+                            value = -1;
+                            if (*p == '\0') break;
+                        } else {
+                            return false;
+                        }
+                    }
+                    return octets == 4;
+                };
+
+                // Validate port (1-65535)
+                auto is_valid_port = [](const char *port) -> bool {
+                    if (!port || port[0] == '\0') return false;
+                    int value = 0;
+                    for (const char *p = port; *p; p++) {
+                        if (*p < '0' || *p > '9') return false;
+                        value = value * 10 + (*p - '0');
+                        if (value > 65535) return false;
+                    }
+                    return value >= 1;
+                };
+
+                bool ip_filled = temp_settings.host_ip[0] != '\0';
+                bool ip_valid = is_valid_ipv4(temp_settings.host_ip);
+                bool port_filled = temp_settings.host_port[0] != '\0';
+                bool port_valid = is_valid_port(temp_settings.host_port);
+
+                ImGui::SetNextItemWidth(200.0f);
+                ImGui::InputText("IP Address", temp_settings.host_ip, sizeof(temp_settings.host_ip));
+                if (ImGui::IsItemHovered()) {
+                    char tooltip_buf[256];
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Your LAN or Hamachi/VPN IP address.\n"
+                             "This is the IP receivers will connect to.\n"
+                             "Find it via 'ipconfig' (Windows) or 'ifconfig' (Mac/Linux).");
+                    ImGui::SetTooltip("%s", tooltip_buf);
+                }
+                if (ip_filled && !ip_valid) {
+                    ImGui::SameLine();
+                    ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid IP address (expected format: x.x.x.x)");
+                }
 
                 ImGui::SetNextItemWidth(120.0f);
                 ImGui::InputText("Port", temp_settings.host_port, sizeof(temp_settings.host_port),
@@ -2305,6 +2362,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "The 'Force Port Mod' defaults it to 25565.");
                     ImGui::SetTooltip("%s", tooltip_buf);
                 }
+                if (port_filled && !port_valid) {
+                    ImGui::SameLine();
+                    ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid port (must be 1-65535)");
+                }
+
+                coop_host_input_error = (ip_filled && !ip_valid) || (port_filled && !port_valid);
 
                 ImGui::Spacing();
                 ImGui::Separator();
@@ -2490,24 +2553,59 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     host_display_name = (first.display_name[0] != '\0') ? first.display_name : first.username;
                 }
                 bool no_host_name = !host_display_name || host_display_name[0] == '\0';
+                bool no_host_ip = temp_settings.host_ip[0] == '\0';
+                bool no_host_port = temp_settings.host_port[0] == '\0';
+                bool generate_disabled = no_host_name || no_host_ip || no_host_port ||
+                                         !ip_valid || !port_valid || has_unsaved_changes;
 
-                if (no_host_name) ImGui::BeginDisabled();
+                if (generate_disabled) ImGui::BeginDisabled();
                 if (ImGui::Button("Generate & Copy Invite Code")) {
                     char code[512];
-                    if (invite_code_generate(temp_settings.host_port, host_display_name, code, sizeof(code))) {
+                    if (invite_code_generate(temp_settings.host_ip, temp_settings.host_port,
+                                             host_display_name, code, sizeof(code))) {
                         SDL_SetClipboardText(code);
                         snprintf(invite_status_msg, sizeof(invite_status_msg),
                                  "Invite code copied to clipboard!");
                         coop_invite_error = false;
                     } else {
                         snprintf(invite_status_msg, sizeof(invite_status_msg),
-                                 "Failed to generate invite code (check internet connection).");
+                                 "Failed to generate invite code.");
                         coop_invite_error = true;
                     }
                 }
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                     char tooltip_buf[256];
-                    if (no_host_name) {
+                    if (has_unsaved_changes) {
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Apply your settings first before generating an invite code.");
+                    } else if (!ip_valid && ip_filled) {
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "The IP address is invalid. Expected format: x.x.x.x");
+                    } else if (!port_valid && port_filled) {
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "The port is invalid. Must be a number between 1 and 65535.");
+                    } else if (no_host_ip && no_host_port && no_host_name) {
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Enter your IP address, port, and add at least one player to the roster first.\n"
+                                 "The first player's name is used as the host name in the invite code.");
+                    } else if (no_host_ip && no_host_port) {
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Enter your LAN/Hamachi IP address and port above first.");
+                    } else if (no_host_ip && no_host_name) {
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Enter your IP address and add at least one player to the roster first.\n"
+                                 "The first player's name is used as the host name in the invite code.");
+                    } else if (no_host_port && no_host_name) {
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Enter a port and add at least one player to the roster first.\n"
+                                 "The first player's name is used as the host name in the invite code.");
+                    } else if (no_host_ip) {
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Enter your LAN/Hamachi IP address above first.");
+                    } else if (no_host_port) {
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Enter a port above first.");
+                    } else if (no_host_name) {
                         snprintf(tooltip_buf, sizeof(tooltip_buf),
                                  "Add at least one player to the roster above first.\n"
                                  "The first player's name is used as the host name in the invite code.");
@@ -2519,7 +2617,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     }
                     ImGui::SetTooltip("%s", tooltip_buf);
                 }
-                if (no_host_name) ImGui::EndDisabled();
+                if (generate_disabled) ImGui::EndDisabled();
                 if (invite_status_msg[0] != '\0') {
                     ImGui::SameLine();
                     if (coop_invite_error) {
@@ -2776,7 +2874,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
     // Disable "Apply Settings" button on visual editing mode or unsaved template editor changes
     bool visual_editing = t && t->is_visual_layout_editing;
     bool template_unsaved = t && t->template_editor_has_unsaved_changes;
-    bool apply_disabled = visual_editing || template_unsaved || coop_invite_error;
+    bool apply_disabled = visual_editing || template_unsaved || coop_invite_error || coop_host_input_error;
 
     // Apply the changes or pressing Enter or Ctrl/Cmd + S keys in the settings window when NO popup is shown
 
@@ -2890,6 +2988,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
                      "Disabled while the Template Editor has unsaved changes.\n"
                      "Save or revert your template changes first, then apply settings.");
+        } else if (coop_host_input_error) {
+            snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
+                     "Disabled due to an invalid IP address or port in the Co-op tab.\n"
+                     "Fix the highlighted fields before applying.");
         } else if (coop_invite_error) {
             snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
                      "Disabled due to a Co-op invite code error.\n"
@@ -3070,6 +3172,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             snprintf(restart_button_tooltip_buffer, sizeof(restart_button_tooltip_buffer),
                      "Disabled while the Template Editor has unsaved changes.\n"
                      "Save or revert your template changes first, then restart.");
+        } else if (coop_host_input_error) {
+            snprintf(restart_button_tooltip_buffer, sizeof(restart_button_tooltip_buffer),
+                     "Disabled due to an invalid IP address or port in the Co-op tab.\n"
+                     "Fix the highlighted fields before restarting.");
         } else if (coop_invite_error) {
             snprintf(restart_button_tooltip_buffer, sizeof(restart_button_tooltip_buffer),
                      "Disabled due to a Co-op invite code error.\n"
