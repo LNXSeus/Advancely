@@ -140,7 +140,8 @@ extern "C" {
     X(MC_VERSION_26_1_1, "26.1.1") \
     /* 2026 April Fools Version HERDCRAFT */ \
     X(MC_VERSION_26W14A, "26w14a") \
-    X(MC_VERSION_26_2, "26.2")
+    X(MC_VERSION_26_2, "26.2") \
+    X(MC_VERSION_26_3, "26.3")
 
 #ifdef __cplusplus
 extern "C" {

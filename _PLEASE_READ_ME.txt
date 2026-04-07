@@ -6,16 +6,6 @@ Thank you for using Advancely!
 To ensure the application works correctly, please follow the instructions for your operating system.
 
 --------------------------------------------------
---- For ALL Users: Use English-Only (ASCII) File Paths ---
---------------------------------------------------
-
-To prevent errors, please make sure the **entire folder path** to your Advancely application (or your user data folder on Linux) contains **only standard English (ASCII) characters**.
-Special characters, accents (like `é`, `ü`, `ñ`), or symbols in the file path can cause the tracker to fail when loading templates or watching your save files.
-
-- **BAD Path:** `C:\Users\Jörg\Desktop\Spiele\Advancely\`
-- **GOOD Path:** `C:\Users\Joerg\Desktop\Games\Advancely\`
-
---------------------------------------------------
 --- For macOS Users ---
 --------------------------------------------------
 
@@ -43,7 +33,7 @@ If the above fail, run this command to remove the quarantine attribute:
 3. A warning box will appear. Click the **"Open"** button.
 4. You only need to do this once.
 
-✔️ **Method 3: System Settings (If Method 1 fails)**
+✔️ **Method 3: System Settings (If Method 2 fails)**
 
 If the app does not open or says it is damaged/cannot be checked:
 1. Attempt to open the app normally so the error message appears. Click OK.

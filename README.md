@@ -949,7 +949,7 @@ all April Fool's snapshots.
 * **1.13 – 1.16.5 (Modern)**: Reads from separate, per-world advancements and stats files. Playtime is tracked via
   `minecraft:play_one_minute`.
 * **1.17-1.21.11**: Same as above, but playtime is tracked via the renamed `minecraft:play_time` statistic.
-* **25w14craftmine**: Fully supports the unique advancements, stats, and unlocks files from this snapshot.
+* **25w14craftmine**: Fully supports the unique advancements, stats, and unlocks files of this snapshot.
 * **26.1+**: Players' advancements and statistic files are now within the `players/advancements` and `players/stats`
   folders instead of `advancements` and `stats`.
 
@@ -971,20 +971,20 @@ This way templates don't need to be copied for each subversion.
 <summary><strong>View Template List</strong></summary>
 <br>
 
-| Category           | Template Version(s)                               | Optional Flag(s)                    | Languages           |
-|--------------------|---------------------------------------------------|-------------------------------------|---------------------|
-| `any%`             | 25w14craftmine                                    |                                     | Default             |
-| `AMI`              | 25w14craftmine                                    |                                     | Default             |
-| `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4       |                                     | Default, ger        |
-| `all_achievements` | 1.11                                              |                                     | Default             |
-| `all_advancements` | 1.12, 1.13, 25w14craftmine                        |                                     | Default             |
-| `all_advancements` | 1.14, 1.15, 1.16.1, 1.21.3, 1.21.6, 1.21.11, 26.1 |                                     | Default, ger, zh_cn |
-| `all_advancements` | 1.16.1                                            | `_categorical`, `_aatool_optimized` | Default, ger, zh_cn |
-| `all_advancements` | 1.17                                              | `_aatool_optimized`                 | Default, ger, zh_cn |
-| `all_advancements` | 1.21.3, 1.21.6, 1.21.11, 26.1                     | `_optimized`                        | Default, ger, zh_cn |
-| `miku%`            | 1.21                                              |                                     | Default             |
-| `all_trims`        | 1.21                                              |                                     | Default             |
-| `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 25w14craftmine        | `1`                                 | Default             |
+| Category           | Template Version(s)                                     | Optional Flag(s)                    | Languages           |
+|--------------------|---------------------------------------------------------|-------------------------------------|---------------------|
+| `any%`             | 25w14craftmine                                          |                                     | Default             |
+| `AMI`              | 25w14craftmine                                          |                                     | Default             |
+| `all_achievements` | 1.0, 1.1, 1.2.5, 1.3.1, 1.4.7, 1.5.2, 1.6.4             |                                     | Default, ger        |
+| `all_achievements` | 1.11                                                    |                                     | Default             |
+| `all_advancements` | 1.12, 1.13, 25w14craftmine                              |                                     | Default             |
+| `all_advancements` | 1.14, 1.15, 1.16.1, 1.21.3, 1.21.6, 1.21.11, 26.1, 26.2 |                                     | Default, ger, zh_cn |
+| `all_advancements` | 1.16.1                                                  | `_categorical`, `_aatool_optimized` | Default, ger, zh_cn |
+| `all_advancements` | 1.17                                                    | `_aatool_optimized`                 | Default, ger, zh_cn |
+| `all_advancements` | 1.21.3, 1.21.6, 1.21.11, 26.1, 26.2                     | `_optimized`                        | Default, ger, zh_cn |
+| `miku%`            | 1.21                                                    |                                     | Default             |
+| `all_trims`        | 1.21                                                    |                                     | Default             |
+| `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 25w14craftmine              | `1`                                 | Default             |
 
 If a `Template Version` or `Optional Flag` shows `(has layout)` then you must enable the `Manual Layout` in the bottom right of the tracker.
 
