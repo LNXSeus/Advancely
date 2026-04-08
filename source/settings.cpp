@@ -34,6 +34,7 @@
 #include "template_scanner.h"
 #include "temp_creator.h"
 #include "update_checker.h"
+#include "coop_net.h" // For co-op networking status display
 
 // Helper function to robustly compare two AppSettings structs
 // Changing window geometry of overlay and tracker window DO NOT cause the "Unsaved Changes" text to appear.
@@ -2288,6 +2289,55 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 coop_host_input_error = false;
             }
             temp_settings.network_mode = (NetworkMode) mode;
+
+            // --- Connection Status Display ---
+            if (g_coop_ctx && temp_settings.network_mode != NETWORK_SINGLEPLAYER) {
+                ImGui::Spacing();
+                CoopNetState net_state = coop_net_get_state(g_coop_ctx);
+                char status_buf[256];
+                coop_net_get_status_msg(g_coop_ctx, status_buf, sizeof(status_buf));
+
+                ImVec4 status_color;
+                const char *state_label;
+                switch (net_state) {
+                    case COOP_NET_LISTENING:
+                        status_color = ImVec4(0.4f, 0.8f, 1.0f, 1.0f); // Blue
+                        state_label = "Listening";
+                        break;
+                    case COOP_NET_CONNECTING:
+                        status_color = ImVec4(1.0f, 0.8f, 0.4f, 1.0f); // Yellow
+                        state_label = "Connecting";
+                        break;
+                    case COOP_NET_CONNECTED:
+                        status_color = ImVec4(0.4f, 1.0f, 0.4f, 1.0f); // Green
+                        state_label = "Connected";
+                        break;
+                    case COOP_NET_DISCONNECTED:
+                        status_color = ImVec4(1.0f, 0.6f, 0.4f, 1.0f); // Orange
+                        state_label = "Disconnected";
+                        break;
+                    case COOP_NET_ERROR:
+                        status_color = ImVec4(1.0f, 0.4f, 0.4f, 1.0f); // Red
+                        state_label = "Error";
+                        break;
+                    default:
+                        status_color = ImVec4(0.6f, 0.6f, 0.6f, 1.0f); // Gray
+                        state_label = "Idle";
+                        break;
+                }
+
+                ImGui::TextColored(status_color, "%s", state_label);
+                ImGui::SameLine();
+                ImGui::TextDisabled("- %s", status_buf);
+
+                if (temp_settings.network_mode == NETWORK_HOST && net_state == COOP_NET_LISTENING) {
+                    char clients_buf[64];
+                    snprintf(clients_buf, sizeof(clients_buf), "Clients: %d", coop_net_get_client_count(g_coop_ctx));
+                    ImGui::SameLine();
+                    ImGui::Text("| %s", clients_buf);
+                }
+                ImGui::Spacing();
+            }
 
             // --- Host Settings ---
             if (temp_settings.network_mode == NETWORK_HOST) {

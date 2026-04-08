@@ -66,6 +66,7 @@ set(SOURCE_FILES
         "source/update_checker.cpp"
         "source/logger.cpp"
         "source/dialog_utils.cpp"
+        "source/coop_net.cpp"
 
         # External libraries included as source and stay in C
         "source/external/cJSON.c"
@@ -175,7 +176,7 @@ target_link_libraries(${EXECUTABLE_NAME} PRIVATE
 # Add platform-specific system libraries
 if (WIN32)
     # Link against common Windows libraries needed by SDL and advancely
-    target_link_libraries(${EXECUTABLE_NAME} PRIVATE gdi32 user32 winmm shell32 version ntdll urlmon)
+    target_link_libraries(${EXECUTABLE_NAME} PRIVATE gdi32 user32 winmm shell32 version ntdll urlmon ws2_32)
 elseif (APPLE)
     # On macOS, link against required system frameworks
     target_link_libraries(${EXECUTABLE_NAME} PRIVATE "-framework Cocoa" "-framework Metal" "-framework IOKit")

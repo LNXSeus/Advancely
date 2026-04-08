@@ -59,6 +59,7 @@ extern "C" {
 #include "settings_utils.h" // Include for AppSettings and version checking
 #include "logger.h"
 #include "update_checker.h" // For update checker
+#include "coop_net.h" // For co-op networking
 
 // ImGUI imports
 #include "imgui/imgui.h"
@@ -1123,6 +1124,13 @@ int main(int argc, char *argv[]) {
     }
     // --- End out-of-bounds check ---
 
+    // Initialize co-op networking context
+    CoopNetContext coop_ctx;
+    if (!coop_net_init(&coop_ctx)) {
+        log_message(LOG_ERROR, "[MAIN] Failed to initialize co-op networking.\n");
+    }
+    g_coop_ctx = &coop_ctx;
+
     if (tracker_new(&tracker, &app_settings)) {
         // Check for updates on startup
         if (app_settings.check_for_updates && !g_disable_updater) {
@@ -1751,6 +1759,8 @@ int main(int argc, char *argv[]) {
 
             handle_global_events(tracker, nullptr, &app_settings, &is_running, &settings_opened, &deltaTime);
 
+            // Tick co-op networking (lightweight per-frame check)
+            coop_net_tick(&coop_ctx);
 
             // Close immediately if app not running
             if (!is_running) break;
@@ -1891,6 +1901,37 @@ int main(int argc, char *argv[]) {
                 // Reload settings from file to get the latest changes.
                 settings_load(&app_settings);
                 log_set_settings(&app_settings); // Update the logger with the new settings.
+
+                // Update co-op networking based on settings.
+                // Skip restart if networking is already running in the correct mode —
+                // this avoids unnecessary disconnects when non-network settings change
+                // (e.g. window position, theme, etc.)
+                CoopNetState net_state = coop_net_get_state(&coop_ctx);
+                bool net_is_active = (net_state == COOP_NET_LISTENING || net_state == COOP_NET_CONNECTED
+                                      || net_state == COOP_NET_CONNECTING);
+
+                if (app_settings.network_mode == NETWORK_SINGLEPLAYER) {
+                    if (net_is_active) {
+                        coop_net_stop(&coop_ctx);
+                        log_message(LOG_INFO, "[MAIN] Switched to singleplayer, networking stopped.\n");
+                    }
+                } else if (app_settings.network_mode == NETWORK_HOST) {
+                    if (net_state != COOP_NET_LISTENING) {
+                        coop_net_stop(&coop_ctx);
+                        int port = atoi(app_settings.host_port);
+                        if (port > 0 && port <= 65535 && app_settings.host_ip[0] != '\0') {
+                            coop_net_start_host(&coop_ctx, app_settings.host_ip, port);
+                        }
+                    }
+                } else if (app_settings.network_mode == NETWORK_RECEIVER) {
+                    if (net_state != COOP_NET_CONNECTED && net_state != COOP_NET_CONNECTING) {
+                        coop_net_stop(&coop_ctx);
+                        int port = atoi(app_settings.receiver_port);
+                        if (port > 0 && port <= 65535 && app_settings.receiver_ip[0] != '\0') {
+                            coop_net_start_receiver(&coop_ctx, app_settings.receiver_ip, port);
+                        }
+                    }
+                }
 
                 // Update the tracker with the new paths and template data
                 tracker_reinit_template(tracker, &app_settings);
@@ -2303,6 +2344,10 @@ int main(int argc, char *argv[]) {
     if (g_logo_texture) {
         SDL_DestroyTexture(g_logo_texture);
     }
+
+    // Shut down co-op networking before SDL_Quit
+    coop_net_shutdown(&coop_ctx);
+    g_coop_ctx = nullptr;
 
     tracker_free(&tracker, &app_settings);
     SDL_Quit(); // This is ONCE for all windows
