@@ -164,6 +164,42 @@ static bool read_message(coop_socket_t fd, uint32_t *out_type, char **out_payloa
     return true;
 }
 
+// Translate a socket error code into a user-facing explanation
+static const char *socket_error_hint(int err) {
+#ifdef _WIN32
+    switch (err) {
+        case 10060: /* WSAETIMEDOUT */    return "Connection timed out. The host's firewall may be blocking the port.";
+        case 10061: /* WSAECONNREFUSED */ return "Connection refused. The host may not be listening, or the IP/port is wrong.";
+        case 10065: /* WSAEHOSTUNREACH */ return "Host unreachable. Check your network/VPN connection.";
+        case 10051: /* WSAENETUNREACH */  return "Network unreachable. Check your network/VPN connection.";
+        case 10064: /* WSAEHOSTDOWN */    return "Host is down. Check that the host device is online.";
+        case 10048: /* WSAEADDRINUSE */   return "Port already in use. Another application may be using it.";
+        case 10049: /* WSAEADDRNOTAVAIL */return "IP address not available on this machine. Check the IP.";
+        default:                          return nullptr;
+    }
+#else
+    switch (err) {
+        case ETIMEDOUT:       return "Connection timed out. The host's firewall may be blocking the port.";
+        case ECONNREFUSED:    return "Connection refused. The host may not be listening, or the IP/port is wrong.";
+        case EHOSTUNREACH:    return "Host unreachable. Check your network/VPN connection.";
+        case ENETUNREACH:     return "Network unreachable. Check your network/VPN connection.";
+        case EADDRINUSE:      return "Port already in use. Another application may be using it.";
+        case EADDRNOTAVAIL:   return "IP address not available on this machine. Check the IP.";
+        default:              return nullptr;
+    }
+#endif
+}
+
+// Set the status to a user-friendly connection error message
+static void set_connect_error_status(CoopNetContext *ctx, int err) {
+    const char *hint = socket_error_hint(err);
+    if (hint) {
+        set_status(ctx, "%s", hint);
+    } else {
+        set_status(ctx, "Connection failed (error %d).", err);
+    }
+}
+
 // Close a socket if it's valid, then set to INVALID_SOCKET
 static void close_socket(coop_socket_t *fd) {
     if (*fd != COOP_INVALID_SOCKET) {
@@ -387,10 +423,15 @@ static int SDLCALL receiver_thread_func(void *data) {
         }
 #endif
         if (!connect_pending) {
-            log_message(LOG_ERROR, "[COOP NET] Immediate connect failure to %s:%d\n", ctx->connect_ip, ctx->connect_port);
+#ifdef _WIN32
+            int imm_err = err;
+#else
+            int imm_err = errno;
+#endif
+            log_message(LOG_ERROR, "[COOP NET] Immediate connect failure to %s:%d (error=%d)\n", ctx->connect_ip, ctx->connect_port, imm_err);
             close_socket(&ctx->client_fd);
             set_state(ctx, COOP_NET_ERROR);
-            set_status(ctx, "Connection refused");
+            set_connect_error_status(ctx, imm_err);
             return 1;
         }
     } else {
@@ -400,6 +441,7 @@ static int SDLCALL receiver_thread_func(void *data) {
     // Wait for connection to complete (or should_stop / socket closed by stop)
     if (connect_pending) {
         bool connected = false;
+        int connect_err = 0; // Stores the socket error if connection fails
         while (!should_stop(ctx)) {
             fd_set write_fds, err_fds;
             FD_ZERO(&write_fds);
@@ -420,22 +462,20 @@ static int SDLCALL receiver_thread_func(void *data) {
             if (ready == 0) continue; // Timeout, loop and check should_stop
 
             if (FD_ISSET(ctx->client_fd, &err_fds)) {
-                int so_error = 0;
-                socklen_t len = sizeof(so_error);
-                getsockopt(ctx->client_fd, SOL_SOCKET, SO_ERROR, (char *)&so_error, &len);
-                log_message(LOG_ERROR, "[COOP NET] Connect error fd_set triggered (SO_ERROR=%d)\n", so_error);
+                socklen_t len = sizeof(connect_err);
+                getsockopt(ctx->client_fd, SOL_SOCKET, SO_ERROR, (char *)&connect_err, &len);
+                log_message(LOG_ERROR, "[COOP NET] Connect error fd_set triggered (SO_ERROR=%d)\n", connect_err);
                 break; // Connection failed
             }
 
             if (FD_ISSET(ctx->client_fd, &write_fds)) {
                 // Check if connect actually succeeded via SO_ERROR
-                int so_error = 0;
-                socklen_t len = sizeof(so_error);
-                getsockopt(ctx->client_fd, SOL_SOCKET, SO_ERROR, (char *)&so_error, &len);
-                if (so_error == 0) {
+                socklen_t len = sizeof(connect_err);
+                getsockopt(ctx->client_fd, SOL_SOCKET, SO_ERROR, (char *)&connect_err, &len);
+                if (connect_err == 0) {
                     connected = true;
                 } else {
-                    log_message(LOG_ERROR, "[COOP NET] Connect failed (SO_ERROR=%d)\n", so_error);
+                    log_message(LOG_ERROR, "[COOP NET] Connect failed (SO_ERROR=%d)\n", connect_err);
                 }
                 break;
             }
@@ -445,9 +485,9 @@ static int SDLCALL receiver_thread_func(void *data) {
             if (should_stop(ctx) || ctx->client_fd == COOP_INVALID_SOCKET) {
                 log_message(LOG_INFO, "[COOP NET] Receiver connect cancelled.\n");
             } else {
-                log_message(LOG_ERROR, "[COOP NET] Failed to connect to %s:%d\n", ctx->connect_ip, ctx->connect_port);
+                log_message(LOG_ERROR, "[COOP NET] Failed to connect to %s:%d (error=%d)\n", ctx->connect_ip, ctx->connect_port, connect_err);
                 set_state(ctx, COOP_NET_ERROR);
-                set_status(ctx, "Connection refused");
+                set_connect_error_status(ctx, connect_err);
             }
             close_socket(&ctx->client_fd);
             return 1;
@@ -646,13 +686,15 @@ bool coop_net_start_host(CoopNetContext *ctx, const char *ip, int port) {
 
     if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR) {
 #ifdef _WIN32
-        log_message(LOG_ERROR, "[COOP NET] Failed to bind to %s:%d (WSA error=%d)\n", ip ? ip : "0.0.0.0", port, WSAGetLastError());
+        int bind_err = WSAGetLastError();
+        log_message(LOG_ERROR, "[COOP NET] Failed to bind to %s:%d (WSA error=%d)\n", ip ? ip : "0.0.0.0", port, bind_err);
 #else
-        log_message(LOG_ERROR, "[COOP NET] Failed to bind to %s:%d (errno=%d: %s)\n", ip ? ip : "0.0.0.0", port, errno, strerror(errno));
+        int bind_err = errno;
+        log_message(LOG_ERROR, "[COOP NET] Failed to bind to %s:%d (errno=%d: %s)\n", ip ? ip : "0.0.0.0", port, bind_err, strerror(bind_err));
 #endif
         COOP_CLOSE_SOCKET(sock);
         set_state(ctx, COOP_NET_ERROR);
-        set_status(ctx, "Failed to bind (port in use?)");
+        set_connect_error_status(ctx, bind_err);
         return false;
     }
 

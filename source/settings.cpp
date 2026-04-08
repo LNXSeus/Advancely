@@ -2336,6 +2336,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::SameLine();
                     ImGui::Text("| %s", clients_buf);
                 }
+
+                // Disconnect button — shown when networking is active
+                if (net_state == COOP_NET_LISTENING || net_state == COOP_NET_CONNECTING || net_state == COOP_NET_CONNECTED) {
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Disconnect")) {
+                        coop_net_stop(g_coop_ctx);
+                    }
+                }
                 ImGui::Spacing();
             }
 
