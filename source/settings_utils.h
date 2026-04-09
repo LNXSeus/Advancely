@@ -107,7 +107,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_COOP_ENABLED false
 #define DEFAULT_NETWORK_MODE NETWORK_SINGLEPLAYER
 #define DEFAULT_COOP_GOAL_LOGIC COOP_TRACK_MAX_PROGRESS
-#define DEFAULT_HOST_PORT "25565"
+#define DEFAULT_HOST_PORT "12345"
 
 // DEFINE DEFAULT SETTINGS
 #define DEFAULT_VERSION "1.16.1"  // Also needs to be changed in settings_load()
@@ -331,7 +331,7 @@ struct AppSettings {
     NetworkMode network_mode; // Runtime state: Singleplayer, Host, or Receiver (set programmatically)
     CoopGoalLogic coop_goal_logic; // How to merge progress from multiple players
     char host_ip[64]; // The host's ZeroTier/VPN IP address (entered manually by the host)
-    char host_port[16]; // The port the host listens on (default "25565")
+    char host_port[16]; // The port the host listens on (default "12345")
 
     // --- Player Roster (Host only) ---
     int coop_player_count; // Number of players in the roster

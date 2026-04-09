@@ -2560,7 +2560,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         } else {
                             if (ImGui::IsItemHovered()) {
                                 char tooltip_buf[256];
-                                snprintf(tooltip_buf, sizeof(tooltip_buf), "Default is 25565.");
+                                snprintf(tooltip_buf, sizeof(tooltip_buf), "Default is 12345.");
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
                         }
@@ -2791,7 +2791,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         }
                     }
 
-                    // --- Pending Join Requests (host only, shown right above lobby) ---
+                    // --- Waiting Room (host only, shown right above lobby) ---
                     if (g_coop_ctx && net_state == COOP_NET_LISTENING) {
                         CoopJoinRequest pending[COOP_MAX_CLIENTS];
                         int pending_count = coop_net_get_pending_requests(g_coop_ctx, pending, COOP_MAX_CLIENTS);
@@ -2799,8 +2799,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::Spacing();
                             ImGui::Separator();
                             ImGui::Spacing();
-                            ImGui::Text("Pending Join Requests");
+                            ImGui::Text("Waiting Room");
                             ImGui::Spacing();
+                            ImGui::BeginChild("WaitingRoom", ImVec2(0, 150), true);
                             for (int i = 0; i < pending_count; i++) {
                                 ImGui::PushID(2000 + i);
                                 const char *name = pending[i].display_name[0] ? pending[i].display_name : pending[i].username;
@@ -2817,6 +2818,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 }
                                 ImGui::PopID();
                             }
+                            ImGui::EndChild();
                         }
                     }
 
@@ -2848,6 +2850,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         CoopLobbyPlayer lobby[COOP_MAX_LOBBY];
                         int lobby_count = coop_net_get_lobby_players(g_coop_ctx, lobby, COOP_MAX_LOBBY);
 
+                        char player_header[64];
+                        snprintf(player_header, sizeof(player_header), "Players (%d/%d)", lobby_count, COOP_MAX_LOBBY);
+                        ImGui::Text("%s", player_header);
+                        ImGui::Spacing();
+
+                        ImGui::BeginChild("LobbyPlayerList", ImVec2(0, 200), true);
                         for (int i = 0; i < lobby_count; i++) {
                             ImGui::PushID(3000 + i);
                             const char *name = lobby[i].display_name[0] ? lobby[i].display_name : lobby[i].username;
@@ -2879,6 +2887,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             }
                             ImGui::PopID();
                         }
+                        ImGui::EndChild();
                     }
 
                 } // end identity_complete
