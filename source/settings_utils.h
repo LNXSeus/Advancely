@@ -330,7 +330,8 @@ struct AppSettings {
     CoopPlayer local_player; // This user's own Minecraft identity
     NetworkMode network_mode; // Runtime state: Singleplayer, Host, or Receiver (set programmatically)
     CoopGoalLogic coop_goal_logic; // How to merge progress from multiple players
-    char host_ip[64]; // The host's ZeroTier/VPN IP address (entered manually by the host)
+    char host_ip[64]; // The IP address to bind the server socket on (local/VPN)
+    char host_public_ip[64]; // Optional public IP used for the room code (port forwarding)
     char host_port[16]; // The port the host listens on (default "12345")
 
     // --- Player Roster (Host only) ---

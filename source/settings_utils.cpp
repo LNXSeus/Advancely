@@ -437,6 +437,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->network_mode = DEFAULT_NETWORK_MODE;
     settings->coop_goal_logic = DEFAULT_COOP_GOAL_LOGIC;
     settings->host_ip[0] = '\0';
+    settings->host_public_ip[0] = '\0';
     strncpy(settings->host_port, DEFAULT_HOST_PORT, sizeof(settings->host_port) - 1);
     settings->host_port[sizeof(settings->host_port) - 1] = '\0';
     settings->coop_player_count = 0;
@@ -1129,6 +1130,14 @@ bool settings_load(AppSettings *settings) {
             settings->host_ip[0] = '\0';
         }
 
+        const cJSON *pub_ip = cJSON_GetObjectItem(coop_settings, "host_public_ip");
+        if (pub_ip && cJSON_IsString(pub_ip)) {
+            strncpy(settings->host_public_ip, pub_ip->valuestring, sizeof(settings->host_public_ip) - 1);
+            settings->host_public_ip[sizeof(settings->host_public_ip) - 1] = '\0';
+        } else {
+            settings->host_public_ip[0] = '\0';
+        }
+
         const cJSON *port = cJSON_GetObjectItem(coop_settings, "host_port");
         if (port && cJSON_IsString(port)) {
             strncpy(settings->host_port, port->valuestring, sizeof(settings->host_port) - 1);
@@ -1375,6 +1384,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
                               cJSON_CreateString(coop_goal_logic_to_string(settings->coop_goal_logic)));
         cJSON_DeleteItemFromObject(coop_obj, "host_ip");
         cJSON_AddItemToObject(coop_obj, "host_ip", cJSON_CreateString(settings->host_ip));
+        cJSON_DeleteItemFromObject(coop_obj, "host_public_ip");
+        cJSON_AddItemToObject(coop_obj, "host_public_ip", cJSON_CreateString(settings->host_public_ip));
         cJSON_DeleteItemFromObject(coop_obj, "host_port");
         cJSON_AddItemToObject(coop_obj, "host_port", cJSON_CreateString(settings->host_port));
         // Save player roster

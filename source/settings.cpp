@@ -219,6 +219,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     static char coop_room_code_buf[128] = "";
     static char coop_room_code_error[256] = "";
     static bool coop_ip_revealed = false;
+    static bool coop_public_ip_revealed = false;
 
     // Holds temporary copy of the settings for editing
     static AppSettings temp_settings;
@@ -367,6 +368,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         show_template_not_found_error = false;
         // Reset co-op tab transient state
         coop_ip_revealed = false;
+        coop_public_ip_revealed = false;
         coop_identity_status_msg[0] = '\0';
         coop_identity_status_is_error = false;
         coop_room_code_error[0] = '\0';
@@ -395,6 +397,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         coop_identity_status_msg[0] = '\0';
         coop_identity_status_is_error = false;
         coop_ip_revealed = false;
+        coop_public_ip_revealed = false;
         coop_room_code_error[0] = '\0';
     }
 
@@ -2307,6 +2310,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 net_is_active = false;
                 coop_room_code_buf[0] = '\0';
                 coop_ip_revealed = false;
+                coop_public_ip_revealed = false;
             }
 
             if (temp_settings.coop_enabled) {
@@ -2517,8 +2521,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (ImGui::IsItemHovered()) {
                                 char tooltip_buf[512];
                                 snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                         "Your ZeroTier IP address.\n"
-                                         "Find it in the ZeroTier app under your network.\n"
+                                         "The IP address Advancely binds to on this machine.\n"
+                                         "Use your VPN/LAN IP (e.g. ZeroTier) or local network IP.\n"
                                          "This field is hidden to prevent accidental leaks on stream.");
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
@@ -2546,6 +2550,63 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid IP (x.x.x.x)");
                         }
 
+                        // Optional public IP for the room code
+                        bool pub_ip_filled = temp_settings.host_public_ip[0] != '\0';
+                        bool pub_ip_valid = !pub_ip_filled || is_valid_ipv4(temp_settings.host_public_ip);
+                        bool pub_ip_duplicate = pub_ip_filled && ip_filled
+                                                && strcmp(temp_settings.host_public_ip, temp_settings.host_ip) == 0;
+
+                        if (net_is_active) ImGui::BeginDisabled();
+                        ImGui::SetNextItemWidth(200.0f);
+                        ImGuiInputTextFlags pub_ip_flags = coop_public_ip_revealed ? 0 : ImGuiInputTextFlags_Password;
+                        ImGui::InputTextWithHint("Public IP##host", "Optional",
+                                                 temp_settings.host_public_ip,
+                                                 sizeof(temp_settings.host_public_ip),
+                                                 pub_ip_flags);
+                        if (net_is_active) {
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                char tooltip_buf[256];
+                                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                         "Cannot change Public IP while a lobby is active.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+                        } else {
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buf[512];
+                                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                         "Optional. Your public IP for players connecting over the internet.\n"
+                                         "Requires port forwarding on your router.\n"
+                                         "If set, the room code will use this IP instead of the bind IP.\n"
+                                         "Leave empty to use the bind IP for the room code (VPN/LAN).");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+                        }
+                        if (net_is_active) ImGui::EndDisabled();
+                        // Reveal/Hide button for public IP
+                        ImGui::SameLine();
+                        if (coop_public_ip_revealed) {
+                            if (ImGui::SmallButton("Hide Public IP")) {
+                                coop_public_ip_revealed = false;
+                            }
+                        } else {
+                            if (ImGui::SmallButton("Reveal Public IP")) {
+                                ImGui::OpenPopup("Reveal Public IP?##coop");
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buf[256];
+                                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                         "Show the public IP address in plain text.\n"
+                                         "WARNING: Do not reveal this while streaming or screen sharing.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+                        }
+                        if (pub_ip_filled && !pub_ip_valid) {
+                            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid IP (x.x.x.x)");
+                        }
+                        if (pub_ip_duplicate) {
+                            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Public IP must be different from the bind IP.");
+                        }
+
                         if (net_is_active) ImGui::BeginDisabled();
                         ImGui::SetNextItemWidth(120.0f);
                         ImGui::InputText("Port", temp_settings.host_port, sizeof(temp_settings.host_port),
@@ -2570,13 +2631,15 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         }
                         if (net_is_active) ImGui::EndDisabled();
 
-                        coop_host_input_error = (ip_filled && !ip_valid) || (port_filled && !port_valid);
+                        coop_host_input_error = (ip_filled && !ip_valid) || (port_filled && !port_valid)
+                                                || (pub_ip_filled && !pub_ip_valid) || pub_ip_duplicate;
 
                         ImGui::Spacing();
 
                         // Start Lobby button (disabled when already hosting, invalid input, or unsaved changes)
                         {
-                            bool can_start = ip_valid && port_valid && g_coop_ctx && !net_is_active && !has_unsaved_changes;
+                            bool can_start = ip_valid && port_valid && pub_ip_valid && !pub_ip_duplicate
+                                             && g_coop_ctx && !net_is_active && !has_unsaved_changes;
                             if (!can_start) ImGui::BeginDisabled();
                             if (ImGui::Button("Start Lobby")) {
                                 int port = atoi(temp_settings.host_port);
@@ -2584,7 +2647,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                         temp_settings.local_player.username,
                                                         temp_settings.local_player.uuid,
                                                         temp_settings.local_player.display_name)) {
-                                    coop_encode_room_code(temp_settings.host_ip, port,
+                                    // Use public IP for room code if provided, otherwise use bind IP
+                                    const char *room_code_ip = pub_ip_filled ? temp_settings.host_public_ip
+                                                                             : temp_settings.host_ip;
+                                    coop_encode_room_code(room_code_ip, port,
                                                           coop_room_code_buf, sizeof(coop_room_code_buf));
                                 }
                             }
@@ -2600,6 +2666,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     snprintf(tooltip_buf, sizeof(tooltip_buf), "A valid IP address is required to start a lobby.");
                                 } else if (!port_valid) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf), "A valid port is required to start a lobby.");
+                                } else if (!pub_ip_valid) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf), "The public IP is not a valid IP address.");
+                                } else if (pub_ip_duplicate) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf), "Public IP must be different from the bind IP.");
                                 }
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
@@ -2937,6 +3007,51 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 }
             }
 
+            // --- Reveal Public IP Confirmation Popup ---
+            {
+                ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+                ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+                if (ImGui::BeginPopupModal("Reveal Public IP?##coop", nullptr,
+                                           ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+                    ImGui::Text("Are you sure you want to reveal your public IP address?");
+                    ImGui::Spacing();
+                    ImGui::TextDisabled("Make sure you are not streaming or screen sharing.");
+                    ImGui::Spacing();
+                    ImGui::Separator();
+                    ImGui::Spacing();
+
+                    bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter);
+                    if (ImGui::Button("Reveal") || enter_pressed) {
+                        coop_public_ip_revealed = true;
+                        ImGui::CloseCurrentPopup();
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buf[128];
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Show the public IP address in the text field.\n"
+                                 "You can also press 'ENTER'.");
+                        ImGui::SetTooltip("%s", tooltip_buf);
+                    }
+
+                    ImGui::SameLine();
+
+                    bool esc_pressed = ImGui::IsKeyPressed(ImGuiKey_Escape);
+                    if (ImGui::Button("Cancel") || esc_pressed) {
+                        ImGui::CloseCurrentPopup();
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buf[128];
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Keep the public IP address hidden.\n"
+                                 "You can also press 'ESCAPE'.");
+                        ImGui::SetTooltip("%s", tooltip_buf);
+                    }
+
+                    ImGui::EndPopup();
+                }
+            }
+
             ImGui::EndTabItem();
         } // End of Co-op Tab
 
@@ -3263,6 +3378,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             coop_identity_status_msg[0] = '\0';
             coop_identity_status_is_error = false;
             coop_ip_revealed = false;
+            coop_public_ip_revealed = false;
             coop_room_code_error[0] = '\0';
         }
         if (ImGui::IsItemHovered()) {
