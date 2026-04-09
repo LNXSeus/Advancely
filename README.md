@@ -1021,7 +1021,7 @@ _(Submit your template through the [official discord](https://discord.gg/TyNgXDz
   player file that has most recently been modified. This means Advancely doesn't `combine` progress of multiple
   players. (e.g., each player completes different advancements). If you're playing on a server then the required player
   files are not saved locally so Advancely can't read them.
-* **Overlay Recording**: Especially on a Windows machine and OBS you must use Gamecapture to capture the overlay.
+* **Overlay Recording**: Especially on a Windows machine and OBS you must use **Gamecapture** to capture the overlay.
   Window capture can cause weird issues.
 * **PNG Image Compatibility**: On Linux and macOS, custom icons must be standard **8-bit per channel (32-bit RGBA)**
   PNG files. Files with 16-bit depth, interlacing, or complex color profiles may fail to load (showing as pink squares

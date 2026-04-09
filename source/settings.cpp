@@ -2318,23 +2318,37 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 ImGui::Separator();
                 ImGui::Spacing();
                 ImGui::Text("Your Identity");
-                ImGui::TextDisabled("Link your Minecraft account before hosting or joining.\n"
-                                    "Apply settings to remember your identity between sessions.");
+                if (net_is_active) {
+                    ImGui::TextDisabled("Cannot modify identity while a lobby is active.");
+                } else {
+                    ImGui::TextDisabled("Link your Minecraft account before hosting or joining.\n"
+                                        "Apply settings to remember your identity between sessions.");
+                }
                 ImGui::Spacing();
 
+                if (net_is_active) ImGui::BeginDisabled();
                 ImGui::SetNextItemWidth(200.0f);
                 ImGui::InputText("Username##local", temp_settings.local_player.username,
                                  sizeof(temp_settings.local_player.username));
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buf[256];
-                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                             "Your Minecraft username.\n"
-                             "Click 'Link Account' to fetch your UUID from the Mojang API.");
-                    ImGui::SetTooltip("%s", tooltip_buf);
+                if (net_is_active) {
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tooltip_buf[256];
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Cannot modify identity while a lobby is active.");
+                        ImGui::SetTooltip("%s", tooltip_buf);
+                    }
+                } else {
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buf[256];
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Your Minecraft username.\n"
+                                 "Click 'Link Account' to fetch your UUID from the Mojang API.");
+                        ImGui::SetTooltip("%s", tooltip_buf);
+                    }
                 }
 
                 ImGui::SameLine();
-                bool can_link = temp_settings.local_player.username[0] != '\0';
+                bool can_link = !net_is_active && temp_settings.local_player.username[0] != '\0';
                 if (!can_link) ImGui::BeginDisabled();
                 if (ImGui::Button("Link Account")) {
                     char fetched_uuid[48] = "";
@@ -2386,6 +2400,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 ImGui::InputTextWithHint("Display Name##local", "Optional",
                                          temp_settings.local_player.display_name,
                                          sizeof(temp_settings.local_player.display_name));
+                if (net_is_active) ImGui::EndDisabled();
 
                 bool identity_complete = temp_settings.local_player.uuid[0] != '\0';
 
@@ -2405,21 +2420,39 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     int mode = temp_settings.network_mode;
                     if (mode == NETWORK_SINGLEPLAYER) mode = NETWORK_HOST; // Default to host when first choosing
                     ImGui::RadioButton("Host", &mode, NETWORK_HOST);
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char tooltip_buf[256];
-                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                 "Host a co-op lobby.\n"
-                                 "You read game files for all players and share a room code.");
-                        ImGui::SetTooltip("%s", tooltip_buf);
+                    if (net_is_active) {
+                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            char tooltip_buf[256];
+                            snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                     "Cannot change role while a lobby is active.");
+                            ImGui::SetTooltip("%s", tooltip_buf);
+                        }
+                    } else {
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buf[256];
+                            snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                     "Host a co-op lobby.\n"
+                                     "You read game files for all players and share a room code.");
+                            ImGui::SetTooltip("%s", tooltip_buf);
+                        }
                     }
                     ImGui::SameLine();
                     ImGui::RadioButton("Receiver", &mode, NETWORK_RECEIVER);
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char tooltip_buf[256];
-                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                 "Join a co-op lobby.\n"
-                                 "Paste a room code from the host to connect.");
-                        ImGui::SetTooltip("%s", tooltip_buf);
+                    if (net_is_active) {
+                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            char tooltip_buf[256];
+                            snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                     "Cannot change role while a lobby is active.");
+                            ImGui::SetTooltip("%s", tooltip_buf);
+                        }
+                    } else {
+                        if (ImGui::IsItemHovered()) {
+                            char tooltip_buf[256];
+                            snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                     "Join a co-op lobby.\n"
+                                     "Paste a room code from the host to connect.");
+                            ImGui::SetTooltip("%s", tooltip_buf);
+                        }
                     }
                     temp_settings.network_mode = (NetworkMode) mode;
                     if (net_is_active) ImGui::EndDisabled();
@@ -2473,13 +2506,22 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ImGuiInputTextFlags ip_flags = coop_ip_revealed ? 0 : ImGuiInputTextFlags_Password;
                         ImGui::InputText("IP Address", temp_settings.host_ip, sizeof(temp_settings.host_ip),
                                          ip_flags);
-                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                            char tooltip_buf[512];
-                            snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                     "Your ZeroTier IP address.\n"
-                                     "Find it in the ZeroTier app under your network.\n"
-                                     "This field is hidden to prevent accidental leaks on stream.");
-                            ImGui::SetTooltip("%s", tooltip_buf);
+                        if (net_is_active) {
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                char tooltip_buf[256];
+                                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                         "Cannot change IP while a lobby is active.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+                        } else {
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buf[512];
+                                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                         "Your ZeroTier IP address.\n"
+                                         "Find it in the ZeroTier app under your network.\n"
+                                         "This field is hidden to prevent accidental leaks on stream.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
                         }
                         if (net_is_active) ImGui::EndDisabled();
                         // Reveal/Hide button stays enabled even while hosting
@@ -2508,10 +2550,19 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ImGui::SetNextItemWidth(120.0f);
                         ImGui::InputText("Port", temp_settings.host_port, sizeof(temp_settings.host_port),
                                          ImGuiInputTextFlags_CharsDecimal);
-                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                            char tooltip_buf[256];
-                            snprintf(tooltip_buf, sizeof(tooltip_buf), "Default is 25565.");
-                            ImGui::SetTooltip("%s", tooltip_buf);
+                        if (net_is_active) {
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                char tooltip_buf[256];
+                                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                         "Cannot change port while a lobby is active.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+                        } else {
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buf[256];
+                                snprintf(tooltip_buf, sizeof(tooltip_buf), "Default is 25565.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
                         }
                         if (port_filled && !port_valid) {
                             ImGui::SameLine();
@@ -2537,9 +2588,17 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                           coop_room_code_buf, sizeof(coop_room_code_buf));
                                 }
                             }
-                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && net_state == COOP_NET_LISTENING) {
-                                char tooltip_buf[128];
-                                snprintf(tooltip_buf, sizeof(tooltip_buf), "The lobby has already been started.");
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && !can_start) {
+                                char tooltip_buf[256];
+                                if (net_is_active) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf), "The lobby has already been started.");
+                                } else if (!ip_valid && !port_valid) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf), "A valid IP address and port are required to start a lobby.");
+                                } else if (!ip_valid) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf), "A valid IP address is required to start a lobby.");
+                                } else if (!port_valid) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf), "A valid port is required to start a lobby.");
+                                }
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
                             if (!can_start) ImGui::EndDisabled();
