@@ -332,8 +332,6 @@ struct AppSettings {
     CoopGoalLogic coop_goal_logic; // How to merge progress from multiple players
     char host_ip[64]; // The host's ZeroTier/VPN IP address (entered manually by the host)
     char host_port[16]; // The port the host listens on (default "25565")
-    char receiver_ip[64]; // Deprecated: replaced by room codes (kept for backward compat)
-    char receiver_port[16]; // Deprecated: replaced by room codes (kept for backward compat)
 
     // --- Player Roster (Host only) ---
     int coop_player_count; // Number of players in the roster
