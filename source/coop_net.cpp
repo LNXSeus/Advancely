@@ -28,6 +28,7 @@
 #endif
 
 #include "coop_net.h"
+#include "main.h"
 #include "logger.h"
 
 #include <cJSON.h>
@@ -568,23 +569,47 @@ static int SDLCALL host_thread_func(void *data) {
                             free(json_str);
 
                             bool valid = false;
+                            bool version_mismatch = false;
                             char req_uuid[48] = {0}, req_username[64] = {0}, req_display[64] = {0};
 
                             if (json) {
-                                cJSON *u = cJSON_GetObjectItem(json, "uuid");
-                                cJSON *n = cJSON_GetObjectItem(json, "username");
-                                cJSON *d = cJSON_GetObjectItem(json, "display_name");
-                                if (u && cJSON_IsString(u) && n && cJSON_IsString(n)) {
-                                    strncpy(req_uuid, u->valuestring, sizeof(req_uuid) - 1);
-                                    strncpy(req_username, n->valuestring, sizeof(req_username) - 1);
-                                    if (d && cJSON_IsString(d))
-                                        strncpy(req_display, d->valuestring, sizeof(req_display) - 1);
-                                    valid = true;
+                                // Check version first
+                                cJSON *v = cJSON_GetObjectItem(json, "version");
+                                if (!v || !cJSON_IsString(v) || strcmp(v->valuestring, ADVANCELY_VERSION) != 0) {
+                                    version_mismatch = true;
+                                    char reason[256];
+                                    snprintf(reason, sizeof(reason),
+                                             "Version mismatch: host is %s, you are %s",
+                                             ADVANCELY_VERSION,
+                                             (v && cJSON_IsString(v)) ? v->valuestring : "unknown");
+                                    send_message(ctx->clients[i].socket_fd, COOP_MSG_JOIN_REJECT,
+                                                 reason, (uint32_t)strlen(reason));
+                                    graceful_close_socket(&ctx->clients[i].socket_fd);
+                                    ctx->clients[i].active = false;
+                                    log_message(LOG_INFO, "[COOP NET] Rejected %s: version mismatch (theirs: %s, ours: %s).\n",
+                                                ctx->clients[i].label,
+                                                (v && cJSON_IsString(v)) ? v->valuestring : "unknown",
+                                                ADVANCELY_VERSION);
+                                }
+
+                                if (!version_mismatch) {
+                                    cJSON *u = cJSON_GetObjectItem(json, "uuid");
+                                    cJSON *n = cJSON_GetObjectItem(json, "username");
+                                    cJSON *d = cJSON_GetObjectItem(json, "display_name");
+                                    if (u && cJSON_IsString(u) && n && cJSON_IsString(n)) {
+                                        strncpy(req_uuid, u->valuestring, sizeof(req_uuid) - 1);
+                                        strncpy(req_username, n->valuestring, sizeof(req_username) - 1);
+                                        if (d && cJSON_IsString(d))
+                                            strncpy(req_display, d->valuestring, sizeof(req_display) - 1);
+                                        valid = true;
+                                    }
                                 }
                                 cJSON_Delete(json);
                             }
 
-                            if (!valid || req_uuid[0] == '\0') {
+                            if (version_mismatch) {
+                                // Already handled above
+                            } else if (!valid || req_uuid[0] == '\0') {
                                 const char *reason = "Invalid handshake data";
                                 send_message(ctx->clients[i].socket_fd, COOP_MSG_JOIN_REJECT,
                                              reason, (uint32_t)strlen(reason));
@@ -865,6 +890,7 @@ static int SDLCALL receiver_thread_func(void *data) {
     // ---- Send JOIN_REQUEST with identity ----
     {
         cJSON *req = cJSON_CreateObject();
+        cJSON_AddStringToObject(req, "version", ADVANCELY_VERSION);
         cJSON_AddStringToObject(req, "uuid", ctx->connect_uuid);
         cJSON_AddStringToObject(req, "username", ctx->connect_username);
         cJSON_AddStringToObject(req, "display_name", ctx->connect_display_name);
