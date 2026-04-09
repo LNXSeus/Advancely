@@ -2718,7 +2718,6 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                                         temp_settings.local_player.username,
                                                                         temp_settings.local_player.uuid,
                                                                         temp_settings.local_player.display_name);
-                                                SDL_SetClipboardText(""); // Clear clipboard
                                             }
                                         } else {
                                             snprintf(coop_room_code_error, sizeof(coop_room_code_error),

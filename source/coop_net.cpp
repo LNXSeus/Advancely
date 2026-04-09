@@ -475,6 +475,45 @@ static int SDLCALL host_thread_func(void *data) {
     log_message(LOG_INFO, "[COOP NET] Host thread started. Listening for connections.\n");
 
     while (!should_stop(ctx)) {
+        // Process any pending kick/reject actions queued by the UI thread
+        {
+            bool lobby_dirty = false;
+            for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
+                if (!ctx->clients[i].active) continue;
+                int action = SDL_GetAtomicInt(&ctx->clients[i].pending_action);
+                if (action == COOP_ACTION_NONE) continue;
+                SDL_SetAtomicInt(&ctx->clients[i].pending_action, COOP_ACTION_NONE);
+
+                if (action == COOP_ACTION_KICK) {
+                    send_message(ctx->clients[i].socket_fd, COOP_MSG_KICK,
+                                 ctx->clients[i].pending_action_reason,
+                                 (uint32_t)strlen(ctx->clients[i].pending_action_reason));
+                    log_message(LOG_INFO, "[COOP NET] Kicked %s (%s): %s\n",
+                                ctx->clients[i].username, ctx->clients[i].label,
+                                ctx->clients[i].pending_action_reason);
+                    graceful_close_socket(&ctx->clients[i].socket_fd);
+                    ctx->clients[i].active = false;
+                    ctx->client_count--;
+                    lobby_dirty = true;
+                } else if (action == COOP_ACTION_REJECT) {
+                    send_message(ctx->clients[i].socket_fd, COOP_MSG_JOIN_REJECT,
+                                 ctx->clients[i].pending_action_reason,
+                                 (uint32_t)strlen(ctx->clients[i].pending_action_reason));
+                    log_message(LOG_INFO, "[COOP NET] Rejected join request from %s (%s): %s\n",
+                                ctx->clients[i].username, ctx->clients[i].label,
+                                ctx->clients[i].pending_action_reason);
+                    graceful_close_socket(&ctx->clients[i].socket_fd);
+                    ctx->clients[i].active = false;
+                    remove_pending_request(ctx, i);
+                }
+            }
+            if (lobby_dirty) {
+                set_status(ctx, "%d player(s) in lobby", ctx->client_count + 1);
+                rebuild_lobby_list(ctx);
+                broadcast_player_list(ctx);
+            }
+        }
+
         fd_set read_fds;
         FD_ZERO(&read_fds);
         FD_SET(ctx->server_fd, &read_fds);
@@ -496,9 +535,18 @@ static int SDLCALL host_thread_func(void *data) {
         int ready = select((int)(max_fd + 1), &read_fds, nullptr, nullptr, &tv);
         if (ready < 0) {
 #ifdef _WIN32
-            if (WSAGetLastError() == WSAEINTR) continue;
+            int sel_err = WSAGetLastError();
+            if (sel_err == WSAEINTR) continue;
+            if (sel_err == WSAENOTSOCK) {
+                log_message(LOG_ERROR, "[COOP NET] Host select() got WSAENOTSOCK, rebuilding fd_set.\n");
+                continue;
+            }
 #else
             if (errno == EINTR) continue;
+            if (errno == EBADF) {
+                log_message(LOG_ERROR, "[COOP NET] Host select() got EBADF, rebuilding fd_set.\n");
+                continue;
+            }
 #endif
             log_message(LOG_ERROR, "[COOP NET] Host select() error.\n");
             break;
@@ -1451,16 +1499,12 @@ bool coop_net_reject_request(CoopNetContext *ctx, int client_slot, const char *r
     if (client_slot < 0 || client_slot >= COOP_MAX_CLIENTS) return false;
     if (!ctx->clients[client_slot].active || !ctx->clients[client_slot].pending_approval) return false;
 
+    // Queue the reject for the host thread to process safely
     const char *msg = reason ? reason : "Rejected by host";
-    send_message(ctx->clients[client_slot].socket_fd, COOP_MSG_JOIN_REJECT, msg, (uint32_t)strlen(msg));
-
-    log_message(LOG_INFO, "[COOP NET] Rejected join request from %s (%s): %s\n",
-                ctx->clients[client_slot].username, ctx->clients[client_slot].label, msg);
-
-    graceful_close_socket(&ctx->clients[client_slot].socket_fd);
-    ctx->clients[client_slot].active = false;
-
-    remove_pending_request(ctx, client_slot);
+    strncpy(ctx->clients[client_slot].pending_action_reason, msg,
+            sizeof(ctx->clients[client_slot].pending_action_reason) - 1);
+    ctx->clients[client_slot].pending_action_reason[sizeof(ctx->clients[client_slot].pending_action_reason) - 1] = '\0';
+    SDL_SetAtomicInt(&ctx->clients[client_slot].pending_action, COOP_ACTION_REJECT);
     return true;
 }
 
@@ -1468,18 +1512,11 @@ bool coop_net_kick_client(CoopNetContext *ctx, int client_slot, const char *reas
     if (client_slot < 0 || client_slot >= COOP_MAX_CLIENTS) return false;
     if (!ctx->clients[client_slot].active || !ctx->clients[client_slot].handshake_done) return false;
 
+    // Queue the kick for the host thread to process safely
     const char *msg = reason ? reason : "Kicked by host";
-    send_message(ctx->clients[client_slot].socket_fd, COOP_MSG_KICK, msg, (uint32_t)strlen(msg));
-
-    log_message(LOG_INFO, "[COOP NET] Kicked %s (%s): %s\n",
-                ctx->clients[client_slot].username, ctx->clients[client_slot].label, msg);
-
-    graceful_close_socket(&ctx->clients[client_slot].socket_fd);
-    ctx->clients[client_slot].active = false;
-    ctx->client_count--;
-
-    set_status(ctx, "%d player(s) in lobby", ctx->client_count + 1);
-    rebuild_lobby_list(ctx);
-    broadcast_player_list(ctx);
+    strncpy(ctx->clients[client_slot].pending_action_reason, msg,
+            sizeof(ctx->clients[client_slot].pending_action_reason) - 1);
+    ctx->clients[client_slot].pending_action_reason[sizeof(ctx->clients[client_slot].pending_action_reason) - 1] = '\0';
+    SDL_SetAtomicInt(&ctx->clients[client_slot].pending_action, COOP_ACTION_KICK);
     return true;
 }

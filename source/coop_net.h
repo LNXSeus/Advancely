@@ -76,6 +76,13 @@ typedef struct {
     bool is_host;
 } CoopLobbyPlayer;
 
+// Pending action the UI thread requests the host thread to carry out
+enum CoopClientAction {
+    COOP_ACTION_NONE = 0,
+    COOP_ACTION_KICK,
+    COOP_ACTION_REJECT,
+};
+
 typedef struct {
     coop_socket_t socket_fd;    // Client socket descriptor
     char label[64];             // Display label e.g. "192.168.1.5:12345"
@@ -86,6 +93,8 @@ typedef struct {
     char uuid[48];              // From handshake
     char display_name[64];      // From handshake
     Uint32 connect_time;        // When the socket was accepted (for handshake timeout)
+    SDL_AtomicInt pending_action; // CoopClientAction: set by UI thread, processed by host thread
+    char pending_action_reason[128]; // Reason string for kick/reject
 } CoopClient;
 
 // A pending join request shown in the host UI for approval
