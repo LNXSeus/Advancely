@@ -149,19 +149,19 @@
 			"icon":	"items/netherite_boots_20w14infinite.png",
 			"criteria":	{
 				"minecraft:nether_wastes":	{
-					"icon":	"neBiomes/nether_wastes.png"
+					"icon":	"neBiomes/26.2+/nether_wastes.png"
 				},
 				"minecraft:crimson_forest":	{
-					"icon":	"neBiomes/crimson_forest.png"
+					"icon":	"neBiomes/26.2+/crimson_forest.png"
 				},
 				"minecraft:warped_forest":	{
-					"icon":	"neBiomes/warped_forest.png"
+					"icon":	"neBiomes/26.2+/warped_forest.png"
 				},
 				"minecraft:basalt_deltas":	{
-					"icon":	"neBiomes/basalt_deltas.png"
+					"icon":	"neBiomes/26.2+/basalt_deltas.png"
 				},
 				"minecraft:soul_sand_valley":	{
-					"icon":	"neBiomes/soul_sand_valley.png"
+					"icon":	"neBiomes/26.2+/soul_sand_valley.png"
 				}
 			}
 		},
