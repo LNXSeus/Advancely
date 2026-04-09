@@ -1221,7 +1221,7 @@ bool coop_net_start_host(CoopNetContext *ctx, const char *ip, int port,
     ctx->client_count = 0;
 
     set_state(ctx, COOP_NET_LISTENING);
-    set_status(ctx, "Listening on %s:%d", ip && ip[0] ? ip : "0.0.0.0", port);
+    set_status(ctx, "Listening on port %d", port);
     SDL_SetAtomicInt(&ctx->should_stop, 0);
 
     ctx->thread = SDL_CreateThread(host_thread_func, "CoopHost", ctx);
@@ -1256,7 +1256,7 @@ bool coop_net_start_receiver(CoopNetContext *ctx, const char *ip, int port,
     SDL_UnlockMutex(ctx->lobby_mutex);
 
     set_state(ctx, COOP_NET_CONNECTING);
-    set_status(ctx, "Connecting to %s:%d...", ip, port);
+    set_status(ctx, "Connecting...");
     SDL_SetAtomicInt(&ctx->should_stop, 0);
 
     ctx->thread = SDL_CreateThread(receiver_thread_func, "CoopRecv", ctx);
