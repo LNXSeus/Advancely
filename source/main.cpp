@@ -2166,6 +2166,9 @@ int main(int argc, char *argv[]) {
             temp_creator_render_gui(&tracker->temp_creator_window_open, &app_settings, tracker->roboto_font, tracker);
 
             // --- Quit Confirmation Popup ---
+            CoopNetState quit_net_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
+            bool quit_lobby_active = (quit_net_state == COOP_NET_LISTENING || quit_net_state == COOP_NET_CONNECTED
+                                      || quit_net_state == COOP_NET_CONNECTING);
             if (tracker->quit_requested) {
                 ImGui::OpenPopup("Unsaved Changes##quit");
                 tracker->quit_requested = false; // Only open once, popup stays open via ImGui state
@@ -2179,19 +2182,25 @@ int main(int argc, char *argv[]) {
                                        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
                 bool unsaved_settings = tracker->settings_has_unsaved_changes;
                 bool unsaved_template = tracker->template_editor_has_unsaved_changes;
+                bool has_unsaved = unsaved_settings || unsaved_template;
 
-                ImGui::Text("You have unsaved changes in:");
+                ImGui::Text("Please note before exiting:");
                 ImGui::Spacing();
-                if (unsaved_settings && unsaved_template) {
-                    ImGui::BulletText("Settings");
-                    ImGui::BulletText("Template Editor");
-                } else if (unsaved_settings) {
-                    ImGui::BulletText("Settings");
-                } else if (unsaved_template) {
-                    ImGui::BulletText("Template Editor");
+                if (unsaved_settings) {
+                    ImGui::BulletText("You have unsaved changes in Settings");
+                }
+                if (unsaved_template) {
+                    ImGui::BulletText("You have unsaved changes in the Template Editor");
+                }
+                if (quit_lobby_active) {
+                    ImGui::BulletText("A co-op lobby is currently active");
                 }
                 ImGui::Spacing();
-                ImGui::Text("Are you sure you want to exit without saving?");
+                if (has_unsaved) {
+                    ImGui::Text("Are you sure you want to exit without saving?");
+                } else {
+                    ImGui::Text("Are you sure you want to exit?");
+                }
                 ImGui::Spacing();
                 ImGui::Separator();
                 ImGui::Spacing();

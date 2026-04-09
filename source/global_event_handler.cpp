@@ -13,6 +13,7 @@
 #include "overlay.h"
 #include "settings.h"
 #include "settings_utils.h" // For AppSettings
+#include "coop_net.h"
 
 #include "imgui_impl_sdl3.h"
 #include "logger.h"
@@ -26,8 +27,11 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
         ImGui_ImplSDL3_ProcessEvent(&event);
         // TOP LEVEL QUIT when it's not the X on the settings window
         if (event.type == SDL_EVENT_QUIT) {
-            // Check for unsaved changes before quitting
-            if (t && (t->settings_has_unsaved_changes || t->template_editor_has_unsaved_changes)) {
+            // Check for unsaved changes or active lobby before quitting
+            CoopNetState quit_net_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
+            bool quit_lobby_active = (quit_net_state == COOP_NET_LISTENING || quit_net_state == COOP_NET_CONNECTED
+                                      || quit_net_state == COOP_NET_CONNECTING);
+            if (t && (t->settings_has_unsaved_changes || t->template_editor_has_unsaved_changes || quit_lobby_active)) {
                 t->quit_requested = true;
             } else {
                 *is_running = false;

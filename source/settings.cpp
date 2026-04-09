@@ -2574,9 +2574,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                         ImGui::Spacing();
 
-                        // Start Lobby button (disabled when already hosting or invalid input)
+                        // Start Lobby button (disabled when already hosting, invalid input, or unsaved changes)
                         {
-                            bool can_start = ip_valid && port_valid && g_coop_ctx && !net_is_active;
+                            bool can_start = ip_valid && port_valid && g_coop_ctx && !net_is_active && !has_unsaved_changes;
                             if (!can_start) ImGui::BeginDisabled();
                             if (ImGui::Button("Start Lobby")) {
                                 int port = atoi(temp_settings.host_port);
@@ -2592,6 +2592,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 char tooltip_buf[256];
                                 if (net_is_active) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf), "The lobby has already been started.");
+                                } else if (has_unsaved_changes) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf), "Apply settings before starting a lobby.");
                                 } else if (!ip_valid && !port_valid) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf), "A valid IP address and port are required to start a lobby.");
                                 } else if (!ip_valid) {
@@ -2700,6 +2702,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "%s", status_buf);
                             } else {
                                 // Idle / Error / Disconnected — show paste button
+                                bool can_join = !has_unsaved_changes;
+                                if (!can_join) ImGui::BeginDisabled();
                                 if (ImGui::Button("Paste Room Code")) {
                                     coop_room_code_error[0] = '\0';
                                     char *clipboard = SDL_GetClipboardText();
@@ -2723,12 +2727,22 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     }
                                     SDL_free(clipboard);
                                 }
-                                if (ImGui::IsItemHovered()) {
-                                    char tooltip_buf[256];
-                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Paste the room code shared by the host.\n"
-                                             "This sends a join request that the host must accept.");
-                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                if (!can_join) {
+                                    ImGui::EndDisabled();
+                                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                        char tooltip_buf[256];
+                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                                 "Apply settings before joining a lobby.");
+                                        ImGui::SetTooltip("%s", tooltip_buf);
+                                    }
+                                } else {
+                                    if (ImGui::IsItemHovered()) {
+                                        char tooltip_buf[256];
+                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                                 "Paste the room code shared by the host.\n"
+                                                 "This sends a join request that the host must accept.");
+                                        ImGui::SetTooltip("%s", tooltip_buf);
+                                    }
                                 }
                             }
 

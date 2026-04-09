@@ -30,6 +30,7 @@
 #include "file_utils.h" // has the cJSON_from_file function
 #include "template_scanner.h" // For parse_manual_pos
 #include "temp_creator_utils.h"
+#include "coop_net.h"
 #include "global_event_handler.h"
 #include "format_utils.h"
 #include "logger.h"
@@ -3363,13 +3364,17 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
 void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settings_opened) {
     switch (event->type) {
         // This should be handled in the global event handler
-        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-            // Check for unsaved changes before quitting
-            if (t && (t->settings_has_unsaved_changes || t->template_editor_has_unsaved_changes)) {
+        case SDL_EVENT_WINDOW_CLOSE_REQUESTED: {
+            // Check for unsaved changes or active lobby before quitting
+            CoopNetState quit_net_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
+            bool quit_lobby_active = (quit_net_state == COOP_NET_LISTENING || quit_net_state == COOP_NET_CONNECTED
+                                      || quit_net_state == COOP_NET_CONNECTING);
+            if (t && (t->settings_has_unsaved_changes || t->template_editor_has_unsaved_changes || quit_lobby_active)) {
                 t->quit_requested = true;
             } else {
                 *is_running = false;
             }
+        }
             break;
 
         case SDL_EVENT_KEY_DOWN:
