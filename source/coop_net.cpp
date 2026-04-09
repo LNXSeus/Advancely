@@ -653,7 +653,7 @@ static int SDLCALL host_thread_func(void *data) {
                             lobby_dirty = true;
                         }
                         if (was_pending) remove_pending_request(ctx, i);
-                        set_status(ctx, "%d player(s) in lobby", ctx->client_count);
+                        set_status(ctx, "%d player(s) in lobby", ctx->client_count + 1);
                     }
                     free(payload);
                 } else if (disconnected) {
@@ -667,7 +667,7 @@ static int SDLCALL host_thread_func(void *data) {
                         lobby_dirty = true;
                     }
                     if (was_pending) remove_pending_request(ctx, i);
-                    set_status(ctx, "%d player(s) in lobby", ctx->client_count);
+                    set_status(ctx, "%d player(s) in lobby", ctx->client_count + 1);
                 }
             }
         }
@@ -699,7 +699,7 @@ static int SDLCALL host_thread_func(void *data) {
                     ctx->clients[i].active = false;
                     ctx->client_count--;
                     lobby_dirty = true;
-                    set_status(ctx, "%d player(s) in lobby", ctx->client_count);
+                    set_status(ctx, "%d player(s) in lobby", ctx->client_count + 1);
                     continue;
                 }
 
@@ -710,7 +710,7 @@ static int SDLCALL host_thread_func(void *data) {
                     ctx->clients[i].active = false;
                     ctx->client_count--;
                     lobby_dirty = true;
-                    set_status(ctx, "%d player(s) in lobby", ctx->client_count);
+                    set_status(ctx, "%d player(s) in lobby", ctx->client_count + 1);
                 }
             }
         }
@@ -1348,7 +1348,7 @@ bool coop_net_broadcast(CoopNetContext *ctx, const void *data, size_t size) {
             close_socket(&ctx->clients[i].socket_fd);
             ctx->clients[i].active = false;
             ctx->client_count--;
-            set_status(ctx, "%d player(s) in lobby", ctx->client_count);
+            set_status(ctx, "%d player(s) in lobby", ctx->client_count + 1);
             all_ok = false;
         }
     }
@@ -1401,7 +1401,7 @@ bool coop_net_approve_request(CoopNetContext *ctx, int client_slot) {
 
     log_message(LOG_INFO, "[COOP NET] Approved join request from %s (%s).\n",
                 ctx->clients[client_slot].username, ctx->clients[client_slot].label);
-    set_status(ctx, "%d player(s) in lobby", ctx->client_count);
+    set_status(ctx, "%d player(s) in lobby", ctx->client_count + 1);
 
     // Remove from pending queue
     remove_pending_request(ctx, client_slot);
@@ -1452,7 +1452,7 @@ bool coop_net_kick_client(CoopNetContext *ctx, int client_slot, const char *reas
     ctx->clients[client_slot].active = false;
     ctx->client_count--;
 
-    set_status(ctx, "%d player(s) in lobby", ctx->client_count);
+    set_status(ctx, "%d player(s) in lobby", ctx->client_count + 1);
     rebuild_lobby_list(ctx);
     broadcast_player_list(ctx);
     return true;

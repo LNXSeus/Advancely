@@ -213,6 +213,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Co-op error flag (block Apply when host IP/port is invalid)
     static bool coop_host_input_error = false;
 
+    // Co-op tab state (at function scope so revert/open can reset them)
+    static char coop_identity_status_msg[256] = "";
+    static bool coop_identity_status_is_error = false;
+    static char coop_room_code_buf[128] = "";
+    static char coop_room_code_error[256] = "";
+    static bool coop_ip_revealed = false;
+
     // Holds temporary copy of the settings for editing
     static AppSettings temp_settings;
 
@@ -358,6 +365,12 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         show_defaults_applied_message = false; // Reset "Defaults Applied" message visibility
         show_hotkey_warning_message = false;
         show_template_not_found_error = false;
+        // Reset co-op tab transient state
+        coop_ip_revealed = false;
+        coop_identity_status_msg[0] = '\0';
+        coop_identity_status_is_error = false;
+        coop_room_code_error[0] = '\0';
+        // Don't clear coop_room_code_buf — it's only valid while hosting
     }
 
     // Window title
@@ -379,6 +392,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         (ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_LeftSuper)) &&
         ImGui::IsKeyPressed(ImGuiKey_Z)) {
         memcpy(&temp_settings, &saved_settings, sizeof(AppSettings));
+        coop_identity_status_msg[0] = '\0';
+        coop_identity_status_is_error = false;
+        coop_ip_revealed = false;
+        coop_room_code_error[0] = '\0';
     }
 
     // If settings were forced open, display a prominent and context-aware warning message
@@ -2256,11 +2273,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         } // End of Overlay Tab
 
         if (ImGui::BeginTabItem("Co-op")) {
-            // Static state for this tab
-            static char identity_status_msg[256] = "";
-            static bool identity_status_is_error = false;
-            static char room_code_buf[128] = "";
-            static char room_code_error[256] = "";
+            // Co-op tab uses function-scoped statics: coop_identity_status_msg,
+            // coop_identity_status_is_error, coop_room_code_buf, coop_room_code_error, coop_ip_revealed
 
             coop_host_input_error = false; // Reset each frame
 
@@ -2291,7 +2305,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 coop_net_stop(g_coop_ctx);
                 net_state = COOP_NET_IDLE;
                 net_is_active = false;
-                room_code_buf[0] = '\0';
+                coop_room_code_buf[0] = '\0';
+                coop_ip_revealed = false;
             }
 
             if (temp_settings.coop_enabled) {
@@ -2328,15 +2343,15 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     if (fetched) {
                         strncpy(temp_settings.local_player.uuid, fetched_uuid,
                                 sizeof(temp_settings.local_player.uuid) - 1);
-                        snprintf(identity_status_msg, sizeof(identity_status_msg),
+                        snprintf(coop_identity_status_msg, sizeof(coop_identity_status_msg),
                                  "Linked: %s", fetched_uuid);
-                        identity_status_is_error = false;
+                        coop_identity_status_is_error = false;
                     } else {
                         temp_settings.local_player.uuid[0] = '\0';
-                        snprintf(identity_status_msg, sizeof(identity_status_msg),
+                        snprintf(coop_identity_status_msg, sizeof(coop_identity_status_msg),
                                  "Could not find player '%s'. Check the username.",
                                  temp_settings.local_player.username);
-                        identity_status_is_error = true;
+                        coop_identity_status_is_error = true;
                     }
                 }
                 if (!can_link) ImGui::EndDisabled();
@@ -2345,11 +2360,24 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 if (temp_settings.local_player.uuid[0] != '\0') {
                     ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "Linked: %s",
                                        temp_settings.local_player.uuid);
-                } else if (identity_status_msg[0] != '\0') {
-                    if (identity_status_is_error)
-                        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", identity_status_msg);
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Unlink")) {
+                        temp_settings.local_player.uuid[0] = '\0';
+                        coop_identity_status_msg[0] = '\0';
+                        coop_identity_status_is_error = false;
+                        // Stop networking if active since identity is now incomplete
+                        if (net_is_active && g_coop_ctx) {
+                            coop_net_stop(g_coop_ctx);
+                            net_state = COOP_NET_IDLE;
+                            net_is_active = false;
+                            coop_room_code_buf[0] = '\0';
+                        }
+                    }
+                } else if (coop_identity_status_msg[0] != '\0') {
+                    if (coop_identity_status_is_error)
+                        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", coop_identity_status_msg);
                     else
-                        ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "%s", identity_status_msg);
+                        ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "%s", coop_identity_status_msg);
                 } else {
                     ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "Not linked yet");
                 }
@@ -2442,20 +2470,41 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                         if (net_is_active) ImGui::BeginDisabled();
                         ImGui::SetNextItemWidth(200.0f);
-                        ImGui::InputText("IP Address", temp_settings.host_ip, sizeof(temp_settings.host_ip));
+                        ImGuiInputTextFlags ip_flags = coop_ip_revealed ? 0 : ImGuiInputTextFlags_Password;
+                        ImGui::InputText("IP Address", temp_settings.host_ip, sizeof(temp_settings.host_ip),
+                                         ip_flags);
                         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                             char tooltip_buf[512];
                             snprintf(tooltip_buf, sizeof(tooltip_buf),
                                      "Your ZeroTier IP address.\n"
                                      "Find it in the ZeroTier app under your network.\n"
-                                     "WARNING: Do not share your ZeroTier Network ID publicly.");
+                                     "This field is hidden to prevent accidental leaks on stream.");
                             ImGui::SetTooltip("%s", tooltip_buf);
                         }
+                        if (net_is_active) ImGui::EndDisabled();
+                        // Reveal/Hide button stays enabled even while hosting
+                        ImGui::SameLine();
+                        if (coop_ip_revealed) {
+                            if (ImGui::SmallButton("Hide IP")) {
+                                coop_ip_revealed = false;
+                            }
+                        } else {
+                            if (ImGui::SmallButton("Reveal IP")) {
+                                ImGui::OpenPopup("Reveal IP?##coop");
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buf[256];
+                                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                         "Show the IP address in plain text.\n"
+                                         "WARNING: Do not reveal this while streaming or screen sharing.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+                        }
                         if (ip_filled && !ip_valid) {
-                            ImGui::SameLine();
                             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid IP (x.x.x.x)");
                         }
 
+                        if (net_is_active) ImGui::BeginDisabled();
                         ImGui::SetNextItemWidth(120.0f);
                         ImGui::InputText("Port", temp_settings.host_port, sizeof(temp_settings.host_port),
                                          ImGuiInputTextFlags_CharsDecimal);
@@ -2474,21 +2523,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                         ImGui::Spacing();
 
-                        // Start Lobby / Room Code
-                        if (net_state == COOP_NET_LISTENING) {
-                            // Show room code when hosting
-                            if (room_code_buf[0] != '\0') {
-                                ImGui::Text("Room Code:");
-                                ImGui::SameLine();
-                                ImGui::SetNextItemWidth(250.0f);
-                                ImGui::InputText("##room_code", room_code_buf, sizeof(room_code_buf),
-                                                 ImGuiInputTextFlags_ReadOnly);
-                                ImGui::SameLine();
-                                if (ImGui::SmallButton("Copy")) {
-                                    SDL_SetClipboardText(room_code_buf);
-                                }
-                            }
-                        } else {
+                        // Start Lobby button (disabled when already hosting or invalid input)
+                        {
                             bool can_start = ip_valid && port_valid && g_coop_ctx && !net_is_active;
                             if (!can_start) ImGui::BeginDisabled();
                             if (ImGui::Button("Start Lobby")) {
@@ -2498,10 +2534,30 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                         temp_settings.local_player.uuid,
                                                         temp_settings.local_player.display_name)) {
                                     coop_encode_room_code(temp_settings.host_ip, port,
-                                                          room_code_buf, sizeof(room_code_buf));
+                                                          coop_room_code_buf, sizeof(coop_room_code_buf));
                                 }
                             }
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && net_state == COOP_NET_LISTENING) {
+                                char tooltip_buf[128];
+                                snprintf(tooltip_buf, sizeof(tooltip_buf), "The lobby has already been started.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
                             if (!can_start) ImGui::EndDisabled();
+                        }
+                        // Copy Room Code button (shown next to Start Lobby when hosting)
+                        if (net_state == COOP_NET_LISTENING && coop_room_code_buf[0] != '\0') {
+                            ImGui::SameLine();
+                            if (ImGui::Button("Copy Room Code")) {
+                                SDL_SetClipboardText(coop_room_code_buf);
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buf[512];
+                                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                         "Copy the room code to your clipboard.\n"
+                                         "Share this code privately with players on the same VPN/LAN.\n"
+                                         "They can paste it in the Receiver tab to send a join request.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
                         }
 
                         // Show error/disconnect status inline (lobby handles active states)
@@ -2567,69 +2623,72 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     // Step 4b: Join a Lobby (Receiver)
                     // ============================================================
                     if (temp_settings.network_mode == NETWORK_RECEIVER) {
-                        ImGui::Separator();
-                        ImGui::Spacing();
-                        ImGui::Text("Join a Lobby");
-                        ImGui::Spacing();
-
-                        if (net_state == COOP_NET_CONNECTING) {
-                            // Show disconnect + status while connecting
-                            if (ImGui::Button("Disconnect")) {
-                                coop_net_stop(g_coop_ctx);
-                            }
+                        // Hide the entire "Join a Lobby" section once connected
+                        if (net_state != COOP_NET_CONNECTED) {
+                            ImGui::Separator();
                             ImGui::Spacing();
-                            char status_buf[256];
-                            coop_net_get_status_msg(g_coop_ctx, status_buf, sizeof(status_buf));
-                            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "%s", status_buf);
-                        } else if (net_state != COOP_NET_CONNECTED) {
-                            // Idle / Error / Disconnected — show paste button
-                            if (ImGui::Button("Paste Room Code")) {
-                                room_code_error[0] = '\0';
-                                char *clipboard = SDL_GetClipboardText();
-                                if (!clipboard || clipboard[0] == '\0') {
-                                    snprintf(room_code_error, sizeof(room_code_error), "Clipboard is empty.");
-                                } else {
-                                    char decoded_ip[64];
-                                    int decoded_port;
-                                    if (coop_decode_room_code(clipboard, decoded_ip, sizeof(decoded_ip), &decoded_port)) {
-                                        if (g_coop_ctx) {
-                                            coop_net_start_receiver(g_coop_ctx, decoded_ip, decoded_port,
-                                                                    temp_settings.local_player.username,
-                                                                    temp_settings.local_player.uuid,
-                                                                    temp_settings.local_player.display_name);
-                                            SDL_SetClipboardText(""); // Clear clipboard
-                                        }
-                                    } else {
-                                        snprintf(room_code_error, sizeof(room_code_error),
-                                                 "Invalid room code format.");
-                                    }
+                            ImGui::Text("Join a Lobby");
+                            ImGui::Spacing();
+
+                            if (net_state == COOP_NET_CONNECTING) {
+                                // Show disconnect + status while connecting
+                                if (ImGui::Button("Disconnect")) {
+                                    coop_net_stop(g_coop_ctx);
                                 }
-                                SDL_free(clipboard);
+                                ImGui::Spacing();
+                                char status_buf[256];
+                                coop_net_get_status_msg(g_coop_ctx, status_buf, sizeof(status_buf));
+                                ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "%s", status_buf);
+                            } else {
+                                // Idle / Error / Disconnected — show paste button
+                                if (ImGui::Button("Paste Room Code")) {
+                                    coop_room_code_error[0] = '\0';
+                                    char *clipboard = SDL_GetClipboardText();
+                                    if (!clipboard || clipboard[0] == '\0') {
+                                        snprintf(coop_room_code_error, sizeof(coop_room_code_error), "Clipboard is empty.");
+                                    } else {
+                                        char decoded_ip[64];
+                                        int decoded_port;
+                                        if (coop_decode_room_code(clipboard, decoded_ip, sizeof(decoded_ip), &decoded_port)) {
+                                            if (g_coop_ctx) {
+                                                coop_net_start_receiver(g_coop_ctx, decoded_ip, decoded_port,
+                                                                        temp_settings.local_player.username,
+                                                                        temp_settings.local_player.uuid,
+                                                                        temp_settings.local_player.display_name);
+                                                SDL_SetClipboardText(""); // Clear clipboard
+                                            }
+                                        } else {
+                                            snprintf(coop_room_code_error, sizeof(coop_room_code_error),
+                                                     "Invalid room code format.");
+                                        }
+                                    }
+                                    SDL_free(clipboard);
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tooltip_buf[256];
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Paste the room code shared by the host.\n"
+                                             "This sends a join request that the host must accept.");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
                             }
-                            if (ImGui::IsItemHovered()) {
-                                char tooltip_buf[256];
-                                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                         "Paste the room code from the host's clipboard.\n"
-                                         "The code will be decoded and used to connect.");
-                                ImGui::SetTooltip("%s", tooltip_buf);
+
+                            if (coop_room_code_error[0] != '\0') {
+                                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", coop_room_code_error);
+                            }
+
+                            // Show error/disconnect status
+                            if (g_coop_ctx && (net_state == COOP_NET_ERROR || net_state == COOP_NET_DISCONNECTED)) {
+                                ImGui::Spacing();
+                                char status_buf[256];
+                                coop_net_get_status_msg(g_coop_ctx, status_buf, sizeof(status_buf));
+                                ImVec4 sc = (net_state == COOP_NET_ERROR) ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f) :
+                                            ImVec4(1.0f, 0.6f, 0.4f, 1.0f);
+                                ImGui::TextColored(sc, "%s", status_buf);
                             }
                         }
 
-                        if (room_code_error[0] != '\0') {
-                            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", room_code_error);
-                        }
-
-                        // Show error/disconnect status (lobby handles connected state)
-                        if (g_coop_ctx && (net_state == COOP_NET_ERROR || net_state == COOP_NET_DISCONNECTED)) {
-                            ImGui::Spacing();
-                            char status_buf[256];
-                            coop_net_get_status_msg(g_coop_ctx, status_buf, sizeof(status_buf));
-                            ImVec4 sc = (net_state == COOP_NET_ERROR) ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f) :
-                                        ImVec4(1.0f, 0.6f, 0.4f, 1.0f);
-                            ImGui::TextColored(sc, "%s", status_buf);
-                        }
-
-                        // Goal merging logic (read-only for receiver)
+                        // Goal merging logic (read-only for receiver, shown when connected)
                         if (net_state == COOP_NET_CONNECTED) {
                             ImGui::Spacing();
                             ImGui::Separator();
@@ -2706,7 +2765,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::SameLine();
                             if (ImGui::SmallButton("Disconnect##lobby")) {
                                 coop_net_stop(g_coop_ctx);
-                                room_code_buf[0] = '\0';
+                                coop_room_code_buf[0] = '\0';
                             }
                         }
 
@@ -2751,6 +2810,51 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                 } // end identity_complete
             } // end coop_enabled
+
+            // --- Reveal IP Confirmation Popup ---
+            {
+                ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+                ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+                if (ImGui::BeginPopupModal("Reveal IP?##coop", nullptr,
+                                           ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+                    ImGui::Text("Are you sure you want to reveal your IP address?");
+                    ImGui::Spacing();
+                    ImGui::TextDisabled("Make sure you are not streaming or screen sharing.");
+                    ImGui::Spacing();
+                    ImGui::Separator();
+                    ImGui::Spacing();
+
+                    bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter);
+                    if (ImGui::Button("Reveal") || enter_pressed) {
+                        coop_ip_revealed = true;
+                        ImGui::CloseCurrentPopup();
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buf[128];
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Show the IP address in the text field.\n"
+                                 "You can also press 'ENTER'.");
+                        ImGui::SetTooltip("%s", tooltip_buf);
+                    }
+
+                    ImGui::SameLine();
+
+                    bool esc_pressed = ImGui::IsKeyPressed(ImGuiKey_Escape);
+                    if (ImGui::Button("Cancel") || esc_pressed) {
+                        ImGui::CloseCurrentPopup();
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        char tooltip_buf[128];
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Keep the IP address hidden.\n"
+                                 "You can also press 'ESCAPE'.");
+                        ImGui::SetTooltip("%s", tooltip_buf);
+                    }
+
+                    ImGui::EndPopup();
+                }
+            }
 
             ImGui::EndTabItem();
         } // End of Co-op Tab
@@ -3075,6 +3179,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         // Replace the TextColored indicator with a Revert button
         if (ImGui::Button("Revert Changes")) {
             memcpy(&temp_settings, &saved_settings, sizeof(AppSettings));
+            coop_identity_status_msg[0] = '\0';
+            coop_identity_status_is_error = false;
+            coop_ip_revealed = false;
+            coop_room_code_error[0] = '\0';
         }
         if (ImGui::IsItemHovered()) {
             char revert_button_tooltip_buffer[1024];
