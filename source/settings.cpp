@@ -35,6 +35,7 @@
 #include "temp_creator.h"
 #include "update_checker.h"
 #include "coop_net.h" // For co-op networking status display
+#include <SDL3/SDL_clipboard.h> // For room code copy/paste
 
 // Helper function to robustly compare two AppSettings structs
 // Changing window geometry of overlay and tracker window DO NOT cause the "Unsaved Changes" text to appear.
@@ -123,12 +124,14 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         memcmp(a->section_order, b->section_order, sizeof(a->section_order)) != 0 ||
 
         // Co-op settings
+        a->coop_enabled != b->coop_enabled ||
+        strcmp(a->local_player.username, b->local_player.username) != 0 ||
+        strcmp(a->local_player.uuid, b->local_player.uuid) != 0 ||
+        strcmp(a->local_player.display_name, b->local_player.display_name) != 0 ||
         a->network_mode != b->network_mode ||
         a->coop_goal_logic != b->coop_goal_logic ||
         strcmp(a->host_ip, b->host_ip) != 0 ||
         strcmp(a->host_port, b->host_port) != 0 ||
-        strcmp(a->receiver_ip, b->receiver_ip) != 0 ||
-        strcmp(a->receiver_port, b->receiver_port) != 0 ||
         a->coop_player_count != b->coop_player_count) {
         return true;
     }
@@ -2253,423 +2256,501 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         } // End of Overlay Tab
 
         if (ImGui::BeginTabItem("Co-op")) {
-            ImGui::TextDisabled("Configure co-op networking to track progress across multiple players.");
-            ImGui::Spacing();
+            // Static state for this tab
+            static char identity_status_msg[256] = "";
+            static bool identity_status_is_error = false;
+            static char room_code_buf[128] = "";
+            static char room_code_error[256] = "";
 
-            // --- Network Mode ---
-            ImGui::Text("Network Mode");
-            int mode = temp_settings.network_mode;
-            ImGui::RadioButton("Singleplayer", &mode, NETWORK_SINGLEPLAYER);
-            if (ImGui::IsItemHovered()) {
-                char tooltip_buf[256];
-                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                         "Default mode.\n"
-                         "No networking, local tracking for one player-file only.");
-                ImGui::SetTooltip("%s", tooltip_buf);
-            }
-            ImGui::SameLine();
-            ImGui::RadioButton("Host", &mode, NETWORK_HOST);
-            if (ImGui::IsItemHovered()) {
-                char tooltip_buf[256];
-                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                         "Host a co-op session.\n"
-                         "Reads game files for all players and broadcasts progress.");
-                ImGui::SetTooltip("%s", tooltip_buf);
-            }
-            ImGui::SameLine();
-            ImGui::RadioButton("Receiver", &mode, NETWORK_RECEIVER);
-            if (ImGui::IsItemHovered()) {
-                char tooltip_buf[256];
-                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                         "Join a co-op session.\n"
-                         "Connects to a Host and receives progress updates.");
-                ImGui::SetTooltip("%s", tooltip_buf);
-            }
-            if ((NetworkMode) mode != temp_settings.network_mode) {
-                coop_host_input_error = false;
-            }
-            temp_settings.network_mode = (NetworkMode) mode;
+            coop_host_input_error = false; // Reset each frame
 
-            // --- Connection Status Display ---
-            if (g_coop_ctx && temp_settings.network_mode != NETWORK_SINGLEPLAYER) {
+            // Get current networking state
+            CoopNetState net_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
+            bool net_is_active = (net_state == COOP_NET_LISTENING || net_state == COOP_NET_CONNECTED
+                                  || net_state == COOP_NET_CONNECTING);
+
+            // ============================================================
+            // Step 1: Enable Co-op
+            // ============================================================
+            ImGui::Checkbox("Enable Co-op", &temp_settings.coop_enabled);
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buf[256];
+                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                         "Enable cooperative multiplayer tracking.\n"
+                         "Requires all players to be on the same local network.\n"
+                         "Use ZeroTier (zerotier.com) to create a virtual LAN.");
+                ImGui::SetTooltip("%s", tooltip_buf);
+            }
+            if (temp_settings.coop_enabled) {
+                ImGui::TextDisabled("Co-op requires all players to be on the same local network.\n"
+                                    "Use ZeroTier (zerotier.com) to create a virtual LAN.");
+            }
+
+            // If co-op was just unchecked while networking is active, stop it
+            if (!temp_settings.coop_enabled && net_is_active && g_coop_ctx) {
+                coop_net_stop(g_coop_ctx);
+                net_state = COOP_NET_IDLE;
+                net_is_active = false;
+                room_code_buf[0] = '\0';
+            }
+
+            if (temp_settings.coop_enabled) {
                 ImGui::Spacing();
-                CoopNetState net_state = coop_net_get_state(g_coop_ctx);
-                char status_buf[256];
-                coop_net_get_status_msg(g_coop_ctx, status_buf, sizeof(status_buf));
 
-                ImVec4 status_color;
-                const char *state_label;
-                switch (net_state) {
-                    case COOP_NET_LISTENING:
-                        status_color = ImVec4(0.4f, 0.8f, 1.0f, 1.0f); // Blue
-                        state_label = "Listening";
-                        break;
-                    case COOP_NET_CONNECTING:
-                        status_color = ImVec4(1.0f, 0.8f, 0.4f, 1.0f); // Yellow
-                        state_label = "Connecting";
-                        break;
-                    case COOP_NET_CONNECTED:
-                        status_color = ImVec4(0.4f, 1.0f, 0.4f, 1.0f); // Green
-                        state_label = "Connected";
-                        break;
-                    case COOP_NET_DISCONNECTED:
-                        status_color = ImVec4(1.0f, 0.6f, 0.4f, 1.0f); // Orange
-                        state_label = "Disconnected";
-                        break;
-                    case COOP_NET_ERROR:
-                        status_color = ImVec4(1.0f, 0.4f, 0.4f, 1.0f); // Red
-                        state_label = "Error";
-                        break;
-                    default:
-                        status_color = ImVec4(0.6f, 0.6f, 0.6f, 1.0f); // Gray
-                        state_label = "Idle";
-                        break;
-                }
-
-                ImGui::TextColored(status_color, "%s", state_label);
-                ImGui::SameLine();
-                ImGui::TextDisabled("- %s", status_buf);
-
-                if (temp_settings.network_mode == NETWORK_HOST && net_state == COOP_NET_LISTENING) {
-                    char clients_buf[64];
-                    snprintf(clients_buf, sizeof(clients_buf), "Clients: %d", coop_net_get_client_count(g_coop_ctx));
-                    ImGui::SameLine();
-                    ImGui::Text("| %s", clients_buf);
-                }
-
-                // Disconnect button — shown when networking is active
-                if (net_state == COOP_NET_LISTENING || net_state == COOP_NET_CONNECTING || net_state == COOP_NET_CONNECTED) {
-                    ImGui::SameLine();
-                    if (ImGui::SmallButton("Disconnect")) {
-                        coop_net_stop(g_coop_ctx);
-                    }
-                }
-                ImGui::Spacing();
-            }
-
-            // --- Host Settings ---
-            if (temp_settings.network_mode == NETWORK_HOST) {
+                // ============================================================
+                // Step 2: Your Identity
+                // ============================================================
                 ImGui::Separator();
                 ImGui::Spacing();
-                ImGui::Text("Host Settings");
+                ImGui::Text("Your Identity");
+                ImGui::TextDisabled("Link your Minecraft account before hosting or joining.\n"
+                                    "Apply settings to remember your identity between sessions.");
                 ImGui::Spacing();
 
-                // Validate IP address (IPv4: four octets 0-255)
-                auto is_valid_ipv4 = [](const char *ip) -> bool {
-                    if (!ip || ip[0] == '\0') return false;
-                    int octets = 0;
-                    int value = -1;
-                    for (const char *p = ip; ; p++) {
-                        if (*p >= '0' && *p <= '9') {
-                            if (value < 0) value = 0;
-                            value = value * 10 + (*p - '0');
-                            if (value > 255) return false;
-                        } else if (*p == '.' || *p == '\0') {
-                            if (value < 0) return false;
-                            octets++;
-                            value = -1;
-                            if (*p == '\0') break;
-                        } else {
-                            return false;
-                        }
-                    }
-                    return octets == 4;
-                };
-
-                // Validate port (1-65535)
-                auto is_valid_port = [](const char *port) -> bool {
-                    if (!port || port[0] == '\0') return false;
-                    int value = 0;
-                    for (const char *p = port; *p; p++) {
-                        if (*p < '0' || *p > '9') return false;
-                        value = value * 10 + (*p - '0');
-                        if (value > 65535) return false;
-                    }
-                    return value >= 1;
-                };
-
-                bool ip_filled = temp_settings.host_ip[0] != '\0';
-                bool ip_valid = is_valid_ipv4(temp_settings.host_ip);
-                bool port_filled = temp_settings.host_port[0] != '\0';
-                bool port_valid = is_valid_port(temp_settings.host_port);
-
                 ImGui::SetNextItemWidth(200.0f);
-                ImGui::InputText("IP Address", temp_settings.host_ip, sizeof(temp_settings.host_ip));
+                ImGui::InputText("Username##local", temp_settings.local_player.username,
+                                 sizeof(temp_settings.local_player.username));
                 if (ImGui::IsItemHovered()) {
                     char tooltip_buf[256];
                     snprintf(tooltip_buf, sizeof(tooltip_buf),
-                             "Your LAN or Hamachi/VPN IP address.\n"
-                             "This is the IP receivers will connect to.\n"
-                             "Find it via 'ipconfig' (Windows) or 'ifconfig' (Mac/Linux).");
+                             "Your Minecraft username.\n"
+                             "Click 'Link Account' to fetch your UUID from the Mojang API.");
                     ImGui::SetTooltip("%s", tooltip_buf);
                 }
-                if (ip_filled && !ip_valid) {
-                    ImGui::SameLine();
-                    ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid IP address (expected format: x.x.x.x)");
-                }
 
-                ImGui::SetNextItemWidth(120.0f);
-                ImGui::InputText("Port", temp_settings.host_port, sizeof(temp_settings.host_port),
-                                 ImGuiInputTextFlags_CharsDecimal);
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buf[256];
-                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                             "The port to listen on for incoming receiver connections.\n"
-                             "Default is 25565.");
-                    ImGui::SetTooltip("%s", tooltip_buf);
-                }
-                if (port_filled && !port_valid) {
-                    ImGui::SameLine();
-                    ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid port (must be 1-65535)");
-                }
-
-                coop_host_input_error = (ip_filled && !ip_valid) || (port_filled && !port_valid);
-
-                ImGui::Spacing();
-                ImGui::Separator();
-                ImGui::Spacing();
-
-                // --- Goal Merging Logic (per goal type) ---
-                ImGui::Text("Goal Merging Logic");
-                ImGui::TextDisabled("Controls how progress is combined when multiple players track the same goals.");
-                ImGui::Spacing();
-
-                // Global merging logic (will become per-section in the future)
-                const char *goal_type_labels[] = {
-                    advancements_label_plural_uppercase, "Statistics", "Custom Goals", "Multi-Stage Goals"
-                };
-                int logic = temp_settings.coop_goal_logic;
-                for (int i = 0; i < 4; i++) {
-                    if (i > 0) ImGui::Spacing();
-                    ImGui::PushID(i);
-                    ImGui::BeginDisabled(i > 0); // Only Advancements editable for now, rest follows
-                    ImGui::Text("%s:", goal_type_labels[i]);
-                    ImGui::SameLine();
-                    ImGui::RadioButton("Max Progress", &logic, COOP_TRACK_MAX_PROGRESS);
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char tooltip_buf[256];
-                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                 "Use whichever player has the most criteria completed for each goal.");
-                        ImGui::SetTooltip("%s", tooltip_buf);
-                    }
-                    ImGui::SameLine();
-                    ImGui::RadioButton("First to Start", &logic, COOP_TRACK_FIRST_START);
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char tooltip_buf[256];
-                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                 "Track whoever triggered the first criterion of each goal (by timestamp).");
-                        ImGui::SetTooltip("%s", tooltip_buf);
-                    }
-                    ImGui::SameLine();
-                    ImGui::RadioButton("Any Completion", &logic, COOP_TRACK_ANY_COMPLETION);
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char tooltip_buf[256];
-                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                 "A goal is complete if any player has finished it.");
-                        ImGui::SetTooltip("%s", tooltip_buf);
-                    }
-                    ImGui::EndDisabled();
-                    ImGui::PopID();
-                }
-                temp_settings.coop_goal_logic = (CoopGoalLogic) logic;
-
-                ImGui::Spacing();
-                ImGui::Separator();
-                ImGui::Spacing();
-
-                // --- Player Roster ---
-                ImGui::Text("Player Roster");
-                ImGui::TextDisabled("Add Minecraft usernames to track. UUIDs are fetched automatically.\n"
-                                    "The first player in the list is used as the host name in invite codes.");
-                ImGui::Spacing();
-
-                // Add player input
-                static char new_username[64] = "";
-                static char roster_status_msg[256] = "";
-                static bool roster_status_is_error = false;
-
-                ImGui::SetNextItemWidth(200.0f);
-                ImGui::InputText("##new_username", new_username, sizeof(new_username));
                 ImGui::SameLine();
-                bool can_add = new_username[0] != '\0' && temp_settings.coop_player_count < MAX_COOP_PLAYERS;
-                if (!can_add) ImGui::BeginDisabled();
-                if (ImGui::Button("Add Player")) {
-                    // Check for duplicate username
-                    bool duplicate = false;
-                    for (int i = 0; i < temp_settings.coop_player_count; i++) {
-                        if (strcmp(temp_settings.coop_players[i].username, new_username) == 0) {
-                            duplicate = true;
-                            break;
-                        }
-                    }
-                    if (duplicate) {
-                        snprintf(roster_status_msg, sizeof(roster_status_msg),
-                                 "Player '%s' is already in the roster.", new_username);
-                        roster_status_is_error = true;
+                bool can_link = temp_settings.local_player.username[0] != '\0';
+                if (!can_link) ImGui::BeginDisabled();
+                if (ImGui::Button("Link Account")) {
+                    char fetched_uuid[48] = "";
+                    bool fetched = mojang_fetch_uuid(temp_settings.local_player.username,
+                                                     fetched_uuid, sizeof(fetched_uuid));
+                    if (fetched) {
+                        strncpy(temp_settings.local_player.uuid, fetched_uuid,
+                                sizeof(temp_settings.local_player.uuid) - 1);
+                        snprintf(identity_status_msg, sizeof(identity_status_msg),
+                                 "Linked: %s", fetched_uuid);
+                        identity_status_is_error = false;
                     } else {
-                        char fetched_uuid[48] = "";
-                        bool fetched = mojang_fetch_uuid(new_username, fetched_uuid, sizeof(fetched_uuid));
-                        if (fetched) {
-                            CoopPlayer *p = &temp_settings.coop_players[temp_settings.coop_player_count];
-                            memset(p, 0, sizeof(CoopPlayer));
-                            strncpy(p->username, new_username, sizeof(p->username) - 1);
-                            strncpy(p->uuid, fetched_uuid, sizeof(p->uuid) - 1);
-                            p->display_name[0] = '\0';
-                            temp_settings.coop_player_count++;
-                            snprintf(roster_status_msg, sizeof(roster_status_msg),
-                                     "Added '%s' (UUID: %s)", new_username, fetched_uuid);
-                            roster_status_is_error = false;
-                            new_username[0] = '\0';
-                        } else {
-                            snprintf(roster_status_msg, sizeof(roster_status_msg),
-                                     "Could not find player '%s'.\n"
-                                     "Check the username.", new_username);
-                            roster_status_is_error = true;
-                        }
+                        temp_settings.local_player.uuid[0] = '\0';
+                        snprintf(identity_status_msg, sizeof(identity_status_msg),
+                                 "Could not find player '%s'. Check the username.",
+                                 temp_settings.local_player.username);
+                        identity_status_is_error = true;
                     }
                 }
-                if (!can_add) ImGui::EndDisabled();
+                if (!can_link) ImGui::EndDisabled();
 
-                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    char tooltip_buf[256];
-                    if (temp_settings.coop_player_count >= MAX_COOP_PLAYERS) {
-                        snprintf(tooltip_buf, sizeof(tooltip_buf), "Roster is full (%d players max).", MAX_COOP_PLAYERS);
-                    } else {
-                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                 "Type a Minecraft username and click to fetch their UUID\n"
-                                 "from the Mojang API and add them to the roster.");
-                    }
-                    ImGui::SetTooltip("%s", tooltip_buf);
-                }
-
-                // Status message
-                if (roster_status_msg[0] != '\0') {
-                    if (roster_status_is_error)
-                        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", roster_status_msg);
+                // Show link status
+                if (temp_settings.local_player.uuid[0] != '\0') {
+                    ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "Linked: %s",
+                                       temp_settings.local_player.uuid);
+                } else if (identity_status_msg[0] != '\0') {
+                    if (identity_status_is_error)
+                        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", identity_status_msg);
                     else
-                        ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "%s", roster_status_msg);
+                        ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "%s", identity_status_msg);
+                } else {
+                    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "Not linked yet");
                 }
-
-                ImGui::Spacing();
-
-                // Player list
-                int remove_index = -1;
-                for (int i = 0; i < temp_settings.coop_player_count; i++) {
-                    ImGui::PushID(i + 1000); // Offset to avoid ID conflicts with goal logic
-                    CoopPlayer *p = &temp_settings.coop_players[i];
-
-                    // Display name (editable)
-                    ImGui::SetNextItemWidth(120.0f);
-                    char display_label[128];
-                    snprintf(display_label, sizeof(display_label), "##display_%d", i);
-                    ImGui::InputTextWithHint(display_label, "Display Name", p->display_name, sizeof(p->display_name));
-                    if (ImGui::IsItemHovered()) {
-                        char tooltip_buf[256];
-                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                 "Custom display name (leave empty to use '%s').\n"
-                                 "UUID: %s",
-                                 p->username, p->uuid);
-                        ImGui::SetTooltip("%s", tooltip_buf);
-                    }
-
-                    ImGui::SameLine();
-                    ImGui::TextDisabled("%s", p->username);
-
-                    ImGui::SameLine();
-                    if (ImGui::SmallButton("Remove")) {
-                        remove_index = i;
-                    }
-
-                    ImGui::PopID();
-                }
-
-                // Handle removal
-                if (remove_index >= 0) {
-                    for (int i = remove_index; i < temp_settings.coop_player_count - 1; i++) {
-                        temp_settings.coop_players[i] = temp_settings.coop_players[i + 1];
-                    }
-                    temp_settings.coop_player_count--;
-                    memset(&temp_settings.coop_players[temp_settings.coop_player_count], 0, sizeof(CoopPlayer));
-                    roster_status_msg[0] = '\0';
-                }
-
-            }
-
-            // --- Receiver Settings ---
-            if (temp_settings.network_mode == NETWORK_RECEIVER) {
-                ImGui::Separator();
-                ImGui::Spacing();
-                ImGui::Text("Receiver Settings");
-                ImGui::TextDisabled("Enter the Host's IP address and port to connect.");
-                ImGui::Spacing();
-
-                // Reuse the same validation lambdas as Host side
-                auto is_valid_ipv4_recv = [](const char *addr) -> bool {
-                    if (!addr || addr[0] == '\0') return false;
-                    int octets = 0;
-                    int value = -1;
-                    for (const char *p = addr; ; p++) {
-                        if (*p >= '0' && *p <= '9') {
-                            if (value < 0) value = 0;
-                            value = value * 10 + (*p - '0');
-                            if (value > 255) return false;
-                        } else if (*p == '.' || *p == '\0') {
-                            if (value < 0) return false;
-                            octets++;
-                            value = -1;
-                            if (*p == '\0') break;
-                        } else {
-                            return false;
-                        }
-                    }
-                    return octets == 4;
-                };
-
-                auto is_valid_port_recv = [](const char *p) -> bool {
-                    if (!p || p[0] == '\0') return false;
-                    int value = 0;
-                    for (const char *c = p; *c; c++) {
-                        if (*c < '0' || *c > '9') return false;
-                        value = value * 10 + (*c - '0');
-                        if (value > 65535) return false;
-                    }
-                    return value >= 1;
-                };
-
-                bool recv_ip_filled = temp_settings.receiver_ip[0] != '\0';
-                bool recv_ip_valid = is_valid_ipv4_recv(temp_settings.receiver_ip);
-                bool recv_port_filled = temp_settings.receiver_port[0] != '\0';
-                bool recv_port_valid = is_valid_port_recv(temp_settings.receiver_port);
 
                 ImGui::SetNextItemWidth(200.0f);
-                ImGui::InputText("Host IP", temp_settings.receiver_ip, sizeof(temp_settings.receiver_ip));
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buf[256];
-                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                             "The Host's LAN or Hamachi/VPN IP address.\n"
-                             "Ask the Host for this.");
-                    ImGui::SetTooltip("%s", tooltip_buf);
-                }
-                if (recv_ip_filled && !recv_ip_valid) {
-                    ImGui::SameLine();
-                    ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid IP address (expected format: x.x.x.x)");
-                }
+                ImGui::InputTextWithHint("Display Name##local", "Optional",
+                                         temp_settings.local_player.display_name,
+                                         sizeof(temp_settings.local_player.display_name));
 
-                ImGui::SetNextItemWidth(120.0f);
-                ImGui::InputText("Host Port", temp_settings.receiver_port, sizeof(temp_settings.receiver_port),
-                                 ImGuiInputTextFlags_CharsDecimal);
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buf[256];
-                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                             "The port the Host is listening on.\n"
-                             "Ask the Host for this (default is 25565).");
-                    ImGui::SetTooltip("%s", tooltip_buf);
-                }
-                if (recv_port_filled && !recv_port_valid) {
+                bool identity_complete = temp_settings.local_player.uuid[0] != '\0';
+
+                if (identity_complete) {
+                    ImGui::Spacing();
+
+                    // ============================================================
+                    // Step 3: Choose Role
+                    // ============================================================
+                    ImGui::Separator();
+                    ImGui::Spacing();
+                    ImGui::Text("Role");
+                    ImGui::Spacing();
+
+                    // Disable role switching while networking is active
+                    if (net_is_active) ImGui::BeginDisabled();
+                    int mode = temp_settings.network_mode;
+                    if (mode == NETWORK_SINGLEPLAYER) mode = NETWORK_HOST; // Default to host when first choosing
+                    ImGui::RadioButton("Host", &mode, NETWORK_HOST);
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tooltip_buf[256];
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Host a co-op lobby.\n"
+                                 "You read game files for all players and share a room code.");
+                        ImGui::SetTooltip("%s", tooltip_buf);
+                    }
                     ImGui::SameLine();
-                    ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid port (must be 1-65535)");
-                }
-            }
+                    ImGui::RadioButton("Receiver", &mode, NETWORK_RECEIVER);
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        char tooltip_buf[256];
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Join a co-op lobby.\n"
+                                 "Paste a room code from the host to connect.");
+                        ImGui::SetTooltip("%s", tooltip_buf);
+                    }
+                    temp_settings.network_mode = (NetworkMode) mode;
+                    if (net_is_active) ImGui::EndDisabled();
+
+                    ImGui::Spacing();
+
+                    // ============================================================
+                    // Step 4a: Host a Lobby
+                    // ============================================================
+                    if (temp_settings.network_mode == NETWORK_HOST) {
+                        ImGui::Separator();
+                        ImGui::Spacing();
+                        ImGui::Text("Host Settings");
+                        ImGui::Spacing();
+
+                        // IPv4 validation
+                        auto is_valid_ipv4 = [](const char *ip) -> bool {
+                            if (!ip || ip[0] == '\0') return false;
+                            int octets = 0, value = -1;
+                            for (const char *p = ip; ; p++) {
+                                if (*p >= '0' && *p <= '9') {
+                                    if (value < 0) value = 0;
+                                    value = value * 10 + (*p - '0');
+                                    if (value > 255) return false;
+                                } else if (*p == '.' || *p == '\0') {
+                                    if (value < 0) return false;
+                                    octets++; value = -1;
+                                    if (*p == '\0') break;
+                                } else return false;
+                            }
+                            return octets == 4;
+                        };
+                        auto is_valid_port = [](const char *port) -> bool {
+                            if (!port || port[0] == '\0') return false;
+                            int value = 0;
+                            for (const char *p = port; *p; p++) {
+                                if (*p < '0' || *p > '9') return false;
+                                value = value * 10 + (*p - '0');
+                                if (value > 65535) return false;
+                            }
+                            return value >= 1;
+                        };
+
+                        bool ip_filled = temp_settings.host_ip[0] != '\0';
+                        bool ip_valid = is_valid_ipv4(temp_settings.host_ip);
+                        bool port_filled = temp_settings.host_port[0] != '\0';
+                        bool port_valid = is_valid_port(temp_settings.host_port);
+
+                        if (net_is_active) ImGui::BeginDisabled();
+                        ImGui::SetNextItemWidth(200.0f);
+                        ImGui::InputText("IP Address", temp_settings.host_ip, sizeof(temp_settings.host_ip));
+                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            char tooltip_buf[512];
+                            snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                     "Your ZeroTier IP address.\n"
+                                     "Find it in the ZeroTier app under your network.\n"
+                                     "WARNING: Do not share your ZeroTier Network ID publicly.");
+                            ImGui::SetTooltip("%s", tooltip_buf);
+                        }
+                        if (ip_filled && !ip_valid) {
+                            ImGui::SameLine();
+                            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid IP (x.x.x.x)");
+                        }
+
+                        ImGui::SetNextItemWidth(120.0f);
+                        ImGui::InputText("Port", temp_settings.host_port, sizeof(temp_settings.host_port),
+                                         ImGuiInputTextFlags_CharsDecimal);
+                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            char tooltip_buf[256];
+                            snprintf(tooltip_buf, sizeof(tooltip_buf), "Default is 25565.");
+                            ImGui::SetTooltip("%s", tooltip_buf);
+                        }
+                        if (port_filled && !port_valid) {
+                            ImGui::SameLine();
+                            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid port (1-65535)");
+                        }
+                        if (net_is_active) ImGui::EndDisabled();
+
+                        coop_host_input_error = (ip_filled && !ip_valid) || (port_filled && !port_valid);
+
+                        ImGui::Spacing();
+
+                        // Start Lobby / Room Code
+                        if (net_state == COOP_NET_LISTENING) {
+                            // Show room code when hosting
+                            if (room_code_buf[0] != '\0') {
+                                ImGui::Text("Room Code:");
+                                ImGui::SameLine();
+                                ImGui::SetNextItemWidth(250.0f);
+                                ImGui::InputText("##room_code", room_code_buf, sizeof(room_code_buf),
+                                                 ImGuiInputTextFlags_ReadOnly);
+                                ImGui::SameLine();
+                                if (ImGui::SmallButton("Copy")) {
+                                    SDL_SetClipboardText(room_code_buf);
+                                }
+                            }
+                        } else {
+                            bool can_start = ip_valid && port_valid && g_coop_ctx && !net_is_active;
+                            if (!can_start) ImGui::BeginDisabled();
+                            if (ImGui::Button("Start Lobby")) {
+                                int port = atoi(temp_settings.host_port);
+                                if (coop_net_start_host(g_coop_ctx, temp_settings.host_ip, port,
+                                                        temp_settings.local_player.username,
+                                                        temp_settings.local_player.uuid,
+                                                        temp_settings.local_player.display_name)) {
+                                    coop_encode_room_code(temp_settings.host_ip, port,
+                                                          room_code_buf, sizeof(room_code_buf));
+                                }
+                            }
+                            if (!can_start) ImGui::EndDisabled();
+                        }
+
+                        // Show error/disconnect status inline (lobby handles active states)
+                        if (g_coop_ctx && (net_state == COOP_NET_ERROR || net_state == COOP_NET_DISCONNECTED)) {
+                            ImGui::Spacing();
+                            char status_buf[256];
+                            coop_net_get_status_msg(g_coop_ctx, status_buf, sizeof(status_buf));
+                            ImVec4 sc = (net_state == COOP_NET_ERROR) ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f) :
+                                        ImVec4(1.0f, 0.6f, 0.4f, 1.0f);
+                            ImGui::TextColored(sc, "%s", status_buf);
+                        }
+
+                        // --- Goal Merging Logic ---
+                        if (net_state == COOP_NET_LISTENING) {
+                            ImGui::Spacing();
+                            ImGui::Separator();
+                            ImGui::Spacing();
+                            ImGui::Text("Goal Merging Logic");
+                            ImGui::TextDisabled("Controls how progress is combined when multiple players track the same goals.");
+                            ImGui::Spacing();
+
+                            const char *goal_type_labels[] = {
+                                advancements_label_plural_uppercase, "Statistics", "Custom Goals", "Multi-Stage Goals"
+                            };
+                            int logic = temp_settings.coop_goal_logic;
+                            for (int i = 0; i < 4; i++) {
+                                if (i > 0) ImGui::Spacing();
+                                ImGui::PushID(i);
+                                ImGui::BeginDisabled(i > 0);
+                                ImGui::Text("%s:", goal_type_labels[i]);
+                                ImGui::SameLine();
+                                ImGui::RadioButton("Max Progress", &logic, COOP_TRACK_MAX_PROGRESS);
+                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                    char tooltip_buf[256];
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Use whichever player has the most criteria completed for each goal.");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
+                                ImGui::SameLine();
+                                ImGui::RadioButton("First to Start", &logic, COOP_TRACK_FIRST_START);
+                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                    char tooltip_buf[256];
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Track whoever triggered the first criterion of each goal (by timestamp).");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
+                                ImGui::SameLine();
+                                ImGui::RadioButton("Any Completion", &logic, COOP_TRACK_ANY_COMPLETION);
+                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                    char tooltip_buf[256];
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "A goal is complete if any player has finished it.");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
+                                ImGui::EndDisabled();
+                                ImGui::PopID();
+                            }
+                            temp_settings.coop_goal_logic = (CoopGoalLogic) logic;
+                        }
+                    }
+
+                    // ============================================================
+                    // Step 4b: Join a Lobby (Receiver)
+                    // ============================================================
+                    if (temp_settings.network_mode == NETWORK_RECEIVER) {
+                        ImGui::Separator();
+                        ImGui::Spacing();
+                        ImGui::Text("Join a Lobby");
+                        ImGui::Spacing();
+
+                        if (net_state == COOP_NET_CONNECTING) {
+                            // Show disconnect + status while connecting
+                            if (ImGui::Button("Disconnect")) {
+                                coop_net_stop(g_coop_ctx);
+                            }
+                            ImGui::Spacing();
+                            char status_buf[256];
+                            coop_net_get_status_msg(g_coop_ctx, status_buf, sizeof(status_buf));
+                            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "%s", status_buf);
+                        } else if (net_state != COOP_NET_CONNECTED) {
+                            // Idle / Error / Disconnected — show paste button
+                            if (ImGui::Button("Paste Room Code")) {
+                                room_code_error[0] = '\0';
+                                char *clipboard = SDL_GetClipboardText();
+                                if (!clipboard || clipboard[0] == '\0') {
+                                    snprintf(room_code_error, sizeof(room_code_error), "Clipboard is empty.");
+                                } else {
+                                    char decoded_ip[64];
+                                    int decoded_port;
+                                    if (coop_decode_room_code(clipboard, decoded_ip, sizeof(decoded_ip), &decoded_port)) {
+                                        if (g_coop_ctx) {
+                                            coop_net_start_receiver(g_coop_ctx, decoded_ip, decoded_port,
+                                                                    temp_settings.local_player.username,
+                                                                    temp_settings.local_player.uuid,
+                                                                    temp_settings.local_player.display_name);
+                                            SDL_SetClipboardText(""); // Clear clipboard
+                                        }
+                                    } else {
+                                        snprintf(room_code_error, sizeof(room_code_error),
+                                                 "Invalid room code format.");
+                                    }
+                                }
+                                SDL_free(clipboard);
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tooltip_buf[256];
+                                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                         "Paste the room code from the host's clipboard.\n"
+                                         "The code will be decoded and used to connect.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+                        }
+
+                        if (room_code_error[0] != '\0') {
+                            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", room_code_error);
+                        }
+
+                        // Show error/disconnect status (lobby handles connected state)
+                        if (g_coop_ctx && (net_state == COOP_NET_ERROR || net_state == COOP_NET_DISCONNECTED)) {
+                            ImGui::Spacing();
+                            char status_buf[256];
+                            coop_net_get_status_msg(g_coop_ctx, status_buf, sizeof(status_buf));
+                            ImVec4 sc = (net_state == COOP_NET_ERROR) ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f) :
+                                        ImVec4(1.0f, 0.6f, 0.4f, 1.0f);
+                            ImGui::TextColored(sc, "%s", status_buf);
+                        }
+
+                        // Goal merging logic (read-only for receiver)
+                        if (net_state == COOP_NET_CONNECTED) {
+                            ImGui::Spacing();
+                            ImGui::Separator();
+                            ImGui::Spacing();
+                            ImGui::Text("Goal Merging Logic");
+                            ImGui::TextDisabled("Only the host can change this.");
+                            ImGui::Spacing();
+
+                            ImGui::BeginDisabled();
+                            const char *goal_type_labels[] = {
+                                advancements_label_plural_uppercase, "Statistics", "Custom Goals", "Multi-Stage Goals"
+                            };
+                            int logic = temp_settings.coop_goal_logic;
+                            for (int i = 0; i < 4; i++) {
+                                if (i > 0) ImGui::Spacing();
+                                ImGui::PushID(i + 500);
+                                ImGui::Text("%s:", goal_type_labels[i]);
+                                ImGui::SameLine();
+                                ImGui::RadioButton("Max Progress", &logic, COOP_TRACK_MAX_PROGRESS);
+                                ImGui::SameLine();
+                                ImGui::RadioButton("First to Start", &logic, COOP_TRACK_FIRST_START);
+                                ImGui::SameLine();
+                                ImGui::RadioButton("Any Completion", &logic, COOP_TRACK_ANY_COMPLETION);
+                                ImGui::PopID();
+                            }
+                            ImGui::EndDisabled();
+                        }
+                    }
+
+                    // --- Pending Join Requests (host only, shown right above lobby) ---
+                    if (g_coop_ctx && net_state == COOP_NET_LISTENING) {
+                        CoopJoinRequest pending[COOP_MAX_CLIENTS];
+                        int pending_count = coop_net_get_pending_requests(g_coop_ctx, pending, COOP_MAX_CLIENTS);
+                        if (pending_count > 0) {
+                            ImGui::Spacing();
+                            ImGui::Separator();
+                            ImGui::Spacing();
+                            ImGui::Text("Pending Join Requests");
+                            ImGui::Spacing();
+                            for (int i = 0; i < pending_count; i++) {
+                                ImGui::PushID(2000 + i);
+                                const char *name = pending[i].display_name[0] ? pending[i].display_name : pending[i].username;
+                                ImGui::Text("%s", name);
+                                ImGui::SameLine();
+                                ImGui::TextDisabled("(%s)", pending[i].username);
+                                ImGui::SameLine();
+                                if (ImGui::SmallButton("Accept")) {
+                                    coop_net_approve_request(g_coop_ctx, pending[i].client_slot);
+                                }
+                                ImGui::SameLine();
+                                if (ImGui::SmallButton("Reject")) {
+                                    coop_net_reject_request(g_coop_ctx, pending[i].client_slot, "Rejected by host");
+                                }
+                                ImGui::PopID();
+                            }
+                        }
+                    }
+
+                    // ============================================================
+                    // Lobby Player List (shown for both host and receiver when active)
+                    // ============================================================
+                    if (g_coop_ctx && (net_state == COOP_NET_LISTENING || net_state == COOP_NET_CONNECTED)) {
+                        ImGui::Spacing();
+                        ImGui::Separator();
+                        ImGui::Spacing();
+
+                        // Status line with disconnect button
+                        {
+                            char status_buf[256];
+                            coop_net_get_status_msg(g_coop_ctx, status_buf, sizeof(status_buf));
+                            ImVec4 sc = (net_state == COOP_NET_LISTENING) ? ImVec4(0.4f, 0.8f, 1.0f, 1.0f) :
+                                        ImVec4(0.4f, 1.0f, 0.4f, 1.0f);
+                            ImGui::TextColored(sc, "Lobby - %s", status_buf);
+                            ImGui::SameLine();
+                            if (ImGui::SmallButton("Disconnect##lobby")) {
+                                coop_net_stop(g_coop_ctx);
+                                room_code_buf[0] = '\0';
+                            }
+                        }
+
+                        ImGui::Spacing();
+
+                        // Player list
+                        CoopLobbyPlayer lobby[COOP_MAX_LOBBY];
+                        int lobby_count = coop_net_get_lobby_players(g_coop_ctx, lobby, COOP_MAX_LOBBY);
+
+                        for (int i = 0; i < lobby_count; i++) {
+                            ImGui::PushID(3000 + i);
+                            const char *name = lobby[i].display_name[0] ? lobby[i].display_name : lobby[i].username;
+
+                            if (lobby[i].is_host) {
+                                ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s", name);
+                                ImGui::SameLine();
+                                ImGui::TextDisabled("(Host)");
+                            } else {
+                                ImGui::Text("%s", name);
+                                ImGui::SameLine();
+                                ImGui::TextDisabled("(Receiver)");
+
+                                // Kick button (host only)
+                                if (temp_settings.network_mode == NETWORK_HOST && net_state == COOP_NET_LISTENING) {
+                                    ImGui::SameLine();
+                                    if (ImGui::SmallButton("Kick")) {
+                                        // Find the client slot by UUID
+                                        for (int j = 0; j < COOP_MAX_CLIENTS; j++) {
+                                            if (g_coop_ctx->clients[j].active &&
+                                                g_coop_ctx->clients[j].handshake_done &&
+                                                strcmp(g_coop_ctx->clients[j].uuid, lobby[i].uuid) == 0) {
+                                                coop_net_kick_client(g_coop_ctx, j, "Kicked by host");
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            ImGui::PopID();
+                        }
+                    }
+
+                } // end identity_complete
+            } // end coop_enabled
 
             ImGui::EndTabItem();
         } // End of Co-op Tab

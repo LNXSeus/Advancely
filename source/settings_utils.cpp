@@ -432,6 +432,8 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_show_update_timer = true;
 
     // Co-op Defaults
+    settings->coop_enabled = DEFAULT_COOP_ENABLED;
+    memset(&settings->local_player, 0, sizeof(settings->local_player));
     settings->network_mode = DEFAULT_NETWORK_MODE;
     settings->coop_goal_logic = DEFAULT_COOP_GOAL_LOGIC;
     settings->host_ip[0] = '\0';
@@ -1082,6 +1084,30 @@ bool settings_load(AppSettings *settings) {
     // Load Co-op Settings
     cJSON *coop_settings = cJSON_GetObjectItem(json, "coop");
     if (coop_settings) {
+        // Co-op enabled toggle
+        const cJSON *enabled = cJSON_GetObjectItem(coop_settings, "enabled");
+        if (enabled && cJSON_IsBool(enabled))
+            settings->coop_enabled = cJSON_IsTrue(enabled);
+        else {
+            settings->coop_enabled = DEFAULT_COOP_ENABLED;
+            defaults_were_used = true;
+        }
+
+        // Local player identity
+        const cJSON *local_player_json = cJSON_GetObjectItem(coop_settings, "local_player");
+        memset(&settings->local_player, 0, sizeof(settings->local_player));
+        if (local_player_json && cJSON_IsObject(local_player_json)) {
+            const cJSON *lp_uname = cJSON_GetObjectItem(local_player_json, "username");
+            if (lp_uname && cJSON_IsString(lp_uname))
+                strncpy(settings->local_player.username, lp_uname->valuestring, sizeof(settings->local_player.username) - 1);
+            const cJSON *lp_uuid = cJSON_GetObjectItem(local_player_json, "uuid");
+            if (lp_uuid && cJSON_IsString(lp_uuid))
+                strncpy(settings->local_player.uuid, lp_uuid->valuestring, sizeof(settings->local_player.uuid) - 1);
+            const cJSON *lp_dname = cJSON_GetObjectItem(local_player_json, "display_name");
+            if (lp_dname && cJSON_IsString(lp_dname))
+                strncpy(settings->local_player.display_name, lp_dname->valuestring, sizeof(settings->local_player.display_name) - 1);
+        }
+
         const cJSON *net_mode = cJSON_GetObjectItem(coop_settings, "network_mode");
         if (net_mode && cJSON_IsString(net_mode))
             settings->network_mode = string_to_network_mode(net_mode->valuestring);
@@ -1116,6 +1142,7 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
+        // Legacy receiver IP/port (kept for backward compat, no longer used in UI)
         const cJSON *recv_ip = cJSON_GetObjectItem(coop_settings, "receiver_ip");
         if (recv_ip && cJSON_IsString(recv_ip)) {
             strncpy(settings->receiver_ip, recv_ip->valuestring, sizeof(settings->receiver_ip) - 1);
@@ -1350,6 +1377,17 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
 
         // --- Save Co-op Settings ---
         cJSON *coop_obj = get_or_create_object(root, "coop");
+        cJSON_DeleteItemFromObject(coop_obj, "enabled");
+        cJSON_AddItemToObject(coop_obj, "enabled", cJSON_CreateBool(settings->coop_enabled));
+
+        // Save local player identity
+        cJSON_DeleteItemFromObject(coop_obj, "local_player");
+        cJSON *lp_obj = cJSON_CreateObject();
+        cJSON_AddItemToObject(lp_obj, "username", cJSON_CreateString(settings->local_player.username));
+        cJSON_AddItemToObject(lp_obj, "uuid", cJSON_CreateString(settings->local_player.uuid));
+        cJSON_AddItemToObject(lp_obj, "display_name", cJSON_CreateString(settings->local_player.display_name));
+        cJSON_AddItemToObject(coop_obj, "local_player", lp_obj);
+
         cJSON_DeleteItemFromObject(coop_obj, "network_mode");
         cJSON_AddItemToObject(coop_obj, "network_mode",
                               cJSON_CreateString(network_mode_to_string(settings->network_mode)));

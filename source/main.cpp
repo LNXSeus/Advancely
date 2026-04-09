@@ -1902,34 +1902,15 @@ int main(int argc, char *argv[]) {
                 settings_load(&app_settings);
                 log_set_settings(&app_settings); // Update the logger with the new settings.
 
-                // Update co-op networking based on settings.
-                // Skip restart if networking is already running in the correct mode —
-                // this avoids unnecessary disconnects when non-network settings change
-                // (e.g. window position, theme, etc.)
-                CoopNetState net_state = coop_net_get_state(&coop_ctx);
-                bool net_is_active = (net_state == COOP_NET_LISTENING || net_state == COOP_NET_CONNECTED
-                                      || net_state == COOP_NET_CONNECTING);
-
-                if (app_settings.network_mode == NETWORK_SINGLEPLAYER) {
+                // Co-op networking is now triggered by UI buttons (Start Lobby / Paste Room Code),
+                // not by settings reload. Only stop networking if co-op was toggled off.
+                if (!app_settings.coop_enabled) {
+                    CoopNetState net_state = coop_net_get_state(&coop_ctx);
+                    bool net_is_active = (net_state == COOP_NET_LISTENING || net_state == COOP_NET_CONNECTED
+                                          || net_state == COOP_NET_CONNECTING);
                     if (net_is_active) {
                         coop_net_stop(&coop_ctx);
-                        log_message(LOG_INFO, "[MAIN] Switched to singleplayer, networking stopped.\n");
-                    }
-                } else if (app_settings.network_mode == NETWORK_HOST) {
-                    if (net_state != COOP_NET_LISTENING) {
-                        coop_net_stop(&coop_ctx);
-                        int port = atoi(app_settings.host_port);
-                        if (port > 0 && port <= 65535 && app_settings.host_ip[0] != '\0') {
-                            coop_net_start_host(&coop_ctx, app_settings.host_ip, port);
-                        }
-                    }
-                } else if (app_settings.network_mode == NETWORK_RECEIVER) {
-                    if (net_state != COOP_NET_CONNECTED && net_state != COOP_NET_CONNECTING) {
-                        coop_net_stop(&coop_ctx);
-                        int port = atoi(app_settings.receiver_port);
-                        if (port > 0 && port <= 65535 && app_settings.receiver_ip[0] != '\0') {
-                            coop_net_start_receiver(&coop_ctx, app_settings.receiver_ip, port);
-                        }
+                        log_message(LOG_INFO, "[MAIN] Co-op disabled, networking stopped.\n");
                     }
                 }
 

@@ -37,11 +37,16 @@ enum CoopNetState {
 // Wire format: [4 bytes type (network order)] [4 bytes length (network order)] [payload]
 
 enum CoopMsgType {
-    COOP_MSG_HEARTBEAT     = 1, // Keepalive ping (empty payload)
-    COOP_MSG_HEARTBEAT_ACK = 2, // Keepalive response (empty payload)
-    COOP_MSG_DISCONNECT    = 3, // Graceful disconnect notification (empty payload)
-    COOP_MSG_STATE_UPDATE  = 4, // Serialized tracker state (Step 5)
-    COOP_MSG_TEMPLATE_SYNC = 5  // Template handshake data (Step 6)
+    COOP_MSG_HEARTBEAT     = 1,  // Keepalive ping (empty payload)
+    COOP_MSG_HEARTBEAT_ACK = 2,  // Keepalive response (empty payload)
+    COOP_MSG_DISCONNECT    = 3,  // Graceful disconnect notification (empty payload)
+    COOP_MSG_STATE_UPDATE  = 4,  // Serialized tracker state
+    COOP_MSG_TEMPLATE_SYNC = 5,  // Template handshake data
+    COOP_MSG_JOIN_REQUEST  = 6,  // Receiver -> Host: JSON {uuid, username, display_name}
+    COOP_MSG_JOIN_ACCEPT   = 7,  // Host -> Receiver: JSON lobby player list
+    COOP_MSG_JOIN_REJECT   = 8,  // Host -> Receiver: reason string, then close
+    COOP_MSG_PLAYER_LIST   = 9,  // Host -> All receivers: JSON player list on any change
+    COOP_MSG_KICK          = 10  // Host -> Receiver: reason string, then close
 };
 
 #define COOP_MSG_HEADER_SIZE 8 // 4 bytes type + 4 bytes length
@@ -60,13 +65,36 @@ enum CoopMsgType {
 
 // ---- Data Structures ----
 
-#define COOP_MAX_CLIENTS 31 // MAX_COOP_PLAYERS (32) minus the host
+#define COOP_MAX_CLIENTS 31  // MAX_COOP_PLAYERS (32) minus the host
+#define COOP_MAX_LOBBY   32  // Host + all clients
+
+// A player entry in the lobby display (used by both host and receiver UI)
+typedef struct {
+    char username[64];
+    char uuid[48];
+    char display_name[64];
+    bool is_host;
+} CoopLobbyPlayer;
 
 typedef struct {
-    coop_socket_t socket_fd; // Client socket descriptor
-    char label[64];          // Display label e.g. "192.168.1.5:12345"
-    bool active;             // Slot is in use
+    coop_socket_t socket_fd;    // Client socket descriptor
+    char label[64];             // Display label e.g. "192.168.1.5:12345"
+    bool active;                // Slot is in use
+    bool handshake_done;        // JOIN_REQUEST validated and approved by host
+    bool pending_approval;      // Waiting for host to accept/reject
+    char username[64];          // From handshake
+    char uuid[48];              // From handshake
+    char display_name[64];      // From handshake
+    Uint32 connect_time;        // When the socket was accepted (for handshake timeout)
 } CoopClient;
+
+// A pending join request shown in the host UI for approval
+typedef struct {
+    int client_slot;            // Which client slot this request is from
+    char username[64];
+    char uuid[48];
+    char display_name[64];
+} CoopJoinRequest;
 
 typedef struct {
     // -- State (atomically readable from any thread) --
@@ -76,12 +104,22 @@ typedef struct {
     // -- Host fields --
     coop_socket_t server_fd;                // Listening socket (COOP_INVALID_SOCKET when unused)
     CoopClient clients[COOP_MAX_CLIENTS];
-    int client_count;
+    int client_count;                       // Handshaked (approved) clients only
+
+    // -- Host identity (copied from settings at start) --
+    char host_username[64];
+    char host_uuid[48];
+    char host_display_name[64];
 
     // -- Receiver fields --
     coop_socket_t client_fd; // Connection to host (COOP_INVALID_SOCKET when unused)
-    char connect_ip[64];   // Target IP for receiver connect (set before thread spawn)
-    int connect_port;      // Target port for receiver connect
+    char connect_ip[64];     // Target IP for receiver connect (set before thread spawn)
+    int connect_port;        // Target port for receiver connect
+
+    // -- Receiver identity (set before starting receiver thread) --
+    char connect_username[64];
+    char connect_uuid[48];
+    char connect_display_name[64];
 
     // -- Threading --
     SDL_Thread *thread; // The network thread (host or receiver)
@@ -95,6 +133,18 @@ typedef struct {
     char *recv_buffer;
     size_t recv_buffer_size;
     bool recv_data_ready;
+
+    // -- Lobby player list (mutex-protected, for UI display) --
+    // Written by net thread, read by UI thread. Both host and receiver populate this.
+    SDL_Mutex *lobby_mutex;
+    CoopLobbyPlayer lobby_players[COOP_MAX_LOBBY];
+    int lobby_player_count;
+    bool lobby_changed;
+
+    // -- Pending join requests (host only, mutex-protected via lobby_mutex) --
+    CoopJoinRequest pending_requests[COOP_MAX_CLIENTS];
+    int pending_request_count;
+    bool pending_requests_changed;
 } CoopNetContext;
 
 // ---- Public API ----
@@ -105,11 +155,13 @@ bool coop_net_init(CoopNetContext *ctx);
 // Tear down everything (stop thread, close sockets, destroy mutexes). Call at app shutdown.
 void coop_net_shutdown(CoopNetContext *ctx);
 
-// Start hosting on the given IP and port. Spawns the host thread.
-bool coop_net_start_host(CoopNetContext *ctx, const char *ip, int port);
+// Start hosting with the host's identity. Spawns the host thread.
+bool coop_net_start_host(CoopNetContext *ctx, const char *ip, int port,
+                         const char *username, const char *uuid, const char *display_name);
 
-// Connect to a host at the given IP and port. Spawns the receiver thread.
-bool coop_net_start_receiver(CoopNetContext *ctx, const char *ip, int port);
+// Connect to a host with the receiver's identity. Spawns the receiver thread.
+bool coop_net_start_receiver(CoopNetContext *ctx, const char *ip, int port,
+                             const char *username, const char *uuid, const char *display_name);
 
 // Gracefully stop the current session (host or receiver). Blocks until the thread exits.
 void coop_net_stop(CoopNetContext *ctx);
@@ -123,12 +175,43 @@ CoopNetState coop_net_get_state(CoopNetContext *ctx);
 // Copy the human-readable status message into out (mutex-protected).
 void coop_net_get_status_msg(CoopNetContext *ctx, char *out, size_t out_size);
 
-// Get the number of currently connected clients (Host only).
+// Get the number of currently connected (approved) clients (Host only).
 int coop_net_get_client_count(CoopNetContext *ctx);
 
 // Broadcast data to all connected clients (Host only). Returns false if not hosting.
 // Payload is sent with COOP_MSG_STATE_UPDATE type.
 bool coop_net_broadcast(CoopNetContext *ctx, const void *data, size_t size);
+
+// ---- Lobby & Join Request API ----
+
+// Get a thread-safe snapshot of the lobby player list. Returns player count.
+int coop_net_get_lobby_players(CoopNetContext *ctx, CoopLobbyPlayer *out_players, int max_players);
+
+// Check if the lobby list has changed since last call (check-and-clear).
+bool coop_net_lobby_changed(CoopNetContext *ctx);
+
+// Get a thread-safe snapshot of pending join requests (Host only). Returns count.
+int coop_net_get_pending_requests(CoopNetContext *ctx, CoopJoinRequest *out_requests, int max_requests);
+
+// Check if pending requests changed since last call (check-and-clear).
+bool coop_net_pending_requests_changed(CoopNetContext *ctx);
+
+// Host approves a pending join request by client slot index.
+bool coop_net_approve_request(CoopNetContext *ctx, int client_slot);
+
+// Host rejects a pending join request by client slot index.
+bool coop_net_reject_request(CoopNetContext *ctx, int client_slot, const char *reason);
+
+// Host kicks a connected (approved) client by slot index.
+bool coop_net_kick_client(CoopNetContext *ctx, int client_slot, const char *reason);
+
+// ---- Room Code (Base64-encoded IP:PORT) ----
+
+// Encode IP:port into a Base64 room code. Returns true on success.
+bool coop_encode_room_code(const char *ip, int port, char *out_code, size_t code_max_len);
+
+// Decode a Base64 room code back into IP and port. Returns true on success.
+bool coop_decode_room_code(const char *code, char *out_ip, size_t ip_max_len, int *out_port);
 
 // ---- Global pointer (set in main.cpp so settings.cpp can read state) ----
 extern CoopNetContext *g_coop_ctx;

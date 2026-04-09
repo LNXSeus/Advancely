@@ -104,6 +104,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_SHOW_WELCOME_ON_STARTUP true
 
 // Co-op Defaults
+#define DEFAULT_COOP_ENABLED false
 #define DEFAULT_NETWORK_MODE NETWORK_SINGLEPLAYER
 #define DEFAULT_COOP_GOAL_LOGIC COOP_TRACK_MAX_PROGRESS
 #define DEFAULT_HOST_PORT "25565"
@@ -154,6 +155,8 @@ typedef struct {
     char uuid[48];          // UUID from Mojang API (with hyphens, e.g., "069a79f4-44e9-4726-a5be-fca90e38aaf5")
     char display_name[64];  // Optional custom display name (empty = use username)
 } CoopPlayer;
+
+// CoopLobbyPlayer is defined in coop_net.h (used for lobby display)
 
 typedef struct {
     char target_goal[192];
@@ -323,12 +326,14 @@ struct AppSettings {
     bool show_welcome_on_startup; // If true, shows the welcome message on startup
 
     // --- Co-op Settings ---
-    NetworkMode network_mode; // Singleplayer, Host, or Receiver
+    bool coop_enabled; // Master toggle for co-op mode
+    CoopPlayer local_player; // This user's own Minecraft identity
+    NetworkMode network_mode; // Runtime state: Singleplayer, Host, or Receiver (set programmatically)
     CoopGoalLogic coop_goal_logic; // How to merge progress from multiple players
-    char host_ip[64]; // The host's LAN/Hamachi IP address (entered manually by the host)
-    char host_port[16]; // The port the host listens on (default "25565" - Force Port Mod)
-    char receiver_ip[64]; // The host's IP address as entered by the receiver
-    char receiver_port[16]; // The host's port as entered by the receiver
+    char host_ip[64]; // The host's ZeroTier/VPN IP address (entered manually by the host)
+    char host_port[16]; // The port the host listens on (default "25565")
+    char receiver_ip[64]; // Deprecated: replaced by room codes (kept for backward compat)
+    char receiver_port[16]; // Deprecated: replaced by room codes (kept for backward compat)
 
     // --- Player Roster (Host only) ---
     int coop_player_count; // Number of players in the roster
