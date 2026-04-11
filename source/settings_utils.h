@@ -38,11 +38,20 @@ enum NetworkMode {
     NETWORK_RECEIVER      // Receiver: connects to host, receives co-op state
 };
 
-// Co-op goal merging logic
-enum CoopGoalLogic {
-    COOP_TRACK_MAX_PROGRESS,  // Use whichever player has the most criteria completed
-    COOP_TRACK_FIRST_START,   // Track whoever triggered the first criterion (by timestamp)
-    COOP_TRACK_ANY_COMPLETION // Check off globally if any player completes it
+// Co-op merge settings (per goal type)
+enum CoopStatMerge {
+    COOP_STAT_HIGHEST,     // Use whichever player has the highest stat value
+    COOP_STAT_CUMULATIVE   // Sum stat values across all players
+};
+
+enum CoopStatCheckbox {
+    COOP_STAT_CHECKBOX_HOST_ONLY,  // Only host can check off stats
+    COOP_STAT_CHECKBOX_ANY_PLAYER  // Any player can check off stats
+};
+
+enum CoopCustomGoalMode {
+    COOP_CUSTOM_HOST_ONLY,   // Only host modifies custom goals
+    COOP_CUSTOM_ANY_PLAYER   // Any player can modify custom goals
 };
 
 // Enum to identify the tracker sections
@@ -106,7 +115,9 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 // Co-op Defaults
 #define DEFAULT_COOP_ENABLED false
 #define DEFAULT_NETWORK_MODE NETWORK_SINGLEPLAYER
-#define DEFAULT_COOP_GOAL_LOGIC COOP_TRACK_MAX_PROGRESS
+#define DEFAULT_COOP_STAT_MERGE COOP_STAT_HIGHEST
+#define DEFAULT_COOP_STAT_CHECKBOX COOP_STAT_CHECKBOX_ANY_PLAYER
+#define DEFAULT_COOP_CUSTOM_GOAL_MODE COOP_CUSTOM_ANY_PLAYER
 #define DEFAULT_HOST_PORT "12345"
 
 // DEFINE DEFAULT SETTINGS
@@ -329,7 +340,9 @@ struct AppSettings {
     bool coop_enabled; // Master toggle for co-op mode
     CoopPlayer local_player; // This user's own Minecraft identity
     NetworkMode network_mode; // Runtime state: Singleplayer, Host, or Receiver (set programmatically)
-    CoopGoalLogic coop_goal_logic; // How to merge progress from multiple players
+    CoopStatMerge coop_stat_merge; // How to merge stat values: highest or cumulative
+    CoopStatCheckbox coop_stat_checkbox; // Who can check off stats: host only or any player
+    CoopCustomGoalMode coop_custom_goal_mode; // Who can modify custom goals: host only or any player
     char host_ip[64]; // The IP address to bind the server socket on (local/VPN)
     char host_public_ip[64]; // Optional public IP used for the room code (port forwarding)
     char host_port[16]; // The port the host listens on (default "12345")

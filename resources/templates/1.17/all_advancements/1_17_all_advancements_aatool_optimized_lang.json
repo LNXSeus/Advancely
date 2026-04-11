@@ -247,6 +247,7 @@
 	"stat.stat:tnt_picked_up":	"TNT",
 	"stat.stat:debris_picked_up":	"Debris",
 	"stat.stat:bee_nests_picked_up":	"Hives",
+	"stat.cauldrons":	"Cauldrons",
 	"multi_stage_goal.ms_goal:beacon.display_name":	"Need:",
 	"multi_stage_goal.ms_goal:beacon.stage.1":	"Skulls",
 	"multi_stage_goal.ms_goal:beacon.stage.2":	"Summon Wither",

@@ -326,6 +326,175 @@ static void deserialize_template_data(char *buffer, TemplateData *target_td) {
 }
 
 
+// Merges progress-only state from a serialize_template_data() buffer into an existing,
+// already-loaded TemplateData. Unlike deserialize_template_data(), this preserves every
+// pointer field (textures, criteria arrays, etc.) in the target, so it's safe to call
+// inside the tracker process — the receiver merges host state without clobbering its
+// own loaded resources. Returns true on success, false if counts don't match (indicating
+// the receiver hasn't finished reloading to the host's template yet).
+static bool merge_coop_progress(const char *buffer, TemplateData *target) {
+    if (!buffer || !target) return false;
+    const char *head = buffer;
+
+    TemplateData incoming;
+    memcpy(&incoming, head, sizeof(TemplateData));
+    head += sizeof(TemplateData);
+
+    if (incoming.advancement_count != target->advancement_count ||
+        incoming.stat_count != target->stat_count ||
+        incoming.multi_stage_goal_count != target->multi_stage_goal_count ||
+        incoming.unlock_count != target->unlock_count ||
+        incoming.custom_goal_count != target->custom_goal_count ||
+        incoming.counter_goal_count != target->counter_goal_count) {
+        log_message(LOG_ERROR,
+                    "[COOP] Merge skipped: template count mismatch with host "
+                    "(host adv=%d stat=%d msg=%d unl=%d cg=%d cnt=%d, "
+                    "receiver adv=%d stat=%d msg=%d unl=%d cg=%d cnt=%d). "
+                    "Waiting for template sync to reload.\n",
+                    incoming.advancement_count, incoming.stat_count, incoming.multi_stage_goal_count,
+                    incoming.unlock_count, incoming.custom_goal_count, incoming.counter_goal_count,
+                    target->advancement_count, target->stat_count, target->multi_stage_goal_count,
+                    target->unlock_count, target->custom_goal_count, target->counter_goal_count);
+        return false;
+    }
+
+    target->advancements_completed_count = incoming.advancements_completed_count;
+    target->stats_completed_count = incoming.stats_completed_count;
+    target->stats_completed_criteria_count = incoming.stats_completed_criteria_count;
+    target->unlocks_completed_count = incoming.unlocks_completed_count;
+    target->completed_criteria_count = incoming.completed_criteria_count;
+    target->overall_progress_percentage = incoming.overall_progress_percentage;
+    target->play_time_ticks = incoming.play_time_ticks;
+    target->frozen_play_time_ticks = incoming.frozen_play_time_ticks;
+    target->run_completed = incoming.run_completed;
+
+    for (int i = 0; i < target->advancement_count; i++) {
+        TrackableCategory in_cat;
+        memcpy(&in_cat, head, sizeof(TrackableCategory));
+        head += sizeof(TrackableCategory);
+
+        TrackableCategory *dst = target->advancements[i];
+        if (!dst || dst->criteria_count != in_cat.criteria_count) {
+            log_message(LOG_ERROR, "[COOP] Merge skipped: criteria count mismatch for advancement %d.\n", i);
+            return false;
+        }
+        dst->done = in_cat.done;
+        dst->is_manually_completed = in_cat.is_manually_completed;
+        dst->all_template_criteria_met = in_cat.all_template_criteria_met;
+        dst->done_in_snapshot = in_cat.done_in_snapshot;
+        dst->progress = in_cat.progress;
+        dst->completed_criteria_count = in_cat.completed_criteria_count;
+
+        for (int j = 0; j < in_cat.criteria_count; j++) {
+            TrackableItem in_item;
+            memcpy(&in_item, head, sizeof(TrackableItem));
+            head += sizeof(TrackableItem);
+            TrackableItem *dst_item = dst->criteria ? dst->criteria[j] : nullptr;
+            if (!dst_item) continue;
+            dst_item->done = in_item.done;
+            dst_item->progress = in_item.progress;
+            dst_item->initial_progress = in_item.initial_progress;
+            dst_item->is_manually_completed = in_item.is_manually_completed;
+        }
+    }
+
+    for (int i = 0; i < target->stat_count; i++) {
+        TrackableCategory in_cat;
+        memcpy(&in_cat, head, sizeof(TrackableCategory));
+        head += sizeof(TrackableCategory);
+
+        TrackableCategory *dst = target->stats[i];
+        if (!dst || dst->criteria_count != in_cat.criteria_count) {
+            log_message(LOG_ERROR, "[COOP] Merge skipped: criteria count mismatch for stat %d.\n", i);
+            return false;
+        }
+        dst->done = in_cat.done;
+        dst->is_manually_completed = in_cat.is_manually_completed;
+        dst->all_template_criteria_met = in_cat.all_template_criteria_met;
+        dst->done_in_snapshot = in_cat.done_in_snapshot;
+        dst->progress = in_cat.progress;
+        dst->completed_criteria_count = in_cat.completed_criteria_count;
+
+        for (int j = 0; j < in_cat.criteria_count; j++) {
+            TrackableItem in_item;
+            memcpy(&in_item, head, sizeof(TrackableItem));
+            head += sizeof(TrackableItem);
+            TrackableItem *dst_item = dst->criteria ? dst->criteria[j] : nullptr;
+            if (!dst_item) continue;
+            dst_item->done = in_item.done;
+            dst_item->progress = in_item.progress;
+            dst_item->initial_progress = in_item.initial_progress;
+            dst_item->is_manually_completed = in_item.is_manually_completed;
+        }
+    }
+
+    for (int i = 0; i < target->multi_stage_goal_count; i++) {
+        MultiStageGoal in_msg;
+        memcpy(&in_msg, head, sizeof(MultiStageGoal));
+        head += sizeof(MultiStageGoal);
+
+        MultiStageGoal *dst = target->multi_stage_goals[i];
+        if (!dst || dst->stage_count != in_msg.stage_count) {
+            log_message(LOG_ERROR, "[COOP] Merge skipped: stage count mismatch for multi-stage goal %d.\n", i);
+            return false;
+        }
+        dst->current_stage = in_msg.current_stage;
+
+        for (int j = 0; j < in_msg.stage_count; j++) {
+            SubGoal in_stage;
+            memcpy(&in_stage, head, sizeof(SubGoal));
+            head += sizeof(SubGoal);
+            SubGoal *dst_stage = dst->stages ? dst->stages[j] : nullptr;
+            if (!dst_stage) continue;
+            dst_stage->current_stat_progress = in_stage.current_stat_progress;
+        }
+    }
+
+    for (int i = 0; i < target->unlock_count; i++) {
+        TrackableItem in_item;
+        memcpy(&in_item, head, sizeof(TrackableItem));
+        head += sizeof(TrackableItem);
+        TrackableItem *dst_item = target->unlocks[i];
+        if (!dst_item) continue;
+        dst_item->done = in_item.done;
+        dst_item->progress = in_item.progress;
+        dst_item->initial_progress = in_item.initial_progress;
+        dst_item->is_manually_completed = in_item.is_manually_completed;
+    }
+
+    for (int i = 0; i < target->custom_goal_count; i++) {
+        TrackableItem in_item;
+        memcpy(&in_item, head, sizeof(TrackableItem));
+        head += sizeof(TrackableItem);
+        TrackableItem *dst_item = target->custom_goals[i];
+        if (!dst_item) continue;
+        dst_item->done = in_item.done;
+        dst_item->progress = in_item.progress;
+        dst_item->initial_progress = in_item.initial_progress;
+        dst_item->is_manually_completed = in_item.is_manually_completed;
+    }
+
+    for (int i = 0; i < target->counter_goal_count; i++) {
+        CounterGoal in_cg;
+        memcpy(&in_cg, head, sizeof(CounterGoal));
+        head += sizeof(CounterGoal);
+
+        CounterGoal *dst = target->counter_goals[i];
+        if (!dst || dst->linked_goal_count != in_cg.linked_goal_count) {
+            log_message(LOG_ERROR, "[COOP] Merge skipped: linked goal count mismatch for counter %d.\n", i);
+            return false;
+        }
+        dst->completed_count = in_cg.completed_count;
+        dst->done = in_cg.done;
+
+        // Linked goals carry no dynamic state; skip over the wire bytes.
+        head += (size_t) in_cg.linked_goal_count * sizeof(CounterLinkedGoal);
+    }
+
+    return true;
+}
+
+
 static void free_deserialized_data(TemplateData *td) {
     if (!td) return;
 
@@ -2004,28 +2173,131 @@ int main(int argc, char *argv[]) {
             }
 
 
+            // --- Co-op Receiver: consume template sync from host ---
+            if (app_settings.network_mode == NETWORK_RECEIVER && g_coop_ctx &&
+                coop_net_template_sync_ready(g_coop_ctx)) {
+                char sync_json[1024];
+                if (coop_net_get_template_sync(g_coop_ctx, sync_json, sizeof(sync_json))) {
+                    cJSON *root = cJSON_Parse(sync_json);
+                    if (root) {
+                        cJSON *ver = cJSON_GetObjectItem(root, "version");
+                        cJSON *cat = cJSON_GetObjectItem(root, "category");
+                        cJSON *opt = cJSON_GetObjectItem(root, "optional_flag");
+                        cJSON *sm = cJSON_GetObjectItem(root, "stat_merge");
+                        cJSON *sc = cJSON_GetObjectItem(root, "stat_checkbox");
+                        cJSON *cg = cJSON_GetObjectItem(root, "custom_goal_mode");
+
+                        bool template_changed = false;
+                        if (ver && ver->valuestring) {
+                            if (strcmp(app_settings.version_str, ver->valuestring) != 0) {
+                                strncpy(app_settings.version_str, ver->valuestring, sizeof(app_settings.version_str) - 1);
+                                template_changed = true;
+                            }
+                        }
+                        if (cat && cat->valuestring) {
+                            if (strcmp(app_settings.category, cat->valuestring) != 0) {
+                                strncpy(app_settings.category, cat->valuestring, sizeof(app_settings.category) - 1);
+                                template_changed = true;
+                            }
+                        }
+                        if (opt && opt->valuestring) {
+                            if (strcmp(app_settings.optional_flag, opt->valuestring) != 0) {
+                                strncpy(app_settings.optional_flag, opt->valuestring, sizeof(app_settings.optional_flag) - 1);
+                                template_changed = true;
+                            }
+                        }
+                        if (sm && sm->valuestring)
+                            app_settings.coop_stat_merge = (strcmp(sm->valuestring, "cumulative") == 0)
+                                                               ? COOP_STAT_CUMULATIVE : COOP_STAT_HIGHEST;
+                        if (sc && sc->valuestring)
+                            app_settings.coop_stat_checkbox = (strcmp(sc->valuestring, "host_only") == 0)
+                                                                  ? COOP_STAT_CHECKBOX_HOST_ONLY : COOP_STAT_CHECKBOX_ANY_PLAYER;
+                        if (cg && cg->valuestring)
+                            app_settings.coop_custom_goal_mode = (strcmp(cg->valuestring, "host_only") == 0)
+                                                                     ? COOP_CUSTOM_HOST_ONLY : COOP_CUSTOM_ANY_PLAYER;
+                        cJSON_Delete(root);
+
+                        if (template_changed) {
+                            SDL_SetAtomicInt(&g_settings_changed, 1);
+                            SDL_SetAtomicInt(&g_apply_button_clicked, 1);
+                        }
+                        log_message(LOG_INFO, "[COOP] Applied template sync from host.\n");
+                    }
+                }
+            }
+
+            // --- Co-op Receiver: consume state updates from host ---
+            if (app_settings.network_mode == NETWORK_RECEIVER && g_coop_ctx) {
+                SDL_LockMutex(g_coop_ctx->recv_mutex);
+                if (g_coop_ctx->recv_data_ready && g_coop_ctx->recv_buffer &&
+                    g_coop_ctx->recv_buffer_size >= sizeof(TemplateData) && tracker->template_data) {
+                    // Merge progress-only fields from the host's serialized state into the
+                    // tracker's already-loaded TemplateData. This preserves all texture and
+                    // criteria pointer fields (deserialize_template_data would clobber them
+                    // with host-process addresses and crash the renderer).
+                    bool merged = merge_coop_progress(g_coop_ctx->recv_buffer, tracker->template_data);
+                    g_coop_ctx->recv_data_ready = false;
+
+                    if (merged) {
+                        SDL_SetAtomicInt(&g_needs_update, 1);
+                        SDL_SetAtomicInt(&g_game_data_changed, 1);
+                        log_message(LOG_INFO, "[COOP] Received and applied merged state from host.\n");
+                    }
+                }
+                SDL_UnlockMutex(g_coop_ctx->recv_mutex);
+            }
+
             // Check if dmon (or manual update through custom goal) has requested an update
             // Use SDL_SetAtomicInt to check AND reset the flag atomically.
             if (SDL_SetAtomicInt(&g_needs_update, 0) == 1) {
                 // --- TODO: Debug Print ---
                 log_message(LOG_INFO, "[DEBUG - MAIN] g_needs_update was 1. Triggering full tracker update.\n");
                 // ----------------
-                MC_Version version = settings_get_version_from_string(app_settings.version_str);
-                find_player_data_files(
-                    tracker->saves_path,
-                    version,
-                    // This toggles if StatsPerWorld mod is enabled (local stats for legacy)
-                    app_settings.using_stats_per_world_legacy,
-                    &app_settings,
-                    tracker->world_name,
-                    tracker->advancements_path,
-                    tracker->stats_path,
-                    tracker->unlocks_path,
-                    MAX_PATH_LENGTH
-                );
 
-                // Now update progress with the correct paths
-                tracker_update(tracker, &app_settings);
+                // Receiver mode: skip file reading (data comes from host via network)
+                if (app_settings.network_mode != NETWORK_RECEIVER) {
+                    MC_Version version = settings_get_version_from_string(app_settings.version_str);
+                    find_player_data_files(
+                        tracker->saves_path,
+                        version,
+                        // This toggles if StatsPerWorld mod is enabled (local stats for legacy)
+                        app_settings.using_stats_per_world_legacy,
+                        &app_settings,
+                        tracker->world_name,
+                        tracker->advancements_path,
+                        tracker->stats_path,
+                        tracker->unlocks_path,
+                        MAX_PATH_LENGTH
+                    );
+
+                    // Co-op Host: merge all players' data and broadcast
+                    if (app_settings.network_mode == NETWORK_HOST &&
+                        coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
+                        coop_net_get_client_count(g_coop_ctx) > 0) {
+                        tracker_update_coop_merged(tracker, &app_settings);
+
+                        // Drain and apply any custom goal modifications from receivers
+                        CoopCustomGoalModMsg mods[COOP_MAX_CUSTOM_MODS];
+                        int mod_count = coop_net_drain_custom_mods(g_coop_ctx, mods, COOP_MAX_CUSTOM_MODS);
+                        if (mod_count > 0) {
+                            tracker_apply_coop_mods(tracker, &app_settings, mods, mod_count);
+                            log_message(LOG_INFO, "[COOP] Applied %d custom goal modification(s).\n", mod_count);
+                        }
+
+                        // Broadcast merged state to all receivers
+                        char *broadcast_buf = (char *)malloc(4 * 1024 * 1024); // 4 MB heap buffer
+                        if (broadcast_buf) {
+                            size_t broadcast_size = serialize_template_data(tracker->template_data, broadcast_buf);
+                            if (broadcast_size > 0) {
+                                coop_net_broadcast(g_coop_ctx, broadcast_buf, broadcast_size);
+                            }
+                            free(broadcast_buf);
+                        }
+                    } else {
+                        // Singleplayer or host with no clients: normal update
+                        tracker_update(tracker, &app_settings);
+                    }
+                }
 
                 // Update TITLE of the tracker window with some info, similar to the debug print
                 tracker_update_title(tracker, &app_settings);

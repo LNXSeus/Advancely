@@ -46,7 +46,8 @@ enum CoopMsgType {
     COOP_MSG_JOIN_ACCEPT   = 7,  // Host -> Receiver: JSON lobby player list
     COOP_MSG_JOIN_REJECT   = 8,  // Host -> Receiver: reason string, then close
     COOP_MSG_PLAYER_LIST   = 9,  // Host -> All receivers: JSON player list on any change
-    COOP_MSG_KICK          = 10  // Host -> Receiver: reason string, then close
+    COOP_MSG_KICK          = 10, // Host -> Receiver: reason string, then close
+    COOP_MSG_CUSTOM_GOAL_MOD = 11  // Receiver -> Host: custom goal/stat checkbox modification
 };
 
 #define COOP_MSG_HEADER_SIZE 8 // 4 bytes type + 4 bytes length
@@ -75,6 +76,23 @@ typedef struct {
     char display_name[64];
     bool is_host;
 } CoopLobbyPlayer;
+
+// Custom goal/stat checkbox modification actions (Receiver -> Host)
+enum CoopGoalModAction {
+    COOP_MOD_TOGGLE = 0,     // Toggle a checkbox (custom goal or stat)
+    COOP_MOD_INCREMENT = 1,  // Increment a counter
+    COOP_MOD_DECREMENT = 2,  // Decrement a counter
+    COOP_MOD_SET_VALUE = 3   // Set a specific value
+};
+
+typedef struct {
+    char goal_root_name[192];  // root_name of the custom goal or stat
+    char parent_root_name[192]; // parent root_name for sub-stats (empty = top-level)
+    int action;                // CoopGoalModAction
+    int value;                 // For SET_VALUE action
+} CoopCustomGoalModMsg;
+
+#define COOP_MAX_CUSTOM_MODS 64
 
 // Pending action the UI thread requests the host thread to carry out
 enum CoopClientAction {
@@ -154,6 +172,17 @@ typedef struct {
     CoopJoinRequest pending_requests[COOP_MAX_CLIENTS];
     int pending_request_count;
     bool pending_requests_changed;
+
+    // -- Custom goal modification queue (host only, mutex-protected) --
+    // Receivers send COOP_MSG_CUSTOM_GOAL_MOD messages; host thread queues them here.
+    SDL_Mutex *custom_mod_mutex;
+    CoopCustomGoalModMsg custom_mod_queue[COOP_MAX_CUSTOM_MODS];
+    int custom_mod_count;
+
+    // -- Template sync (host sets, sent on approve; receiver receives and stores) --
+    SDL_Mutex *template_sync_mutex;
+    char template_sync_payload[1024]; // JSON string with version, category, optional_flag, merge settings
+    bool template_sync_ready;         // Receiver: true when new sync data available for main thread
 } CoopNetContext;
 
 // ---- Public API ----
@@ -213,6 +242,28 @@ bool coop_net_reject_request(CoopNetContext *ctx, int client_slot, const char *r
 
 // Host kicks a connected (approved) client by slot index.
 bool coop_net_kick_client(CoopNetContext *ctx, int client_slot, const char *reason);
+
+// ---- Custom Goal Modification API ----
+
+// Receiver sends a custom goal modification to the host. Returns false if not connected.
+bool coop_net_send_custom_goal_mod(CoopNetContext *ctx, const CoopCustomGoalModMsg *msg);
+
+// Host drains queued custom goal modifications (thread-safe). Returns count written to out_mods.
+int coop_net_drain_custom_mods(CoopNetContext *ctx, CoopCustomGoalModMsg *out_mods, int max_mods);
+
+// ---- Template Sync API ----
+
+// Host: set the template sync payload (JSON). Called from main thread whenever settings change.
+void coop_net_set_template_sync(CoopNetContext *ctx, const char *json_payload);
+
+// Receiver: check-and-clear template sync availability. Returns true if new data is ready.
+bool coop_net_template_sync_ready(CoopNetContext *ctx);
+
+// Receiver: copy the template sync payload into out buffer. Returns true if data was available.
+bool coop_net_get_template_sync(CoopNetContext *ctx, char *out, size_t out_size);
+
+// Host: broadcast current template sync payload to all connected (approved) clients.
+void coop_net_broadcast_template_sync(CoopNetContext *ctx);
 
 // ---- Room Code (Base64-encoded IP:PORT) ----
 

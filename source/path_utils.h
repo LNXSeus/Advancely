@@ -73,6 +73,41 @@ void find_player_data_files(
 );
 
 /**
+ * @brief Finds player data files for a specific player by UUID/username in co-op mode.
+ *
+ * Unlike find_player_data_files() which finds the first file via glob, this function
+ * constructs deterministic paths for a specific player. The world name must already
+ * be known (determined by the host's initial scan).
+ *
+ * - For MC 1.7+: stats/advancements are <uuid>.json
+ * - For MC <= 1.6.4: stats are stats_<username_lowercase>_unsent.dat
+ * - For 25w14craftmine: unlocks are <uuid>.json in unlocks/
+ *
+ * @param saves_path The full path to the .minecraft/saves directory.
+ * @param version The Minecraft version enum.
+ * @param use_stats_per_world_mod Whether the StatsPerWorld mod is in use (legacy only).
+ * @param world_name The already-determined world name (from host's initial scan).
+ * @param uuid The player's UUID (with hyphens, e.g., "069a79f4-44e9-4726-a5be-fca90e38aaf5").
+ * @param username The player's Minecraft username (used for legacy .dat filenames).
+ * @param out_adv_path Buffer for the advancements file path.
+ * @param out_stats_path Buffer for the stats file path.
+ * @param out_unlocks_path Buffer for the unlocks file path.
+ * @param max_len The size of the output path buffers.
+ */
+void find_player_data_files_for_uuid(
+    const char *saves_path,
+    MC_Version version,
+    bool use_stats_per_world_mod,
+    const char *world_name,
+    const char *uuid,
+    const char *username,
+    char *out_adv_path,
+    char *out_stats_path,
+    char *out_unlocks_path,
+    size_t max_len
+);
+
+/**
 * @brief Checks if a given file or directory path exists.
 * @param path The path to check.
 * @return true if the path exists, false otherwise.

@@ -89,20 +89,46 @@ static NetworkMode string_to_network_mode(const char *str) {
     return NETWORK_SINGLEPLAYER; // Fallback
 }
 
-static const char *coop_goal_logic_to_string(CoopGoalLogic logic) {
-    switch (logic) {
-        case COOP_TRACK_FIRST_START: return "first_start";
-        case COOP_TRACK_ANY_COMPLETION: return "any_completion";
-        case COOP_TRACK_MAX_PROGRESS:
-        default: return "max_progress"; // Default
+static const char *coop_stat_merge_to_string(CoopStatMerge mode) {
+    switch (mode) {
+        case COOP_STAT_CUMULATIVE: return "cumulative";
+        case COOP_STAT_HIGHEST:
+        default: return "highest";
     }
 }
 
-static CoopGoalLogic string_to_coop_goal_logic(const char *str) {
-    if (!str) return COOP_TRACK_MAX_PROGRESS;
-    if (strcmp(str, "first_start") == 0) return COOP_TRACK_FIRST_START;
-    if (strcmp(str, "any_completion") == 0) return COOP_TRACK_ANY_COMPLETION;
-    return COOP_TRACK_MAX_PROGRESS; // Default
+static CoopStatMerge string_to_coop_stat_merge(const char *str) {
+    if (!str) return DEFAULT_COOP_STAT_MERGE;
+    if (strcmp(str, "cumulative") == 0) return COOP_STAT_CUMULATIVE;
+    return COOP_STAT_HIGHEST;
+}
+
+static const char *coop_stat_checkbox_to_string(CoopStatCheckbox mode) {
+    switch (mode) {
+        case COOP_STAT_CHECKBOX_HOST_ONLY: return "host_only";
+        case COOP_STAT_CHECKBOX_ANY_PLAYER:
+        default: return "any_player";
+    }
+}
+
+static CoopStatCheckbox string_to_coop_stat_checkbox(const char *str) {
+    if (!str) return DEFAULT_COOP_STAT_CHECKBOX;
+    if (strcmp(str, "host_only") == 0) return COOP_STAT_CHECKBOX_HOST_ONLY;
+    return COOP_STAT_CHECKBOX_ANY_PLAYER;
+}
+
+static const char *coop_custom_goal_mode_to_string(CoopCustomGoalMode mode) {
+    switch (mode) {
+        case COOP_CUSTOM_HOST_ONLY: return "host_only";
+        case COOP_CUSTOM_ANY_PLAYER:
+        default: return "any_player";
+    }
+}
+
+static CoopCustomGoalMode string_to_coop_custom_goal_mode(const char *str) {
+    if (!str) return DEFAULT_COOP_CUSTOM_GOAL_MODE;
+    if (strcmp(str, "host_only") == 0) return COOP_CUSTOM_HOST_ONLY;
+    return COOP_CUSTOM_ANY_PLAYER;
 }
 
 // Helper Prototypes for Loading/Saving
@@ -435,7 +461,9 @@ void settings_set_defaults(AppSettings *settings) {
     settings->coop_enabled = DEFAULT_COOP_ENABLED;
     memset(&settings->local_player, 0, sizeof(settings->local_player));
     settings->network_mode = DEFAULT_NETWORK_MODE;
-    settings->coop_goal_logic = DEFAULT_COOP_GOAL_LOGIC;
+    settings->coop_stat_merge = DEFAULT_COOP_STAT_MERGE;
+    settings->coop_stat_checkbox = DEFAULT_COOP_STAT_CHECKBOX;
+    settings->coop_custom_goal_mode = DEFAULT_COOP_CUSTOM_GOAL_MODE;
     settings->host_ip[0] = '\0';
     settings->host_public_ip[0] = '\0';
     strncpy(settings->host_port, DEFAULT_HOST_PORT, sizeof(settings->host_port) - 1);
@@ -1114,11 +1142,37 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
-        const cJSON *goal_logic = cJSON_GetObjectItem(coop_settings, "goal_logic");
-        if (goal_logic && cJSON_IsString(goal_logic))
-            settings->coop_goal_logic = string_to_coop_goal_logic(goal_logic->valuestring);
-        else {
-            settings->coop_goal_logic = DEFAULT_COOP_GOAL_LOGIC;
+        // Merge settings sub-object (replaces old "goal_logic" single enum)
+        const cJSON *merge_obj = cJSON_GetObjectItem(coop_settings, "merge_settings");
+        if (merge_obj && cJSON_IsObject(merge_obj)) {
+            const cJSON *sm = cJSON_GetObjectItem(merge_obj, "stat_merge");
+            if (sm && cJSON_IsString(sm))
+                settings->coop_stat_merge = string_to_coop_stat_merge(sm->valuestring);
+            else {
+                settings->coop_stat_merge = DEFAULT_COOP_STAT_MERGE;
+                defaults_were_used = true;
+            }
+
+            const cJSON *sc = cJSON_GetObjectItem(merge_obj, "stat_checkbox");
+            if (sc && cJSON_IsString(sc))
+                settings->coop_stat_checkbox = string_to_coop_stat_checkbox(sc->valuestring);
+            else {
+                settings->coop_stat_checkbox = DEFAULT_COOP_STAT_CHECKBOX;
+                defaults_were_used = true;
+            }
+
+            const cJSON *cg = cJSON_GetObjectItem(merge_obj, "custom_goal_mode");
+            if (cg && cJSON_IsString(cg))
+                settings->coop_custom_goal_mode = string_to_coop_custom_goal_mode(cg->valuestring);
+            else {
+                settings->coop_custom_goal_mode = DEFAULT_COOP_CUSTOM_GOAL_MODE;
+                defaults_were_used = true;
+            }
+        } else {
+            // Old "goal_logic" key or missing — use defaults
+            settings->coop_stat_merge = DEFAULT_COOP_STAT_MERGE;
+            settings->coop_stat_checkbox = DEFAULT_COOP_STAT_CHECKBOX;
+            settings->coop_custom_goal_mode = DEFAULT_COOP_CUSTOM_GOAL_MODE;
             defaults_were_used = true;
         }
 
@@ -1379,9 +1433,19 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(coop_obj, "network_mode");
         cJSON_AddItemToObject(coop_obj, "network_mode",
                               cJSON_CreateString(network_mode_to_string(settings->network_mode)));
+        // Remove old "goal_logic" key if present (backward compat cleanup)
         cJSON_DeleteItemFromObject(coop_obj, "goal_logic");
-        cJSON_AddItemToObject(coop_obj, "goal_logic",
-                              cJSON_CreateString(coop_goal_logic_to_string(settings->coop_goal_logic)));
+
+        // Save merge settings as sub-object
+        cJSON_DeleteItemFromObject(coop_obj, "merge_settings");
+        cJSON *merge_obj = cJSON_CreateObject();
+        cJSON_AddItemToObject(merge_obj, "stat_merge",
+                              cJSON_CreateString(coop_stat_merge_to_string(settings->coop_stat_merge)));
+        cJSON_AddItemToObject(merge_obj, "stat_checkbox",
+                              cJSON_CreateString(coop_stat_checkbox_to_string(settings->coop_stat_checkbox)));
+        cJSON_AddItemToObject(merge_obj, "custom_goal_mode",
+                              cJSON_CreateString(coop_custom_goal_mode_to_string(settings->coop_custom_goal_mode)));
+        cJSON_AddItemToObject(coop_obj, "merge_settings", merge_obj);
         cJSON_DeleteItemFromObject(coop_obj, "host_ip");
         cJSON_AddItemToObject(coop_obj, "host_ip", cJSON_CreateString(settings->host_ip));
         cJSON_DeleteItemFromObject(coop_obj, "host_public_ip");

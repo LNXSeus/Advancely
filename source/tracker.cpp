@@ -3416,6 +3416,577 @@ void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settin
     }
 }
 
+// -------------------------------------------- CO-OP MERGE HELPERS --------------------------------------------
+
+/**
+ * @brief Resets all progress fields in TemplateData to zero/false before co-op merge.
+ */
+static void coop_reset_template_progress(TemplateData *td) {
+    td->advancements_completed_count = 0;
+    td->completed_criteria_count = 0;
+    td->stats_completed_count = 0;
+    td->stats_completed_criteria_count = 0;
+    td->unlocks_completed_count = 0;
+    td->play_time_ticks = 0;
+    td->frozen_play_time_ticks = 0;
+    td->run_completed = false;
+    td->overall_progress_percentage = 0.0f;
+
+    for (int i = 0; i < td->advancement_count; i++) {
+        TrackableCategory *adv = td->advancements[i];
+        adv->done = false;
+        adv->all_template_criteria_met = false;
+        adv->completed_criteria_count = 0;
+        for (int j = 0; j < adv->criteria_count; j++) {
+            adv->criteria[j]->done = false;
+        }
+    }
+
+    for (int i = 0; i < td->stat_count; i++) {
+        TrackableCategory *stat_cat = td->stats[i];
+        stat_cat->done = false;
+        stat_cat->completed_criteria_count = 0;
+        for (int j = 0; j < stat_cat->criteria_count; j++) {
+            stat_cat->criteria[j]->progress = 0;
+            stat_cat->criteria[j]->done = false;
+        }
+    }
+
+    for (int i = 0; i < td->unlock_count; i++) {
+        td->unlocks[i]->done = false;
+    }
+
+    for (int i = 0; i < td->multi_stage_goal_count; i++) {
+        td->multi_stage_goals[i]->current_stage = 0;
+        for (int j = 0; j < td->multi_stage_goals[i]->stage_count; j++) {
+            td->multi_stage_goals[i]->stages[j]->current_stat_progress = 0;
+        }
+    }
+}
+
+/**
+ * @brief Merges one player's advancement data into TemplateData (accumulative).
+ *
+ * - Simple advancements (no criteria): OR across players — done if any player completed
+ * - Complex advancements (has criteria): track the player with the most criteria completed
+ *
+ * Works for both modern advancements (1.12+) and mid-era achievements (1.7-1.11.2).
+ */
+static void coop_merge_advancements_modern(TemplateData *td, const cJSON *player_adv_json) {
+    if (!player_adv_json) return;
+
+    for (int i = 0; i < td->advancement_count; i++) {
+        TrackableCategory *adv = td->advancements[i];
+
+        cJSON *player_entry = cJSON_GetObjectItem(player_adv_json, adv->root_name);
+        if (!player_entry) continue;
+
+        bool game_is_done = cJSON_IsTrue(cJSON_GetObjectItem(player_entry, "done"));
+
+        if (adv->criteria_count == 0) {
+            // Simple advancement: OR across players
+            if (game_is_done) {
+                adv->done = true;
+                adv->all_template_criteria_met = true;
+            }
+        } else {
+            // Complex advancement: track player with most criteria
+            cJSON *player_criteria = cJSON_GetObjectItem(player_entry, "criteria");
+            int this_player_count = 0;
+
+            if (player_criteria) {
+                for (int j = 0; j < adv->criteria_count; j++) {
+                    if (cJSON_HasObjectItem(player_criteria, adv->criteria[j]->root_name)) {
+                        this_player_count++;
+                    }
+                }
+            }
+
+            // If this player has more criteria than the current best, adopt their state
+            if (this_player_count > adv->completed_criteria_count) {
+                adv->completed_criteria_count = this_player_count;
+                // Overwrite criteria done flags with this player's state
+                for (int j = 0; j < adv->criteria_count; j++) {
+                    adv->criteria[j]->done = (player_criteria &&
+                        cJSON_HasObjectItem(player_criteria, adv->criteria[j]->root_name));
+                }
+                adv->all_template_criteria_met = (adv->completed_criteria_count >= adv->criteria_count);
+                adv->done = game_is_done || adv->all_template_criteria_met;
+            } else if (game_is_done && !adv->done) {
+                // Even if another player had more criteria, if this player fully completed it, mark done
+                adv->done = true;
+                adv->all_template_criteria_met = true;
+            }
+        }
+    }
+}
+
+/**
+ * @brief Merges one player's mid-era achievement data into TemplateData (accumulative).
+ * Mid-era (1.7-1.11.2): achievements are in a flat JSON with value/progress fields.
+ */
+static void coop_merge_achievements_mid(TemplateData *td, const cJSON *player_stats_json) {
+    if (!player_stats_json) return;
+
+    for (int i = 0; i < td->advancement_count; i++) {
+        TrackableCategory *ach = td->advancements[i];
+
+        cJSON *ach_entry = cJSON_GetObjectItem(player_stats_json, ach->root_name);
+        if (!ach_entry) continue;
+
+        // Determine if this player has it done
+        bool game_is_done = false;
+        if (cJSON_IsNumber(ach_entry)) {
+            game_is_done = (ach_entry->valueint >= 1);
+        } else if (cJSON_IsObject(ach_entry)) {
+            cJSON *value_item = cJSON_GetObjectItem(ach_entry, "value");
+            game_is_done = (cJSON_IsNumber(value_item) && value_item->valueint >= 1);
+        }
+
+        if (ach->criteria_count == 0) {
+            // Simple achievement: OR across players
+            if (game_is_done) {
+                ach->done = true;
+                ach->all_template_criteria_met = true;
+            }
+        } else {
+            // Complex achievement with criteria: track player with most
+            cJSON *progress_array = cJSON_GetObjectItem(ach_entry, "progress");
+            int this_player_count = 0;
+
+            if (cJSON_IsArray(progress_array)) {
+                for (int j = 0; j < ach->criteria_count; j++) {
+                    cJSON *progress_item;
+                    cJSON_ArrayForEach(progress_item, progress_array) {
+                        if (cJSON_IsString(progress_item) &&
+                            strcmp(progress_item->valuestring, ach->criteria[j]->root_name) == 0) {
+                            this_player_count++;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (this_player_count > ach->completed_criteria_count) {
+                ach->completed_criteria_count = this_player_count;
+                // Overwrite criteria done flags
+                for (int j = 0; j < ach->criteria_count; j++) {
+                    bool found = false;
+                    if (cJSON_IsArray(progress_array)) {
+                        cJSON *progress_item;
+                        cJSON_ArrayForEach(progress_item, progress_array) {
+                            if (cJSON_IsString(progress_item) &&
+                                strcmp(progress_item->valuestring, ach->criteria[j]->root_name) == 0) {
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                    ach->criteria[j]->done = found;
+                }
+                ach->all_template_criteria_met = (ach->completed_criteria_count >= ach->criteria_count);
+                ach->done = game_is_done || ach->all_template_criteria_met;
+            } else if (game_is_done && !ach->done) {
+                ach->done = true;
+                ach->all_template_criteria_met = true;
+            }
+        }
+    }
+}
+
+/**
+ * @brief Merges one player's legacy achievement data into TemplateData (accumulative).
+ * Legacy (<=1.6.4): achievements are in stats-change array.
+ */
+static void coop_merge_achievements_legacy(TemplateData *td, const cJSON *player_stats_json) {
+    if (!player_stats_json) return;
+
+    cJSON *stats_change = cJSON_GetObjectItem(player_stats_json, "stats-change");
+    if (!cJSON_IsArray(stats_change)) return;
+
+    for (int i = 0; i < td->advancement_count; i++) {
+        TrackableCategory *ach = td->advancements[i];
+
+        cJSON *stat_entry;
+        cJSON_ArrayForEach(stat_entry, stats_change) {
+            cJSON *item = stat_entry->child;
+            if (item && strcmp(item->string, ach->root_name) == 0 && item->valueint >= 1) {
+                ach->done = true; // OR across players
+                break;
+            }
+        }
+    }
+}
+
+/**
+ * @brief Merges one player's stat data into TemplateData using modern JSON format (1.13+).
+ * Supports HIGHEST (max) or CUMULATIVE (sum) merge modes.
+ */
+static void coop_merge_stats_modern(TemplateData *td, const cJSON *player_stats_json,
+                                    CoopStatMerge merge_mode, MC_Version version) {
+    if (!player_stats_json) return;
+
+    cJSON *stats_obj = cJSON_GetObjectItem(player_stats_json, "stats");
+    if (!stats_obj) return;
+
+    // Merge playtime (always use max across players for IGT display)
+    cJSON *custom_stats = cJSON_GetObjectItem(stats_obj, "minecraft:custom");
+    if (custom_stats) {
+        const char *playtime_key = (version >= MC_VERSION_1_17) ? "minecraft:play_time" : "minecraft:play_one_minute";
+        cJSON *play_time = cJSON_GetObjectItem(custom_stats, playtime_key);
+        if (cJSON_IsNumber(play_time)) {
+            long long player_time = (long long) play_time->valuedouble;
+            if (player_time > td->play_time_ticks) {
+                td->play_time_ticks = player_time;
+            }
+        }
+    }
+
+    for (int i = 0; i < td->stat_count; i++) {
+        TrackableCategory *stat_cat = td->stats[i];
+
+        for (int j = 0; j < stat_cat->criteria_count; j++) {
+            TrackableItem *sub_stat = stat_cat->criteria[j];
+
+            if (sub_stat->stat_category_key[0] != '\0') {
+                cJSON *category_obj = cJSON_GetObjectItem(stats_obj, sub_stat->stat_category_key);
+                if (category_obj) {
+                    cJSON *stat_value = cJSON_GetObjectItem(category_obj, sub_stat->stat_item_key);
+                    if (cJSON_IsNumber(stat_value)) {
+                        int player_value = stat_value->valueint;
+                        if (merge_mode == COOP_STAT_CUMULATIVE) {
+                            sub_stat->progress += player_value;
+                        } else {
+                            // COOP_STAT_HIGHEST
+                            if (player_value > sub_stat->progress) {
+                                sub_stat->progress = player_value;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * @brief Merges one player's stat data into TemplateData using mid-era JSON format (1.7-1.12.2).
+ * Flat JSON with stat keys at top level.
+ */
+static void coop_merge_stats_mid(TemplateData *td, const cJSON *player_stats_json,
+                                 CoopStatMerge merge_mode) {
+    if (!player_stats_json) return;
+
+    // Merge mid-era playtime
+    cJSON *play_time_entry = cJSON_GetObjectItem(player_stats_json, "stat.playOneMinute");
+    if (cJSON_IsNumber(play_time_entry)) {
+        long long player_time = (long long) play_time_entry->valuedouble;
+        if (player_time > td->play_time_ticks) {
+            td->play_time_ticks = player_time;
+        }
+    }
+
+    for (int i = 0; i < td->stat_count; i++) {
+        TrackableCategory *stat_cat = td->stats[i];
+
+        for (int j = 0; j < stat_cat->criteria_count; j++) {
+            TrackableItem *sub_stat = stat_cat->criteria[j];
+
+            cJSON *stat_entry = cJSON_GetObjectItem(player_stats_json, sub_stat->root_name);
+            if (cJSON_IsNumber(stat_entry)) {
+                int player_value = stat_entry->valueint;
+                if (merge_mode == COOP_STAT_CUMULATIVE) {
+                    sub_stat->progress += player_value;
+                } else {
+                    if (player_value > sub_stat->progress) {
+                        sub_stat->progress = player_value;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * @brief Merges one player's stat data using legacy .dat format (<=1.6.4).
+ * Legacy stats are in "stats-change" array with numeric IDs.
+ */
+static void coop_merge_stats_legacy(TemplateData *td, const cJSON *player_stats_json,
+                                    CoopStatMerge merge_mode) {
+    if (!player_stats_json) return;
+
+    cJSON *stats_change = cJSON_GetObjectItem(player_stats_json, "stats-change");
+    if (!cJSON_IsArray(stats_change)) return;
+
+    // Merge legacy playtime (stat ID 1100)
+    cJSON *stat_entry_iter;
+    cJSON_ArrayForEach(stat_entry_iter, stats_change) {
+        cJSON *item = stat_entry_iter->child;
+        if (item && strcmp(item->string, "1100") == 0) {
+            long long player_time = (long long) item->valueint;
+            if (player_time > td->play_time_ticks) {
+                td->play_time_ticks = player_time;
+            }
+            break;
+        }
+    }
+
+    for (int i = 0; i < td->stat_count; i++) {
+        TrackableCategory *stat_cat = td->stats[i];
+
+        for (int j = 0; j < stat_cat->criteria_count; j++) {
+            TrackableItem *sub_stat = stat_cat->criteria[j];
+
+            cJSON *stat_entry;
+            cJSON_ArrayForEach(stat_entry, stats_change) {
+                cJSON *item_inner = stat_entry->child;
+                if (item_inner && strcmp(item_inner->string, sub_stat->root_name) == 0) {
+                    int player_value = item_inner->valueint - sub_stat->initial_progress;
+                    if (player_value < 0) player_value = 0;
+                    if (merge_mode == COOP_STAT_CUMULATIVE) {
+                        sub_stat->progress += player_value;
+                    } else {
+                        if (player_value > sub_stat->progress) {
+                            sub_stat->progress = player_value;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+}
+
+/**
+ * @brief Merges one player's unlock data into TemplateData (OR across players).
+ */
+static void coop_merge_unlocks(TemplateData *td, const cJSON *player_unlocks_json) {
+    if (!player_unlocks_json) return;
+
+    cJSON *obtained_obj = cJSON_GetObjectItem(player_unlocks_json, "obtained");
+    if (!obtained_obj) return;
+
+    for (int i = 0; i < td->unlock_count; i++) {
+        TrackableItem *unlock = td->unlocks[i];
+        cJSON *unlock_status = cJSON_GetObjectItem(obtained_obj, unlock->root_name);
+        if (cJSON_IsTrue(unlock_status)) {
+            unlock->done = true; // OR across players
+        }
+    }
+}
+
+/**
+ * @brief Merges one player's multi-stage goal progress (global — any player any stage).
+ * Uses max(current_stage, player's furthest completed stage) across all players.
+ */
+static void coop_merge_multi_stage(TemplateData *td, const cJSON *player_adv_json,
+                                   const cJSON *player_stats_json, const cJSON *player_unlocks_json,
+                                   MC_Version version) {
+    if (td->multi_stage_goal_count == 0) return;
+    if (!player_adv_json && !player_stats_json) return;
+
+    for (int i = 0; i < td->multi_stage_goal_count; i++) {
+        MultiStageGoal *goal = td->multi_stage_goals[i];
+
+        // Evaluate how far this player gets, starting from stage 0
+        int player_furthest = 0;
+
+        for (int j = 0; j < goal->stage_count; j++) {
+            SubGoal *stage = goal->stages[j];
+            bool stage_completed = false;
+
+            if (stage->type == SUBGOAL_MANUAL) break;
+
+            switch (stage->type) {
+                case SUBGOAL_ADVANCEMENT:
+                    if (player_adv_json) {
+                        cJSON *adv_entry = cJSON_GetObjectItem(player_adv_json, stage->root_name);
+                        if (adv_entry && cJSON_IsTrue(cJSON_GetObjectItem(adv_entry, "done"))) {
+                            stage_completed = true;
+                        }
+                    }
+                    break;
+
+                case SUBGOAL_STAT: {
+                    int current_progress = 0;
+                    if (version <= MC_VERSION_1_6_4) {
+                        // Legacy: look up from already-merged stats in TemplateData
+                        for (int c_idx = 0; c_idx < td->stat_count; c_idx++) {
+                            for (int s_idx = 0; s_idx < td->stats[c_idx]->criteria_count; s_idx++) {
+                                TrackableItem *sub = td->stats[c_idx]->criteria[s_idx];
+                                if (strcmp(sub->root_name, stage->root_name) == 0) {
+                                    current_progress = sub->progress;
+                                    goto stat_found_coop;
+                                }
+                            }
+                        }
+                        stat_found_coop:;
+                    } else if (version <= MC_VERSION_1_12_2) {
+                        cJSON *stat_entry = cJSON_GetObjectItem(player_stats_json, stage->root_name);
+                        if (cJSON_IsNumber(stat_entry)) {
+                            current_progress = stat_entry->valueint;
+                        }
+                    } else {
+                        cJSON *stats_obj = cJSON_GetObjectItem(player_stats_json, "stats");
+                        if (stats_obj) {
+                            char root_copy[192];
+                            strncpy(root_copy, stage->root_name, sizeof(root_copy) - 1);
+                            root_copy[sizeof(root_copy) - 1] = '\0';
+                            char *item_key = strchr(root_copy, '/');
+                            if (item_key) {
+                                *item_key = '\0';
+                                item_key++;
+                                cJSON *cat_obj = cJSON_GetObjectItem(stats_obj, root_copy);
+                                if (cat_obj) {
+                                    cJSON *val = cJSON_GetObjectItem(cat_obj, item_key);
+                                    if (cJSON_IsNumber(val)) {
+                                        current_progress = val->valueint;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (current_progress >= stage->required_progress) {
+                        stage_completed = true;
+                    }
+                    // Update stat progress to max across players
+                    if (current_progress > stage->current_stat_progress) {
+                        stage->current_stat_progress = current_progress;
+                    }
+                    break;
+                }
+
+                case SUBGOAL_CRITERION:
+                    if (version >= MC_VERSION_1_12) {
+                        if (player_adv_json) {
+                            cJSON *adv_entry = cJSON_GetObjectItem(player_adv_json, stage->parent_advancement);
+                            if (adv_entry) {
+                                cJSON *criteria_obj = cJSON_GetObjectItem(adv_entry, "criteria");
+                                if (criteria_obj && cJSON_HasObjectItem(criteria_obj, stage->root_name)) {
+                                    stage_completed = true;
+                                }
+                            }
+                        }
+                    } else if (version >= MC_VERSION_1_7_2) {
+                        if (player_stats_json) {
+                            cJSON *ach_entry = cJSON_GetObjectItem(player_stats_json, stage->parent_advancement);
+                            if (ach_entry) {
+                                cJSON *progress_array = cJSON_GetObjectItem(ach_entry, "progress");
+                                if (cJSON_IsArray(progress_array)) {
+                                    cJSON *p_item;
+                                    cJSON_ArrayForEach(p_item, progress_array) {
+                                        if (cJSON_IsString(p_item) &&
+                                            strcmp(p_item->valuestring, stage->root_name) == 0) {
+                                            stage_completed = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    break;
+
+                case SUBGOAL_UNLOCK:
+                    if (player_unlocks_json) {
+                        cJSON *obtained_obj = cJSON_GetObjectItem(player_unlocks_json, "obtained");
+                        if (obtained_obj && cJSON_IsTrue(cJSON_GetObjectItem(obtained_obj, stage->root_name))) {
+                            stage_completed = true;
+                        }
+                    }
+                    break;
+
+                case SUBGOAL_MANUAL:
+                default:
+                    break;
+            }
+
+            if (stage_completed) {
+                player_furthest = j + 1;
+            } else {
+                break; // Stages are sequential; stop at first incomplete
+            }
+        }
+
+        // Use max across all players
+        if (player_furthest > goal->current_stage) {
+            goal->current_stage = player_furthest;
+        }
+    }
+}
+
+/**
+ * @brief After merging all players' stat data, finalize stat completion status.
+ * Applies manual overrides and determines done flags based on merged progress values.
+ */
+static void coop_finalize_stats(TemplateData *td, const cJSON *settings_json) {
+    cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : nullptr;
+
+    td->stats_completed_count = 0;
+    td->stats_completed_criteria_count = 0;
+
+    for (int i = 0; i < td->stat_count; i++) {
+        TrackableCategory *stat_cat = td->stats[i];
+        stat_cat->completed_criteria_count = 0;
+
+        cJSON *parent_override = override_obj ? cJSON_GetObjectItem(override_obj, stat_cat->root_name) : nullptr;
+        bool parent_forced_true = cJSON_IsBool(parent_override) && cJSON_IsTrue(parent_override);
+        stat_cat->is_manually_completed = parent_forced_true;
+
+        for (int j = 0; j < stat_cat->criteria_count; j++) {
+            TrackableItem *sub_stat = stat_cat->criteria[j];
+            bool naturally_done = (sub_stat->goal > 0 && sub_stat->progress >= sub_stat->goal);
+
+            cJSON *sub_override;
+            if (stat_cat->criteria_count == 1) {
+                sub_override = parent_override;
+            } else {
+                char sub_stat_key[512];
+                snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s",
+                         stat_cat->root_name, sub_stat->root_name);
+                sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : nullptr;
+            }
+            bool sub_forced_true = cJSON_IsBool(sub_override) && cJSON_IsTrue(sub_override);
+            sub_stat->is_manually_completed = sub_forced_true;
+
+            sub_stat->done = naturally_done || sub_forced_true || parent_forced_true;
+            if (sub_stat->done) stat_cat->completed_criteria_count++;
+        }
+
+        bool all_children_done = (stat_cat->criteria_count > 0 &&
+                                  stat_cat->completed_criteria_count >= stat_cat->criteria_count);
+        stat_cat->done = all_children_done || parent_forced_true;
+
+        if (stat_cat->done) td->stats_completed_count++;
+        td->stats_completed_criteria_count += stat_cat->completed_criteria_count;
+    }
+}
+
+/**
+ * @brief After merging all players' advancement data, finalize advancement completion counts.
+ */
+static void coop_finalize_advancements(TemplateData *td) {
+    td->advancements_completed_count = 0;
+    td->completed_criteria_count = 0;
+
+    for (int i = 0; i < td->advancement_count; i++) {
+        TrackableCategory *adv = td->advancements[i];
+        if (adv->done && !adv->is_recipe) td->advancements_completed_count++;
+        td->completed_criteria_count += adv->completed_criteria_count;
+    }
+}
+
+/**
+ * @brief After merging all players' unlock data, finalize unlock completion count.
+ */
+static void coop_finalize_unlocks(TemplateData *td) {
+    td->unlocks_completed_count = 0;
+    for (int i = 0; i < td->unlock_count; i++) {
+        if (td->unlocks[i]->done) td->unlocks_completed_count++;
+    }
+}
+
 // Periodically recheck file changes
 void tracker_update(Tracker *t, const AppSettings *settings) {
     // Detect if the world has changed since the last update.
@@ -3511,6 +4082,201 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
     cJSON_Delete(player_stats_json);
     cJSON_Delete(player_unlocks_json);
     cJSON_Delete(settings_json);
+}
+
+void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
+    if (!t || !t->template_data || !settings) return;
+
+    MC_Version version = settings_get_version_from_string(settings->version_str);
+
+    // Detect world changes (same as tracker_update)
+    if (t->template_data->last_known_world_name[0] == '\0' ||
+        strcmp(t->world_name, t->template_data->last_known_world_name) != 0) {
+        tracker_save_notes(t, settings);
+        tracker_reset_progress_on_world_change(t, settings);
+        tracker_update_notes_path(t, settings);
+        tracker_load_notes(t, settings);
+        t->notes_widget_id_counter++;
+    }
+    strncpy(t->template_data->last_known_world_name, t->world_name,
+            sizeof(t->template_data->last_known_world_name) - 1);
+    t->template_data->last_known_world_name[sizeof(t->template_data->last_known_world_name) - 1] = '\0';
+
+    // Legacy snapshot logic (applies to host's own files for world-change detection)
+    if (version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy &&
+        strcmp(t->world_name, t->template_data->snapshot_world_name) != 0) {
+        log_message(LOG_INFO, "[COOP] Legacy world change detected. Taking new stat snapshot for world: %s\n",
+                    t->world_name);
+        tracker_snapshot_legacy_stats(t, settings);
+    }
+
+    // 1. Reset all progress to zero before merging
+    coop_reset_template_progress(t->template_data);
+
+    // 2. Iterate over all players in the roster and merge their data
+    for (int p = 0; p < settings->coop_player_count; p++) {
+        const CoopPlayer *player = &settings->coop_players[p];
+
+        // Find this player's data files by UUID
+        char player_adv_path[MAX_PATH_LENGTH];
+        char player_stats_path[MAX_PATH_LENGTH];
+        char player_unlocks_path[MAX_PATH_LENGTH];
+
+        find_player_data_files_for_uuid(
+            t->saves_path, version, settings->using_stats_per_world_legacy,
+            t->world_name, player->uuid, player->username,
+            player_adv_path, player_stats_path, player_unlocks_path, MAX_PATH_LENGTH
+        );
+
+        // Parse the player's JSON files
+        cJSON *player_adv_json = (player_adv_path[0] != '\0') ? cJSON_from_file(player_adv_path) : nullptr;
+        cJSON *player_stats_json = (player_stats_path[0] != '\0') ? cJSON_from_file(player_stats_path) : nullptr;
+        cJSON *player_unlocks_json = (player_unlocks_path[0] != '\0') ? cJSON_from_file(player_unlocks_path) : nullptr;
+
+        // Merge advancements/achievements
+        if (version <= MC_VERSION_1_6_4) {
+            coop_merge_achievements_legacy(t->template_data, player_stats_json);
+            coop_merge_stats_legacy(t->template_data, player_stats_json, settings->coop_stat_merge);
+        } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_11_2) {
+            coop_merge_achievements_mid(t->template_data, player_stats_json);
+            coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge);
+        } else if (version >= MC_VERSION_1_12 && version <= MC_VERSION_1_12_2) {
+            coop_merge_advancements_modern(t->template_data, player_adv_json);
+            coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge);
+        } else if (version >= MC_VERSION_1_13) {
+            coop_merge_advancements_modern(t->template_data, player_adv_json);
+            coop_merge_stats_modern(t->template_data, player_stats_json, settings->coop_stat_merge, version);
+        }
+
+        // Merge unlocks (OR across players)
+        coop_merge_unlocks(t->template_data, player_unlocks_json);
+
+        // Merge multi-stage goals (global — any player any stage)
+        coop_merge_multi_stage(t->template_data, player_adv_json, player_stats_json,
+                               player_unlocks_json, version);
+
+        // Clean up this player's JSON
+        cJSON_Delete(player_adv_json);
+        cJSON_Delete(player_stats_json);
+        cJSON_Delete(player_unlocks_json);
+    }
+
+    // 3. Finalize after all players are merged
+    cJSON *settings_json = cJSON_from_file(get_settings_file_path());
+
+    coop_finalize_advancements(t->template_data);
+    coop_finalize_stats(t->template_data, settings_json);
+    coop_finalize_unlocks(t->template_data);
+
+    // Custom goals: handled by host's settings.json (not merged from game files)
+    tracker_update_custom_progress(t, settings_json, settings);
+
+    // Fixed-point iteration for linked goals
+    {
+        bool changed;
+        int guard = 0;
+        do {
+            changed = tracker_update_custom_goal_linked_goals(t);
+            changed |= tracker_update_stat_linked_goals(t);
+            changed |= tracker_update_counter_goals(t);
+        } while (changed && ++guard < 32);
+    }
+
+    tracker_calculate_overall_progress(t, version, settings);
+
+    cJSON_Delete(settings_json);
+}
+
+void tracker_apply_coop_mods(Tracker *t, const AppSettings *settings,
+                             const CoopCustomGoalModMsg *mods, int mod_count) {
+    if (!t || !t->template_data || !settings || mod_count <= 0) return;
+
+    TemplateData *td = t->template_data;
+    bool any_applied = false;
+
+    for (int m = 0; m < mod_count; m++) {
+        const CoopCustomGoalModMsg *mod = &mods[m];
+
+        // Try custom goals first (parent_root_name is empty for custom goals)
+        if (mod->parent_root_name[0] == '\0') {
+            // Check custom goals
+            for (int i = 0; i < td->custom_goal_count; i++) {
+                TrackableItem *item = td->custom_goals[i];
+                if (!item || strcmp(item->root_name, mod->goal_root_name) != 0) continue;
+
+                if (mod->action == COOP_MOD_TOGGLE) {
+                    item->is_manually_completed = !item->is_manually_completed;
+                    if (item->is_manually_completed) {
+                        item->done = true;
+                    } else {
+                        item->done = (item->linked_goal_count > 0 &&
+                                      check_linked_goals_satisfied(td, item->linked_goals,
+                                                                   item->linked_goal_count, item->linked_goal_mode));
+                    }
+                    item->progress = item->done ? 1 : 0;
+                    any_applied = true;
+                }
+                break;
+            }
+
+            // Check parent stat categories (toggle parent checkbox)
+            for (int s = 0; s < td->stat_count; s++) {
+                TrackableCategory *cat = td->stats[s];
+                if (!cat || strcmp(cat->root_name, mod->goal_root_name) != 0) continue;
+
+                if (mod->action == COOP_MOD_TOGGLE) {
+                    cat->is_manually_completed = !cat->is_manually_completed;
+                    bool all_children_done = (cat->criteria_count > 0 &&
+                                              cat->completed_criteria_count >= cat->criteria_count);
+                    cat->done = cat->is_manually_completed || all_children_done;
+
+                    for (int j = 0; j < cat->criteria_count; j++) {
+                        TrackableItem *crit = cat->criteria[j];
+                        bool crit_naturally_done = (crit->goal > 0 && crit->progress >= crit->goal);
+                        crit->done = cat->is_manually_completed || crit->is_manually_completed || crit_naturally_done;
+                    }
+                    cat->completed_criteria_count = 0;
+                    for (int k = 0; k < cat->criteria_count; k++) {
+                        if (cat->criteria[k]->done) cat->completed_criteria_count++;
+                    }
+                    any_applied = true;
+                }
+                break;
+            }
+        } else {
+            // Sub-stat checkbox toggle: find parent, then child
+            for (int s = 0; s < td->stat_count; s++) {
+                TrackableCategory *cat = td->stats[s];
+                if (!cat || strcmp(cat->root_name, mod->parent_root_name) != 0) continue;
+
+                for (int j = 0; j < cat->criteria_count; j++) {
+                    TrackableItem *crit = cat->criteria[j];
+                    if (!crit || strcmp(crit->root_name, mod->goal_root_name) != 0) continue;
+
+                    if (mod->action == COOP_MOD_TOGGLE) {
+                        crit->is_manually_completed = !crit->is_manually_completed;
+                        bool crit_naturally_done = (crit->goal > 0 && crit->progress >= crit->goal);
+                        crit->done = crit->is_manually_completed || crit_naturally_done;
+
+                        cat->completed_criteria_count = 0;
+                        for (int k = 0; k < cat->criteria_count; k++) {
+                            if (cat->criteria[k]->done) cat->completed_criteria_count++;
+                        }
+                        bool all_children_done = (cat->criteria_count > 0 &&
+                                                  cat->completed_criteria_count >= cat->criteria_count);
+                        cat->done = cat->is_manually_completed || all_children_done;
+                        any_applied = true;
+                    }
+                    break;
+                }
+                break;
+            }
+        }
+    }
+
+    if (any_applied) {
+        settings_save(settings, td, SAVE_CONTEXT_ALL);
+    }
 }
 
 // UNUSED
@@ -5123,27 +5889,39 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             }
 
                             // Deactivating left click when in visual editing mode
+                            // Co-op: Receivers respect stat checkbox permission
                             if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->
                                 is_visual_layout_editing) {
-                                // Toggle manual completion and update 'done' status
-                                crit->is_manually_completed = !crit->is_manually_completed;
-                                bool crit_naturally_done = (crit->goal > 0 && crit->progress >= crit->goal);
-                                // A criterion is done if forced OR naturally complete
-                                crit->done = crit->is_manually_completed || crit_naturally_done;
+                                if (settings->network_mode == NETWORK_RECEIVER &&
+                                    settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY) {
+                                    // Host-only mode: clicking disabled for receivers
+                                } else if (settings->network_mode == NETWORK_RECEIVER &&
+                                           settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_ANY_PLAYER &&
+                                           g_coop_ctx) {
+                                    // Any-player mode: send toggle request to host
+                                    CoopCustomGoalModMsg mod = {};
+                                    snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", crit->root_name);
+                                    snprintf(mod.parent_root_name, sizeof(mod.parent_root_name), "%s", cat->root_name);
+                                    mod.action = COOP_MOD_TOGGLE;
+                                    coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
+                                } else {
+                                    // Host or singleplayer: toggle locally
+                                    crit->is_manually_completed = !crit->is_manually_completed;
+                                    bool crit_naturally_done = (crit->goal > 0 && crit->progress >= crit->goal);
+                                    crit->done = crit->is_manually_completed || crit_naturally_done;
 
-                                // Recalculate parent completion counts and status
-                                cat->completed_criteria_count = 0;
-                                for (int k = 0; k < cat->criteria_count; ++k) {
-                                    if (cat->criteria[k]->done) cat->completed_criteria_count++;
+                                    cat->completed_criteria_count = 0;
+                                    for (int k = 0; k < cat->criteria_count; ++k) {
+                                        if (cat->criteria[k]->done) cat->completed_criteria_count++;
+                                    }
+                                    bool all_children_done = (
+                                        cat->criteria_count > 0 && cat->completed_criteria_count >= cat->criteria_count);
+                                    cat->done = cat->is_manually_completed || all_children_done;
+
+                                    settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
+                                    SDL_SetAtomicInt(&g_needs_update, 1);
+                                    SDL_SetAtomicInt(&g_game_data_changed, 1);
                                 }
-                                bool all_children_done = (
-                                    cat->criteria_count > 0 && cat->completed_criteria_count >= cat->criteria_count);
-                                cat->done = cat->is_manually_completed || all_children_done;
-                                // Parent done if forced OR all children done
-
-                                settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
-                                SDL_SetAtomicInt(&g_needs_update, 1);
-                                SDL_SetAtomicInt(&g_game_data_changed, 1);
                             }
                         }
 
@@ -5357,32 +6135,43 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     }
 
                     // Deactivating left click when in visual editing mode
+                    // Co-op: Receivers respect stat checkbox permission
                     if (is_hovered_parent && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->
                         is_visual_layout_editing) {
-                        cat->is_manually_completed = !cat->is_manually_completed;
-                        // Update parent 'done' status
-                        bool all_children_naturally_done = (
-                            cat->criteria_count > 0 && cat->completed_criteria_count >= cat->criteria_count);
-                        cat->done = cat->is_manually_completed || all_children_naturally_done;
+                        if (settings->network_mode == NETWORK_RECEIVER &&
+                            settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY) {
+                            // Host-only mode: clicking disabled for receivers
+                        } else if (settings->network_mode == NETWORK_RECEIVER &&
+                                   settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_ANY_PLAYER &&
+                                   g_coop_ctx) {
+                            // Any-player mode: send toggle request to host (parent stat)
+                            CoopCustomGoalModMsg mod = {};
+                            snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", cat->root_name);
+                            mod.parent_root_name[0] = '\0';
+                            mod.action = COOP_MOD_TOGGLE;
+                            coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
+                        } else {
+                            // Host or singleplayer: toggle locally
+                            cat->is_manually_completed = !cat->is_manually_completed;
+                            bool all_children_naturally_done = (
+                                cat->criteria_count > 0 && cat->completed_criteria_count >= cat->criteria_count);
+                            cat->done = cat->is_manually_completed || all_children_naturally_done;
 
-                        // Update all children 'done' status based on parent override
-                        for (int j = 0; j < cat->criteria_count; ++j) {
-                            TrackableItem *crit = cat->criteria[j];
-                            bool crit_naturally_done = (crit->goal > 0 && crit->progress >= crit->goal);
-                            // Child is done if parent forces it OR child forces it OR naturally done
-                            crit->done = cat->is_manually_completed || crit->is_manually_completed ||
-                                         crit_naturally_done;
+                            for (int j = 0; j < cat->criteria_count; ++j) {
+                                TrackableItem *crit = cat->criteria[j];
+                                bool crit_naturally_done = (crit->goal > 0 && crit->progress >= crit->goal);
+                                crit->done = cat->is_manually_completed || crit->is_manually_completed ||
+                                             crit_naturally_done;
+                            }
+                            cat->completed_criteria_count = 0;
+                            for (int k = 0; k < cat->criteria_count; ++k) {
+                                if (cat->criteria[k]->done) cat->completed_criteria_count++;
+                            }
+
+                            settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
+                            SDL_SetAtomicInt(&g_needs_update, 1);
+                            SDL_SetAtomicInt(&g_game_data_changed, 1);
                         }
-                        // Recalculate completed count AFTER potentially updating children
-                        cat->completed_criteria_count = 0;
-                        for (int k = 0; k < cat->criteria_count; ++k) {
-                            if (cat->criteria[k]->done) cat->completed_criteria_count++;
-                        }
-
-
-                        settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
-                        SDL_SetAtomicInt(&g_needs_update, 1);
-                        SDL_SetAtomicInt(&g_game_data_changed, 1);
                     }
                 } // End if (is_stat_section) for parent checkbox
             } // End if (is_visible_on_screen)
@@ -6339,21 +7128,35 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
                 // Handle click interaction
                 // Deactivating when in visual layout editor mode
+                // Co-op: Receivers respect custom goal permission
                 if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->is_visual_layout_editing) {
-                    item->is_manually_completed = !item->is_manually_completed;
-                    if (item->is_manually_completed) {
-                        // Placing checkmark: goal is done regardless of auto-completion state
-                        item->done = true;
+                    if (settings->network_mode == NETWORK_RECEIVER &&
+                        settings->coop_custom_goal_mode == COOP_CUSTOM_HOST_ONLY) {
+                        // Host-only mode: clicking disabled for receivers
+                    } else if (settings->network_mode == NETWORK_RECEIVER &&
+                               settings->coop_custom_goal_mode == COOP_CUSTOM_ANY_PLAYER &&
+                               g_coop_ctx) {
+                        // Any-player mode: send toggle request to host
+                        CoopCustomGoalModMsg mod = {};
+                        snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", item->root_name);
+                        mod.parent_root_name[0] = '\0';
+                        mod.action = COOP_MOD_TOGGLE;
+                        coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
                     } else {
-                        // Removing checkmark: done only if linked goals are still satisfied
-                        item->done = (item->linked_goal_count > 0 &&
-                                      check_linked_goals_satisfied(t->template_data, item->linked_goals,
-                                                                   item->linked_goal_count, item->linked_goal_mode));
+                        // Host or singleplayer: toggle locally
+                        item->is_manually_completed = !item->is_manually_completed;
+                        if (item->is_manually_completed) {
+                            item->done = true;
+                        } else {
+                            item->done = (item->linked_goal_count > 0 &&
+                                          check_linked_goals_satisfied(t->template_data, item->linked_goals,
+                                                                       item->linked_goal_count, item->linked_goal_mode));
+                        }
+                        item->progress = item->done ? 1 : 0;
+                        settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
+                        SDL_SetAtomicInt(&g_needs_update, 1);
+                        SDL_SetAtomicInt(&g_game_data_changed, 1);
                     }
-                    item->progress = item->done ? 1 : 0;
-                    settings_save(settings, t->template_data, SAVE_CONTEXT_ALL); // Save change immediately
-                    SDL_SetAtomicInt(&g_needs_update, 1); // Trigger data refresh
-                    SDL_SetAtomicInt(&g_game_data_changed, 1); // Indicate change wasn't from game file
                 }
             } // End if (can_be_overridden && visible)
         } // End if (is_visible_on_screen)

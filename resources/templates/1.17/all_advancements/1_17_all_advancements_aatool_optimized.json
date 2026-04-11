@@ -2743,7 +2743,7 @@
 				}],
 			"icon_pos":	{
 				"x":	1248,
-				"y":	192
+				"y":	125
 			},
 			"text_pos":	{
 				"x":	-200000,
@@ -2751,7 +2751,7 @@
 			},
 			"progress_pos":	{
 				"x":	1296,
-				"y":	300,
+				"y":	233,
 				"anchor":	4
 			}
 		},
@@ -2764,7 +2764,7 @@
 				}],
 			"icon_pos":	{
 				"x":	1128,
-				"y":	442
+				"y":	375
 			},
 			"text_pos":	{
 				"x":	-200000,
@@ -2772,7 +2772,7 @@
 			},
 			"progress_pos":	{
 				"x":	1176,
-				"y":	550,
+				"y":	483,
 				"anchor":	4
 			}
 		},
@@ -2785,7 +2785,7 @@
 				}],
 			"icon_pos":	{
 				"x":	1248,
-				"y":	442
+				"y":	375
 			},
 			"text_pos":	{
 				"x":	-200000,
@@ -2793,7 +2793,7 @@
 			},
 			"progress_pos":	{
 				"x":	1296,
-				"y":	550,
+				"y":	483,
 				"anchor":	4
 			}
 		},
@@ -2809,7 +2809,7 @@
 				}],
 			"icon_pos":	{
 				"x":	1248,
-				"y":	317
+				"y":	250
 			},
 			"text_pos":	{
 				"x":	-3000,
@@ -2818,8 +2818,21 @@
 			},
 			"progress_pos":	{
 				"x":	1296,
-				"y":	425,
+				"y":	358,
 				"anchor":	4
+			}
+		},
+		"cauldrons":	{
+			"icon":	"blocks/Powder_Snow_Cauldron_JE1.png",
+			"root_name":	"minecraft:used/minecraft:cauldron",
+			"target":	-1,
+			"linked_goals":	[{
+					"root_name":	"minecraft:adventure/walk_on_powder_snow_with_leather_boots"
+				}],
+			"icon_pos":	{
+				"x":	1237,
+				"y":	492,
+				"anchor":	1
 			}
 		}
 	},
@@ -2874,7 +2887,7 @@
 				}],
 			"icon_pos":	{
 				"x":	1128,
-				"y":	317
+				"y":	250
 			},
 			"text_pos":	{
 				"x":	-200000,
@@ -2882,7 +2895,7 @@
 			},
 			"progress_pos":	{
 				"x":	1176,
-				"y":	424,
+				"y":	357,
 				"anchor":	4
 			}
 		}, {
@@ -2927,7 +2940,7 @@
 				}],
 			"icon_pos":	{
 				"x":	1128,
-				"y":	192
+				"y":	125
 			},
 			"text_pos":	{
 				"x":	-200000,
@@ -2935,7 +2948,7 @@
 			},
 			"progress_pos":	{
 				"x":	1176,
-				"y":	300,
+				"y":	233,
 				"anchor":	4
 			}
 		}, {
@@ -3002,11 +3015,7 @@
 				}],
 			"icon_pos":	{
 				"x":	1128,
-				"y":	67
-			},
-			"text_pos":	{
-				"x":	1144,
-				"y":	167
+				"y":	0
 			},
 			"progress_pos":	{
 				"x":	-200000,
@@ -3027,11 +3036,7 @@
 				}],
 			"icon_pos":	{
 				"x":	1248,
-				"y":	67
-			},
-			"text_pos":	{
-				"x":	1253,
-				"y":	167
+				"y":	0
 			},
 			"progress_pos":	{
 				"x":	-200000,
@@ -3068,11 +3073,7 @@
 				}],
 			"icon_pos":	{
 				"x":	1248,
-				"y":	317
-			},
-			"text_pos":	{
-				"x":	1296,
-				"y":	417
+				"y":	250
 			},
 			"progress_pos":	{
 				"x":	-3000,

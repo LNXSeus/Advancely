@@ -247,6 +247,7 @@
 	"stat.stat:tnt_picked_up":	"TNT",
 	"stat.stat:debris_picked_up":	"Schrott",
 	"stat.stat:bee_nests_picked_up":	"Nester",
+	"stat.cauldrons":	"Kessel",
 	"multi_stage_goal.ms_goal:beacon.display_name":	"Ben.:",
 	"multi_stage_goal.ms_goal:beacon.stage.1":	"Schaedel",
 	"multi_stage_goal.ms_goal:beacon.stage.2":	"Wither rufen",

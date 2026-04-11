@@ -884,6 +884,111 @@ void find_player_data_files(
 }
 #endif
 
+void find_player_data_files_for_uuid(
+    const char *saves_path,
+    MC_Version version,
+    bool use_stats_per_world_mod,
+    const char *world_name,
+    const char *uuid,
+    const char *username,
+    char *out_adv_path,
+    char *out_stats_path,
+    char *out_unlocks_path,
+    size_t max_len
+) {
+    out_adv_path[0] = '\0';
+    out_stats_path[0] = '\0';
+    out_unlocks_path[0] = '\0';
+
+    if (!saves_path || !uuid || !username) return;
+
+    char candidate[MAX_PATH_LENGTH];
+
+    if (version <= MC_VERSION_1_6_4) {
+        // Legacy: .dat files are username-based, e.g., stats_lnxseus_unsent.dat
+        // Username in the filename is lowercase
+        char username_lower[64];
+        size_t len = strlen(username);
+        if (len >= sizeof(username_lower)) len = sizeof(username_lower) - 1;
+        for (size_t i = 0; i < len; i++) {
+            username_lower[i] = (char) tolower((unsigned char) username[i]);
+        }
+        username_lower[len] = '\0';
+
+        if (use_stats_per_world_mod) {
+            // Per-world: saves/<world>/stats/stats_<username>_unsent.dat
+            if (world_name && world_name[0] != '\0') {
+                snprintf(candidate, sizeof(candidate), "%s/%s/stats/stats_%s_unsent.dat",
+                         saves_path, world_name, username_lower);
+                normalize_path(candidate);
+                if (path_exists(candidate)) {
+                    strncpy(out_stats_path, candidate, max_len - 1);
+                    out_stats_path[max_len - 1] = '\0';
+                    log_message(LOG_INFO, "[PATH UTILS] Co-op: Found legacy per-world stats for %s: %s\n",
+                                username, out_stats_path);
+                }
+            }
+        } else {
+            // Global: .minecraft/stats/stats_<username>_unsent.dat
+            char mc_root_path[MAX_PATH_LENGTH];
+            strncpy(mc_root_path, saves_path, sizeof(mc_root_path) - 1);
+            mc_root_path[sizeof(mc_root_path) - 1] = '\0';
+            char *last_slash = strrchr(mc_root_path, '/');
+            if (last_slash) *last_slash = '\0';
+
+            snprintf(candidate, sizeof(candidate), "%s/stats/stats_%s_unsent.dat",
+                     mc_root_path, username_lower);
+            normalize_path(candidate);
+            if (path_exists(candidate)) {
+                strncpy(out_stats_path, candidate, max_len - 1);
+                out_stats_path[max_len - 1] = '\0';
+                log_message(LOG_INFO, "[PATH UTILS] Co-op: Found legacy global stats for %s: %s\n",
+                            username, out_stats_path);
+            }
+        }
+    } else {
+        // Modern & Mid-era: UUID-based .json files
+        if (!world_name || world_name[0] == '\0') return;
+
+        const char *stats_subdir = (version >= MC_VERSION_26_1) ? "players/stats" : "stats";
+        const char *adv_subdir = (version >= MC_VERSION_26_1) ? "players/advancements" : "advancements";
+
+        // Stats: saves/<world>/stats/<uuid>.json
+        snprintf(candidate, sizeof(candidate), "%s/%s/%s/%s.json",
+                 saves_path, world_name, stats_subdir, uuid);
+        normalize_path(candidate);
+        if (path_exists(candidate)) {
+            strncpy(out_stats_path, candidate, max_len - 1);
+            out_stats_path[max_len - 1] = '\0';
+            log_message(LOG_INFO, "[PATH UTILS] Co-op: Found stats for %s: %s\n", username, out_stats_path);
+        }
+
+        // Advancements: saves/<world>/advancements/<uuid>.json (1.12+)
+        if (version >= MC_VERSION_1_12) {
+            snprintf(candidate, sizeof(candidate), "%s/%s/%s/%s.json",
+                     saves_path, world_name, adv_subdir, uuid);
+            normalize_path(candidate);
+            if (path_exists(candidate)) {
+                strncpy(out_adv_path, candidate, max_len - 1);
+                out_adv_path[max_len - 1] = '\0';
+                log_message(LOG_INFO, "[PATH UTILS] Co-op: Found advancements for %s: %s\n", username, out_adv_path);
+            }
+        }
+
+        // Unlocks: saves/<world>/unlocks/<uuid>.json (25w14craftmine only)
+        if (version == MC_VERSION_25W14CRAFTMINE) {
+            snprintf(candidate, sizeof(candidate), "%s/%s/unlocks/%s.json",
+                     saves_path, world_name, uuid);
+            normalize_path(candidate);
+            if (path_exists(candidate)) {
+                strncpy(out_unlocks_path, candidate, max_len - 1);
+                out_unlocks_path[max_len - 1] = '\0';
+                log_message(LOG_INFO, "[PATH UTILS] Co-op: Found unlocks for %s: %s\n", username, out_unlocks_path);
+            }
+        }
+    }
+}
+
 bool path_exists(const char *path) {
 #ifdef _WIN32
     DWORD file_attributes = GetFileAttributesA(path);

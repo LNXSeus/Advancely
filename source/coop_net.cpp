@@ -714,6 +714,17 @@ static int SDLCALL host_thread_func(void *data) {
                         }
                     } else if (msg_type == COOP_MSG_HEARTBEAT_ACK) {
                         client_last_ack[i] = SDL_GetTicks();
+                    } else if (msg_type == COOP_MSG_CUSTOM_GOAL_MOD) {
+                        // Queue the modification for the main thread to process
+                        if (payload_len == sizeof(CoopCustomGoalModMsg) && ctx->clients[i].handshake_done) {
+                            SDL_LockMutex(ctx->custom_mod_mutex);
+                            if (ctx->custom_mod_count < COOP_MAX_CUSTOM_MODS) {
+                                memcpy(&ctx->custom_mod_queue[ctx->custom_mod_count],
+                                       payload, sizeof(CoopCustomGoalModMsg));
+                                ctx->custom_mod_count++;
+                            }
+                            SDL_UnlockMutex(ctx->custom_mod_mutex);
+                        }
                     } else if (msg_type == COOP_MSG_DISCONNECT) {
                         log_message(LOG_INFO, "[COOP NET] Client %s disconnected gracefully.\n",
                                     ctx->clients[i].label);
@@ -1032,6 +1043,42 @@ static int SDLCALL receiver_thread_func(void *data) {
         return 1;
     }
 
+    // ---- Wait briefly for TEMPLATE_SYNC (sent right after JOIN_ACCEPT) ----
+    {
+        Uint32 sync_start = SDL_GetTicks();
+        while (!should_stop(ctx) && (SDL_GetTicks() - sync_start) < 3000) {
+            fd_set sync_fds;
+            FD_ZERO(&sync_fds);
+            if (ctx->client_fd == COOP_INVALID_SOCKET) break;
+            FD_SET(ctx->client_fd, &sync_fds);
+            struct timeval stv;
+            stv.tv_sec = 0;
+            stv.tv_usec = 200000;
+            int sr = select((int)(ctx->client_fd + 1), &sync_fds, nullptr, nullptr, &stv);
+            if (sr <= 0) continue;
+            uint32_t sync_type;
+            char *sync_payload;
+            uint32_t sync_len;
+            bool sync_disc;
+            if (read_message(ctx->client_fd, &sync_type, &sync_payload, &sync_len, &sync_disc)) {
+                if (sync_type == COOP_MSG_TEMPLATE_SYNC && sync_payload) {
+                    SDL_LockMutex(ctx->template_sync_mutex);
+                    size_t copy_len = sync_len < sizeof(ctx->template_sync_payload) - 1
+                                          ? sync_len : sizeof(ctx->template_sync_payload) - 1;
+                    memcpy(ctx->template_sync_payload, sync_payload, copy_len);
+                    ctx->template_sync_payload[copy_len] = '\0';
+                    ctx->template_sync_ready = true;
+                    SDL_UnlockMutex(ctx->template_sync_mutex);
+                    log_message(LOG_INFO, "[COOP NET] Received template sync from host.\n");
+                }
+                free(sync_payload);
+                break;
+            } else if (sync_disc) {
+                break;
+            }
+        }
+    }
+
     set_state(ctx, COOP_NET_CONNECTED);
     set_status(ctx, "Connected to lobby");
     log_message(LOG_INFO, "[COOP NET] Joined lobby at %s:%d\n", ctx->connect_ip, ctx->connect_port);
@@ -1110,6 +1157,16 @@ static int SDLCALL receiver_thread_func(void *data) {
                     payload = nullptr; // Ownership transferred
                     last_heartbeat_recv = SDL_GetTicks();
                 } else if (msg_type == COOP_MSG_TEMPLATE_SYNC) {
+                    if (payload && payload_len > 0) {
+                        SDL_LockMutex(ctx->template_sync_mutex);
+                        size_t copy_len = payload_len < sizeof(ctx->template_sync_payload) - 1
+                                              ? payload_len : sizeof(ctx->template_sync_payload) - 1;
+                        memcpy(ctx->template_sync_payload, payload, copy_len);
+                        ctx->template_sync_payload[copy_len] = '\0';
+                        ctx->template_sync_ready = true;
+                        SDL_UnlockMutex(ctx->template_sync_mutex);
+                        log_message(LOG_INFO, "[COOP NET] Received template sync update from host.\n");
+                    }
                     last_heartbeat_recv = SDL_GetTicks();
                 }
 
@@ -1158,7 +1215,9 @@ bool coop_net_init(CoopNetContext *ctx) {
     ctx->status_mutex = SDL_CreateMutex();
     ctx->recv_mutex = SDL_CreateMutex();
     ctx->lobby_mutex = SDL_CreateMutex();
-    if (!ctx->status_mutex || !ctx->recv_mutex || !ctx->lobby_mutex) {
+    ctx->custom_mod_mutex = SDL_CreateMutex();
+    ctx->template_sync_mutex = SDL_CreateMutex();
+    if (!ctx->status_mutex || !ctx->recv_mutex || !ctx->lobby_mutex || !ctx->custom_mod_mutex || !ctx->template_sync_mutex) {
         log_message(LOG_ERROR, "[COOP NET] Failed to create mutexes.\n");
         return false;
     }
@@ -1195,6 +1254,14 @@ void coop_net_shutdown(CoopNetContext *ctx) {
     if (ctx->lobby_mutex) {
         SDL_DestroyMutex(ctx->lobby_mutex);
         ctx->lobby_mutex = nullptr;
+    }
+    if (ctx->custom_mod_mutex) {
+        SDL_DestroyMutex(ctx->custom_mod_mutex);
+        ctx->custom_mod_mutex = nullptr;
+    }
+    if (ctx->template_sync_mutex) {
+        SDL_DestroyMutex(ctx->template_sync_mutex);
+        ctx->template_sync_mutex = nullptr;
     }
     free(ctx->recv_buffer);
     ctx->recv_buffer = nullptr;
@@ -1390,9 +1457,11 @@ void coop_net_stop(CoopNetContext *ctx) {
 }
 
 void coop_net_tick(CoopNetContext *ctx) {
-    // Currently a placeholder for main-thread processing.
-    // In Step 5, this will check recv_data_ready and apply received state.
-    (void)ctx;
+    // Lightweight per-frame check. The main loop in main.cpp reads recv_data_ready
+    // directly after this call for state updates. This function handles any
+    // housekeeping that needs to happen each frame.
+    if (!ctx) return;
+    // Currently no per-frame housekeeping needed beyond what main.cpp handles.
 }
 
 CoopNetState coop_net_get_state(CoopNetContext *ctx) {
@@ -1490,6 +1559,14 @@ bool coop_net_approve_request(CoopNetContext *ctx, int client_slot) {
         free(json);
     }
 
+    // Send TEMPLATE_SYNC with host's version, category, optional flag, and merge settings
+    SDL_LockMutex(ctx->template_sync_mutex);
+    if (ctx->template_sync_payload[0] != '\0') {
+        send_message(ctx->clients[client_slot].socket_fd, COOP_MSG_TEMPLATE_SYNC,
+                     ctx->template_sync_payload, (uint32_t)strlen(ctx->template_sync_payload));
+    }
+    SDL_UnlockMutex(ctx->template_sync_mutex);
+
     // Broadcast updated player list to all other approved clients
     broadcast_player_list(ctx);
     return true;
@@ -1519,4 +1596,86 @@ bool coop_net_kick_client(CoopNetContext *ctx, int client_slot, const char *reas
     ctx->clients[client_slot].pending_action_reason[sizeof(ctx->clients[client_slot].pending_action_reason) - 1] = '\0';
     SDL_SetAtomicInt(&ctx->clients[client_slot].pending_action, COOP_ACTION_KICK);
     return true;
+}
+
+bool coop_net_send_custom_goal_mod(CoopNetContext *ctx, const CoopCustomGoalModMsg *msg) {
+    if (!ctx || !msg) return false;
+    if (coop_net_get_state(ctx) != COOP_NET_CONNECTED) return false;
+    if (ctx->client_fd == COOP_INVALID_SOCKET) return false;
+
+    return send_message(ctx->client_fd, COOP_MSG_CUSTOM_GOAL_MOD,
+                        msg, (uint32_t) sizeof(CoopCustomGoalModMsg));
+}
+
+int coop_net_drain_custom_mods(CoopNetContext *ctx, CoopCustomGoalModMsg *out_mods, int max_mods) {
+    if (!ctx || !out_mods || max_mods <= 0) return 0;
+
+    SDL_LockMutex(ctx->custom_mod_mutex);
+    int count = ctx->custom_mod_count;
+    if (count > max_mods) count = max_mods;
+    if (count > 0) {
+        memcpy(out_mods, ctx->custom_mod_queue, count * sizeof(CoopCustomGoalModMsg));
+        // Shift remaining items if we didn't drain all
+        int remaining = ctx->custom_mod_count - count;
+        if (remaining > 0) {
+            memmove(ctx->custom_mod_queue, &ctx->custom_mod_queue[count],
+                    remaining * sizeof(CoopCustomGoalModMsg));
+        }
+        ctx->custom_mod_count = remaining;
+    }
+    SDL_UnlockMutex(ctx->custom_mod_mutex);
+
+    return count;
+}
+
+// ---- Template Sync API ----
+
+void coop_net_set_template_sync(CoopNetContext *ctx, const char *json_payload) {
+    if (!ctx || !json_payload) return;
+    SDL_LockMutex(ctx->template_sync_mutex);
+    strncpy(ctx->template_sync_payload, json_payload, sizeof(ctx->template_sync_payload) - 1);
+    ctx->template_sync_payload[sizeof(ctx->template_sync_payload) - 1] = '\0';
+    SDL_UnlockMutex(ctx->template_sync_mutex);
+}
+
+bool coop_net_template_sync_ready(CoopNetContext *ctx) {
+    if (!ctx) return false;
+    SDL_LockMutex(ctx->template_sync_mutex);
+    bool ready = ctx->template_sync_ready;
+    if (ready) ctx->template_sync_ready = false;
+    SDL_UnlockMutex(ctx->template_sync_mutex);
+    return ready;
+}
+
+bool coop_net_get_template_sync(CoopNetContext *ctx, char *out, size_t out_size) {
+    if (!ctx || !out || out_size == 0) return false;
+    SDL_LockMutex(ctx->template_sync_mutex);
+    if (ctx->template_sync_payload[0] == '\0') {
+        SDL_UnlockMutex(ctx->template_sync_mutex);
+        return false;
+    }
+    strncpy(out, ctx->template_sync_payload, out_size - 1);
+    out[out_size - 1] = '\0';
+    SDL_UnlockMutex(ctx->template_sync_mutex);
+    return true;
+}
+
+void coop_net_broadcast_template_sync(CoopNetContext *ctx) {
+    if (!ctx) return;
+    SDL_LockMutex(ctx->template_sync_mutex);
+    if (ctx->template_sync_payload[0] == '\0') {
+        SDL_UnlockMutex(ctx->template_sync_mutex);
+        return;
+    }
+    char payload[1024];
+    strncpy(payload, ctx->template_sync_payload, sizeof(payload) - 1);
+    payload[sizeof(payload) - 1] = '\0';
+    SDL_UnlockMutex(ctx->template_sync_mutex);
+
+    uint32_t len = (uint32_t)strlen(payload);
+    for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
+        if (ctx->clients[i].active && ctx->clients[i].handshake_done) {
+            send_message(ctx->clients[i].socket_fd, COOP_MSG_TEMPLATE_SYNC, payload, len);
+        }
+    }
 }

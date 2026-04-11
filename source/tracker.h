@@ -14,6 +14,7 @@
 #include "data_structures.h"
 #include "hermes_rotator.h"
 #include "settings_utils.h" // For AppSettings
+#include "coop_net.h" // For CoopCustomGoalModMsg
 
 #include "imgui.h"
 
@@ -395,6 +396,33 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings);
 * @param settings A pointer to the application settings.
 */
 void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings);
+
+/**
+ * @brief Reads all co-op roster players' data files and merges into the tracker's TemplateData.
+ *
+ * Called by the Host instead of the normal tracker_update() path. Resets all progress,
+ * iterates over each player in the roster, reads their game files by UUID, and merges
+ * according to the per-goal-type merge settings (stat highest/cumulative, etc.).
+ * Runs linked-goal iteration and progress calculation after merging.
+ *
+ * @param t        A pointer to the Tracker struct.
+ * @param settings A pointer to the application settings (contains roster and merge settings).
+ */
+void tracker_update_coop_merged(Tracker *t, const AppSettings *settings);
+
+/**
+ * @brief Applies a batch of custom goal/stat checkbox modifications from receivers.
+ *
+ * Called by the host after draining the custom mod queue. Modifies the template data
+ * in-place and saves settings.
+ *
+ * @param t The tracker instance.
+ * @param settings The current app settings (for save and merge mode checks).
+ * @param mods Array of modification messages.
+ * @param mod_count Number of modifications to apply.
+ */
+void tracker_apply_coop_mods(Tracker *t, const AppSettings *settings,
+                             const CoopCustomGoalModMsg *mods, int mod_count);
 
 /**
  * @brief Recalculates overall progress percentage from current in-memory state.

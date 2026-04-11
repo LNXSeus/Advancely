@@ -37,6 +37,22 @@
 #include "coop_net.h" // For co-op networking status display
 #include <SDL3/SDL_clipboard.h> // For room code copy/paste
 
+// Build and set the template sync JSON payload on the co-op context.
+// Called when host starts and when settings are applied while hosting.
+static void update_coop_template_sync(const AppSettings *s) {
+    if (!g_coop_ctx) return;
+    const char *stat_merge = (s->coop_stat_merge == COOP_STAT_CUMULATIVE) ? "cumulative" : "highest";
+    const char *stat_cb = (s->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY) ? "host_only" : "any_player";
+    const char *custom = (s->coop_custom_goal_mode == COOP_CUSTOM_HOST_ONLY) ? "host_only" : "any_player";
+    char buf[1024];
+    snprintf(buf, sizeof(buf),
+             "{\"version\":\"%s\",\"category\":\"%s\",\"optional_flag\":\"%s\","
+             "\"stat_merge\":\"%s\",\"stat_checkbox\":\"%s\",\"custom_goal_mode\":\"%s\"}",
+             s->version_str, s->category, s->optional_flag,
+             stat_merge, stat_cb, custom);
+    coop_net_set_template_sync(g_coop_ctx, buf);
+}
+
 // Helper function to robustly compare two AppSettings structs
 // Changing window geometry of overlay and tracker window DO NOT cause the "Unsaved Changes" text to appear.
 static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
@@ -129,7 +145,9 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         strcmp(a->local_player.uuid, b->local_player.uuid) != 0 ||
         strcmp(a->local_player.display_name, b->local_player.display_name) != 0 ||
         a->network_mode != b->network_mode ||
-        a->coop_goal_logic != b->coop_goal_logic ||
+        a->coop_stat_merge != b->coop_stat_merge ||
+        a->coop_stat_checkbox != b->coop_stat_checkbox ||
+        a->coop_custom_goal_mode != b->coop_custom_goal_mode ||
         strcmp(a->host_ip, b->host_ip) != 0 ||
         strcmp(a->host_port, b->host_port) != 0 ||
         a->coop_player_count != b->coop_player_count) {
@@ -623,6 +641,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::Spacing();
 
             // Template Settings
+            // Co-op receivers have version/category/flag locked by host
+            bool coop_template_locked = (temp_settings.network_mode == NETWORK_RECEIVER &&
+                                         g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
             ImGui::Text("Template Settings");
             if (ImGui::IsItemHovered()) {
                 char template_settings_tooltip_buffer[1024];
@@ -679,6 +700,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     break;
                 }
             }
+            if (coop_template_locked) ImGui::BeginDisabled();
             if (ImGui::Combo("Template Version", &current_template_version_idx, version_display_c_strs.data(),
                              version_display_c_strs.size())) {
                 if (current_template_version_idx >= 0) {
@@ -696,18 +718,24 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     update_temp_display_category();
                 }
             }
-            if (ImGui::IsItemHovered()) {
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char version_tooltip_buffer[1024];
-                snprintf(version_tooltip_buffer, sizeof(version_tooltip_buffer),
-                         "Select the functional version of the template.\n"
-                         "This determines which template file to load and how to parse game data.\n"
-                         "The number in brackets shows how many templates are available for that version.\n"
-                         "This doesn't necessarily have to be the exact version of your minecraft instance.\n"
-                         "(E.g., Playing 1.21.6 (Template Version) all_advancements in 1.21.10 (Display Version).)\n"
-                         "This way templates don't need to be copied for each subversion.\n"
-                         "Click on '(Version Support)' to see the version ranges that functionally equal.");
+                if (coop_template_locked) {
+                    snprintf(version_tooltip_buffer, sizeof(version_tooltip_buffer),
+                             "Controlled by Host");
+                } else {
+                    snprintf(version_tooltip_buffer, sizeof(version_tooltip_buffer),
+                             "Select the functional version of the template.\n"
+                             "This determines which template file to load and how to parse game data.\n"
+                             "The number in brackets shows how many templates are available for that version.\n"
+                             "This doesn't necessarily have to be the exact version of your minecraft instance.\n"
+                             "(E.g., Playing 1.21.6 (Template Version) all_advancements in 1.21.10 (Display Version).)\n"
+                             "This way templates don't need to be copied for each subversion.\n"
+                             "Click on '(Version Support)' to see the version ranges that functionally equal.");
+                }
                 ImGui::SetTooltip("%s", version_tooltip_buffer);
             }
+            if (coop_template_locked) ImGui::EndDisabled();
 
             // "Display Version" dropdown
             int current_display_version_idx = -1;
@@ -917,6 +945,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 }
             }
 
+            if (coop_template_locked) ImGui::BeginDisabled();
             if (ImGui::Combo("Category", &category_idx, category_display_names.data(), category_display_names.size())) {
                 if (category_idx >= 0 && (size_t) category_idx < unique_category_values.size()) {
                     // Use the raw category value, not the display name with "(has layout)"
@@ -944,17 +973,23 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 }
             }
 
-            if (ImGui::IsItemHovered()) {
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char category_tooltip_buffer[1024];
-                snprintf(category_tooltip_buffer, sizeof(category_tooltip_buffer),
-                         "Choose between available categories for the selected version.\n"
-                         "If the category you're looking for isn't available you can create it\n"
-                         "by clicking the 'Edit Templates' button or view the list of officially added\n"
-                         "templates by clicking the '(Learn more)' button next to the 'Template Settings'.\n\n"
-                         "Templates marked with '(has layout)' include pre-defined positions for goals.\n"
-                         "Enable the 'Manual Layout' checkbox to use them.");
+                if (coop_template_locked) {
+                    snprintf(category_tooltip_buffer, sizeof(category_tooltip_buffer),
+                             "Controlled by Host");
+                } else {
+                    snprintf(category_tooltip_buffer, sizeof(category_tooltip_buffer),
+                             "Choose between available categories for the selected version.\n"
+                             "If the category you're looking for isn't available you can create it\n"
+                             "by clicking the 'Edit Templates' button or view the list of officially added\n"
+                             "templates by clicking the '(Learn more)' button next to the 'Template Settings'.\n\n"
+                             "Templates marked with '(has layout)' include pre-defined positions for goals.\n"
+                             "Enable the 'Manual Layout' checkbox to use them.");
+                }
                 ImGui::SetTooltip("%s", category_tooltip_buffer);
             }
+            if (coop_template_locked) ImGui::EndDisabled();
 
 
             // --- OPTIONAL FLAG DROPDOWN ---
@@ -993,6 +1028,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 }
             }
 
+            if (coop_template_locked) ImGui::BeginDisabled();
             if (ImGui::Combo("Optional Flag", &flag_idx, flag_display_names.data(), flag_display_names.size())) {
                 if (flag_idx >= 0 && (size_t) flag_idx < flag_values.size()) {
                     // Use the raw flag value, not the display name with "(has layout)"
@@ -1007,15 +1043,21 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 }
             }
 
-            if (ImGui::IsItemHovered()) {
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char flag_tooltip_buffer[1024];
-                snprintf(flag_tooltip_buffer, sizeof(flag_tooltip_buffer),
-                         "Choose between available optional flags for the selected version and category.\n"
-                         "The optional flag is used to differentiate between different alterations of the same template.\n\n"
-                         "Templates marked with '(has layout)' include pre-defined positions for goals.\n"
-                         "Enable the 'Manual Layout' checkbox to use them.");
+                if (coop_template_locked) {
+                    snprintf(flag_tooltip_buffer, sizeof(flag_tooltip_buffer),
+                             "Controlled by Host");
+                } else {
+                    snprintf(flag_tooltip_buffer, sizeof(flag_tooltip_buffer),
+                             "Choose between available optional flags for the selected version and category.\n"
+                             "The optional flag is used to differentiate between different alterations of the same template.\n\n"
+                             "Templates marked with '(has layout)' include pre-defined positions for goals.\n"
+                             "Enable the 'Manual Layout' checkbox to use them.");
+                }
                 ImGui::SetTooltip("%s", flag_tooltip_buffer);
             }
+            if (coop_template_locked) ImGui::EndDisabled();
 
             // --- Category Display Name Text Input ---
 
@@ -1140,15 +1182,26 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             // Place Template Creator Button in same line
             ImGui::SameLine();
 
+            bool coop_session_active = g_coop_ctx &&
+                (coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING ||
+                 coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED ||
+                 coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTING);
+            if (coop_session_active) ImGui::BeginDisabled();
             if (ImGui::Button("Edit Templates")) {
                 *p_temp_creator_open = true; // Open the template creator window
             }
-            if (ImGui::IsItemHovered()) {
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char open_template_creator_tooltip_buffer[1024];
-                snprintf(open_template_creator_tooltip_buffer, sizeof(open_template_creator_tooltip_buffer),
-                         "Open the Template Editor to modify or build a new template or language.");
+                if (coop_session_active) {
+                    snprintf(open_template_creator_tooltip_buffer, sizeof(open_template_creator_tooltip_buffer),
+                             "Template editing is disabled during a Co-op session");
+                } else {
+                    snprintf(open_template_creator_tooltip_buffer, sizeof(open_template_creator_tooltip_buffer),
+                             "Open the Template Editor to modify or build a new template or language.");
+                }
                 ImGui::SetTooltip("%s", open_template_creator_tooltip_buffer);
             }
+            if (coop_session_active) ImGui::EndDisabled();
 
 
             ImGui::EndTabItem();
@@ -2577,7 +2630,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                          "Optional. Your public IP for players connecting over the internet.\n"
                                          "Requires port forwarding on your router.\n"
                                          "If set, the room code will use this IP instead of the bind IP.\n"
-                                         "Leave empty to use the bind IP for the room code (VPN/LAN).");
+                                         "Leave empty to use the bind IP for the room code (VPN/LAN).\n"
+                                         "This field is hidden to prevent accidental leaks on stream.");
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
                         }
@@ -2647,6 +2701,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                         temp_settings.local_player.username,
                                                         temp_settings.local_player.uuid,
                                                         temp_settings.local_player.display_name)) {
+                                    // Set template sync payload for receivers
+                                    update_coop_template_sync(&temp_settings);
+
                                     // Use public IP for room code if provided, otherwise use bind IP
                                     const char *room_code_ip = pub_ip_filled ? temp_settings.host_public_ip
                                                                              : temp_settings.host_ip;
@@ -2701,52 +2758,113 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::TextColored(sc, "%s", status_buf);
                         }
 
-                        // --- Goal Merging Logic ---
+                        // --- Goal Merging Rules ---
                         if (net_state == COOP_NET_LISTENING) {
                             ImGui::Spacing();
                             ImGui::Separator();
                             ImGui::Spacing();
-                            ImGui::Text("Goal Merging Logic");
-                            ImGui::TextDisabled("Controls how progress is combined when multiple players track the same goals.");
+                            ImGui::Text("Goal Merging Rules");
+                            ImGui::TextDisabled("Controls how progress is combined across players. All settings can be changed mid-run.");
                             ImGui::Spacing();
 
-                            const char *goal_type_labels[] = {
-                                advancements_label_plural_uppercase, "Statistics", "Custom Goals", "Multi-Stage Goals"
-                            };
-                            int logic = temp_settings.coop_goal_logic;
-                            for (int i = 0; i < 4; i++) {
-                                if (i > 0) ImGui::Spacing();
-                                ImGui::PushID(i);
-                                ImGui::BeginDisabled(i > 0);
-                                ImGui::Text("%s:", goal_type_labels[i]);
-                                ImGui::SameLine();
-                                ImGui::RadioButton("Max Progress", &logic, COOP_TRACK_MAX_PROGRESS);
-                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                                    char tooltip_buf[256];
+                            // --- Automatic rules (read-only info) ---
+                            {
+                                char tooltip_buf[256];
+
+                                ImGui::BulletText("%s: Completed if any player completes it.", advancements_label_plural_uppercase);
+                                if (ImGui::IsItemHovered()) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Use whichever player has the most criteria completed for each goal.");
+                                             "Simple %s are done when any player completes them.\n"
+                                             "Complex ones (with criteria) track the player with the most criteria.",
+                                             advancements_label_plural_uppercase);
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
+                                ImGui::BulletText("Multi-Stage Goals: Any player progress counts globally.");
+                                if (ImGui::IsItemHovered()) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Each stage can be advanced by any player. The furthest stage across all players is used.");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
+                                if (selected_version == MC_VERSION_25W14CRAFTMINE) {
+                                    ImGui::BulletText("Unlocks: Tracked per-player.");
+                                    if (ImGui::IsItemHovered()) {
+                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                                 "An unlock is completed if any player has obtained it.");
+                                        ImGui::SetTooltip("%s", tooltip_buf);
+                                    }
+                                }
+                                ImGui::BulletText("Counters: Derived automatically from linked goals.");
+                            }
+
+                            ImGui::Spacing();
+
+                            // --- Configurable merge settings ---
+                            {
+                                char tooltip_buf[256];
+
+                                // Stats / Sub-Stats merge mode
+                                ImGui::Text("Stats / Sub-Stats:");
+                                ImGui::SameLine();
+                                int stat_merge = temp_settings.coop_stat_merge;
+                                ImGui::PushID("coop_stat_merge");
+                                ImGui::RadioButton("Highest Value", &stat_merge, COOP_STAT_HIGHEST);
+                                if (ImGui::IsItemHovered()) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Use whichever player has the highest value for each stat.");
                                     ImGui::SetTooltip("%s", tooltip_buf);
                                 }
                                 ImGui::SameLine();
-                                ImGui::RadioButton("First to Start", &logic, COOP_TRACK_FIRST_START);
-                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                                    char tooltip_buf[256];
+                                ImGui::RadioButton("Cumulative (Sum)", &stat_merge, COOP_STAT_CUMULATIVE);
+                                if (ImGui::IsItemHovered()) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Track whoever triggered the first criterion of each goal (by timestamp).");
+                                             "Sum stat values across all players.");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
+                                temp_settings.coop_stat_merge = (CoopStatMerge) stat_merge;
+                                ImGui::PopID();
+
+                                // Stat Checkboxes
+                                ImGui::Text("Stat Checkboxes:");
+                                ImGui::SameLine();
+                                int stat_cb = temp_settings.coop_stat_checkbox;
+                                ImGui::PushID("coop_stat_cb");
+                                ImGui::RadioButton("Host Only", &stat_cb, COOP_STAT_CHECKBOX_HOST_ONLY);
+                                if (ImGui::IsItemHovered()) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Only the host can manually check off stats.");
                                     ImGui::SetTooltip("%s", tooltip_buf);
                                 }
                                 ImGui::SameLine();
-                                ImGui::RadioButton("Any Completion", &logic, COOP_TRACK_ANY_COMPLETION);
-                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                                    char tooltip_buf[256];
+                                ImGui::RadioButton("Any Player", &stat_cb, COOP_STAT_CHECKBOX_ANY_PLAYER);
+                                if (ImGui::IsItemHovered()) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "A goal is complete if any player has finished it.");
+                                             "Any player can manually check off stats.");
                                     ImGui::SetTooltip("%s", tooltip_buf);
                                 }
-                                ImGui::EndDisabled();
+                                temp_settings.coop_stat_checkbox = (CoopStatCheckbox) stat_cb;
+                                ImGui::PopID();
+
+                                // Custom Goals
+                                ImGui::Text("Custom Goals:");
+                                ImGui::SameLine();
+                                int custom_mode = temp_settings.coop_custom_goal_mode;
+                                ImGui::PushID("coop_custom");
+                                ImGui::RadioButton("Host Only", &custom_mode, COOP_CUSTOM_HOST_ONLY);
+                                if (ImGui::IsItemHovered()) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Only the host can modify custom goals and checkboxes.");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
+                                ImGui::SameLine();
+                                ImGui::RadioButton("Any Player", &custom_mode, COOP_CUSTOM_ANY_PLAYER);
+                                if (ImGui::IsItemHovered()) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Any player can modify custom goals and checkboxes.");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
+                                temp_settings.coop_custom_goal_mode = (CoopCustomGoalMode) custom_mode;
                                 ImGui::PopID();
                             }
-                            temp_settings.coop_goal_logic = (CoopGoalLogic) logic;
                         }
                     }
 
@@ -2830,30 +2948,64 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             }
                         }
 
-                        // Goal merging logic (read-only for receiver, shown when connected)
+                        // Goal merging rules (read-only for receiver, shown when connected)
                         if (net_state == COOP_NET_CONNECTED) {
                             ImGui::Spacing();
                             ImGui::Separator();
                             ImGui::Spacing();
-                            ImGui::Text("Goal Merging Logic");
-                            ImGui::TextDisabled("Only the host can change this.");
+                            ImGui::Text("Goal Merging Rules");
+                            ImGui::TextDisabled("Only the host can change these settings.");
                             ImGui::Spacing();
 
+                            // --- Automatic rules (read-only info, same as host) ---
+                            {
+                                char tooltip_buf[256];
+
+                                ImGui::BulletText("%s: Completed if any player completes it.", advancements_label_plural_uppercase);
+                                if (ImGui::IsItemHovered()) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Simple %s are done when any player completes them.\n"
+                                             "Complex ones (with criteria) track the player with the most criteria.",
+                                             advancements_label_plural_uppercase);
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
+                                ImGui::BulletText("Multi-Stage Goals: Any player progress counts globally.");
+                                if (selected_version == MC_VERSION_25W14CRAFTMINE) {
+                                    ImGui::BulletText("Unlocks: Tracked per-player.");
+                                }
+                                ImGui::BulletText("Counters: Derived automatically from linked goals.");
+                            }
+
+                            ImGui::Spacing();
+
+                            // --- Configurable settings (disabled for receiver) ---
                             ImGui::BeginDisabled();
-                            const char *goal_type_labels[] = {
-                                advancements_label_plural_uppercase, "Statistics", "Custom Goals", "Multi-Stage Goals"
-                            };
-                            int logic = temp_settings.coop_goal_logic;
-                            for (int i = 0; i < 4; i++) {
-                                if (i > 0) ImGui::Spacing();
-                                ImGui::PushID(i + 500);
-                                ImGui::Text("%s:", goal_type_labels[i]);
+                            {
+                                int stat_merge = temp_settings.coop_stat_merge;
+                                ImGui::Text("Stats / Sub-Stats:");
                                 ImGui::SameLine();
-                                ImGui::RadioButton("Max Progress", &logic, COOP_TRACK_MAX_PROGRESS);
+                                ImGui::PushID("coop_stat_merge_recv");
+                                ImGui::RadioButton("Highest Value", &stat_merge, COOP_STAT_HIGHEST);
                                 ImGui::SameLine();
-                                ImGui::RadioButton("First to Start", &logic, COOP_TRACK_FIRST_START);
+                                ImGui::RadioButton("Cumulative (Sum)", &stat_merge, COOP_STAT_CUMULATIVE);
+                                ImGui::PopID();
+
+                                int stat_cb = temp_settings.coop_stat_checkbox;
+                                ImGui::Text("Stat Checkboxes:");
                                 ImGui::SameLine();
-                                ImGui::RadioButton("Any Completion", &logic, COOP_TRACK_ANY_COMPLETION);
+                                ImGui::PushID("coop_stat_cb_recv");
+                                ImGui::RadioButton("Host Only", &stat_cb, COOP_STAT_CHECKBOX_HOST_ONLY);
+                                ImGui::SameLine();
+                                ImGui::RadioButton("Any Player", &stat_cb, COOP_STAT_CHECKBOX_ANY_PLAYER);
+                                ImGui::PopID();
+
+                                int custom_mode = temp_settings.coop_custom_goal_mode;
+                                ImGui::Text("Custom Goals:");
+                                ImGui::SameLine();
+                                ImGui::PushID("coop_custom_recv");
+                                ImGui::RadioButton("Host Only", &custom_mode, COOP_CUSTOM_HOST_ONLY);
+                                ImGui::SameLine();
+                                ImGui::RadioButton("Any Player", &custom_mode, COOP_CUSTOM_ANY_PLAYER);
                                 ImGui::PopID();
                             }
                             ImGui::EndDisabled();
@@ -3334,6 +3486,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
                 SDL_SetAtomicInt(&g_settings_changed, 1); // Trigger a reload
                 SDL_SetAtomicInt(&g_apply_button_clicked, 1);
+
+                // Update template sync for connected receivers if hosting
+                if (app_settings->network_mode == NETWORK_HOST && g_coop_ctx) {
+                    update_coop_template_sync(app_settings);
+                    coop_net_broadcast_template_sync(g_coop_ctx);
+                }
 
                 if (is_template_change && had_active_hotkeys) {
                     show_hotkey_warning_message = true;
