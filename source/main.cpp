@@ -60,6 +60,7 @@ extern "C" {
 #include "logger.h"
 #include "update_checker.h" // For update checker
 #include "coop_net.h" // For co-op networking
+#include "template_scanner.h" // For compute_template_goal_hash
 
 // ImGUI imports
 #include "imgui/imgui.h"
@@ -1776,6 +1777,10 @@ int main(int argc, char *argv[]) {
         Uint32 last_frame_time = SDL_GetTicks();
         float frame_target_time = 1000.0f / app_settings.fps;
 
+        // Co-op template mismatch popup state
+        bool coop_template_mismatch = false;
+        char coop_mismatch_msg[512] = {};
+
         // Start a timer if test mode is enabled
         Uint32 test_mode_start_time = 0;
         if (is_test_mode) {
@@ -2186,42 +2191,75 @@ int main(int argc, char *argv[]) {
                         cJSON *sm = cJSON_GetObjectItem(root, "stat_merge");
                         cJSON *sc = cJSON_GetObjectItem(root, "stat_checkbox");
                         cJSON *cg = cJSON_GetObjectItem(root, "custom_goal_mode");
+                        cJSON *th = cJSON_GetObjectItem(root, "template_hash");
 
-                        bool template_changed = false;
-                        if (ver && ver->valuestring) {
-                            if (strcmp(app_settings.version_str, ver->valuestring) != 0) {
-                                strncpy(app_settings.version_str, ver->valuestring, sizeof(app_settings.version_str) - 1);
-                                template_changed = true;
+                        // Validate template match on join: version/category/flag must match
+                        // and the goal structure hash must be identical.
+                        bool mismatch = false;
+                        const char *host_ver = (ver && ver->valuestring) ? ver->valuestring : "";
+                        const char *host_cat = (cat && cat->valuestring) ? cat->valuestring : "";
+                        const char *host_opt = (opt && opt->valuestring) ? opt->valuestring : "";
+
+                        if (strcmp(app_settings.version_str, host_ver) != 0 ||
+                            strcmp(app_settings.category, host_cat) != 0 ||
+                            strcmp(app_settings.optional_flag, host_opt) != 0) {
+                            // Template selection doesn't match — build a readable name for the popup
+                            char host_name[384];
+                            if (host_opt[0] != '\0')
+                                snprintf(host_name, sizeof(host_name), "%s / %s / %s", host_ver, host_cat, host_opt);
+                            else
+                                snprintf(host_name, sizeof(host_name), "%s / %s", host_ver, host_cat);
+                            char local_name[384];
+                            if (app_settings.optional_flag[0] != '\0')
+                                snprintf(local_name, sizeof(local_name), "%s / %s / %s",
+                                         app_settings.version_str, app_settings.category, app_settings.optional_flag);
+                            else
+                                snprintf(local_name, sizeof(local_name), "%s / %s",
+                                         app_settings.version_str, app_settings.category);
+                            snprintf(coop_mismatch_msg, sizeof(coop_mismatch_msg),
+                                     "Your template (%s) doesn't match the host's template (%s).\n\n"
+                                     "Switch to the same template and try joining again.",
+                                     local_name, host_name);
+                            mismatch = true;
+                        } else if (th && th->valuestring) {
+                            // Same template selection — compare goal structure hashes
+                            uint64_t local_hash = compute_template_goal_hash(app_settings.template_path);
+                            char local_hash_str[20];
+                            snprintf(local_hash_str, sizeof(local_hash_str), "%016llx",
+                                     (unsigned long long)local_hash);
+                            if (strcmp(local_hash_str, th->valuestring) != 0) {
+                                snprintf(coop_mismatch_msg, sizeof(coop_mismatch_msg),
+                                         "Your template has different goals than the host's template.\n\n"
+                                         "The comparison ignores language files, icon paths, positions,\n"
+                                         "decorations, and display settings. Only the goal structure matters\n"
+                                         "(advancements, stats, unlocks, custom goals, multi-stage goals,\n"
+                                         "counter goals, and their targets/criteria/linked goals).\n\n"
+                                         "Make sure you have the exact same template file as the host\n"
+                                         "and try joining again.");
+                                mismatch = true;
                             }
                         }
-                        if (cat && cat->valuestring) {
-                            if (strcmp(app_settings.category, cat->valuestring) != 0) {
-                                strncpy(app_settings.category, cat->valuestring, sizeof(app_settings.category) - 1);
-                                template_changed = true;
-                            }
+
+                        if (mismatch) {
+                            log_message(LOG_ERROR, "[COOP] Template mismatch with host. Disconnecting.\n");
+                            coop_template_mismatch = true;
+                            coop_net_stop(g_coop_ctx);
+                        } else {
+                            // Template matches — apply goal merging settings from host
+                            if (sm && sm->valuestring)
+                                app_settings.coop_stat_merge = (strcmp(sm->valuestring, "cumulative") == 0)
+                                                                   ? COOP_STAT_CUMULATIVE : COOP_STAT_HIGHEST;
+                            if (sc && sc->valuestring)
+                                app_settings.coop_stat_checkbox = (strcmp(sc->valuestring, "host_only") == 0)
+                                                                      ? COOP_STAT_CHECKBOX_HOST_ONLY
+                                                                      : COOP_STAT_CHECKBOX_ANY_PLAYER;
+                            if (cg && cg->valuestring)
+                                app_settings.coop_custom_goal_mode = (strcmp(cg->valuestring, "host_only") == 0)
+                                                                         ? COOP_CUSTOM_HOST_ONLY
+                                                                         : COOP_CUSTOM_ANY_PLAYER;
+                            log_message(LOG_INFO, "[COOP] Template validated and sync applied from host.\n");
                         }
-                        if (opt && opt->valuestring) {
-                            if (strcmp(app_settings.optional_flag, opt->valuestring) != 0) {
-                                strncpy(app_settings.optional_flag, opt->valuestring, sizeof(app_settings.optional_flag) - 1);
-                                template_changed = true;
-                            }
-                        }
-                        if (sm && sm->valuestring)
-                            app_settings.coop_stat_merge = (strcmp(sm->valuestring, "cumulative") == 0)
-                                                               ? COOP_STAT_CUMULATIVE : COOP_STAT_HIGHEST;
-                        if (sc && sc->valuestring)
-                            app_settings.coop_stat_checkbox = (strcmp(sc->valuestring, "host_only") == 0)
-                                                                  ? COOP_STAT_CHECKBOX_HOST_ONLY : COOP_STAT_CHECKBOX_ANY_PLAYER;
-                        if (cg && cg->valuestring)
-                            app_settings.coop_custom_goal_mode = (strcmp(cg->valuestring, "host_only") == 0)
-                                                                     ? COOP_CUSTOM_HOST_ONLY : COOP_CUSTOM_ANY_PLAYER;
                         cJSON_Delete(root);
-
-                        if (template_changed) {
-                            SDL_SetAtomicInt(&g_settings_changed, 1);
-                            SDL_SetAtomicInt(&g_apply_button_clicked, 1);
-                        }
-                        log_message(LOG_INFO, "[COOP] Applied template sync from host.\n");
                     }
                 }
             }
@@ -2503,6 +2541,40 @@ int main(int argc, char *argv[]) {
                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                              "Go back and save your changes before exiting.\n"
                              "You can also press 'ESCAPE'.");
+                    ImGui::SetTooltip("%s", tooltip_buf);
+                }
+
+                ImGui::EndPopup();
+            }
+
+            // --- Co-op Template Mismatch Popup ---
+            if (coop_template_mismatch) {
+                ImGui::OpenPopup("Template Mismatch##coop");
+                coop_template_mismatch = false;
+            }
+            {
+                ImVec2 mismatch_center = ImGui::GetMainViewport()->GetCenter();
+                ImGui::SetNextWindowPos(mismatch_center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+            }
+            if (ImGui::BeginPopupModal("Template Mismatch##coop", nullptr,
+                                       ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+                ImGui::Text("Could not join the lobby.");
+                ImGui::Spacing();
+                ImGui::TextWrapped("%s", coop_mismatch_msg);
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::Spacing();
+
+                bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter);
+                bool esc_pressed = ImGui::IsKeyPressed(ImGuiKey_Escape);
+                if (ImGui::Button("OK") || enter_pressed || esc_pressed) {
+                    ImGui::CloseCurrentPopup();
+                }
+                if (ImGui::IsItemHovered()) {
+                    char tooltip_buf[128];
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Dismiss this message.\n"
+                             "You can also press 'ENTER' or 'ESCAPE'.");
                     ImGui::SetTooltip("%s", tooltip_buf);
                 }
 

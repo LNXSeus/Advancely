@@ -348,3 +348,177 @@ void free_discovered_templates(DiscoveredTemplate **templates, int *count) {
     }
     *count = 0;
 }
+
+// ---- Template Goal Hash (FNV-1a 64-bit) ----
+
+static const uint64_t FNV_OFFSET_BASIS = 14695981039346656037ULL;
+static const uint64_t FNV_PRIME = 1099511628211ULL;
+
+static uint64_t fnv1a_bytes(uint64_t hash, const void *data, size_t len) {
+    const unsigned char *p = (const unsigned char *)data;
+    for (size_t i = 0; i < len; i++) {
+        hash ^= p[i];
+        hash *= FNV_PRIME;
+    }
+    return hash;
+}
+
+static uint64_t fnv1a_str(uint64_t hash, const char *str) {
+    if (!str) return hash;
+    return fnv1a_bytes(hash, str, strlen(str));
+}
+
+static uint64_t fnv1a_int(uint64_t hash, int value) {
+    return fnv1a_bytes(hash, &value, sizeof(value));
+}
+
+// Hash a linked_goals array: each entry has root_name, optional stage_id, optional parent_root
+static uint64_t hash_linked_goals(uint64_t hash, cJSON *linked_goals) {
+    if (!linked_goals || !cJSON_IsArray(linked_goals)) return hash;
+    cJSON *lg = nullptr;
+    cJSON_ArrayForEach(lg, linked_goals) {
+        cJSON *rn = cJSON_GetObjectItem(lg, "root_name");
+        if (rn && rn->valuestring) hash = fnv1a_str(hash, rn->valuestring);
+        cJSON *sid = cJSON_GetObjectItem(lg, "stage_id");
+        if (sid && sid->valuestring) hash = fnv1a_str(hash, sid->valuestring);
+        cJSON *pr = cJSON_GetObjectItem(lg, "parent_root");
+        if (pr && pr->valuestring) hash = fnv1a_str(hash, pr->valuestring);
+    }
+    return hash;
+}
+
+// Hash the linked_goal_mode field ("and" or "or") if present
+static uint64_t hash_linked_goal_mode(uint64_t hash, cJSON *obj) {
+    cJSON *mode = cJSON_GetObjectItem(obj, "linked_goal_mode");
+    if (mode && cJSON_IsString(mode)) hash = fnv1a_str(hash, mode->valuestring);
+    return hash;
+}
+
+uint64_t compute_template_goal_hash(const char *template_file_path) {
+    if (!template_file_path) return 0;
+
+    cJSON *json = cJSON_from_file(template_file_path);
+    if (!json) return 0;
+
+    uint64_t hash = FNV_OFFSET_BASIS;
+
+    // --- Advancements (object keyed by root_name) ---
+    cJSON *advancements = cJSON_GetObjectItem(json, "advancements");
+    if (advancements && cJSON_IsObject(advancements)) {
+        cJSON *adv = nullptr;
+        cJSON_ArrayForEach(adv, advancements) {
+            hash = fnv1a_str(hash, adv->string); // root_name is the key
+            // is_recipe flag affects tracking (recipes vs real advancements)
+            cJSON *recipe = cJSON_GetObjectItem(adv, "is_recipe");
+            if (recipe && cJSON_IsTrue(recipe)) hash = fnv1a_int(hash, 1);
+            // Criteria keys (sub-criteria names matter for tracking)
+            cJSON *criteria = cJSON_GetObjectItem(adv, "criteria");
+            if (criteria && cJSON_IsObject(criteria)) {
+                cJSON *crit = nullptr;
+                cJSON_ArrayForEach(crit, criteria) {
+                    hash = fnv1a_str(hash, crit->string); // criterion key
+                    cJSON *target = cJSON_GetObjectItem(crit, "target");
+                    if (target && cJSON_IsNumber(target)) hash = fnv1a_int(hash, target->valueint);
+                }
+            }
+        }
+    }
+
+    // --- Stats (object keyed by category ID) ---
+    cJSON *stats = cJSON_GetObjectItem(json, "stats");
+    if (stats && cJSON_IsObject(stats)) {
+        cJSON *stat = nullptr;
+        cJSON_ArrayForEach(stat, stats) {
+            hash = fnv1a_str(hash, stat->string); // category key e.g. "stat_category:log_collection"
+            // Single-stat categories have root_name + target at top level
+            cJSON *rn = cJSON_GetObjectItem(stat, "root_name");
+            if (rn && rn->valuestring) hash = fnv1a_str(hash, rn->valuestring);
+            cJSON *target = cJSON_GetObjectItem(stat, "target");
+            if (target && cJSON_IsNumber(target)) hash = fnv1a_int(hash, target->valueint);
+            // Multi-stat categories have criteria with sub-stat keys + targets
+            cJSON *criteria = cJSON_GetObjectItem(stat, "criteria");
+            if (criteria && cJSON_IsObject(criteria)) {
+                cJSON *crit = nullptr;
+                cJSON_ArrayForEach(crit, criteria) {
+                    hash = fnv1a_str(hash, crit->string); // sub-stat key
+                    cJSON *ct = cJSON_GetObjectItem(crit, "target");
+                    if (ct && cJSON_IsNumber(ct)) hash = fnv1a_int(hash, ct->valueint);
+                    // Sub-stat criteria can also have linked_goals + mode
+                    hash = hash_linked_goals(hash, cJSON_GetObjectItem(crit, "linked_goals"));
+                    hash = hash_linked_goal_mode(hash, crit);
+                }
+            }
+            // Stat category linked_goals + mode (for auto-completion)
+            hash = hash_linked_goals(hash, cJSON_GetObjectItem(stat, "linked_goals"));
+            hash = hash_linked_goal_mode(hash, stat);
+        }
+    }
+
+    // --- Unlocks (array of objects with root_name) ---
+    cJSON *unlocks = cJSON_GetObjectItem(json, "unlocks");
+    if (unlocks && cJSON_IsArray(unlocks)) {
+        cJSON *unlock = nullptr;
+        cJSON_ArrayForEach(unlock, unlocks) {
+            cJSON *rn = cJSON_GetObjectItem(unlock, "root_name");
+            if (rn && rn->valuestring) hash = fnv1a_str(hash, rn->valuestring);
+        }
+    }
+
+    // --- Custom goals (array, JSON key is "custom") ---
+    cJSON *custom = cJSON_GetObjectItem(json, "custom");
+    if (custom && cJSON_IsArray(custom)) {
+        cJSON *cg = nullptr;
+        cJSON_ArrayForEach(cg, custom) {
+            cJSON *rn = cJSON_GetObjectItem(cg, "root_name");
+            if (rn && rn->valuestring) hash = fnv1a_str(hash, rn->valuestring);
+            cJSON *target = cJSON_GetObjectItem(cg, "target");
+            if (target && cJSON_IsNumber(target)) hash = fnv1a_int(hash, target->valueint);
+            // Linked goals only apply when target <= 0 (manual/infinite custom goals)
+            int target_val = (target && cJSON_IsNumber(target)) ? target->valueint : 0;
+            if (target_val <= 0) {
+                hash = hash_linked_goals(hash, cJSON_GetObjectItem(cg, "linked_goals"));
+                hash = hash_linked_goal_mode(hash, cg);
+            }
+        }
+    }
+
+    // --- Multi-stage goals (array) ---
+    cJSON *ms_goals = cJSON_GetObjectItem(json, "multi_stage_goals");
+    if (ms_goals && cJSON_IsArray(ms_goals)) {
+        cJSON *msg = nullptr;
+        cJSON_ArrayForEach(msg, ms_goals) {
+            cJSON *rn = cJSON_GetObjectItem(msg, "root_name");
+            if (rn && rn->valuestring) hash = fnv1a_str(hash, rn->valuestring);
+            cJSON *stages = cJSON_GetObjectItem(msg, "stages");
+            if (stages && cJSON_IsArray(stages)) {
+                cJSON *stage = nullptr;
+                cJSON_ArrayForEach(stage, stages) {
+                    cJSON *sid = cJSON_GetObjectItem(stage, "stage_id");
+                    if (sid && sid->valuestring) hash = fnv1a_str(hash, sid->valuestring);
+                    cJSON *type = cJSON_GetObjectItem(stage, "type");
+                    if (type && type->valuestring) hash = fnv1a_str(hash, type->valuestring);
+                    cJSON *srn = cJSON_GetObjectItem(stage, "root_name");
+                    if (srn && srn->valuestring) hash = fnv1a_str(hash, srn->valuestring);
+                    cJSON *parent = cJSON_GetObjectItem(stage, "parent_advancement");
+                    if (parent && parent->valuestring) hash = fnv1a_str(hash, parent->valuestring);
+                    cJSON *starget = cJSON_GetObjectItem(stage, "target");
+                    if (starget && cJSON_IsNumber(starget)) hash = fnv1a_int(hash, starget->valueint);
+                }
+            }
+        }
+    }
+
+    // --- Counter goals (array) ---
+    cJSON *counters = cJSON_GetObjectItem(json, "counter_goals");
+    if (counters && cJSON_IsArray(counters)) {
+        cJSON *ctr = nullptr;
+        cJSON_ArrayForEach(ctr, counters) {
+            cJSON *rn = cJSON_GetObjectItem(ctr, "root_name");
+            if (rn && rn->valuestring) hash = fnv1a_str(hash, rn->valuestring);
+            hash = hash_linked_goals(hash, cJSON_GetObjectItem(ctr, "linked_goals"));
+        }
+    }
+
+    cJSON_Delete(json);
+    return hash;
+}

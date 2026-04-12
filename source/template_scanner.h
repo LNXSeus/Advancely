@@ -47,6 +47,15 @@ void scan_for_templates(const char *version_str, DiscoveredTemplate **out_templa
 */
 void free_discovered_templates(DiscoveredTemplate **templates, int *count);
 
+/**
+ * @brief Computes a 64-bit hash of the goal structure in a template JSON file.
+ * Hashes only the tracking-relevant parts: root_names, criteria keys, goal/target values,
+ * multi-stage goal stages, counter linked goals. Ignores display names, icons, positions, decorations.
+ * @param template_file_path Absolute path to the main template JSON file.
+ * @return A 64-bit FNV-1a hash of the goal structure, or 0 if the file could not be read.
+ */
+uint64_t compute_template_goal_hash(const char *template_file_path);
+
 #ifdef __cplusplus
 }
 #endif

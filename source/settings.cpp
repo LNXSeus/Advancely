@@ -44,12 +44,16 @@ static void update_coop_template_sync(const AppSettings *s) {
     const char *stat_merge = (s->coop_stat_merge == COOP_STAT_CUMULATIVE) ? "cumulative" : "highest";
     const char *stat_cb = (s->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY) ? "host_only" : "any_player";
     const char *custom = (s->coop_custom_goal_mode == COOP_CUSTOM_HOST_ONLY) ? "host_only" : "any_player";
+    // Compute a hash of the template's goal structure for receiver validation
+    uint64_t goal_hash = compute_template_goal_hash(s->template_path);
     char buf[1024];
     snprintf(buf, sizeof(buf),
              "{\"version\":\"%s\",\"category\":\"%s\",\"optional_flag\":\"%s\","
-             "\"stat_merge\":\"%s\",\"stat_checkbox\":\"%s\",\"custom_goal_mode\":\"%s\"}",
+             "\"stat_merge\":\"%s\",\"stat_checkbox\":\"%s\",\"custom_goal_mode\":\"%s\","
+             "\"template_hash\":\"%016llx\"}",
              s->version_str, s->category, s->optional_flag,
-             stat_merge, stat_cb, custom);
+             stat_merge, stat_cb, custom,
+             (unsigned long long)goal_hash);
     coop_net_set_template_sync(g_coop_ctx, buf);
 }
 
@@ -641,9 +645,14 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::Spacing();
 
             // Template Settings
-            // Co-op receivers have version/category/flag locked by host
-            bool coop_template_locked = (temp_settings.network_mode == NETWORK_RECEIVER &&
-                                         g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+            // Template selection is locked for both host and receivers during an active lobby
+            CoopNetState tpl_net_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
+            bool coop_template_locked = g_coop_ctx &&
+                ((temp_settings.network_mode == NETWORK_RECEIVER && tpl_net_state == COOP_NET_CONNECTED) ||
+                 (temp_settings.network_mode == NETWORK_HOST && tpl_net_state == COOP_NET_LISTENING));
+            const char *coop_template_locked_tooltip = (temp_settings.network_mode == NETWORK_HOST)
+                ? "Template settings are locked while a lobby is active"
+                : "Controlled by Host";
             ImGui::Text("Template Settings");
             if (ImGui::IsItemHovered()) {
                 char template_settings_tooltip_buffer[1024];
@@ -722,7 +731,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 char version_tooltip_buffer[1024];
                 if (coop_template_locked) {
                     snprintf(version_tooltip_buffer, sizeof(version_tooltip_buffer),
-                             "Controlled by Host");
+                             "%s", coop_template_locked_tooltip);
                 } else {
                     snprintf(version_tooltip_buffer, sizeof(version_tooltip_buffer),
                              "Select the functional version of the template.\n"
@@ -977,7 +986,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 char category_tooltip_buffer[1024];
                 if (coop_template_locked) {
                     snprintf(category_tooltip_buffer, sizeof(category_tooltip_buffer),
-                             "Controlled by Host");
+                             "%s", coop_template_locked_tooltip);
                 } else {
                     snprintf(category_tooltip_buffer, sizeof(category_tooltip_buffer),
                              "Choose between available categories for the selected version.\n"
@@ -1047,7 +1056,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 char flag_tooltip_buffer[1024];
                 if (coop_template_locked) {
                     snprintf(flag_tooltip_buffer, sizeof(flag_tooltip_buffer),
-                             "Controlled by Host");
+                             "%s", coop_template_locked_tooltip);
                 } else {
                     snprintf(flag_tooltip_buffer, sizeof(flag_tooltip_buffer),
                              "Choose between available optional flags for the selected version and category.\n"
@@ -2690,10 +2699,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                         ImGui::Spacing();
 
-                        // Start Lobby button (disabled when already hosting, invalid input, or unsaved changes)
+                        // Start Lobby button (disabled when already hosting, invalid input, unsaved changes, or template editor open)
                         {
+                            bool editor_open = p_temp_creator_open && *p_temp_creator_open;
                             bool can_start = ip_valid && port_valid && pub_ip_valid && !pub_ip_duplicate
-                                             && g_coop_ctx && !net_is_active && !has_unsaved_changes;
+                                             && g_coop_ctx && !net_is_active && !has_unsaved_changes && !editor_open;
                             if (!can_start) ImGui::BeginDisabled();
                             if (ImGui::Button("Start Lobby")) {
                                 int port = atoi(temp_settings.host_port);
@@ -2727,6 +2737,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     snprintf(tooltip_buf, sizeof(tooltip_buf), "The public IP is not a valid IP address.");
                                 } else if (pub_ip_duplicate) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf), "Public IP must be different from the bind IP.");
+                                } else if (editor_open) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf), "Close the Template Editor before starting a lobby.");
                                 }
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
@@ -2890,7 +2902,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "%s", status_buf);
                             } else {
                                 // Idle / Error / Disconnected — show paste button
-                                bool can_join = !has_unsaved_changes;
+                                bool join_editor_open = p_temp_creator_open && *p_temp_creator_open;
+                                bool can_join = !has_unsaved_changes && !join_editor_open;
                                 if (!can_join) ImGui::BeginDisabled();
                                 if (ImGui::Button("Paste Room Code")) {
                                     coop_room_code_error[0] = '\0';
@@ -2918,8 +2931,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     ImGui::EndDisabled();
                                     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                         char tooltip_buf[256];
-                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                                 "Apply settings before joining a lobby.");
+                                        if (join_editor_open) {
+                                            snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                                     "Close the Template Editor before joining a lobby.");
+                                        } else {
+                                            snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                                     "Apply settings before joining a lobby.");
+                                        }
                                         ImGui::SetTooltip("%s", tooltip_buf);
                                     }
                                 } else {
