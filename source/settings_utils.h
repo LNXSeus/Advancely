@@ -54,6 +54,12 @@ enum CoopCustomGoalMode {
     COOP_CUSTOM_ANY_PLAYER   // Any player can modify custom goals
 };
 
+// Account type: online (Mojang API lookup) vs offline (manual UUID entry)
+enum AccountType {
+    ACCOUNT_ONLINE,   // UUID fetched from Mojang API
+    ACCOUNT_OFFLINE   // UUID entered manually (offline/cracked accounts)
+};
+
 // Enum to identify the tracker sections
 enum TrackerSection {
     SECTION_COUNTERS, // Counter goals (completion counters) - above other sections by default
@@ -111,6 +117,9 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_PER_WORLD_NOTES true // When true the notes are per world, otherwise per template
 #define DEFAULT_CHECK_FOR_UPDATES true
 #define DEFAULT_SHOW_WELCOME_ON_STARTUP true
+
+// Account Defaults
+#define DEFAULT_ACCOUNT_TYPE ACCOUNT_ONLINE
 
 // Co-op Defaults
 #define DEFAULT_COOP_ENABLED false
@@ -336,9 +345,12 @@ struct AppSettings {
     bool check_for_updates; // If true, checks for new versions on startup
     bool show_welcome_on_startup; // If true, shows the welcome message on startup
 
+    // --- Account Settings ---
+    AccountType account_type; // Online (Mojang API) or Offline (manual UUID)
+    CoopPlayer local_player; // This user's own Minecraft identity
+
     // --- Co-op Settings ---
     bool coop_enabled; // Master toggle for co-op mode
-    CoopPlayer local_player; // This user's own Minecraft identity
     NetworkMode network_mode; // Runtime state: Singleplayer, Host, or Receiver (set programmatically)
     CoopStatMerge coop_stat_merge; // How to merge stat values: highest or cumulative
     CoopStatCheckbox coop_stat_checkbox; // Who can check off stats: host only or any player

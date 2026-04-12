@@ -491,6 +491,7 @@ static int SDLCALL host_thread_func(void *data) {
                     log_message(LOG_INFO, "[COOP NET] Kicked %s (%s): %s\n",
                                 ctx->clients[i].username, ctx->clients[i].label,
                                 ctx->clients[i].pending_action_reason);
+                    set_status(ctx, "Kicked %s", ctx->clients[i].username);
                     graceful_close_socket(&ctx->clients[i].socket_fd);
                     ctx->clients[i].active = false;
                     ctx->client_count--;
@@ -739,6 +740,10 @@ static int SDLCALL host_thread_func(void *data) {
                         } else {
                             log_message(LOG_INFO, "[COOP NET] Client %s disconnected gracefully.\n",
                                         ctx->clients[i].label);
+                            const char *dn = ctx->clients[i].display_name[0] != '\0'
+                                                 ? ctx->clients[i].display_name
+                                                 : ctx->clients[i].username;
+                            set_status(ctx, "%s disconnected", dn);
                         }
                         bool was_approved = ctx->clients[i].handshake_done;
                         bool was_pending = ctx->clients[i].pending_approval;
@@ -753,6 +758,12 @@ static int SDLCALL host_thread_func(void *data) {
                     free(payload);
                 } else if (disconnected) {
                     log_message(LOG_INFO, "[COOP NET] Client %s connection lost.\n", ctx->clients[i].label);
+                    {
+                        const char *dn = ctx->clients[i].display_name[0] != '\0'
+                                             ? ctx->clients[i].display_name
+                                             : ctx->clients[i].username;
+                        set_status(ctx, "%s: connection lost", dn);
+                    }
                     bool was_approved = ctx->clients[i].handshake_done;
                     bool was_pending = ctx->clients[i].pending_approval;
                     close_socket(&ctx->clients[i].socket_fd);

@@ -457,9 +457,12 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_show_igt = true;
     settings->overlay_show_update_timer = true;
 
+    // Account Defaults
+    settings->account_type = DEFAULT_ACCOUNT_TYPE;
+    memset(&settings->local_player, 0, sizeof(settings->local_player));
+
     // Co-op Defaults
     settings->coop_enabled = DEFAULT_COOP_ENABLED;
-    memset(&settings->local_player, 0, sizeof(settings->local_player));
     settings->network_mode = DEFAULT_NETWORK_MODE;
     settings->coop_stat_merge = DEFAULT_COOP_STAT_MERGE;
     settings->coop_stat_checkbox = DEFAULT_COOP_STAT_CHECKBOX;
@@ -1107,6 +1110,42 @@ bool settings_load(AppSettings *settings) {
         settings->adv_bg_done_path[sizeof(settings->adv_bg_done_path) - 1] = '\0';
     }
 
+    // Load Account Settings (new top-level section; falls back to coop.local_player for migration)
+    memset(&settings->local_player, 0, sizeof(settings->local_player));
+    settings->account_type = DEFAULT_ACCOUNT_TYPE;
+    cJSON *account_json = cJSON_GetObjectItem(json, "account");
+    if (account_json && cJSON_IsObject(account_json)) {
+        const cJSON *acc_type = cJSON_GetObjectItem(account_json, "type");
+        if (acc_type && cJSON_IsString(acc_type) && strcmp(acc_type->valuestring, "offline") == 0)
+            settings->account_type = ACCOUNT_OFFLINE;
+        const cJSON *acc_uname = cJSON_GetObjectItem(account_json, "username");
+        if (acc_uname && cJSON_IsString(acc_uname))
+            strncpy(settings->local_player.username, acc_uname->valuestring, sizeof(settings->local_player.username) - 1);
+        const cJSON *acc_uuid = cJSON_GetObjectItem(account_json, "uuid");
+        if (acc_uuid && cJSON_IsString(acc_uuid))
+            strncpy(settings->local_player.uuid, acc_uuid->valuestring, sizeof(settings->local_player.uuid) - 1);
+        const cJSON *acc_dname = cJSON_GetObjectItem(account_json, "display_name");
+        if (acc_dname && cJSON_IsString(acc_dname))
+            strncpy(settings->local_player.display_name, acc_dname->valuestring, sizeof(settings->local_player.display_name) - 1);
+    } else {
+        // Migration: read from old coop.local_player location
+        cJSON *coop_migration = cJSON_GetObjectItem(json, "coop");
+        if (coop_migration) {
+            const cJSON *local_player_json = cJSON_GetObjectItem(coop_migration, "local_player");
+            if (local_player_json && cJSON_IsObject(local_player_json)) {
+                const cJSON *lp_uname = cJSON_GetObjectItem(local_player_json, "username");
+                if (lp_uname && cJSON_IsString(lp_uname))
+                    strncpy(settings->local_player.username, lp_uname->valuestring, sizeof(settings->local_player.username) - 1);
+                const cJSON *lp_uuid = cJSON_GetObjectItem(local_player_json, "uuid");
+                if (lp_uuid && cJSON_IsString(lp_uuid))
+                    strncpy(settings->local_player.uuid, lp_uuid->valuestring, sizeof(settings->local_player.uuid) - 1);
+                const cJSON *lp_dname = cJSON_GetObjectItem(local_player_json, "display_name");
+                if (lp_dname && cJSON_IsString(lp_dname))
+                    strncpy(settings->local_player.display_name, lp_dname->valuestring, sizeof(settings->local_player.display_name) - 1);
+            }
+        }
+    }
+
     // Load Co-op Settings
     cJSON *coop_settings = cJSON_GetObjectItem(json, "coop");
     if (coop_settings) {
@@ -1117,21 +1156,6 @@ bool settings_load(AppSettings *settings) {
         else {
             settings->coop_enabled = DEFAULT_COOP_ENABLED;
             defaults_were_used = true;
-        }
-
-        // Local player identity
-        const cJSON *local_player_json = cJSON_GetObjectItem(coop_settings, "local_player");
-        memset(&settings->local_player, 0, sizeof(settings->local_player));
-        if (local_player_json && cJSON_IsObject(local_player_json)) {
-            const cJSON *lp_uname = cJSON_GetObjectItem(local_player_json, "username");
-            if (lp_uname && cJSON_IsString(lp_uname))
-                strncpy(settings->local_player.username, lp_uname->valuestring, sizeof(settings->local_player.username) - 1);
-            const cJSON *lp_uuid = cJSON_GetObjectItem(local_player_json, "uuid");
-            if (lp_uuid && cJSON_IsString(lp_uuid))
-                strncpy(settings->local_player.uuid, lp_uuid->valuestring, sizeof(settings->local_player.uuid) - 1);
-            const cJSON *lp_dname = cJSON_GetObjectItem(local_player_json, "display_name");
-            if (lp_dname && cJSON_IsString(lp_dname))
-                strncpy(settings->local_player.display_name, lp_dname->valuestring, sizeof(settings->local_player.display_name) - 1);
         }
 
         const cJSON *net_mode = cJSON_GetObjectItem(coop_settings, "network_mode");
@@ -1417,18 +1441,27 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(general_obj, "overlay_show_update_timer",
                               cJSON_CreateBool(settings->overlay_show_update_timer));
 
+        // --- Save Account Settings ---
+        cJSON *account_obj = get_or_create_object(root, "account");
+        cJSON_DeleteItemFromObject(account_obj, "type");
+        cJSON_AddItemToObject(account_obj, "type",
+                              cJSON_CreateString(settings->account_type == ACCOUNT_OFFLINE ? "offline" : "online"));
+        cJSON_DeleteItemFromObject(account_obj, "username");
+        cJSON_AddItemToObject(account_obj, "username", cJSON_CreateString(settings->local_player.username));
+        cJSON_DeleteItemFromObject(account_obj, "uuid");
+        cJSON_AddItemToObject(account_obj, "uuid", cJSON_CreateString(settings->local_player.uuid));
+        cJSON_DeleteItemFromObject(account_obj, "display_name");
+        cJSON_AddItemToObject(account_obj, "display_name", cJSON_CreateString(settings->local_player.display_name));
+
+        // Remove old coop.local_player if present (migrated to account section)
+        cJSON *coop_obj_migration = cJSON_GetObjectItem(root, "coop");
+        if (coop_obj_migration)
+            cJSON_DeleteItemFromObject(coop_obj_migration, "local_player");
+
         // --- Save Co-op Settings ---
         cJSON *coop_obj = get_or_create_object(root, "coop");
         cJSON_DeleteItemFromObject(coop_obj, "enabled");
         cJSON_AddItemToObject(coop_obj, "enabled", cJSON_CreateBool(settings->coop_enabled));
-
-        // Save local player identity
-        cJSON_DeleteItemFromObject(coop_obj, "local_player");
-        cJSON *lp_obj = cJSON_CreateObject();
-        cJSON_AddItemToObject(lp_obj, "username", cJSON_CreateString(settings->local_player.username));
-        cJSON_AddItemToObject(lp_obj, "uuid", cJSON_CreateString(settings->local_player.uuid));
-        cJSON_AddItemToObject(lp_obj, "display_name", cJSON_CreateString(settings->local_player.display_name));
-        cJSON_AddItemToObject(coop_obj, "local_player", lp_obj);
 
         cJSON_DeleteItemFromObject(coop_obj, "network_mode");
         cJSON_AddItemToObject(coop_obj, "network_mode",

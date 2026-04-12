@@ -1714,6 +1714,12 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        // First-run account setup: if no UUID is configured, prompt the user
+        if (g_force_open_reason == FORCE_OPEN_NONE && app_settings.local_player.uuid[0] == '\0') {
+            log_message(LOG_INFO, "[MAIN] No account configured. Prompting Account tab setup.\n");
+            g_force_open_reason = FORCE_OPEN_ACCOUNT_SETUP;
+        }
+
         dmon_init();
         dmon_initialized = true;
         SDL_SetAtomicInt(&g_needs_update, 1);
@@ -1935,6 +1941,58 @@ int main(int argc, char *argv[]) {
 
             // Tick co-op networking (lightweight per-frame check)
             coop_net_tick(&coop_ctx);
+
+            // --- Co-op Host: sync lobby player list to coop_players roster ---
+            // When players join, leave, or get kicked, the lobby list changes.
+            // We sync it into app_settings.coop_players[] so tracker_update_coop_merged()
+            // can find each player's data files by UUID.
+            if (app_settings.network_mode == NETWORK_HOST && g_coop_ctx &&
+                coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
+                coop_net_lobby_changed(g_coop_ctx)) {
+
+                CoopLobbyPlayer lobby[COOP_MAX_LOBBY];
+                int lobby_count = coop_net_get_lobby_players(g_coop_ctx, lobby, COOP_MAX_LOBBY);
+
+                // Rebuild coop_players roster from lobby list.
+                // Host is always index 0 (marked is_host in the lobby list).
+                app_settings.coop_player_count = 0;
+                int host_idx = -1;
+                for (int i = 0; i < lobby_count; i++) {
+                    if (lobby[i].is_host) { host_idx = i; break; }
+                }
+
+                // Slot 0: host
+                if (host_idx >= 0) {
+                    CoopPlayer *p = &app_settings.coop_players[0];
+                    strncpy(p->username, lobby[host_idx].username, sizeof(p->username) - 1);
+                    p->username[sizeof(p->username) - 1] = '\0';
+                    strncpy(p->uuid, lobby[host_idx].uuid, sizeof(p->uuid) - 1);
+                    p->uuid[sizeof(p->uuid) - 1] = '\0';
+                    strncpy(p->display_name, lobby[host_idx].display_name, sizeof(p->display_name) - 1);
+                    p->display_name[sizeof(p->display_name) - 1] = '\0';
+                    app_settings.coop_player_count = 1;
+                }
+
+                // Remaining slots: other players (in lobby order, skipping host)
+                for (int i = 0; i < lobby_count && app_settings.coop_player_count < MAX_COOP_PLAYERS; i++) {
+                    if (i == host_idx) continue;
+                    CoopPlayer *p = &app_settings.coop_players[app_settings.coop_player_count];
+                    strncpy(p->username, lobby[i].username, sizeof(p->username) - 1);
+                    p->username[sizeof(p->username) - 1] = '\0';
+                    strncpy(p->uuid, lobby[i].uuid, sizeof(p->uuid) - 1);
+                    p->uuid[sizeof(p->uuid) - 1] = '\0';
+                    strncpy(p->display_name, lobby[i].display_name, sizeof(p->display_name) - 1);
+                    p->display_name[sizeof(p->display_name) - 1] = '\0';
+                    app_settings.coop_player_count++;
+                }
+
+                log_message(LOG_INFO, "[COOP] Synced lobby to roster: %d player(s).\n",
+                            app_settings.coop_player_count);
+
+                // Force a data re-read so the host picks up the new player's files
+                SDL_SetAtomicInt(&g_needs_update, 1);
+                SDL_SetAtomicInt(&g_game_data_changed, 1);
+            }
 
             // Close immediately if app not running
             if (!is_running) break;
@@ -2292,13 +2350,16 @@ int main(int argc, char *argv[]) {
                 log_message(LOG_INFO, "[DEBUG - MAIN] g_needs_update was 1. Triggering full tracker update.\n");
                 // ----------------
 
-                // Receiver mode: skip file reading (data comes from host via network)
-                if (app_settings.network_mode != NETWORK_RECEIVER) {
+                // Receiver mode: skip file reading when connected (data comes from host)
+                bool receiver_connected = (app_settings.network_mode == NETWORK_RECEIVER &&
+                    g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+                if (!receiver_connected) {
                     MC_Version version = settings_get_version_from_string(app_settings.version_str);
+
+                    // Step 1: Find the latest world (and fallback file paths)
                     find_player_data_files(
                         tracker->saves_path,
                         version,
-                        // This toggles if StatsPerWorld mod is enabled (local stats for legacy)
                         app_settings.using_stats_per_world_legacy,
                         &app_settings,
                         tracker->world_name,
@@ -2307,6 +2368,40 @@ int main(int argc, char *argv[]) {
                         tracker->unlocks_path,
                         MAX_PATH_LENGTH
                     );
+
+                    // Step 2: If the local player's UUID is known, override file paths
+                    // with exact UUID-based matches. This eliminates reading wrong files
+                    // when multiple players' data exists in the same world folder.
+                    if (app_settings.local_player.uuid[0] != '\0' &&
+                        tracker->world_name[0] != '\0' &&
+                        strcmp(tracker->world_name, "No Worlds Found") != 0) {
+                        char uuid_adv[MAX_PATH_LENGTH] = {};
+                        char uuid_stats[MAX_PATH_LENGTH] = {};
+                        char uuid_unlocks[MAX_PATH_LENGTH] = {};
+                        find_player_data_files_for_uuid(
+                            tracker->saves_path, version,
+                            app_settings.using_stats_per_world_legacy,
+                            tracker->world_name,
+                            app_settings.local_player.uuid,
+                            app_settings.local_player.username,
+                            uuid_adv, uuid_stats, uuid_unlocks, MAX_PATH_LENGTH
+                        );
+                        // Override only if the UUID-based file was found; keep the
+                        // generic fallback otherwise (e.g. single-player world with
+                        // only one file that we just haven't linked an account for yet).
+                        if (uuid_stats[0] != '\0') {
+                            strncpy(tracker->stats_path, uuid_stats, MAX_PATH_LENGTH - 1);
+                            tracker->stats_path[MAX_PATH_LENGTH - 1] = '\0';
+                        }
+                        if (uuid_adv[0] != '\0') {
+                            strncpy(tracker->advancements_path, uuid_adv, MAX_PATH_LENGTH - 1);
+                            tracker->advancements_path[MAX_PATH_LENGTH - 1] = '\0';
+                        }
+                        if (uuid_unlocks[0] != '\0') {
+                            strncpy(tracker->unlocks_path, uuid_unlocks, MAX_PATH_LENGTH - 1);
+                            tracker->unlocks_path[MAX_PATH_LENGTH - 1] = '\0';
+                        }
+                    }
 
                     // Co-op Host: merge all players' data and broadcast
                     if (app_settings.network_mode == NETWORK_HOST &&

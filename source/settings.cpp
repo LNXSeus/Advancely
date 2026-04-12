@@ -143,11 +143,14 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
                sizeof(a->tracker_section_custom_item_width)) != 0 ||
         memcmp(a->section_order, b->section_order, sizeof(a->section_order)) != 0 ||
 
-        // Co-op settings
-        a->coop_enabled != b->coop_enabled ||
+        // Account settings
+        a->account_type != b->account_type ||
         strcmp(a->local_player.username, b->local_player.username) != 0 ||
         strcmp(a->local_player.uuid, b->local_player.uuid) != 0 ||
         strcmp(a->local_player.display_name, b->local_player.display_name) != 0 ||
+
+        // Co-op settings
+        a->coop_enabled != b->coop_enabled ||
         a->network_mode != b->network_mode ||
         a->coop_stat_merge != b->coop_stat_merge ||
         a->coop_stat_checkbox != b->coop_stat_checkbox ||
@@ -433,26 +436,35 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         } else if (*force_open_reason == FORCE_OPEN_MANUAL_FAIL) {
             ImGui::TextWrapped("IMPORTANT: The manually configured saves path is invalid or does not exist.");
             ImGui::TextWrapped("Please check the path you have entered and click 'Apply Settings'.");
+        } else if (*force_open_reason == FORCE_OPEN_ACCOUNT_SETUP) {
+            ImGui::TextWrapped("Welcome! Configure your Minecraft account in the Account tab.");
+            ImGui::TextWrapped(
+                "This lets Advancely read the correct player files by UUID. "
+                "Click 'Apply Settings' when done.");
         }
         ImGui::PopStyleColor();
         ImGui::Separator();
         ImGui::Spacing();
     }
 
-    // --- No saves path warning ---
+    // --- No saves path warning (suppressed for connected receivers — they get data from host) ---
     {
-        bool has_valid_saves = t && t->saves_path[0] != '\0' && path_exists(t->saves_path);
-        if (has_valid_saves) {
-            size_t sp_len = strlen(t->saves_path);
-            if (sp_len > 0 && t->saves_path[sp_len - 1] == '/') sp_len--;
-            has_valid_saves = (sp_len >= 6 && strncmp(t->saves_path + sp_len - 6, "/saves", 6) == 0);
-        }
-        if (!has_valid_saves) {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.6f, 0.2f, 1.0f));
-            ImGui::TextWrapped("Warning: No valid Minecraft saves folder is currently being tracked.");
-            ImGui::PopStyleColor();
-            ImGui::Separator();
-            ImGui::Spacing();
+        bool is_receiver_connected = (temp_settings.network_mode == NETWORK_RECEIVER &&
+            g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+        if (!is_receiver_connected) {
+            bool has_valid_saves = t && t->saves_path[0] != '\0' && path_exists(t->saves_path);
+            if (has_valid_saves) {
+                size_t sp_len = strlen(t->saves_path);
+                if (sp_len > 0 && t->saves_path[sp_len - 1] == '/') sp_len--;
+                has_valid_saves = (sp_len >= 6 && strncmp(t->saves_path + sp_len - 6, "/saves", 6) == 0);
+            }
+            if (!has_valid_saves) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.6f, 0.2f, 1.0f));
+                ImGui::TextWrapped("Warning: No valid Minecraft saves folder is currently being tracked.");
+                ImGui::PopStyleColor();
+                ImGui::Separator();
+                ImGui::Spacing();
+            }
         }
     }
 
@@ -485,6 +497,167 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // SETTINGS TABS START
     if (ImGui::BeginTabBar("SettingsTabs", ImGuiTabBarFlags_None)) {
+
+        // ================================================================
+        // Account Tab (first tab — identity must be set up before anything else)
+        // ================================================================
+        if (ImGui::BeginTabItem("Account")) {
+            CoopNetState acc_net_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
+            bool acc_net_active = (acc_net_state == COOP_NET_LISTENING || acc_net_state == COOP_NET_CONNECTED
+                                   || acc_net_state == COOP_NET_CONNECTING);
+
+            ImGui::Text("Minecraft Account");
+            ImGui::TextDisabled("Link your Minecraft account so Advancely reads the correct player files.\n"
+                                "This is required for Co-op and recommended for singleplayer when\n"
+                                "multiple players share the same world.");
+            ImGui::Spacing();
+
+            // Account type radio (Online / Offline)
+            if (acc_net_active) ImGui::BeginDisabled();
+            int acc_type = temp_settings.account_type;
+            ImGui::RadioButton("Online##acc_type", &acc_type, ACCOUNT_ONLINE);
+            if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
+                char tooltip_buf[256];
+                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                         "Java Edition account. UUID is fetched automatically\n"
+                         "from the Mojang API based on your username.");
+                ImGui::SetTooltip("%s", tooltip_buf);
+            }
+            ImGui::SameLine();
+            ImGui::RadioButton("Offline##acc_type", &acc_type, ACCOUNT_OFFLINE);
+            if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
+                char tooltip_buf[256];
+                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                         "Offline/cracked account. You must enter your UUID manually.\n"
+                         "Find it in your world's playerdata or stats folder.");
+                ImGui::SetTooltip("%s", tooltip_buf);
+            }
+            temp_settings.account_type = (AccountType) acc_type;
+            if (acc_net_active) ImGui::EndDisabled();
+
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            if (acc_net_active) ImGui::BeginDisabled();
+
+            // Username input
+            ImGui::SetNextItemWidth(200.0f);
+            ImGui::InputText("Username##account", temp_settings.local_player.username,
+                             sizeof(temp_settings.local_player.username));
+            if (acc_net_active) {
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                    char tooltip_buf[256];
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Cannot modify account while a lobby is active.");
+                    ImGui::SetTooltip("%s", tooltip_buf);
+                }
+            } else {
+                if (ImGui::IsItemHovered()) {
+                    char tooltip_buf[256];
+                    snprintf(tooltip_buf, sizeof(tooltip_buf), "Your Minecraft username.");
+                    ImGui::SetTooltip("%s", tooltip_buf);
+                }
+            }
+
+            if (temp_settings.account_type == ACCOUNT_ONLINE) {
+                // Online mode: Link Account button fetches UUID from Mojang API
+                ImGui::SameLine();
+                bool can_link = !acc_net_active && temp_settings.local_player.username[0] != '\0';
+                if (!can_link) ImGui::BeginDisabled();
+                if (ImGui::Button("Link Account##account")) {
+                    char fetched_uuid[48] = "";
+                    bool fetched = mojang_fetch_uuid(temp_settings.local_player.username,
+                                                     fetched_uuid, sizeof(fetched_uuid));
+                    if (fetched) {
+                        strncpy(temp_settings.local_player.uuid, fetched_uuid,
+                                sizeof(temp_settings.local_player.uuid) - 1);
+                        snprintf(coop_identity_status_msg, sizeof(coop_identity_status_msg),
+                                 "Linked: %s", fetched_uuid);
+                        coop_identity_status_is_error = false;
+                    } else {
+                        temp_settings.local_player.uuid[0] = '\0';
+                        snprintf(coop_identity_status_msg, sizeof(coop_identity_status_msg),
+                                 "Could not find player '%s'. Check the username.",
+                                 temp_settings.local_player.username);
+                        coop_identity_status_is_error = true;
+                    }
+                }
+                if (!can_link) ImGui::EndDisabled();
+
+                // Show link status
+                if (temp_settings.local_player.uuid[0] != '\0') {
+                    ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "Linked: %s",
+                                       temp_settings.local_player.uuid);
+                    ImGui::SameLine();
+                    if (!acc_net_active && ImGui::SmallButton("Unlink##account")) {
+                        temp_settings.local_player.uuid[0] = '\0';
+                        coop_identity_status_msg[0] = '\0';
+                        coop_identity_status_is_error = false;
+                        if (acc_net_active && g_coop_ctx) {
+                            coop_net_stop(g_coop_ctx);
+                        }
+                    }
+                } else if (coop_identity_status_msg[0] != '\0') {
+                    if (coop_identity_status_is_error)
+                        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", coop_identity_status_msg);
+                    else
+                        ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "%s", coop_identity_status_msg);
+                } else {
+                    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "Not linked yet");
+                }
+            } else {
+                // Offline mode: manual UUID input
+                ImGui::SetNextItemWidth(320.0f);
+                ImGui::InputTextWithHint("UUID##account_offline", "e.g. 069a79f4-44e9-4726-a5be-fca90e38aaf5",
+                                         temp_settings.local_player.uuid,
+                                         sizeof(temp_settings.local_player.uuid));
+                if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
+                    char tooltip_buf[256];
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Your offline UUID. Look in your world's stats or playerdata folder\n"
+                             "for a JSON file named with your UUID (e.g. 069a79f4-...-fca90e38aaf5.json).");
+                    ImGui::SetTooltip("%s", tooltip_buf);
+                }
+                if (temp_settings.local_player.uuid[0] != '\0') {
+                    ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "UUID set");
+                } else {
+                    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "UUID not set");
+                }
+            }
+
+            // Display Name (optional, shared between online/offline)
+            ImGui::SetNextItemWidth(200.0f);
+            ImGui::InputTextWithHint("Display Name##account", "Optional",
+                                     temp_settings.local_player.display_name,
+                                     sizeof(temp_settings.local_player.display_name));
+            if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
+                char tooltip_buf[256];
+                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                         "Optional display name shown in the Co-op lobby.\n"
+                         "Leave empty to use your username.");
+                ImGui::SetTooltip("%s", tooltip_buf);
+            }
+
+            if (acc_net_active) ImGui::EndDisabled();
+
+            // Status summary
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+            bool identity_ready = temp_settings.local_player.uuid[0] != '\0';
+            if (identity_ready) {
+                ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "Account configured.");
+                ImGui::TextDisabled("Advancely will use your UUID to read the correct player files.");
+            } else {
+                ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "Account not configured.");
+                ImGui::TextDisabled("Without an account, Advancely picks the first file it finds.\n"
+                                    "This can read the wrong player's data in shared worlds.");
+            }
+
+            ImGui::EndTabItem();
+        }
+
         if (ImGui::BeginTabItem("Paths & Templates")) {
             // Path Settings
             ImGui::Text("Path Settings");
@@ -2376,99 +2549,22 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             }
 
             if (temp_settings.coop_enabled) {
-                ImGui::Spacing();
+                bool identity_complete = temp_settings.local_player.uuid[0] != '\0';
 
-                // ============================================================
-                // Step 2: Your Identity
-                // ============================================================
+                // Show identity status from Account tab
+                ImGui::Spacing();
                 ImGui::Separator();
                 ImGui::Spacing();
-                ImGui::Text("Your Identity");
-                if (net_is_active) {
-                    ImGui::TextDisabled("Cannot modify identity while a lobby is active.");
+                if (identity_complete) {
+                    char id_label[128];
+                    snprintf(id_label, sizeof(id_label), "Account: %s",
+                             temp_settings.local_player.username[0] != '\0'
+                                 ? temp_settings.local_player.username : temp_settings.local_player.uuid);
+                    ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "%s", id_label);
                 } else {
-                    ImGui::TextDisabled("Link your Minecraft account before hosting or joining.\n"
-                                        "Apply settings to remember your identity between sessions.");
+                    ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
+                                       "Account not configured. Go to the Account tab first.");
                 }
-                ImGui::Spacing();
-
-                if (net_is_active) ImGui::BeginDisabled();
-                ImGui::SetNextItemWidth(200.0f);
-                ImGui::InputText("Username##local", temp_settings.local_player.username,
-                                 sizeof(temp_settings.local_player.username));
-                if (net_is_active) {
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                        char tooltip_buf[256];
-                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                 "Cannot modify identity while a lobby is active.");
-                        ImGui::SetTooltip("%s", tooltip_buf);
-                    }
-                } else {
-                    if (ImGui::IsItemHovered()) {
-                        char tooltip_buf[256];
-                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                 "Your Minecraft username.\n"
-                                 "Click 'Link Account' to fetch your UUID from the Mojang API.");
-                        ImGui::SetTooltip("%s", tooltip_buf);
-                    }
-                }
-
-                ImGui::SameLine();
-                bool can_link = !net_is_active && temp_settings.local_player.username[0] != '\0';
-                if (!can_link) ImGui::BeginDisabled();
-                if (ImGui::Button("Link Account")) {
-                    char fetched_uuid[48] = "";
-                    bool fetched = mojang_fetch_uuid(temp_settings.local_player.username,
-                                                     fetched_uuid, sizeof(fetched_uuid));
-                    if (fetched) {
-                        strncpy(temp_settings.local_player.uuid, fetched_uuid,
-                                sizeof(temp_settings.local_player.uuid) - 1);
-                        snprintf(coop_identity_status_msg, sizeof(coop_identity_status_msg),
-                                 "Linked: %s", fetched_uuid);
-                        coop_identity_status_is_error = false;
-                    } else {
-                        temp_settings.local_player.uuid[0] = '\0';
-                        snprintf(coop_identity_status_msg, sizeof(coop_identity_status_msg),
-                                 "Could not find player '%s'. Check the username.",
-                                 temp_settings.local_player.username);
-                        coop_identity_status_is_error = true;
-                    }
-                }
-                if (!can_link) ImGui::EndDisabled();
-
-                // Show link status
-                if (temp_settings.local_player.uuid[0] != '\0') {
-                    ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "Linked: %s",
-                                       temp_settings.local_player.uuid);
-                    ImGui::SameLine();
-                    if (ImGui::SmallButton("Unlink")) {
-                        temp_settings.local_player.uuid[0] = '\0';
-                        coop_identity_status_msg[0] = '\0';
-                        coop_identity_status_is_error = false;
-                        // Stop networking if active since identity is now incomplete
-                        if (net_is_active && g_coop_ctx) {
-                            coop_net_stop(g_coop_ctx);
-                            net_state = COOP_NET_IDLE;
-                            net_is_active = false;
-                            coop_room_code_buf[0] = '\0';
-                        }
-                    }
-                } else if (coop_identity_status_msg[0] != '\0') {
-                    if (coop_identity_status_is_error)
-                        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", coop_identity_status_msg);
-                    else
-                        ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "%s", coop_identity_status_msg);
-                } else {
-                    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "Not linked yet");
-                }
-
-                ImGui::SetNextItemWidth(200.0f);
-                ImGui::InputTextWithHint("Display Name##local", "Optional",
-                                         temp_settings.local_player.display_name,
-                                         sizeof(temp_settings.local_player.display_name));
-                if (net_is_active) ImGui::EndDisabled();
-
-                bool identity_complete = temp_settings.local_player.uuid[0] != '\0';
 
                 if (identity_complete) {
                     ImGui::Spacing();
@@ -2697,6 +2793,136 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         coop_host_input_error = (ip_filled && !ip_valid) || (port_filled && !port_valid)
                                                 || (pub_ip_filled && !pub_ip_valid) || pub_ip_duplicate;
 
+                        // --- Goal Merging Rules (above Start Lobby so host configures before starting) ---
+                        ImGui::Spacing();
+                        ImGui::Separator();
+                        ImGui::Spacing();
+                        ImGui::Text("Goal Merging Rules");
+                        ImGui::TextDisabled("Controls how progress is combined across players.");
+                        ImGui::Spacing();
+
+                        // --- Automatic rules (read-only info) ---
+                        {
+                            char tooltip_buf[256];
+
+                            ImGui::BulletText("%s: Completed if any player completes it, tracking the player with the most criteria.", advancements_label_plural_uppercase);
+                            ImGui::BulletText("Multi-Stage Goals: Any player progress counts globally.");
+                            if (ImGui::IsItemHovered()) {
+                                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                         "Each stage can be advanced by any player. The furthest stage across all players is used.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+                            if (selected_version == MC_VERSION_25W14CRAFTMINE) {
+                                ImGui::BulletText("Unlocks: Tracked per-player.");
+                                if (ImGui::IsItemHovered()) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "An unlock is completed if any player has obtained it.");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
+                            }
+                            ImGui::BulletText("Counters: Derived automatically from linked goals.");
+                        }
+
+                        ImGui::Spacing();
+
+                        // --- Configurable merge settings ---
+                        {
+                            char tooltip_buf[256];
+                            bool merge_locked = net_is_active;
+                            if (merge_locked) ImGui::BeginDisabled();
+
+                            // Stats / Sub-Stats merge mode
+                            ImGui::Text("Stats / Sub-Stats:");
+                            ImGui::SameLine();
+                            int stat_merge = temp_settings.coop_stat_merge;
+                            ImGui::PushID("coop_stat_merge");
+                            ImGui::RadioButton("Highest Value", &stat_merge, COOP_STAT_HIGHEST);
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                if (merge_locked)
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Goal merging rules are locked while a lobby is active");
+                                else
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Use whichever player has the highest value for each stat.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+                            ImGui::SameLine();
+                            ImGui::RadioButton("Cumulative (Sum)", &stat_merge, COOP_STAT_CUMULATIVE);
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                if (merge_locked)
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Goal merging rules are locked while a lobby is active");
+                                else
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Sum stat values across all players.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+                            temp_settings.coop_stat_merge = (CoopStatMerge) stat_merge;
+                            ImGui::PopID();
+
+                            // Stat Checkboxes
+                            ImGui::Text("Stat Checkboxes:");
+                            ImGui::SameLine();
+                            int stat_cb = temp_settings.coop_stat_checkbox;
+                            ImGui::PushID("coop_stat_cb");
+                            ImGui::RadioButton("Host Only", &stat_cb, COOP_STAT_CHECKBOX_HOST_ONLY);
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                if (merge_locked)
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Goal merging rules are locked while a lobby is active");
+                                else
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Only the host can manually check off stats.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+                            ImGui::SameLine();
+                            ImGui::RadioButton("Any Player", &stat_cb, COOP_STAT_CHECKBOX_ANY_PLAYER);
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                if (merge_locked)
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Goal merging rules are locked while a lobby is active");
+                                else
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Any player can manually check off stats.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+                            temp_settings.coop_stat_checkbox = (CoopStatCheckbox) stat_cb;
+                            ImGui::PopID();
+
+                            // Custom Goals
+                            ImGui::Text("Custom Goals:");
+                            ImGui::SameLine();
+                            int custom_mode = temp_settings.coop_custom_goal_mode;
+                            ImGui::PushID("coop_custom");
+                            ImGui::RadioButton("Host Only", &custom_mode, COOP_CUSTOM_HOST_ONLY);
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                if (merge_locked)
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Goal merging rules are locked while a lobby is active");
+                                else
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Only the host can modify custom goals and checkboxes.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+                            ImGui::SameLine();
+                            ImGui::RadioButton("Any Player", &custom_mode, COOP_CUSTOM_ANY_PLAYER);
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                if (merge_locked)
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Goal merging rules are locked while a lobby is active");
+                                else
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Any player can modify custom goals and checkboxes.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+                            temp_settings.coop_custom_goal_mode = (CoopCustomGoalMode) custom_mode;
+                            ImGui::PopID();
+
+                            if (merge_locked) ImGui::EndDisabled();
+                        }
+
+                        ImGui::Spacing();
+                        ImGui::Separator();
                         ImGui::Spacing();
 
                         // Start Lobby button (disabled when already hosting, invalid input, unsaved changes, or template editor open)
@@ -2770,143 +2996,6 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::TextColored(sc, "%s", status_buf);
                         }
 
-                        // --- Goal Merging Rules ---
-                        if (net_state == COOP_NET_LISTENING) {
-                            ImGui::Spacing();
-                            ImGui::Separator();
-                            ImGui::Spacing();
-                            ImGui::Text("Goal Merging Rules");
-                            ImGui::TextDisabled("Controls how progress is combined across players. All settings can be changed mid-run.");
-                            ImGui::Spacing();
-
-                            // --- Automatic rules (read-only info) ---
-                            {
-                                char tooltip_buf[256];
-
-                                ImGui::BulletText("%s: Completed if any player completes it.", advancements_label_plural_uppercase);
-                                if (ImGui::IsItemHovered()) {
-                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Simple %s are done when any player completes them.\n"
-                                             "Complex ones (with criteria) track the player with the most criteria.",
-                                             advancements_label_plural_uppercase);
-                                    ImGui::SetTooltip("%s", tooltip_buf);
-                                }
-                                ImGui::BulletText("Multi-Stage Goals: Any player progress counts globally.");
-                                if (ImGui::IsItemHovered()) {
-                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Each stage can be advanced by any player. The furthest stage across all players is used.");
-                                    ImGui::SetTooltip("%s", tooltip_buf);
-                                }
-                                if (selected_version == MC_VERSION_25W14CRAFTMINE) {
-                                    ImGui::BulletText("Unlocks: Tracked per-player.");
-                                    if (ImGui::IsItemHovered()) {
-                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                                 "An unlock is completed if any player has obtained it.");
-                                        ImGui::SetTooltip("%s", tooltip_buf);
-                                    }
-                                }
-                                ImGui::BulletText("Counters: Derived automatically from linked goals.");
-                            }
-
-                            ImGui::Spacing();
-
-                            // --- Configurable merge settings ---
-                            // Locked once the lobby is active so all players stay in sync
-                            {
-                                char tooltip_buf[256];
-                                bool merge_locked = net_is_active;
-                                if (merge_locked) ImGui::BeginDisabled();
-
-                                // Stats / Sub-Stats merge mode
-                                ImGui::Text("Stats / Sub-Stats:");
-                                ImGui::SameLine();
-                                int stat_merge = temp_settings.coop_stat_merge;
-                                ImGui::PushID("coop_stat_merge");
-                                ImGui::RadioButton("Highest Value", &stat_merge, COOP_STAT_HIGHEST);
-                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                                    if (merge_locked)
-                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                                 "Goal merging rules are locked while a lobby is active");
-                                    else
-                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                                 "Use whichever player has the highest value for each stat.");
-                                    ImGui::SetTooltip("%s", tooltip_buf);
-                                }
-                                ImGui::SameLine();
-                                ImGui::RadioButton("Cumulative (Sum)", &stat_merge, COOP_STAT_CUMULATIVE);
-                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                                    if (merge_locked)
-                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                                 "Goal merging rules are locked while a lobby is active");
-                                    else
-                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                                 "Sum stat values across all players.");
-                                    ImGui::SetTooltip("%s", tooltip_buf);
-                                }
-                                temp_settings.coop_stat_merge = (CoopStatMerge) stat_merge;
-                                ImGui::PopID();
-
-                                // Stat Checkboxes
-                                ImGui::Text("Stat Checkboxes:");
-                                ImGui::SameLine();
-                                int stat_cb = temp_settings.coop_stat_checkbox;
-                                ImGui::PushID("coop_stat_cb");
-                                ImGui::RadioButton("Host Only", &stat_cb, COOP_STAT_CHECKBOX_HOST_ONLY);
-                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                                    if (merge_locked)
-                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                                 "Goal merging rules are locked while a lobby is active");
-                                    else
-                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                                 "Only the host can manually check off stats.");
-                                    ImGui::SetTooltip("%s", tooltip_buf);
-                                }
-                                ImGui::SameLine();
-                                ImGui::RadioButton("Any Player", &stat_cb, COOP_STAT_CHECKBOX_ANY_PLAYER);
-                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                                    if (merge_locked)
-                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                                 "Goal merging rules are locked while a lobby is active");
-                                    else
-                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                                 "Any player can manually check off stats.");
-                                    ImGui::SetTooltip("%s", tooltip_buf);
-                                }
-                                temp_settings.coop_stat_checkbox = (CoopStatCheckbox) stat_cb;
-                                ImGui::PopID();
-
-                                // Custom Goals
-                                ImGui::Text("Custom Goals:");
-                                ImGui::SameLine();
-                                int custom_mode = temp_settings.coop_custom_goal_mode;
-                                ImGui::PushID("coop_custom");
-                                ImGui::RadioButton("Host Only", &custom_mode, COOP_CUSTOM_HOST_ONLY);
-                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                                    if (merge_locked)
-                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                                 "Goal merging rules are locked while a lobby is active");
-                                    else
-                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                                 "Only the host can modify custom goals and checkboxes.");
-                                    ImGui::SetTooltip("%s", tooltip_buf);
-                                }
-                                ImGui::SameLine();
-                                ImGui::RadioButton("Any Player", &custom_mode, COOP_CUSTOM_ANY_PLAYER);
-                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                                    if (merge_locked)
-                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                                 "Goal merging rules are locked while a lobby is active");
-                                    else
-                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                                 "Any player can modify custom goals and checkboxes.");
-                                    ImGui::SetTooltip("%s", tooltip_buf);
-                                }
-                                temp_settings.coop_custom_goal_mode = (CoopCustomGoalMode) custom_mode;
-                                ImGui::PopID();
-
-                                if (merge_locked) ImGui::EndDisabled();
-                            }
-                        }
                     }
 
                     // ============================================================
@@ -2995,68 +3084,6 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             }
                         }
 
-                        // Goal merging rules (read-only for receiver, shown when connected)
-                        if (net_state == COOP_NET_CONNECTED) {
-                            ImGui::Spacing();
-                            ImGui::Separator();
-                            ImGui::Spacing();
-                            ImGui::Text("Goal Merging Rules");
-                            ImGui::TextDisabled("Only the host can change these settings.");
-                            ImGui::Spacing();
-
-                            // --- Automatic rules (read-only info, same as host) ---
-                            {
-                                char tooltip_buf[256];
-
-                                ImGui::BulletText("%s: Completed if any player completes it.", advancements_label_plural_uppercase);
-                                if (ImGui::IsItemHovered()) {
-                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Simple %s are done when any player completes them.\n"
-                                             "Complex ones (with criteria) track the player with the most criteria.",
-                                             advancements_label_plural_uppercase);
-                                    ImGui::SetTooltip("%s", tooltip_buf);
-                                }
-                                ImGui::BulletText("Multi-Stage Goals: Any player progress counts globally.");
-                                if (selected_version == MC_VERSION_25W14CRAFTMINE) {
-                                    ImGui::BulletText("Unlocks: Tracked per-player.");
-                                }
-                                ImGui::BulletText("Counters: Derived automatically from linked goals.");
-                            }
-
-                            ImGui::Spacing();
-
-                            // --- Configurable settings (disabled for receiver) ---
-                            ImGui::BeginDisabled();
-                            {
-                                int stat_merge = temp_settings.coop_stat_merge;
-                                ImGui::Text("Stats / Sub-Stats:");
-                                ImGui::SameLine();
-                                ImGui::PushID("coop_stat_merge_recv");
-                                ImGui::RadioButton("Highest Value", &stat_merge, COOP_STAT_HIGHEST);
-                                ImGui::SameLine();
-                                ImGui::RadioButton("Cumulative (Sum)", &stat_merge, COOP_STAT_CUMULATIVE);
-                                ImGui::PopID();
-
-                                int stat_cb = temp_settings.coop_stat_checkbox;
-                                ImGui::Text("Stat Checkboxes:");
-                                ImGui::SameLine();
-                                ImGui::PushID("coop_stat_cb_recv");
-                                ImGui::RadioButton("Host Only", &stat_cb, COOP_STAT_CHECKBOX_HOST_ONLY);
-                                ImGui::SameLine();
-                                ImGui::RadioButton("Any Player", &stat_cb, COOP_STAT_CHECKBOX_ANY_PLAYER);
-                                ImGui::PopID();
-
-                                int custom_mode = temp_settings.coop_custom_goal_mode;
-                                ImGui::Text("Custom Goals:");
-                                ImGui::SameLine();
-                                ImGui::PushID("coop_custom_recv");
-                                ImGui::RadioButton("Host Only", &custom_mode, COOP_CUSTOM_HOST_ONLY);
-                                ImGui::SameLine();
-                                ImGui::RadioButton("Any Player", &custom_mode, COOP_CUSTOM_ANY_PLAYER);
-                                ImGui::PopID();
-                            }
-                            ImGui::EndDisabled();
-                        }
                     }
 
                     // --- Waiting Room (host only, shown right above lobby) ---
@@ -3100,11 +3127,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                         // Status line with disconnect button
                         {
-                            char status_buf[256];
-                            coop_net_get_status_msg(g_coop_ctx, status_buf, sizeof(status_buf));
                             ImVec4 sc = (net_state == COOP_NET_LISTENING) ? ImVec4(0.4f, 0.8f, 1.0f, 1.0f) :
                                         ImVec4(0.4f, 1.0f, 0.4f, 1.0f);
-                            ImGui::TextColored(sc, "Lobby - %s", status_buf);
+                            if (net_state == COOP_NET_CONNECTED) {
+                                ImGui::TextColored(sc, "Connected");
+                            } else {
+                                ImGui::TextColored(sc, "Lobby Active");
+                            }
                             ImGui::SameLine();
                             if (ImGui::SmallButton("Disconnect##lobby")) {
                                 coop_net_stop(g_coop_ctx);

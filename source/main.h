@@ -39,7 +39,8 @@ extern "C" {
 typedef enum {
     FORCE_OPEN_NONE,
     FORCE_OPEN_AUTO_FAIL,
-    FORCE_OPEN_MANUAL_FAIL
+    FORCE_OPEN_MANUAL_FAIL,
+    FORCE_OPEN_ACCOUNT_SETUP   // First-run: prompt user to configure their Minecraft account
 } ForceOpenReason;
 
 // Global error message function, accessible for other files
