@@ -183,6 +183,9 @@ typedef struct {
     SDL_Mutex *template_sync_mutex;
     char template_sync_payload[1024]; // JSON string with version, category, optional_flag, merge settings
     bool template_sync_ready;         // Receiver: true when new sync data available for main thread
+
+    // -- Disconnect reason (receiver sets before stopping, sent in the thread's cleanup path) --
+    char disconnect_reason[128];      // Non-empty = include as payload in DISCONNECT message
 } CoopNetContext;
 
 // ---- Public API ----
@@ -264,6 +267,10 @@ bool coop_net_get_template_sync(CoopNetContext *ctx, char *out, size_t out_size)
 
 // Host: broadcast current template sync payload to all connected (approved) clients.
 void coop_net_broadcast_template_sync(CoopNetContext *ctx);
+
+// Receiver: send a DISCONNECT message with an optional reason string, then stop.
+// The host will display the reason in its status area.
+void coop_net_disconnect_with_reason(CoopNetContext *ctx, const char *reason);
 
 // ---- Room Code (Base64-encoded IP:PORT) ----
 

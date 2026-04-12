@@ -508,7 +508,6 @@ static int SDLCALL host_thread_func(void *data) {
                 }
             }
             if (lobby_dirty) {
-                set_status(ctx, "%d player(s) in lobby", ctx->client_count + 1);
                 rebuild_lobby_list(ctx);
                 broadcast_player_list(ctx);
             }
@@ -726,8 +725,21 @@ static int SDLCALL host_thread_func(void *data) {
                             SDL_UnlockMutex(ctx->custom_mod_mutex);
                         }
                     } else if (msg_type == COOP_MSG_DISCONNECT) {
-                        log_message(LOG_INFO, "[COOP NET] Client %s disconnected gracefully.\n",
-                                    ctx->clients[i].label);
+                        // Check if the disconnect includes a reason payload
+                        if (payload && payload_len > 0) {
+                            char reason[256];
+                            size_t copy_len = payload_len < sizeof(reason) - 1
+                                                  ? payload_len : sizeof(reason) - 1;
+                            memcpy(reason, payload, copy_len);
+                            reason[copy_len] = '\0';
+                            log_message(LOG_INFO, "[COOP NET] Client %s disconnected: %s\n",
+                                        ctx->clients[i].label, reason);
+                            set_status(ctx, "%s disconnected: %s",
+                                       ctx->clients[i].display_name, reason);
+                        } else {
+                            log_message(LOG_INFO, "[COOP NET] Client %s disconnected gracefully.\n",
+                                        ctx->clients[i].label);
+                        }
                         bool was_approved = ctx->clients[i].handshake_done;
                         bool was_pending = ctx->clients[i].pending_approval;
                         close_socket(&ctx->clients[i].socket_fd);
@@ -737,7 +749,6 @@ static int SDLCALL host_thread_func(void *data) {
                             lobby_dirty = true;
                         }
                         if (was_pending) remove_pending_request(ctx, i);
-                        set_status(ctx, "%d player(s) in lobby", ctx->client_count + 1);
                     }
                     free(payload);
                 } else if (disconnected) {
@@ -751,7 +762,6 @@ static int SDLCALL host_thread_func(void *data) {
                         lobby_dirty = true;
                     }
                     if (was_pending) remove_pending_request(ctx, i);
-                    set_status(ctx, "%d player(s) in lobby", ctx->client_count + 1);
                 }
             }
         }
@@ -783,7 +793,6 @@ static int SDLCALL host_thread_func(void *data) {
                     ctx->clients[i].active = false;
                     ctx->client_count--;
                     lobby_dirty = true;
-                    set_status(ctx, "%d player(s) in lobby", ctx->client_count + 1);
                     continue;
                 }
 
@@ -794,7 +803,6 @@ static int SDLCALL host_thread_func(void *data) {
                     ctx->clients[i].active = false;
                     ctx->client_count--;
                     lobby_dirty = true;
-                    set_status(ctx, "%d player(s) in lobby", ctx->client_count + 1);
                 }
             }
         }
@@ -1188,9 +1196,15 @@ static int SDLCALL receiver_thread_func(void *data) {
         }
     }
 
-    // Graceful disconnect
+    // Graceful disconnect — include reason if one was set by coop_net_disconnect_with_reason
     if (ctx->client_fd != COOP_INVALID_SOCKET) {
-        send_message(ctx->client_fd, COOP_MSG_DISCONNECT, nullptr, 0);
+        if (ctx->disconnect_reason[0] != '\0') {
+            send_message(ctx->client_fd, COOP_MSG_DISCONNECT,
+                         ctx->disconnect_reason, (uint32_t)strlen(ctx->disconnect_reason));
+            ctx->disconnect_reason[0] = '\0';
+        } else {
+            send_message(ctx->client_fd, COOP_MSG_DISCONNECT, nullptr, 0);
+        }
         close_socket(&ctx->client_fd);
     }
 
@@ -1417,9 +1431,13 @@ void coop_net_stop(CoopNetContext *ctx) {
 
     SDL_SetAtomicInt(&ctx->should_stop, 1);
 
-    // Close sockets from outside the thread to unblock select() / non-blocking connect()
+    // Close sockets from outside the thread to unblock select() / non-blocking connect().
+    // If a disconnect reason is pending, keep client_fd open so the receiver thread can
+    // send the reason before closing it. The thread will exit via should_stop within ~200ms.
     close_socket(&ctx->server_fd);
-    close_socket(&ctx->client_fd);
+    if (ctx->disconnect_reason[0] == '\0') {
+        close_socket(&ctx->client_fd);
+    }
 
     SDL_WaitThread(ctx->thread, nullptr);
     ctx->thread = nullptr;
@@ -1454,6 +1472,18 @@ void coop_net_stop(CoopNetContext *ctx) {
     set_status(ctx, "Idle");
 
     log_message(LOG_INFO, "[COOP NET] Networking stopped.\n");
+}
+
+void coop_net_disconnect_with_reason(CoopNetContext *ctx, const char *reason) {
+    if (!ctx) return;
+    // Store the reason so the receiver thread's cleanup path can include it in the
+    // DISCONNECT message. This avoids sending on the socket from the main thread
+    // while the network thread is still reading from it.
+    if (reason) {
+        strncpy(ctx->disconnect_reason, reason, sizeof(ctx->disconnect_reason) - 1);
+        ctx->disconnect_reason[sizeof(ctx->disconnect_reason) - 1] = '\0';
+    }
+    coop_net_stop(ctx);
 }
 
 void coop_net_tick(CoopNetContext *ctx) {
@@ -1491,7 +1521,6 @@ bool coop_net_broadcast(CoopNetContext *ctx, const void *data, size_t size) {
             close_socket(&ctx->clients[i].socket_fd);
             ctx->clients[i].active = false;
             ctx->client_count--;
-            set_status(ctx, "%d player(s) in lobby", ctx->client_count + 1);
             all_ok = false;
         }
     }
@@ -1544,7 +1573,6 @@ bool coop_net_approve_request(CoopNetContext *ctx, int client_slot) {
 
     log_message(LOG_INFO, "[COOP NET] Approved join request from %s (%s).\n",
                 ctx->clients[client_slot].username, ctx->clients[client_slot].label);
-    set_status(ctx, "%d player(s) in lobby", ctx->client_count + 1);
 
     // Remove from pending queue
     remove_pending_request(ctx, client_slot);

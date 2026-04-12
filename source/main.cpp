@@ -2241,9 +2241,9 @@ int main(int argc, char *argv[]) {
                         }
 
                         if (mismatch) {
-                            log_message(LOG_ERROR, "[COOP] Template mismatch with host. Disconnecting.\n");
+                            log_message(LOG_INFO, "[COOP] Template mismatch with host. Disconnecting.\n");
                             coop_template_mismatch = true;
-                            coop_net_stop(g_coop_ctx);
+                            coop_net_disconnect_with_reason(g_coop_ctx, "Template mismatch");
                         } else {
                             // Template matches — apply goal merging settings from host
                             if (sm && sm->valuestring)
@@ -2556,6 +2556,7 @@ int main(int argc, char *argv[]) {
                 ImVec2 mismatch_center = ImGui::GetMainViewport()->GetCenter();
                 ImGui::SetNextWindowPos(mismatch_center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
             }
+            ImGui::SetNextWindowSizeConstraints(ImVec2(450, 0), ImVec2(FLT_MAX, FLT_MAX));
             if (ImGui::BeginPopupModal("Template Mismatch##coop", nullptr,
                                        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
                 ImGui::Text("Could not join the lobby.");

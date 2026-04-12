@@ -2811,8 +2811,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::Spacing();
 
                             // --- Configurable merge settings ---
+                            // Locked once the lobby is active so all players stay in sync
                             {
                                 char tooltip_buf[256];
+                                bool merge_locked = net_is_active;
+                                if (merge_locked) ImGui::BeginDisabled();
 
                                 // Stats / Sub-Stats merge mode
                                 ImGui::Text("Stats / Sub-Stats:");
@@ -2820,16 +2823,24 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 int stat_merge = temp_settings.coop_stat_merge;
                                 ImGui::PushID("coop_stat_merge");
                                 ImGui::RadioButton("Highest Value", &stat_merge, COOP_STAT_HIGHEST);
-                                if (ImGui::IsItemHovered()) {
-                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Use whichever player has the highest value for each stat.");
+                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                    if (merge_locked)
+                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                                 "Goal merging rules are locked while a lobby is active");
+                                    else
+                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                                 "Use whichever player has the highest value for each stat.");
                                     ImGui::SetTooltip("%s", tooltip_buf);
                                 }
                                 ImGui::SameLine();
                                 ImGui::RadioButton("Cumulative (Sum)", &stat_merge, COOP_STAT_CUMULATIVE);
-                                if (ImGui::IsItemHovered()) {
-                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Sum stat values across all players.");
+                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                    if (merge_locked)
+                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                                 "Goal merging rules are locked while a lobby is active");
+                                    else
+                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                                 "Sum stat values across all players.");
                                     ImGui::SetTooltip("%s", tooltip_buf);
                                 }
                                 temp_settings.coop_stat_merge = (CoopStatMerge) stat_merge;
@@ -2841,16 +2852,24 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 int stat_cb = temp_settings.coop_stat_checkbox;
                                 ImGui::PushID("coop_stat_cb");
                                 ImGui::RadioButton("Host Only", &stat_cb, COOP_STAT_CHECKBOX_HOST_ONLY);
-                                if (ImGui::IsItemHovered()) {
-                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Only the host can manually check off stats.");
+                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                    if (merge_locked)
+                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                                 "Goal merging rules are locked while a lobby is active");
+                                    else
+                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                                 "Only the host can manually check off stats.");
                                     ImGui::SetTooltip("%s", tooltip_buf);
                                 }
                                 ImGui::SameLine();
                                 ImGui::RadioButton("Any Player", &stat_cb, COOP_STAT_CHECKBOX_ANY_PLAYER);
-                                if (ImGui::IsItemHovered()) {
-                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Any player can manually check off stats.");
+                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                    if (merge_locked)
+                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                                 "Goal merging rules are locked while a lobby is active");
+                                    else
+                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                                 "Any player can manually check off stats.");
                                     ImGui::SetTooltip("%s", tooltip_buf);
                                 }
                                 temp_settings.coop_stat_checkbox = (CoopStatCheckbox) stat_cb;
@@ -2862,20 +2881,30 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 int custom_mode = temp_settings.coop_custom_goal_mode;
                                 ImGui::PushID("coop_custom");
                                 ImGui::RadioButton("Host Only", &custom_mode, COOP_CUSTOM_HOST_ONLY);
-                                if (ImGui::IsItemHovered()) {
-                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Only the host can modify custom goals and checkboxes.");
+                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                    if (merge_locked)
+                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                                 "Goal merging rules are locked while a lobby is active");
+                                    else
+                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                                 "Only the host can modify custom goals and checkboxes.");
                                     ImGui::SetTooltip("%s", tooltip_buf);
                                 }
                                 ImGui::SameLine();
                                 ImGui::RadioButton("Any Player", &custom_mode, COOP_CUSTOM_ANY_PLAYER);
-                                if (ImGui::IsItemHovered()) {
-                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Any player can modify custom goals and checkboxes.");
+                                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                    if (merge_locked)
+                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                                 "Goal merging rules are locked while a lobby is active");
+                                    else
+                                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                                 "Any player can modify custom goals and checkboxes.");
                                     ImGui::SetTooltip("%s", tooltip_buf);
                                 }
                                 temp_settings.coop_custom_goal_mode = (CoopCustomGoalMode) custom_mode;
                                 ImGui::PopID();
+
+                                if (merge_locked) ImGui::EndDisabled();
                             }
                         }
                     }
