@@ -78,14 +78,37 @@ static void set_tcp_nodelay(coop_socket_t fd) {
 }
 
 // Send exactly `len` bytes. Returns true on success, false on error/disconnect.
+// Handles EWOULDBLOCK on non-blocking sockets by waiting up to 5 seconds for the socket
+// to become writable. This prevents disconnects when sending large payloads that fill
+// the TCP send buffer (e.g., broadcasting full template state after granting all advancements).
 static bool send_all(coop_socket_t fd, const void *data, size_t len) {
     const char *ptr = (const char *)data;
     size_t remaining = len;
     while (remaining > 0) {
         int sent = send(fd, ptr, (int)remaining, 0);
-        if (sent <= 0) return false;
-        ptr += sent;
-        remaining -= (size_t)sent;
+        if (sent > 0) {
+            ptr += sent;
+            remaining -= (size_t)sent;
+            continue;
+        }
+        if (sent == 0) return false; // Connection closed
+
+        // sent < 0: check if it's a recoverable WOULDBLOCK
+#ifdef _WIN32
+        int err = WSAGetLastError();
+        if (err != WSAEWOULDBLOCK) return false;
+#else
+        if (errno != EAGAIN && errno != EWOULDBLOCK) return false;
+#endif
+        // Wait for the socket to become writable (up to 5 seconds)
+        fd_set write_fds;
+        FD_ZERO(&write_fds);
+        FD_SET(fd, &write_fds);
+        struct timeval tv;
+        tv.tv_sec = 5;
+        tv.tv_usec = 0;
+        int ready = select((int)fd + 1, nullptr, &write_fds, nullptr, &tv);
+        if (ready <= 0) return false; // Timeout or error
     }
     return true;
 }

@@ -365,6 +365,8 @@ static bool merge_coop_progress(const char *buffer, TemplateData *target) {
     target->unlocks_completed_count = incoming.unlocks_completed_count;
     target->completed_criteria_count = incoming.completed_criteria_count;
     target->overall_progress_percentage = incoming.overall_progress_percentage;
+    target->total_progress_steps = incoming.total_progress_steps;
+    target->advancement_goal_count = incoming.advancement_goal_count;
     target->play_time_ticks = incoming.play_time_ticks;
     target->frozen_play_time_ticks = incoming.frozen_play_time_ticks;
     target->run_completed = incoming.run_completed;
@@ -2130,9 +2132,22 @@ int main(int argc, char *argv[]) {
                 // Re-watch the config directory first
                 dmon_watch(dmon_config_path, settings_watch_callback, 0, nullptr);
 
+                // Preserve the coop_players roster across reload — it's runtime state
+                // managed by the lobby sync, not saved to disk.
+                int saved_coop_player_count = app_settings.coop_player_count;
+                CoopPlayer saved_coop_players[MAX_COOP_PLAYERS];
+                memcpy(saved_coop_players, app_settings.coop_players, sizeof(saved_coop_players));
+
                 // Reload settings from file to get the latest changes.
                 settings_load(&app_settings);
                 log_set_settings(&app_settings); // Update the logger with the new settings.
+
+                // Restore the coop_players roster if we're hosting
+                if (app_settings.network_mode == NETWORK_HOST &&
+                    coop_net_get_state(&coop_ctx) == COOP_NET_LISTENING) {
+                    app_settings.coop_player_count = saved_coop_player_count;
+                    memcpy(app_settings.coop_players, saved_coop_players, sizeof(saved_coop_players));
+                }
 
                 // Co-op networking is now triggered by UI buttons (Start Lobby / Paste Room Code),
                 // not by settings reload. Only stop networking if co-op was toggled off.
@@ -2325,22 +2340,70 @@ int main(int argc, char *argv[]) {
             // --- Co-op Receiver: consume state updates from host ---
             if (app_settings.network_mode == NETWORK_RECEIVER && g_coop_ctx) {
                 SDL_LockMutex(g_coop_ctx->recv_mutex);
+                if (g_coop_ctx->recv_data_ready) {
+                    log_message(LOG_INFO, "[COOP DEBUG] Receiver: data ready. buf=%p size=%zu "
+                                "sizeof(TemplateData)=%zu template_data=%p\n",
+                                (void*)g_coop_ctx->recv_buffer,
+                                g_coop_ctx->recv_buffer_size,
+                                sizeof(TemplateData),
+                                (void*)tracker->template_data);
+                }
                 if (g_coop_ctx->recv_data_ready && g_coop_ctx->recv_buffer &&
                     g_coop_ctx->recv_buffer_size >= sizeof(TemplateData) && tracker->template_data) {
-                    // Merge progress-only fields from the host's serialized state into the
-                    // tracker's already-loaded TemplateData. This preserves all texture and
-                    // criteria pointer fields (deserialize_template_data would clobber them
-                    // with host-process addresses and crash the renderer).
                     bool merged = merge_coop_progress(g_coop_ctx->recv_buffer, tracker->template_data);
                     g_coop_ctx->recv_data_ready = false;
 
                     if (merged) {
                         SDL_SetAtomicInt(&g_needs_update, 1);
                         SDL_SetAtomicInt(&g_game_data_changed, 1);
-                        log_message(LOG_INFO, "[COOP] Received and applied merged state from host.\n");
+                        log_message(LOG_INFO, "[COOP] Received and applied merged state from host. "
+                                    "overall_progress=%.1f%%\n",
+                                    tracker->template_data->overall_progress_percentage);
+                    } else {
+                        log_message(LOG_ERROR, "[COOP DEBUG] Receiver: merge_coop_progress returned false!\n");
                     }
+                } else if (g_coop_ctx->recv_data_ready) {
+                    // Data ready but one of the preconditions failed — log which one
+                    log_message(LOG_ERROR, "[COOP DEBUG] Receiver: data ready but SKIPPED. "
+                                "buf=%s size_ok=%s template=%s\n",
+                                g_coop_ctx->recv_buffer ? "yes" : "NO",
+                                g_coop_ctx->recv_buffer_size >= sizeof(TemplateData) ? "yes" : "NO",
+                                tracker->template_data ? "yes" : "NO");
+                    g_coop_ctx->recv_data_ready = false; // Don't spin on bad data
                 }
                 SDL_UnlockMutex(g_coop_ctx->recv_mutex);
+            }
+
+            // --- Co-op Host: check for queued custom goal mods every frame ---
+            // Receivers send checkbox toggles to the host, but the host only processes
+            // them inside g_needs_update (which requires a file change). Poll here so
+            // mods are applied promptly even when no game file changes.
+            if (app_settings.network_mode == NETWORK_HOST && g_coop_ctx &&
+                coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
+                coop_net_get_client_count(g_coop_ctx) > 0 && tracker->template_data) {
+                CoopCustomGoalModMsg mods[COOP_MAX_CUSTOM_MODS];
+                int mod_count = coop_net_drain_custom_mods(g_coop_ctx, mods, COOP_MAX_CUSTOM_MODS);
+                if (mod_count > 0) {
+                    tracker_apply_coop_mods(tracker, &app_settings, mods, mod_count);
+                    log_message(LOG_INFO, "[COOP] Applied %d custom goal modification(s) from receiver.\n", mod_count);
+
+                    // Recalculate progress after applying mods
+                    tracker_recalculate_progress(tracker, &app_settings);
+
+                    // Broadcast updated state immediately
+                    char *broadcast_buf = (char *)malloc(4 * 1024 * 1024);
+                    if (broadcast_buf) {
+                        size_t broadcast_size = serialize_template_data(tracker->template_data, broadcast_buf);
+                        if (broadcast_size > 0) {
+                            coop_net_broadcast(g_coop_ctx, broadcast_buf, broadcast_size);
+                        }
+                        free(broadcast_buf);
+                    }
+
+                    // Trigger IPC update so the overlay also refreshes
+                    SDL_SetAtomicInt(&g_needs_update, 1);
+                    SDL_SetAtomicInt(&g_game_data_changed, 1);
+                }
             }
 
             // Check if dmon (or manual update through custom goal) has requested an update
@@ -2407,6 +2470,10 @@ int main(int argc, char *argv[]) {
                     if (app_settings.network_mode == NETWORK_HOST &&
                         coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
                         coop_net_get_client_count(g_coop_ctx) > 0) {
+                        log_message(LOG_INFO, "[COOP DEBUG] Host: entering coop merge path. "
+                                    "player_count=%d, client_count=%d\n",
+                                    app_settings.coop_player_count,
+                                    coop_net_get_client_count(g_coop_ctx));
                         tracker_update_coop_merged(tracker, &app_settings);
 
                         // Drain and apply any custom goal modifications from receivers
@@ -2421,6 +2488,9 @@ int main(int argc, char *argv[]) {
                         char *broadcast_buf = (char *)malloc(4 * 1024 * 1024); // 4 MB heap buffer
                         if (broadcast_buf) {
                             size_t broadcast_size = serialize_template_data(tracker->template_data, broadcast_buf);
+                            log_message(LOG_INFO, "[COOP DEBUG] Host: broadcast_size=%zu, overall_progress=%.1f%%\n",
+                                        broadcast_size,
+                                        tracker->template_data ? tracker->template_data->overall_progress_percentage : -1.0f);
                             if (broadcast_size > 0) {
                                 coop_net_broadcast(g_coop_ctx, broadcast_buf, broadcast_size);
                             }

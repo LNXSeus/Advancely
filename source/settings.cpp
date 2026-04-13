@@ -3552,8 +3552,15 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     }
                 }
 
-                // Preserve the live Manual Layout toggle (it's controlled from the tracker, not settings)
+                // Preserve runtime state that is managed outside the settings UI
                 temp_settings.use_manual_layout = app_settings->use_manual_layout;
+
+                // Preserve the coop_players roster — it's managed by the lobby sync in main.cpp,
+                // not the settings UI. Without this, Apply Settings wipes the roster to 0 players
+                // and the host broadcasts empty (0%) progress.
+                temp_settings.coop_player_count = app_settings->coop_player_count;
+                memcpy(temp_settings.coop_players, app_settings->coop_players,
+                       sizeof(app_settings->coop_players));
 
                 // Copy temp settings to the real settings, save, and trigger a reload
                 memcpy(app_settings, &temp_settings, sizeof(AppSettings));
@@ -3746,6 +3753,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
     if (ImGui::Button("Restart Advancely")) {
         // 1. Save any pending changes from the settings window first.
         temp_settings.use_manual_layout = app_settings->use_manual_layout;
+        temp_settings.coop_player_count = app_settings->coop_player_count;
+        memcpy(temp_settings.coop_players, app_settings->coop_players,
+               sizeof(app_settings->coop_players));
         memcpy(app_settings, &temp_settings, sizeof(AppSettings));
         settings_save(app_settings, nullptr, SAVE_CONTEXT_ALL);
         saved_settings = temp_settings; // Sync so has_unsaved_changes stays false on future frames
