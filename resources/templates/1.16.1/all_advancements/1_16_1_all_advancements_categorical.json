@@ -2760,7 +2760,7 @@
 					"icon":	"items/heart_of_the_sea_25w14craftmine.png",
 					"target":	1
 				},
-				"minecraft:picked_up/nautilus_shell":	{
+				"minecraft:picked_up/minecraft:nautilus_shell":	{
 					"icon":	"items/nautilus_shell_25w14craftmine.png",
 					"target":	8
 				}
@@ -4084,7 +4084,7 @@
 					"root_name":	"minecraft:picked_up/minecraft:heart_of_the_sea",
 					"parent_root":	"conduit"
 				}, {
-					"root_name":	"minecraft:picked_up/nautilus_shell",
+					"root_name":	"minecraft:picked_up/minecraft:nautilus_shell",
 					"parent_root":	"conduit"
 				}, {
 					"root_name":	"pufferfish"

@@ -2247,6 +2247,20 @@ int main(int argc, char *argv[]) {
 #endif
                         }
                     }
+
+                    // Co-op Host: broadcast Hermes-updated state to receivers immediately
+                    if (app_settings.network_mode == NETWORK_HOST && g_coop_ctx &&
+                        coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
+                        coop_net_get_client_count(g_coop_ctx) > 0) {
+                        char *broadcast_buf = (char *)malloc(4 * 1024 * 1024);
+                        if (broadcast_buf) {
+                            size_t broadcast_size = serialize_template_data(tracker->template_data, broadcast_buf);
+                            if (broadcast_size > 0) {
+                                coop_net_broadcast(g_coop_ctx, broadcast_buf, broadcast_size);
+                            }
+                            free(broadcast_buf);
+                        }
+                    }
                 }
             }
 

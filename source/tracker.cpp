@@ -14,6 +14,8 @@
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
+#include <strings.h>
+#include <unordered_map>
 #include <cJSON.h>
 #include <cmath>
 #include <ctime>
@@ -3259,6 +3261,7 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     t->hermes_file_offset = 0;
     t->hermes_active = false;
     t->hermes_wants_ipc_flush = false;
+    t->hermes_coop_stat_cache = new std::unordered_map<std::string, int>();
 
     // Initialize notes state
     t->notes_window_open = false;
@@ -4113,6 +4116,13 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
     // 1. Reset all progress to zero before merging
     coop_reset_template_progress(t->template_data);
 
+    // Clear the Hermes per-player stat cache — the file-based merge is authoritative.
+    // It will be re-seeded below with each player's values from their JSON files.
+    auto *hermes_cache = t->hermes_coop_stat_cache
+        ? static_cast<std::unordered_map<std::string, int>*>(t->hermes_coop_stat_cache)
+        : nullptr;
+    if (hermes_cache) hermes_cache->clear();
+
     // 2. Iterate over all players in the roster and merge their data
     for (int p = 0; p < settings->coop_player_count; p++) {
         const CoopPlayer *player = &settings->coop_players[p];
@@ -4154,6 +4164,64 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
         // Merge multi-stage goals (global — any player any stage)
         coop_merge_multi_stage(t->template_data, player_adv_json, player_stats_json,
                                player_unlocks_json, version);
+
+        // Seed the Hermes per-player stat cache with this player's current values.
+        // This prevents double-counting when the first Hermes event arrives after
+        // a file-based merge — without seeding, old_value would be 0 and the entire
+        // file-based value would be added as a delta on top of the merged total.
+        if (hermes_cache && settings->using_hermes &&
+            settings->coop_stat_merge == COOP_STAT_CUMULATIVE &&
+            player_stats_json && player->uuid[0] != '\0') {
+
+            std::string uuid_prefix = player->uuid;
+            uuid_prefix += ':';
+
+            if (version >= MC_VERSION_1_13) {
+                // Modern: stats → { "minecraft:custom": { "minecraft:play_time": 123, ... }, ... }
+                cJSON *stats_obj = cJSON_GetObjectItem(player_stats_json, "stats");
+                if (stats_obj) {
+                    for (int i = 0; i < t->template_data->stat_count; i++) {
+                        TrackableCategory *sc = t->template_data->stats[i];
+                        for (int j = 0; j < sc->criteria_count; j++) {
+                            TrackableItem *sub = sc->criteria[j];
+                            if (sub->stat_category_key[0] == '\0') continue;
+                            cJSON *cat_obj = cJSON_GetObjectItem(stats_obj, sub->stat_category_key);
+                            if (!cat_obj) continue;
+                            cJSON *val = cJSON_GetObjectItem(cat_obj, sub->stat_item_key);
+                            if (cJSON_IsNumber(val)) {
+                                // Build the Hermes-format key: "minecraft.picked_up:minecraft.oak_log"
+                                // Hermes uses dots where the JSON has colons in the category/item prefix
+                                char hermes_key[384];
+                                char h_cat[192], h_item[192];
+                                strncpy(h_cat, sub->stat_category_key, sizeof(h_cat) - 1);
+                                h_cat[sizeof(h_cat) - 1] = '\0';
+                                strncpy(h_item, sub->stat_item_key, sizeof(h_item) - 1);
+                                h_item[sizeof(h_item) - 1] = '\0';
+                                // Convert "minecraft:picked_up" → "minecraft.picked_up"
+                                char *colon_pos = strchr(h_cat, ':');
+                                if (colon_pos) *colon_pos = '.';
+                                colon_pos = strchr(h_item, ':');
+                                if (colon_pos) *colon_pos = '.';
+                                snprintf(hermes_key, sizeof(hermes_key), "%s:%s", h_cat, h_item);
+                                (*hermes_cache)[uuid_prefix + hermes_key] = val->valueint;
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Legacy/mid-era: flat JSON with stat keys at top level
+                for (int i = 0; i < t->template_data->stat_count; i++) {
+                    TrackableCategory *sc = t->template_data->stats[i];
+                    for (int j = 0; j < sc->criteria_count; j++) {
+                        TrackableItem *sub = sc->criteria[j];
+                        cJSON *val = cJSON_GetObjectItem(player_stats_json, sub->root_name);
+                        if (cJSON_IsNumber(val)) {
+                            (*hermes_cache)[uuid_prefix + sub->root_name] = val->valueint;
+                        }
+                    }
+                }
+            }
+        }
 
         // Clean up this player's JSON
         cJSON_Delete(player_adv_json);
@@ -9723,7 +9791,10 @@ static bool hermes_apply_stat_event(Tracker *t, const cJSON *data) {
 
             if (!matches) continue;
 
-            // Hermes value is always the cumulative total -> overwrite directly.
+            // Hermes value is always the cumulative total for one player.
+            // In singleplayer: overwrite directly (only one player).
+            // In coop HIGHEST mode: only apply if higher (preserves max across players).
+            if (new_value <= sub->progress) continue;
             sub->progress = new_value;
 
             if (!sub->is_manually_completed) {
@@ -9783,8 +9854,10 @@ static bool hermes_apply_stat_event(Tracker *t, const cJSON *data) {
 
         if (!matches) continue;
 
-        stage->current_stat_progress = new_value;
-        changed = true;
+        if (new_value > stage->current_stat_progress) {
+            stage->current_stat_progress = new_value;
+            changed = true;
+        }
 
         if (stage->required_progress > 0 &&
             stage->current_stat_progress >= stage->required_progress) {
@@ -9792,6 +9865,148 @@ static bool hermes_apply_stat_event(Tracker *t, const cJSON *data) {
                 goal->current_stage++;
                 log_message(LOG_INFO,
                             "[TRACKER - HERMES] Multi-stage goal '%s' advanced to stage %d.\n",
+                            goal->root_name, goal->current_stage);
+            }
+        }
+    }
+
+    return changed;
+}
+
+
+/**
+ * Applies a single Hermes "stat" event using CUMULATIVE (sum) merge logic.
+ * Instead of setting the stat value directly, this tracks each player's last-known
+ * value and applies only the delta to the merged template_data.
+ *
+ * Example: Player A had 45, now reports 50. Delta = +5. Merged total increases by 5.
+ * This preserves the sum across all players even though events arrive one at a time.
+ *
+ * The per-player cache key is "uuid:stat_key" (or "?:stat_key" if UUID unavailable).
+ * The cache is cleared each time the file-based merge runs (authoritative reset).
+ */
+static bool hermes_apply_stat_event_cumulative(Tracker *t, const cJSON *data,
+                                                const char *player_uuid) {
+    cJSON *stat_key_json = cJSON_GetObjectItem(data, "stat");
+    cJSON *value_json = cJSON_GetObjectItem(data, "value");
+
+    if (!cJSON_IsString(stat_key_json) || !cJSON_IsNumber(value_json))
+        return false;
+
+    const char *hermes_key = stat_key_json->valuestring;
+    int new_value = (int) value_json->valuedouble;
+
+    auto *cache = static_cast<std::unordered_map<std::string, int>*>(t->hermes_coop_stat_cache);
+    if (!cache) return false;
+
+    // Build the cache key: "uuid:stat_key"
+    std::string cache_key = (player_uuid ? player_uuid : "?");
+    cache_key += ':';
+    cache_key += hermes_key;
+
+    // Look up old value and compute delta
+    int old_value = 0;
+    auto it = cache->find(cache_key);
+    if (it != cache->end()) {
+        old_value = it->second;
+    }
+    int delta = new_value - old_value;
+    (*cache)[cache_key] = new_value;
+
+    if (delta == 0) return false;
+
+    char h_cat[192], h_item[192];
+    bool is_modern = hermes_parse_stat_key(hermes_key, h_cat, h_item, sizeof(h_cat));
+
+    bool changed = false;
+
+    for (int i = 0; i < t->template_data->stat_count; i++) {
+        TrackableCategory *stat_cat = t->template_data->stats[i];
+        if (!stat_cat) continue;
+
+        bool cat_changed = false;
+
+        for (int j = 0; j < stat_cat->criteria_count; j++) {
+            TrackableItem *sub = stat_cat->criteria[j];
+            if (!sub) continue;
+
+            bool matches = false;
+            if (is_modern) {
+                if (sub->stat_category_key[0] == '\0') continue;
+                matches = (strcmp(sub->stat_category_key, h_cat) == 0 &&
+                           strcmp(sub->stat_item_key, h_item) == 0);
+            } else {
+                matches = (strcmp(sub->root_name, hermes_key) == 0);
+            }
+
+            if (!matches) continue;
+
+            // Add the delta to the merged cumulative total
+            sub->progress += delta;
+
+            if (!sub->is_manually_completed) {
+                if (sub->goal > 0) sub->done = (sub->progress >= sub->goal);
+                else if (sub->goal == -1) sub->done = false;
+            }
+
+            cat_changed = true;
+            changed = true;
+        }
+
+        if (cat_changed) {
+            int completed = 0;
+            for (int j = 0; j < stat_cat->criteria_count; j++) {
+                if (stat_cat->criteria[j] && stat_cat->criteria[j]->done)
+                    completed++;
+            }
+            stat_cat->completed_criteria_count = completed;
+
+            if (!stat_cat->is_manually_completed) {
+                stat_cat->done = (stat_cat->criteria_count > 0 &&
+                                  completed >= stat_cat->criteria_count);
+            }
+        }
+    }
+
+    // Multi-stage goals with CUMULATIVE: also use delta
+    for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
+        MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+        if (!goal) continue;
+        if (goal->current_stage >= goal->stage_count) continue;
+
+        SubGoal *stage = goal->stages[goal->current_stage];
+        if (!stage || stage->type != SUBGOAL_STAT) continue;
+
+        bool matches = false;
+        if (is_modern) {
+            const char *slash = strchr(stage->root_name, '/');
+            if (!slash) continue;
+
+            char s_cat[192], s_item[192];
+            size_t cat_len = (size_t)(slash - stage->root_name);
+            if (cat_len == 0 || cat_len >= sizeof(s_cat)) continue;
+
+            strncpy(s_cat, stage->root_name, cat_len);
+            s_cat[cat_len] = '\0';
+            strncpy(s_item, slash + 1, sizeof(s_item) - 1);
+            s_item[sizeof(s_item) - 1] = '\0';
+
+            matches = (strcmp(s_cat, h_cat) == 0 && strcmp(s_item, h_item) == 0);
+        } else {
+            matches = (strcmp(stage->root_name, hermes_key) == 0);
+        }
+
+        if (!matches) continue;
+
+        stage->current_stat_progress += delta;
+        changed = true;
+
+        if (stage->required_progress > 0 &&
+            stage->current_stat_progress >= stage->required_progress) {
+            if (goal->current_stage + 1 < goal->stage_count) {
+                goal->current_stage++;
+                log_message(LOG_INFO,
+                            "[TRACKER - HERMES] Multi-stage goal '%s' advanced to stage %d (cumulative).\n",
                             goal->root_name, goal->current_stage);
             }
         }
@@ -9997,10 +10212,73 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
 
         const char *type = type_json->valuestring;
 
+        // --- Player identity filter ---
+        // Hermes events include a "player" object with "name" and "uuid".
+        // In coop HOST mode: accept events from any player in the lobby roster.
+        // In singleplayer/receiver: accept only the local player's events.
+        // Match by UUID first (authoritative, case-insensitive hex), then
+        // fall back to case-insensitive username (Hermes "name" may differ
+        // in case; legacy stats files are fully lowercase).
+        const char *event_player_uuid = nullptr; // Used for stat cache key
+        cJSON *player_json = cJSON_GetObjectItem(data, "player");
+        if (cJSON_IsObject(player_json)) {
+            cJSON *uuid_json = cJSON_GetObjectItem(player_json, "uuid");
+            cJSON *name_json = cJSON_GetObjectItem(player_json, "name");
+            const char *ev_uuid = cJSON_IsString(uuid_json) ? uuid_json->valuestring : nullptr;
+            const char *ev_name = cJSON_IsString(name_json) ? name_json->valuestring : nullptr;
+
+            bool player_match = false;
+
+            if (settings->network_mode == NETWORK_HOST && settings->coop_player_count > 0) {
+                // Coop host: match against any player in the roster
+                for (int p = 0; p < settings->coop_player_count; p++) {
+                    const CoopPlayer *rp = &settings->coop_players[p];
+                    if (ev_uuid && rp->uuid[0] != '\0' &&
+                        strcasecmp(ev_uuid, rp->uuid) == 0) {
+                        player_match = true;
+                        event_player_uuid = ev_uuid;
+                        break;
+                    }
+                    if (!player_match && ev_name && rp->username[0] != '\0' &&
+                        strcasecmp(ev_name, rp->username) == 0) {
+                        player_match = true;
+                        event_player_uuid = ev_uuid; // may be null, that's OK
+                        break;
+                    }
+                }
+            } else {
+                // Singleplayer or receiver: match local player only
+                if (settings->local_player.uuid[0] != '\0' && ev_uuid) {
+                    player_match = (strcasecmp(ev_uuid, settings->local_player.uuid) == 0);
+                }
+                if (!player_match && settings->local_player.username[0] != '\0' && ev_name) {
+                    player_match = (strcasecmp(ev_name, settings->local_player.username) == 0);
+                }
+                if (player_match) event_player_uuid = ev_uuid;
+            }
+
+            if (!player_match) {
+                cJSON_Delete(event);
+                continue; // Skip events from players not in roster / not local
+            }
+        }
+        // If no player object in event, allow it through (older Hermes versions)
+
+        // --- Dispatch event ---
         if (strcmp(type, "stat") == 0) {
-            if (hermes_apply_stat_event(t, data))
-                any_changed = true;
+            if (settings->network_mode == NETWORK_HOST &&
+                settings->coop_stat_merge == COOP_STAT_CUMULATIVE &&
+                t->hermes_coop_stat_cache) {
+                // CUMULATIVE mode: track per-player deltas
+                if (hermes_apply_stat_event_cumulative(t, data, event_player_uuid))
+                    any_changed = true;
+            } else {
+                // HIGHEST mode or singleplayer: direct apply (higher-wins or sole player)
+                if (hermes_apply_stat_event(t, data))
+                    any_changed = true;
+            }
         } else if (strcmp(type, "advancement") == 0) {
+            // Advancements are always OR-merged: any player completing = done
             if (hermes_apply_advancement_event(t, data))
                 any_changed = true;
         }
@@ -10390,6 +10668,12 @@ void tracker_free(Tracker **tracker, AppSettings *settings) {
         if (t->hermes_play_log) {
             fclose(t->hermes_play_log);
             t->hermes_play_log = nullptr;
+        }
+
+        // Free Hermes coop stat cache
+        if (t->hermes_coop_stat_cache) {
+            delete static_cast<std::unordered_map<std::string, int>*>(t->hermes_coop_stat_cache);
+            t->hermes_coop_stat_cache = nullptr;
         }
 
         // tracker is heap allocated so free it
