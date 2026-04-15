@@ -34,6 +34,7 @@ extern SDL_AtomicInt g_notes_changed; // To signal that the notes.txt file needs
 extern SDL_AtomicInt g_apply_button_clicked; // To signal when overlay window should restart (on apply button click)
 extern SDL_AtomicInt g_templates_changed; // To signal that the template list needs to be rescanned.
 extern SDL_AtomicInt g_coop_broadcast_needed; // Custom goal change: broadcast + IPC without full file re-merge
+extern SDL_AtomicInt g_suppress_settings_watch; // Suppress dmon settings watcher for app-initiated saves
 extern ForceOpenReason g_force_open_reason; // Flag to force settings open on invalid path
 
 /**

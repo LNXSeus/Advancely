@@ -67,7 +67,9 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                 // CUSTOM GOAL HOTKEYS
                 // Hotkeys don't work when in visual layout editing mode
                 // Co-op: Receivers with host-only custom goals cannot use counter hotkeys
-                bool coop_hotkeys_blocked = (app_settings->network_mode == NETWORK_RECEIVER &&
+                bool rcv_in_lobby = (app_settings->network_mode == NETWORK_RECEIVER &&
+                                     g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+                bool coop_hotkeys_blocked = (rcv_in_lobby &&
                                              app_settings->coop_custom_goal_mode == COOP_CUSTOM_HOST_ONLY);
                 if (t && t->template_data && t->template_data->custom_goals &&
                     !t->is_visual_layout_editing && !coop_hotkeys_blocked) {
@@ -98,9 +100,8 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
 
                         if (mod_action >= 0) {
                             // Co-op Receiver: send modification to host
-                            if (app_settings->network_mode == NETWORK_RECEIVER &&
-                                app_settings->coop_custom_goal_mode == COOP_CUSTOM_ANY_PLAYER &&
-                                g_coop_ctx) {
+                            if (rcv_in_lobby &&
+                                app_settings->coop_custom_goal_mode == COOP_CUSTOM_ANY_PLAYER) {
                                 CoopCustomGoalModMsg mod = {};
                                 snprintf(mod.goal_root_name, sizeof(mod.goal_root_name),
                                          "%s", target_goal->root_name);
@@ -114,6 +115,12 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                                 } else {
                                     target_goal->progress--;
                                 }
+                                // Recalculate done state immediately so the background
+                                // texture updates this frame (not deferred to file re-read)
+                                if (target_goal->goal > 0) {
+                                    target_goal->done = (target_goal->progress >= target_goal->goal);
+                                }
+                                SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
                                 settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
                                 SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
                                 SDL_SetAtomicInt(&g_game_data_changed, 1);

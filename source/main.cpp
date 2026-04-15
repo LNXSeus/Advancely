@@ -633,6 +633,10 @@ static void global_watch_callback(dmon_watch_id watch_id, dmon_action action, co
 /**
  * @brief Callback for dmon watching the CONFIG directory for settings.json.
  */
+// Flag to suppress dmon settings watcher when the app itself writes to settings.json
+// (e.g. checkbox toggles, hotkey counters). Prevents a destructive full reinit cycle.
+SDL_AtomicInt g_suppress_settings_watch;
+
 static void settings_watch_callback(dmon_watch_id watch_id, dmon_action action, const char *rootdir,
                                     const char *filepath, const char *oldfilepath, void *user) {
     (void) watch_id;
@@ -647,6 +651,12 @@ static void settings_watch_callback(dmon_watch_id watch_id, dmon_action action, 
         log_message(LOG_INFO, "[DEBUG - DMON - MAIN] Settings Watcher triggered by file: %s\n", filepath);
         // ----------------
         if (strcmp(filepath, "settings.json") == 0) {
+            // If the app itself wrote settings.json (e.g. checkbox toggle, counter hotkey),
+            // suppress the watcher to avoid a destructive full template reinit.
+            if (SDL_SetAtomicInt(&g_suppress_settings_watch, 0) == 1) {
+                log_message(LOG_INFO, "[DMON - MAIN] settings.json modified by app — suppressed.\n");
+                return;
+            }
             log_message(LOG_INFO, "[DMON - MAIN] settings.json modified. Triggering update.\n");
 
             SDL_SetAtomicInt(&g_settings_changed, 1);

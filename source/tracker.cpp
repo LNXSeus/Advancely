@@ -4282,10 +4282,8 @@ void tracker_apply_coop_mods(Tracker *t, const AppSettings *settings,
 
                 if (mod->action == COOP_MOD_TOGGLE) {
                     cat->is_manually_completed = !cat->is_manually_completed;
-                    bool all_children_done = (cat->criteria_count > 0 &&
-                                              cat->completed_criteria_count >= cat->criteria_count);
-                    cat->done = cat->is_manually_completed || all_children_done;
 
+                    // Recalculate children FIRST so completed_criteria_count is correct
                     for (int j = 0; j < cat->criteria_count; j++) {
                         TrackableItem *crit = cat->criteria[j];
                         bool crit_naturally_done = (crit->goal > 0 && crit->progress >= crit->goal);
@@ -4295,6 +4293,11 @@ void tracker_apply_coop_mods(Tracker *t, const AppSettings *settings,
                     for (int k = 0; k < cat->criteria_count; k++) {
                         if (cat->criteria[k]->done) cat->completed_criteria_count++;
                     }
+
+                    // Now calculate parent done based on updated children
+                    bool all_children_done = (cat->criteria_count > 0 &&
+                                              cat->completed_criteria_count >= cat->criteria_count);
+                    cat->done = cat->is_manually_completed || all_children_done;
                     any_applied = true;
                 }
                 break;
@@ -4331,6 +4334,7 @@ void tracker_apply_coop_mods(Tracker *t, const AppSettings *settings,
     }
 
     if (any_applied) {
+        SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
         settings_save(settings, td, SAVE_CONTEXT_ALL);
     }
 }
@@ -5958,12 +5962,13 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             // Co-op: Receivers respect stat checkbox permission
                             if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->
                                 is_visual_layout_editing) {
-                                if (settings->network_mode == NETWORK_RECEIVER &&
+                                bool rcv_in_lobby = (settings->network_mode == NETWORK_RECEIVER &&
+                                    g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+                                if (rcv_in_lobby &&
                                     settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY) {
                                     // Host-only mode: clicking disabled for receivers
-                                } else if (settings->network_mode == NETWORK_RECEIVER &&
-                                           settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_ANY_PLAYER &&
-                                           g_coop_ctx) {
+                                } else if (rcv_in_lobby &&
+                                           settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_ANY_PLAYER) {
                                     // Any-player mode: send toggle request to host
                                     CoopCustomGoalModMsg mod = {};
                                     snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", crit->root_name);
@@ -5985,6 +5990,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                         criteria_count);
                                     cat->done = cat->is_manually_completed || all_children_done;
 
+                                    SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
                                     settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
                                     SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
                                     SDL_SetAtomicInt(&g_game_data_changed, 1);
@@ -6214,12 +6220,13 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     // Co-op: Receivers respect stat checkbox permission
                     if (is_hovered_parent && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->
                         is_visual_layout_editing) {
-                        if (settings->network_mode == NETWORK_RECEIVER &&
+                        bool rcv_in_lobby = (settings->network_mode == NETWORK_RECEIVER &&
+                            g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+                        if (rcv_in_lobby &&
                             settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY) {
                             // Host-only mode: clicking disabled for receivers
-                        } else if (settings->network_mode == NETWORK_RECEIVER &&
-                                   settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_ANY_PLAYER &&
-                                   g_coop_ctx) {
+                        } else if (rcv_in_lobby &&
+                                   settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_ANY_PLAYER) {
                             // Any-player mode: send toggle request to host (parent stat)
                             CoopCustomGoalModMsg mod = {};
                             snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", cat->root_name);
@@ -6229,10 +6236,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         } else {
                             // Host or singleplayer: toggle locally
                             cat->is_manually_completed = !cat->is_manually_completed;
-                            bool all_children_naturally_done = (
-                                cat->criteria_count > 0 && cat->completed_criteria_count >= cat->criteria_count);
-                            cat->done = cat->is_manually_completed || all_children_naturally_done;
 
+                            // Recalculate children FIRST so completed_criteria_count is correct
                             for (int j = 0; j < cat->criteria_count; ++j) {
                                 TrackableItem *crit = cat->criteria[j];
                                 bool crit_naturally_done = (crit->goal > 0 && crit->progress >= crit->goal);
@@ -6244,6 +6249,12 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                 if (cat->criteria[k]->done) cat->completed_criteria_count++;
                             }
 
+                            // Now calculate parent done based on updated children
+                            bool all_children_done = (
+                                cat->criteria_count > 0 && cat->completed_criteria_count >= cat->criteria_count);
+                            cat->done = cat->is_manually_completed || all_children_done;
+
+                            SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
                             settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
                             SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
                             SDL_SetAtomicInt(&g_game_data_changed, 1);
@@ -7206,7 +7217,9 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 // Deactivating when in visual layout editor mode
                 // Co-op: Receivers respect custom goal permission
                 // Co-op: Show tooltip for host-only custom goals
-                if (is_hovered && settings->network_mode == NETWORK_RECEIVER &&
+                bool rcv_in_lobby = (settings->network_mode == NETWORK_RECEIVER &&
+                    g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+                if (is_hovered && rcv_in_lobby &&
                     settings->coop_custom_goal_mode == COOP_CUSTOM_HOST_ONLY) {
                     char tooltip_buf[128];
                     snprintf(tooltip_buf, sizeof(tooltip_buf),
@@ -7215,12 +7228,11 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 }
 
                 if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->is_visual_layout_editing) {
-                    if (settings->network_mode == NETWORK_RECEIVER &&
+                    if (rcv_in_lobby &&
                         settings->coop_custom_goal_mode == COOP_CUSTOM_HOST_ONLY) {
                         // Host-only mode: clicking disabled for receivers
-                    } else if (settings->network_mode == NETWORK_RECEIVER &&
-                               settings->coop_custom_goal_mode == COOP_CUSTOM_ANY_PLAYER &&
-                               g_coop_ctx) {
+                    } else if (rcv_in_lobby &&
+                               settings->coop_custom_goal_mode == COOP_CUSTOM_ANY_PLAYER) {
                         // Any-player mode: send toggle request to host
                         CoopCustomGoalModMsg mod = {};
                         snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", item->root_name);
@@ -7239,6 +7251,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                                                                        item->linked_goal_mode));
                         }
                         item->progress = item->done ? 1 : 0;
+                        SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
                         settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
                         // Lightweight broadcast path: no full file re-merge needed for custom goals
                         SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
