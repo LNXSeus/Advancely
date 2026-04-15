@@ -355,7 +355,7 @@ static const uint64_t FNV_OFFSET_BASIS = 14695981039346656037ULL;
 static const uint64_t FNV_PRIME = 1099511628211ULL;
 
 static uint64_t fnv1a_bytes(uint64_t hash, const void *data, size_t len) {
-    const unsigned char *p = (const unsigned char *)data;
+    const unsigned char *p = (const unsigned char *) data;
     for (size_t i = 0; i < len; i++) {
         hash ^= p[i];
         hash *= FNV_PRIME;

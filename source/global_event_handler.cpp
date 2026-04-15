@@ -63,12 +63,14 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                 // We don't break here; we want other event processing to continue,
                 // but we skip the hotkey logic for this specific event.
                 // Only trigger on initial key press
-                bool hotkey_triggered = false;
-
                 // Defensive check to prevent crash if data is not ready
                 // CUSTOM GOAL HOTKEYS
                 // Hotkeys don't work when in visual layout editing mode
-                if (t && t->template_data && t->template_data->custom_goals && !t->is_visual_layout_editing) {
+                // Co-op: Receivers with host-only custom goals cannot use counter hotkeys
+                bool coop_hotkeys_blocked = (app_settings->network_mode == NETWORK_RECEIVER &&
+                                             app_settings->coop_custom_goal_mode == COOP_CUSTOM_HOST_ONLY);
+                if (t && t->template_data && t->template_data->custom_goals &&
+                    !t->is_visual_layout_editing && !coop_hotkeys_blocked) {
                     for (int i = 0; i < app_settings->hotkey_count; i++) {
                         HotkeyBinding *hb = &app_settings->hotkeys[i];
                         TrackableItem *target_goal = nullptr;
@@ -87,18 +89,35 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                         SDL_Scancode dec_scancode = SDL_GetScancodeFromName(hb->decrement_key);
 
                         // Check if the pressed key matches a hotkey
+                        int mod_action = -1;
                         if (event.key.scancode == inc_scancode) {
-                            target_goal->progress++;
-                            hotkey_triggered = true;
+                            mod_action = COOP_MOD_INCREMENT;
                         } else if (event.key.scancode == dec_scancode) {
-                            target_goal->progress--;
-                            hotkey_triggered = true;
+                            mod_action = COOP_MOD_DECREMENT;
                         }
 
-                        if (hotkey_triggered) {
-                            settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
-                            SDL_SetAtomicInt(&g_needs_update, 1); // Request a data refresh
-                            SDL_SetAtomicInt(&g_game_data_changed, 1);
+                        if (mod_action >= 0) {
+                            // Co-op Receiver: send modification to host
+                            if (app_settings->network_mode == NETWORK_RECEIVER &&
+                                app_settings->coop_custom_goal_mode == COOP_CUSTOM_ANY_PLAYER &&
+                                g_coop_ctx) {
+                                CoopCustomGoalModMsg mod = {};
+                                snprintf(mod.goal_root_name, sizeof(mod.goal_root_name),
+                                         "%s", target_goal->root_name);
+                                mod.parent_root_name[0] = '\0';
+                                mod.action = mod_action;
+                                coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
+                            } else {
+                                // Host or singleplayer: modify locally
+                                if (mod_action == COOP_MOD_INCREMENT) {
+                                    target_goal->progress++;
+                                } else {
+                                    target_goal->progress--;
+                                }
+                                settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
+                                SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
+                                SDL_SetAtomicInt(&g_game_data_changed, 1);
+                            }
                             break;
                         }
                     }

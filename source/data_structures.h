@@ -191,7 +191,7 @@ struct ManualPos {
 
 enum LinkedGoalMode {
     LINKED_GOAL_AND = 0, // All linked goals must be completed
-    LINKED_GOAL_OR = 1   // At least one linked goal must be completed
+    LINKED_GOAL_OR = 1 // At least one linked goal must be completed
 };
 
 // Forward declaration (defined below in the counter goals section)
@@ -321,6 +321,7 @@ struct SubGoal {
     char root_name[192]; // The target, e.g., "minecraft:trident" or "minecraft:adventure/very_very_frightening"
     int required_progress; // The value to reach, e.g., 1
     int current_stat_progress; // Current value of stat within multi-stage goal
+    bool coop_completed; // Co-op: true if any player completed this stage (non-stat types)
 
     char icon_path[256];
     SDL_Texture *texture;
@@ -471,6 +472,8 @@ struct TemplateData {
     int completed_criteria_count;
     float overall_progress_percentage;
     // Percentage score of everything BUT ADVANCEMENTS (have their own advancements_completed_count)
+
+    float host_time_since_last_update; // Co-op: host's update timer, mirrored by receivers
 
     long long play_time_ticks; // Store the player's total playtime in ticks
     long long frozen_play_time_ticks; // IGT frozen at the moment of run completion

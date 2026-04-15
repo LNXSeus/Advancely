@@ -94,6 +94,7 @@ SDL_AtomicInt g_game_data_changed; // When game data is modified, custom counter
 SDL_AtomicInt g_notes_changed;
 SDL_AtomicInt g_apply_button_clicked;
 SDL_AtomicInt g_templates_changed;
+SDL_AtomicInt g_coop_broadcast_needed; // Custom goal change: broadcast + IPC without full file re-merge
 
 // Change the global flag from a bool to our new enum.
 ForceOpenReason g_force_open_reason = FORCE_OPEN_NONE;
@@ -370,6 +371,7 @@ static bool merge_coop_progress(const char *buffer, TemplateData *target) {
     target->play_time_ticks = incoming.play_time_ticks;
     target->frozen_play_time_ticks = incoming.frozen_play_time_ticks;
     target->run_completed = incoming.run_completed;
+    target->host_time_since_last_update = incoming.host_time_since_last_update;
 
     for (int i = 0; i < target->advancement_count; i++) {
         TrackableCategory in_cat;
@@ -1789,6 +1791,9 @@ int main(int argc, char *argv[]) {
         bool coop_template_mismatch = false;
         char coop_mismatch_msg[512] = {};
 
+        // Track previous coop state for detecting disconnects
+        CoopNetState prev_coop_state = COOP_NET_IDLE;
+
         // Start a timer if test mode is enabled
         Uint32 test_mode_start_time = 0;
         if (is_test_mode) {
@@ -1900,6 +1905,9 @@ int main(int argc, char *argv[]) {
 
             // Increment the time since the last update every frame
             tracker->time_since_last_update += deltaTime;
+            // Stamp host timer into template_data so broadcasts carry it to receivers
+            if (tracker->template_data)
+                tracker->template_data->host_time_since_last_update = tracker->time_since_last_update;
             // Periodically check if the active instance has changed.
             // When an instance is actively being tracked, poll every 2s to react quickly
             // to instance switches. When no Minecraft process is running, back off to
@@ -1944,6 +1952,16 @@ int main(int argc, char *argv[]) {
             // Tick co-op networking (lightweight per-frame check)
             coop_net_tick(&coop_ctx);
 
+            // Detect coop disconnection (kicked, host shutdown, connection lost)
+            // and apply settings to trigger a proper reload
+            CoopNetState cur_coop_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
+            if (prev_coop_state == COOP_NET_CONNECTED && cur_coop_state == COOP_NET_DISCONNECTED) {
+                log_message(LOG_INFO, "[COOP] Disconnection detected — applying settings for reload.\n");
+                SDL_SetAtomicInt(&g_settings_changed, 1);
+                SDL_SetAtomicInt(&g_apply_button_clicked, 1);
+            }
+            prev_coop_state = cur_coop_state;
+
             // --- Co-op Host: sync lobby player list to coop_players roster ---
             // When players join, leave, or get kicked, the lobby list changes.
             // We sync it into app_settings.coop_players[] so tracker_update_coop_merged()
@@ -1951,7 +1969,6 @@ int main(int argc, char *argv[]) {
             if (app_settings.network_mode == NETWORK_HOST && g_coop_ctx &&
                 coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
                 coop_net_lobby_changed(g_coop_ctx)) {
-
                 CoopLobbyPlayer lobby[COOP_MAX_LOBBY];
                 int lobby_count = coop_net_get_lobby_players(g_coop_ctx, lobby, COOP_MAX_LOBBY);
 
@@ -1960,7 +1977,10 @@ int main(int argc, char *argv[]) {
                 app_settings.coop_player_count = 0;
                 int host_idx = -1;
                 for (int i = 0; i < lobby_count; i++) {
-                    if (lobby[i].is_host) { host_idx = i; break; }
+                    if (lobby[i].is_host) {
+                        host_idx = i;
+                        break;
+                    }
                 }
 
                 // Slot 0: host
@@ -1991,9 +2011,9 @@ int main(int argc, char *argv[]) {
                 log_message(LOG_INFO, "[COOP] Synced lobby to roster: %d player(s).\n",
                             app_settings.coop_player_count);
 
-                // Force a data re-read so the host picks up the new player's files
-                SDL_SetAtomicInt(&g_needs_update, 1);
-                SDL_SetAtomicInt(&g_game_data_changed, 1);
+                // Apply settings and force a data re-read so the host picks up the new player's files
+                SDL_SetAtomicInt(&g_settings_changed, 1);
+                SDL_SetAtomicInt(&g_apply_button_clicked, 1);
             }
 
             // Close immediately if app not running
@@ -2231,8 +2251,25 @@ int main(int argc, char *argv[]) {
                             if (sem_wait(tracker->mutex) == 0) {
 #endif
                             OverlayIPCHeader header;
-                            strncpy(header.world_name, tracker->world_name, MAX_PATH_LENGTH - 1);
-                            header.world_name[MAX_PATH_LENGTH - 1] = '\0';
+                            // For receivers, show "Syncing with <Host>" in overlay world name
+                            bool hermes_rcv_connected = (app_settings.network_mode == NETWORK_RECEIVER &&
+                                g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+                            if (hermes_rcv_connected) {
+                                CoopLobbyPlayer hermes_lobby[COOP_MAX_LOBBY];
+                                int hermes_lobby_count = coop_net_get_lobby_players(g_coop_ctx, hermes_lobby, COOP_MAX_LOBBY);
+                                const char *hermes_host_name = "Host";
+                                for (int i = 0; i < hermes_lobby_count; i++) {
+                                    if (hermes_lobby[i].is_host) {
+                                        hermes_host_name = hermes_lobby[i].display_name[0] != '\0'
+                                            ? hermes_lobby[i].display_name : hermes_lobby[i].username;
+                                        break;
+                                    }
+                                }
+                                snprintf(header.world_name, MAX_PATH_LENGTH, "Syncing with %s", hermes_host_name);
+                            } else {
+                                strncpy(header.world_name, tracker->world_name, MAX_PATH_LENGTH - 1);
+                                header.world_name[MAX_PATH_LENGTH - 1] = '\0';
+                            }
                             header.time_since_last_update = tracker->time_since_last_update;
 
                             char *buffer_head = tracker->p_shared_data->buffer;
@@ -2252,7 +2289,7 @@ int main(int argc, char *argv[]) {
                     if (app_settings.network_mode == NETWORK_HOST && g_coop_ctx &&
                         coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
                         coop_net_get_client_count(g_coop_ctx) > 0) {
-                        char *broadcast_buf = (char *)malloc(4 * 1024 * 1024);
+                        char *broadcast_buf = (char *) malloc(4 * 1024 * 1024);
                         if (broadcast_buf) {
                             size_t broadcast_size = serialize_template_data(tracker->template_data, broadcast_buf);
                             if (broadcast_size > 0) {
@@ -2279,6 +2316,7 @@ int main(int argc, char *argv[]) {
                         cJSON *sc = cJSON_GetObjectItem(root, "stat_checkbox");
                         cJSON *cg = cJSON_GetObjectItem(root, "custom_goal_mode");
                         cJSON *th = cJSON_GetObjectItem(root, "template_hash");
+                        cJSON *hm = cJSON_GetObjectItem(root, "using_hermes");
 
                         // Validate template match on join: version/category/flag must match
                         // and the goal structure hash must be identical.
@@ -2313,7 +2351,7 @@ int main(int argc, char *argv[]) {
                             uint64_t local_hash = compute_template_goal_hash(app_settings.template_path);
                             char local_hash_str[20];
                             snprintf(local_hash_str, sizeof(local_hash_str), "%016llx",
-                                     (unsigned long long)local_hash);
+                                     (unsigned long long) local_hash);
                             if (strcmp(local_hash_str, th->valuestring) != 0) {
                                 snprintf(coop_mismatch_msg, sizeof(coop_mismatch_msg),
                                          "Your template has different goals than the host's template.\n\n"
@@ -2327,6 +2365,25 @@ int main(int argc, char *argv[]) {
                             }
                         }
 
+                        // Check Hermes mismatch: if host uses Hermes, receiver must too
+                        if (!mismatch && hm && cJSON_IsBool(hm)) {
+                            bool host_hermes = cJSON_IsTrue(hm);
+                            if (host_hermes && !app_settings.using_hermes) {
+                                snprintf(coop_mismatch_msg, sizeof(coop_mismatch_msg),
+                                         "The host is using the Hermes Mod (Live Tracking), but you don't "
+                                         "have it enabled.\n\n"
+                                         "Enable 'Using Hermes Mod (Live Tracking)' in the Paths & Templates "
+                                         "tab and try joining again.");
+                                mismatch = true;
+                            } else if (!host_hermes && app_settings.using_hermes) {
+                                snprintf(coop_mismatch_msg, sizeof(coop_mismatch_msg),
+                                         "You have the Hermes Mod enabled, but the host is not using it.\n\n"
+                                         "Disable 'Using Hermes Mod (Live Tracking)' in the Paths & Templates "
+                                         "tab and try joining again.");
+                                mismatch = true;
+                            }
+                        }
+
                         if (mismatch) {
                             log_message(LOG_INFO, "[COOP] Template mismatch with host. Disconnecting.\n");
                             coop_template_mismatch = true;
@@ -2335,7 +2392,8 @@ int main(int argc, char *argv[]) {
                             // Template matches — apply goal merging settings from host
                             if (sm && sm->valuestring)
                                 app_settings.coop_stat_merge = (strcmp(sm->valuestring, "cumulative") == 0)
-                                                                   ? COOP_STAT_CUMULATIVE : COOP_STAT_HIGHEST;
+                                                                   ? COOP_STAT_CUMULATIVE
+                                                                   : COOP_STAT_HIGHEST;
                             if (sc && sc->valuestring)
                                 app_settings.coop_stat_checkbox = (strcmp(sc->valuestring, "host_only") == 0)
                                                                       ? COOP_STAT_CHECKBOX_HOST_ONLY
@@ -2357,10 +2415,10 @@ int main(int argc, char *argv[]) {
                 if (g_coop_ctx->recv_data_ready) {
                     log_message(LOG_INFO, "[COOP DEBUG] Receiver: data ready. buf=%p size=%zu "
                                 "sizeof(TemplateData)=%zu template_data=%p\n",
-                                (void*)g_coop_ctx->recv_buffer,
+                                (void *) g_coop_ctx->recv_buffer,
                                 g_coop_ctx->recv_buffer_size,
                                 sizeof(TemplateData),
-                                (void*)tracker->template_data);
+                                (void *) tracker->template_data);
                 }
                 if (g_coop_ctx->recv_data_ready && g_coop_ctx->recv_buffer &&
                     g_coop_ctx->recv_buffer_size >= sizeof(TemplateData) && tracker->template_data) {
@@ -2368,6 +2426,8 @@ int main(int argc, char *argv[]) {
                     g_coop_ctx->recv_data_ready = false;
 
                     if (merged) {
+                        // Mirror the host's update timer so the receiver shows the same "Upd:" value
+                        tracker->time_since_last_update = tracker->template_data->host_time_since_last_update;
                         SDL_SetAtomicInt(&g_needs_update, 1);
                         SDL_SetAtomicInt(&g_game_data_changed, 1);
                         log_message(LOG_INFO, "[COOP] Received and applied merged state from host. "
@@ -2405,7 +2465,7 @@ int main(int argc, char *argv[]) {
                     tracker_recalculate_progress(tracker, &app_settings);
 
                     // Broadcast updated state immediately
-                    char *broadcast_buf = (char *)malloc(4 * 1024 * 1024);
+                    char *broadcast_buf = (char *) malloc(4 * 1024 * 1024);
                     if (broadcast_buf) {
                         size_t broadcast_size = serialize_template_data(tracker->template_data, broadcast_buf);
                         if (broadcast_size > 0) {
@@ -2414,8 +2474,8 @@ int main(int argc, char *argv[]) {
                         free(broadcast_buf);
                     }
 
-                    // Trigger IPC update so the overlay also refreshes
-                    SDL_SetAtomicInt(&g_needs_update, 1);
+                    // Trigger IPC + overlay update (not full re-merge, we already broadcast)
+                    SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
                     SDL_SetAtomicInt(&g_game_data_changed, 1);
                 }
             }
@@ -2423,13 +2483,15 @@ int main(int argc, char *argv[]) {
             // Check if dmon (or manual update through custom goal) has requested an update
             // Use SDL_SetAtomicInt to check AND reset the flag atomically.
             if (SDL_SetAtomicInt(&g_needs_update, 0) == 1) {
+                // Full update covers broadcast needs too
+                SDL_SetAtomicInt(&g_coop_broadcast_needed, 0);
                 // --- TODO: Debug Print ---
                 log_message(LOG_INFO, "[DEBUG - MAIN] g_needs_update was 1. Triggering full tracker update.\n");
                 // ----------------
 
                 // Receiver mode: skip file reading when connected (data comes from host)
                 bool receiver_connected = (app_settings.network_mode == NETWORK_RECEIVER &&
-                    g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+                                           g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
                 if (!receiver_connected) {
                     MC_Version version = settings_get_version_from_string(app_settings.version_str);
 
@@ -2499,12 +2561,14 @@ int main(int argc, char *argv[]) {
                         }
 
                         // Broadcast merged state to all receivers
-                        char *broadcast_buf = (char *)malloc(4 * 1024 * 1024); // 4 MB heap buffer
+                        char *broadcast_buf = (char *) malloc(4 * 1024 * 1024); // 4 MB heap buffer
                         if (broadcast_buf) {
                             size_t broadcast_size = serialize_template_data(tracker->template_data, broadcast_buf);
                             log_message(LOG_INFO, "[COOP DEBUG] Host: broadcast_size=%zu, overall_progress=%.1f%%\n",
                                         broadcast_size,
-                                        tracker->template_data ? tracker->template_data->overall_progress_percentage : -1.0f);
+                                        tracker->template_data
+                                            ? tracker->template_data->overall_progress_percentage
+                                            : -1.0f);
                             if (broadcast_size > 0) {
                                 coop_net_broadcast(g_coop_ctx, broadcast_buf, broadcast_size);
                             }
@@ -2523,7 +2587,12 @@ int main(int argc, char *argv[]) {
                 // Reset the timer BEFORE writing to IPC so the overlay gets "0s" instead of the old time.
                 if (SDL_SetAtomicInt(&g_game_data_changed, 0) == 1) {
                     // Reset the timer as the update has happened
-                    tracker->time_since_last_update = 0.0f;
+                    // Receivers mirror the host's timer (set during merge), so skip the reset
+                    bool rcv_connected = (app_settings.network_mode == NETWORK_RECEIVER &&
+                        g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+                    if (!rcv_connected) {
+                        tracker->time_since_last_update = 0.0f;
+                    }
 
                     // REDUCE SPAM, only print when update was triggered by game file change
                     // Print debug status (individual prints use log_message function)
@@ -2541,8 +2610,26 @@ int main(int argc, char *argv[]) {
                         // --- Critical Section: We have the lock ---
 
                         OverlayIPCHeader header;
-                        strncpy(header.world_name, tracker->world_name, MAX_PATH_LENGTH - 1);
-                        header.world_name[MAX_PATH_LENGTH - 1] = '\0'; // Ensure null-termination
+                        // For receivers, show "Syncing with <Host>" in overlay world name
+                        bool ipc_rcv_connected = (app_settings.network_mode == NETWORK_RECEIVER &&
+                                                  g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+                        if (ipc_rcv_connected) {
+                            CoopLobbyPlayer ipc_lobby[COOP_MAX_LOBBY];
+                            int ipc_lobby_count = coop_net_get_lobby_players(g_coop_ctx, ipc_lobby, COOP_MAX_LOBBY);
+                            const char *ipc_host_name = "Host";
+                            for (int i = 0; i < ipc_lobby_count; i++) {
+                                if (ipc_lobby[i].is_host) {
+                                    ipc_host_name = ipc_lobby[i].display_name[0] != '\0'
+                                                        ? ipc_lobby[i].display_name
+                                                        : ipc_lobby[i].username;
+                                    break;
+                                }
+                            }
+                            snprintf(header.world_name, MAX_PATH_LENGTH, "Syncing with %s", ipc_host_name);
+                        } else {
+                            strncpy(header.world_name, tracker->world_name, MAX_PATH_LENGTH - 1);
+                            header.world_name[MAX_PATH_LENGTH - 1] = '\0';
+                        }
                         header.time_since_last_update = tracker->time_since_last_update;
 
                         // Get a pointer to the beginning of the shared buffer.
@@ -2568,6 +2655,75 @@ int main(int argc, char *argv[]) {
                 }
             }
 
+            // Lightweight custom goal broadcast: no file re-reading, just recalculate + broadcast + IPC
+            else if (SDL_SetAtomicInt(&g_coop_broadcast_needed, 0) == 1) {
+                log_message(LOG_INFO, "[COOP] Custom goal change — broadcasting without full re-merge.\n");
+                tracker_recalculate_progress(tracker, &app_settings);
+
+                // Broadcast to receivers
+                if (app_settings.network_mode == NETWORK_HOST && g_coop_ctx &&
+                    coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
+                    coop_net_get_client_count(g_coop_ctx) > 0) {
+                    char *broadcast_buf = (char *) malloc(4 * 1024 * 1024);
+                    if (broadcast_buf) {
+                        size_t broadcast_size = serialize_template_data(tracker->template_data, broadcast_buf);
+                        if (broadcast_size > 0) {
+                            coop_net_broadcast(g_coop_ctx, broadcast_buf, broadcast_size);
+                        }
+                        free(broadcast_buf);
+                    }
+                }
+
+                tracker_update_title(tracker, &app_settings);
+
+                if (SDL_SetAtomicInt(&g_game_data_changed, 0) == 1) {
+                    tracker->time_since_last_update = 0.0f;
+                    tracker_print_debug_status(tracker, &app_settings);
+                }
+
+                // IPC write to overlay
+                if (tracker->p_shared_data) {
+#ifdef _WIN32
+                    DWORD wait_result = WaitForSingleObject(tracker->h_mutex, 50);
+                    if (wait_result == WAIT_OBJECT_0) {
+#else
+                        if (sem_wait(tracker->mutex) == 0) {
+#endif
+                        OverlayIPCHeader header;
+                        bool ipc_rcv_connected = (app_settings.network_mode == NETWORK_RECEIVER &&
+                                                  g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+                        if (ipc_rcv_connected) {
+                            CoopLobbyPlayer ipc_lobby[COOP_MAX_LOBBY];
+                            int ipc_lobby_count = coop_net_get_lobby_players(g_coop_ctx, ipc_lobby, COOP_MAX_LOBBY);
+                            const char *ipc_host_name = "Host";
+                            for (int i = 0; i < ipc_lobby_count; i++) {
+                                if (ipc_lobby[i].is_host) {
+                                    ipc_host_name = ipc_lobby[i].display_name[0] != '\0'
+                                                        ? ipc_lobby[i].display_name
+                                                        : ipc_lobby[i].username;
+                                    break;
+                                }
+                            }
+                            snprintf(header.world_name, MAX_PATH_LENGTH, "Syncing with %s", ipc_host_name);
+                        } else {
+                            strncpy(header.world_name, tracker->world_name, MAX_PATH_LENGTH - 1);
+                            header.world_name[MAX_PATH_LENGTH - 1] = '\0';
+                        }
+                        header.time_since_last_update = tracker->time_since_last_update;
+                        char *buffer_head = tracker->p_shared_data->buffer;
+                        memcpy(buffer_head, &header, sizeof(OverlayIPCHeader));
+                        buffer_head += sizeof(OverlayIPCHeader);
+                        size_t template_data_size = serialize_template_data(tracker->template_data, buffer_head);
+                        tracker->p_shared_data->data_size = sizeof(OverlayIPCHeader) + template_data_size;
+#ifdef _WIN32
+                        ReleaseMutex(tracker->h_mutex);
+#else
+                        sem_post(tracker->mutex);
+#endif
+                    }
+                }
+            }
+
             // Continuous Update - Update the time in shared memory every frame so the overlay timer ticks
             else if (tracker->p_shared_data) {
 #ifdef _WIN32
@@ -2577,8 +2733,25 @@ int main(int argc, char *argv[]) {
 #endif
                     // Update ONLY the header part of shared memory to keep the timer in sync
                     OverlayIPCHeader header;
-                    strncpy(header.world_name, tracker->world_name, MAX_PATH_LENGTH - 1);
-                    header.world_name[MAX_PATH_LENGTH - 1] = '\0';
+                    // For receivers, show "Syncing with <Host>" in overlay world name
+                    bool timer_rcv_connected = (app_settings.network_mode == NETWORK_RECEIVER &&
+                        g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+                    if (timer_rcv_connected) {
+                        CoopLobbyPlayer timer_lobby[COOP_MAX_LOBBY];
+                        int timer_lobby_count = coop_net_get_lobby_players(g_coop_ctx, timer_lobby, COOP_MAX_LOBBY);
+                        const char *timer_host_name = "Host";
+                        for (int i = 0; i < timer_lobby_count; i++) {
+                            if (timer_lobby[i].is_host) {
+                                timer_host_name = timer_lobby[i].display_name[0] != '\0'
+                                    ? timer_lobby[i].display_name : timer_lobby[i].username;
+                                break;
+                            }
+                        }
+                        snprintf(header.world_name, MAX_PATH_LENGTH, "Syncing with %s", timer_host_name);
+                    } else {
+                        strncpy(header.world_name, tracker->world_name, MAX_PATH_LENGTH - 1);
+                        header.world_name[MAX_PATH_LENGTH - 1] = '\0';
+                    }
                     header.time_since_last_update = tracker->time_since_last_update;
 
                     // Write header at the start of buffer
@@ -2730,8 +2903,7 @@ int main(int argc, char *argv[]) {
             if (coop_template_mismatch) {
                 ImGui::OpenPopup("Template Mismatch##coop");
                 coop_template_mismatch = false;
-            }
-            {
+            } {
                 ImVec2 mismatch_center = ImGui::GetMainViewport()->GetCenter();
                 ImGui::SetNextWindowPos(mismatch_center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
             }

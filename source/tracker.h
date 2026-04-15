@@ -144,7 +144,7 @@ struct Tracker {
     bool hermes_active; // true if Hermes was detected for this world
     bool hermes_wants_ipc_flush; // set when in-memory state changed; cleared by main loop after IPC write
     void *hermes_coop_stat_cache; // Per-player stat values for CUMULATIVE merge delta tracking
-                                  // (std::unordered_map<std::string, int>*, managed in tracker.cpp)
+    // (std::unordered_map<std::string, int>*, managed in tracker.cpp)
 };
 
 /**

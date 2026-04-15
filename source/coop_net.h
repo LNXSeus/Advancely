@@ -25,29 +25,29 @@ extern "C" {
 // ---- Connection States ----
 
 enum CoopNetState {
-    COOP_NET_IDLE,          // Not started
-    COOP_NET_LISTENING,     // Host: server socket open, waiting for clients
-    COOP_NET_CONNECTING,    // Receiver: attempting connection to host
-    COOP_NET_CONNECTED,     // Receiver: connected to host
-    COOP_NET_DISCONNECTED,  // Clean disconnect (remote closed or stop called)
-    COOP_NET_ERROR          // Fatal error (bind failed, connect refused, etc.)
+    COOP_NET_IDLE, // Not started
+    COOP_NET_LISTENING, // Host: server socket open, waiting for clients
+    COOP_NET_CONNECTING, // Receiver: attempting connection to host
+    COOP_NET_CONNECTED, // Receiver: connected to host
+    COOP_NET_DISCONNECTED, // Clean disconnect (remote closed or stop called)
+    COOP_NET_ERROR // Fatal error (bind failed, connect refused, etc.)
 };
 
 // ---- Message Protocol ----
 // Wire format: [4 bytes type (network order)] [4 bytes length (network order)] [payload]
 
 enum CoopMsgType {
-    COOP_MSG_HEARTBEAT     = 1,  // Keepalive ping (empty payload)
-    COOP_MSG_HEARTBEAT_ACK = 2,  // Keepalive response (empty payload)
-    COOP_MSG_DISCONNECT    = 3,  // Graceful disconnect notification (empty payload)
-    COOP_MSG_STATE_UPDATE  = 4,  // Serialized tracker state
-    COOP_MSG_TEMPLATE_SYNC = 5,  // Template handshake data
-    COOP_MSG_JOIN_REQUEST  = 6,  // Receiver -> Host: JSON {uuid, username, display_name}
-    COOP_MSG_JOIN_ACCEPT   = 7,  // Host -> Receiver: JSON lobby player list
-    COOP_MSG_JOIN_REJECT   = 8,  // Host -> Receiver: reason string, then close
-    COOP_MSG_PLAYER_LIST   = 9,  // Host -> All receivers: JSON player list on any change
-    COOP_MSG_KICK          = 10, // Host -> Receiver: reason string, then close
-    COOP_MSG_CUSTOM_GOAL_MOD = 11  // Receiver -> Host: custom goal/stat checkbox modification
+    COOP_MSG_HEARTBEAT = 1, // Keepalive ping (empty payload)
+    COOP_MSG_HEARTBEAT_ACK = 2, // Keepalive response (empty payload)
+    COOP_MSG_DISCONNECT = 3, // Graceful disconnect notification (empty payload)
+    COOP_MSG_STATE_UPDATE = 4, // Serialized tracker state
+    COOP_MSG_TEMPLATE_SYNC = 5, // Template handshake data
+    COOP_MSG_JOIN_REQUEST = 6, // Receiver -> Host: JSON {uuid, username, display_name}
+    COOP_MSG_JOIN_ACCEPT = 7, // Host -> Receiver: JSON lobby player list
+    COOP_MSG_JOIN_REJECT = 8, // Host -> Receiver: reason string, then close
+    COOP_MSG_PLAYER_LIST = 9, // Host -> All receivers: JSON player list on any change
+    COOP_MSG_KICK = 10, // Host -> Receiver: reason string, then close
+    COOP_MSG_CUSTOM_GOAL_MOD = 11 // Receiver -> Host: custom goal/stat checkbox modification
 };
 
 #define COOP_MSG_HEADER_SIZE 8 // 4 bytes type + 4 bytes length
@@ -56,12 +56,12 @@ enum CoopMsgType {
 // On Windows, SOCKET is UINT_PTR (8 bytes on x64). We mirror that size without
 // pulling in winsock2.h (which must precede windows.h and can conflict).
 #ifdef _WIN32
-    #include <stddef.h>
-    typedef size_t coop_socket_t; // Same width as SOCKET (UINT_PTR)
-    #define COOP_INVALID_SOCKET ((coop_socket_t)(~0))
+#include <stddef.h>
+typedef size_t coop_socket_t; // Same width as SOCKET (UINT_PTR)
+#define COOP_INVALID_SOCKET ((coop_socket_t)(~0))
 #else
-    typedef int coop_socket_t;
-    #define COOP_INVALID_SOCKET (-1)
+typedef int coop_socket_t;
+#define COOP_INVALID_SOCKET (-1)
 #endif
 
 // ---- Data Structures ----
@@ -79,17 +79,17 @@ typedef struct {
 
 // Custom goal/stat checkbox modification actions (Receiver -> Host)
 enum CoopGoalModAction {
-    COOP_MOD_TOGGLE = 0,     // Toggle a checkbox (custom goal or stat)
-    COOP_MOD_INCREMENT = 1,  // Increment a counter
-    COOP_MOD_DECREMENT = 2,  // Decrement a counter
-    COOP_MOD_SET_VALUE = 3   // Set a specific value
+    COOP_MOD_TOGGLE = 0, // Toggle a checkbox (custom goal or stat)
+    COOP_MOD_INCREMENT = 1, // Increment a counter
+    COOP_MOD_DECREMENT = 2, // Decrement a counter
+    COOP_MOD_SET_VALUE = 3 // Set a specific value
 };
 
 typedef struct {
-    char goal_root_name[192];  // root_name of the custom goal or stat
+    char goal_root_name[192]; // root_name of the custom goal or stat
     char parent_root_name[192]; // parent root_name for sub-stats (empty = top-level)
-    int action;                // CoopGoalModAction
-    int value;                 // For SET_VALUE action
+    int action; // CoopGoalModAction
+    int value; // For SET_VALUE action
 } CoopCustomGoalModMsg;
 
 #define COOP_MAX_CUSTOM_MODS 64
@@ -102,22 +102,22 @@ enum CoopClientAction {
 };
 
 typedef struct {
-    coop_socket_t socket_fd;    // Client socket descriptor
-    char label[64];             // Display label e.g. "192.168.1.5:12345"
-    bool active;                // Slot is in use
-    bool handshake_done;        // JOIN_REQUEST validated and approved by host
-    bool pending_approval;      // Waiting for host to accept/reject
-    char username[64];          // From handshake
-    char uuid[48];              // From handshake
-    char display_name[64];      // From handshake
-    Uint32 connect_time;        // When the socket was accepted (for handshake timeout)
+    coop_socket_t socket_fd; // Client socket descriptor
+    char label[64]; // Display label e.g. "192.168.1.5:12345"
+    bool active; // Slot is in use
+    bool handshake_done; // JOIN_REQUEST validated and approved by host
+    bool pending_approval; // Waiting for host to accept/reject
+    char username[64]; // From handshake
+    char uuid[48]; // From handshake
+    char display_name[64]; // From handshake
+    Uint32 connect_time; // When the socket was accepted (for handshake timeout)
     SDL_AtomicInt pending_action; // CoopClientAction: set by UI thread, processed by host thread
     char pending_action_reason[128]; // Reason string for kick/reject
 } CoopClient;
 
 // A pending join request shown in the host UI for approval
 typedef struct {
-    int client_slot;            // Which client slot this request is from
+    int client_slot; // Which client slot this request is from
     char username[64];
     char uuid[48];
     char display_name[64];
@@ -125,13 +125,13 @@ typedef struct {
 
 typedef struct {
     // -- State (atomically readable from any thread) --
-    SDL_AtomicInt state;        // CoopNetState
-    SDL_AtomicInt should_stop;  // Signal for network thread to shut down
+    SDL_AtomicInt state; // CoopNetState
+    SDL_AtomicInt should_stop; // Signal for network thread to shut down
 
     // -- Host fields --
-    coop_socket_t server_fd;                // Listening socket (COOP_INVALID_SOCKET when unused)
+    coop_socket_t server_fd; // Listening socket (COOP_INVALID_SOCKET when unused)
     CoopClient clients[COOP_MAX_CLIENTS];
-    int client_count;                       // Handshaked (approved) clients only
+    int client_count; // Handshaked (approved) clients only
 
     // -- Host identity (copied from settings at start) --
     char host_username[64];
@@ -140,8 +140,8 @@ typedef struct {
 
     // -- Receiver fields --
     coop_socket_t client_fd; // Connection to host (COOP_INVALID_SOCKET when unused)
-    char connect_ip[64];     // Target IP for receiver connect (set before thread spawn)
-    int connect_port;        // Target port for receiver connect
+    char connect_ip[64]; // Target IP for receiver connect (set before thread spawn)
+    int connect_port; // Target port for receiver connect
 
     // -- Receiver identity (set before starting receiver thread) --
     char connect_username[64];
@@ -182,10 +182,10 @@ typedef struct {
     // -- Template sync (host sets, sent on approve; receiver receives and stores) --
     SDL_Mutex *template_sync_mutex;
     char template_sync_payload[1024]; // JSON string with version, category, optional_flag, merge settings
-    bool template_sync_ready;         // Receiver: true when new sync data available for main thread
+    bool template_sync_ready; // Receiver: true when new sync data available for main thread
 
     // -- Disconnect reason (receiver sets before stopping, sent in the thread's cleanup path) --
-    char disconnect_reason[128];      // Non-empty = include as payload in DISCONNECT message
+    char disconnect_reason[128]; // Non-empty = include as payload in DISCONNECT message
 } CoopNetContext;
 
 // ---- Public API ----

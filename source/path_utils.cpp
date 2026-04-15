@@ -289,7 +289,8 @@ static bool get_active_instance_saves_path(char *out_path, size_t max_len) {
                             }
 
                             if (extracted_path_w[0] != L'\0') {
-                                WideCharToMultiByte(CP_UTF8, 0, extracted_path_w, -1, instance_path_mbs, sizeof(instance_path_mbs), nullptr, nullptr);
+                                WideCharToMultiByte(CP_UTF8, 0, extracted_path_w, -1, instance_path_mbs,
+                                                    sizeof(instance_path_mbs), nullptr, nullptr);
 
                                 // Trim /natives if the path came from Djava.library.path
                                 if (wcsstr(cmd_line, keys[0])) {

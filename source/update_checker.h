@@ -20,7 +20,7 @@ extern "C" {
  * @brief Helper function to recursively delete a directory and its contents.
  * @param path The path to the directory to delete.
  */
-void delete_directory_recursively(const char* path);
+void delete_directory_recursively(const char *path);
 
 /**
  * @brief Checks GitHub for the latest release of Advancely.
@@ -38,7 +38,8 @@ void delete_directory_recursively(const char* path);
  * @param html_url_max_len The size of the out_html_url buffer.
  * @return true if a new version is available, false otherwise or on error.
 */
-bool check_for_updates(const char* current_version, char* out_latest_version, size_t max_len, char* out_download_url, size_t url_max_len, char* out_html_url, size_t html_url_max_len);
+bool check_for_updates(const char *current_version, char *out_latest_version, size_t max_len, char *out_download_url,
+                       size_t url_max_len, char *out_html_url, size_t html_url_max_len);
 
 /**
 * @brief Downloads the update zip file from a given URL.
@@ -49,7 +50,7 @@ bool check_for_updates(const char* current_version, char* out_latest_version, si
 * @param url The direct URL to the .zip release asset.
 * @return true on successful download, false otherwise.
 */
-bool download_update_zip(const char* url);
+bool download_update_zip(const char *url);
 
 /**
 * @brief Applies the downloaded and extracted update.
@@ -66,7 +67,7 @@ bool download_update_zip(const char* url);
 * @param main_executable_path The path to the currently running executable.
 * @return true if the application should restart, false on error.
 */
-bool apply_update(const char* main_executable_path);
+bool apply_update(const char *main_executable_path);
 
 /**
 * @brief Initiates an application restart.

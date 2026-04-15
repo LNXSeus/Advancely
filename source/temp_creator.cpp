@@ -5647,7 +5647,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                             static char focused_crit_root[192] = {};
                             if (ImGui::InputText("Criterion Root Name", criterion.root_name,
-                                             sizeof(criterion.root_name))) {
+                                                 sizeof(criterion.root_name))) {
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemActivated()) {
@@ -6645,7 +6645,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 goal_selector_custom_goal_index = -1;
                                 goal_selector_deco_index = -1;
                                 goal_selector_last_clicked_flat_index = -1;
-                                snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s", stat_cat.root_name);
+                                snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s",
+                                         stat_cat.root_name);
                                 // Find the index of this stat category
                                 goal_selector_stat_cat_index = -1;
                                 for (int si = 0; si < (int) current_template_data.stats.size(); si++) {
@@ -6750,11 +6751,12 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             auto &simple_crit = stat_cat.criteria[0];
                             static char focused_simple_stat_root[192] = {};
                             if (ImGui::InputText("Stat Root Name", simple_crit.root_name,
-                                             sizeof(simple_crit.root_name))) {
+                                                 sizeof(simple_crit.root_name))) {
                                 save_message_type = MSG_NONE;
                             }
                             if (ImGui::IsItemActivated()) {
-                                strncpy(focused_simple_stat_root, simple_crit.root_name, sizeof(focused_simple_stat_root));
+                                strncpy(focused_simple_stat_root, simple_crit.root_name,
+                                        sizeof(focused_simple_stat_root));
                                 focused_simple_stat_root[sizeof(focused_simple_stat_root) - 1] = '\0';
                             }
                             if (ImGui::IsItemDeactivatedAfterEdit()) {
@@ -7210,7 +7212,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                         goal_selector_custom_goal_index = -1;
                                         goal_selector_deco_index = -1;
                                         goal_selector_last_clicked_flat_index = -1;
-                                        snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s", crit.root_name);
+                                        snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s",
+                                                 crit.root_name);
                                         // Find the index of this stat category
                                         goal_selector_stat_cat_index = -1;
                                         for (int si = 0; si < (int) current_template_data.stats.size(); si++) {
@@ -8103,7 +8106,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 goal_selector_deco_index = -1;
                                 goal_selector_last_clicked_flat_index = -1;
                                 goal_selector_custom_goal_index = (int) i;
-                                snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s", goal.root_name);
+                                snprintf(goal_selector_target_id, sizeof(goal_selector_target_id), "%s",
+                                         goal.root_name);
                                 goal_selector_multi_selections.clear();
                                 for (const auto &lg: goal.linked_goals) {
                                     goal_selector_multi_selections.push_back(lg);
@@ -12905,11 +12909,13 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                 return true;
             // Match against section names so searching e.g. "Advancements" filters by section
             const char *section_name = nullptr;
-            if (strcmp(type_name, "Advancement") == 0 || strcmp(type_name, "Criterion") == 0) section_name = "Advancements";
+            if (strcmp(type_name, "Advancement") == 0 || strcmp(type_name, "Criterion") == 0)
+                section_name = "Advancements";
             else if (strcmp(type_name, "Stat") == 0 || strcmp(type_name, "Sub-Stat") == 0) section_name = "Stats";
             else if (strcmp(type_name, "Unlock") == 0) section_name = "Unlocks";
             else if (strcmp(type_name, "Custom Goal") == 0) section_name = "Custom Goals";
-            else if (strcmp(type_name, "Multi-Stage Goal") == 0 || strcmp(type_name, "Stage") == 0) section_name = "Multi-Stage Goals";
+            else if (strcmp(type_name, "Multi-Stage Goal") == 0 || strcmp(type_name, "Stage") == 0)
+                section_name = "Multi-Stage Goals";
             else if (strcmp(type_name, "Counter") == 0) section_name = "Counters";
             return section_name && str_contains_insensitive(section_name, goal_selector_search_buffer);
         };

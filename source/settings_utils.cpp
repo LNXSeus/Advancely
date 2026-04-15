@@ -1120,13 +1120,15 @@ bool settings_load(AppSettings *settings) {
             settings->account_type = ACCOUNT_OFFLINE;
         const cJSON *acc_uname = cJSON_GetObjectItem(account_json, "username");
         if (acc_uname && cJSON_IsString(acc_uname))
-            strncpy(settings->local_player.username, acc_uname->valuestring, sizeof(settings->local_player.username) - 1);
+            strncpy(settings->local_player.username, acc_uname->valuestring,
+                    sizeof(settings->local_player.username) - 1);
         const cJSON *acc_uuid = cJSON_GetObjectItem(account_json, "uuid");
         if (acc_uuid && cJSON_IsString(acc_uuid))
             strncpy(settings->local_player.uuid, acc_uuid->valuestring, sizeof(settings->local_player.uuid) - 1);
         const cJSON *acc_dname = cJSON_GetObjectItem(account_json, "display_name");
         if (acc_dname && cJSON_IsString(acc_dname))
-            strncpy(settings->local_player.display_name, acc_dname->valuestring, sizeof(settings->local_player.display_name) - 1);
+            strncpy(settings->local_player.display_name, acc_dname->valuestring,
+                    sizeof(settings->local_player.display_name) - 1);
     } else {
         // Migration: read from old coop.local_player location
         cJSON *coop_migration = cJSON_GetObjectItem(json, "coop");
@@ -1135,13 +1137,15 @@ bool settings_load(AppSettings *settings) {
             if (local_player_json && cJSON_IsObject(local_player_json)) {
                 const cJSON *lp_uname = cJSON_GetObjectItem(local_player_json, "username");
                 if (lp_uname && cJSON_IsString(lp_uname))
-                    strncpy(settings->local_player.username, lp_uname->valuestring, sizeof(settings->local_player.username) - 1);
+                    strncpy(settings->local_player.username, lp_uname->valuestring,
+                            sizeof(settings->local_player.username) - 1);
                 const cJSON *lp_uuid = cJSON_GetObjectItem(local_player_json, "uuid");
                 if (lp_uuid && cJSON_IsString(lp_uuid))
                     strncpy(settings->local_player.uuid, lp_uuid->valuestring, sizeof(settings->local_player.uuid) - 1);
                 const cJSON *lp_dname = cJSON_GetObjectItem(local_player_json, "display_name");
                 if (lp_dname && cJSON_IsString(lp_dname))
-                    strncpy(settings->local_player.display_name, lp_dname->valuestring, sizeof(settings->local_player.display_name) - 1);
+                    strncpy(settings->local_player.display_name, lp_dname->valuestring,
+                            sizeof(settings->local_player.display_name) - 1);
             }
         }
     }
@@ -1492,7 +1496,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
             cJSON *player_obj = cJSON_CreateObject();
             cJSON_AddItemToObject(player_obj, "username", cJSON_CreateString(settings->coop_players[i].username));
             cJSON_AddItemToObject(player_obj, "uuid", cJSON_CreateString(settings->coop_players[i].uuid));
-            cJSON_AddItemToObject(player_obj, "display_name", cJSON_CreateString(settings->coop_players[i].display_name));
+            cJSON_AddItemToObject(player_obj, "display_name",
+                                  cJSON_CreateString(settings->coop_players[i].display_name));
             cJSON_AddItemToArray(roster_arr, player_obj);
         }
         cJSON_AddItemToObject(coop_obj, "player_roster", roster_arr);

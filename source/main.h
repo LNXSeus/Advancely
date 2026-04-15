@@ -23,6 +23,7 @@
 #include <SDL3_image/SDL_image.h> // Load with IMG_Load and get *SDL_Surface, SDL_SetWindowIcon (maybe for overlay idk) -> https://youtu.be/EP6EwVwfCiU?t=1200
 
 
+
 #include <SDL3_ttf/SDL_ttf.h>
 
 
@@ -40,7 +41,7 @@ typedef enum {
     FORCE_OPEN_NONE,
     FORCE_OPEN_AUTO_FAIL,
     FORCE_OPEN_MANUAL_FAIL,
-    FORCE_OPEN_ACCOUNT_SETUP   // First-run: prompt user to configure their Minecraft account
+    FORCE_OPEN_ACCOUNT_SETUP // First-run: prompt user to configure their Minecraft account
 } ForceOpenReason;
 
 // Global error message function, accessible for other files

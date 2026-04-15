@@ -50,10 +50,11 @@ static void update_coop_template_sync(const AppSettings *s) {
     snprintf(buf, sizeof(buf),
              "{\"version\":\"%s\",\"category\":\"%s\",\"optional_flag\":\"%s\","
              "\"stat_merge\":\"%s\",\"stat_checkbox\":\"%s\",\"custom_goal_mode\":\"%s\","
-             "\"template_hash\":\"%016llx\"}",
+             "\"template_hash\":\"%016llx\",\"using_hermes\":%s}",
              s->version_str, s->category, s->optional_flag,
              stat_merge, stat_cb, custom,
-             (unsigned long long)goal_hash);
+             (unsigned long long) goal_hash,
+             s->using_hermes ? "true" : "false");
     coop_net_set_template_sync(g_coop_ctx, buf);
 }
 
@@ -450,7 +451,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // --- No saves path warning (suppressed for connected receivers — they get data from host) ---
     {
         bool is_receiver_connected = (temp_settings.network_mode == NETWORK_RECEIVER &&
-            g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+                                      g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
         if (!is_receiver_connected) {
             bool has_valid_saves = t && t->saves_path[0] != '\0' && path_exists(t->saves_path);
             if (has_valid_saves) {
@@ -497,167 +498,6 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
 
     // SETTINGS TABS START
     if (ImGui::BeginTabBar("SettingsTabs", ImGuiTabBarFlags_None)) {
-
-        // ================================================================
-        // Account Tab (first tab — identity must be set up before anything else)
-        // ================================================================
-        if (ImGui::BeginTabItem("Account")) {
-            CoopNetState acc_net_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
-            bool acc_net_active = (acc_net_state == COOP_NET_LISTENING || acc_net_state == COOP_NET_CONNECTED
-                                   || acc_net_state == COOP_NET_CONNECTING);
-
-            ImGui::Text("Minecraft Account");
-            ImGui::TextDisabled("Link your Minecraft account so Advancely reads the correct player files.\n"
-                                "This is required for Co-op and recommended for singleplayer when\n"
-                                "multiple players share the same world.");
-            ImGui::Spacing();
-
-            // Account type radio (Online / Offline)
-            if (acc_net_active) ImGui::BeginDisabled();
-            int acc_type = temp_settings.account_type;
-            ImGui::RadioButton("Online##acc_type", &acc_type, ACCOUNT_ONLINE);
-            if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
-                char tooltip_buf[256];
-                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                         "Java Edition account. UUID is fetched automatically\n"
-                         "from the Mojang API based on your username.");
-                ImGui::SetTooltip("%s", tooltip_buf);
-            }
-            ImGui::SameLine();
-            ImGui::RadioButton("Offline##acc_type", &acc_type, ACCOUNT_OFFLINE);
-            if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
-                char tooltip_buf[256];
-                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                         "Offline/cracked account. You must enter your UUID manually.\n"
-                         "Find it in your world's playerdata or stats folder.");
-                ImGui::SetTooltip("%s", tooltip_buf);
-            }
-            temp_settings.account_type = (AccountType) acc_type;
-            if (acc_net_active) ImGui::EndDisabled();
-
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
-
-            if (acc_net_active) ImGui::BeginDisabled();
-
-            // Username input
-            ImGui::SetNextItemWidth(200.0f);
-            ImGui::InputText("Username##account", temp_settings.local_player.username,
-                             sizeof(temp_settings.local_player.username));
-            if (acc_net_active) {
-                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                    char tooltip_buf[256];
-                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                             "Cannot modify account while a lobby is active.");
-                    ImGui::SetTooltip("%s", tooltip_buf);
-                }
-            } else {
-                if (ImGui::IsItemHovered()) {
-                    char tooltip_buf[256];
-                    snprintf(tooltip_buf, sizeof(tooltip_buf), "Your Minecraft username.");
-                    ImGui::SetTooltip("%s", tooltip_buf);
-                }
-            }
-
-            if (temp_settings.account_type == ACCOUNT_ONLINE) {
-                // Online mode: Link Account button fetches UUID from Mojang API
-                ImGui::SameLine();
-                bool can_link = !acc_net_active && temp_settings.local_player.username[0] != '\0';
-                if (!can_link) ImGui::BeginDisabled();
-                if (ImGui::Button("Link Account##account")) {
-                    char fetched_uuid[48] = "";
-                    bool fetched = mojang_fetch_uuid(temp_settings.local_player.username,
-                                                     fetched_uuid, sizeof(fetched_uuid));
-                    if (fetched) {
-                        strncpy(temp_settings.local_player.uuid, fetched_uuid,
-                                sizeof(temp_settings.local_player.uuid) - 1);
-                        snprintf(coop_identity_status_msg, sizeof(coop_identity_status_msg),
-                                 "Linked: %s", fetched_uuid);
-                        coop_identity_status_is_error = false;
-                    } else {
-                        temp_settings.local_player.uuid[0] = '\0';
-                        snprintf(coop_identity_status_msg, sizeof(coop_identity_status_msg),
-                                 "Could not find player '%s'. Check the username.",
-                                 temp_settings.local_player.username);
-                        coop_identity_status_is_error = true;
-                    }
-                }
-                if (!can_link) ImGui::EndDisabled();
-
-                // Show link status
-                if (temp_settings.local_player.uuid[0] != '\0') {
-                    ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "Linked: %s",
-                                       temp_settings.local_player.uuid);
-                    ImGui::SameLine();
-                    if (!acc_net_active && ImGui::SmallButton("Unlink##account")) {
-                        temp_settings.local_player.uuid[0] = '\0';
-                        coop_identity_status_msg[0] = '\0';
-                        coop_identity_status_is_error = false;
-                        if (acc_net_active && g_coop_ctx) {
-                            coop_net_stop(g_coop_ctx);
-                        }
-                    }
-                } else if (coop_identity_status_msg[0] != '\0') {
-                    if (coop_identity_status_is_error)
-                        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", coop_identity_status_msg);
-                    else
-                        ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "%s", coop_identity_status_msg);
-                } else {
-                    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "Not linked yet");
-                }
-            } else {
-                // Offline mode: manual UUID input
-                ImGui::SetNextItemWidth(320.0f);
-                ImGui::InputTextWithHint("UUID##account_offline", "e.g. 069a79f4-44e9-4726-a5be-fca90e38aaf5",
-                                         temp_settings.local_player.uuid,
-                                         sizeof(temp_settings.local_player.uuid));
-                if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
-                    char tooltip_buf[256];
-                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                             "Your offline UUID. Look in your world's stats or playerdata folder\n"
-                             "for a JSON file named with your UUID (e.g. 069a79f4-...-fca90e38aaf5.json).");
-                    ImGui::SetTooltip("%s", tooltip_buf);
-                }
-                if (temp_settings.local_player.uuid[0] != '\0') {
-                    ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "UUID set");
-                } else {
-                    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "UUID not set");
-                }
-            }
-
-            // Display Name (optional, shared between online/offline)
-            ImGui::SetNextItemWidth(200.0f);
-            ImGui::InputTextWithHint("Display Name##account", "Optional",
-                                     temp_settings.local_player.display_name,
-                                     sizeof(temp_settings.local_player.display_name));
-            if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
-                char tooltip_buf[256];
-                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                         "Optional display name shown in the Co-op lobby.\n"
-                         "Leave empty to use your username.");
-                ImGui::SetTooltip("%s", tooltip_buf);
-            }
-
-            if (acc_net_active) ImGui::EndDisabled();
-
-            // Status summary
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
-            bool identity_ready = temp_settings.local_player.uuid[0] != '\0';
-            if (identity_ready) {
-                ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "Account configured.");
-                ImGui::TextDisabled("Advancely will use your UUID to read the correct player files.");
-            } else {
-                ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "Account not configured.");
-                ImGui::TextDisabled("Without an account, Advancely picks the first file it finds.\n"
-                                    "This can read the wrong player's data in shared worlds.");
-            }
-
-            ImGui::EndTabItem();
-        }
-
         if (ImGui::BeginTabItem("Paths & Templates")) {
             // Path Settings
             ImGui::Text("Path Settings");
@@ -821,11 +661,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             // Template selection is locked for both host and receivers during an active lobby
             CoopNetState tpl_net_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
             bool coop_template_locked = g_coop_ctx &&
-                ((temp_settings.network_mode == NETWORK_RECEIVER && tpl_net_state == COOP_NET_CONNECTED) ||
-                 (temp_settings.network_mode == NETWORK_HOST && tpl_net_state == COOP_NET_LISTENING));
+                                        ((temp_settings.network_mode == NETWORK_RECEIVER && tpl_net_state ==
+                                          COOP_NET_CONNECTED) ||
+                                         (temp_settings.network_mode == NETWORK_HOST && tpl_net_state ==
+                                          COOP_NET_LISTENING));
             const char *coop_template_locked_tooltip = (temp_settings.network_mode == NETWORK_HOST)
-                ? "Template settings are locked while a lobby is active"
-                : "Controlled by Host";
+                                                           ? "Template settings are locked while a lobby is active"
+                                                           : "Controlled by Host";
             ImGui::Text("Template Settings");
             if (ImGui::IsItemHovered()) {
                 char template_settings_tooltip_buffer[1024];
@@ -962,8 +804,15 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             }
 
             // Hermes Mod checkbox — available for all versions that support Fabric
+            // Disable when lobby is active (host or receiver)
+            CoopNetState hermes_net_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
+            bool hermes_net_active = (hermes_net_state == COOP_NET_LISTENING ||
+                                      hermes_net_state == COOP_NET_CONNECTED ||
+                                      hermes_net_state == COOP_NET_CONNECTING);
+            if (hermes_net_active) ImGui::BeginDisabled();
             ImGui::Checkbox("Using Hermes Mod (Live Tracking)", &temp_settings.using_hermes);
-            if (ImGui::IsItemHovered()) {
+            if (hermes_net_active) ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(hermes_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
                 ImGui::BeginTooltip();
                 ImGui::PushTextWrapPos(ImGui::GetFontSize() * 38.0f);
                 ImGui::TextUnformatted("Hermes Mod (by DuncanRuns, for Fabric)");
@@ -1006,6 +855,11 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     "  when the game actually saves.");
                 ImGui::Spacing();
                 ImGui::TextDisabled("Requires Hermes to be installed and a world to be loaded.");
+                if (hermes_net_active) {
+                    ImGui::Spacing();
+                    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f),
+                                       "Cannot change while a lobby is active.");
+                }
                 ImGui::PopTextWrapPos();
                 ImGui::EndTooltip();
             }
@@ -1365,9 +1219,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
             ImGui::SameLine();
 
             bool coop_session_active = g_coop_ctx &&
-                (coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING ||
-                 coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED ||
-                 coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTING);
+                                       (coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING ||
+                                        coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED ||
+                                        coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTING);
             if (coop_session_active) ImGui::BeginDisabled();
             if (ImGui::Button("Edit Templates")) {
                 *p_temp_creator_open = true; // Open the template creator window
@@ -2191,7 +2045,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 if (ImGui::IsItemHovered()) {
                     char overlay_text_world_tooltip_buffer[1024];
                     snprintf(overlay_text_world_tooltip_buffer, sizeof(overlay_text_world_tooltip_buffer),
-                             "Shows the current world name.");
+                             "Shows the current world name.\n"
+                             "For Co-op receivers, this shows 'Syncing with <Host>'.");
                     ImGui::SetTooltip("%s", overlay_text_world_tooltip_buffer);
                 }
                 ImGui::SameLine();
@@ -2510,6 +2365,171 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             ImGui::EndTabItem();
         } // End of Overlay Tab
 
+        // Account Tab
+        if (ImGui::BeginTabItem("Account")) {
+            CoopNetState acc_net_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
+            bool acc_net_active = (acc_net_state == COOP_NET_LISTENING || acc_net_state == COOP_NET_CONNECTED
+                                   || acc_net_state == COOP_NET_CONNECTING);
+
+            ImGui::Text("Minecraft Account");
+            ImGui::TextDisabled("Link your Minecraft account so Advancely reads the correct player files.\n"
+                "This is required for Co-op and recommended for singleplayer when\n"
+                "multiple players share the same world.");
+            ImGui::Spacing();
+
+            // Account type radio (Online / Offline)
+            if (acc_net_active) ImGui::BeginDisabled();
+            int acc_type = temp_settings.account_type;
+            ImGui::RadioButton("Online##acc_type", &acc_type, ACCOUNT_ONLINE);
+            if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
+                char tooltip_buf[256];
+                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                         "Java Edition account. UUID is fetched automatically\n"
+                         "from the Mojang API based on your username.");
+                ImGui::SetTooltip("%s", tooltip_buf);
+            }
+            ImGui::SameLine();
+            ImGui::RadioButton("Offline##acc_type", &acc_type, ACCOUNT_OFFLINE);
+            if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
+                char tooltip_buf[256];
+                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                         "Offline/cracked account. You must enter your UUID manually.\n"
+                         "Find it through you worlds advancements or stats files.");
+                ImGui::SetTooltip("%s", tooltip_buf);
+            }
+            temp_settings.account_type = (AccountType) acc_type;
+            if (acc_net_active) ImGui::EndDisabled();
+
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            bool account_linked = (temp_settings.account_type == ACCOUNT_ONLINE &&
+                                   temp_settings.local_player.uuid[0] != '\0');
+            bool username_disabled = acc_net_active || account_linked;
+
+            if (username_disabled) ImGui::BeginDisabled();
+
+            // Username input
+            ImGui::SetNextItemWidth(200.0f);
+            ImGui::InputText("Username##account", temp_settings.local_player.username,
+                             sizeof(temp_settings.local_player.username));
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                char tooltip_buf[256];
+                if (acc_net_active) {
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Cannot modify account while a lobby is active.");
+                } else if (account_linked) {
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Username is locked while the account is linked.\n"
+                             "Unlink the account to change your username.");
+                } else {
+                    snprintf(tooltip_buf, sizeof(tooltip_buf), "Your Minecraft username.");
+                }
+                ImGui::SetTooltip("%s", tooltip_buf);
+            }
+            if (username_disabled) ImGui::EndDisabled();
+
+            if (temp_settings.account_type == ACCOUNT_ONLINE) {
+                // Online mode: Link Account button fetches UUID from Mojang API
+                ImGui::SameLine();
+                bool can_link = !acc_net_active && !account_linked &&
+                                temp_settings.local_player.username[0] != '\0';
+                if (!can_link) ImGui::BeginDisabled();
+                if (ImGui::Button("Link Account##account")) {
+                    char fetched_uuid[48] = "";
+                    bool fetched = mojang_fetch_uuid(temp_settings.local_player.username,
+                                                     fetched_uuid, sizeof(fetched_uuid));
+                    if (fetched) {
+                        strncpy(temp_settings.local_player.uuid, fetched_uuid,
+                                sizeof(temp_settings.local_player.uuid) - 1);
+                        snprintf(coop_identity_status_msg, sizeof(coop_identity_status_msg),
+                                 "Linked: %s", fetched_uuid);
+                        coop_identity_status_is_error = false;
+                    } else {
+                        temp_settings.local_player.uuid[0] = '\0';
+                        snprintf(coop_identity_status_msg, sizeof(coop_identity_status_msg),
+                                 "Could not find player '%s'. Check the username.",
+                                 temp_settings.local_player.username);
+                        coop_identity_status_is_error = true;
+                    }
+                }
+                if (!can_link) ImGui::EndDisabled();
+
+                // Show link status
+                if (temp_settings.local_player.uuid[0] != '\0') {
+                    ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "Linked: %s",
+                                       temp_settings.local_player.uuid);
+                    if (!acc_net_active) {
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Unlink##account")) {
+                            temp_settings.local_player.uuid[0] = '\0';
+                            coop_identity_status_msg[0] = '\0';
+                            coop_identity_status_is_error = false;
+                        }
+                    }
+                } else if (coop_identity_status_msg[0] != '\0') {
+                    if (coop_identity_status_is_error)
+                        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", coop_identity_status_msg);
+                    else
+                        ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "%s", coop_identity_status_msg);
+                } else {
+                    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "Not linked yet");
+                }
+            } else {
+                // Offline mode: manual UUID input
+                if (acc_net_active) ImGui::BeginDisabled();
+                ImGui::SetNextItemWidth(320.0f);
+                ImGui::InputTextWithHint("UUID##account_offline", "e.g. 069a79f4-44e9-4726-a5be-fca90e38aaf5",
+                                         temp_settings.local_player.uuid,
+                                         sizeof(temp_settings.local_player.uuid));
+                if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
+                    char tooltip_buf[256];
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Your offline UUID. Look in your world's stats or playerdata folder\n"
+                             "for a JSON file named with your UUID (e.g. 069a79f4-...-fca90e38aaf5.json).");
+                    ImGui::SetTooltip("%s", tooltip_buf);
+                }
+                if (temp_settings.local_player.uuid[0] != '\0') {
+                    ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "UUID set");
+                } else {
+                    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "UUID not set");
+                }
+                if (acc_net_active) ImGui::EndDisabled();
+            }
+
+            // Display Name (optional, shared between online/offline)
+            if (acc_net_active) ImGui::BeginDisabled();
+            ImGui::SetNextItemWidth(200.0f);
+            ImGui::InputTextWithHint("Display Name##account", "Optional",
+                                     temp_settings.local_player.display_name,
+                                     sizeof(temp_settings.local_player.display_name));
+            if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
+                char tooltip_buf[256];
+                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                         "Optional display name shown in the Co-op lobby.\n"
+                         "Leave empty to use your username.");
+                ImGui::SetTooltip("%s", tooltip_buf);
+            }
+            if (acc_net_active) ImGui::EndDisabled();
+
+            // Status summary
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+            bool identity_ready = temp_settings.local_player.uuid[0] != '\0';
+            if (identity_ready) {
+                ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "Account configured.");
+                ImGui::TextDisabled("Advancely will use your UUID to read the correct player files.");
+            } else {
+                ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "Account not configured.");
+                ImGui::TextDisabled("Without an account, Advancely picks the first file it finds.\n"
+                    "This can read the wrong player's data in shared worlds.");
+            }
+
+            ImGui::EndTabItem();
+        }
+
         if (ImGui::BeginTabItem("Co-op")) {
             // Co-op tab uses function-scoped statics: coop_identity_status_msg,
             // coop_identity_status_is_error, coop_room_code_buf, coop_room_code_error, coop_ip_revealed
@@ -2524,18 +2544,30 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             // ============================================================
             // Step 1: Enable Co-op
             // ============================================================
+            bool is_craftmine = (selected_version == MC_VERSION_25W14CRAFTMINE);
+            if (is_craftmine) {
+                temp_settings.coop_enabled = false;
+                ImGui::BeginDisabled();
+            }
             ImGui::Checkbox("Enable Co-op", &temp_settings.coop_enabled);
-            if (ImGui::IsItemHovered()) {
+            if (is_craftmine) ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(is_craftmine ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
                 char tooltip_buf[256];
-                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                         "Enable cooperative multiplayer tracking.\n"
-                         "Requires all players to be on the same local network.\n"
-                         "Use ZeroTier (zerotier.com) to create a virtual LAN.");
+                if (is_craftmine) {
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Co-op is not available for 25w14craftmine.\n"
+                             "Unlocks don't work correctly in co-op mode.");
+                } else {
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Enable cooperative multiplayer tracking.\n"
+                             "Requires all players to be on the same local network.\n"
+                             "Use ZeroTier (zerotier.com) to create a virtual LAN.");
+                }
                 ImGui::SetTooltip("%s", tooltip_buf);
             }
             if (temp_settings.coop_enabled) {
                 ImGui::TextDisabled("Co-op requires all players to be on the same local network.\n"
-                                    "Use ZeroTier (zerotier.com) to create a virtual LAN.");
+                    "Use ZeroTier (zerotier.com) to create a virtual LAN.");
             }
 
             // If co-op was just unchecked while networking is active, stop it
@@ -2559,7 +2591,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     char id_label[128];
                     snprintf(id_label, sizeof(id_label), "Account: %s",
                              temp_settings.local_player.username[0] != '\0'
-                                 ? temp_settings.local_player.username : temp_settings.local_player.uuid);
+                                 ? temp_settings.local_player.username
+                                 : temp_settings.local_player.uuid);
                     ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "%s", id_label);
                 } else {
                     ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
@@ -2641,7 +2674,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     if (value > 255) return false;
                                 } else if (*p == '.' || *p == '\0') {
                                     if (value < 0) return false;
-                                    octets++; value = -1;
+                                    octets++;
+                                    value = -1;
                                     if (*p == '\0') break;
                                 } else return false;
                             }
@@ -2763,7 +2797,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid IP (x.x.x.x)");
                         }
                         if (pub_ip_duplicate) {
-                            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Public IP must be different from the bind IP.");
+                            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
+                                               "Public IP must be different from the bind IP.");
                         }
 
                         if (net_is_active) ImGui::BeginDisabled();
@@ -2805,20 +2840,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         {
                             char tooltip_buf[256];
 
-                            ImGui::BulletText("%s: Completed if any player completes it, tracking the player with the most criteria.", advancements_label_plural_uppercase);
+                            ImGui::BulletText(
+                                "%s: Completed if any player completes it, tracking the player with the most criteria.",
+                                advancements_label_plural_uppercase);
                             ImGui::BulletText("Multi-Stage Goals: Any player progress counts globally.");
                             if (ImGui::IsItemHovered()) {
                                 snprintf(tooltip_buf, sizeof(tooltip_buf),
                                          "Each stage can be advanced by any player. The furthest stage across all players is used.");
                                 ImGui::SetTooltip("%s", tooltip_buf);
-                            }
-                            if (selected_version == MC_VERSION_25W14CRAFTMINE) {
-                                ImGui::BulletText("Unlocks: Tracked per-player.");
-                                if (ImGui::IsItemHovered()) {
-                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "An unlock is completed if any player has obtained it.");
-                                    ImGui::SetTooltip("%s", tooltip_buf);
-                                }
                             }
                             ImGui::BulletText("Counters: Derived automatically from linked goals.");
                         }
@@ -2941,8 +2970,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     update_coop_template_sync(&temp_settings);
 
                                     // Use public IP for room code if provided, otherwise use bind IP
-                                    const char *room_code_ip = pub_ip_filled ? temp_settings.host_public_ip
-                                                                             : temp_settings.host_ip;
+                                    const char *room_code_ip = pub_ip_filled
+                                                                   ? temp_settings.host_public_ip
+                                                                   : temp_settings.host_ip;
                                     coop_encode_room_code(room_code_ip, port,
                                                           coop_room_code_buf, sizeof(coop_room_code_buf));
                                 }
@@ -2952,19 +2982,26 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 if (net_is_active) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf), "The lobby has already been started.");
                                 } else if (has_unsaved_changes) {
-                                    snprintf(tooltip_buf, sizeof(tooltip_buf), "Apply settings before starting a lobby.");
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Apply settings before starting a lobby.");
                                 } else if (!ip_valid && !port_valid) {
-                                    snprintf(tooltip_buf, sizeof(tooltip_buf), "A valid IP address and port are required to start a lobby.");
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "A valid IP address and port are required to start a lobby.");
                                 } else if (!ip_valid) {
-                                    snprintf(tooltip_buf, sizeof(tooltip_buf), "A valid IP address is required to start a lobby.");
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "A valid IP address is required to start a lobby.");
                                 } else if (!port_valid) {
-                                    snprintf(tooltip_buf, sizeof(tooltip_buf), "A valid port is required to start a lobby.");
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "A valid port is required to start a lobby.");
                                 } else if (!pub_ip_valid) {
-                                    snprintf(tooltip_buf, sizeof(tooltip_buf), "The public IP is not a valid IP address.");
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "The public IP is not a valid IP address.");
                                 } else if (pub_ip_duplicate) {
-                                    snprintf(tooltip_buf, sizeof(tooltip_buf), "Public IP must be different from the bind IP.");
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Public IP must be different from the bind IP.");
                                 } else if (editor_open) {
-                                    snprintf(tooltip_buf, sizeof(tooltip_buf), "Close the Template Editor before starting a lobby.");
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Close the Template Editor before starting a lobby.");
                                 }
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
@@ -2991,11 +3028,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::Spacing();
                             char status_buf[256];
                             coop_net_get_status_msg(g_coop_ctx, status_buf, sizeof(status_buf));
-                            ImVec4 sc = (net_state == COOP_NET_ERROR) ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f) :
-                                        ImVec4(1.0f, 0.6f, 0.4f, 1.0f);
+                            ImVec4 sc = (net_state == COOP_NET_ERROR)
+                                            ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f)
+                                            : ImVec4(1.0f, 0.6f, 0.4f, 1.0f);
                             ImGui::TextColored(sc, "%s", status_buf);
                         }
-
                     }
 
                     // ============================================================
@@ -3013,6 +3050,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 // Show disconnect + status while connecting
                                 if (ImGui::Button("Disconnect")) {
                                     coop_net_stop(g_coop_ctx);
+                                    SDL_SetAtomicInt(&g_settings_changed, 1);
+                                    SDL_SetAtomicInt(&g_apply_button_clicked, 1);
                                 }
                                 ImGui::Spacing();
                                 char status_buf[256];
@@ -3027,11 +3066,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     coop_room_code_error[0] = '\0';
                                     char *clipboard = SDL_GetClipboardText();
                                     if (!clipboard || clipboard[0] == '\0') {
-                                        snprintf(coop_room_code_error, sizeof(coop_room_code_error), "Clipboard is empty.");
+                                        snprintf(coop_room_code_error, sizeof(coop_room_code_error),
+                                                 "Clipboard is empty.");
                                     } else {
                                         char decoded_ip[64];
                                         int decoded_port;
-                                        if (coop_decode_room_code(clipboard, decoded_ip, sizeof(decoded_ip), &decoded_port)) {
+                                        if (coop_decode_room_code(clipboard, decoded_ip, sizeof(decoded_ip),
+                                                                  &decoded_port)) {
                                             if (g_coop_ctx) {
                                                 coop_net_start_receiver(g_coop_ctx, decoded_ip, decoded_port,
                                                                         temp_settings.local_player.username,
@@ -3078,12 +3119,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 ImGui::Spacing();
                                 char status_buf[256];
                                 coop_net_get_status_msg(g_coop_ctx, status_buf, sizeof(status_buf));
-                                ImVec4 sc = (net_state == COOP_NET_ERROR) ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f) :
-                                            ImVec4(1.0f, 0.6f, 0.4f, 1.0f);
+                                ImVec4 sc = (net_state == COOP_NET_ERROR)
+                                                ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f)
+                                                : ImVec4(1.0f, 0.6f, 0.4f, 1.0f);
                                 ImGui::TextColored(sc, "%s", status_buf);
                             }
                         }
-
                     }
 
                     // --- Waiting Room (host only, shown right above lobby) ---
@@ -3099,7 +3140,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::BeginChild("WaitingRoom", ImVec2(0, 150), true);
                             for (int i = 0; i < pending_count; i++) {
                                 ImGui::PushID(2000 + i);
-                                const char *name = pending[i].display_name[0] ? pending[i].display_name : pending[i].username;
+                                const char *name = pending[i].display_name[0]
+                                                       ? pending[i].display_name
+                                                       : pending[i].username;
                                 ImGui::Text("%s", name);
                                 ImGui::SameLine();
                                 ImGui::TextDisabled("(%s)", pending[i].username);
@@ -3127,8 +3170,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                         // Status line with disconnect button
                         {
-                            ImVec4 sc = (net_state == COOP_NET_LISTENING) ? ImVec4(0.4f, 0.8f, 1.0f, 1.0f) :
-                                        ImVec4(0.4f, 1.0f, 0.4f, 1.0f);
+                            ImVec4 sc = (net_state == COOP_NET_LISTENING)
+                                            ? ImVec4(0.4f, 0.8f, 1.0f, 1.0f)
+                                            : ImVec4(0.4f, 1.0f, 0.4f, 1.0f);
                             if (net_state == COOP_NET_CONNECTED) {
                                 ImGui::TextColored(sc, "Connected");
                             } else {
@@ -3138,6 +3182,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (ImGui::SmallButton("Disconnect##lobby")) {
                                 coop_net_stop(g_coop_ctx);
                                 coop_room_code_buf[0] = '\0';
+                                // Apply settings to trigger a proper reload
+                                SDL_SetAtomicInt(&g_settings_changed, 1);
+                                SDL_SetAtomicInt(&g_apply_button_clicked, 1);
                             }
                         }
 
@@ -3186,7 +3233,6 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         }
                         ImGui::EndChild();
                     }
-
                 } // end identity_complete
             } // end coop_enabled
 
@@ -3204,7 +3250,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::Separator();
                     ImGui::Spacing();
 
-                    bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter);
+                    bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(
+                                             ImGuiKey_KeypadEnter);
                     if (ImGui::Button("Reveal") || enter_pressed) {
                         coop_ip_revealed = true;
                         ImGui::CloseCurrentPopup();
@@ -3249,7 +3296,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::Separator();
                     ImGui::Spacing();
 
-                    bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter);
+                    bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(
+                                             ImGuiKey_KeypadEnter);
                     if (ImGui::Button("Reveal") || enter_pressed) {
                         coop_public_ip_revealed = true;
                         ImGui::CloseCurrentPopup();

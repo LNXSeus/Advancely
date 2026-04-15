@@ -3378,7 +3378,7 @@ void tracker_events(Tracker *t, SDL_Event *event, bool *is_running, bool *settin
                 *is_running = false;
             }
         }
-            break;
+        break;
 
         case SDL_EVENT_KEY_DOWN:
             if (event->key.repeat == 0) {
@@ -3455,14 +3455,11 @@ static void coop_reset_template_progress(TemplateData *td) {
         }
     }
 
-    for (int i = 0; i < td->unlock_count; i++) {
-        td->unlocks[i]->done = false;
-    }
-
     for (int i = 0; i < td->multi_stage_goal_count; i++) {
         td->multi_stage_goals[i]->current_stage = 0;
         for (int j = 0; j < td->multi_stage_goals[i]->stage_count; j++) {
             td->multi_stage_goals[i]->stages[j]->current_stat_progress = 0;
+            td->multi_stage_goals[i]->stages[j]->coop_completed = false;
         }
     }
 }
@@ -3511,7 +3508,7 @@ static void coop_merge_advancements_modern(TemplateData *td, const cJSON *player
                 // Overwrite criteria done flags with this player's state
                 for (int j = 0; j < adv->criteria_count; j++) {
                     adv->criteria[j]->done = (player_criteria &&
-                        cJSON_HasObjectItem(player_criteria, adv->criteria[j]->root_name));
+                                              cJSON_HasObjectItem(player_criteria, adv->criteria[j]->root_name));
                 }
                 adv->all_template_criteria_met = (adv->completed_criteria_count >= adv->criteria_count);
                 adv->done = game_is_done || adv->all_template_criteria_met;
@@ -3763,24 +3760,15 @@ static void coop_merge_stats_legacy(TemplateData *td, const cJSON *player_stats_
 /**
  * @brief Merges one player's unlock data into TemplateData (OR across players).
  */
-static void coop_merge_unlocks(TemplateData *td, const cJSON *player_unlocks_json) {
-    if (!player_unlocks_json) return;
-
-    cJSON *obtained_obj = cJSON_GetObjectItem(player_unlocks_json, "obtained");
-    if (!obtained_obj) return;
-
-    for (int i = 0; i < td->unlock_count; i++) {
-        TrackableItem *unlock = td->unlocks[i];
-        cJSON *unlock_status = cJSON_GetObjectItem(obtained_obj, unlock->root_name);
-        if (cJSON_IsTrue(unlock_status)) {
-            unlock->done = true; // OR across players
-        }
-    }
-}
-
+// Note: coop_merge_unlocks was removed — co-op is disabled for craftmine (the only
+// version with unlocks), so unlock merging is not needed.
 /**
- * @brief Merges one player's multi-stage goal progress (global — any player any stage).
- * Uses max(current_stage, player's furthest completed stage) across all players.
+ * @brief Accumulates one player's data into multi-stage goals for co-op merge.
+ *
+ * For stats, progress is always accumulated (summed) across players — this is NOT
+ * affected by the highest/cumulative toggle. For advancements, criteria, and unlocks,
+ * completion is OR'd across players. The actual stage progression is evaluated
+ * globally in coop_finalize_multi_stage() after all players have been merged.
  */
 static void coop_merge_multi_stage(TemplateData *td, const cJSON *player_adv_json,
                                    const cJSON *player_stats_json, const cJSON *player_unlocks_json,
@@ -3791,43 +3779,39 @@ static void coop_merge_multi_stage(TemplateData *td, const cJSON *player_adv_jso
     for (int i = 0; i < td->multi_stage_goal_count; i++) {
         MultiStageGoal *goal = td->multi_stage_goals[i];
 
-        // Evaluate how far this player gets, starting from stage 0
-        int player_furthest = 0;
-
         for (int j = 0; j < goal->stage_count; j++) {
             SubGoal *stage = goal->stages[j];
-            bool stage_completed = false;
 
-            if (stage->type == SUBGOAL_MANUAL) break;
+            if (stage->type == SUBGOAL_MANUAL) continue;
 
             switch (stage->type) {
                 case SUBGOAL_ADVANCEMENT:
                     if (player_adv_json) {
                         cJSON *adv_entry = cJSON_GetObjectItem(player_adv_json, stage->root_name);
                         if (adv_entry && cJSON_IsTrue(cJSON_GetObjectItem(adv_entry, "done"))) {
-                            stage_completed = true;
+                            stage->coop_completed = true;
                         }
                     }
                     break;
 
                 case SUBGOAL_STAT: {
-                    int current_progress = 0;
+                    int player_progress = 0;
                     if (version <= MC_VERSION_1_6_4) {
                         // Legacy: look up from already-merged stats in TemplateData
                         for (int c_idx = 0; c_idx < td->stat_count; c_idx++) {
                             for (int s_idx = 0; s_idx < td->stats[c_idx]->criteria_count; s_idx++) {
                                 TrackableItem *sub = td->stats[c_idx]->criteria[s_idx];
                                 if (strcmp(sub->root_name, stage->root_name) == 0) {
-                                    current_progress = sub->progress;
+                                    player_progress = sub->progress;
                                     goto stat_found_coop;
                                 }
                             }
                         }
-                        stat_found_coop:;
+                    stat_found_coop:;
                     } else if (version <= MC_VERSION_1_12_2) {
                         cJSON *stat_entry = cJSON_GetObjectItem(player_stats_json, stage->root_name);
                         if (cJSON_IsNumber(stat_entry)) {
-                            current_progress = stat_entry->valueint;
+                            player_progress = stat_entry->valueint;
                         }
                     } else {
                         cJSON *stats_obj = cJSON_GetObjectItem(player_stats_json, "stats");
@@ -3843,20 +3827,15 @@ static void coop_merge_multi_stage(TemplateData *td, const cJSON *player_adv_jso
                                 if (cat_obj) {
                                     cJSON *val = cJSON_GetObjectItem(cat_obj, item_key);
                                     if (cJSON_IsNumber(val)) {
-                                        current_progress = val->valueint;
+                                        player_progress = val->valueint;
                                     }
                                 }
                             }
                         }
                     }
 
-                    if (current_progress >= stage->required_progress) {
-                        stage_completed = true;
-                    }
-                    // Update stat progress to max across players
-                    if (current_progress > stage->current_stat_progress) {
-                        stage->current_stat_progress = current_progress;
-                    }
+                    // Stats in multi-stage goals are ALWAYS cumulative (summed across players)
+                    stage->current_stat_progress += player_progress;
                     break;
                 }
 
@@ -3867,7 +3846,7 @@ static void coop_merge_multi_stage(TemplateData *td, const cJSON *player_adv_jso
                             if (adv_entry) {
                                 cJSON *criteria_obj = cJSON_GetObjectItem(adv_entry, "criteria");
                                 if (criteria_obj && cJSON_HasObjectItem(criteria_obj, stage->root_name)) {
-                                    stage_completed = true;
+                                    stage->coop_completed = true;
                                 }
                             }
                         }
@@ -3881,7 +3860,7 @@ static void coop_merge_multi_stage(TemplateData *td, const cJSON *player_adv_jso
                                     cJSON_ArrayForEach(p_item, progress_array) {
                                         if (cJSON_IsString(p_item) &&
                                             strcmp(p_item->valuestring, stage->root_name) == 0) {
-                                            stage_completed = true;
+                                            stage->coop_completed = true;
                                             break;
                                         }
                                     }
@@ -3895,7 +3874,7 @@ static void coop_merge_multi_stage(TemplateData *td, const cJSON *player_adv_jso
                     if (player_unlocks_json) {
                         cJSON *obtained_obj = cJSON_GetObjectItem(player_unlocks_json, "obtained");
                         if (obtained_obj && cJSON_IsTrue(cJSON_GetObjectItem(obtained_obj, stage->root_name))) {
-                            stage_completed = true;
+                            stage->coop_completed = true;
                         }
                     }
                     break;
@@ -3904,17 +3883,32 @@ static void coop_merge_multi_stage(TemplateData *td, const cJSON *player_adv_jso
                 default:
                     break;
             }
+        }
+    }
+}
+
+static void coop_finalize_multi_stage(TemplateData *td) {
+    for (int i = 0; i < td->multi_stage_goal_count; i++) {
+        MultiStageGoal *goal = td->multi_stage_goals[i];
+        goal->current_stage = 0;
+
+        for (int j = 0; j < goal->stage_count; j++) {
+            SubGoal *stage = goal->stages[j];
+
+            if (stage->type == SUBGOAL_MANUAL) break;
+
+            bool stage_completed = false;
+            if (stage->type == SUBGOAL_STAT) {
+                stage_completed = (stage->current_stat_progress >= stage->required_progress);
+            } else {
+                stage_completed = stage->coop_completed;
+            }
 
             if (stage_completed) {
-                player_furthest = j + 1;
+                goal->current_stage = j + 1;
             } else {
                 break; // Stages are sequential; stop at first incomplete
             }
-        }
-
-        // Use max across all players
-        if (player_furthest > goal->current_stage) {
-            goal->current_stage = player_furthest;
         }
     }
 }
@@ -3977,16 +3971,6 @@ static void coop_finalize_advancements(TemplateData *td) {
         TrackableCategory *adv = td->advancements[i];
         if (adv->done && !adv->is_recipe) td->advancements_completed_count++;
         td->completed_criteria_count += adv->completed_criteria_count;
-    }
-}
-
-/**
- * @brief After merging all players' unlock data, finalize unlock completion count.
- */
-static void coop_finalize_unlocks(TemplateData *td) {
-    td->unlocks_completed_count = 0;
-    for (int i = 0; i < td->unlock_count; i++) {
-        if (td->unlocks[i]->done) td->unlocks_completed_count++;
     }
 }
 
@@ -4119,8 +4103,8 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
     // Clear the Hermes per-player stat cache — the file-based merge is authoritative.
     // It will be re-seeded below with each player's values from their JSON files.
     auto *hermes_cache = t->hermes_coop_stat_cache
-        ? static_cast<std::unordered_map<std::string, int>*>(t->hermes_coop_stat_cache)
-        : nullptr;
+                             ? static_cast<std::unordered_map<std::string, int> *>(t->hermes_coop_stat_cache)
+                             : nullptr;
     if (hermes_cache) hermes_cache->clear();
 
     // 2. Iterate over all players in the roster and merge their data
@@ -4158,9 +4142,6 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
             coop_merge_stats_modern(t->template_data, player_stats_json, settings->coop_stat_merge, version);
         }
 
-        // Merge unlocks (OR across players)
-        coop_merge_unlocks(t->template_data, player_unlocks_json);
-
         // Merge multi-stage goals (global — any player any stage)
         coop_merge_multi_stage(t->template_data, player_adv_json, player_stats_json,
                                player_unlocks_json, version);
@@ -4172,7 +4153,6 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
         if (hermes_cache && settings->using_hermes &&
             settings->coop_stat_merge == COOP_STAT_CUMULATIVE &&
             player_stats_json && player->uuid[0] != '\0') {
-
             std::string uuid_prefix = player->uuid;
             uuid_prefix += ':';
 
@@ -4234,7 +4214,7 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
 
     coop_finalize_advancements(t->template_data);
     coop_finalize_stats(t->template_data, settings_json);
-    coop_finalize_unlocks(t->template_data);
+    coop_finalize_multi_stage(t->template_data);
 
     // Custom goals: handled by host's settings.json (not merged from game files)
     tracker_update_custom_progress(t, settings_json, settings);
@@ -4282,6 +4262,14 @@ void tracker_apply_coop_mods(Tracker *t, const AppSettings *settings,
                                                                    item->linked_goal_count, item->linked_goal_mode));
                     }
                     item->progress = item->done ? 1 : 0;
+                    any_applied = true;
+                } else if (mod->action == COOP_MOD_INCREMENT) {
+                    item->progress++;
+                    item->done = (item->goal > 0 && item->progress >= item->goal);
+                    any_applied = true;
+                } else if (mod->action == COOP_MOD_DECREMENT) {
+                    item->progress--;
+                    item->done = (item->goal > 0 && item->progress >= item->goal);
                     any_applied = true;
                 }
                 break;
@@ -5492,7 +5480,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             // Skip auto-layout items that are fully hidden in manual layout
             if (settings->use_manual_layout && !cat->icon_pos.is_set &&
                 cat->icon_pos.is_hidden_in_layout && cat->text_pos.is_hidden_in_layout &&
-                (!has_progress_text || cat->progress_pos.is_hidden_in_layout) && settings->goal_hiding_mode != SHOW_ALL) {
+                (!has_progress_text || cat->progress_pos.is_hidden_in_layout) && settings->goal_hiding_mode !=
+                SHOW_ALL) {
                 continue;
             }
 
@@ -5956,6 +5945,15 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                 draw_list->AddLine(p2, p3, checkmark_color, 2.0f * t->zoom_level);
                             }
 
+                            // Co-op: Show tooltip for host-only stat checkboxes
+                            if (is_hovered && settings->network_mode == NETWORK_RECEIVER &&
+                                settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY) {
+                                char tooltip_buf[128];
+                                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                         "Stat checkboxes are set to Host Only.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+
                             // Deactivating left click when in visual editing mode
                             // Co-op: Receivers respect stat checkbox permission
                             if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->
@@ -5983,11 +5981,12 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                         if (cat->criteria[k]->done) cat->completed_criteria_count++;
                                     }
                                     bool all_children_done = (
-                                        cat->criteria_count > 0 && cat->completed_criteria_count >= cat->criteria_count);
+                                        cat->criteria_count > 0 && cat->completed_criteria_count >= cat->
+                                        criteria_count);
                                     cat->done = cat->is_manually_completed || all_children_done;
 
                                     settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
-                                    SDL_SetAtomicInt(&g_needs_update, 1);
+                                    SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
                                     SDL_SetAtomicInt(&g_game_data_changed, 1);
                                 }
                             }
@@ -6202,6 +6201,15 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         draw_list->AddLine(p2, p3, checkmark_color, 2.0f * t->zoom_level);
                     }
 
+                    // Co-op: Show tooltip for host-only stat checkboxes
+                    if (is_hovered_parent && settings->network_mode == NETWORK_RECEIVER &&
+                        settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY) {
+                        char tooltip_buf[128];
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Stat checkboxes are set to Host Only.");
+                        ImGui::SetTooltip("%s", tooltip_buf);
+                    }
+
                     // Deactivating left click when in visual editing mode
                     // Co-op: Receivers respect stat checkbox permission
                     if (is_hovered_parent && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->
@@ -6237,7 +6245,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             }
 
                             settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
-                            SDL_SetAtomicInt(&g_needs_update, 1);
+                            SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
                             SDL_SetAtomicInt(&g_game_data_changed, 1);
                         }
                     }
@@ -7197,6 +7205,15 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 // Handle click interaction
                 // Deactivating when in visual layout editor mode
                 // Co-op: Receivers respect custom goal permission
+                // Co-op: Show tooltip for host-only custom goals
+                if (is_hovered && settings->network_mode == NETWORK_RECEIVER &&
+                    settings->coop_custom_goal_mode == COOP_CUSTOM_HOST_ONLY) {
+                    char tooltip_buf[128];
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Custom goals are set to Host Only.");
+                    ImGui::SetTooltip("%s", tooltip_buf);
+                }
+
                 if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->is_visual_layout_editing) {
                     if (settings->network_mode == NETWORK_RECEIVER &&
                         settings->coop_custom_goal_mode == COOP_CUSTOM_HOST_ONLY) {
@@ -7218,11 +7235,13 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                         } else {
                             item->done = (item->linked_goal_count > 0 &&
                                           check_linked_goals_satisfied(t->template_data, item->linked_goals,
-                                                                       item->linked_goal_count, item->linked_goal_mode));
+                                                                       item->linked_goal_count,
+                                                                       item->linked_goal_mode));
                         }
                         item->progress = item->done ? 1 : 0;
                         settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
-                        SDL_SetAtomicInt(&g_needs_update, 1);
+                        // Lightweight broadcast path: no full file re-merge needed for custom goals
+                        SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
                         SDL_SetAtomicInt(&g_game_data_changed, 1);
                     }
                 }
@@ -7347,7 +7366,8 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                     break;
             }
             if (should_hide_width || !(counter_matches_search(goal, t->search_buffer)
-                                       || s_linked_top.count(goal->root_name))) continue;
+                                       || s_linked_top.count(goal->root_name)))
+                continue;
 
             SET_FONT_SCALE(settings->tracker_font_size, t->tracker_font->LegacySize);
             float text_width = ImGui::CalcTextSize(goal->display_name).x;
@@ -7394,7 +7414,8 @@ static void render_counter_goals_section(Tracker *t, const AppSettings *settings
                 break;
         }
         if (should_hide_render || !(counter_matches_search(goal, t->search_buffer)
-                                    || s_linked_top.count(goal->root_name))) continue;
+                                    || s_linked_top.count(goal->root_name)))
+            continue;
 
         // Progress text
         char progress_text[32];
@@ -7792,7 +7813,7 @@ static void render_multistage_goals_section(Tracker *t, const AppSettings *setti
             // Apply search filter for width calculation
             SubGoal *active_stage_width = goal->stages[goal->current_stage];
             bool name_matches_width = ms_goal_matches_search(goal, t->search_buffer)
-                                       || s_linked_top.count(goal->root_name);
+                                      || s_linked_top.count(goal->root_name);
             bool stage_matches_width = stage_matches_search(goal, active_stage_width, t->search_buffer);
 
             // Only consider items that will actually be rendered for width calculation
@@ -9021,8 +9042,9 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                            t->template_data->overall_progress_percentage >= 100.0f;
 
     // Use frozen IGT for the info window when the run is completed
-    long long display_ticks = is_run_complete ? t->template_data->frozen_play_time_ticks
-                                              : t->template_data->play_time_ticks;
+    long long display_ticks = is_run_complete
+                                  ? t->template_data->frozen_play_time_ticks
+                                  : t->template_data->play_time_ticks;
     format_time(display_ticks, formatted_time, sizeof(formatted_time));
 
     if (is_run_complete) {
@@ -9040,15 +9062,36 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         bool show_adv_counter = (t->template_data->advancement_goal_count > 0);
         bool show_prog_percent = (t->template_data->total_progress_steps > 0);
 
+        // For receivers, show "Syncing with <Host>" instead of world name
+        const char *info_world = t->world_name;
+        char info_sync_buf[MAX_PATH_LENGTH];
+        bool info_rcv_connected = (settings->network_mode == NETWORK_RECEIVER &&
+                                   g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+        if (info_rcv_connected) {
+            CoopLobbyPlayer info_lobby[COOP_MAX_LOBBY];
+            int info_lobby_count = coop_net_get_lobby_players(g_coop_ctx, info_lobby, COOP_MAX_LOBBY);
+            const char *info_host_name = "Host";
+            for (int i = 0; i < info_lobby_count; i++) {
+                if (info_lobby[i].is_host) {
+                    info_host_name = info_lobby[i].display_name[0] != '\0'
+                                         ? info_lobby[i].display_name
+                                         : info_lobby[i].username;
+                    break;
+                }
+            }
+            snprintf(info_sync_buf, sizeof(info_sync_buf), "Syncing with %s", info_host_name);
+            info_world = info_sync_buf;
+        }
+
         // Start with the world name and run details
         if (settings->category_display_name[0] != '\0') {
             snprintf(info_buffer, sizeof(info_buffer), "%s  |  %s - %s",
-                     t->world_name,
+                     info_world,
                      settings->display_version_str,
                      settings->category_display_name);
         } else {
             snprintf(info_buffer, sizeof(info_buffer), "%s  |  %s",
-                     t->world_name,
+                     info_world,
                      settings->display_version_str);
         }
 
@@ -9087,7 +9130,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
         ImGui::TextUnformatted("Progress Text");
 
-        ImGui::BulletText("World: Shows the current world name.");
+        ImGui::BulletText("World: Shows the current world name and 'Syncing with <Host>' if in receiver mode.");
         ImGui::BulletText("Run Details: Shows the Display Version & Display Category.");
         ImGui::BulletText("Progress: Shows the main adv/ach counter and overall percentage.");
         ImGui::BulletText("IGT: Displays the in-game time from the stats file (ticks).");
@@ -9886,7 +9929,7 @@ static bool hermes_apply_stat_event(Tracker *t, const cJSON *data) {
  * The cache is cleared each time the file-based merge runs (authoritative reset).
  */
 static bool hermes_apply_stat_event_cumulative(Tracker *t, const cJSON *data,
-                                                const char *player_uuid) {
+                                               const char *player_uuid) {
     cJSON *stat_key_json = cJSON_GetObjectItem(data, "stat");
     cJSON *value_json = cJSON_GetObjectItem(data, "value");
 
@@ -9896,7 +9939,7 @@ static bool hermes_apply_stat_event_cumulative(Tracker *t, const cJSON *data,
     const char *hermes_key = stat_key_json->valuestring;
     int new_value = (int) value_json->valuedouble;
 
-    auto *cache = static_cast<std::unordered_map<std::string, int>*>(t->hermes_coop_stat_cache);
+    auto *cache = static_cast<std::unordered_map<std::string, int> *>(t->hermes_coop_stat_cache);
     if (!cache) return false;
 
     // Build the cache key: "uuid:stat_key"
@@ -9983,7 +10026,7 @@ static bool hermes_apply_stat_event_cumulative(Tracker *t, const cJSON *data,
             if (!slash) continue;
 
             char s_cat[192], s_item[192];
-            size_t cat_len = (size_t)(slash - stage->root_name);
+            size_t cat_len = (size_t) (slash - stage->root_name);
             if (cat_len == 0 || cat_len >= sizeof(s_cat)) continue;
 
             strncpy(s_cat, stage->root_name, cat_len);
@@ -10672,7 +10715,7 @@ void tracker_free(Tracker **tracker, AppSettings *settings) {
 
         // Free Hermes coop stat cache
         if (t->hermes_coop_stat_cache) {
-            delete static_cast<std::unordered_map<std::string, int>*>(t->hermes_coop_stat_cache);
+            delete static_cast<std::unordered_map<std::string, int> *>(t->hermes_coop_stat_cache);
             t->hermes_coop_stat_cache = nullptr;
         }
 
@@ -10725,9 +10768,29 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
         snprintf(category_chunk, sizeof(category_chunk), "    -    %s", settings->category_display_name);
     }
 
+    // For receivers, show "Syncing with <Host>" instead of world name
+    bool is_receiver_connected = (settings->network_mode == NETWORK_RECEIVER &&
+                                  g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+    char world_display[MAX_PATH_LENGTH];
+    if (is_receiver_connected) {
+        CoopLobbyPlayer lobby[COOP_MAX_LOBBY];
+        int lobby_count = coop_net_get_lobby_players(g_coop_ctx, lobby, COOP_MAX_LOBBY);
+        const char *host_name = "Host";
+        for (int i = 0; i < lobby_count; i++) {
+            if (lobby[i].is_host) {
+                host_name = lobby[i].display_name[0] != '\0' ? lobby[i].display_name : lobby[i].username;
+                break;
+            }
+        }
+        snprintf(world_display, sizeof(world_display), "Syncing with %s", host_name);
+    } else {
+        strncpy(world_display, t->world_name, sizeof(world_display) - 1);
+        world_display[sizeof(world_display) - 1] = '\0';
+    }
+
     snprintf(title_buffer, sizeof(title_buffer),
              "  Advancely  %s    |    %s    -    %s%s%s    |    %s IGT    |    %s %s",
-             ADVANCELY_VERSION, t->world_name,
+             ADVANCELY_VERSION, world_display,
              settings->display_version_str,
              category_chunk,
              progress_chunk, formatted_time,
@@ -10787,13 +10850,32 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
 
     // Format the time to DD:HH:MM:SS.MS — use frozen time when the run is completed
     char formatted_time[128];
-    long long display_ticks = is_run_complete ? t->template_data->frozen_play_time_ticks
-                                              : t->template_data->play_time_ticks;
+    long long display_ticks = is_run_complete
+                                  ? t->template_data->frozen_play_time_ticks
+                                  : t->template_data->play_time_ticks;
     format_time(display_ticks, formatted_time, sizeof(formatted_time));
 
 
     log_message(LOG_INFO, "============================================================\n");
-    log_message(LOG_INFO, " World:      %s\n", t->world_name);
+    // For receivers, show "Syncing with <Host>" instead of world name
+    bool dbg_receiver_connected = (settings->network_mode == NETWORK_RECEIVER &&
+                                   g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+    if (dbg_receiver_connected) {
+        CoopLobbyPlayer dbg_lobby[COOP_MAX_LOBBY];
+        int dbg_lobby_count = coop_net_get_lobby_players(g_coop_ctx, dbg_lobby, COOP_MAX_LOBBY);
+        const char *dbg_host_name = "Host";
+        for (int i = 0; i < dbg_lobby_count; i++) {
+            if (dbg_lobby[i].is_host) {
+                dbg_host_name = dbg_lobby[i].display_name[0] != '\0'
+                                    ? dbg_lobby[i].display_name
+                                    : dbg_lobby[i].username;
+                break;
+            }
+        }
+        log_message(LOG_INFO, " World:      Syncing with %s\n", dbg_host_name);
+    } else {
+        log_message(LOG_INFO, " World:      %s\n", t->world_name);
+    }
     log_message(LOG_INFO, " Version:    %s\n", settings->display_version_str);
 
     // When category display name isn't empty

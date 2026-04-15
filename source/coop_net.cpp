@@ -9,22 +9,22 @@
 
 // ---- Cross-platform socket includes (must come before anything that pulls in windows.h) ----
 #ifdef _WIN32
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    typedef int socklen_t;
-    #define COOP_CLOSE_SOCKET closesocket
-    static bool wsa_initialized = false;
+#include <winsock2.h>
+#include <ws2tcpip.h>
+typedef int socklen_t;
+#define COOP_CLOSE_SOCKET closesocket
+static bool wsa_initialized = false;
 #else
-    #include <sys/socket.h>
-    #include <netinet/in.h>
-    #include <netinet/tcp.h>
-    #include <arpa/inet.h>
-    #include <unistd.h>
-    #include <fcntl.h>
-    #include <errno.h>
-    #include <sys/select.h>
-    #define COOP_CLOSE_SOCKET close
-    #define SOCKET_ERROR (-1)
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/select.h>
+#define COOP_CLOSE_SOCKET close
+#define SOCKET_ERROR (-1)
 #endif
 
 #include "coop_net.h"
@@ -74,7 +74,7 @@ static bool set_nonblocking(coop_socket_t fd) {
 // Enable TCP_NODELAY (disable Nagle's algorithm) for lower latency
 static void set_tcp_nodelay(coop_socket_t fd) {
     int flag = 1;
-    setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (const char *)&flag, sizeof(flag));
+    setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (const char *) &flag, sizeof(flag));
 }
 
 // Send exactly `len` bytes. Returns true on success, false on error/disconnect.
@@ -82,13 +82,13 @@ static void set_tcp_nodelay(coop_socket_t fd) {
 // to become writable. This prevents disconnects when sending large payloads that fill
 // the TCP send buffer (e.g., broadcasting full template state after granting all advancements).
 static bool send_all(coop_socket_t fd, const void *data, size_t len) {
-    const char *ptr = (const char *)data;
+    const char *ptr = (const char *) data;
     size_t remaining = len;
     while (remaining > 0) {
-        int sent = send(fd, ptr, (int)remaining, 0);
+        int sent = send(fd, ptr, (int) remaining, 0);
         if (sent > 0) {
             ptr += sent;
-            remaining -= (size_t)sent;
+            remaining -= (size_t) sent;
             continue;
         }
         if (sent == 0) return false; // Connection closed
@@ -107,7 +107,7 @@ static bool send_all(coop_socket_t fd, const void *data, size_t len) {
         struct timeval tv;
         tv.tv_sec = 5;
         tv.tv_usec = 0;
-        int ready = select((int)fd + 1, nullptr, &write_fds, nullptr, &tv);
+        int ready = select((int) fd + 1, nullptr, &write_fds, nullptr, &tv);
         if (ready <= 0) return false; // Timeout or error
     }
     return true;
@@ -128,7 +128,7 @@ static bool send_message(coop_socket_t fd, uint32_t type, const void *payload, u
 // Try to receive exactly `len` bytes (non-blocking friendly).
 // Returns: >0 = bytes read (may be < len), 0 = connection closed, -1 = would block, -2 = error
 static int recv_exact(coop_socket_t fd, void *buf, size_t len) {
-    int result = recv(fd, (char *)buf, (int)len, 0);
+    int result = recv(fd, (char *) buf, (int) len, 0);
     if (result > 0) return result;
     if (result == 0) return 0; // Connection closed
 #ifdef _WIN32
@@ -146,7 +146,8 @@ static int recv_exact(coop_socket_t fd, void *buf, size_t len) {
 // Returns true if a message was read. Sets out_type, out_payload (caller must free), out_payload_len.
 // Returns false if no complete message available yet or error.
 // Sets *disconnected = true if the remote side closed the connection.
-static bool read_message(coop_socket_t fd, uint32_t *out_type, char **out_payload, uint32_t *out_payload_len, bool *disconnected) {
+static bool read_message(coop_socket_t fd, uint32_t *out_type, char **out_payload, uint32_t *out_payload_len,
+                         bool *disconnected) {
     *disconnected = false;
     *out_payload = nullptr;
     *out_payload_len = 0;
@@ -155,11 +156,17 @@ static bool read_message(coop_socket_t fd, uint32_t *out_type, char **out_payloa
     uint32_t header[2];
     size_t header_read = 0;
     while (header_read < sizeof(header)) {
-        int r = recv_exact(fd, (char *)header + header_read, sizeof(header) - header_read);
-        if (r == 0) { *disconnected = true; return false; }
+        int r = recv_exact(fd, (char *) header + header_read, sizeof(header) - header_read);
+        if (r == 0) {
+            *disconnected = true;
+            return false;
+        }
         if (r == -1) return false; // Would block, no data yet
-        if (r == -2) { *disconnected = true; return false; }
-        header_read += (size_t)r;
+        if (r == -2) {
+            *disconnected = true;
+            return false;
+        }
+        header_read += (size_t) r;
     }
 
     *out_type = ntohl(header[0]);
@@ -172,29 +179,35 @@ static bool read_message(coop_socket_t fd, uint32_t *out_type, char **out_payloa
     }
 
     if (*out_payload_len > 0) {
-        *out_payload = (char *)malloc(*out_payload_len);
-        if (!*out_payload) { *disconnected = true; return false; }
+        *out_payload = (char *) malloc(*out_payload_len);
+        if (!*out_payload) {
+            *disconnected = true;
+            return false;
+        }
 
         size_t payload_read = 0;
         while (payload_read < *out_payload_len) {
             int r = recv_exact(fd, *out_payload + payload_read, *out_payload_len - payload_read);
-            if (r == 0) { // Connection closed
+            if (r == 0) {
+                // Connection closed
                 free(*out_payload);
                 *out_payload = nullptr;
                 *disconnected = true;
                 return false;
             }
-            if (r == -1) { // Would block — header consumed but payload incomplete
+            if (r == -1) {
+                // Would block — header consumed but payload incomplete
                 // Spin-wait briefly for remaining payload (it must arrive since header was valid)
                 continue;
             }
-            if (r == -2) { // Real error
+            if (r == -2) {
+                // Real error
                 free(*out_payload);
                 *out_payload = nullptr;
                 *disconnected = true;
                 return false;
             }
-            payload_read += (size_t)r;
+            payload_read += (size_t) r;
         }
     }
 
@@ -205,24 +218,25 @@ static bool read_message(coop_socket_t fd, uint32_t *out_type, char **out_payloa
 static const char *socket_error_hint(int err) {
 #ifdef _WIN32
     switch (err) {
-        case 10060: /* WSAETIMEDOUT */    return "Connection timed out. The host's firewall may be blocking the port.";
-        case 10061: /* WSAECONNREFUSED */ return "Connection refused. The host may not be listening, or the IP/port is wrong.";
+        case 10060: /* WSAETIMEDOUT */ return "Connection timed out. The host's firewall may be blocking the port.";
+        case 10061: /* WSAECONNREFUSED */ return
+                    "Connection refused. The host may not be listening, or the IP/port is wrong.";
         case 10065: /* WSAEHOSTUNREACH */ return "Host unreachable. Check your network/VPN connection.";
-        case 10051: /* WSAENETUNREACH */  return "Network unreachable. Check your network/VPN connection.";
-        case 10064: /* WSAEHOSTDOWN */    return "Host is down. Check that the host device is online.";
-        case 10048: /* WSAEADDRINUSE */   return "Port already in use. Another application may be using it.";
+        case 10051: /* WSAENETUNREACH */ return "Network unreachable. Check your network/VPN connection.";
+        case 10064: /* WSAEHOSTDOWN */ return "Host is down. Check that the host device is online.";
+        case 10048: /* WSAEADDRINUSE */ return "Port already in use. Another application may be using it.";
         case 10049: /* WSAEADDRNOTAVAIL */return "IP address not available on this machine. Check the IP.";
-        default:                          return nullptr;
+        default: return nullptr;
     }
 #else
     switch (err) {
-        case ETIMEDOUT:       return "Connection timed out. The host's firewall may be blocking the port.";
-        case ECONNREFUSED:    return "Connection refused. The host may not be listening, or the IP/port is wrong.";
-        case EHOSTUNREACH:    return "Host unreachable. Check your network/VPN connection.";
-        case ENETUNREACH:     return "Network unreachable. Check your network/VPN connection.";
-        case EADDRINUSE:      return "Port already in use. Another application may be using it.";
-        case EADDRNOTAVAIL:   return "IP address not available on this machine. Check the IP.";
-        default:              return nullptr;
+        case ETIMEDOUT: return "Connection timed out. The host's firewall may be blocking the port.";
+        case ECONNREFUSED: return "Connection refused. The host may not be listening, or the IP/port is wrong.";
+        case EHOSTUNREACH: return "Host unreachable. Check your network/VPN connection.";
+        case ENETUNREACH: return "Network unreachable. Check your network/VPN connection.";
+        case EADDRINUSE: return "Port already in use. Another application may be using it.";
+        case EADDRNOTAVAIL: return "IP address not available on this machine. Check the IP.";
+        default: return nullptr;
     }
 #endif
 }
@@ -288,7 +302,7 @@ static size_t base64_decode(const char *encoded, uint8_t *out, size_t out_max) {
 
         if (a < 0 || b < 0 || c < 0 || d < 0) return 0; // Invalid character
 
-        uint32_t triple = ((uint32_t)a << 18) | ((uint32_t)b << 12) | ((uint32_t)c << 6) | (uint32_t)d;
+        uint32_t triple = ((uint32_t) a << 18) | ((uint32_t) b << 12) | ((uint32_t) c << 6) | (uint32_t) d;
         if (j < out_len) out[j++] = (triple >> 16) & 0xFF;
         if (j < out_len) out[j++] = (triple >> 8) & 0xFF;
         if (j < out_len) out[j++] = triple & 0xFF;
@@ -301,8 +315,8 @@ static size_t base64_decode(const char *encoded, uint8_t *out, size_t out_max) {
 bool coop_encode_room_code(const char *ip, int port, char *out_code, size_t code_max_len) {
     char plain[128];
     int n = snprintf(plain, sizeof(plain), "%s:%d", ip, port);
-    if (n <= 0 || (size_t)n >= sizeof(plain)) return false;
-    return base64_encode((const uint8_t *)plain, (size_t)n, out_code, code_max_len) > 0;
+    if (n <= 0 || (size_t) n >= sizeof(plain)) return false;
+    return base64_encode((const uint8_t *) plain, (size_t) n, out_code, code_max_len) > 0;
 }
 
 bool coop_decode_room_code(const char *code, char *out_ip, size_t ip_max_len, int *out_port) {
@@ -314,10 +328,10 @@ bool coop_decode_room_code(const char *code, char *out_ip, size_t ip_max_len, in
     decoded[decoded_len] = '\0';
 
     // Find the colon separator
-    const char *colon = strchr((const char *)decoded, ':');
+    const char *colon = strchr((const char *) decoded, ':');
     if (!colon) return false;
 
-    size_t ip_len = (size_t)(colon - (const char *)decoded);
+    size_t ip_len = (size_t) (colon - (const char *) decoded);
     if (ip_len == 0 || ip_len >= ip_max_len) return false;
 
     memcpy(out_ip, decoded, ip_len);
@@ -354,7 +368,7 @@ static void graceful_close_socket(coop_socket_t *fd) {
             FD_ZERO(&rfds);
             FD_SET(*fd, &rfds);
             struct timeval tv = {0, 10000}; // 10ms
-            if (select((int)(*fd + 1), &rfds, nullptr, nullptr, &tv) <= 0) break;
+            if (select((int) (*fd + 1), &rfds, nullptr, nullptr, &tv) <= 0) break;
             int r = recv(*fd, drain, sizeof(drain), 0);
             if (r <= 0) break;
         }
@@ -451,7 +465,7 @@ static void broadcast_player_list(CoopNetContext *ctx) {
     char *json = build_lobby_json(ctx);
     if (!json) return;
 
-    uint32_t len = (uint32_t)strlen(json);
+    uint32_t len = (uint32_t) strlen(json);
     for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
         if (!ctx->clients[i].active || !ctx->clients[i].handshake_done) continue;
         send_message(ctx->clients[i].socket_fd, COOP_MSG_PLAYER_LIST, json, len);
@@ -479,7 +493,7 @@ static void remove_pending_request(CoopNetContext *ctx, int client_slot) {
 // ---- Host Thread ----
 
 static int SDLCALL host_thread_func(void *data) {
-    CoopNetContext *ctx = (CoopNetContext *)data;
+    CoopNetContext *ctx = (CoopNetContext *) data;
 
     // Heartbeat tracking
     Uint32 last_heartbeat = SDL_GetTicks();
@@ -510,7 +524,7 @@ static int SDLCALL host_thread_func(void *data) {
                 if (action == COOP_ACTION_KICK) {
                     send_message(ctx->clients[i].socket_fd, COOP_MSG_KICK,
                                  ctx->clients[i].pending_action_reason,
-                                 (uint32_t)strlen(ctx->clients[i].pending_action_reason));
+                                 (uint32_t) strlen(ctx->clients[i].pending_action_reason));
                     log_message(LOG_INFO, "[COOP NET] Kicked %s (%s): %s\n",
                                 ctx->clients[i].username, ctx->clients[i].label,
                                 ctx->clients[i].pending_action_reason);
@@ -522,7 +536,7 @@ static int SDLCALL host_thread_func(void *data) {
                 } else if (action == COOP_ACTION_REJECT) {
                     send_message(ctx->clients[i].socket_fd, COOP_MSG_JOIN_REJECT,
                                  ctx->clients[i].pending_action_reason,
-                                 (uint32_t)strlen(ctx->clients[i].pending_action_reason));
+                                 (uint32_t) strlen(ctx->clients[i].pending_action_reason));
                     log_message(LOG_INFO, "[COOP NET] Rejected join request from %s (%s): %s\n",
                                 ctx->clients[i].username, ctx->clients[i].label,
                                 ctx->clients[i].pending_action_reason);
@@ -555,7 +569,7 @@ static int SDLCALL host_thread_func(void *data) {
         tv.tv_sec = 0;
         tv.tv_usec = 100000; // 100ms
 
-        int ready = select((int)(max_fd + 1), &read_fds, nullptr, nullptr, &tv);
+        int ready = select((int) (max_fd + 1), &read_fds, nullptr, nullptr, &tv);
         if (ready < 0) {
 #ifdef _WIN32
             int sel_err = WSAGetLastError();
@@ -579,7 +593,7 @@ static int SDLCALL host_thread_func(void *data) {
         if (ready > 0 && FD_ISSET(ctx->server_fd, &read_fds)) {
             struct sockaddr_in client_addr;
             socklen_t addr_len = sizeof(client_addr);
-            coop_socket_t new_fd = accept(ctx->server_fd, (struct sockaddr *)&client_addr, &addr_len);
+            coop_socket_t new_fd = accept(ctx->server_fd, (struct sockaddr *) &client_addr, &addr_len);
 
             if (new_fd != COOP_INVALID_SOCKET) {
                 set_nonblocking(new_fd);
@@ -587,7 +601,10 @@ static int SDLCALL host_thread_func(void *data) {
 
                 int slot = -1;
                 for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
-                    if (!ctx->clients[i].active) { slot = i; break; }
+                    if (!ctx->clients[i].active) {
+                        slot = i;
+                        break;
+                    }
                 }
 
                 if (slot >= 0) {
@@ -605,7 +622,7 @@ static int SDLCALL host_thread_func(void *data) {
                                 ctx->clients[slot].label, slot);
                 } else {
                     const char *reason = "Server full";
-                    send_message(new_fd, COOP_MSG_JOIN_REJECT, reason, (uint32_t)strlen(reason));
+                    send_message(new_fd, COOP_MSG_JOIN_REJECT, reason, (uint32_t) strlen(reason));
 #ifdef _WIN32
                     shutdown(new_fd, SD_SEND);
 #else
@@ -631,7 +648,7 @@ static int SDLCALL host_thread_func(void *data) {
                 if (read_message(ctx->clients[i].socket_fd, &msg_type, &payload, &payload_len, &disconnected)) {
                     if (msg_type == COOP_MSG_JOIN_REQUEST && !ctx->clients[i].handshake_done) {
                         // Parse identity from JSON payload
-                        char *json_str = (char *)malloc(payload_len + 1);
+                        char *json_str = (char *) malloc(payload_len + 1);
                         if (json_str) {
                             memcpy(json_str, payload, payload_len);
                             json_str[payload_len] = '\0';
@@ -654,13 +671,14 @@ static int SDLCALL host_thread_func(void *data) {
                                              ADVANCELY_VERSION,
                                              (v && cJSON_IsString(v)) ? v->valuestring : "unknown");
                                     send_message(ctx->clients[i].socket_fd, COOP_MSG_JOIN_REJECT,
-                                                 reason, (uint32_t)strlen(reason));
+                                                 reason, (uint32_t) strlen(reason));
                                     graceful_close_socket(&ctx->clients[i].socket_fd);
                                     ctx->clients[i].active = false;
-                                    log_message(LOG_INFO, "[COOP NET] Rejected %s: version mismatch (theirs: %s, ours: %s).\n",
-                                                ctx->clients[i].label,
-                                                (v && cJSON_IsString(v)) ? v->valuestring : "unknown",
-                                                ADVANCELY_VERSION);
+                                    log_message(
+                                        LOG_INFO, "[COOP NET] Rejected %s: version mismatch (theirs: %s, ours: %s).\n",
+                                        ctx->clients[i].label,
+                                        (v && cJSON_IsString(v)) ? v->valuestring : "unknown",
+                                        ADVANCELY_VERSION);
                                 }
 
                                 if (!version_mismatch) {
@@ -683,7 +701,7 @@ static int SDLCALL host_thread_func(void *data) {
                             } else if (!valid || req_uuid[0] == '\0') {
                                 const char *reason = "Invalid handshake data";
                                 send_message(ctx->clients[i].socket_fd, COOP_MSG_JOIN_REJECT,
-                                             reason, (uint32_t)strlen(reason));
+                                             reason, (uint32_t) strlen(reason));
                                 graceful_close_socket(&ctx->clients[i].socket_fd);
                                 ctx->clients[i].active = false;
                                 log_message(LOG_INFO, "[COOP NET] Rejected %s: invalid handshake.\n",
@@ -705,16 +723,18 @@ static int SDLCALL host_thread_func(void *data) {
                                 if (duplicate) {
                                     const char *reason = "A player with this UUID is already in the lobby";
                                     send_message(ctx->clients[i].socket_fd, COOP_MSG_JOIN_REJECT,
-                                                 reason, (uint32_t)strlen(reason));
+                                                 reason, (uint32_t) strlen(reason));
                                     graceful_close_socket(&ctx->clients[i].socket_fd);
                                     ctx->clients[i].active = false;
                                     log_message(LOG_INFO, "[COOP NET] Rejected %s: duplicate UUID %s.\n",
                                                 ctx->clients[i].label, req_uuid);
                                 } else {
                                     // Store identity, add to pending approval queue
-                                    strncpy(ctx->clients[i].username, req_username, sizeof(ctx->clients[i].username) - 1);
+                                    strncpy(ctx->clients[i].username, req_username,
+                                            sizeof(ctx->clients[i].username) - 1);
                                     strncpy(ctx->clients[i].uuid, req_uuid, sizeof(ctx->clients[i].uuid) - 1);
-                                    strncpy(ctx->clients[i].display_name, req_display, sizeof(ctx->clients[i].display_name) - 1);
+                                    strncpy(ctx->clients[i].display_name, req_display,
+                                            sizeof(ctx->clients[i].display_name) - 1);
                                     ctx->clients[i].pending_approval = true;
 
                                     // Add to pending requests for UI
@@ -729,8 +749,10 @@ static int SDLCALL host_thread_func(void *data) {
                                     }
                                     SDL_UnlockMutex(ctx->lobby_mutex);
 
-                                    log_message(LOG_INFO, "[COOP NET] Join request from %s (%s, UUID: %s). Waiting for host approval.\n",
-                                                ctx->clients[i].label, req_username, req_uuid);
+                                    log_message(
+                                        LOG_INFO,
+                                        "[COOP NET] Join request from %s (%s, UUID: %s). Waiting for host approval.\n",
+                                        ctx->clients[i].label, req_username, req_uuid);
                                     set_status(ctx, "Join request from %s", req_username);
                                 }
                             }
@@ -753,7 +775,8 @@ static int SDLCALL host_thread_func(void *data) {
                         if (payload && payload_len > 0) {
                             char reason[256];
                             size_t copy_len = payload_len < sizeof(reason) - 1
-                                                  ? payload_len : sizeof(reason) - 1;
+                                                  ? payload_len
+                                                  : sizeof(reason) - 1;
                             memcpy(reason, payload, copy_len);
                             reason[copy_len] = '\0';
                             log_message(LOG_INFO, "[COOP NET] Client %s disconnected: %s\n",
@@ -780,8 +803,7 @@ static int SDLCALL host_thread_func(void *data) {
                     }
                     free(payload);
                 } else if (disconnected) {
-                    log_message(LOG_INFO, "[COOP NET] Client %s connection lost.\n", ctx->clients[i].label);
-                    {
+                    log_message(LOG_INFO, "[COOP NET] Client %s connection lost.\n", ctx->clients[i].label); {
                         const char *dn = ctx->clients[i].display_name[0] != '\0'
                                              ? ctx->clients[i].display_name
                                              : ctx->clients[i].username;
@@ -866,7 +888,7 @@ static int SDLCALL host_thread_func(void *data) {
 // ---- Receiver Thread ----
 
 static int SDLCALL receiver_thread_func(void *data) {
-    CoopNetContext *ctx = (CoopNetContext *)data;
+    CoopNetContext *ctx = (CoopNetContext *) data;
 
     // Create socket and store it in ctx immediately so coop_net_stop() can close it
     coop_socket_t sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -881,7 +903,7 @@ static int SDLCALL receiver_thread_func(void *data) {
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_port = htons((uint16_t)ctx->connect_port);
+    addr.sin_port = htons((uint16_t) ctx->connect_port);
 
     if (inet_pton(AF_INET, ctx->connect_ip, &addr.sin_addr) != 1) {
         log_message(LOG_ERROR, "[COOP NET] Invalid receiver target IP: %s\n", ctx->connect_ip);
@@ -896,7 +918,7 @@ static int SDLCALL receiver_thread_func(void *data) {
     // Use non-blocking connect so we can check should_stop while waiting
     set_nonblocking(sock);
 
-    int connect_result = connect(sock, (struct sockaddr *)&addr, sizeof(addr));
+    int connect_result = connect(sock, (struct sockaddr *) &addr, sizeof(addr));
     bool connect_pending = false;
     if (connect_result == SOCKET_ERROR) {
 #ifdef _WIN32
@@ -917,14 +939,16 @@ static int SDLCALL receiver_thread_func(void *data) {
 #else
             int imm_err = errno;
 #endif
-            log_message(LOG_ERROR, "[COOP NET] Immediate connect failure to %s:%d (error=%d)\n", ctx->connect_ip, ctx->connect_port, imm_err);
+            log_message(LOG_ERROR, "[COOP NET] Immediate connect failure to %s:%d (error=%d)\n", ctx->connect_ip,
+                        ctx->connect_port, imm_err);
             close_socket(&ctx->client_fd);
             set_state(ctx, COOP_NET_ERROR);
             set_connect_error_status(ctx, imm_err);
             return 1;
         }
     } else {
-        log_message(LOG_INFO, "[COOP NET] connect() succeeded immediately to %s:%d\n", ctx->connect_ip, ctx->connect_port);
+        log_message(LOG_INFO, "[COOP NET] connect() succeeded immediately to %s:%d\n", ctx->connect_ip,
+                    ctx->connect_port);
     }
 
     // Wait for connection to complete (or should_stop / socket closed by stop)
@@ -946,13 +970,13 @@ static int SDLCALL receiver_thread_func(void *data) {
             tv.tv_sec = 0;
             tv.tv_usec = 200000; // 200ms poll interval
 
-            int ready = select((int)(ctx->client_fd + 1), nullptr, &write_fds, &err_fds, &tv);
+            int ready = select((int) (ctx->client_fd + 1), nullptr, &write_fds, &err_fds, &tv);
             if (ready < 0) break;
             if (ready == 0) continue; // Timeout, loop and check should_stop
 
             if (FD_ISSET(ctx->client_fd, &err_fds)) {
                 socklen_t len = sizeof(connect_err);
-                getsockopt(ctx->client_fd, SOL_SOCKET, SO_ERROR, (char *)&connect_err, &len);
+                getsockopt(ctx->client_fd, SOL_SOCKET, SO_ERROR, (char *) &connect_err, &len);
                 log_message(LOG_ERROR, "[COOP NET] Connect error fd_set triggered (SO_ERROR=%d)\n", connect_err);
                 break; // Connection failed
             }
@@ -960,7 +984,7 @@ static int SDLCALL receiver_thread_func(void *data) {
             if (FD_ISSET(ctx->client_fd, &write_fds)) {
                 // Check if connect actually succeeded via SO_ERROR
                 socklen_t len = sizeof(connect_err);
-                getsockopt(ctx->client_fd, SOL_SOCKET, SO_ERROR, (char *)&connect_err, &len);
+                getsockopt(ctx->client_fd, SOL_SOCKET, SO_ERROR, (char *) &connect_err, &len);
                 if (connect_err == 0) {
                     connected = true;
                 } else {
@@ -974,7 +998,8 @@ static int SDLCALL receiver_thread_func(void *data) {
             if (should_stop(ctx) || ctx->client_fd == COOP_INVALID_SOCKET) {
                 log_message(LOG_INFO, "[COOP NET] Receiver connect cancelled.\n");
             } else {
-                log_message(LOG_ERROR, "[COOP NET] Failed to connect to %s:%d (error=%d)\n", ctx->connect_ip, ctx->connect_port, connect_err);
+                log_message(LOG_ERROR, "[COOP NET] Failed to connect to %s:%d (error=%d)\n", ctx->connect_ip,
+                            ctx->connect_port, connect_err);
                 set_state(ctx, COOP_NET_ERROR);
                 set_connect_error_status(ctx, connect_err);
             }
@@ -998,7 +1023,7 @@ static int SDLCALL receiver_thread_func(void *data) {
         char *json_str = cJSON_PrintUnformatted(req);
         cJSON_Delete(req);
 
-        if (!json_str || !send_message(ctx->client_fd, COOP_MSG_JOIN_REQUEST, json_str, (uint32_t)strlen(json_str))) {
+        if (!json_str || !send_message(ctx->client_fd, COOP_MSG_JOIN_REQUEST, json_str, (uint32_t) strlen(json_str))) {
             free(json_str);
             log_message(LOG_ERROR, "[COOP NET] Failed to send join request.\n");
             set_state(ctx, COOP_NET_ERROR);
@@ -1025,7 +1050,7 @@ static int SDLCALL receiver_thread_func(void *data) {
         tv.tv_sec = 0;
         tv.tv_usec = 200000; // 200ms
 
-        int ready = select((int)(ctx->client_fd + 1), &read_fds, nullptr, nullptr, &tv);
+        int ready = select((int) (ctx->client_fd + 1), &read_fds, nullptr, nullptr, &tv);
         if (ready < 0) break;
         if (ready == 0) continue;
 
@@ -1037,7 +1062,7 @@ static int SDLCALL receiver_thread_func(void *data) {
         if (read_message(ctx->client_fd, &msg_type, &payload, &payload_len, &disconnected)) {
             if (msg_type == COOP_MSG_JOIN_ACCEPT) {
                 // Parse lobby player list
-                char *json_str = (char *)malloc(payload_len + 1);
+                char *json_str = (char *) malloc(payload_len + 1);
                 if (json_str) {
                     memcpy(json_str, payload, payload_len);
                     json_str[payload_len] = '\0';
@@ -1096,7 +1121,7 @@ static int SDLCALL receiver_thread_func(void *data) {
             struct timeval stv;
             stv.tv_sec = 0;
             stv.tv_usec = 200000;
-            int sr = select((int)(ctx->client_fd + 1), &sync_fds, nullptr, nullptr, &stv);
+            int sr = select((int) (ctx->client_fd + 1), &sync_fds, nullptr, nullptr, &stv);
             if (sr <= 0) continue;
             uint32_t sync_type;
             char *sync_payload;
@@ -1106,7 +1131,8 @@ static int SDLCALL receiver_thread_func(void *data) {
                 if (sync_type == COOP_MSG_TEMPLATE_SYNC && sync_payload) {
                     SDL_LockMutex(ctx->template_sync_mutex);
                     size_t copy_len = sync_len < sizeof(ctx->template_sync_payload) - 1
-                                          ? sync_len : sizeof(ctx->template_sync_payload) - 1;
+                                          ? sync_len
+                                          : sizeof(ctx->template_sync_payload) - 1;
                     memcpy(ctx->template_sync_payload, sync_payload, copy_len);
                     ctx->template_sync_payload[copy_len] = '\0';
                     ctx->template_sync_ready = true;
@@ -1139,7 +1165,7 @@ static int SDLCALL receiver_thread_func(void *data) {
         tv.tv_sec = 0;
         tv.tv_usec = 100000; // 100ms
 
-        int ready = select((int)(ctx->client_fd + 1), &read_fds, nullptr, nullptr, &tv);
+        int ready = select((int) (ctx->client_fd + 1), &read_fds, nullptr, nullptr, &tv);
         if (ready < 0) {
 #ifdef _WIN32
             if (WSAGetLastError() == WSAEINTR) continue;
@@ -1181,7 +1207,7 @@ static int SDLCALL receiver_thread_func(void *data) {
                     set_status(ctx, "Kicked: %s", reason);
                     break;
                 } else if (msg_type == COOP_MSG_PLAYER_LIST) {
-                    char *json_str = (char *)malloc(payload_len + 1);
+                    char *json_str = (char *) malloc(payload_len + 1);
                     if (json_str) {
                         memcpy(json_str, payload, payload_len);
                         json_str[payload_len] = '\0';
@@ -1202,7 +1228,8 @@ static int SDLCALL receiver_thread_func(void *data) {
                     if (payload && payload_len > 0) {
                         SDL_LockMutex(ctx->template_sync_mutex);
                         size_t copy_len = payload_len < sizeof(ctx->template_sync_payload) - 1
-                                              ? payload_len : sizeof(ctx->template_sync_payload) - 1;
+                                              ? payload_len
+                                              : sizeof(ctx->template_sync_payload) - 1;
                         memcpy(ctx->template_sync_payload, payload, copy_len);
                         ctx->template_sync_payload[copy_len] = '\0';
                         ctx->template_sync_ready = true;
@@ -1234,7 +1261,7 @@ static int SDLCALL receiver_thread_func(void *data) {
     if (ctx->client_fd != COOP_INVALID_SOCKET) {
         if (ctx->disconnect_reason[0] != '\0') {
             send_message(ctx->client_fd, COOP_MSG_DISCONNECT,
-                         ctx->disconnect_reason, (uint32_t)strlen(ctx->disconnect_reason));
+                         ctx->disconnect_reason, (uint32_t) strlen(ctx->disconnect_reason));
             ctx->disconnect_reason[0] = '\0';
         } else {
             send_message(ctx->client_fd, COOP_MSG_DISCONNECT, nullptr, 0);
@@ -1265,7 +1292,8 @@ bool coop_net_init(CoopNetContext *ctx) {
     ctx->lobby_mutex = SDL_CreateMutex();
     ctx->custom_mod_mutex = SDL_CreateMutex();
     ctx->template_sync_mutex = SDL_CreateMutex();
-    if (!ctx->status_mutex || !ctx->recv_mutex || !ctx->lobby_mutex || !ctx->custom_mod_mutex || !ctx->template_sync_mutex) {
+    if (!ctx->status_mutex || !ctx->recv_mutex || !ctx->lobby_mutex || !ctx->custom_mod_mutex || !ctx->
+        template_sync_mutex) {
         log_message(LOG_ERROR, "[COOP NET] Failed to create mutexes.\n");
         return false;
     }
@@ -1353,12 +1381,12 @@ bool coop_net_start_host(CoopNetContext *ctx, const char *ip, int port,
 
     // Allow port reuse
     int opt = 1;
-    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof(opt));
+    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const char *) &opt, sizeof(opt));
 
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_port = htons((uint16_t)port);
+    addr.sin_port = htons((uint16_t) port);
 
     if (ip && ip[0] != '\0') {
         if (inet_pton(AF_INET, ip, &addr.sin_addr) != 1) {
@@ -1372,13 +1400,15 @@ bool coop_net_start_host(CoopNetContext *ctx, const char *ip, int port,
         addr.sin_addr.s_addr = INADDR_ANY;
     }
 
-    if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR) {
+    if (bind(sock, (struct sockaddr *) &addr, sizeof(addr)) == SOCKET_ERROR) {
 #ifdef _WIN32
         int bind_err = WSAGetLastError();
-        log_message(LOG_ERROR, "[COOP NET] Failed to bind to %s:%d (WSA error=%d)\n", ip ? ip : "0.0.0.0", port, bind_err);
+        log_message(LOG_ERROR, "[COOP NET] Failed to bind to %s:%d (WSA error=%d)\n", ip ? ip : "0.0.0.0", port,
+                    bind_err);
 #else
         int bind_err = errno;
-        log_message(LOG_ERROR, "[COOP NET] Failed to bind to %s:%d (errno=%d: %s)\n", ip ? ip : "0.0.0.0", port, bind_err, strerror(bind_err));
+        log_message(LOG_ERROR, "[COOP NET] Failed to bind to %s:%d (errno=%d: %s)\n", ip ? ip : "0.0.0.0", port,
+                    bind_err, strerror(bind_err));
 #endif
         COOP_CLOSE_SOCKET(sock);
         set_state(ctx, COOP_NET_ERROR);
@@ -1390,7 +1420,7 @@ bool coop_net_start_host(CoopNetContext *ctx, const char *ip, int port,
     {
         struct sockaddr_in bound_addr;
         socklen_t bound_len = sizeof(bound_addr);
-        if (getsockname(sock, (struct sockaddr *)&bound_addr, &bound_len) == 0) {
+        if (getsockname(sock, (struct sockaddr *) &bound_addr, &bound_len) == 0) {
             char bound_ip[64];
             inet_ntop(AF_INET, &bound_addr.sin_addr, bound_ip, sizeof(bound_ip));
             log_message(LOG_INFO, "[COOP NET] Socket actually bound to %s:%d\n", bound_ip, ntohs(bound_addr.sin_port));
@@ -1529,7 +1559,7 @@ void coop_net_tick(CoopNetContext *ctx) {
 }
 
 CoopNetState coop_net_get_state(CoopNetContext *ctx) {
-    return (CoopNetState)SDL_GetAtomicInt(&ctx->state);
+    return (CoopNetState) SDL_GetAtomicInt(&ctx->state);
 }
 
 void coop_net_get_status_msg(CoopNetContext *ctx, char *out, size_t out_size) {
@@ -1550,7 +1580,7 @@ bool coop_net_broadcast(CoopNetContext *ctx, const void *data, size_t size) {
     bool all_ok = true;
     for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
         if (!ctx->clients[i].active || !ctx->clients[i].handshake_done) continue;
-        if (!send_message(ctx->clients[i].socket_fd, COOP_MSG_STATE_UPDATE, data, (uint32_t)size)) {
+        if (!send_message(ctx->clients[i].socket_fd, COOP_MSG_STATE_UPDATE, data, (uint32_t) size)) {
             log_message(LOG_ERROR, "[COOP NET] Failed to broadcast to client %s.\n", ctx->clients[i].label);
             close_socket(&ctx->clients[i].socket_fd);
             ctx->clients[i].active = false;
@@ -1567,7 +1597,7 @@ int coop_net_get_lobby_players(CoopNetContext *ctx, CoopLobbyPlayer *out_players
     SDL_LockMutex(ctx->lobby_mutex);
     int count = ctx->lobby_player_count;
     if (count > max_players) count = max_players;
-    memcpy(out_players, ctx->lobby_players, (size_t)count * sizeof(CoopLobbyPlayer));
+    memcpy(out_players, ctx->lobby_players, (size_t) count * sizeof(CoopLobbyPlayer));
     SDL_UnlockMutex(ctx->lobby_mutex);
     return count;
 }
@@ -1584,7 +1614,7 @@ int coop_net_get_pending_requests(CoopNetContext *ctx, CoopJoinRequest *out_requ
     SDL_LockMutex(ctx->lobby_mutex);
     int count = ctx->pending_request_count;
     if (count > max_requests) count = max_requests;
-    memcpy(out_requests, ctx->pending_requests, (size_t)count * sizeof(CoopJoinRequest));
+    memcpy(out_requests, ctx->pending_requests, (size_t) count * sizeof(CoopJoinRequest));
     SDL_UnlockMutex(ctx->lobby_mutex);
     return count;
 }
@@ -1617,7 +1647,7 @@ bool coop_net_approve_request(CoopNetContext *ctx, int client_slot) {
     // Send JOIN_ACCEPT to this client with current lobby state
     char *json = build_lobby_json(ctx);
     if (json) {
-        send_message(ctx->clients[client_slot].socket_fd, COOP_MSG_JOIN_ACCEPT, json, (uint32_t)strlen(json));
+        send_message(ctx->clients[client_slot].socket_fd, COOP_MSG_JOIN_ACCEPT, json, (uint32_t) strlen(json));
         free(json);
     }
 
@@ -1625,7 +1655,7 @@ bool coop_net_approve_request(CoopNetContext *ctx, int client_slot) {
     SDL_LockMutex(ctx->template_sync_mutex);
     if (ctx->template_sync_payload[0] != '\0') {
         send_message(ctx->clients[client_slot].socket_fd, COOP_MSG_TEMPLATE_SYNC,
-                     ctx->template_sync_payload, (uint32_t)strlen(ctx->template_sync_payload));
+                     ctx->template_sync_payload, (uint32_t) strlen(ctx->template_sync_payload));
     }
     SDL_UnlockMutex(ctx->template_sync_mutex);
 
@@ -1734,7 +1764,7 @@ void coop_net_broadcast_template_sync(CoopNetContext *ctx) {
     payload[sizeof(payload) - 1] = '\0';
     SDL_UnlockMutex(ctx->template_sync_mutex);
 
-    uint32_t len = (uint32_t)strlen(payload);
+    uint32_t len = (uint32_t) strlen(payload);
     for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
         if (ctx->clients[i].active && ctx->clients[i].handshake_done) {
             send_message(ctx->clients[i].socket_fd, COOP_MSG_TEMPLATE_SYNC, payload, len);

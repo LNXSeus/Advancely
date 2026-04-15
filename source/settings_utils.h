@@ -34,30 +34,30 @@ enum GoalHidingMode {
 // Co-op networking mode
 enum NetworkMode {
     NETWORK_SINGLEPLAYER, // Default: no networking, local tracking only
-    NETWORK_HOST,         // Host: reads game files, broadcasts co-op state
-    NETWORK_RECEIVER      // Receiver: connects to host, receives co-op state
+    NETWORK_HOST, // Host: reads game files, broadcasts co-op state
+    NETWORK_RECEIVER // Receiver: connects to host, receives co-op state
 };
 
 // Co-op merge settings (per goal type)
 enum CoopStatMerge {
-    COOP_STAT_HIGHEST,     // Use whichever player has the highest stat value
-    COOP_STAT_CUMULATIVE   // Sum stat values across all players
+    COOP_STAT_HIGHEST, // Use whichever player has the highest stat value
+    COOP_STAT_CUMULATIVE // Sum stat values across all players
 };
 
 enum CoopStatCheckbox {
-    COOP_STAT_CHECKBOX_HOST_ONLY,  // Only host can check off stats
-    COOP_STAT_CHECKBOX_ANY_PLAYER  // Any player can check off stats
+    COOP_STAT_CHECKBOX_HOST_ONLY, // Only host can check off stats
+    COOP_STAT_CHECKBOX_ANY_PLAYER // Any player can check off stats
 };
 
 enum CoopCustomGoalMode {
-    COOP_CUSTOM_HOST_ONLY,   // Only host modifies custom goals
-    COOP_CUSTOM_ANY_PLAYER   // Any player can modify custom goals
+    COOP_CUSTOM_HOST_ONLY, // Only host modifies custom goals
+    COOP_CUSTOM_ANY_PLAYER // Any player can modify custom goals
 };
 
 // Account type: online (Mojang API lookup) vs offline (manual UUID entry)
 enum AccountType {
-    ACCOUNT_ONLINE,   // UUID fetched from Mojang API
-    ACCOUNT_OFFLINE   // UUID entered manually (offline/cracked accounts)
+    ACCOUNT_ONLINE, // UUID fetched from Mojang API
+    ACCOUNT_OFFLINE // UUID entered manually (offline/cracked accounts)
 };
 
 // Enum to identify the tracker sections
@@ -171,9 +171,9 @@ struct TemplateData;
 
 // A player in the co-op roster (Host tracks these)
 typedef struct {
-    char username[64];      // Minecraft username e.g., Notch
-    char uuid[48];          // UUID from Mojang API (with hyphens, e.g., "069a79f4-44e9-4726-a5be-fca90e38aaf5")
-    char display_name[64];  // Optional custom display name (empty = use username)
+    char username[64]; // Minecraft username e.g., Notch
+    char uuid[48]; // UUID from Mojang API (with hyphens, e.g., "069a79f4-44e9-4726-a5be-fca90e38aaf5")
+    char display_name[64]; // Optional custom display name (empty = use username)
 } CoopPlayer;
 
 // CoopLobbyPlayer is defined in coop_net.h (used for lobby display)
