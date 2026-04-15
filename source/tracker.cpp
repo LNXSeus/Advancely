@@ -9808,7 +9808,7 @@ static bool hermes_parse_stat_key(const char *hermes_key,
  *
  * Returns true if at least one in-memory value changed.
  */
-static bool hermes_apply_stat_event(Tracker *t, const cJSON *data) {
+static bool hermes_apply_stat_event(Tracker *t, const cJSON *data, bool skip_multi_stage = false) {
     cJSON *stat_key_json = cJSON_GetObjectItem(data, "stat");
     cJSON *value_json = cJSON_GetObjectItem(data, "value");
 
@@ -9878,50 +9878,54 @@ static bool hermes_apply_stat_event(Tracker *t, const cJSON *data) {
     }
 
     // --- Active SUBGOAL_STAT stage in multi-stage goals ---
-    for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
-        MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
-        if (!goal) continue;
-        if (goal->current_stage >= goal->stage_count) continue;
+    // In coop HOST mode, multi-stage stages are handled by the cumulative function
+    // (always summed across players, independent of the stat merge setting).
+    if (!skip_multi_stage) {
+        for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
+            MultiStageGoal *goal = t->template_data->multi_stage_goals[i];
+            if (!goal) continue;
+            if (goal->current_stage >= goal->stage_count) continue;
 
-        SubGoal *stage = goal->stages[goal->current_stage];
-        if (!stage || stage->type != SUBGOAL_STAT) continue;
+            SubGoal *stage = goal->stages[goal->current_stage];
+            if (!stage || stage->type != SUBGOAL_STAT) continue;
 
-        bool matches = false;
-        if (is_modern) {
-            // Modern template format: "minecraft:picked_up/minecraft:wither_skeleton_skull"
-            const char *slash = strchr(stage->root_name, '/');
-            if (!slash) continue;
+            bool matches = false;
+            if (is_modern) {
+                // Modern template format: "minecraft:picked_up/minecraft:wither_skeleton_skull"
+                const char *slash = strchr(stage->root_name, '/');
+                if (!slash) continue;
 
-            char s_cat[192], s_item[192];
-            size_t cat_len = (size_t) (slash - stage->root_name);
-            if (cat_len == 0 || cat_len >= sizeof(s_cat)) continue;
+                char s_cat[192], s_item[192];
+                size_t cat_len = (size_t) (slash - stage->root_name);
+                if (cat_len == 0 || cat_len >= sizeof(s_cat)) continue;
 
-            strncpy(s_cat, stage->root_name, cat_len);
-            s_cat[cat_len] = '\0';
-            strncpy(s_item, slash + 1, sizeof(s_item) - 1);
-            s_item[sizeof(s_item) - 1] = '\0';
+                strncpy(s_cat, stage->root_name, cat_len);
+                s_cat[cat_len] = '\0';
+                strncpy(s_item, slash + 1, sizeof(s_item) - 1);
+                s_item[sizeof(s_item) - 1] = '\0';
 
-            matches = (strcmp(s_cat, h_cat) == 0 &&
-                       strcmp(s_item, h_item) == 0);
-        } else {
-            // Legacy/mid-era: direct compare, e.g. "5242881" or "stat.pickup.minecraft.skull"
-            matches = (strcmp(stage->root_name, hermes_key) == 0);
-        }
+                matches = (strcmp(s_cat, h_cat) == 0 &&
+                           strcmp(s_item, h_item) == 0);
+            } else {
+                // Legacy/mid-era: direct compare, e.g. "5242881" or "stat.pickup.minecraft.skull"
+                matches = (strcmp(stage->root_name, hermes_key) == 0);
+            }
 
-        if (!matches) continue;
+            if (!matches) continue;
 
-        if (new_value > stage->current_stat_progress) {
-            stage->current_stat_progress = new_value;
-            changed = true;
-        }
+            if (new_value > stage->current_stat_progress) {
+                stage->current_stat_progress = new_value;
+                changed = true;
+            }
 
-        if (stage->required_progress > 0 &&
-            stage->current_stat_progress >= stage->required_progress) {
-            if (goal->current_stage + 1 < goal->stage_count) {
-                goal->current_stage++;
-                log_message(LOG_INFO,
-                            "[TRACKER - HERMES] Multi-stage goal '%s' advanced to stage %d.\n",
-                            goal->root_name, goal->current_stage);
+            if (stage->required_progress > 0 &&
+                stage->current_stat_progress >= stage->required_progress) {
+                if (goal->current_stage + 1 < goal->stage_count) {
+                    goal->current_stage++;
+                    log_message(LOG_INFO,
+                                "[TRACKER - HERMES] Multi-stage goal '%s' advanced to stage %d.\n",
+                                goal->root_name, goal->current_stage);
+                }
             }
         }
     }
@@ -9942,7 +9946,8 @@ static bool hermes_apply_stat_event(Tracker *t, const cJSON *data) {
  * The cache is cleared each time the file-based merge runs (authoritative reset).
  */
 static bool hermes_apply_stat_event_cumulative(Tracker *t, const cJSON *data,
-                                               const char *player_uuid) {
+                                               const char *player_uuid,
+                                               bool multi_stage_only = false) {
     cJSON *stat_key_json = cJSON_GetObjectItem(data, "stat");
     cJSON *value_json = cJSON_GetObjectItem(data, "value");
 
@@ -9976,53 +9981,56 @@ static bool hermes_apply_stat_event_cumulative(Tracker *t, const cJSON *data,
 
     bool changed = false;
 
-    for (int i = 0; i < t->template_data->stat_count; i++) {
-        TrackableCategory *stat_cat = t->template_data->stats[i];
-        if (!stat_cat) continue;
+    // Regular stat categories (skip when only processing multi-stage stages)
+    if (!multi_stage_only) {
+        for (int i = 0; i < t->template_data->stat_count; i++) {
+            TrackableCategory *stat_cat = t->template_data->stats[i];
+            if (!stat_cat) continue;
 
-        bool cat_changed = false;
+            bool cat_changed = false;
 
-        for (int j = 0; j < stat_cat->criteria_count; j++) {
-            TrackableItem *sub = stat_cat->criteria[j];
-            if (!sub) continue;
-
-            bool matches = false;
-            if (is_modern) {
-                if (sub->stat_category_key[0] == '\0') continue;
-                matches = (strcmp(sub->stat_category_key, h_cat) == 0 &&
-                           strcmp(sub->stat_item_key, h_item) == 0);
-            } else {
-                matches = (strcmp(sub->root_name, hermes_key) == 0);
-            }
-
-            if (!matches) continue;
-
-            // Add the delta to the merged cumulative total
-            sub->progress += delta;
-
-            if (!sub->is_manually_completed) {
-                if (sub->goal > 0) sub->done = (sub->progress >= sub->goal);
-                else if (sub->goal == -1) sub->done = false;
-            }
-
-            cat_changed = true;
-            changed = true;
-        }
-
-        if (cat_changed) {
-            int completed = 0;
             for (int j = 0; j < stat_cat->criteria_count; j++) {
-                if (stat_cat->criteria[j] && stat_cat->criteria[j]->done)
-                    completed++;
-            }
-            stat_cat->completed_criteria_count = completed;
+                TrackableItem *sub = stat_cat->criteria[j];
+                if (!sub) continue;
 
-            if (!stat_cat->is_manually_completed) {
-                stat_cat->done = (stat_cat->criteria_count > 0 &&
-                                  completed >= stat_cat->criteria_count);
+                bool matches = false;
+                if (is_modern) {
+                    if (sub->stat_category_key[0] == '\0') continue;
+                    matches = (strcmp(sub->stat_category_key, h_cat) == 0 &&
+                               strcmp(sub->stat_item_key, h_item) == 0);
+                } else {
+                    matches = (strcmp(sub->root_name, hermes_key) == 0);
+                }
+
+                if (!matches) continue;
+
+                // Add the delta to the merged cumulative total
+                sub->progress += delta;
+
+                if (!sub->is_manually_completed) {
+                    if (sub->goal > 0) sub->done = (sub->progress >= sub->goal);
+                    else if (sub->goal == -1) sub->done = false;
+                }
+
+                cat_changed = true;
+                changed = true;
+            }
+
+            if (cat_changed) {
+                int completed = 0;
+                for (int j = 0; j < stat_cat->criteria_count; j++) {
+                    if (stat_cat->criteria[j] && stat_cat->criteria[j]->done)
+                        completed++;
+                }
+                stat_cat->completed_criteria_count = completed;
+
+                if (!stat_cat->is_manually_completed) {
+                    stat_cat->done = (stat_cat->criteria_count > 0 &&
+                                      completed >= stat_cat->criteria_count);
+                }
             }
         }
-    }
+    } // end if (!multi_stage_only)
 
     // Multi-stage goals with CUMULATIVE: also use delta
     for (int i = 0; i < t->template_data->multi_stage_goal_count; i++) {
@@ -10322,14 +10330,21 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
 
         // --- Dispatch event ---
         if (strcmp(type, "stat") == 0) {
-            if (settings->network_mode == NETWORK_HOST &&
-                settings->coop_stat_merge == COOP_STAT_CUMULATIVE &&
-                t->hermes_coop_stat_cache) {
-                // CUMULATIVE mode: track per-player deltas
+            bool is_coop_host = (settings->network_mode == NETWORK_HOST &&
+                                 t->hermes_coop_stat_cache);
+            if (is_coop_host && settings->coop_stat_merge == COOP_STAT_CUMULATIVE) {
+                // CUMULATIVE mode: track per-player deltas for everything
                 if (hermes_apply_stat_event_cumulative(t, data, event_player_uuid))
                     any_changed = true;
+            } else if (is_coop_host) {
+                // HIGHEST mode: use higher-wins for regular stats, but multi-stage
+                // stages must always be cumulative (summed across all players)
+                if (hermes_apply_stat_event(t, data, true))  // skip_multi_stage
+                    any_changed = true;
+                if (hermes_apply_stat_event_cumulative(t, data, event_player_uuid, true))  // multi_stage_only
+                    any_changed = true;
             } else {
-                // HIGHEST mode or singleplayer: direct apply (higher-wins or sole player)
+                // Singleplayer: direct apply (only one player, highest == actual)
                 if (hermes_apply_stat_event(t, data))
                     any_changed = true;
             }
