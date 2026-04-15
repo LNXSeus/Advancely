@@ -239,6 +239,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Co-op error flag (block Apply when host IP/port is invalid)
     static bool coop_host_input_error = false;
 
+    // Hotkey duplicate error flag (block Apply when two goals share the same key)
+    static bool hotkey_duplicate_error = false;
+
     // Co-op tab state (at function scope so revert/open can reset them)
     static char coop_identity_status_msg[256] = "";
     static bool coop_identity_status_is_error = false;
@@ -3332,6 +3335,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         } // End of Co-op Tab
 
         if (ImGui::BeginTabItem("Hotkeys")) {
+            hotkey_duplicate_error = false; // Reset each frame; re-evaluated below if counters exist
             ImGui::TextDisabled(
                 "Select a template with custom goals using target values different from 0 to adjust their hotkeys here.");
             // --- Hotkey Settings ---
@@ -3457,6 +3461,48 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         }
                     }
                 }
+
+                // --- Duplicate Hotkey Validation ---
+                // Collect all active (non-"None") keys and check for duplicates
+                for (int i = 0; i < temp_settings.hotkey_count && !hotkey_duplicate_error; ++i) {
+                    const char *inc_i = temp_settings.hotkeys[i].increment_key;
+                    const char *dec_i = temp_settings.hotkeys[i].decrement_key;
+                    bool inc_active = (strcmp(inc_i, "None") != 0);
+                    bool dec_active = (strcmp(dec_i, "None") != 0);
+
+                    // Check increment vs decrement within the same binding
+                    if (inc_active && dec_active && strcmp(inc_i, dec_i) == 0) {
+                        hotkey_duplicate_error = true;
+                        break;
+                    }
+
+                    // Check against all other bindings
+                    for (int j = i + 1; j < temp_settings.hotkey_count; ++j) {
+                        const char *inc_j = temp_settings.hotkeys[j].increment_key;
+                        const char *dec_j = temp_settings.hotkeys[j].decrement_key;
+                        bool inc_j_active = (strcmp(inc_j, "None") != 0);
+                        bool dec_j_active = (strcmp(dec_j, "None") != 0);
+
+                        if (inc_active && inc_j_active && strcmp(inc_i, inc_j) == 0) {
+                            hotkey_duplicate_error = true; break;
+                        }
+                        if (inc_active && dec_j_active && strcmp(inc_i, dec_j) == 0) {
+                            hotkey_duplicate_error = true; break;
+                        }
+                        if (dec_active && inc_j_active && strcmp(dec_i, inc_j) == 0) {
+                            hotkey_duplicate_error = true; break;
+                        }
+                        if (dec_active && dec_j_active && strcmp(dec_i, dec_j) == 0) {
+                            hotkey_duplicate_error = true; break;
+                        }
+                    }
+                }
+
+                if (hotkey_duplicate_error) {
+                    ImGui::Spacing();
+                    ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f),
+                                       "Error: Two or more goals share the same hotkey. Each key can only be used once.");
+                }
             }
 
             ImGui::EndTabItem();
@@ -3517,7 +3563,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
     // Disable "Apply Settings" button on visual editing mode or unsaved template editor changes
     bool visual_editing = t && t->is_visual_layout_editing;
     bool template_unsaved = t && t->template_editor_has_unsaved_changes;
-    bool apply_disabled = visual_editing || template_unsaved || coop_host_input_error;
+    bool apply_disabled = visual_editing || template_unsaved || coop_host_input_error || hotkey_duplicate_error;
 
     // Apply the changes or pressing Enter or Ctrl/Cmd + S keys in the settings window when NO popup is shown
 
@@ -3648,6 +3694,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
                      "Disabled due to an invalid IP address or port in the Co-op tab.\n"
                      "Fix the highlighted fields before applying.");
+        } else if (hotkey_duplicate_error) {
+            snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
+                     "Disabled because two or more goals share the same hotkey.\n"
+                     "Each key can only be assigned to one action across all goals.");
         } else {
             snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
                      "Apply any changes made in this window. You can also press 'ENTER' or 'Ctrl/Cmd + S' to apply.\n"
@@ -3836,6 +3886,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             snprintf(restart_button_tooltip_buffer, sizeof(restart_button_tooltip_buffer),
                      "Disabled due to an invalid IP address or port in the Co-op tab.\n"
                      "Fix the highlighted fields before restarting.");
+        } else if (hotkey_duplicate_error) {
+            snprintf(restart_button_tooltip_buffer, sizeof(restart_button_tooltip_buffer),
+                     "Disabled because two or more goals share the same hotkey.\n"
+                     "Each key can only be assigned to one action across all goals.");
         } else {
             snprintf(restart_button_tooltip_buffer, sizeof(restart_button_tooltip_buffer),
                      "Saves all current settings and restarts the application.\n"
