@@ -2570,6 +2570,11 @@ int main(int argc, char *argv[]) {
                             log_message(LOG_INFO, "[COOP] Applied %d custom goal modification(s).\n", mod_count);
                         }
 
+                        // Reset host timer BEFORE broadcast so receivers get
+                        // the post-update value (0) instead of the stale pre-update time.
+                        tracker->time_since_last_update = 0.0f;
+                        tracker->template_data->host_time_since_last_update = 0.0f;
+
                         // Broadcast merged state to all receivers
                         char *broadcast_buf = (char *) malloc(4 * 1024 * 1024); // 4 MB heap buffer
                         if (broadcast_buf) {
@@ -2670,6 +2675,14 @@ int main(int argc, char *argv[]) {
                 log_message(LOG_INFO, "[COOP] Custom goal change — broadcasting without full re-merge.\n");
                 tracker_recalculate_progress(tracker, &app_settings);
 
+                // Reset timer before broadcast so receivers get the updated value
+                if (SDL_SetAtomicInt(&g_game_data_changed, 0) == 1) {
+                    tracker->time_since_last_update = 0.0f;
+                    if (tracker->template_data)
+                        tracker->template_data->host_time_since_last_update = 0.0f;
+                    tracker_print_debug_status(tracker, &app_settings);
+                }
+
                 // Broadcast to receivers
                 if (app_settings.network_mode == NETWORK_HOST && g_coop_ctx &&
                     coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
@@ -2685,11 +2698,6 @@ int main(int argc, char *argv[]) {
                 }
 
                 tracker_update_title(tracker, &app_settings);
-
-                if (SDL_SetAtomicInt(&g_game_data_changed, 0) == 1) {
-                    tracker->time_since_last_update = 0.0f;
-                    tracker_print_debug_status(tracker, &app_settings);
-                }
 
                 // IPC write to overlay
                 if (tracker->p_shared_data) {

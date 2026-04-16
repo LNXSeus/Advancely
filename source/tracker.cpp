@@ -9510,18 +9510,38 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
 
             // --- Controls at the bottom of the window ---
-            // Per-World Toggle
+            // Per-World Toggle — disabled for receivers in coop (no world file available)
+            bool rcv_notes_locked = (settings->network_mode == NETWORK_RECEIVER &&
+                                     g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+            if (rcv_notes_locked) {
+                // Force per-template for receivers and reload if it was per-world
+                if (settings->per_world_notes) {
+                    settings->per_world_notes = false;
+                    tracker_update_notes_path(t, settings);
+                    tracker_load_notes(t, settings);
+                    settings_save(settings, nullptr, SAVE_CONTEXT_ALL);
+                }
+                ImGui::BeginDisabled();
+            }
             if (ImGui::Checkbox("Per-World Notes", &settings->per_world_notes)) {
                 // When toggled, immediately update the path and reload the notes
                 tracker_update_notes_path(t, settings);
                 tracker_load_notes(t, settings);
                 settings_save(settings, nullptr, SAVE_CONTEXT_ALL); // Save the setting change
             }
-            if (ImGui::IsItemHovered()) {
+            if (rcv_notes_locked)
+                ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 char per_world_notes_tooltip_buffer[512];
-                snprintf(per_world_notes_tooltip_buffer, sizeof(per_world_notes_tooltip_buffer),
-                         "When enabled, notes are saved for each world individually.\n"
-                         "When disabled, notes are shared for the current template.");
+                if (rcv_notes_locked) {
+                    snprintf(per_world_notes_tooltip_buffer, sizeof(per_world_notes_tooltip_buffer),
+                             "Per-World notes are not available in Co-op as a receiver.\n"
+                             "Notes are saved per template while connected.");
+                } else {
+                    snprintf(per_world_notes_tooltip_buffer, sizeof(per_world_notes_tooltip_buffer),
+                             "When enabled, notes are saved for each world individually.\n"
+                             "When disabled, notes are shared for the current template.");
+                }
                 ImGui::SetTooltip("%s", per_world_notes_tooltip_buffer);
             }
 

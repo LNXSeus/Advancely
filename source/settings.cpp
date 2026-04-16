@@ -242,6 +242,9 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     // Hotkey duplicate error flag (block Apply when two goals share the same key)
     static bool hotkey_duplicate_error = false;
 
+    // Account validation error flag (block Apply when UUID is empty or has bad format)
+    static bool account_validation_error = false;
+
     // Co-op tab state (at function scope so revert/open can reset them)
     static char coop_identity_status_msg[256] = "";
     static bool coop_identity_status_is_error = false;
@@ -2368,8 +2371,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             ImGui::EndTabItem();
         } // End of Overlay Tab
 
-        // Account Tab
-        if (ImGui::BeginTabItem("Account")) {
+        // Account Tab — auto-select when forced open for first-time account setup
+        ImGuiTabItemFlags account_tab_flags = ImGuiTabItemFlags_None;
+        if (force_open_reason && *force_open_reason == FORCE_OPEN_ACCOUNT_SETUP && just_opened)
+            account_tab_flags = ImGuiTabItemFlags_SetSelected;
+        if (ImGui::BeginTabItem("Account", nullptr, account_tab_flags)) {
             CoopNetState acc_net_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
             bool acc_net_active = (acc_net_state == COOP_NET_LISTENING || acc_net_state == COOP_NET_CONNECTED
                                    || acc_net_state == COOP_NET_CONNECTING);
@@ -2516,14 +2522,44 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             }
             if (acc_net_active) ImGui::EndDisabled();
 
+            // --- UUID validation (empty + format check) ---
+            bool uuid_empty = (temp_settings.local_player.uuid[0] == '\0');
+            bool uuid_bad_format = false;
+            if (!uuid_empty) {
+                const char *u = temp_settings.local_player.uuid;
+                size_t len = strlen(u);
+                if (len != 36) {
+                    uuid_bad_format = true;
+                } else {
+                    for (size_t ci = 0; ci < 36 && !uuid_bad_format; ++ci) {
+                        if (ci == 8 || ci == 13 || ci == 18 || ci == 23) {
+                            if (u[ci] != '-') uuid_bad_format = true;
+                        } else {
+                            char ch = u[ci];
+                            if (!((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')))
+                                uuid_bad_format = true;
+                        }
+                    }
+                }
+            }
+            account_validation_error = uuid_empty || uuid_bad_format;
+
+            if (uuid_bad_format) {
+                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
+                                   "Invalid UUID format. Expected: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx");
+            }
+
             // Status summary
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
-            bool identity_ready = temp_settings.local_player.uuid[0] != '\0';
+            bool identity_ready = !account_validation_error;
             if (identity_ready) {
                 ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "Account configured.");
                 ImGui::TextDisabled("Advancely will use your UUID to read the correct player files.");
+            } else if (uuid_bad_format) {
+                ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "Invalid UUID format.");
+                ImGui::TextDisabled("The UUID must be in the format 8-4-4-4-12 hex digits with dashes.");
             } else {
                 ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "Account not configured.");
                 ImGui::TextDisabled("Without an account, Advancely picks the first file it finds.\n"
@@ -3563,7 +3599,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
     // Disable "Apply Settings" button on visual editing mode or unsaved template editor changes
     bool visual_editing = t && t->is_visual_layout_editing;
     bool template_unsaved = t && t->template_editor_has_unsaved_changes;
-    bool apply_disabled = visual_editing || template_unsaved || coop_host_input_error || hotkey_duplicate_error;
+    bool apply_disabled = visual_editing || template_unsaved || coop_host_input_error || hotkey_duplicate_error || account_validation_error;
 
     // Apply the changes or pressing Enter or Ctrl/Cmd + S keys in the settings window when NO popup is shown
 
@@ -3698,6 +3734,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
                      "Disabled because two or more goals share the same hotkey.\n"
                      "Each key can only be assigned to one action across all goals.");
+        } else if (account_validation_error) {
+            snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
+                     "Disabled because the Account tab has invalid settings.\n"
+                     "A valid UUID is required (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx).");
         } else {
             snprintf(apply_button_tooltip_buffer, sizeof(apply_button_tooltip_buffer),
                      "Apply any changes made in this window. You can also press 'ENTER' or 'Ctrl/Cmd + S' to apply.\n"
