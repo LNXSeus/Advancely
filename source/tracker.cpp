@@ -3270,6 +3270,7 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     t->search_buffer[0] = '\0';
     t->focus_search_box_requested = false;
     t->focus_tc_search_box = false; // CURRENTLY UNUSED
+    t->selected_coop_player_idx = -1; // Default: "All Players" (merged view)
     t->is_temp_creator_focused = false;
     t->notes_widget_id_counter = 0;
 
@@ -4220,6 +4221,77 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
     tracker_update_custom_progress(t, settings_json, settings);
 
     // Fixed-point iteration for linked goals
+    {
+        bool changed;
+        int guard = 0;
+        do {
+            changed = tracker_update_custom_goal_linked_goals(t);
+            changed |= tracker_update_stat_linked_goals(t);
+            changed |= tracker_update_counter_goals(t);
+        } while (changed && ++guard < 32);
+    }
+
+    tracker_calculate_overall_progress(t, version, settings);
+
+    cJSON_Delete(settings_json);
+}
+
+void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, int player_idx) {
+    if (!t || !t->template_data || !settings) return;
+    if (player_idx < 0 || player_idx >= settings->coop_player_count) return;
+
+    MC_Version version = settings_get_version_from_string(settings->version_str);
+
+    // Reset all progress to zero
+    coop_reset_template_progress(t->template_data);
+
+    // Merge only the selected player
+    const CoopPlayer *player = &settings->coop_players[player_idx];
+
+    char player_adv_path[MAX_PATH_LENGTH];
+    char player_stats_path[MAX_PATH_LENGTH];
+    char player_unlocks_path[MAX_PATH_LENGTH];
+
+    find_player_data_files_for_uuid(
+        t->saves_path, version, settings->using_stats_per_world_legacy,
+        t->world_name, player->uuid, player->username,
+        player_adv_path, player_stats_path, player_unlocks_path, MAX_PATH_LENGTH
+    );
+
+    cJSON *player_adv_json = (player_adv_path[0] != '\0') ? cJSON_from_file(player_adv_path) : nullptr;
+    cJSON *player_stats_json = (player_stats_path[0] != '\0') ? cJSON_from_file(player_stats_path) : nullptr;
+    cJSON *player_unlocks_json = (player_unlocks_path[0] != '\0') ? cJSON_from_file(player_unlocks_path) : nullptr;
+
+    if (version <= MC_VERSION_1_6_4) {
+        coop_merge_achievements_legacy(t->template_data, player_stats_json);
+        coop_merge_stats_legacy(t->template_data, player_stats_json, settings->coop_stat_merge);
+    } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_11_2) {
+        coop_merge_achievements_mid(t->template_data, player_stats_json);
+        coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge);
+    } else if (version >= MC_VERSION_1_12 && version <= MC_VERSION_1_12_2) {
+        coop_merge_advancements_modern(t->template_data, player_adv_json);
+        coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge);
+    } else if (version >= MC_VERSION_1_13) {
+        coop_merge_advancements_modern(t->template_data, player_adv_json);
+        coop_merge_stats_modern(t->template_data, player_stats_json, settings->coop_stat_merge, version);
+    }
+
+    coop_merge_multi_stage(t->template_data, player_adv_json, player_stats_json,
+                           player_unlocks_json, version);
+
+    cJSON_Delete(player_adv_json);
+    cJSON_Delete(player_stats_json);
+    cJSON_Delete(player_unlocks_json);
+
+    // Finalize
+    cJSON *settings_json = cJSON_from_file(get_settings_file_path());
+
+    coop_finalize_advancements(t->template_data);
+    coop_finalize_stats(t->template_data, settings_json);
+    coop_finalize_multi_stage(t->template_data);
+
+    tracker_update_custom_progress(t, settings_json, settings);
+
     {
         bool changed;
         int guard = 0;
@@ -5466,7 +5538,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
             float criteria_list_height = 0.0f; // The pixel height the list will take up
 
             // ONLY expand parent height based on UNPLACED criteria!
-            if (unplaced_criteria_count > 0) {
+            // Skip for simple stat categories — their single criterion is rendered
+            // as inline progress text, not as a sub-item row.
+            bool is_simple_stat = is_stat_section && cat->is_single_stat_category;
+            if (unplaced_criteria_count > 0 && !is_simple_stat) {
                 item_height += 12.0f; // Initial padding before criteria list
 
                 // Check if we exceed the threshold AND no children are manually placed
@@ -9366,6 +9441,62 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
         ImGui::PopTextWrapPos();
         ImGui::EndTooltip();
+    }
+
+    // Player dropdown — only visible in coop
+    {
+        CoopNetState player_dd_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
+        bool in_coop = (player_dd_state == COOP_NET_LISTENING || player_dd_state == COOP_NET_CONNECTED);
+        if (in_coop && settings->coop_player_count > 0) {
+            ImGui::SameLine();
+
+            // Build preview label
+            const char *preview = "All Players";
+            if (t->selected_coop_player_idx >= 0 && t->selected_coop_player_idx < settings->coop_player_count) {
+                const CoopPlayer *sel = &settings->coop_players[t->selected_coop_player_idx];
+                preview = sel->display_name[0] != '\0' ? sel->display_name : sel->username;
+            }
+
+            ImGui::SetNextItemWidth(160.0f);
+            if (ImGui::BeginCombo("##PlayerView", preview, ImGuiComboFlags_None)) {
+                // "All Players" entry
+                bool is_all = (t->selected_coop_player_idx == -1);
+                if (ImGui::Selectable("All Players", is_all)) {
+                    if (!is_all) {
+                        t->selected_coop_player_idx = -1;
+                        SDL_SetAtomicInt(&g_needs_update, 1);
+                    }
+                }
+                if (is_all) ImGui::SetItemDefaultFocus();
+
+                // Individual players
+                for (int pi = 0; pi < settings->coop_player_count; pi++) {
+                    const CoopPlayer *p = &settings->coop_players[pi];
+                    const char *label = p->display_name[0] != '\0' ? p->display_name : p->username;
+                    char player_label[128];
+                    snprintf(player_label, sizeof(player_label), "%s##player_%d", label, pi);
+                    bool is_selected = (t->selected_coop_player_idx == pi);
+                    if (ImGui::Selectable(player_label, is_selected)) {
+                        if (!is_selected) {
+                            t->selected_coop_player_idx = pi;
+                            SDL_SetAtomicInt(&g_needs_update, 1);
+                        }
+                    }
+                    if (is_selected) ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+            if (ImGui::IsItemHovered()) {
+                char tooltip_buf[256];
+                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                         "View progress for a specific player or all players combined.\n"
+                         "'All Players' shows the merged Co-op progress.");
+                ImGui::SetTooltip("%s", tooltip_buf);
+            }
+        } else {
+            // Reset to All Players when not in coop
+            t->selected_coop_player_idx = -1;
+        }
     }
 
     ImGui::SameLine();

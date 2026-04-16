@@ -2421,8 +2421,15 @@ int main(int argc, char *argv[]) {
 
             // --- Co-op Receiver: consume state updates from host ---
             if (app_settings.network_mode == NETWORK_RECEIVER && g_coop_ctx) {
+                static int rcv_last_applied_player_idx = -1;
+
                 SDL_LockMutex(g_coop_ctx->recv_mutex);
-                if (g_coop_ctx->recv_data_ready) {
+
+                bool new_data = g_coop_ctx->recv_data_ready;
+                bool new_player_data = g_coop_ctx->recv_player_data_ready;
+                bool player_view_changed = (tracker->selected_coop_player_idx != rcv_last_applied_player_idx);
+
+                if (new_data) {
                     log_message(LOG_INFO, "[COOP DEBUG] Receiver: data ready. buf=%p size=%zu "
                                 "sizeof(TemplateData)=%zu template_data=%p\n",
                                 (void *) g_coop_ctx->recv_buffer,
@@ -2430,31 +2437,59 @@ int main(int argc, char *argv[]) {
                                 sizeof(TemplateData),
                                 (void *) tracker->template_data);
                 }
-                if (g_coop_ctx->recv_data_ready && g_coop_ctx->recv_buffer &&
-                    g_coop_ctx->recv_buffer_size >= sizeof(TemplateData) && tracker->template_data) {
-                    bool merged = merge_coop_progress(g_coop_ctx->recv_buffer, tracker->template_data);
-                    g_coop_ctx->recv_data_ready = false;
 
-                    if (merged) {
-                        // Mirror the host's update timer so the receiver shows the same "Upd:" value
-                        tracker->time_since_last_update = tracker->template_data->host_time_since_last_update;
-                        SDL_SetAtomicInt(&g_needs_update, 1);
-                        SDL_SetAtomicInt(&g_game_data_changed, 1);
-                        log_message(LOG_INFO, "[COOP] Received and applied merged state from host. "
-                                    "overall_progress=%.1f%%\n",
-                                    tracker->template_data->overall_progress_percentage);
-                    } else {
-                        log_message(LOG_ERROR, "[COOP DEBUG] Receiver: merge_coop_progress returned false!\n");
+                // Determine which buffer to apply: per-player snapshot or merged
+                if ((new_data || new_player_data || player_view_changed) && tracker->template_data) {
+                    const char *apply_buf = nullptr;
+                    size_t apply_size = 0;
+                    int sel = tracker->selected_coop_player_idx;
+
+                    if (sel >= 0 && sel < g_coop_ctx->recv_player_snapshot_count &&
+                        g_coop_ctx->recv_player_buffers[sel] &&
+                        g_coop_ctx->recv_player_buffer_sizes[sel] >= sizeof(TemplateData)) {
+                        // Apply per-player snapshot
+                        apply_buf = g_coop_ctx->recv_player_buffers[sel];
+                        apply_size = g_coop_ctx->recv_player_buffer_sizes[sel];
+                    } else if (g_coop_ctx->recv_merged_snapshot &&
+                               g_coop_ctx->recv_merged_snapshot_size >= sizeof(TemplateData)) {
+                        // Fall back to merged snapshot
+                        apply_buf = g_coop_ctx->recv_merged_snapshot;
+                        apply_size = g_coop_ctx->recv_merged_snapshot_size;
+                    } else if (new_data && g_coop_ctx->recv_buffer &&
+                               g_coop_ctx->recv_buffer_size >= sizeof(TemplateData)) {
+                        // First data arrival, no persistent snapshot yet
+                        apply_buf = g_coop_ctx->recv_buffer;
+                        apply_size = g_coop_ctx->recv_buffer_size;
                     }
+
+                    if (apply_buf && apply_size > 0) {
+                        bool merged = merge_coop_progress(apply_buf, tracker->template_data);
+                        if (merged) {
+                            tracker->time_since_last_update = tracker->template_data->host_time_since_last_update;
+                            SDL_SetAtomicInt(&g_needs_update, 1);
+                            SDL_SetAtomicInt(&g_game_data_changed, 1);
+                            rcv_last_applied_player_idx = sel;
+                            log_message(LOG_INFO, "[COOP] Receiver: applied %s state. "
+                                        "overall_progress=%.1f%%\n",
+                                        sel >= 0 ? "per-player" : "merged",
+                                        tracker->template_data->overall_progress_percentage);
+                        } else {
+                            log_message(LOG_ERROR, "[COOP DEBUG] Receiver: merge_coop_progress returned false!\n");
+                        }
+                    } else if (new_data) {
+                        log_message(LOG_ERROR, "[COOP DEBUG] Receiver: data ready but SKIPPED. "
+                                    "buf=%s size_ok=%s template=%s\n",
+                                    g_coop_ctx->recv_buffer ? "yes" : "NO",
+                                    g_coop_ctx->recv_buffer_size >= sizeof(TemplateData) ? "yes" : "NO",
+                                    tracker->template_data ? "yes" : "NO");
+                    }
+
+                    if (new_data) g_coop_ctx->recv_data_ready = false;
+                    if (g_coop_ctx->recv_player_data_ready) g_coop_ctx->recv_player_data_ready = false;
                 } else if (g_coop_ctx->recv_data_ready) {
-                    // Data ready but one of the preconditions failed — log which one
-                    log_message(LOG_ERROR, "[COOP DEBUG] Receiver: data ready but SKIPPED. "
-                                "buf=%s size_ok=%s template=%s\n",
-                                g_coop_ctx->recv_buffer ? "yes" : "NO",
-                                g_coop_ctx->recv_buffer_size >= sizeof(TemplateData) ? "yes" : "NO",
-                                tracker->template_data ? "yes" : "NO");
-                    g_coop_ctx->recv_data_ready = false; // Don't spin on bad data
+                    g_coop_ctx->recv_data_ready = false;
                 }
+
                 SDL_UnlockMutex(g_coop_ctx->recv_mutex);
             }
 
@@ -2575,20 +2610,67 @@ int main(int argc, char *argv[]) {
                         tracker->time_since_last_update = 0.0f;
                         tracker->template_data->host_time_since_last_update = 0.0f;
 
-                        // Broadcast merged state to all receivers
-                        char *broadcast_buf = (char *) malloc(4 * 1024 * 1024); // 4 MB heap buffer
-                        if (broadcast_buf) {
-                            size_t broadcast_size = serialize_template_data(tracker->template_data, broadcast_buf);
-                            log_message(LOG_INFO, "[COOP DEBUG] Host: broadcast_size=%zu, overall_progress=%.1f%%\n",
-                                        broadcast_size,
-                                        tracker->template_data
-                                            ? tracker->template_data->overall_progress_percentage
-                                            : -1.0f);
-                            if (broadcast_size > 0) {
-                                coop_net_broadcast(g_coop_ctx, broadcast_buf, broadcast_size);
+                        // Broadcast merged state to all receivers and save a copy for restore
+                        char *merged_snapshot = nullptr;
+                        {
+                            char *broadcast_buf = (char *) malloc(4 * 1024 * 1024);
+                            if (broadcast_buf) {
+                                size_t broadcast_size = serialize_template_data(tracker->template_data, broadcast_buf);
+                                log_message(LOG_INFO, "[COOP DEBUG] Host: broadcast_size=%zu, overall_progress=%.1f%%\n",
+                                            broadcast_size,
+                                            tracker->template_data
+                                                ? tracker->template_data->overall_progress_percentage
+                                                : -1.0f);
+                                if (broadcast_size > 0) {
+                                    coop_net_broadcast(g_coop_ctx, broadcast_buf, broadcast_size);
+                                    // Keep a copy so we can restore merged view without re-reading disk
+                                    merged_snapshot = (char *) malloc(broadcast_size);
+                                    if (merged_snapshot) {
+                                        memcpy(merged_snapshot, broadcast_buf, broadcast_size);
+                                    }
+                                }
+                                free(broadcast_buf);
                             }
-                            free(broadcast_buf);
                         }
+
+                        // Broadcast per-player progress snapshots so receivers can
+                        // use the player dropdown to view individual progress.
+                        {
+                            int pc = app_settings.coop_player_count;
+                            char **pp_bufs = (char **) calloc(pc, sizeof(char *));
+                            size_t *pp_sizes = (size_t *) calloc(pc, sizeof(size_t));
+                            char *pp_work = (char *) malloc(4 * 1024 * 1024);
+                            if (pp_bufs && pp_sizes && pp_work) {
+                                for (int pi = 0; pi < pc; pi++) {
+                                    tracker_update_coop_single_player(tracker, &app_settings, pi);
+                                    size_t sz = serialize_template_data(tracker->template_data, pp_work);
+                                    pp_bufs[pi] = (char *) malloc(sz);
+                                    if (pp_bufs[pi]) {
+                                        memcpy(pp_bufs[pi], pp_work, sz);
+                                        pp_sizes[pi] = sz;
+                                    }
+                                }
+                                coop_net_broadcast_player_states(g_coop_ctx, pp_bufs, pp_sizes, pc);
+
+                                // Restore host's display: either single player or merged
+                                if (tracker->selected_coop_player_idx >= 0 &&
+                                    tracker->selected_coop_player_idx < pc) {
+                                    int sel = tracker->selected_coop_player_idx;
+                                    if (pp_bufs[sel] && pp_sizes[sel] > 0) {
+                                        merge_coop_progress(pp_bufs[sel], tracker->template_data);
+                                    }
+                                } else if (merged_snapshot) {
+                                    merge_coop_progress(merged_snapshot, tracker->template_data);
+                                }
+                                tracker_recalculate_progress(tracker, &app_settings);
+
+                                for (int pi = 0; pi < pc; pi++) free(pp_bufs[pi]);
+                            }
+                            free(pp_bufs);
+                            free(pp_sizes);
+                            free(pp_work);
+                        }
+                        free(merged_snapshot);
                     } else {
                         // Singleplayer or host with no clients: normal update
                         tracker_update(tracker, &app_settings);

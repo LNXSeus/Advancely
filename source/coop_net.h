@@ -47,7 +47,8 @@ enum CoopMsgType {
     COOP_MSG_JOIN_REJECT = 8, // Host -> Receiver: reason string, then close
     COOP_MSG_PLAYER_LIST = 9, // Host -> All receivers: JSON player list on any change
     COOP_MSG_KICK = 10, // Host -> Receiver: reason string, then close
-    COOP_MSG_CUSTOM_GOAL_MOD = 11 // Receiver -> Host: custom goal/stat checkbox modification
+    COOP_MSG_CUSTOM_GOAL_MOD = 11, // Receiver -> Host: custom goal/stat checkbox modification
+    COOP_MSG_PLAYER_STATES = 12 // Host -> All receivers: per-player progress snapshots
 };
 
 #define COOP_MSG_HEADER_SIZE 8 // 4 bytes type + 4 bytes length
@@ -161,6 +162,16 @@ typedef struct {
     size_t recv_buffer_size;
     bool recv_data_ready;
 
+    // -- Persistent merged snapshot (Receiver side: kept so dropdown switch can re-apply) --
+    char *recv_merged_snapshot;
+    size_t recv_merged_snapshot_size;
+
+    // -- Per-player progress snapshots (Receiver side: one buffer per coop player) --
+    char *recv_player_buffers[COOP_MAX_LOBBY];
+    size_t recv_player_buffer_sizes[COOP_MAX_LOBBY];
+    int recv_player_snapshot_count;
+    bool recv_player_data_ready;
+
     // -- Lobby player list (mutex-protected, for UI display) --
     // Written by net thread, read by UI thread. Both host and receiver populate this.
     SDL_Mutex *lobby_mutex;
@@ -222,6 +233,13 @@ int coop_net_get_client_count(CoopNetContext *ctx);
 // Broadcast data to all connected clients (Host only). Returns false if not hosting.
 // Payload is sent with COOP_MSG_STATE_UPDATE type.
 bool coop_net_broadcast(CoopNetContext *ctx, const void *data, size_t size);
+
+// Broadcast per-player progress snapshots to all connected clients (Host only).
+// payload_data is an array of {buffer, size} pairs, one per player.
+// Format on wire: [4B player_count] then for each player [4B idx][4B size][data].
+bool coop_net_broadcast_player_states(CoopNetContext *ctx,
+                                      char **player_buffers, size_t *player_sizes,
+                                      int player_count);
 
 // ---- Lobby & Join Request API ----
 

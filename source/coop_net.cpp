@@ -905,12 +905,38 @@ static int SDLCALL receiver_thread_func(void *data) {
     addr.sin_family = AF_INET;
     addr.sin_port = htons((uint16_t) ctx->connect_port);
 
+    // Try inet_pton first (raw IP), then fall back to getaddrinfo (domain resolution)
     if (inet_pton(AF_INET, ctx->connect_ip, &addr.sin_addr) != 1) {
-        log_message(LOG_ERROR, "[COOP NET] Invalid receiver target IP: %s\n", ctx->connect_ip);
-        close_socket(&ctx->client_fd);
-        set_state(ctx, COOP_NET_ERROR);
-        set_status(ctx, "Invalid IP address");
-        return 1;
+        // Not a valid IP — try resolving as a domain name
+        struct addrinfo hints, *result = nullptr;
+        memset(&hints, 0, sizeof(hints));
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_protocol = IPPROTO_TCP;
+
+        char port_str[8];
+        snprintf(port_str, sizeof(port_str), "%d", ctx->connect_port);
+
+        int gai_err = getaddrinfo(ctx->connect_ip, port_str, &hints, &result);
+        if (gai_err != 0 || !result) {
+            log_message(LOG_ERROR, "[COOP NET] Failed to resolve '%s' (error %d)\n",
+                        ctx->connect_ip, gai_err);
+            close_socket(&ctx->client_fd);
+            set_state(ctx, COOP_NET_ERROR);
+            set_status(ctx, "Could not resolve domain '%s'", ctx->connect_ip);
+            if (result) freeaddrinfo(result);
+            return 1;
+        }
+
+        // Use the first resolved address
+        struct sockaddr_in *resolved = (struct sockaddr_in *) result->ai_addr;
+        addr.sin_addr = resolved->sin_addr;
+
+        char resolved_ip[64];
+        inet_ntop(AF_INET, &addr.sin_addr, resolved_ip, sizeof(resolved_ip));
+        log_message(LOG_INFO, "[COOP NET] Resolved '%s' to %s\n", ctx->connect_ip, resolved_ip);
+
+        freeaddrinfo(result);
     }
 
     log_message(LOG_INFO, "[COOP NET] Receiver connecting to %s:%d...\n", ctx->connect_ip, ctx->connect_port);
@@ -1221,8 +1247,53 @@ static int SDLCALL receiver_thread_func(void *data) {
                     ctx->recv_buffer = payload;
                     ctx->recv_buffer_size = payload_len;
                     ctx->recv_data_ready = true;
+                    // Also keep a persistent copy of the merged snapshot
+                    free(ctx->recv_merged_snapshot);
+                    ctx->recv_merged_snapshot = (char *) malloc(payload_len);
+                    if (ctx->recv_merged_snapshot) {
+                        memcpy(ctx->recv_merged_snapshot, payload, payload_len);
+                        ctx->recv_merged_snapshot_size = payload_len;
+                    } else {
+                        ctx->recv_merged_snapshot_size = 0;
+                    }
                     SDL_UnlockMutex(ctx->recv_mutex);
                     payload = nullptr; // Ownership transferred
+                    last_heartbeat_recv = SDL_GetTicks();
+                } else if (msg_type == COOP_MSG_PLAYER_STATES) {
+                    // Parse batched per-player snapshots:
+                    // [4B player_count] then for each: [4B idx][4B size][data]
+                    if (payload && payload_len >= 4) {
+                        const char *p = payload;
+                        uint32_t pc;
+                        memcpy(&pc, p, 4); pc = ntohl(pc); p += 4;
+                        SDL_LockMutex(ctx->recv_mutex);
+                        // Free all old per-player buffers
+                        for (int pi = 0; pi < COOP_MAX_LOBBY; pi++) {
+                            free(ctx->recv_player_buffers[pi]);
+                            ctx->recv_player_buffers[pi] = nullptr;
+                            ctx->recv_player_buffer_sizes[pi] = 0;
+                        }
+                        ctx->recv_player_snapshot_count = 0;
+                        for (uint32_t pi = 0; pi < pc && (size_t)(p - payload) + 8 <= payload_len; pi++) {
+                            uint32_t idx, sz;
+                            memcpy(&idx, p, 4); idx = ntohl(idx); p += 4;
+                            memcpy(&sz, p, 4);  sz  = ntohl(sz);  p += 4;
+                            if ((size_t)(p - payload) + sz > payload_len) break;
+                            if (idx < COOP_MAX_LOBBY) {
+                                ctx->recv_player_buffers[idx] = (char *) malloc(sz);
+                                if (ctx->recv_player_buffers[idx]) {
+                                    memcpy(ctx->recv_player_buffers[idx], p, sz);
+                                    ctx->recv_player_buffer_sizes[idx] = sz;
+                                    if ((int)(idx + 1) > ctx->recv_player_snapshot_count)
+                                        ctx->recv_player_snapshot_count = (int)(idx + 1);
+                                }
+                            }
+                            p += sz;
+                        }
+                        ctx->recv_player_data_ready = true;
+                        SDL_UnlockMutex(ctx->recv_mutex);
+                        log_message(LOG_INFO, "[COOP NET] Received %u per-player snapshots from host.\n", pc);
+                    }
                     last_heartbeat_recv = SDL_GetTicks();
                 } else if (msg_type == COOP_MSG_TEMPLATE_SYNC) {
                     if (payload && payload_len > 0) {
@@ -1341,6 +1412,13 @@ void coop_net_shutdown(CoopNetContext *ctx) {
     }
     free(ctx->recv_buffer);
     ctx->recv_buffer = nullptr;
+    free(ctx->recv_merged_snapshot);
+    ctx->recv_merged_snapshot = nullptr;
+    for (int i = 0; i < COOP_MAX_LOBBY; i++) {
+        free(ctx->recv_player_buffers[i]);
+        ctx->recv_player_buffers[i] = nullptr;
+    }
+    ctx->recv_player_snapshot_count = 0;
 
 #ifdef _WIN32
     if (wsa_initialized) {
@@ -1516,12 +1594,22 @@ void coop_net_stop(CoopNetContext *ctx) {
     ctx->client_count = 0;
     close_socket(&ctx->client_fd);
 
-    // Free receive buffer
+    // Free receive buffers
     SDL_LockMutex(ctx->recv_mutex);
     free(ctx->recv_buffer);
     ctx->recv_buffer = nullptr;
     ctx->recv_buffer_size = 0;
     ctx->recv_data_ready = false;
+    free(ctx->recv_merged_snapshot);
+    ctx->recv_merged_snapshot = nullptr;
+    ctx->recv_merged_snapshot_size = 0;
+    for (int i = 0; i < COOP_MAX_LOBBY; i++) {
+        free(ctx->recv_player_buffers[i]);
+        ctx->recv_player_buffers[i] = nullptr;
+        ctx->recv_player_buffer_sizes[i] = 0;
+    }
+    ctx->recv_player_snapshot_count = 0;
+    ctx->recv_player_data_ready = false;
     SDL_UnlockMutex(ctx->recv_mutex);
 
     // Clear lobby and pending requests
@@ -1588,6 +1676,50 @@ bool coop_net_broadcast(CoopNetContext *ctx, const void *data, size_t size) {
             all_ok = false;
         }
     }
+    return all_ok;
+}
+
+bool coop_net_broadcast_player_states(CoopNetContext *ctx,
+                                      char **player_buffers, size_t *player_sizes,
+                                      int player_count) {
+    if (coop_net_get_state(ctx) != COOP_NET_LISTENING) return false;
+    if (ctx->client_count == 0 || player_count <= 0) return true;
+
+    // Build batched payload: [4B player_count] then for each [4B idx][4B size][data]
+    size_t total_size = 4;
+    for (int i = 0; i < player_count; i++) {
+        total_size += 4 + 4 + player_sizes[i]; // idx + size + data
+    }
+
+    char *payload = (char *) malloc(total_size);
+    if (!payload) return false;
+
+    char *p = payload;
+    uint32_t net_pc = htonl((uint32_t) player_count);
+    memcpy(p, &net_pc, 4); p += 4;
+
+    for (int i = 0; i < player_count; i++) {
+        uint32_t net_idx = htonl((uint32_t) i);
+        uint32_t net_sz = htonl((uint32_t) player_sizes[i]);
+        memcpy(p, &net_idx, 4); p += 4;
+        memcpy(p, &net_sz, 4);  p += 4;
+        memcpy(p, player_buffers[i], player_sizes[i]); p += player_sizes[i];
+    }
+
+    bool all_ok = true;
+    for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
+        if (!ctx->clients[i].active || !ctx->clients[i].handshake_done) continue;
+        if (!send_message(ctx->clients[i].socket_fd, COOP_MSG_PLAYER_STATES, payload, (uint32_t) total_size)) {
+            log_message(LOG_ERROR, "[COOP NET] Failed to broadcast player states to client %s.\n",
+                        ctx->clients[i].label);
+            close_socket(&ctx->clients[i].socket_fd);
+            ctx->clients[i].active = false;
+            ctx->client_count--;
+            all_ok = false;
+        }
+    }
+
+    free(payload);
     return all_ok;
 }
 

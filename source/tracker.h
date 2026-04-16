@@ -117,6 +117,7 @@ struct Tracker {
     char search_buffer[256]; // Buffer for the search functionality.
     bool focus_search_box_requested; // Flag for Ctrl+F hotkey of tracker
     bool focus_tc_search_box; // CURRENTLY UNUSED Flag for Ctrl+F hotkey in the template creator
+    int selected_coop_player_idx; // -1 = "All Players" (merged), 0..N-1 = individual player view
     int notes_widget_id_counter; // Used to force-reset the notes widget UI state
 
     // --- Fonts ---
@@ -411,6 +412,12 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings);
  * @param settings A pointer to the application settings (contains roster and merge settings).
  */
 void tracker_update_coop_merged(Tracker *t, const AppSettings *settings);
+
+/**
+ * @brief Updates the tracker with a single player's progress (for individual player view in coop).
+ * Same merge logic as tracker_update_coop_merged but only processes one player.
+ */
+void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, int player_idx);
 
 /**
  * @brief Applies a batch of custom goal/stat checkbox modifications from receivers.

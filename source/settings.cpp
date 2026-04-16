@@ -407,6 +407,13 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         // Don't clear coop_room_code_buf — it's only valid while hosting
     }
 
+    // Position the settings window to the right half of the viewport when force-opened,
+    // so it doesn't overlap the welcome window which ImGui places near the top-left.
+    if (just_opened && force_open_reason && *force_open_reason != FORCE_OPEN_NONE) {
+        ImGuiIO &io = ImGui::GetIO();
+        ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.1f), ImGuiCond_Always);
+    }
+
     // Window title
     ImGui::Begin("Advancely Settings", p_open, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
 
@@ -795,26 +802,37 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 ImGui::SetTooltip("%s", display_version_tooltip_buffer);
             }
 
+            // Coop state check — shared by StatsPerWorld and Hermes checkboxes
+            CoopNetState hermes_net_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
+            bool hermes_net_active = (hermes_net_state == COOP_NET_LISTENING ||
+                                      hermes_net_state == COOP_NET_CONNECTED ||
+                                      hermes_net_state == COOP_NET_CONNECTING);
+
             // Only show the StatsPerWorld checkbox for legacy versions
+            // Disable when lobby is active (must be synced across all players)
             if (selected_version <= MC_VERSION_1_6_4) {
+                if (hermes_net_active) ImGui::BeginDisabled();
                 ImGui::Checkbox("Using StatsPerWorld Mod", &temp_settings.using_stats_per_world_legacy);
-                if (ImGui::IsItemHovered()) {
+                if (hermes_net_active) ImGui::EndDisabled();
+                if (ImGui::IsItemHovered(hermes_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
                     char stats_per_world_tooltip_buffer[1024];
-                    snprintf(stats_per_world_tooltip_buffer, sizeof(stats_per_world_tooltip_buffer),
-                             "The StatsPerWorld Mod (with Legacy Fabric) allows legacy Minecraft versions\n"
-                             "to track stats locally per world. Check this if you're using this mod.\n\n"
-                             "If unchecked, the tracker will use a snapshot system to simulate per-world\n"
-                             "progress, and achievements will indicate if they were completed on a previous world.");
+                    if (hermes_net_active) {
+                        snprintf(stats_per_world_tooltip_buffer, sizeof(stats_per_world_tooltip_buffer),
+                                 "Cannot change while a lobby is active.\n"
+                                 "All players must use the same setting.");
+                    } else {
+                        snprintf(stats_per_world_tooltip_buffer, sizeof(stats_per_world_tooltip_buffer),
+                                 "The StatsPerWorld Mod (with Legacy Fabric) allows legacy Minecraft versions\n"
+                                 "to track stats locally per world. Check this if you're using this mod.\n\n"
+                                 "If unchecked, the tracker will use a snapshot system to simulate per-world\n"
+                                 "progress, and achievements will indicate if they were completed on a previous world.");
+                    }
                     ImGui::SetTooltip("%s", stats_per_world_tooltip_buffer);
                 }
             }
 
             // Hermes Mod checkbox — available for all versions that support Fabric
             // Disable when lobby is active (host or receiver)
-            CoopNetState hermes_net_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
-            bool hermes_net_active = (hermes_net_state == COOP_NET_LISTENING ||
-                                      hermes_net_state == COOP_NET_CONNECTED ||
-                                      hermes_net_state == COOP_NET_CONNECTING);
             if (hermes_net_active) ImGui::BeginDisabled();
             ImGui::Checkbox("Using Hermes Mod (Live Tracking)", &temp_settings.using_hermes);
             if (hermes_net_active) ImGui::EndDisabled();
@@ -2392,18 +2410,28 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             ImGui::RadioButton("Online##acc_type", &acc_type, ACCOUNT_ONLINE);
             if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
                 char tooltip_buf[256];
-                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                         "Java Edition account. UUID is fetched automatically\n"
-                         "from the Mojang API based on your username.");
+                if (acc_net_active) {
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Cannot change while a lobby is active.");
+                } else {
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Java Edition account. UUID is fetched automatically\n"
+                             "from the Mojang API based on your username.");
+                }
                 ImGui::SetTooltip("%s", tooltip_buf);
             }
             ImGui::SameLine();
             ImGui::RadioButton("Offline##acc_type", &acc_type, ACCOUNT_OFFLINE);
             if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
                 char tooltip_buf[256];
-                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                         "Offline/cracked account. You must enter your UUID manually.\n"
-                         "Find it through you worlds advancements or stats files.");
+                if (acc_net_active) {
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Cannot change while a lobby is active.");
+                } else {
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Offline/cracked account. You must enter your UUID manually.\n"
+                             "Find it through your world's advancements or stats files.");
+                }
                 ImGui::SetTooltip("%s", tooltip_buf);
             }
             temp_settings.account_type = (AccountType) acc_type;
@@ -2781,9 +2809,27 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid IP (x.x.x.x)");
                         }
 
-                        // Optional public IP for the room code
+                        // Optional public IP or domain for the room code
+                        auto is_valid_domain = [](const char *host) -> bool {
+                            if (!host || host[0] == '\0') return false;
+                            size_t len = strlen(host);
+                            if (len > 253) return false;
+                            // Must contain at least one dot and not start/end with dot or hyphen
+                            bool has_dot = false;
+                            for (size_t i = 0; i < len; i++) {
+                                char c = host[i];
+                                if (c == '.') { has_dot = true; continue; }
+                                if (c == '-') continue;
+                                if (c >= '0' && c <= '9') continue;
+                                if (c >= 'a' && c <= 'z') continue;
+                                if (c >= 'A' && c <= 'Z') continue;
+                                return false; // Invalid character
+                            }
+                            return has_dot && host[0] != '.' && host[len - 1] != '.';
+                        };
                         bool pub_ip_filled = temp_settings.host_public_ip[0] != '\0';
-                        bool pub_ip_valid = !pub_ip_filled || is_valid_ipv4(temp_settings.host_public_ip);
+                        bool pub_ip_valid = !pub_ip_filled || is_valid_ipv4(temp_settings.host_public_ip)
+                                            || is_valid_domain(temp_settings.host_public_ip);
                         bool pub_ip_duplicate = pub_ip_filled && ip_filled
                                                 && strcmp(temp_settings.host_public_ip, temp_settings.host_ip) == 0;
 
@@ -2805,10 +2851,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (ImGui::IsItemHovered()) {
                                 char tooltip_buf[512];
                                 snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                         "Optional. Your public IP for players connecting over the internet.\n"
+                                         "Optional. Your public IP or domain for players connecting over the internet.\n"
                                          "Requires port forwarding on your router.\n"
-                                         "If set, the room code will use this IP instead of the bind IP.\n"
+                                         "If set, the room code will use this instead of the bind IP.\n"
                                          "Leave empty to use the bind IP for the room code (VPN/LAN).\n"
+                                         "Accepts IPv4 addresses (e.g. 203.0.113.5) or domains (e.g. play.example.com).\n"
                                          "This field is hidden to prevent accidental leaks on stream.");
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
@@ -2833,7 +2880,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             }
                         }
                         if (pub_ip_filled && !pub_ip_valid) {
-                            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid IP (x.x.x.x)");
+                            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid IP or domain");
                         }
                         if (pub_ip_duplicate) {
                             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
@@ -3034,7 +3081,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                              "A valid port is required to start a lobby.");
                                 } else if (!pub_ip_valid) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "The public IP is not a valid IP address.");
+                                             "The public IP/domain is not valid.");
                                 } else if (pub_ip_duplicate) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                                              "Public IP must be different from the bind IP.");
