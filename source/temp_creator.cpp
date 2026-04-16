@@ -10358,7 +10358,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             save_message_type = MSG_NONE;
                         }
                         if (ImGui::IsItemHovered()) {
-                            char tooltip_buffer[256];
+                            char tooltip_buffer[512];
                             snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                                      "If checked, this counter will be fully hidden on the overlay\n"
                                      "and hidden settings-based on the automatic layout.\n"
