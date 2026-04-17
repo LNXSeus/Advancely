@@ -2070,7 +2070,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     char overlay_text_world_tooltip_buffer[1024];
                     snprintf(overlay_text_world_tooltip_buffer, sizeof(overlay_text_world_tooltip_buffer),
                              "Shows the current world name.\n"
-                             "For Co-op receivers, this shows 'Syncing with <Host>'.");
+                             "For Co-op receivers, this shows 'Syncing with <Host>'\n"
+                             "or 'Syncing for <Player>' depending on the player dropdown selection.");
                     ImGui::SetTooltip("%s", overlay_text_world_tooltip_buffer);
                 }
                 ImGui::SameLine();

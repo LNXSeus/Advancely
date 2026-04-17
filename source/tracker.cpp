@@ -9158,24 +9158,10 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         bool show_adv_counter = (t->template_data->advancement_goal_count > 0);
         bool show_prog_percent = (t->template_data->total_progress_steps > 0);
 
-        // For receivers, show "Syncing with <Host>" instead of world name
+        // For receivers, show co-op sync label instead of world name
         const char *info_world = t->world_name;
         char info_sync_buf[MAX_PATH_LENGTH];
-        bool info_rcv_connected = (settings->network_mode == NETWORK_RECEIVER &&
-                                   g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
-        if (info_rcv_connected) {
-            CoopLobbyPlayer info_lobby[COOP_MAX_LOBBY];
-            int info_lobby_count = coop_net_get_lobby_players(g_coop_ctx, info_lobby, COOP_MAX_LOBBY);
-            const char *info_host_name = "Host";
-            for (int i = 0; i < info_lobby_count; i++) {
-                if (info_lobby[i].is_host) {
-                    info_host_name = info_lobby[i].display_name[0] != '\0'
-                                         ? info_lobby[i].display_name
-                                         : info_lobby[i].username;
-                    break;
-                }
-            }
-            snprintf(info_sync_buf, sizeof(info_sync_buf), "Syncing with %s", info_host_name);
+        if (tracker_build_coop_sync_label(t, settings, info_sync_buf, sizeof(info_sync_buf))) {
             info_world = info_sync_buf;
         }
 
@@ -9226,7 +9212,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
         ImGui::TextUnformatted("Progress Text");
 
-        ImGui::BulletText("World: Shows the current world name and 'Syncing with <Host>' if in receiver mode.");
+        ImGui::BulletText("World: Shows the current world name, or 'Syncing with <Host>' / 'Syncing for <Player>'\n"
+                          "depending on the player dropdown selection when in receiver mode.");
         ImGui::BulletText("Run Details: Shows the Display Version & Display Category.");
         ImGui::BulletText("Progress: Shows the main adv/ach counter and overall percentage.");
         ImGui::BulletText("IGT: Displays the in-game time from the stats file (ticks).");
@@ -11092,6 +11079,36 @@ void tracker_free(Tracker **tracker, AppSettings *settings) {
     }
 }
 
+bool tracker_build_coop_sync_label(const Tracker *t, const AppSettings *settings,
+                                   char *out, size_t out_size) {
+    if (!out || out_size == 0) return false;
+    out[0] = '\0';
+    if (!t || !settings || !g_coop_ctx) return false;
+    if (settings->network_mode != NETWORK_RECEIVER) return false;
+    if (coop_net_get_state(g_coop_ctx) != COOP_NET_CONNECTED) return false;
+
+    int sel = t->selected_coop_player_idx;
+    if (sel >= 0 && sel < settings->coop_player_count) {
+        const CoopPlayer *p = &settings->coop_players[sel];
+        const char *name = p->display_name[0] != '\0' ? p->display_name : p->username;
+        snprintf(out, out_size, "Syncing for %s", name);
+        return true;
+    }
+
+    // All Players -> show host name
+    CoopLobbyPlayer lobby[COOP_MAX_LOBBY];
+    int lobby_count = coop_net_get_lobby_players(g_coop_ctx, lobby, COOP_MAX_LOBBY);
+    const char *host_name = "Host";
+    for (int i = 0; i < lobby_count; i++) {
+        if (lobby[i].is_host) {
+            host_name = lobby[i].display_name[0] != '\0' ? lobby[i].display_name : lobby[i].username;
+            break;
+        }
+    }
+    snprintf(out, out_size, "Syncing with %s", host_name);
+    return true;
+}
+
 void tracker_update_title(Tracker *t, const AppSettings *settings) {
     if (!t || !t->template_data || !settings) return;
 
@@ -11132,22 +11149,9 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
         snprintf(category_chunk, sizeof(category_chunk), "    -    %s", settings->category_display_name);
     }
 
-    // For receivers, show "Syncing with <Host>" instead of world name
-    bool is_receiver_connected = (settings->network_mode == NETWORK_RECEIVER &&
-                                  g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+    // For receivers, show co-op sync label instead of world name
     char world_display[MAX_PATH_LENGTH];
-    if (is_receiver_connected) {
-        CoopLobbyPlayer lobby[COOP_MAX_LOBBY];
-        int lobby_count = coop_net_get_lobby_players(g_coop_ctx, lobby, COOP_MAX_LOBBY);
-        const char *host_name = "Host";
-        for (int i = 0; i < lobby_count; i++) {
-            if (lobby[i].is_host) {
-                host_name = lobby[i].display_name[0] != '\0' ? lobby[i].display_name : lobby[i].username;
-                break;
-            }
-        }
-        snprintf(world_display, sizeof(world_display), "Syncing with %s", host_name);
-    } else {
+    if (!tracker_build_coop_sync_label(t, settings, world_display, sizeof(world_display))) {
         strncpy(world_display, t->world_name, sizeof(world_display) - 1);
         world_display[sizeof(world_display) - 1] = '\0';
     }
@@ -11221,22 +11225,10 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
 
 
     log_message(LOG_INFO, "============================================================\n");
-    // For receivers, show "Syncing with <Host>" instead of world name
-    bool dbg_receiver_connected = (settings->network_mode == NETWORK_RECEIVER &&
-                                   g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
-    if (dbg_receiver_connected) {
-        CoopLobbyPlayer dbg_lobby[COOP_MAX_LOBBY];
-        int dbg_lobby_count = coop_net_get_lobby_players(g_coop_ctx, dbg_lobby, COOP_MAX_LOBBY);
-        const char *dbg_host_name = "Host";
-        for (int i = 0; i < dbg_lobby_count; i++) {
-            if (dbg_lobby[i].is_host) {
-                dbg_host_name = dbg_lobby[i].display_name[0] != '\0'
-                                    ? dbg_lobby[i].display_name
-                                    : dbg_lobby[i].username;
-                break;
-            }
-        }
-        log_message(LOG_INFO, " World:      Syncing with %s\n", dbg_host_name);
+    // For receivers, show co-op sync label instead of world name
+    char dbg_sync_buf[MAX_PATH_LENGTH];
+    if (tracker_build_coop_sync_label(t, settings, dbg_sync_buf, sizeof(dbg_sync_buf))) {
+        log_message(LOG_INFO, " World:      %s\n", dbg_sync_buf);
     } else {
         log_message(LOG_INFO, " World:      %s\n", t->world_name);
     }

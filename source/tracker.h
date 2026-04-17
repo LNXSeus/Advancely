@@ -373,6 +373,15 @@ void tracker_free(Tracker **tracker, AppSettings *settings);
 void tracker_update_title(Tracker *t, const AppSettings *settings);
 
 /**
+ * @brief Build the co-op "Syncing ..." label for the current dropdown selection.
+ * Returns "Syncing with <Host>" when All Players is selected, or
+ * "Syncing for <Username>" when a specific coop player is selected.
+ * Writes nothing and returns false if the receiver is not connected.
+ */
+bool tracker_build_coop_sync_label(const Tracker *t, const AppSettings *settings,
+                                   char *out, size_t out_size);
+
+/**
  * @brief Loads the content of the template-specific notes file into the tracker's notes buffer.
  * If the file does not exist, the buffer is cleared.
  * @param t A pointer to the Tracker struct.

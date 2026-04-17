@@ -2294,22 +2294,9 @@ int main(int argc, char *argv[]) {
                             if (sem_wait(tracker->mutex) == 0) {
 #endif
                             OverlayIPCHeader header;
-                            // For receivers, show "Syncing with <Host>" in overlay world name
-                            bool hermes_rcv_connected = (app_settings.network_mode == NETWORK_RECEIVER &&
-                                g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
-                            if (hermes_rcv_connected) {
-                                CoopLobbyPlayer hermes_lobby[COOP_MAX_LOBBY];
-                                int hermes_lobby_count = coop_net_get_lobby_players(g_coop_ctx, hermes_lobby, COOP_MAX_LOBBY);
-                                const char *hermes_host_name = "Host";
-                                for (int i = 0; i < hermes_lobby_count; i++) {
-                                    if (hermes_lobby[i].is_host) {
-                                        hermes_host_name = hermes_lobby[i].display_name[0] != '\0'
-                                            ? hermes_lobby[i].display_name : hermes_lobby[i].username;
-                                        break;
-                                    }
-                                }
-                                snprintf(header.world_name, MAX_PATH_LENGTH, "Syncing with %s", hermes_host_name);
-                            } else {
+                            // For receivers, show co-op sync label in overlay world name
+                            if (!tracker_build_coop_sync_label(tracker, &app_settings,
+                                                               header.world_name, MAX_PATH_LENGTH)) {
                                 strncpy(header.world_name, tracker->world_name, MAX_PATH_LENGTH - 1);
                                 header.world_name[MAX_PATH_LENGTH - 1] = '\0';
                             }
@@ -2813,23 +2800,9 @@ int main(int argc, char *argv[]) {
                         // --- Critical Section: We have the lock ---
 
                         OverlayIPCHeader header;
-                        // For receivers, show "Syncing with <Host>" in overlay world name
-                        bool ipc_rcv_connected = (app_settings.network_mode == NETWORK_RECEIVER &&
-                                                  g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
-                        if (ipc_rcv_connected) {
-                            CoopLobbyPlayer ipc_lobby[COOP_MAX_LOBBY];
-                            int ipc_lobby_count = coop_net_get_lobby_players(g_coop_ctx, ipc_lobby, COOP_MAX_LOBBY);
-                            const char *ipc_host_name = "Host";
-                            for (int i = 0; i < ipc_lobby_count; i++) {
-                                if (ipc_lobby[i].is_host) {
-                                    ipc_host_name = ipc_lobby[i].display_name[0] != '\0'
-                                                        ? ipc_lobby[i].display_name
-                                                        : ipc_lobby[i].username;
-                                    break;
-                                }
-                            }
-                            snprintf(header.world_name, MAX_PATH_LENGTH, "Syncing with %s", ipc_host_name);
-                        } else {
+                        // For receivers, show co-op sync label in overlay world name
+                        if (!tracker_build_coop_sync_label(tracker, &app_settings,
+                                                           header.world_name, MAX_PATH_LENGTH)) {
                             strncpy(header.world_name, tracker->world_name, MAX_PATH_LENGTH - 1);
                             header.world_name[MAX_PATH_LENGTH - 1] = '\0';
                         }
@@ -2875,13 +2848,43 @@ int main(int argc, char *argv[]) {
                 if (app_settings.network_mode == NETWORK_HOST && g_coop_ctx &&
                     coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
                     coop_net_get_client_count(g_coop_ctx) > 0) {
-                    char *broadcast_buf = (char *) malloc(4 * 1024 * 1024);
-                    if (broadcast_buf) {
-                        size_t broadcast_size = serialize_template_data(tracker->template_data, broadcast_buf);
-                        if (broadcast_size > 0) {
-                            coop_net_broadcast(g_coop_ctx, broadcast_buf, broadcast_size);
+                    // Prefer broadcasting the cached merged snapshot so receivers
+                    // get the merged view regardless of what the host's dropdown
+                    // currently shows. Fall back to template_data if the cache
+                    // isn't populated yet.
+                    if (tracker->coop_merged_snapshot && tracker->coop_merged_snapshot_size > 0) {
+                        coop_net_broadcast(g_coop_ctx, tracker->coop_merged_snapshot,
+                                           tracker->coop_merged_snapshot_size);
+                    } else {
+                        char *broadcast_buf = (char *) malloc(4 * 1024 * 1024);
+                        if (broadcast_buf) {
+                            size_t broadcast_size = serialize_template_data(tracker->template_data, broadcast_buf);
+                            if (broadcast_size > 0) {
+                                coop_net_broadcast(g_coop_ctx, broadcast_buf, broadcast_size);
+                            }
+                            free(broadcast_buf);
                         }
-                        free(broadcast_buf);
+                    }
+
+                    // Also broadcast the per-player snapshots so receivers can
+                    // switch views via the dropdown and see live Hermes updates
+                    // (including multi-stage goal stages) instead of stale data
+                    // from the last disk save.
+                    {
+                        int pc = app_settings.coop_player_count;
+                        if (pc > 0) {
+                            char **pp_bufs = (char **) calloc(pc, sizeof(char *));
+                            size_t *pp_sizes = (size_t *) calloc(pc, sizeof(size_t));
+                            if (pp_bufs && pp_sizes) {
+                                for (int pi = 0; pi < pc; pi++) {
+                                    pp_bufs[pi] = tracker->coop_player_snapshots[pi];
+                                    pp_sizes[pi] = tracker->coop_player_snapshot_sizes[pi];
+                                }
+                                coop_net_broadcast_player_states(g_coop_ctx, pp_bufs, pp_sizes, pc);
+                            }
+                            free(pp_bufs);
+                            free(pp_sizes);
+                        }
                     }
                 }
 
@@ -2896,22 +2899,8 @@ int main(int argc, char *argv[]) {
                         if (sem_wait(tracker->mutex) == 0) {
 #endif
                         OverlayIPCHeader header;
-                        bool ipc_rcv_connected = (app_settings.network_mode == NETWORK_RECEIVER &&
-                                                  g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
-                        if (ipc_rcv_connected) {
-                            CoopLobbyPlayer ipc_lobby[COOP_MAX_LOBBY];
-                            int ipc_lobby_count = coop_net_get_lobby_players(g_coop_ctx, ipc_lobby, COOP_MAX_LOBBY);
-                            const char *ipc_host_name = "Host";
-                            for (int i = 0; i < ipc_lobby_count; i++) {
-                                if (ipc_lobby[i].is_host) {
-                                    ipc_host_name = ipc_lobby[i].display_name[0] != '\0'
-                                                        ? ipc_lobby[i].display_name
-                                                        : ipc_lobby[i].username;
-                                    break;
-                                }
-                            }
-                            snprintf(header.world_name, MAX_PATH_LENGTH, "Syncing with %s", ipc_host_name);
-                        } else {
+                        if (!tracker_build_coop_sync_label(tracker, &app_settings,
+                                                           header.world_name, MAX_PATH_LENGTH)) {
                             strncpy(header.world_name, tracker->world_name, MAX_PATH_LENGTH - 1);
                             header.world_name[MAX_PATH_LENGTH - 1] = '\0';
                         }
@@ -2939,22 +2928,9 @@ int main(int argc, char *argv[]) {
 #endif
                     // Update ONLY the header part of shared memory to keep the timer in sync
                     OverlayIPCHeader header;
-                    // For receivers, show "Syncing with <Host>" in overlay world name
-                    bool timer_rcv_connected = (app_settings.network_mode == NETWORK_RECEIVER &&
-                        g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
-                    if (timer_rcv_connected) {
-                        CoopLobbyPlayer timer_lobby[COOP_MAX_LOBBY];
-                        int timer_lobby_count = coop_net_get_lobby_players(g_coop_ctx, timer_lobby, COOP_MAX_LOBBY);
-                        const char *timer_host_name = "Host";
-                        for (int i = 0; i < timer_lobby_count; i++) {
-                            if (timer_lobby[i].is_host) {
-                                timer_host_name = timer_lobby[i].display_name[0] != '\0'
-                                    ? timer_lobby[i].display_name : timer_lobby[i].username;
-                                break;
-                            }
-                        }
-                        snprintf(header.world_name, MAX_PATH_LENGTH, "Syncing with %s", timer_host_name);
-                    } else {
+                    // For receivers, show co-op sync label in overlay world name
+                    if (!tracker_build_coop_sync_label(tracker, &app_settings,
+                                                       header.world_name, MAX_PATH_LENGTH)) {
                         strncpy(header.world_name, tracker->world_name, MAX_PATH_LENGTH - 1);
                         header.world_name[MAX_PATH_LENGTH - 1] = '\0';
                     }
