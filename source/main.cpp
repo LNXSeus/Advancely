@@ -2566,6 +2566,11 @@ int main(int argc, char *argv[]) {
                     tracker_recalculate_progress(tracker, &app_settings);
                     tracker_update_title(tracker, &app_settings);
                     SDL_SetAtomicInt(&g_game_data_changed, 1); // push view to overlay via IPC
+                    // Also push the new template_data payload to the overlay via IPC.
+                    // The continuous-update path only writes the header (timer), so
+                    // without this the overlay keeps rendering the previous player's
+                    // goals until the next file merge or custom-goal broadcast.
+                    tracker->hermes_wants_ipc_flush = true;
                 }
             }
 
