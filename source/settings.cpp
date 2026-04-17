@@ -3536,8 +3536,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 strcpy(binding->increment_key, "None"); // Set default for the other key
                                 binding->increment_key[sizeof(binding->increment_key) - 1] = '\0';
                             }
-                        } else {
-                            // if binding exists, update it
+                        }
+                        if (binding) {
                             strncpy(binding->decrement_key, key_names[current_dec_key_idx],
                                     sizeof(binding->decrement_key) - 1);
                             binding->decrement_key[sizeof(binding->decrement_key) - 1] = '\0';

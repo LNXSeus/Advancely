@@ -1665,34 +1665,39 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         }
     }
 
-    // Update Hotkeys
-    cJSON_DeleteItemFromObject(root, "hotkeys");
-    cJSON *hotkeys_array = cJSON_CreateArray();
-    for (int i = 0; i < settings->hotkey_count; ++i) {
-        const HotkeyBinding *hb = &settings->hotkeys[i];
-        if (strlen(hb->target_goal) > 0) {
-            // Only save if it's a valid binding
-            cJSON *hotkey_obj = cJSON_CreateObject();
-            cJSON_AddStringToObject(hotkey_obj, "target_goal", hb->target_goal);
-            cJSON_AddStringToObject(hotkey_obj, "increment_key", hb->increment_key);
-            cJSON_AddStringToObject(hotkey_obj, "decrement_key", hb->decrement_key);
-            cJSON_AddItemToArray(hotkeys_array, hotkey_obj);
+    // Hotkeys and view_state are tracker-owned state. Gating by SAVE_CONTEXT_ALL
+    // prevents the overlay's OVERLAY_GEOM save from clobbering them with its
+    // stale in-memory copy loaded at overlay startup.
+    if (context == SAVE_CONTEXT_ALL) {
+        // Update Hotkeys
+        cJSON_DeleteItemFromObject(root, "hotkeys");
+        cJSON *hotkeys_array = cJSON_CreateArray();
+        for (int i = 0; i < settings->hotkey_count; ++i) {
+            const HotkeyBinding *hb = &settings->hotkeys[i];
+            if (strlen(hb->target_goal) > 0) {
+                // Only save if it's a valid binding
+                cJSON *hotkey_obj = cJSON_CreateObject();
+                cJSON_AddStringToObject(hotkey_obj, "target_goal", hb->target_goal);
+                cJSON_AddStringToObject(hotkey_obj, "increment_key", hb->increment_key);
+                cJSON_AddStringToObject(hotkey_obj, "decrement_key", hb->decrement_key);
+                cJSON_AddItemToArray(hotkeys_array, hotkey_obj);
+            }
         }
+        cJSON_AddItemToObject(root, "hotkeys", hotkeys_array);
+
+        // Save View State
+        cJSON *view_state_obj = cJSON_CreateObject();
+        cJSON_AddNumberToObject(view_state_obj, "pan_x", settings->view_pan_x);
+        cJSON_AddNumberToObject(view_state_obj, "pan_y", settings->view_pan_y);
+        cJSON_AddNumberToObject(view_state_obj, "zoom", settings->view_zoom);
+        cJSON_AddBoolToObject(view_state_obj, "locked", settings->view_locked);
+        cJSON_AddNumberToObject(view_state_obj, "locked_width", settings->view_locked_width);
+        cJSON_AddBoolToObject(view_state_obj, "use_manual_layout", settings->use_manual_layout);
+
+        // Safely replace or add view_state
+        cJSON_DeleteItemFromObject(root, "view_state");
+        cJSON_AddItemToObject(root, "view_state", view_state_obj);
     }
-    cJSON_AddItemToObject(root, "hotkeys", hotkeys_array);
-
-    // Save View State
-    cJSON *view_state_obj = cJSON_CreateObject();
-    cJSON_AddNumberToObject(view_state_obj, "pan_x", settings->view_pan_x);
-    cJSON_AddNumberToObject(view_state_obj, "pan_y", settings->view_pan_y);
-    cJSON_AddNumberToObject(view_state_obj, "zoom", settings->view_zoom);
-    cJSON_AddBoolToObject(view_state_obj, "locked", settings->view_locked);
-    cJSON_AddNumberToObject(view_state_obj, "locked_width", settings->view_locked_width);
-    cJSON_AddBoolToObject(view_state_obj, "use_manual_layout", settings->use_manual_layout);
-
-    // Safely replace or add view_state
-    cJSON_DeleteItemFromObject(root, "view_state");
-    cJSON_AddItemToObject(root, "view_state", view_state_obj);
 
     // Write the modified JSON object to the file
     FILE *file = fopen(get_settings_file_path(), "w");

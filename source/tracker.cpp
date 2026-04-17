@@ -10769,40 +10769,41 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
         cJSON_Delete(new_stat_override);
     }
 
-    // Sync hotkeys based on their order in the list, not by name
+    // Sync hotkeys, matching by target_goal (root_name). The on-disk array is
+    // sparse (only counters with bindings are saved), so index-based matching
+    // would scramble bindings when users assign hotkeys to non-leading counters.
     cJSON *old_hotkeys_array = cJSON_GetObjectItem(settings_root, "hotkeys");
     cJSON *new_hotkeys_array = cJSON_CreateArray();
 
-    int counter_index = 0; // This will track their order in the list
     for (int i = 0; i < t->template_data->custom_goal_count; i++) {
         TrackableItem *item = t->template_data->custom_goals[i];
         if (item && (item->goal > 0 || item->goal == -1)) {
             // It's a counter
             cJSON *new_hotkey_obj = cJSON_CreateObject();
-            // The target is always the new counter from the current template
-            // put name of counter in target_goal
             cJSON_AddStringToObject(new_hotkey_obj, "target_goal", item->root_name);
 
             const char *inc_key = "None";
             const char *dec_key = "None";
 
-            // Try to get the hotkey from the OLD settings at the SAME index
+            // Find the old binding whose target_goal matches this counter's root_name.
             if (cJSON_IsArray(old_hotkeys_array)) {
-                cJSON *old_hotkey_item = cJSON_GetArrayItem(old_hotkeys_array, counter_index);
-                if (old_hotkey_item) {
-                    // If a binding exists at this index, preserve its keys.
-                    cJSON *old_inc_key = cJSON_GetObjectItem(old_hotkey_item, "increment_key");
-                    cJSON *old_dec_key = cJSON_GetObjectItem(old_hotkey_item, "decrement_key");
-                    if (old_inc_key) inc_key = old_inc_key->valuestring;
-                    if (old_dec_key) dec_key = old_dec_key->valuestring;
+                cJSON *old_hotkey_item = nullptr;
+                cJSON_ArrayForEach(old_hotkey_item, old_hotkeys_array) {
+                    cJSON *old_target = cJSON_GetObjectItem(old_hotkey_item, "target_goal");
+                    if (cJSON_IsString(old_target) && old_target->valuestring &&
+                        strcmp(old_target->valuestring, item->root_name) == 0) {
+                        cJSON *old_inc_key = cJSON_GetObjectItem(old_hotkey_item, "increment_key");
+                        cJSON *old_dec_key = cJSON_GetObjectItem(old_hotkey_item, "decrement_key");
+                        if (cJSON_IsString(old_inc_key) && old_inc_key->valuestring) inc_key = old_inc_key->valuestring;
+                        if (cJSON_IsString(old_dec_key) && old_dec_key->valuestring) dec_key = old_dec_key->valuestring;
+                        break;
+                    }
                 }
             }
 
             cJSON_AddStringToObject(new_hotkey_obj, "increment_key", inc_key);
             cJSON_AddStringToObject(new_hotkey_obj, "decrement_key", dec_key);
             cJSON_AddItemToArray(new_hotkeys_array, new_hotkey_obj);
-
-            counter_index++; // Move to the next counter index
         }
     }
 
