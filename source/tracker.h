@@ -120,6 +120,16 @@ struct Tracker {
     int selected_coop_player_idx; // -1 = "All Players" (merged), 0..N-1 = individual player view
     int notes_widget_id_counter; // Used to force-reset the notes widget UI state
 
+    // Host-side cache of serialized per-player and merged snapshots. Populated
+    // during tracker_update_coop_merged so the player dropdown can switch views
+    // without triggering a full disk reload (which would zero stale players
+    // that haven't written their save files in the last 5 min).
+    char *coop_player_snapshots[MAX_COOP_PLAYERS];
+    size_t coop_player_snapshot_sizes[MAX_COOP_PLAYERS];
+    char *coop_merged_snapshot;
+    size_t coop_merged_snapshot_size;
+    int coop_view_dirty; // set when the dropdown changes; main loop re-applies the cached snapshot
+
     // --- Fonts ---
     ImFont *roboto_font; // ImGui font for the settings window UI. Now loaded from ui_font_name.
     ImFont *tracker_font; // ImGui font for the main tracker grid display. Loaded from tracker_font_name.
@@ -297,6 +307,14 @@ void tracker_render_gui(Tracker *t, AppSettings *settings);
  * @param settings A pointer to the application settings to use for re-initialization.
  */
 void tracker_reinit_template(Tracker *t, AppSettings *settings);
+
+/**
+ * @brief Frees all cached per-player and merged coop snapshots on the Tracker.
+ * Call whenever the snapshots would become misaligned with current state:
+ * on template reinit (goal layout changed) and on coop roster changes
+ * (slot N may now point to a different player).
+ */
+void tracker_clear_coop_snapshot_cache(Tracker *t);
 
 /**
  * @brief Reloads settings and re-initializes all relevant paths in the tracker struct.

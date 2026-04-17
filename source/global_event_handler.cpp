@@ -141,42 +141,30 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
             }
         }
         // --- Dispatch window events (move, resize, etc.) ---
+        // In-memory rect is kept current so Apply/shutdown can persist it;
+        // we intentionally do NOT write to settings.json here — per-move saves
+        // would trigger dmon and force a full template re-init + game-file reload,
+        // wiping Hermes in-memory state.
         else if (event.type >= SDL_EVENT_WINDOW_FIRST && event.type <= SDL_EVENT_WINDOW_LAST) {
-            bool settings_changed = false;
             if (t && event.window.windowID == SDL_GetWindowID(t->window)) {
                 if (event.type == SDL_EVENT_WINDOW_MOVED || event.type == SDL_EVENT_WINDOW_RESIZED) {
                     SDL_GetWindowPosition(t->window, &app_settings->tracker_window.x, &app_settings->tracker_window.y);
                     SDL_GetWindowSize(t->window, &app_settings->tracker_window.w, &app_settings->tracker_window.h);
-                    settings_changed = true;
                 }
                 tracker_events(t, &event, is_running, settings_opened); // still pass other window events
             } else if (o && event.window.windowID == SDL_GetWindowID(o->window)) {
-                // o might be nullptr, then skip
                 if (event.type == SDL_EVENT_WINDOW_MOVED || event.type == SDL_EVENT_WINDOW_RESIZED) {
                     SDL_GetWindowPosition(o->window, &app_settings->overlay_window.x, &app_settings->overlay_window.y);
                     int w, h;
                     SDL_GetWindowSize(o->window, &w, &h);
-
-                    // Always save the current width and the required fixed height
                     app_settings->overlay_window.w = w;
                     app_settings->overlay_window.h = OVERLAY_FIXED_HEIGHT;
-                    settings_changed = true;
 
-                    // If the resize event resulted in a different height, force it back.
-                    // This creates a "sticky" height that can't be changed by the user dragging the window frame.
                     if (event.type == SDL_EVENT_WINDOW_RESIZED && h != OVERLAY_FIXED_HEIGHT) {
                         SDL_SetWindowSize(o->window, w, OVERLAY_FIXED_HEIGHT);
                     }
                 }
                 overlay_events(o, &event, is_running, deltaTime, app_settings);
-            }
-
-            if (settings_changed) {
-                // Only save window geometry changes if the settings are not being forcibly configured
-                if (g_force_open_reason == FORCE_OPEN_NONE) {
-                    // Save settings, passing nullptr for TemplateData as we only changed window geometry
-                    settings_save(app_settings, nullptr, SAVE_CONTEXT_TRACKER_GEOM);
-                }
             }
         }
     }

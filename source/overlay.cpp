@@ -317,21 +317,17 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
             }
             break;
 
-        // Properly save the window position and size
+        // Keep the in-memory rect current so the overlay-shutdown save persists it.
+        // We intentionally do NOT write settings.json on every move/resize — doing so
+        // would fire the tracker's dmon watcher and force a full reload.
         case SDL_EVENT_WINDOW_MOVED:
         case SDL_EVENT_WINDOW_RESIZED: {
-            // Get the current window position and size
             SDL_GetWindowPosition(o->window, &settings->overlay_window.x, &settings->overlay_window.y);
             int w, h;
             SDL_GetWindowSize(o->window, &w, &h);
-
-            // Always save the current width and the required fixed height
             settings->overlay_window.w = w;
             settings->overlay_window.h = OVERLAY_FIXED_HEIGHT;
-            settings_save(settings, nullptr, SAVE_CONTEXT_OVERLAY_GEOM); // Save the updated settings
 
-            // If the resize event resulted in a different height, force it back.
-            // This creates a "sticky" height that can't be changed by the user.
             if (event->type == SDL_EVENT_WINDOW_RESIZED && h != OVERLAY_FIXED_HEIGHT) {
                 SDL_SetWindowSize(o->window, w, OVERLAY_FIXED_HEIGHT);
             }

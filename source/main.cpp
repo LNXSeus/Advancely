@@ -1190,6 +1190,18 @@ int main(int argc, char *argv[]) {
         // Final cleanup call before exiting
         free_deserialized_data(&live_template_data);
 
+        // Persist the overlay's final position/size on shutdown. This is the ONLY
+        // place the overlay writes geometry — per-move saves are avoided to prevent
+        // spurious tracker dmon reloads.
+        if (overlay && overlay->window) {
+            SDL_GetWindowPosition(overlay->window, &settings.overlay_window.x, &settings.overlay_window.y);
+            int w, h;
+            SDL_GetWindowSize(overlay->window, &w, &h);
+            settings.overlay_window.w = w;
+            settings.overlay_window.h = OVERLAY_FIXED_HEIGHT;
+            settings_save(&settings, nullptr, SAVE_CONTEXT_OVERLAY_GEOM);
+        }
+
         overlay_free(&overlay, &settings);
         TTF_Quit();
         SDL_Quit();
@@ -2021,6 +2033,12 @@ int main(int argc, char *argv[]) {
                 log_message(LOG_INFO, "[COOP] Synced lobby to roster: %d player(s).\n",
                             app_settings.coop_player_count);
 
+                // Roster changed — slot N may now hold a different player, so
+                // drop the cached per-player snapshots. (The following
+                // g_settings_changed=1 would clear them via tracker_reinit_template
+                // anyway, but clearing explicitly keeps the intent local.)
+                tracker_clear_coop_snapshot_cache(tracker);
+
                 // Apply settings and force a data re-read so the host picks up the new player's files
                 SDL_SetAtomicInt(&g_settings_changed, 1);
                 SDL_SetAtomicInt(&g_apply_button_clicked, 1);
@@ -2493,6 +2511,36 @@ int main(int argc, char *argv[]) {
                 SDL_UnlockMutex(g_coop_ctx->recv_mutex);
             }
 
+            // --- Co-op Host: handle player-view dropdown change ---
+            // Apply the cached snapshot for the newly selected player (or merged)
+            // instead of triggering g_needs_update, which would re-read disk and
+            // zero out remote players whose save files are stale.
+            // (Receivers handle view changes in their own block above via
+            // rcv_last_applied_player_idx, so we simply clear the flag there.)
+            if (tracker->coop_view_dirty && app_settings.network_mode != NETWORK_HOST) {
+                tracker->coop_view_dirty = 0;
+            }
+            if (app_settings.network_mode == NETWORK_HOST && tracker->coop_view_dirty &&
+                tracker->template_data) {
+                tracker->coop_view_dirty = 0;
+                int sel = tracker->selected_coop_player_idx;
+                const char *buf = nullptr;
+                size_t sz = 0;
+                if (sel >= 0 && sel < MAX_COOP_PLAYERS && tracker->coop_player_snapshots[sel]) {
+                    buf = tracker->coop_player_snapshots[sel];
+                    sz = tracker->coop_player_snapshot_sizes[sel];
+                } else if (tracker->coop_merged_snapshot) {
+                    buf = tracker->coop_merged_snapshot;
+                    sz = tracker->coop_merged_snapshot_size;
+                }
+                if (buf && sz >= sizeof(TemplateData)) {
+                    merge_coop_progress(buf, tracker->template_data);
+                    tracker_recalculate_progress(tracker, &app_settings);
+                    tracker_update_title(tracker, &app_settings);
+                    SDL_SetAtomicInt(&g_game_data_changed, 1); // push view to overlay via IPC
+                }
+            }
+
             // --- Co-op Host: check for queued custom goal mods every frame ---
             // Receivers send checkbox toggles to the host, but the host only processes
             // them inside g_needs_update (which requires a file change). Poll here so
@@ -2612,6 +2660,7 @@ int main(int argc, char *argv[]) {
 
                         // Broadcast merged state to all receivers and save a copy for restore
                         char *merged_snapshot = nullptr;
+                        size_t merged_snapshot_size = 0;
                         {
                             char *broadcast_buf = (char *) malloc(4 * 1024 * 1024);
                             if (broadcast_buf) {
@@ -2627,6 +2676,7 @@ int main(int argc, char *argv[]) {
                                     merged_snapshot = (char *) malloc(broadcast_size);
                                     if (merged_snapshot) {
                                         memcpy(merged_snapshot, broadcast_buf, broadcast_size);
+                                        merged_snapshot_size = broadcast_size;
                                     }
                                 }
                                 free(broadcast_buf);
@@ -2635,6 +2685,9 @@ int main(int argc, char *argv[]) {
 
                         // Broadcast per-player progress snapshots so receivers can
                         // use the player dropdown to view individual progress.
+                        // Also cache each snapshot on the Tracker so the host's
+                        // dropdown can switch views without re-reading game files
+                        // (disk files only update when the game actually saves).
                         {
                             int pc = app_settings.coop_player_count;
                             char **pp_bufs = (char **) calloc(pc, sizeof(char *));
@@ -2652,25 +2705,45 @@ int main(int argc, char *argv[]) {
                                 }
                                 coop_net_broadcast_player_states(g_coop_ctx, pp_bufs, pp_sizes, pc);
 
+                                // Move per-player snapshots into the tracker cache
+                                // (replacing any previous copies). Slots beyond pc are cleared.
+                                for (int pi = 0; pi < MAX_COOP_PLAYERS; pi++) {
+                                    if (tracker->coop_player_snapshots[pi]) {
+                                        free(tracker->coop_player_snapshots[pi]);
+                                        tracker->coop_player_snapshots[pi] = nullptr;
+                                    }
+                                    tracker->coop_player_snapshot_sizes[pi] = 0;
+                                }
+                                for (int pi = 0; pi < pc; pi++) {
+                                    tracker->coop_player_snapshots[pi] = pp_bufs[pi];
+                                    tracker->coop_player_snapshot_sizes[pi] = pp_sizes[pi];
+                                    pp_bufs[pi] = nullptr; // ownership transferred
+                                }
+
                                 // Restore host's display: either single player or merged
                                 if (tracker->selected_coop_player_idx >= 0 &&
-                                    tracker->selected_coop_player_idx < pc) {
+                                    tracker->selected_coop_player_idx < pc &&
+                                    tracker->coop_player_snapshots[tracker->selected_coop_player_idx]) {
                                     int sel = tracker->selected_coop_player_idx;
-                                    if (pp_bufs[sel] && pp_sizes[sel] > 0) {
-                                        merge_coop_progress(pp_bufs[sel], tracker->template_data);
-                                    }
+                                    merge_coop_progress(tracker->coop_player_snapshots[sel],
+                                                        tracker->template_data);
                                 } else if (merged_snapshot) {
                                     merge_coop_progress(merged_snapshot, tracker->template_data);
                                 }
                                 tracker_recalculate_progress(tracker, &app_settings);
-
-                                for (int pi = 0; pi < pc; pi++) free(pp_bufs[pi]);
                             }
                             free(pp_bufs);
                             free(pp_sizes);
                             free(pp_work);
                         }
-                        free(merged_snapshot);
+
+                        // Cache the merged snapshot on the tracker too. Ownership transfers.
+                        if (tracker->coop_merged_snapshot) {
+                            free(tracker->coop_merged_snapshot);
+                        }
+                        tracker->coop_merged_snapshot = merged_snapshot;
+                        tracker->coop_merged_snapshot_size = merged_snapshot_size;
+                        merged_snapshot = nullptr;
                     } else {
                         // Singleplayer or host with no clients: normal update
                         tracker_update(tracker, &app_settings);

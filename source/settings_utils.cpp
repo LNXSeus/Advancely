@@ -1509,7 +1509,11 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
     if (context == SAVE_CONTEXT_ALL || context == SAVE_CONTEXT_TRACKER_GEOM) {
         save_window_rect(visuals_obj, "tracker_window", &settings->tracker_window);
     }
-    if (context == SAVE_CONTEXT_ALL || context == SAVE_CONTEXT_OVERLAY_GEOM) {
+    // overlay_window is owned by the overlay process. Only write it with an
+    // explicit SAVE_CONTEXT_OVERLAY_GEOM call (from the overlay itself). Under
+    // SAVE_CONTEXT_ALL the tracker's in-memory copy can be stale, so leave the
+    // on-disk value untouched.
+    if (context == SAVE_CONTEXT_OVERLAY_GEOM) {
         save_window_rect(visuals_obj, "overlay_window", &settings->overlay_window);
     }
 

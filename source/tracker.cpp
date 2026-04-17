@@ -3274,6 +3274,14 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     t->is_temp_creator_focused = false;
     t->notes_widget_id_counter = 0;
 
+    for (int i = 0; i < MAX_COOP_PLAYERS; i++) {
+        t->coop_player_snapshots[i] = nullptr;
+        t->coop_player_snapshot_sizes[i] = 0;
+    }
+    t->coop_merged_snapshot = nullptr;
+    t->coop_merged_snapshot_size = 0;
+    t->coop_view_dirty = 0;
+
 
     // Explicitly initialize all members
     t->window = nullptr;
@@ -9464,7 +9472,10 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                 if (ImGui::Selectable("All Players", is_all)) {
                     if (!is_all) {
                         t->selected_coop_player_idx = -1;
-                        SDL_SetAtomicInt(&g_needs_update, 1);
+                        // Apply the cached snapshot on the next frame instead of
+                        // triggering a full disk reload — remote players may not
+                        // have saved their files for several minutes.
+                        t->coop_view_dirty = 1;
                     }
                 }
                 if (is_all) ImGui::SetItemDefaultFocus();
@@ -9479,7 +9490,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                     if (ImGui::Selectable(player_label, is_selected)) {
                         if (!is_selected) {
                             t->selected_coop_player_idx = pi;
-                            SDL_SetAtomicInt(&g_needs_update, 1);
+                            t->coop_view_dirty = 1;
                         }
                     }
                     if (is_selected) ImGui::SetItemDefaultFocus();
@@ -9735,10 +9746,32 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 // -------------------------------------------- TRACKER RENDERING END --------------------------------------------
 
 
+void tracker_clear_coop_snapshot_cache(Tracker *t) {
+    if (!t) return;
+    for (int i = 0; i < MAX_COOP_PLAYERS; i++) {
+        if (t->coop_player_snapshots[i]) {
+            free(t->coop_player_snapshots[i]);
+            t->coop_player_snapshots[i] = nullptr;
+        }
+        t->coop_player_snapshot_sizes[i] = 0;
+    }
+    if (t->coop_merged_snapshot) {
+        free(t->coop_merged_snapshot);
+        t->coop_merged_snapshot = nullptr;
+    }
+    t->coop_merged_snapshot_size = 0;
+    t->coop_view_dirty = 0;
+}
+
 void tracker_reinit_template(Tracker *t, AppSettings *settings) {
     if (!t) return;
 
     log_message(LOG_INFO, "[TRACKER] Re-initializing template...\n");
+
+    // Invalidate coop snapshot cache: serialized buffers are tied to the OLD
+    // template layout (goal counts / order). Applying them after a template
+    // swap would misalign fields or drop goals.
+    tracker_clear_coop_snapshot_cache(t);
 
     // --- BACKUP SCROLL STATE ---
     // We use a map to store the scroll_y value keyed by the category's root_name.
@@ -10897,6 +10930,9 @@ void tracker_free(Tracker **tracker, AppSettings *settings) {
             delete static_cast<std::unordered_map<std::string, int> *>(t->hermes_coop_stat_cache);
             t->hermes_coop_stat_cache = nullptr;
         }
+
+        // Free coop snapshot caches
+        tracker_clear_coop_snapshot_cache(t);
 
         // tracker is heap allocated so free it
         free(t);
