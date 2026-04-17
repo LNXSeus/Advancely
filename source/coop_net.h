@@ -218,7 +218,7 @@ bool coop_net_start_receiver(CoopNetContext *ctx, const char *ip, int port,
 // Gracefully stop the current session (host or receiver). Blocks until the thread exits.
 void coop_net_stop(CoopNetContext *ctx);
 
-// Call once per frame from the main thread. Lightweight — checks state, processes received data.
+// Call once per frame from the main thread. Lightweight - checks state, processes received data.
 void coop_net_tick(CoopNetContext *ctx);
 
 // Get the current connection state (thread-safe atomic read).

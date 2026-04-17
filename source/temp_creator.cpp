@@ -477,7 +477,7 @@ static void build_goal_display_label(const EditorTemplate &data, const char *roo
         }
     }
 
-    // Unlocks, custom goals, or unresolved — just show root_name
+    // Unlocks, custom goals, or unresolved - just show root_name
     strncpy(out, root_name, out_size - 1);
     out[out_size - 1] = '\0';
 }

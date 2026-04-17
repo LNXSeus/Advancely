@@ -331,7 +331,7 @@ static void deserialize_template_data(char *buffer, TemplateData *target_td) {
 // Merges progress-only state from a serialize_template_data() buffer into an existing,
 // already-loaded TemplateData. Unlike deserialize_template_data(), this preserves every
 // pointer field (textures, criteria arrays, etc.) in the target, so it's safe to call
-// inside the tracker process — the receiver merges host state without clobbering its
+// inside the tracker process - the receiver merges host state without clobbering its
 // own loaded resources. Returns true on success, false if counts don't match (indicating
 // the receiver hasn't finished reloading to the host's template yet).
 static bool merge_coop_progress(const char *buffer, TemplateData *target) {
@@ -618,7 +618,7 @@ static void global_watch_callback(dmon_watch_id watch_id, dmon_action action, co
                     if (name_len == 0 ||
                         strncmp(filepath, world_name, name_len) != 0 ||
                         (filepath[name_len] != '/' && filepath[name_len] != '\\')) {
-                        // This change is from a different world — ignore it entirely.
+                        // This change is from a different world - ignore it entirely.
                         return;
                     }
                 }
@@ -654,7 +654,7 @@ static void settings_watch_callback(dmon_watch_id watch_id, dmon_action action, 
             // If the app itself wrote settings.json (e.g. checkbox toggle, counter hotkey),
             // suppress the watcher to avoid a destructive full template reinit.
             if (SDL_SetAtomicInt(&g_suppress_settings_watch, 0) == 1) {
-                log_message(LOG_INFO, "[DMON - MAIN] settings.json modified by app — suppressed.\n");
+                log_message(LOG_INFO, "[DMON - MAIN] settings.json modified by app - suppressed.\n");
                 return;
             }
             log_message(LOG_INFO, "[DMON - MAIN] settings.json modified. Triggering update.\n");
@@ -761,7 +761,7 @@ static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker 
  * Returns false if the window is entirely off-screen, meaning its position needs resetting.
  */
 static bool is_window_on_screen(int x, int y, int w, int h) {
-    // Default/unset positions — SDL will center these itself, always fine.
+    // Default/unset positions - SDL will center these itself, always fine.
     if (x == DEFAULT_WINDOW_POS || y == DEFAULT_WINDOW_POS) return true;
     // Use a minimum visible area: at least 64x32 px of the title bar must be on-screen.
     const int MIN_VISIBLE_W = 64;
@@ -770,7 +770,7 @@ static bool is_window_on_screen(int x, int y, int w, int h) {
 
     int display_count = 0;
     SDL_DisplayID *displays = SDL_GetDisplays(&display_count);
-    if (!displays || display_count == 0) return true; // Can't check — assume fine.
+    if (!displays || display_count == 0) return true; // Can't check - assume fine.
 
     bool visible = false;
     for (int i = 0; i < display_count; i++) {
@@ -1984,13 +1984,18 @@ int main(int argc, char *argv[]) {
             }
             prev_coop_state = cur_coop_state;
 
-            // --- Co-op Host: sync lobby player list to coop_players roster ---
+            // --- Co-op: sync lobby player list to coop_players roster ---
             // When players join, leave, or get kicked, the lobby list changes.
-            // We sync it into app_settings.coop_players[] so tracker_update_coop_merged()
-            // can find each player's data files by UUID.
-            if (app_settings.network_mode == NETWORK_HOST && g_coop_ctx &&
-                coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
-                coop_net_lobby_changed(g_coop_ctx)) {
+            // Host needs it so tracker_update_coop_merged() can find each player's
+            // files by UUID. Receivers need it so the player dropdown reflects the
+            // current lobby (otherwise coop_players only has whatever was loaded
+            // from settings.json at startup).
+            CoopNetState lobby_sync_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
+            bool lobby_sync_eligible = (app_settings.network_mode == NETWORK_HOST &&
+                                        lobby_sync_state == COOP_NET_LISTENING) ||
+                                       (app_settings.network_mode == NETWORK_RECEIVER &&
+                                        lobby_sync_state == COOP_NET_CONNECTED);
+            if (lobby_sync_eligible && g_coop_ctx && coop_net_lobby_changed(g_coop_ctx)) {
                 CoopLobbyPlayer lobby[COOP_MAX_LOBBY];
                 int lobby_count = coop_net_get_lobby_players(g_coop_ctx, lobby, COOP_MAX_LOBBY);
 
@@ -2039,9 +2044,13 @@ int main(int argc, char *argv[]) {
                 // anyway, but clearing explicitly keeps the intent local.)
                 tracker_clear_coop_snapshot_cache(tracker);
 
-                // Apply settings and force a data re-read so the host picks up the new player's files
-                SDL_SetAtomicInt(&g_settings_changed, 1);
-                SDL_SetAtomicInt(&g_apply_button_clicked, 1);
+                // Only the host needs to re-read player files / restart overlay.
+                // Receivers just need the updated roster in app_settings; the next
+                // render frame picks it up via the player dropdown.
+                if (app_settings.network_mode == NETWORK_HOST) {
+                    SDL_SetAtomicInt(&g_settings_changed, 1);
+                    SDL_SetAtomicInt(&g_apply_button_clicked, 1);
+                }
             }
 
             // Close immediately if app not running
@@ -2190,9 +2199,15 @@ int main(int argc, char *argv[]) {
                 settings_load(&app_settings);
                 log_set_settings(&app_settings); // Update the logger with the new settings.
 
-                // Restore the coop_players roster if we're hosting
-                if (app_settings.network_mode == NETWORK_HOST &&
-                    coop_net_get_state(&coop_ctx) == COOP_NET_LISTENING) {
+                // Restore the coop_players roster if a lobby is active.
+                // The roster is runtime-managed by the lobby sync — settings_load
+                // would overwrite it with the (stale/empty) on-disk copy.
+                CoopNetState reload_net_state = coop_net_get_state(&coop_ctx);
+                bool restore_roster = (app_settings.network_mode == NETWORK_HOST &&
+                                       reload_net_state == COOP_NET_LISTENING) ||
+                                      (app_settings.network_mode == NETWORK_RECEIVER &&
+                                       reload_net_state == COOP_NET_CONNECTED);
+                if (restore_roster) {
                     app_settings.coop_player_count = saved_coop_player_count;
                     memcpy(app_settings.coop_players, saved_coop_players, sizeof(saved_coop_players));
                 }

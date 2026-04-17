@@ -404,7 +404,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         coop_identity_status_msg[0] = '\0';
         coop_identity_status_is_error = false;
         coop_room_code_error[0] = '\0';
-        // Don't clear coop_room_code_buf — it's only valid while hosting
+        // Don't clear coop_room_code_buf - it's only valid while hosting
     }
 
     // Position the settings window to the right half of the viewport when force-opened,
@@ -461,7 +461,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         ImGui::Spacing();
     }
 
-    // --- No saves path warning (suppressed for connected receivers — they get data from host) ---
+    // --- No saves path warning (suppressed for connected receivers - they get data from host) ---
     {
         bool is_receiver_connected = (temp_settings.network_mode == NETWORK_RECEIVER &&
                                       g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
@@ -802,7 +802,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 ImGui::SetTooltip("%s", display_version_tooltip_buffer);
             }
 
-            // Coop state check — shared by StatsPerWorld and Hermes checkboxes
+            // Coop state check - shared by StatsPerWorld and Hermes checkboxes
             CoopNetState hermes_net_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
             bool hermes_net_active = (hermes_net_state == COOP_NET_LISTENING ||
                                       hermes_net_state == COOP_NET_CONNECTED ||
@@ -831,7 +831,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                 }
             }
 
-            // Hermes Mod checkbox — available for all versions that support Fabric
+            // Hermes Mod checkbox - available for all versions that support Fabric
             // Disable when lobby is active (host or receiver)
             if (hermes_net_active) ImGui::BeginDisabled();
             ImGui::Checkbox("Using Hermes Mod (Live Tracking)", &temp_settings.using_hermes);
@@ -2461,7 +2461,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "Username is locked while the account is linked.\n"
                              "Unlink the account to change your username.");
                 } else {
-                    snprintf(tooltip_buf, sizeof(tooltip_buf), "Your Minecraft username.");
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Your Minecraft username. Must exactly match your in-game name.\n"
+                             "Capitalization does not matter. Hermes matches usernames case-insensitively.\n"
+                             "Hermes checks BOTH username (lowercased) and UUID, so keep both accurate.");
                 }
                 ImGui::SetTooltip("%s", tooltip_buf);
             }
@@ -2522,9 +2525,16 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                          sizeof(temp_settings.local_player.uuid));
                 if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
                     char tooltip_buf[256];
-                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                             "Your offline UUID. Look in your world's stats or playerdata folder\n"
-                             "for a JSON file named with your UUID (e.g. 069a79f4-...-fca90e38aaf5.json).");
+                    if (acc_net_active) {
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Cannot modify account while a lobby is active.");
+                    } else {
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Your offline UUID. Must be exact. This is the authoritative player\n"
+                                 "identifier used by Hermes and legacy stats files.\n"
+                                 "Look in your world's stats or playerdata folder for a JSON file named\n"
+                                 "with your UUID (e.g. 069a79f4-...-fca90e38aaf5.json).");
+                    }
                     ImGui::SetTooltip("%s", tooltip_buf);
                 }
                 if (temp_settings.local_player.uuid[0] != '\0') {
@@ -2543,9 +2553,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                      sizeof(temp_settings.local_player.display_name));
             if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
                 char tooltip_buf[256];
-                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                         "Optional display name shown in the Co-op lobby.\n"
-                         "Leave empty to use your username.");
+                if (acc_net_active) {
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Cannot modify account while a lobby is active.");
+                } else {
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Optional display name shown in the Co-op lobby.\n"
+                             "Leave empty to use your username.");
+                }
                 ImGui::SetTooltip("%s", tooltip_buf);
             }
             if (acc_net_active) ImGui::EndDisabled();

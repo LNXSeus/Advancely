@@ -265,7 +265,7 @@ static void build_search_linked_sets(const Tracker *t) {
                     }
                     break;
                 }
-                if (!stage_active) continue; // Skip — linked stage is not the current one
+                if (!stage_active) continue; // Skip - linked stage is not the current one
             }
 
             if (goals[j].parent_root[0] != '\0') {

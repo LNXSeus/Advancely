@@ -197,7 +197,7 @@ static bool read_message(coop_socket_t fd, uint32_t *out_type, char **out_payloa
                 return false;
             }
             if (r == -1) {
-                // Would block — header consumed but payload incomplete
+                // Would block - header consumed but payload incomplete
                 // Spin-wait briefly for remaining payload (it must arrive since header was valid)
                 continue;
             }
@@ -908,7 +908,7 @@ static int SDLCALL receiver_thread_func(void *data) {
 
     // Try inet_pton first (raw IP), then fall back to getaddrinfo (domain resolution)
     if (inet_pton(AF_INET, ctx->connect_ip, &addr.sin_addr) != 1) {
-        // Not a valid IP — try resolving as a domain name
+        // Not a valid IP - try resolving as a domain name
         struct addrinfo hints, *result = nullptr;
         memset(&hints, 0, sizeof(hints));
         hints.ai_family = AF_INET;

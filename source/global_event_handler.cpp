@@ -142,7 +142,7 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
         }
         // --- Dispatch window events (move, resize, etc.) ---
         // In-memory rect is kept current so Apply/shutdown can persist it;
-        // we intentionally do NOT write to settings.json here — per-move saves
+        // we intentionally do NOT write to settings.json here - per-move saves
         // would trigger dmon and force a full template re-init + game-file reload,
         // wiping Hermes in-memory state.
         else if (event.type >= SDL_EVENT_WINDOW_FIRST && event.type <= SDL_EVENT_WINDOW_LAST) {

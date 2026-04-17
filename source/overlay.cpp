@@ -318,7 +318,7 @@ void overlay_events(Overlay *o, SDL_Event *event, bool *is_running, float *delta
             break;
 
         // Keep the in-memory rect current so the overlay-shutdown save persists it.
-        // We intentionally do NOT write settings.json on every move/resize — doing so
+        // We intentionally do NOT write settings.json on every move/resize - doing so
         // would fire the tracker's dmon watcher and force a full reload.
         case SDL_EVENT_WINDOW_MOVED:
         case SDL_EVENT_WINDOW_RESIZED: {

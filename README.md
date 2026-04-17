@@ -145,7 +145,7 @@ import, create, copy, and modify any template directly within Advancely.
   sequential steps, or add manual counters with hotkeys for objectives that can't be tracked automatically.
 * **Easy Translation:** Every template has separate language files, allowing you to easily edit display names or provide
   translations without altering the core template logic.
-* **Share Your Templates:** You can export any template—including all its language files—into a single `.zip` file to
+* **Share Your Templates:** You can export any template - including all its language files - into a single `.zip` file to
   share with the Advancely community. Likewise, you can import (`.zip`) templates created by others.
 * **Manual Layout & Visual Layout Editor:** Position every goal, criterion, and decoration precisely on the tracker map.
   Enable "Manual Layout" in settings, then use the **Visual Layout Editor** in the Template Editor to drag-and-drop
