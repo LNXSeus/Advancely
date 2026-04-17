@@ -10400,6 +10400,113 @@ void tracker_recalculate_progress(Tracker *t, const AppSettings *settings) {
 }
 
 
+// Defined in main.cpp. Shared so the host-side Hermes path can update the
+// per-player and merged snapshot caches directly without re-reading disk.
+extern size_t serialize_template_data(TemplateData *td, char *buffer);
+extern bool merge_coop_progress(const char *buffer, TemplateData *target);
+
+
+// Apply a single Hermes event to (a) the source player's snapshot and (b) the
+// merged snapshot, then restore the currently-displayed view into
+// t->template_data based on the dropdown selection. Returns true if any
+// snapshot actually changed.
+//
+// Rationale: the host sees Hermes events from every player in the lobby (LAN
+// games route everyone's stats through the host's world). Applying those events
+// directly to t->template_data made the currently-visible view drift regardless
+// of which player the dropdown had selected. The snapshots are authoritative
+// per-player state; template_data is just a display buffer rebuilt from them.
+static bool hermes_apply_event_to_coop_snapshots(
+    Tracker *t, const AppSettings *settings,
+    int player_idx, const char *event_type, const cJSON *data,
+    char *workbuf, size_t workbuf_size) {
+    if (!t || !t->template_data || !settings || !workbuf) return false;
+
+    bool is_stat = (strcmp(event_type, "stat") == 0);
+    bool is_adv = (strcmp(event_type, "advancement") == 0);
+    if (!is_stat && !is_adv) return false;
+
+    bool any_changed = false;
+
+    // 1. Per-player snapshot: single-player semantics (highest-wins for stats).
+    if (player_idx >= 0 && player_idx < MAX_COOP_PLAYERS &&
+        t->coop_player_snapshots[player_idx] &&
+        t->coop_player_snapshot_sizes[player_idx] >= sizeof(TemplateData)) {
+        if (merge_coop_progress(t->coop_player_snapshots[player_idx], t->template_data)) {
+            bool changed = false;
+            if (is_stat) {
+                changed = hermes_apply_stat_event(t, data, false);
+            } else {
+                changed = hermes_apply_advancement_event(t, data);
+            }
+            if (changed) {
+                tracker_recalculate_progress(t, settings);
+                size_t new_size = serialize_template_data(t->template_data, workbuf);
+                if (new_size > 0 && new_size <= workbuf_size) {
+                    char *new_buf = (char *) realloc(t->coop_player_snapshots[player_idx], new_size);
+                    if (new_buf) {
+                        memcpy(new_buf, workbuf, new_size);
+                        t->coop_player_snapshots[player_idx] = new_buf;
+                        t->coop_player_snapshot_sizes[player_idx] = new_size;
+                        any_changed = true;
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Merged snapshot: coop_stat_merge-aware. Relies on the per-UUID delta
+    //    cache (seeded from disk during tracker_update_coop_merged) so repeat
+    //    events from the same player advance the merged total correctly.
+    if (t->coop_merged_snapshot && t->coop_merged_snapshot_size >= sizeof(TemplateData)) {
+        if (merge_coop_progress(t->coop_merged_snapshot, t->template_data)) {
+            bool changed = false;
+            const char *ev_uuid = (player_idx >= 0 && player_idx < settings->coop_player_count)
+                                      ? settings->coop_players[player_idx].uuid
+                                      : nullptr;
+            if (is_stat) {
+                if (settings->coop_stat_merge == COOP_STAT_CUMULATIVE) {
+                    changed = hermes_apply_stat_event_cumulative(t, data, ev_uuid, false);
+                } else {
+                    bool c1 = hermes_apply_stat_event(t, data, true);
+                    bool c2 = hermes_apply_stat_event_cumulative(t, data, ev_uuid, true);
+                    changed = c1 || c2;
+                }
+            } else {
+                changed = hermes_apply_advancement_event(t, data);
+            }
+            if (changed) {
+                tracker_recalculate_progress(t, settings);
+                size_t new_size = serialize_template_data(t->template_data, workbuf);
+                if (new_size > 0 && new_size <= workbuf_size) {
+                    char *new_buf = (char *) realloc(t->coop_merged_snapshot, new_size);
+                    if (new_buf) {
+                        memcpy(new_buf, workbuf, new_size);
+                        t->coop_merged_snapshot = new_buf;
+                        t->coop_merged_snapshot_size = new_size;
+                        any_changed = true;
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Restore the currently-displayed view so the UI reflects the update.
+    int sel = t->selected_coop_player_idx;
+    const char *restore_buf = nullptr;
+    if (sel >= 0 && sel < MAX_COOP_PLAYERS && t->coop_player_snapshots[sel]) {
+        restore_buf = t->coop_player_snapshots[sel];
+    } else if (t->coop_merged_snapshot) {
+        restore_buf = t->coop_merged_snapshot;
+    }
+    if (restore_buf) {
+        merge_coop_progress(restore_buf, t->template_data);
+    }
+
+    return any_changed;
+}
+
+
 void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
     if (!settings->using_hermes || !t->hermes_active || !t->hermes_play_log)
         return;
@@ -10408,6 +10515,11 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
         return;
 
     bool any_changed = false;
+    bool snapshots_changed = false;
+    // Lazily allocated scratch buffer for snapshot re-serialization. Sized to
+    // match the broadcast buffer used on the file-merge path.
+    char *workbuf = nullptr;
+    const size_t workbuf_size = 4 * 1024 * 1024;
 
     while (true) {
         long start_offset = ftell(t->hermes_play_log);
@@ -10462,12 +10574,15 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
 
         // --- Player identity filter ---
         // Hermes events include a "player" object with "name" and "uuid".
-        // In coop HOST mode: accept events from any player in the lobby roster.
+        // In coop HOST mode: accept events from any player in the lobby roster,
+        //   and remember which roster slot they came from so the event can be
+        //   applied to that player's snapshot specifically.
         // In singleplayer/receiver: accept only the local player's events.
         // Match by UUID first (authoritative, case-insensitive hex), then
         // fall back to case-insensitive username (Hermes "name" may differ
         // in case; legacy stats files are fully lowercase).
         const char *event_player_uuid = nullptr; // Used for stat cache key
+        int matched_player_idx = -1; // Roster index of the source player (coop host)
         cJSON *player_json = cJSON_GetObjectItem(data, "player");
         if (cJSON_IsObject(player_json)) {
             cJSON *uuid_json = cJSON_GetObjectItem(player_json, "uuid");
@@ -10485,12 +10600,14 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
                         strcasecmp(ev_uuid, rp->uuid) == 0) {
                         player_match = true;
                         event_player_uuid = ev_uuid;
+                        matched_player_idx = p;
                         break;
                     }
                     if (!player_match && ev_name && rp->username[0] != '\0' &&
                         strcasecmp(ev_name, rp->username) == 0) {
                         player_match = true;
                         event_player_uuid = ev_uuid; // may be null, that's OK
+                        matched_player_idx = p;
                         break;
                     }
                 }
@@ -10513,9 +10630,27 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
         // If no player object in event, allow it through (older Hermes versions)
 
         // --- Dispatch event ---
-        if (strcmp(type, "stat") == 0) {
-            bool is_coop_host = (settings->network_mode == NETWORK_HOST &&
-                                 t->hermes_coop_stat_cache);
+        bool is_coop_host = (settings->network_mode == NETWORK_HOST &&
+                             t->hermes_coop_stat_cache);
+        bool have_snapshots = (matched_player_idx >= 0 &&
+                               matched_player_idx < MAX_COOP_PLAYERS &&
+                               t->coop_player_snapshots[matched_player_idx] &&
+                               t->coop_merged_snapshot);
+
+        if (is_coop_host && have_snapshots &&
+            (strcmp(type, "stat") == 0 || strcmp(type, "advancement") == 0)) {
+            // Per-player isolation path: update the source player's snapshot
+            // and the merged snapshot, then restore the selected view.
+            if (!workbuf) {
+                workbuf = (char *) malloc(workbuf_size);
+            }
+            if (workbuf &&
+                hermes_apply_event_to_coop_snapshots(t, settings, matched_player_idx,
+                                                     type, data, workbuf, workbuf_size)) {
+                any_changed = true;
+                snapshots_changed = true;
+            }
+        } else if (strcmp(type, "stat") == 0) {
             if (is_coop_host && settings->coop_stat_merge == COOP_STAT_CUMULATIVE) {
                 // CUMULATIVE mode: track per-player deltas for everything
                 if (hermes_apply_stat_event_cumulative(t, data, event_player_uuid))
@@ -10543,9 +10678,22 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
     }
 
     if (any_changed) {
-        tracker_recalculate_progress(t, settings);
+        // The snapshot path already calls tracker_recalculate_progress inside
+        // hermes_apply_event_to_coop_snapshots (per snapshot) and restores the
+        // displayed view. Only recalc here for the legacy direct-apply path.
+        if (!snapshots_changed) {
+            tracker_recalculate_progress(t, settings);
+        }
         t->hermes_wants_ipc_flush = true;
+        // If we updated coop snapshots, broadcast the new merged view to
+        // receivers. The main loop's g_coop_broadcast_needed handler takes
+        // care of serialization + coop_net_broadcast.
+        if (snapshots_changed) {
+            SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
+        }
     }
+
+    if (workbuf) free(workbuf);
 }
 
 // =============================================================================

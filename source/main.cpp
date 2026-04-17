@@ -170,7 +170,7 @@ static void find_and_set_resource_path(char *path_buffer, size_t buffer_size) {
  * @brief Serializes the TemplateData into a flat byte buffer.
  * This "flattens" the complex data structure so it can be sent to another process.
  */
-static size_t serialize_template_data(TemplateData *td, char *buffer) {
+size_t serialize_template_data(TemplateData *td, char *buffer) {
     if (!td || !buffer) return 0;
 
     char *head = buffer;
@@ -334,7 +334,7 @@ static void deserialize_template_data(char *buffer, TemplateData *target_td) {
 // inside the tracker process - the receiver merges host state without clobbering its
 // own loaded resources. Returns true on success, false if counts don't match (indicating
 // the receiver hasn't finished reloading to the host's template yet).
-static bool merge_coop_progress(const char *buffer, TemplateData *target) {
+bool merge_coop_progress(const char *buffer, TemplateData *target) {
     if (!buffer || !target) return false;
     const char *head = buffer;
 
@@ -2498,14 +2498,27 @@ int main(int argc, char *argv[]) {
                     if (apply_buf && apply_size > 0) {
                         bool merged = merge_coop_progress(apply_buf, tracker->template_data);
                         if (merged) {
-                            tracker->time_since_last_update = tracker->template_data->host_time_since_last_update;
+                            // Only mirror the host's timer when the data is genuinely
+                            // fresh from the host (new_data or new_player_data). Cached
+                            // per-player snapshots carry the host_time_since_last_update
+                            // that was frozen in when the host serialized them, so
+                            // applying them on a dropdown switch would spuriously reset
+                            // the receiver's timer. The receiver keeps incrementing
+                            // locally between fresh broadcasts, which keeps it in sync
+                            // with the host.
+                            bool fresh_from_host = (new_data || new_player_data);
+                            if (fresh_from_host) {
+                                tracker->time_since_last_update =
+                                    tracker->template_data->host_time_since_last_update;
+                            }
                             SDL_SetAtomicInt(&g_needs_update, 1);
                             SDL_SetAtomicInt(&g_game_data_changed, 1);
                             rcv_last_applied_player_idx = sel;
                             log_message(LOG_INFO, "[COOP] Receiver: applied %s state. "
-                                        "overall_progress=%.1f%%\n",
+                                        "overall_progress=%.1f%% (timer_mirrored=%s)\n",
                                         sel >= 0 ? "per-player" : "merged",
-                                        tracker->template_data->overall_progress_percentage);
+                                        tracker->template_data->overall_progress_percentage,
+                                        fresh_from_host ? "yes" : "no");
                         } else {
                             log_message(LOG_ERROR, "[COOP DEBUG] Receiver: merge_coop_progress returned false!\n");
                         }
