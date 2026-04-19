@@ -2227,6 +2227,15 @@ int main(int argc, char *argv[]) {
                 // Update the tracker with the new paths and template data
                 tracker_reinit_template(tracker, &app_settings);
 
+                // Receivers: reinit rebuilt template_data from scratch and lost
+                // the progress that was merged in from the host's cached snapshot.
+                // Flag a re-apply so the next receiver-tick restores counts and
+                // checkboxes without requiring a dropdown toggle.
+                if (app_settings.network_mode == NETWORK_RECEIVER && g_coop_ctx &&
+                    coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED) {
+                    tracker->coop_recv_resync_needed = 1;
+                }
+
                 // tracker_load_and_parse_data (called inside reinit) may write to
                 // settings.json to sync template/hotkey data, which causes dmon to
                 // immediately fire settings_watch_callback and set g_settings_changed=1
@@ -2315,17 +2324,40 @@ int main(int argc, char *argv[]) {
                         }
                     }
 
-                    // Co-op Host: broadcast Hermes-updated state to receivers immediately
+                    // Co-op Host: broadcast Hermes-updated state to receivers immediately.
+                    // Use cached merged snapshot so receivers' "All Players" view is
+                    // independent of the host's dropdown filter. Also broadcast per-
+                    // player snapshots so receivers can switch dropdown views live.
                     if (app_settings.network_mode == NETWORK_HOST && g_coop_ctx &&
                         coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
                         coop_net_get_client_count(g_coop_ctx) > 0) {
-                        char *broadcast_buf = (char *) malloc(4 * 1024 * 1024);
-                        if (broadcast_buf) {
-                            size_t broadcast_size = serialize_template_data(tracker->template_data, broadcast_buf);
-                            if (broadcast_size > 0) {
-                                coop_net_broadcast(g_coop_ctx, broadcast_buf, broadcast_size);
+                        if (tracker->coop_merged_snapshot && tracker->coop_merged_snapshot_size > 0) {
+                            coop_net_broadcast(g_coop_ctx, tracker->coop_merged_snapshot,
+                                               tracker->coop_merged_snapshot_size);
+                        } else {
+                            char *broadcast_buf = (char *) malloc(4 * 1024 * 1024);
+                            if (broadcast_buf) {
+                                size_t broadcast_size = serialize_template_data(tracker->template_data, broadcast_buf);
+                                if (broadcast_size > 0) {
+                                    coop_net_broadcast(g_coop_ctx, broadcast_buf, broadcast_size);
+                                }
+                                free(broadcast_buf);
                             }
-                            free(broadcast_buf);
+                        }
+
+                        int pc = app_settings.coop_player_count;
+                        if (pc > 0) {
+                            char **pp_bufs = (char **) calloc(pc, sizeof(char *));
+                            size_t *pp_sizes = (size_t *) calloc(pc, sizeof(size_t));
+                            if (pp_bufs && pp_sizes) {
+                                for (int pi = 0; pi < pc; pi++) {
+                                    pp_bufs[pi] = tracker->coop_player_snapshots[pi];
+                                    pp_sizes[pi] = tracker->coop_player_snapshot_sizes[pi];
+                                }
+                                coop_net_broadcast_player_states(g_coop_ctx, pp_bufs, pp_sizes, pc);
+                            }
+                            free(pp_bufs);
+                            free(pp_sizes);
                         }
                     }
                 }
@@ -2448,6 +2480,11 @@ int main(int argc, char *argv[]) {
                 bool new_data = g_coop_ctx->recv_data_ready;
                 bool new_player_data = g_coop_ctx->recv_player_data_ready;
                 bool player_view_changed = (tracker->selected_coop_player_idx != rcv_last_applied_player_idx);
+                // After a template reinit (settings Apply), template_data has been
+                // rebuilt from scratch and lost the merged-in progress. Force a
+                // re-apply of the cached snapshot so counts/checkboxes come back
+                // without needing to toggle the dropdown.
+                bool force_resync = (tracker->coop_recv_resync_needed != 0);
 
                 if (new_data) {
                     log_message(LOG_INFO, "[COOP DEBUG] Receiver: data ready. buf=%p size=%zu "
@@ -2459,7 +2496,7 @@ int main(int argc, char *argv[]) {
                 }
 
                 // Determine which buffer to apply: per-player snapshot or merged
-                if ((new_data || new_player_data || player_view_changed) && tracker->template_data) {
+                if ((new_data || new_player_data || player_view_changed || force_resync) && tracker->template_data) {
                     const char *apply_buf = nullptr;
                     size_t apply_size = 0;
                     int sel = tracker->selected_coop_player_idx;
@@ -2501,6 +2538,7 @@ int main(int argc, char *argv[]) {
                             SDL_SetAtomicInt(&g_needs_update, 1);
                             SDL_SetAtomicInt(&g_game_data_changed, 1);
                             rcv_last_applied_player_idx = sel;
+                            tracker->coop_recv_resync_needed = 0;
                             log_message(LOG_INFO, "[COOP] Receiver: applied %s state. "
                                         "overall_progress=%.1f%% (timer_mirrored=%s)\n",
                                         sel >= 0 ? "per-player" : "merged",
@@ -2553,11 +2591,39 @@ int main(int argc, char *argv[]) {
                     tracker_recalculate_progress(tracker, &app_settings);
                     tracker_update_title(tracker, &app_settings);
                     SDL_SetAtomicInt(&g_game_data_changed, 1); // push view to overlay via IPC
-                    // Also push the new template_data payload to the overlay via IPC.
-                    // The continuous-update path only writes the header (timer), so
-                    // without this the overlay keeps rendering the previous player's
-                    // goals until the next file merge or custom-goal broadcast.
-                    tracker->hermes_wants_ipc_flush = true;
+
+                    // Push the new template_data payload to the overlay via IPC.
+                    // Do NOT use hermes_wants_ipc_flush here — that path also
+                    // broadcasts to receivers, which would reset their timers to
+                    // the frozen host_time_since_last_update from the cached
+                    // merged snapshot. A host-side dropdown switch is purely a
+                    // local view change and must not touch the network.
+                    if (tracker->p_shared_data) {
+#ifdef _WIN32
+                        DWORD wait_result = WaitForSingleObject(tracker->h_mutex, 50);
+                        if (wait_result == WAIT_OBJECT_0) {
+#else
+                        if (sem_wait(tracker->mutex) == 0) {
+#endif
+                            OverlayIPCHeader header;
+                            if (!tracker_build_coop_sync_label(tracker, &app_settings,
+                                                               header.world_name, MAX_PATH_LENGTH)) {
+                                strncpy(header.world_name, tracker->world_name, MAX_PATH_LENGTH - 1);
+                                header.world_name[MAX_PATH_LENGTH - 1] = '\0';
+                            }
+                            header.time_since_last_update = tracker->time_since_last_update;
+                            char *buffer_head = tracker->p_shared_data->buffer;
+                            memcpy(buffer_head, &header, sizeof(OverlayIPCHeader));
+                            buffer_head += sizeof(OverlayIPCHeader);
+                            size_t td_sz = serialize_template_data(tracker->template_data, buffer_head);
+                            tracker->p_shared_data->data_size = sizeof(OverlayIPCHeader) + td_sz;
+#ifdef _WIN32
+                            ReleaseMutex(tracker->h_mutex);
+#else
+                            sem_post(tracker->mutex);
+#endif
+                        }
+                    }
                 }
             }
 
@@ -2571,25 +2637,17 @@ int main(int argc, char *argv[]) {
                 CoopCustomGoalModMsg mods[COOP_MAX_CUSTOM_MODS];
                 int mod_count = coop_net_drain_custom_mods(g_coop_ctx, mods, COOP_MAX_CUSTOM_MODS);
                 if (mod_count > 0) {
+                    // Persist each mod under its source_uuid's subtree in settings.json
+                    // and mutate in-memory state for instant feedback on the host's view.
                     tracker_apply_coop_mods(tracker, &app_settings, mods, mod_count);
                     log_message(LOG_INFO, "[COOP] Applied %d custom goal modification(s) from receiver.\n", mod_count);
 
-                    // Recalculate progress after applying mods
-                    tracker_recalculate_progress(tracker, &app_settings);
-
-                    // Broadcast updated state immediately
-                    char *broadcast_buf = (char *) malloc(4 * 1024 * 1024);
-                    if (broadcast_buf) {
-                        size_t broadcast_size = serialize_template_data(tracker->template_data, broadcast_buf);
-                        if (broadcast_size > 0) {
-                            coop_net_broadcast(g_coop_ctx, broadcast_buf, broadcast_size);
-                        }
-                        free(broadcast_buf);
-                    }
-
-                    // Trigger IPC + overlay update (not full re-merge, we already broadcast)
-                    SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
-                    SDL_SetAtomicInt(&g_game_data_changed, 1);
+                    // Force a full update so the host rebuilds merged + per-player snapshots
+                    // from the (now-persisted) settings.json and broadcasts both to every
+                    // receiver. Broadcasting template_data directly here would send the
+                    // host's currently-filtered dropdown view, not the authoritative merged
+                    // state, so receivers would see the wrong data.
+                    SDL_SetAtomicInt(&g_needs_update, 1);
                 }
             }
 

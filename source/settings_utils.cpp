@@ -140,6 +140,46 @@ static cJSON *get_or_create_object(cJSON *parent, const char *key) {
     return obj;
 }
 
+// Per-UUID helpers for custom_progress / stat_progress_override.
+// Legacy schema: { "goal_root": value, ... }
+// New schema:    { "<uuid>": { "goal_root": value, ... }, ... }
+// If legacy primitive children are found, they are moved under `migration_uuid`.
+// Returns the subobject for `uuid` (created if missing). Returns nullptr on bad input.
+cJSON *settings_get_player_progress_subobj(cJSON *parent_obj, const char *uuid,
+                                           const char *migration_uuid) {
+    if (!parent_obj || !uuid || uuid[0] == '\0') return nullptr;
+
+    // Migrate primitive (legacy-flat) children into migration_uuid's subtree.
+    if (migration_uuid && migration_uuid[0] != '\0') {
+        cJSON *mig_target = nullptr;
+        cJSON *child = parent_obj->child;
+        while (child) {
+            cJSON *next = child->next;
+            if (!cJSON_IsObject(child) && child->string) {
+                if (!mig_target) {
+                    mig_target = cJSON_GetObjectItem(parent_obj, migration_uuid);
+                    if (!cJSON_IsObject(mig_target)) {
+                        cJSON_DeleteItemFromObject(parent_obj, migration_uuid);
+                        mig_target = cJSON_AddObjectToObject(parent_obj, migration_uuid);
+                    }
+                }
+                cJSON *detached = cJSON_DetachItemViaPointer(parent_obj, child);
+                if (detached) {
+                    cJSON_AddItemToObject(mig_target, detached->string, detached);
+                }
+            }
+            child = next;
+        }
+    }
+
+    cJSON *sub = cJSON_GetObjectItem(parent_obj, uuid);
+    if (!cJSON_IsObject(sub)) {
+        cJSON_DeleteItemFromObject(parent_obj, uuid);
+        sub = cJSON_AddObjectToObject(parent_obj, uuid);
+    }
+    return sub;
+}
+
 /**
  * @brief Loads a window rect from a cJSON object and uses defaults if rect struct is empty: e.g., WindowRect rect = {}
  * @param parent Parent cJSON object
@@ -1609,57 +1649,56 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
                               cJSON_CreateNumber(settings->tracker_list_scroll_speed));
     }
 
-    // Update Custom Progress if provided
+    // Update Custom Progress if provided (per-UUID schema)
     if (td) {
-        cJSON *progress_obj = get_or_create_object(root, "custom_progress");
-        for (int i = 0; i < td->custom_goal_count; i++) {
-            TrackableItem *item = td->custom_goals[i];
+        const char *local_uuid = settings->local_player.uuid;
+        cJSON *progress_root = get_or_create_object(root, "custom_progress");
+        cJSON *progress_obj = settings_get_player_progress_subobj(progress_root, local_uuid, local_uuid);
+        if (progress_obj) {
+            for (int i = 0; i < td->custom_goal_count; i++) {
+                TrackableItem *item = td->custom_goals[i];
 
-            // Delete old entry before adding new one to prevent duplicates
-            cJSON_DeleteItemFromObject(progress_obj, item->root_name);
+                cJSON_DeleteItemFromObject(progress_obj, item->root_name);
 
-            // 3-way logic for custom progress, -1, greater than 0, or 0 and not set
-            if (item->goal == -1) {
-                // Infinite Counter: Save 'true' only if manually completed; auto-completion must not persist.
-                if (item->is_manually_completed) {
-                    cJSON_AddItemToObject(progress_obj, item->root_name, cJSON_CreateBool(true));
-                } else {
+                // 3-way logic for custom progress, -1, greater than 0, or 0 and not set
+                if (item->goal == -1) {
+                    if (item->is_manually_completed) {
+                        cJSON_AddItemToObject(progress_obj, item->root_name, cJSON_CreateBool(true));
+                    } else {
+                        cJSON_AddItemToObject(progress_obj, item->root_name, cJSON_CreateNumber(item->progress));
+                    }
+                } else if (item->goal > 0) {
                     cJSON_AddItemToObject(progress_obj, item->root_name, cJSON_CreateNumber(item->progress));
+                } else {
+                    cJSON_AddItemToObject(progress_obj, item->root_name, cJSON_CreateBool(item->is_manually_completed));
                 }
-            } else if (item->goal > 0) {
-                // Normal Counter: Always save the number.
-                cJSON_AddItemToObject(progress_obj, item->root_name, cJSON_CreateNumber(item->progress));
-            } else {
-                // Simple Toggle: Save manual state only; auto-completion must not persist.
-                cJSON_AddItemToObject(progress_obj, item->root_name, cJSON_CreateBool(item->is_manually_completed));
             }
         }
 
-        // Update Stat Override Progress
-        cJSON *override_obj = get_or_create_object(root, "stat_progress_override");
-        for (int i = 0; i < td->stat_count; i++) {
-            TrackableCategory *stat_cat = td->stats[i];
+        // Update Stat Override Progress (per-UUID schema)
+        cJSON *override_root = get_or_create_object(root, "stat_progress_override");
+        cJSON *override_obj = settings_get_player_progress_subobj(override_root, local_uuid, local_uuid);
+        if (override_obj) {
+            for (int i = 0; i < td->stat_count; i++) {
+                TrackableCategory *stat_cat = td->stats[i];
 
-            // Delete old entry before adding new one
-            cJSON_DeleteItemFromObject(override_obj, stat_cat->root_name);
-            // Save if we are forcing it true, OR if an override key already exists (to update it to false)
-            if (stat_cat->is_manually_completed || cJSON_HasObjectItem(override_obj, stat_cat->root_name)) {
-                cJSON_AddItemToObject(override_obj, stat_cat->root_name,
-                                      cJSON_CreateBool(stat_cat->is_manually_completed));
-            }
+                cJSON_DeleteItemFromObject(override_obj, stat_cat->root_name);
+                if (stat_cat->is_manually_completed || cJSON_HasObjectItem(override_obj, stat_cat->root_name)) {
+                    cJSON_AddItemToObject(override_obj, stat_cat->root_name,
+                                          cJSON_CreateBool(stat_cat->is_manually_completed));
+                }
 
-            for (int j = 0; j < stat_cat->criteria_count; j++) {
-                TrackableItem *sub_stat = stat_cat->criteria[j];
-                char sub_stat_key[512];
-                snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name,
-                         sub_stat->root_name);
+                for (int j = 0; j < stat_cat->criteria_count; j++) {
+                    TrackableItem *sub_stat = stat_cat->criteria[j];
+                    char sub_stat_key[512];
+                    snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name,
+                             sub_stat->root_name);
 
-                // Delete old entry before adding new one
-                cJSON_DeleteItemFromObject(override_obj, sub_stat_key);
-                // Save if we are forcing it true, OR if an override key already exists (to update it to false)
-                if (sub_stat->is_manually_completed || cJSON_HasObjectItem(override_obj, sub_stat_key)) {
-                    cJSON_AddItemToObject(override_obj, sub_stat_key,
-                                          cJSON_CreateBool(sub_stat->is_manually_completed));
+                    cJSON_DeleteItemFromObject(override_obj, sub_stat_key);
+                    if (sub_stat->is_manually_completed || cJSON_HasObjectItem(override_obj, sub_stat_key)) {
+                        cJSON_AddItemToObject(override_obj, sub_stat_key,
+                                              cJSON_CreateBool(sub_stat->is_manually_completed));
+                    }
                 }
             }
         }

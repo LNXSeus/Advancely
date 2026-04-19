@@ -410,6 +410,14 @@ bool settings_load(AppSettings *settings);
 void settings_save(const AppSettings *settings, const TemplateData *td, SettingsSaveContext context);
 
 /**
+ * @brief Returns the per-UUID sub-object from a `custom_progress` or
+ * `stat_progress_override` parent object, migrating legacy flat schema in-place
+ * if primitive children are found (moves them under migration_uuid).
+ * Creates the sub-object if missing. Returns NULL on bad input.
+ */
+cJSON *settings_get_player_progress_subobj(cJSON *parent_obj, const char *uuid, const char *migration_uuid);
+
+/**
  * @brief Constructs the full paths to the template, language, snapshot JSON and notes TXT files. Does NOT CREATE the files or load them.
  *
  * Based on the version, category, and optional flag settings, this function

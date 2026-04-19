@@ -91,6 +91,7 @@ typedef struct {
     char parent_root_name[192]; // parent root_name for sub-stats (empty = top-level)
     int action; // CoopGoalModAction
     int value; // For SET_VALUE action
+    char source_uuid[48]; // UUID of the player whose per-player state this mod targets
 } CoopCustomGoalModMsg;
 
 #define COOP_MAX_CUSTOM_MODS 64

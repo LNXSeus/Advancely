@@ -767,10 +767,48 @@ static void tracker_reset_progress_on_world_change(Tracker *t, const AppSettings
 }
 
 
+// Read per-UUID settings sub-object with legacy-flat fallback.
+// Returns the uuid's subtree if present; otherwise returns the section root itself
+// when it looks like legacy-flat (has primitive children); otherwise nullptr.
+static cJSON *get_per_uuid_progress_obj(cJSON *settings_json, const char *section, const char *uuid) {
+    if (!settings_json || !section) return nullptr;
+    cJSON *section_obj = cJSON_GetObjectItem(settings_json, section);
+    if (!cJSON_IsObject(section_obj)) return nullptr;
+    if (uuid && uuid[0] != '\0') {
+        cJSON *sub = cJSON_GetObjectItem(section_obj, uuid);
+        if (cJSON_IsObject(sub)) return sub;
+    }
+    // Legacy fallback: if section has primitive children, treat it as flat schema.
+    for (cJSON *c = section_obj->child; c; c = c->next) {
+        if (!cJSON_IsObject(c)) return section_obj;
+    }
+    return nullptr;
+}
+
+// Returns the UUID currently shown in the dropdown, or nullptr for "All Players".
+static const char *tracker_current_view_uuid(const Tracker *t, const AppSettings *settings) {
+    if (!t || !settings) return nullptr;
+    int idx = t->selected_coop_player_idx;
+    if (idx < 0 || idx >= settings->coop_player_count) return nullptr;
+    return settings->coop_players[idx].uuid;
+}
+
+// Whether clicks on custom goals / stat checkboxes should mutate the viewed state.
+// Singleplayer: always. Coop All-Players view: always (edit routes to local UUID).
+// Coop specific-player view: only when the viewed UUID is the local player's.
+static bool tracker_view_editable_by_self(const Tracker *t, const AppSettings *settings) {
+    if (!t || !settings) return true;
+    if (settings->network_mode == NETWORK_SINGLEPLAYER) return true;
+    const char *view_uuid = tracker_current_view_uuid(t, settings);
+    if (!view_uuid) return true;
+    return settings->local_player.uuid[0] != '\0' &&
+           strcmp(view_uuid, settings->local_player.uuid) == 0;
+}
+
 /**
  * @brief (Era 1: 1.0-1.6.4) Parses legacy .dat stats files.
  */
-static void tracker_update_stats_legacy(Tracker *t, const cJSON *player_stats_json) {
+static void tracker_update_stats_legacy(Tracker *t, const cJSON *player_stats_json, const char *uuid) {
     if (!player_stats_json) return;
 
     cJSON *stats_change = cJSON_GetObjectItem(player_stats_json, "stats-change");
@@ -801,7 +839,7 @@ static void tracker_update_stats_legacy(Tracker *t, const cJSON *player_stats_js
     }
 
     cJSON *settings_json = cJSON_from_file(get_settings_file_path());
-    cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : nullptr;
+    cJSON *override_obj = get_per_uuid_progress_obj(settings_json, "stat_progress_override", uuid);
 
     t->template_data->play_time_ticks = 0;
     t->template_data->frozen_play_time_ticks = 0;
@@ -893,7 +931,7 @@ static void tracker_update_stats_legacy(Tracker *t, const cJSON *player_stats_js
 /**
  * @brief (Era 2: 1.7.2-1.11.2) Parses unified JSON with achievements and stats.
  */
-static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *player_stats_json) {
+static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *player_stats_json, const char *uuid) {
     if (!player_stats_json) return;
 
     t->template_data->advancements_completed_count = 0;
@@ -958,7 +996,7 @@ static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *p
 
     // Stats logic with sub-stats
     cJSON *settings_json = cJSON_from_file(get_settings_file_path());
-    cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : nullptr;
+    cJSON *override_obj = get_per_uuid_progress_obj(settings_json, "stat_progress_override", uuid);
 
     t->template_data->stats_completed_count = 0;
     t->template_data->stats_completed_criteria_count = 0;
@@ -1029,11 +1067,11 @@ static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *p
  * @brief (Era 2/3: 1.7.2-1.12.2) Parses mid-era flat JSON stats files.
  * Specifically used for 1.12-1.12.2 as it has modern advancements, but mid-era stats formats.
  */
-static void tracker_update_stats_mid(Tracker *t, const cJSON *player_stats_json, const cJSON *settings_json) {
+static void tracker_update_stats_mid(Tracker *t, const cJSON *player_stats_json, cJSON *settings_json, const char *uuid) {
     if (!player_stats_json) return;
 
     // Stats logic with sub-stats
-    cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : nullptr;
+    cJSON *override_obj = get_per_uuid_progress_obj(settings_json, "stat_progress_override", uuid);
 
     t->template_data->stats_completed_count = 0;
     t->template_data->stats_completed_criteria_count = 0;
@@ -1164,8 +1202,8 @@ static void tracker_update_advancements_modern(Tracker *t, const cJSON *player_a
 /**
  * @brief (Era 3: 1.12+) Updates stat progress from modern JSON files.
  */
-static void tracker_update_stats_modern(Tracker *t, const cJSON *player_stats_json, const cJSON *settings_json,
-                                        MC_Version version) {
+static void tracker_update_stats_modern(Tracker *t, const cJSON *player_stats_json, cJSON *settings_json,
+                                        MC_Version version, const char *uuid) {
     if (!player_stats_json) return;
 
     cJSON *stats_obj = cJSON_GetObjectItem(player_stats_json, "stats");
@@ -1183,7 +1221,7 @@ static void tracker_update_stats_modern(Tracker *t, const cJSON *player_stats_js
     }
 
     // Manually override the stat progress
-    cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : nullptr;
+    cJSON *override_obj = get_per_uuid_progress_obj(settings_json, "stat_progress_override", uuid);
 
     t->template_data->stats_completed_count = 0;
     t->template_data->stats_completed_criteria_count = 0;
@@ -2395,54 +2433,87 @@ static void tracker_update_unlock_progress(Tracker *t, const cJSON *player_unloc
  * @param t A pointer to the Tracker struct.
  * @param settings_json A pointer to the parsed settings.json cJSON object.
  */
-static void tracker_update_custom_progress(Tracker *t, cJSON *settings_json, const AppSettings *settings) {
-    (void) settings;
-    if (!settings_json) {
-        log_message(LOG_INFO, "[TRACKER] Failed to load or parse settings file.\n");
-
-        return;
-    }
-
-    cJSON *progress_obj = cJSON_GetObjectItem(settings_json, "custom_progress");
-    if (!cJSON_IsObject(progress_obj)) {
-        return; // NO custom progress saved yet, which is fine
-    }
-
-    // Iterate through the custom goals
+// Apply a single custom_progress subtree to the tracker's in-memory custom goal items.
+// When merge == true, booleans OR and counters SUM across multiple calls; caller must
+// reset items to defaults before the first call. When false, each call overwrites state.
+static void apply_custom_progress_subtree(Tracker *t, cJSON *progress_obj, bool merge) {
+    if (!progress_obj) return;
     for (int i = 0; i < t->template_data->custom_goal_count; i++) {
         TrackableItem *item = t->template_data->custom_goals[i];
-        cJSON *item_progress_json = cJSON_GetObjectItem(progress_obj, item->root_name);
-
-        // Reset state before each update
-        item->done = false;
-        item->is_manually_completed = false;
-        item->progress = 0;
+        cJSON *j = cJSON_GetObjectItem(progress_obj, item->root_name);
+        if (!j) continue;
 
         if (item->goal == -1) {
-            // INFINITE COUNTER WITH TARGET -1 and MANUAL OVERRIDE
-            if (cJSON_IsTrue(item_progress_json)) {
-                // Manually overridden to be complete
+            if (cJSON_IsTrue(j)) {
                 item->done = true;
                 item->is_manually_completed = true;
-                item->progress = 1; // Set progress to 1 for consistency
-            } else if (cJSON_IsNumber(item_progress_json)) {
-                // It's a counter, but can't be completed manually
-                item->progress = item_progress_json->valueint;
-                item->done = false;
+                if (item->progress < 1) item->progress = 1;
+            } else if (cJSON_IsNumber(j)) {
+                if (merge) item->progress += j->valueint;
+                else item->progress = j->valueint;
             }
         } else if (item->goal > 0) {
-            // Normal counter
-            if (cJSON_IsNumber(item_progress_json)) {
-                item->progress = item_progress_json->valueint;
+            if (cJSON_IsNumber(j)) {
+                if (merge) item->progress += j->valueint;
+                else item->progress = j->valueint;
             }
             item->done = (item->progress >= item->goal);
         } else {
-            // Simple toggle (target 0 or not set)
-            if (cJSON_IsTrue(item_progress_json)) {
+            if (cJSON_IsTrue(j)) {
                 item->done = true;
                 item->is_manually_completed = true;
-                item->progress = 1;
+                if (item->progress < 1) item->progress = 1;
             }
+        }
+    }
+}
+
+// uuid == nullptr (or empty) means "merge across all UUIDs in custom_progress" (used
+// for the host's All-Players view when coop_custom_goal_mode == ANY_PLAYER). Otherwise
+// read from the specific UUID's subtree (falling back to legacy flat schema).
+static void tracker_update_custom_progress(Tracker *t, cJSON *settings_json, const AppSettings *settings,
+                                           const char *uuid) {
+    (void) settings;
+
+    // Always reset items to defaults first so empty/missing data renders as blank.
+    for (int i = 0; i < t->template_data->custom_goal_count; i++) {
+        TrackableItem *item = t->template_data->custom_goals[i];
+        item->done = false;
+        item->is_manually_completed = false;
+        item->progress = 0;
+    }
+
+    if (!settings_json) {
+        log_message(LOG_INFO, "[TRACKER] Failed to load or parse settings file.\n");
+        return;
+    }
+
+    cJSON *section_obj = cJSON_GetObjectItem(settings_json, "custom_progress");
+    if (!cJSON_IsObject(section_obj)) return;
+
+    if (uuid && uuid[0] != '\0') {
+        cJSON *sub = cJSON_GetObjectItem(section_obj, uuid);
+        if (cJSON_IsObject(sub)) {
+            apply_custom_progress_subtree(t, sub, false);
+        } else {
+            // Legacy flat fallback: if section has any primitive children, treat as flat.
+            for (cJSON *c = section_obj->child; c; c = c->next) {
+                if (!cJSON_IsObject(c)) {
+                    apply_custom_progress_subtree(t, section_obj, false);
+                    break;
+                }
+            }
+        }
+    } else {
+        bool merged_any_subtree = false;
+        for (cJSON *child = section_obj->child; child; child = child->next) {
+            if (cJSON_IsObject(child)) {
+                apply_custom_progress_subtree(t, child, true);
+                merged_any_subtree = true;
+            }
+        }
+        if (!merged_any_subtree) {
+            apply_custom_progress_subtree(t, section_obj, false);
         }
     }
 }
@@ -3281,6 +3352,7 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     t->coop_merged_snapshot = nullptr;
     t->coop_merged_snapshot_size = 0;
     t->coop_view_dirty = 0;
+    t->coop_recv_resync_needed = 0;
 
 
     // Explicitly initialize all members
@@ -3926,8 +3998,46 @@ static void coop_finalize_multi_stage(TemplateData *td) {
  * @brief After merging all players' stat data, finalize stat completion status.
  * Applies manual overrides and determines done flags based on merged progress values.
  */
-static void coop_finalize_stats(TemplateData *td, const cJSON *settings_json) {
-    cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : nullptr;
+// Look up a stat override key ("root" or "root.criteria.sub") across one or many
+// per-UUID subtrees. When uuid is null/empty, returns true if ANY UUID subtree has
+// the key set true. Falls back to legacy-flat schema when no UUID subtrees exist.
+static bool stat_override_is_true(cJSON *section_obj, const char *uuid, const char *key) {
+    if (!section_obj || !cJSON_IsObject(section_obj) || !key) return false;
+
+    if (uuid && uuid[0] != '\0') {
+        cJSON *sub = cJSON_GetObjectItem(section_obj, uuid);
+        if (cJSON_IsObject(sub)) {
+            cJSON *v = cJSON_GetObjectItem(sub, key);
+            return cJSON_IsBool(v) && cJSON_IsTrue(v);
+        }
+        // Legacy-flat fallback.
+        for (cJSON *c = section_obj->child; c; c = c->next) {
+            if (!cJSON_IsObject(c)) {
+                cJSON *v = cJSON_GetObjectItem(section_obj, key);
+                return cJSON_IsBool(v) && cJSON_IsTrue(v);
+            }
+        }
+        return false;
+    }
+
+    // Merge mode: OR across all UUID subtrees.
+    bool had_subtree = false;
+    for (cJSON *child = section_obj->child; child; child = child->next) {
+        if (cJSON_IsObject(child)) {
+            had_subtree = true;
+            cJSON *v = cJSON_GetObjectItem(child, key);
+            if (cJSON_IsBool(v) && cJSON_IsTrue(v)) return true;
+        }
+    }
+    if (!had_subtree) {
+        cJSON *v = cJSON_GetObjectItem(section_obj, key);
+        return cJSON_IsBool(v) && cJSON_IsTrue(v);
+    }
+    return false;
+}
+
+static void coop_finalize_stats(TemplateData *td, cJSON *settings_json, const char *uuid) {
+    cJSON *section_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : nullptr;
 
     td->stats_completed_count = 0;
     td->stats_completed_criteria_count = 0;
@@ -3936,24 +4046,22 @@ static void coop_finalize_stats(TemplateData *td, const cJSON *settings_json) {
         TrackableCategory *stat_cat = td->stats[i];
         stat_cat->completed_criteria_count = 0;
 
-        cJSON *parent_override = override_obj ? cJSON_GetObjectItem(override_obj, stat_cat->root_name) : nullptr;
-        bool parent_forced_true = cJSON_IsBool(parent_override) && cJSON_IsTrue(parent_override);
+        bool parent_forced_true = stat_override_is_true(section_obj, uuid, stat_cat->root_name);
         stat_cat->is_manually_completed = parent_forced_true;
 
         for (int j = 0; j < stat_cat->criteria_count; j++) {
             TrackableItem *sub_stat = stat_cat->criteria[j];
             bool naturally_done = (sub_stat->goal > 0 && sub_stat->progress >= sub_stat->goal);
 
-            cJSON *sub_override;
+            bool sub_forced_true;
             if (stat_cat->criteria_count == 1) {
-                sub_override = parent_override;
+                sub_forced_true = parent_forced_true;
             } else {
                 char sub_stat_key[512];
                 snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s",
                          stat_cat->root_name, sub_stat->root_name);
-                sub_override = override_obj ? cJSON_GetObjectItem(override_obj, sub_stat_key) : nullptr;
+                sub_forced_true = stat_override_is_true(section_obj, uuid, sub_stat_key);
             }
-            bool sub_forced_true = cJSON_IsBool(sub_override) && cJSON_IsTrue(sub_override);
             sub_stat->is_manually_completed = sub_forced_true;
 
             sub_stat->done = naturally_done || sub_forced_true || parent_forced_true;
@@ -4034,30 +4142,31 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
     cJSON *settings_json = cJSON_from_file(get_settings_file_path());
 
     // Version-based Dispatch
+    const char *self_uuid = settings->local_player.uuid;
     if (version <= MC_VERSION_1_6_4) {
         // If StatsPerWorld mod is enabled, stats file is per-world, still using IDs
-        tracker_update_stats_legacy(t, player_stats_json);
+        tracker_update_stats_legacy(t, player_stats_json, self_uuid);
     } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_11_2) {
         // Mid-Era: 1.7.2 through 1.11.2
         // This function handles both achievements and stats for this range.
-        tracker_update_achievements_and_stats_mid(t, player_stats_json);
+        tracker_update_achievements_and_stats_mid(t, player_stats_json, self_uuid);
     } else if (version >= MC_VERSION_1_12 && version <= MC_VERSION_1_12_2) {
         // Hybrid Era: 1.12.x (Modern Advancements, Mid-era Stats)
         player_adv_json = (strlen(t->advancements_path) > 0) ? cJSON_from_file(t->advancements_path) : nullptr;
         tracker_update_advancements_modern(t, player_adv_json);
-        tracker_update_stats_mid(t, player_stats_json, settings_json); // Use the new stats-only function
+        tracker_update_stats_mid(t, player_stats_json, settings_json, self_uuid); // Use the new stats-only function
     } else if (version >= MC_VERSION_1_13) {
         // Modern Era: 1.13+
         player_adv_json = (strlen(t->advancements_path) > 0) ? cJSON_from_file(t->advancements_path) : nullptr;
         tracker_update_advancements_modern(t, player_adv_json);
 
         // Needs version for playtime as 1.17 renames minecraft:play_one_minute into minecraft:play_time
-        tracker_update_stats_modern(t, player_stats_json, settings_json, version);
+        tracker_update_stats_modern(t, player_stats_json, settings_json, version, self_uuid);
         tracker_update_unlock_progress(t, player_unlocks_json); // Just returns if unlocks don't exist
     }
 
     // Pass the parsed data to the update functions
-    tracker_update_custom_progress(t, settings_json, settings);
+    tracker_update_custom_progress(t, settings_json, settings, settings->local_player.uuid);
     tracker_update_multi_stage_progress(t, player_adv_json, player_stats_json, player_unlocks_json, version, settings);
     // Fixed-point iteration: run until no new completions occur (handles arbitrary-depth chains).
     // Counters participate so that stats/custom goals/counters can all link to counters.
@@ -4222,11 +4331,17 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
     cJSON *settings_json = cJSON_from_file(get_settings_file_path());
 
     coop_finalize_advancements(t->template_data);
-    coop_finalize_stats(t->template_data, settings_json);
+    // All-Players view: ANY_PLAYER => OR across all UUIDs; HOST_ONLY => host subtree only.
+    const char *stat_uuid = (settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_ANY_PLAYER)
+                                ? nullptr
+                                : settings->local_player.uuid;
+    coop_finalize_stats(t->template_data, settings_json, stat_uuid);
     coop_finalize_multi_stage(t->template_data);
 
-    // Custom goals: handled by host's settings.json (not merged from game files)
-    tracker_update_custom_progress(t, settings_json, settings);
+    const char *custom_uuid = (settings->coop_custom_goal_mode == COOP_CUSTOM_ANY_PLAYER)
+                                  ? nullptr
+                                  : settings->local_player.uuid;
+    tracker_update_custom_progress(t, settings_json, settings, custom_uuid);
 
     // Fixed-point iteration for linked goals
     {
@@ -4295,10 +4410,10 @@ void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, 
     cJSON *settings_json = cJSON_from_file(get_settings_file_path());
 
     coop_finalize_advancements(t->template_data);
-    coop_finalize_stats(t->template_data, settings_json);
+    coop_finalize_stats(t->template_data, settings_json, player->uuid);
     coop_finalize_multi_stage(t->template_data);
 
-    tracker_update_custom_progress(t, settings_json, settings);
+    tracker_update_custom_progress(t, settings_json, settings, player->uuid);
 
     {
         bool changed;
@@ -4320,103 +4435,105 @@ void tracker_apply_coop_mods(Tracker *t, const AppSettings *settings,
     if (!t || !t->template_data || !settings || mod_count <= 0) return;
 
     TemplateData *td = t->template_data;
-    bool any_applied = false;
+
+    // Persist each mod to the source player's per-UUID subtree in settings.json.
+    // We do NOT mutate template_data.progress/is_manually_completed here: template_data
+    // may be a merged/filtered view (e.g. "All Players" sum), so incrementing its
+    // progress and writing that back under source_uuid would corrupt per-player state.
+    // The caller forces a full update after this call, which re-reads settings.json
+    // and rebuilds merged + per-player snapshots correctly.
+    cJSON *root = cJSON_from_file(get_settings_file_path());
+    if (!root) root = cJSON_CreateObject();
+    if (!root) return;
 
     for (int m = 0; m < mod_count; m++) {
         const CoopCustomGoalModMsg *mod = &mods[m];
+        if (mod->source_uuid[0] == '\0') continue;
 
-        // Try custom goals first (parent_root_name is empty for custom goals)
+        // Classify: custom goal vs stat checkbox.
+        TrackableItem *cg_item = nullptr;
         if (mod->parent_root_name[0] == '\0') {
-            // Check custom goals
             for (int i = 0; i < td->custom_goal_count; i++) {
-                TrackableItem *item = td->custom_goals[i];
-                if (!item || strcmp(item->root_name, mod->goal_root_name) != 0) continue;
-
-                if (mod->action == COOP_MOD_TOGGLE) {
-                    item->is_manually_completed = !item->is_manually_completed;
-                    if (item->is_manually_completed) {
-                        item->done = true;
-                    } else {
-                        item->done = (item->linked_goal_count > 0 &&
-                                      check_linked_goals_satisfied(td, item->linked_goals,
-                                                                   item->linked_goal_count, item->linked_goal_mode));
-                    }
-                    item->progress = item->done ? 1 : 0;
-                    any_applied = true;
-                } else if (mod->action == COOP_MOD_INCREMENT) {
-                    item->progress++;
-                    item->done = (item->goal > 0 && item->progress >= item->goal);
-                    any_applied = true;
-                } else if (mod->action == COOP_MOD_DECREMENT) {
-                    item->progress--;
-                    item->done = (item->goal > 0 && item->progress >= item->goal);
-                    any_applied = true;
-                }
-                break;
-            }
-
-            // Check parent stat categories (toggle parent checkbox)
-            for (int s = 0; s < td->stat_count; s++) {
-                TrackableCategory *cat = td->stats[s];
-                if (!cat || strcmp(cat->root_name, mod->goal_root_name) != 0) continue;
-
-                if (mod->action == COOP_MOD_TOGGLE) {
-                    cat->is_manually_completed = !cat->is_manually_completed;
-
-                    // Recalculate children FIRST so completed_criteria_count is correct
-                    for (int j = 0; j < cat->criteria_count; j++) {
-                        TrackableItem *crit = cat->criteria[j];
-                        bool crit_naturally_done = (crit->goal > 0 && crit->progress >= crit->goal);
-                        crit->done = cat->is_manually_completed || crit->is_manually_completed || crit_naturally_done;
-                    }
-                    cat->completed_criteria_count = 0;
-                    for (int k = 0; k < cat->criteria_count; k++) {
-                        if (cat->criteria[k]->done) cat->completed_criteria_count++;
-                    }
-
-                    // Now calculate parent done based on updated children
-                    bool all_children_done = (cat->criteria_count > 0 &&
-                                              cat->completed_criteria_count >= cat->criteria_count);
-                    cat->done = cat->is_manually_completed || all_children_done;
-                    any_applied = true;
-                }
-                break;
-            }
-        } else {
-            // Sub-stat checkbox toggle: find parent, then child
-            for (int s = 0; s < td->stat_count; s++) {
-                TrackableCategory *cat = td->stats[s];
-                if (!cat || strcmp(cat->root_name, mod->parent_root_name) != 0) continue;
-
-                for (int j = 0; j < cat->criteria_count; j++) {
-                    TrackableItem *crit = cat->criteria[j];
-                    if (!crit || strcmp(crit->root_name, mod->goal_root_name) != 0) continue;
-
-                    if (mod->action == COOP_MOD_TOGGLE) {
-                        crit->is_manually_completed = !crit->is_manually_completed;
-                        bool crit_naturally_done = (crit->goal > 0 && crit->progress >= crit->goal);
-                        crit->done = crit->is_manually_completed || crit_naturally_done;
-
-                        cat->completed_criteria_count = 0;
-                        for (int k = 0; k < cat->criteria_count; k++) {
-                            if (cat->criteria[k]->done) cat->completed_criteria_count++;
-                        }
-                        bool all_children_done = (cat->criteria_count > 0 &&
-                                                  cat->completed_criteria_count >= cat->criteria_count);
-                        cat->done = cat->is_manually_completed || all_children_done;
-                        any_applied = true;
-                    }
+                TrackableItem *it = td->custom_goals[i];
+                if (it && strcmp(it->root_name, mod->goal_root_name) == 0) {
+                    cg_item = it;
                     break;
                 }
-                break;
             }
+        }
+        bool is_custom_goal = (cg_item != nullptr);
+
+        const char *section = is_custom_goal ? "custom_progress" : "stat_progress_override";
+        cJSON *section_root = cJSON_GetObjectItem(root, section);
+        if (!cJSON_IsObject(section_root)) {
+            cJSON_DeleteItemFromObject(root, section);
+            section_root = cJSON_AddObjectToObject(root, section);
+        }
+        cJSON *uuid_obj = settings_get_player_progress_subobj(
+            section_root, mod->source_uuid, settings->local_player.uuid);
+        if (!uuid_obj) continue;
+
+        if (is_custom_goal) {
+            // Read the source player's previous value, apply the action, write back.
+            cJSON *prev = cJSON_GetObjectItem(uuid_obj, mod->goal_root_name);
+            if (cg_item->goal == -1) {
+                // Target -1: number counter with optional manual-complete override.
+                if (mod->action == COOP_MOD_TOGGLE) {
+                    bool prev_bool = cJSON_IsBool(prev) && cJSON_IsTrue(prev);
+                    cJSON_DeleteItemFromObject(uuid_obj, mod->goal_root_name);
+                    cJSON_AddItemToObject(uuid_obj, mod->goal_root_name, cJSON_CreateBool(!prev_bool));
+                } else {
+                    int cur = cJSON_IsNumber(prev) ? prev->valueint : 0;
+                    int nv = (mod->action == COOP_MOD_INCREMENT) ? cur + 1 : cur - 1;
+                    cJSON_DeleteItemFromObject(uuid_obj, mod->goal_root_name);
+                    cJSON_AddItemToObject(uuid_obj, mod->goal_root_name, cJSON_CreateNumber(nv));
+                }
+            } else if (cg_item->goal > 0) {
+                // Bounded counter.
+                int cur = cJSON_IsNumber(prev) ? prev->valueint : 0;
+                int nv = cur;
+                if (mod->action == COOP_MOD_INCREMENT) nv = cur + 1;
+                else if (mod->action == COOP_MOD_DECREMENT) nv = cur - 1;
+                cJSON_DeleteItemFromObject(uuid_obj, mod->goal_root_name);
+                cJSON_AddItemToObject(uuid_obj, mod->goal_root_name, cJSON_CreateNumber(nv));
+            } else {
+                // Simple toggle.
+                if (mod->action == COOP_MOD_TOGGLE) {
+                    bool prev_bool = cJSON_IsBool(prev) && cJSON_IsTrue(prev);
+                    cJSON_DeleteItemFromObject(uuid_obj, mod->goal_root_name);
+                    cJSON_AddItemToObject(uuid_obj, mod->goal_root_name, cJSON_CreateBool(!prev_bool));
+                }
+            }
+        } else {
+            // Stat checkbox: toggle the stored boolean for this player+key.
+            if (mod->action != COOP_MOD_TOGGLE) continue;
+            char key[512];
+            if (mod->parent_root_name[0] != '\0') {
+                snprintf(key, sizeof(key), "%s.criteria.%s",
+                         mod->parent_root_name, mod->goal_root_name);
+            } else {
+                snprintf(key, sizeof(key), "%s", mod->goal_root_name);
+            }
+            cJSON *prev = cJSON_GetObjectItem(uuid_obj, key);
+            bool prev_bool = cJSON_IsBool(prev) && cJSON_IsTrue(prev);
+            cJSON_DeleteItemFromObject(uuid_obj, key);
+            cJSON_AddItemToObject(uuid_obj, key, cJSON_CreateBool(!prev_bool));
         }
     }
 
-    if (any_applied) {
-        SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
-        settings_save(settings, td, SAVE_CONTEXT_ALL);
+    SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
+    FILE *file = fopen(get_settings_file_path(), "w");
+    if (file) {
+        char *json_str = cJSON_Print(root);
+        if (json_str) {
+            fputs(json_str, file);
+            free(json_str);
+        }
+        fclose(file);
+    } else {
+        log_message(LOG_ERROR, "[TRACKER] Failed to open settings file for coop mod write.\n");
     }
+    cJSON_Delete(root);
 }
 
 // UNUSED
@@ -6032,6 +6149,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                 draw_list->AddLine(p2, p3, checkmark_color, 2.0f * t->zoom_level);
                             }
 
+                            bool view_editable_self = tracker_view_editable_by_self(t, settings);
                             // Co-op: Show tooltip for host-only stat checkboxes
                             if (is_hovered && settings->network_mode == NETWORK_RECEIVER &&
                                 settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY) {
@@ -6039,12 +6157,17 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                 snprintf(tooltip_buf, sizeof(tooltip_buf),
                                          "Stat checkboxes are set to Host Only.");
                                 ImGui::SetTooltip("%s", tooltip_buf);
+                            } else if (is_hovered && !view_editable_self) {
+                                char tooltip_buf[160];
+                                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                         "Read-only: viewing another player. Select 'All Players' or your own name to edit.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
                             }
 
                             // Deactivating left click when in visual editing mode
                             // Co-op: Receivers respect stat checkbox permission
                             if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->
-                                is_visual_layout_editing) {
+                                is_visual_layout_editing && view_editable_self) {
                                 bool rcv_in_lobby = (settings->network_mode == NETWORK_RECEIVER &&
                                     g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
                                 if (rcv_in_lobby &&
@@ -6057,9 +6180,22 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                     snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", crit->root_name);
                                     snprintf(mod.parent_root_name, sizeof(mod.parent_root_name), "%s", cat->root_name);
                                     mod.action = COOP_MOD_TOGGLE;
+                                    snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", settings->local_player.uuid);
                                     coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
+                                } else if (settings->network_mode == NETWORK_HOST &&
+                                           g_coop_ctx &&
+                                           coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING) {
+                                    // Host in coop: route through per-UUID persistence so the
+                                    // toggle lands under host's subtree (not the merged view).
+                                    CoopCustomGoalModMsg mod = {};
+                                    snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", crit->root_name);
+                                    snprintf(mod.parent_root_name, sizeof(mod.parent_root_name), "%s", cat->root_name);
+                                    mod.action = COOP_MOD_TOGGLE;
+                                    snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", settings->local_player.uuid);
+                                    tracker_apply_coop_mods(t, settings, &mod, 1);
+                                    SDL_SetAtomicInt(&g_needs_update, 1);
                                 } else {
-                                    // Host or singleplayer: toggle locally
+                                    // Singleplayer: toggle locally
                                     crit->is_manually_completed = !crit->is_manually_completed;
                                     bool crit_naturally_done = (crit->goal > 0 && crit->progress >= crit->goal);
                                     crit->done = crit->is_manually_completed || crit_naturally_done;
@@ -6290,6 +6426,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         draw_list->AddLine(p2, p3, checkmark_color, 2.0f * t->zoom_level);
                     }
 
+                    bool view_editable_self_p = tracker_view_editable_by_self(t, settings);
                     // Co-op: Show tooltip for host-only stat checkboxes
                     if (is_hovered_parent && settings->network_mode == NETWORK_RECEIVER &&
                         settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY) {
@@ -6297,12 +6434,17 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         snprintf(tooltip_buf, sizeof(tooltip_buf),
                                  "Stat checkboxes are set to Host Only.");
                         ImGui::SetTooltip("%s", tooltip_buf);
+                    } else if (is_hovered_parent && !view_editable_self_p) {
+                        char tooltip_buf[160];
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Read-only: viewing another player. Select 'All Players' or your own name to edit.");
+                        ImGui::SetTooltip("%s", tooltip_buf);
                     }
 
                     // Deactivating left click when in visual editing mode
                     // Co-op: Receivers respect stat checkbox permission
                     if (is_hovered_parent && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->
-                        is_visual_layout_editing) {
+                        is_visual_layout_editing && view_editable_self_p) {
                         bool rcv_in_lobby = (settings->network_mode == NETWORK_RECEIVER &&
                             g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
                         if (rcv_in_lobby &&
@@ -6315,9 +6457,20 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", cat->root_name);
                             mod.parent_root_name[0] = '\0';
                             mod.action = COOP_MOD_TOGGLE;
+                            snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", settings->local_player.uuid);
                             coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
+                        } else if (settings->network_mode == NETWORK_HOST &&
+                                   g_coop_ctx &&
+                                   coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING) {
+                            CoopCustomGoalModMsg mod = {};
+                            snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", cat->root_name);
+                            mod.parent_root_name[0] = '\0';
+                            mod.action = COOP_MOD_TOGGLE;
+                            snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", settings->local_player.uuid);
+                            tracker_apply_coop_mods(t, settings, &mod, 1);
+                            SDL_SetAtomicInt(&g_needs_update, 1);
                         } else {
-                            // Host or singleplayer: toggle locally
+                            // Singleplayer: toggle locally
                             cat->is_manually_completed = !cat->is_manually_completed;
 
                             // Recalculate children FIRST so completed_criteria_count is correct
@@ -7302,15 +7455,22 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 // Co-op: Show tooltip for host-only custom goals
                 bool rcv_in_lobby = (settings->network_mode == NETWORK_RECEIVER &&
                     g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+                bool view_editable_self_cg = tracker_view_editable_by_self(t, settings);
                 if (is_hovered && rcv_in_lobby &&
                     settings->coop_custom_goal_mode == COOP_CUSTOM_HOST_ONLY) {
                     char tooltip_buf[128];
                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                              "Custom goals are set to Host Only.");
                     ImGui::SetTooltip("%s", tooltip_buf);
+                } else if (is_hovered && !view_editable_self_cg) {
+                    char tooltip_buf[160];
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Read-only: viewing another player. Select 'All Players' or your own name to edit.");
+                    ImGui::SetTooltip("%s", tooltip_buf);
                 }
 
-                if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->is_visual_layout_editing) {
+                if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->is_visual_layout_editing &&
+                    view_editable_self_cg) {
                     if (rcv_in_lobby &&
                         settings->coop_custom_goal_mode == COOP_CUSTOM_HOST_ONLY) {
                         // Host-only mode: clicking disabled for receivers
@@ -7321,9 +7481,20 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                         snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", item->root_name);
                         mod.parent_root_name[0] = '\0';
                         mod.action = COOP_MOD_TOGGLE;
+                        snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", settings->local_player.uuid);
                         coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
+                    } else if (settings->network_mode == NETWORK_HOST &&
+                               g_coop_ctx &&
+                               coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING) {
+                        CoopCustomGoalModMsg mod = {};
+                        snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", item->root_name);
+                        mod.parent_root_name[0] = '\0';
+                        mod.action = COOP_MOD_TOGGLE;
+                        snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", settings->local_player.uuid);
+                        tracker_apply_coop_mods(t, settings, &mod, 1);
+                        SDL_SetAtomicInt(&g_needs_update, 1);
                     } else {
-                        // Host or singleplayer: toggle locally
+                        // Singleplayer: toggle locally
                         item->is_manually_completed = !item->is_manually_completed;
                         if (item->is_manually_completed) {
                             item->done = true;
@@ -7336,7 +7507,6 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                         item->progress = item->done ? 1 : 0;
                         SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
                         settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
-                        // Lightweight broadcast path: no full file re-merge needed for custom goals
                         SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
                         SDL_SetAtomicInt(&g_game_data_changed, 1);
                     }
@@ -9485,10 +9655,15 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                 ImGui::EndCombo();
             }
             if (ImGui::IsItemHovered()) {
-                char tooltip_buf[256];
+                char tooltip_buf[768];
                 snprintf(tooltip_buf, sizeof(tooltip_buf),
                          "View progress for a specific player or all players combined.\n"
-                         "'All Players' shows the merged Co-op progress.");
+                         "'All Players' shows the merged Co-op progress across everyone.\n"
+                         "\n"
+                         "Custom goals and manual stat checkboxes are per-player:\n"
+                         " - 'All Players': booleans OR, counters sum (when merge mode is 'Any Player').\n"
+                         " - Your own name: your own state, fully editable.\n"
+                         " - Another player's name: read-only view of their state.");
                 ImGui::SetTooltip("%s", tooltip_buf);
             }
         } else {
@@ -10840,68 +11015,119 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
 
     bool save_needed = false; // FLAG: Only write to disk if data ACTUALLY changed
 
-    // Sync custom_progress
-    cJSON *old_custom_progress = cJSON_GetObjectItem(settings_root, "custom_progress");
-    cJSON *new_custom_progress = cJSON_CreateObject();
-    for (int i = 0; i < t->template_data->custom_goal_count; i++) {
-        TrackableItem *item = t->template_data->custom_goals[i];
-        cJSON *old_item = old_custom_progress ? cJSON_GetObjectItem(old_custom_progress, item->root_name) : nullptr;
-        if (old_item) {
-            // Preserve old value if it exists
-            cJSON_AddItemToObject(new_custom_progress, item->root_name, cJSON_Duplicate(old_item, 1));
-        } else {
-            // Add new item with default value
-            if (item->goal > 0 || item->goal == -1) cJSON_AddNumberToObject(new_custom_progress, item->root_name, 0);
-            else cJSON_AddBoolToObject(new_custom_progress, item->root_name, false);
-        }
-    }
+    // Sync custom_progress — per-UUID schema. Iterate each player's subtree and
+    // sync their goal entries against the current template. Preserve existing
+    // values; insert defaults for newly added goals. Legacy-flat input (primitive
+    // children under "custom_progress") is migrated under the host's UUID.
+    {
+        cJSON *old_custom_progress = cJSON_GetObjectItem(settings_root, "custom_progress");
+        cJSON *new_custom_progress = cJSON_CreateObject();
+        const char *host_uuid = settings->local_player.uuid;
 
-    // Compare before replacing
-    if (json_objects_differ(old_custom_progress, new_custom_progress)) {
-        cJSON_ReplaceItemInObject(settings_root, "custom_progress", new_custom_progress);
-        save_needed = true;
-    } else {
-        cJSON_Delete(new_custom_progress); // Clean up unused new object
-    }
-
-    // Sync stat_progress_override
-    cJSON *old_stat_override = cJSON_GetObjectItem(settings_root, "stat_progress_override");
-    cJSON *new_stat_override = cJSON_CreateObject();
-    for (int i = 0; i < t->template_data->stat_count; i++) {
-        TrackableCategory *stat_cat = t->template_data->stats[i];
-        cJSON *old_cat_item = old_stat_override ? cJSON_GetObjectItem(old_stat_override, stat_cat->root_name) : nullptr;
-
-        // Always add the parent entry (e.g., "stat_cat:mine_more_sand")
-        if (old_cat_item)
-            cJSON_AddItemToObject(new_stat_override, stat_cat->root_name,
-                                  cJSON_Duplicate(old_cat_item, 1));
-        else cJSON_AddBoolToObject(new_stat_override, stat_cat->root_name, false);
-
-        // Only add ".criteria." entries if the template defines multiple sub-stats for this category.
-        if (stat_cat->criteria_count > 1) {
-            for (int j = 0; j < stat_cat->criteria_count; j++) {
-                TrackableItem *sub_stat = stat_cat->criteria[j];
-                char sub_stat_key[512];
-                // Use the sub-stat's actual root_name for the key
-                snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s", stat_cat->root_name,
-                         sub_stat->root_name);
-                cJSON *old_sub_item = old_stat_override
-                                          ? cJSON_GetObjectItem(old_stat_override, sub_stat_key)
-                                          : nullptr;
-                if (old_sub_item)
-                    cJSON_AddItemToObject(new_stat_override, sub_stat_key,
-                                          cJSON_Duplicate(old_sub_item, 1));
-                else cJSON_AddBoolToObject(new_stat_override, sub_stat_key, false);
+        bool old_is_flat = false;
+        if (old_custom_progress) {
+            for (cJSON *c = old_custom_progress->child; c; c = c->next) {
+                if (!cJSON_IsObject(c)) { old_is_flat = true; break; }
             }
         }
+
+        auto build_uuid_subtree = [&](cJSON *old_subtree) {
+            cJSON *new_sub = cJSON_CreateObject();
+            for (int i = 0; i < t->template_data->custom_goal_count; i++) {
+                TrackableItem *item = t->template_data->custom_goals[i];
+                cJSON *old_item = old_subtree ? cJSON_GetObjectItem(old_subtree, item->root_name) : nullptr;
+                if (old_item) {
+                    cJSON_AddItemToObject(new_sub, item->root_name, cJSON_Duplicate(old_item, 1));
+                } else if (item->goal > 0 || item->goal == -1) {
+                    cJSON_AddNumberToObject(new_sub, item->root_name, 0);
+                } else {
+                    cJSON_AddBoolToObject(new_sub, item->root_name, false);
+                }
+            }
+            return new_sub;
+        };
+
+        if (old_is_flat && host_uuid && host_uuid[0]) {
+            // Wrap legacy flat values under host UUID.
+            cJSON_AddItemToObject(new_custom_progress, host_uuid, build_uuid_subtree(old_custom_progress));
+        } else if (old_custom_progress) {
+            for (cJSON *uuid_sub = old_custom_progress->child; uuid_sub; uuid_sub = uuid_sub->next) {
+                if (!cJSON_IsObject(uuid_sub) || !uuid_sub->string) continue;
+                cJSON_AddItemToObject(new_custom_progress, uuid_sub->string, build_uuid_subtree(uuid_sub));
+            }
+        }
+        // Ensure host's own subtree exists so the app has a place to write its own progress.
+        if (host_uuid && host_uuid[0] && !cJSON_GetObjectItem(new_custom_progress, host_uuid)) {
+            cJSON_AddItemToObject(new_custom_progress, host_uuid, build_uuid_subtree(nullptr));
+        }
+
+        if (json_objects_differ(old_custom_progress, new_custom_progress)) {
+            cJSON_ReplaceItemInObject(settings_root, "custom_progress", new_custom_progress);
+            save_needed = true;
+        } else {
+            cJSON_Delete(new_custom_progress);
+        }
     }
 
-    // Compare before replacing
-    if (json_objects_differ(old_stat_override, new_stat_override)) {
-        cJSON_ReplaceItemInObject(settings_root, "stat_progress_override", new_stat_override);
-        save_needed = true;
-    } else {
-        cJSON_Delete(new_stat_override);
+    // Sync stat_progress_override — per-UUID schema, same pattern as custom_progress.
+    {
+        cJSON *old_stat_override = cJSON_GetObjectItem(settings_root, "stat_progress_override");
+        cJSON *new_stat_override = cJSON_CreateObject();
+        const char *host_uuid = settings->local_player.uuid;
+
+        bool old_is_flat = false;
+        if (old_stat_override) {
+            for (cJSON *c = old_stat_override->child; c; c = c->next) {
+                if (!cJSON_IsObject(c)) { old_is_flat = true; break; }
+            }
+        }
+
+        auto build_uuid_subtree = [&](cJSON *old_subtree) {
+            cJSON *new_sub = cJSON_CreateObject();
+            for (int i = 0; i < t->template_data->stat_count; i++) {
+                TrackableCategory *stat_cat = t->template_data->stats[i];
+                cJSON *old_cat_item = old_subtree ? cJSON_GetObjectItem(old_subtree, stat_cat->root_name) : nullptr;
+                if (old_cat_item) {
+                    cJSON_AddItemToObject(new_sub, stat_cat->root_name, cJSON_Duplicate(old_cat_item, 1));
+                } else {
+                    cJSON_AddBoolToObject(new_sub, stat_cat->root_name, false);
+                }
+                if (stat_cat->criteria_count > 1) {
+                    for (int j = 0; j < stat_cat->criteria_count; j++) {
+                        TrackableItem *sub_stat = stat_cat->criteria[j];
+                        char sub_stat_key[512];
+                        snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s",
+                                 stat_cat->root_name, sub_stat->root_name);
+                        cJSON *old_sub_item = old_subtree ? cJSON_GetObjectItem(old_subtree, sub_stat_key) : nullptr;
+                        if (old_sub_item) {
+                            cJSON_AddItemToObject(new_sub, sub_stat_key, cJSON_Duplicate(old_sub_item, 1));
+                        } else {
+                            cJSON_AddBoolToObject(new_sub, sub_stat_key, false);
+                        }
+                    }
+                }
+            }
+            return new_sub;
+        };
+
+        if (old_is_flat && host_uuid && host_uuid[0]) {
+            cJSON_AddItemToObject(new_stat_override, host_uuid, build_uuid_subtree(old_stat_override));
+        } else if (old_stat_override) {
+            for (cJSON *uuid_sub = old_stat_override->child; uuid_sub; uuid_sub = uuid_sub->next) {
+                if (!cJSON_IsObject(uuid_sub) || !uuid_sub->string) continue;
+                cJSON_AddItemToObject(new_stat_override, uuid_sub->string, build_uuid_subtree(uuid_sub));
+            }
+        }
+        if (host_uuid && host_uuid[0] && !cJSON_GetObjectItem(new_stat_override, host_uuid)) {
+            cJSON_AddItemToObject(new_stat_override, host_uuid, build_uuid_subtree(nullptr));
+        }
+
+        if (json_objects_differ(old_stat_override, new_stat_override)) {
+            cJSON_ReplaceItemInObject(settings_root, "stat_progress_override", new_stat_override);
+            save_needed = true;
+        } else {
+            cJSON_Delete(new_stat_override);
+        }
     }
 
     // Sync hotkeys, matching by target_goal (root_name). The on-disk array is
@@ -11207,7 +11433,7 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
     if (!t || !t->template_data) return;
 
     cJSON *settings_json = cJSON_from_file(get_settings_file_path());
-    cJSON *override_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : nullptr;
+    cJSON *override_obj = get_per_uuid_progress_obj(settings_json, "stat_progress_override", settings->local_player.uuid);
 
     // Also load the current game version used
     MC_Version version = settings_get_version_from_string(settings->version_str);

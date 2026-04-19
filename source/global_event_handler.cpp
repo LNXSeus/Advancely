@@ -71,8 +71,21 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                                      g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
                 bool coop_hotkeys_blocked = (rcv_in_lobby &&
                                              app_settings->coop_custom_goal_mode == COOP_CUSTOM_HOST_ONLY);
+
+                // Viewer-is-self gate: hotkeys only mutate state when the dropdown shows
+                // your own view or "All Players". Viewing another specific player is read-only.
+                bool view_is_self_or_all = true;
+                if (t && app_settings->network_mode != NETWORK_SINGLEPLAYER) {
+                    int sel = t->selected_coop_player_idx;
+                    if (sel >= 0 && sel < app_settings->coop_player_count) {
+                        const char *view_uuid = app_settings->coop_players[sel].uuid;
+                        view_is_self_or_all = (app_settings->local_player.uuid[0] != '\0' &&
+                                               strcmp(view_uuid, app_settings->local_player.uuid) == 0);
+                    }
+                }
+
                 if (t && t->template_data && t->template_data->custom_goals &&
-                    !t->is_visual_layout_editing && !coop_hotkeys_blocked) {
+                    !t->is_visual_layout_editing && !coop_hotkeys_blocked && view_is_self_or_all) {
                     for (int i = 0; i < app_settings->hotkey_count; i++) {
                         HotkeyBinding *hb = &app_settings->hotkeys[i];
                         TrackableItem *target_goal = nullptr;
@@ -107,23 +120,41 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                                          "%s", target_goal->root_name);
                                 mod.parent_root_name[0] = '\0';
                                 mod.action = mod_action;
+                                snprintf(mod.source_uuid, sizeof(mod.source_uuid),
+                                         "%s", app_settings->local_player.uuid);
                                 coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
                             } else {
-                                // Host or singleplayer: modify locally
-                                if (mod_action == COOP_MOD_INCREMENT) {
-                                    target_goal->progress++;
+                                bool host_in_lobby = (app_settings->network_mode == NETWORK_HOST &&
+                                                      g_coop_ctx &&
+                                                      coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING);
+                                if (host_in_lobby) {
+                                    // Route host's own hotkey through the same per-UUID persistence
+                                    // path used for receiver mods, so host's increments only affect
+                                    // host's subtree (not the merged view stored in template_data).
+                                    CoopCustomGoalModMsg mod = {};
+                                    snprintf(mod.goal_root_name, sizeof(mod.goal_root_name),
+                                             "%s", target_goal->root_name);
+                                    mod.parent_root_name[0] = '\0';
+                                    mod.action = mod_action;
+                                    snprintf(mod.source_uuid, sizeof(mod.source_uuid),
+                                             "%s", app_settings->local_player.uuid);
+                                    tracker_apply_coop_mods(t, app_settings, &mod, 1);
+                                    SDL_SetAtomicInt(&g_needs_update, 1);
                                 } else {
-                                    target_goal->progress--;
+                                    // Singleplayer: direct in-memory mutation + save.
+                                    if (mod_action == COOP_MOD_INCREMENT) {
+                                        target_goal->progress++;
+                                    } else {
+                                        target_goal->progress--;
+                                    }
+                                    if (target_goal->goal > 0) {
+                                        target_goal->done = (target_goal->progress >= target_goal->goal);
+                                    }
+                                    SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
+                                    settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
+                                    SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
+                                    SDL_SetAtomicInt(&g_game_data_changed, 1);
                                 }
-                                // Recalculate done state immediately so the background
-                                // texture updates this frame (not deferred to file re-read)
-                                if (target_goal->goal > 0) {
-                                    target_goal->done = (target_goal->progress >= target_goal->goal);
-                                }
-                                SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
-                                settings_save(app_settings, t->template_data, SAVE_CONTEXT_ALL);
-                                SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
-                                SDL_SetAtomicInt(&g_game_data_changed, 1);
                             }
                             break;
                         }

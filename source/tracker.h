@@ -129,6 +129,7 @@ struct Tracker {
     char *coop_merged_snapshot;
     size_t coop_merged_snapshot_size;
     int coop_view_dirty; // set when the dropdown changes; main loop re-applies the cached snapshot
+    int coop_recv_resync_needed; // receiver: set after template reinit to force re-apply of cached recv snapshots
 
     // --- Fonts ---
     ImFont *roboto_font; // ImGui font for the settings window UI. Now loaded from ui_font_name.
