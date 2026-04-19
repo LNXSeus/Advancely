@@ -709,19 +709,34 @@ static int SDLCALL host_thread_func(void *data) {
                                             ctx->clients[i].label);
                             } else {
                                 // Check for duplicate UUID
-                                bool duplicate = (strcmp(req_uuid, ctx->host_uuid) == 0);
-                                if (!duplicate) {
+                                bool duplicate_uuid = (strcmp(req_uuid, ctx->host_uuid) == 0);
+                                if (!duplicate_uuid) {
                                     for (int j = 0; j < COOP_MAX_CLIENTS; j++) {
                                         if (j == i || !ctx->clients[j].active) continue;
                                         if (ctx->clients[j].uuid[0] != '\0' &&
                                             strcmp(ctx->clients[j].uuid, req_uuid) == 0) {
-                                            duplicate = true;
+                                            duplicate_uuid = true;
                                             break;
                                         }
                                     }
                                 }
 
-                                if (duplicate) {
+                                // Check for duplicate username (case-insensitive). UUID remains the
+                                // primary identity, but unique usernames are required so per-player
+                                // snapshot files and UI labels don't collide.
+                                bool duplicate_username = (strcasecmp(req_username, ctx->host_username) == 0);
+                                if (!duplicate_uuid && !duplicate_username) {
+                                    for (int j = 0; j < COOP_MAX_CLIENTS; j++) {
+                                        if (j == i || !ctx->clients[j].active) continue;
+                                        if (ctx->clients[j].username[0] != '\0' &&
+                                            strcasecmp(ctx->clients[j].username, req_username) == 0) {
+                                            duplicate_username = true;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (duplicate_uuid) {
                                     const char *reason = "A player with this UUID is already in the lobby";
                                     send_message(ctx->clients[i].socket_fd, COOP_MSG_JOIN_REJECT,
                                                  reason, (uint32_t) strlen(reason));
@@ -729,6 +744,14 @@ static int SDLCALL host_thread_func(void *data) {
                                     ctx->clients[i].active = false;
                                     log_message(LOG_INFO, "[COOP NET] Rejected %s: duplicate UUID %s.\n",
                                                 ctx->clients[i].label, req_uuid);
+                                } else if (duplicate_username) {
+                                    const char *reason = "Username already in lobby";
+                                    send_message(ctx->clients[i].socket_fd, COOP_MSG_JOIN_REJECT,
+                                                 reason, (uint32_t) strlen(reason));
+                                    graceful_close_socket(&ctx->clients[i].socket_fd);
+                                    ctx->clients[i].active = false;
+                                    log_message(LOG_INFO, "[COOP NET] Rejected %s: duplicate username '%s'.\n",
+                                                ctx->clients[i].label, req_username);
                                 } else {
                                     // Store identity, add to pending approval queue
                                     strncpy(ctx->clients[i].username, req_username,
