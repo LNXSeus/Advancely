@@ -6150,17 +6150,42 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             }
 
                             bool view_editable_self = tracker_view_editable_by_self(t, settings);
-                            // Co-op: Show tooltip for host-only stat checkboxes
-                            if (is_hovered && settings->network_mode == NETWORK_RECEIVER &&
-                                settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY) {
-                                char tooltip_buf[128];
-                                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                         "Stat checkboxes are set to Host Only.");
-                                ImGui::SetTooltip("%s", tooltip_buf);
-                            } else if (is_hovered && !view_editable_self) {
-                                char tooltip_buf[160];
-                                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                         "Read-only: viewing another player. Select 'All Players' or your own name to edit.");
+                            bool rcv_host_only_stat = (settings->network_mode == NETWORK_RECEIVER &&
+                                                       settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY);
+                            if (is_hovered) {
+                                static Uint32 s_last_log_stat_sub = 0;
+                                Uint32 now_sub = SDL_GetTicks();
+                                if (now_sub - s_last_log_stat_sub > 1000) {
+                                    s_last_log_stat_sub = now_sub;
+                                    CoopNetState st_sub = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
+                                    const char *view_uuid_sub = tracker_current_view_uuid(t, settings);
+                                    log_message(LOG_ERROR,
+                                                "[TOOLTIP-DEBUG STAT-SUB] crit=%s net_mode=%d coop_state=%d "
+                                                "stat_checkbox=%d view_editable_self=%d rcv_host_only=%d "
+                                                "view_uuid=%s local_uuid=%s\n",
+                                                crit->root_name, (int) settings->network_mode, (int) st_sub,
+                                                (int) settings->coop_stat_checkbox,
+                                                (int) view_editable_self, (int) rcv_host_only_stat,
+                                                view_uuid_sub ? view_uuid_sub : "(null/All Players)",
+                                                settings->local_player.uuid);
+                                }
+                            }
+                            // Co-op: Show tooltip for host-only stat checkboxes and/or cross-player view
+                            if (is_hovered && (rcv_host_only_stat || !view_editable_self)) {
+                                char tooltip_buf[224];
+                                if (rcv_host_only_stat && !view_editable_self) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Read-only: viewing another player, and stat checkboxes are set to Host Only.");
+                                } else if (rcv_host_only_stat) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Read-only: stat checkboxes are set to Host Only.");
+                                } else if (settings->network_mode == NETWORK_RECEIVER) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Read-only: viewing another player. Select your own name to edit.");
+                                } else {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Read-only: viewing another player. Select 'All Players' or your own name to edit.");
+                                }
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
 
@@ -6427,17 +6452,42 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     }
 
                     bool view_editable_self_p = tracker_view_editable_by_self(t, settings);
-                    // Co-op: Show tooltip for host-only stat checkboxes
-                    if (is_hovered_parent && settings->network_mode == NETWORK_RECEIVER &&
-                        settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY) {
-                        char tooltip_buf[128];
-                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                 "Stat checkboxes are set to Host Only.");
-                        ImGui::SetTooltip("%s", tooltip_buf);
-                    } else if (is_hovered_parent && !view_editable_self_p) {
-                        char tooltip_buf[160];
-                        snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                 "Read-only: viewing another player. Select 'All Players' or your own name to edit.");
+                    bool rcv_host_only_stat_p = (settings->network_mode == NETWORK_RECEIVER &&
+                                                 settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY);
+                    if (is_hovered_parent) {
+                        static Uint32 s_last_log_stat_par = 0;
+                        Uint32 now_par = SDL_GetTicks();
+                        if (now_par - s_last_log_stat_par > 1000) {
+                            s_last_log_stat_par = now_par;
+                            CoopNetState st_par = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
+                            const char *view_uuid_par = tracker_current_view_uuid(t, settings);
+                            log_message(LOG_ERROR,
+                                        "[TOOLTIP-DEBUG STAT-PARENT] cat=%s net_mode=%d coop_state=%d "
+                                        "stat_checkbox=%d view_editable_self=%d rcv_host_only=%d "
+                                        "view_uuid=%s local_uuid=%s\n",
+                                        cat->root_name, (int) settings->network_mode, (int) st_par,
+                                        (int) settings->coop_stat_checkbox,
+                                        (int) view_editable_self_p, (int) rcv_host_only_stat_p,
+                                        view_uuid_par ? view_uuid_par : "(null/All Players)",
+                                        settings->local_player.uuid);
+                        }
+                    }
+                    // Co-op: Show tooltip for host-only stat checkboxes and/or cross-player view
+                    if (is_hovered_parent && (rcv_host_only_stat_p || !view_editable_self_p)) {
+                        char tooltip_buf[224];
+                        if (rcv_host_only_stat_p && !view_editable_self_p) {
+                            snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                     "Read-only: viewing another player, and stat checkboxes are set to Host Only.");
+                        } else if (rcv_host_only_stat_p) {
+                            snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                     "Read-only: stat checkboxes are set to Host Only.");
+                        } else if (settings->network_mode == NETWORK_RECEIVER) {
+                            snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                     "Read-only: viewing another player. Select your own name to edit.");
+                        } else {
+                            snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                     "Read-only: viewing another player. Select 'All Players' or your own name to edit.");
+                        }
                         ImGui::SetTooltip("%s", tooltip_buf);
                     }
 
@@ -7456,16 +7506,45 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 bool rcv_in_lobby = (settings->network_mode == NETWORK_RECEIVER &&
                     g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
                 bool view_editable_self_cg = tracker_view_editable_by_self(t, settings);
-                if (is_hovered && rcv_in_lobby &&
-                    settings->coop_custom_goal_mode == COOP_CUSTOM_HOST_ONLY) {
-                    char tooltip_buf[128];
-                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                             "Custom goals are set to Host Only.");
-                    ImGui::SetTooltip("%s", tooltip_buf);
-                } else if (is_hovered && !view_editable_self_cg) {
-                    char tooltip_buf[160];
-                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                             "Read-only: viewing another player. Select 'All Players' or your own name to edit.");
+                bool rcv_host_only_cg = (settings->network_mode == NETWORK_RECEIVER &&
+                                         settings->coop_custom_goal_mode == COOP_CUSTOM_HOST_ONLY);
+                if (is_hovered) {
+                    // DEBUG: throttled log of co-op tooltip state so we can diagnose why
+                    // the Host Only tooltip doesn't fire on receivers in All Players view.
+                    static Uint32 s_last_log_cg = 0;
+                    Uint32 now_cg = SDL_GetTicks();
+                    if (now_cg - s_last_log_cg > 1000) {
+                        s_last_log_cg = now_cg;
+                        CoopNetState st_cg = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
+                        const char *view_uuid_cg = tracker_current_view_uuid(t, settings);
+                        log_message(LOG_ERROR,
+                                    "[TOOLTIP-DEBUG CG] item=%s net_mode=%d coop_state=%d "
+                                    "custom_goal_mode=%d rcv_in_lobby=%d view_editable_self=%d "
+                                    "rcv_host_only=%d view_uuid=%s local_uuid=%s\n",
+                                    item->root_name, (int) settings->network_mode, (int) st_cg,
+                                    (int) settings->coop_custom_goal_mode, (int) rcv_in_lobby,
+                                    (int) view_editable_self_cg, (int) rcv_host_only_cg,
+                                    view_uuid_cg ? view_uuid_cg : "(null/All Players)",
+                                    settings->local_player.uuid);
+                    }
+                }
+                if (is_hovered && (rcv_host_only_cg || !view_editable_self_cg)) {
+                    char tooltip_buf[224];
+                    if (rcv_host_only_cg && !view_editable_self_cg) {
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Read-only: viewing another player, and custom goals are set to Host Only.");
+                    } else if (rcv_host_only_cg) {
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Read-only: custom goals are set to Host Only.");
+                    } else if (settings->network_mode == NETWORK_RECEIVER) {
+                        // Receiver viewing another player (but goals not host-only): still read-only,
+                        // but don't suggest 'All Players' because host-only logic may still apply there.
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Read-only: viewing another player. Select your own name to edit.");
+                    } else {
+                        snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                 "Read-only: viewing another player. Select 'All Players' or your own name to edit.");
+                    }
                     ImGui::SetTooltip("%s", tooltip_buf);
                 }
 

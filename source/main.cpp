@@ -2195,6 +2195,14 @@ int main(int argc, char *argv[]) {
                 CoopPlayer saved_coop_players[MAX_COOP_PLAYERS];
                 memcpy(saved_coop_players, app_settings.coop_players, sizeof(saved_coop_players));
 
+                // Preserve host-synced goal merging rules across reload on receivers.
+                // These are pushed from the host via TEMPLATE_SYNC and live in memory only —
+                // settings_load would otherwise overwrite them with the receiver's own on-disk
+                // values, causing host-only tooltips / restrictions to silently revert.
+                CoopStatMerge saved_stat_merge = app_settings.coop_stat_merge;
+                CoopStatCheckbox saved_stat_checkbox = app_settings.coop_stat_checkbox;
+                CoopCustomGoalMode saved_custom_goal_mode = app_settings.coop_custom_goal_mode;
+
                 // Reload settings from file to get the latest changes.
                 settings_load(&app_settings);
                 log_set_settings(&app_settings); // Update the logger with the new settings.
@@ -2210,6 +2218,14 @@ int main(int argc, char *argv[]) {
                 if (restore_roster) {
                     app_settings.coop_player_count = saved_coop_player_count;
                     memcpy(app_settings.coop_players, saved_coop_players, sizeof(saved_coop_players));
+                }
+
+                // Restore host-synced merge settings on receivers in an active lobby.
+                if (app_settings.network_mode == NETWORK_RECEIVER &&
+                    reload_net_state == COOP_NET_CONNECTED) {
+                    app_settings.coop_stat_merge = saved_stat_merge;
+                    app_settings.coop_stat_checkbox = saved_stat_checkbox;
+                    app_settings.coop_custom_goal_mode = saved_custom_goal_mode;
                 }
 
                 // Co-op networking is now triggered by UI buttons (Start Lobby / Paste Room Code),
