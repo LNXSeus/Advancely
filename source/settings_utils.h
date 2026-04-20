@@ -340,6 +340,8 @@ struct AppSettings {
     bool overlay_show_run_details; // If true, the run details are shown in the overlay.
     bool overlay_show_progress; // If true, the progress bar is shown in the overlay.
     bool overlay_show_igt; // If true, the in-game time is shown in the overlay.
+    bool igt_unit_spacing; // If true, a space is inserted before every time unit suffix (e.g. "02 m 04 s").
+    bool igt_always_show_ms; // If true, milliseconds are always shown regardless of the time magnitude.
     bool overlay_show_update_timer; // If true, the update timer is shown in the overlay.
     bool check_for_updates; // If true, checks for new versions on startup
     bool show_welcome_on_startup; // If true, shows the welcome message on startup

@@ -9462,7 +9462,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     long long display_ticks = is_run_complete
                                   ? t->template_data->frozen_play_time_ticks
                                   : t->template_data->play_time_ticks;
-    format_time(display_ticks, formatted_time, sizeof(formatted_time));
+    format_time(display_ticks, formatted_time, sizeof(formatted_time),
+                settings->igt_unit_spacing, settings->igt_always_show_ms);
 
     if (is_run_complete) {
         snprintf(info_buffer, sizeof(info_buffer),
@@ -11507,7 +11508,8 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
     char formatted_time[64];
     char formatted_update_time[64];
 
-    format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
+    format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time),
+                settings->igt_unit_spacing, settings->igt_always_show_ms);
 
     // Format the time since last update (snapped to 5s intervals like the overlay)
     float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
@@ -11612,7 +11614,8 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
     long long display_ticks = is_run_complete
                                   ? t->template_data->frozen_play_time_ticks
                                   : t->template_data->play_time_ticks;
-    format_time(display_ticks, formatted_time, sizeof(formatted_time));
+    format_time(display_ticks, formatted_time, sizeof(formatted_time),
+                settings->igt_unit_spacing, settings->igt_always_show_ms);
 
 
     log_message(LOG_INFO, "============================================================\n");

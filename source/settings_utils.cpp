@@ -495,6 +495,8 @@ void settings_set_defaults(AppSettings *settings) {
     settings->overlay_show_run_details = true;
     settings->overlay_show_progress = true;
     settings->overlay_show_igt = true;
+    settings->igt_unit_spacing = false;
+    settings->igt_always_show_ms = false;
     settings->overlay_show_update_timer = true;
 
     // Account Defaults
@@ -824,6 +826,14 @@ bool settings_load(AppSettings *settings) {
             settings->overlay_show_igt = true;
             defaults_were_used = true;
         }
+
+        const cJSON *igt_unit_spacing = cJSON_GetObjectItem(general_settings, "igt_unit_spacing");
+        if (igt_unit_spacing && cJSON_IsBool(igt_unit_spacing)) settings->igt_unit_spacing = cJSON_IsTrue(igt_unit_spacing);
+        else { settings->igt_unit_spacing = false; defaults_were_used = true; }
+
+        const cJSON *igt_always_show_ms = cJSON_GetObjectItem(general_settings, "igt_always_show_ms");
+        if (igt_always_show_ms && cJSON_IsBool(igt_always_show_ms)) settings->igt_always_show_ms = cJSON_IsTrue(igt_always_show_ms);
+        else { settings->igt_always_show_ms = false; defaults_were_used = true; }
 
         const cJSON *show_update = cJSON_GetObjectItem(general_settings, "overlay_show_update_timer");
         if (show_update && cJSON_IsBool(show_update)) settings->overlay_show_update_timer = cJSON_IsTrue(show_update);
@@ -1481,6 +1491,10 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(general_obj, "overlay_show_progress", cJSON_CreateBool(settings->overlay_show_progress));
         cJSON_DeleteItemFromObject(general_obj, "overlay_show_igt");
         cJSON_AddItemToObject(general_obj, "overlay_show_igt", cJSON_CreateBool(settings->overlay_show_igt));
+        cJSON_DeleteItemFromObject(general_obj, "igt_unit_spacing");
+        cJSON_AddItemToObject(general_obj, "igt_unit_spacing", cJSON_CreateBool(settings->igt_unit_spacing));
+        cJSON_DeleteItemFromObject(general_obj, "igt_always_show_ms");
+        cJSON_AddItemToObject(general_obj, "igt_always_show_ms", cJSON_CreateBool(settings->igt_always_show_ms));
         cJSON_DeleteItemFromObject(general_obj, "overlay_show_update_timer");
         cJSON_AddItemToObject(general_obj, "overlay_show_update_timer",
                               cJSON_CreateBool(settings->overlay_show_update_timer));

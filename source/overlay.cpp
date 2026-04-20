@@ -12,6 +12,7 @@
 #include "settings_utils.h"
 #include "format_utils.h"
 #include "logger.h"
+#include "supporters.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -44,7 +45,7 @@ const char *SOCIALS[] = {
 const int NUM_SOCIALS = sizeof(SOCIALS) / sizeof(char *);
 
 // --- Supporter Showcase for Completed Runs ---
-// A list of all available icons for the supporter showcase.
+// Icons used in the supporter showcase. The supporter list itself is in supporters.h.
 const char *SUPPORTER_ICONS[] = {
     "emotes/glorpLove-4x.png",
     "emotes/Lnxseuheart.png",
@@ -56,21 +57,6 @@ const char *SUPPORTER_ICONS[] = {
     "emotes/doorLove-4x.gif"
 };
 const int NUM_SUPPORTER_ICONS = sizeof(SUPPORTER_ICONS) / sizeof(char *);
-
-// A structure to hold supporter information.
-typedef struct {
-    const char *name;
-    float amount;
-} Supporter;
-
-// The list of supporters and their donation amounts.
-Supporter SUPPORTERS[] = {
-    {"zurtleTif", 20.0f},
-    {"ethansplace98", 30.0f},
-    {"Totorewa", 31.0f},
-    {"Zesskyo", 10.0f}
-};
-const int NUM_SUPPORTERS = sizeof(SUPPORTERS) / sizeof(Supporter);
 
 // A structure to hold the pre-calculated rendering info for each supporter.
 typedef struct {
@@ -589,7 +575,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         if (is_run_complete) {
             char formatted_time[64];
             // Use frozen IGT so the final time doesn't keep ticking
-            format_time(t->template_data->frozen_play_time_ticks, formatted_time, sizeof(formatted_time));
+            format_time(t->template_data->frozen_play_time_ticks, formatted_time, sizeof(formatted_time),
+                        settings->igt_unit_spacing, settings->igt_always_show_ms);
             snprintf(info_buffer, sizeof(info_buffer),
                      "*** RUN COMPLETED! *** | Final Time: %s | Donate (mentioning 'Advancely') to be featured!",
                      formatted_time);
@@ -636,7 +623,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
             if (settings->overlay_show_igt) {
                 char formatted_time[64];
-                format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time));
+                format_time(t->template_data->play_time_ticks, formatted_time, sizeof(formatted_time),
+                            settings->igt_unit_spacing, settings->igt_always_show_ms);
                 snprintf(temp_chunk, sizeof(temp_chunk), "%s IGT", formatted_time);
                 add_component(temp_chunk);
             }

@@ -28,13 +28,14 @@ extern "C" {
 void format_category_string(const char *input, char *output, size_t max_len);
 
 /**
- * @brief Formats a time in Minecraft ticks into a YYYYy DDd HHh MMm SSs string.
- * It will omit larger units if they are zero (e.g., won't show years or days if playtime is less than a day).
+ * @brief Formats a time in Minecraft ticks into a human-readable string.
  * @param ticks The total number of ticks (20 ticks per second).
  * @param output The buffer to write the formatted time string to.
  * @param max_len The size of the output buffer.
+ * @param unit_spacing If true, a space is inserted before every unit suffix (e.g. "02 m 04 s").
+ * @param always_show_ms If true, milliseconds are appended even when the time exceeds one minute.
  */
-void format_time(long long ticks, char *output, size_t max_len);
+void format_time(long long ticks, char *output, size_t max_len, bool unit_spacing, bool always_show_ms);
 
 /**
  * @brief Formats a duration in seconds into a Hh Mm Ss string.

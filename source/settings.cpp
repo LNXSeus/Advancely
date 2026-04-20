@@ -11,6 +11,7 @@
 #include "settings.h"
 
 #include "format_utils.h"
+#include "supporters.h"
 
 // Includes for fork() and execvp() on Linux/macOS
 #ifndef _WIN32
@@ -108,6 +109,8 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->overlay_show_run_details != b->overlay_show_run_details ||
         a->overlay_show_progress != b->overlay_show_progress ||
         a->overlay_show_igt != b->overlay_show_igt ||
+        a->igt_unit_spacing != b->igt_unit_spacing ||
+        a->igt_always_show_ms != b->igt_always_show_ms ||
         a->overlay_show_update_timer != b->overlay_show_update_timer ||
 
         strcmp(a->tracker_font_name, b->tracker_font_name) != 0 ||
@@ -2143,6 +2146,25 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::SetTooltip("%s", overlay_text_timer_tooltip_buffer);
                 }
 
+                ImGui::Checkbox("IGT Unit Spacing", &temp_settings.igt_unit_spacing);
+                if (ImGui::IsItemHovered()) {
+                    char igt_spacing_tooltip_buffer[256];
+                    snprintf(igt_spacing_tooltip_buffer, sizeof(igt_spacing_tooltip_buffer),
+                             "Adds a space between every number and its unit in the IGT display.\n"
+                             "Example: \"02m 04.500s\" becomes \"02 m 04 s 500 ms\".");
+                    ImGui::SetTooltip("%s", igt_spacing_tooltip_buffer);
+                }
+                ImGui::SameLine();
+                ImGui::Checkbox("IGT Always Show ms", &temp_settings.igt_always_show_ms);
+                if (ImGui::IsItemHovered()) {
+                    char igt_ms_tooltip_buffer[256];
+                    snprintf(igt_ms_tooltip_buffer, sizeof(igt_ms_tooltip_buffer),
+                             "Always shows milliseconds in the IGT display,\n"
+                             "even when the time exceeds one minute.\n"
+                             "Example: \"02m 04.500s\" instead of \"02m 04s\".");
+                    ImGui::SetTooltip("%s", igt_ms_tooltip_buffer);
+                }
+
                 ImGui::Checkbox("Hide Completed Row 3 Goals", &temp_settings.overlay_row3_remove_completed);
                 if (ImGui::IsItemHovered()) {
                     char hide_completed_row_3_tooltip_buffer[1024];
@@ -3684,7 +3706,24 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
         ImGui::EndTabBar();
     } // Ending of Settings Tabs
 
+    // --- Supporters box (always visible regardless of active tab) ---
     ImGui::Separator();
+    ImGui::Spacing();
+    ImGui::TextDisabled("Supporters - Thank you! luvv <3");
+    ImGui::BeginChild("SupportersBox", ImVec2(0, 72), true);
+    for (int i = 0; i < NUM_SUPPORTERS; ++i) {
+        char supporter_buf[128];
+        snprintf(supporter_buf, sizeof(supporter_buf), "%s  $%.0f", SUPPORTERS[i].name, SUPPORTERS[i].amount);
+        ImGui::TextUnformatted(supporter_buf);
+    }
+    ImGui::EndChild();
+    if (ImGui::IsItemHovered()) {
+        char supporter_tip_buf[256];
+        snprintf(supporter_tip_buf, sizeof(supporter_tip_buf),
+                 "Donate at streamlabs.com/lnxseus/tip and mention\n"
+                 "\"Advancely\" to get your name listed here permanently!");
+        ImGui::SetTooltip("%s", supporter_tip_buf);
+    }
     ImGui::Spacing();
 
     // Start of Bottom Buttons
