@@ -185,5 +185,24 @@
 		"locked":	false,
 		"locked_width":	0,
 		"use_manual_layout":	false
+	},
+	"account":	{
+		"type":	"online",
+		"username":	"",
+		"uuid":	"",
+		"display_name":	""
+	},
+	"coop":	{
+		"enabled":	false,
+		"network_mode":	"singleplayer",
+		"merge_settings":	{
+			"stat_merge":	"highest",
+			"stat_checkbox":	"any_player",
+			"custom_goal_mode":	"any_player"
+		},
+		"host_ip":	"",
+		"host_public_ip":	"",
+		"host_port":	"12345",
+		"player_roster":	[]
 	}
 }

@@ -3141,6 +3141,20 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                             ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f)
                                             : ImVec4(1.0f, 0.6f, 0.4f, 1.0f);
                             ImGui::TextColored(sc, "%s", status_buf);
+
+                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.6f, 1.0f, 1.0f));
+                            ImGui::Text("(Connection Error Codes)");
+                            ImGui::PopStyleColor();
+                            if (ImGui::IsItemHovered()) {
+                                char coop_err_tooltip_buf[512];
+                                snprintf(coop_err_tooltip_buf, sizeof(coop_err_tooltip_buf),
+                                         "Opens the Connection Error Codes table in your browser.\n"
+                                         "Look up the exact meaning of the status above.");
+                                ImGui::SetTooltip("%s", coop_err_tooltip_buf);
+                            }
+                            if (ImGui::IsItemClicked()) {
+                                open_content("https://github.com/LNXSeus/Advancely#connection-error-codes");
+                            }
                         }
                     }
 
@@ -3232,6 +3246,20 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                 ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f)
                                                 : ImVec4(1.0f, 0.6f, 0.4f, 1.0f);
                                 ImGui::TextColored(sc, "%s", status_buf);
+
+                                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.6f, 1.0f, 1.0f));
+                                ImGui::Text("(Connection Error Codes)");
+                                ImGui::PopStyleColor();
+                                if (ImGui::IsItemHovered()) {
+                                    char coop_err_tooltip_buf[512];
+                                    snprintf(coop_err_tooltip_buf, sizeof(coop_err_tooltip_buf),
+                                             "Opens the Connection Error Codes table in your browser.\n"
+                                             "Look up the exact meaning of the status above.");
+                                    ImGui::SetTooltip("%s", coop_err_tooltip_buf);
+                                }
+                                if (ImGui::IsItemClicked()) {
+                                    open_content("https://github.com/LNXSeus/Advancely#connection-error-codes");
+                                }
                             }
                         }
                     }

@@ -43,6 +43,16 @@
 - [The Stream Overlay](#the-stream-overlay)
 - [The Template Editor](#the-template-editor-esc--edit-templates)
 - [The Settings Window](#the-settings-window-esc)
+- [Co-op Multiplayer](#co-op-multiplayer)
+    - [How Co-op Works](#how-co-op-works)
+    - [Account & Player Identity](#account--player-identity)
+    - [Lobby Setup Walkthrough](#lobby-setup-walkthrough)
+    - [Networking Options (LAN, ZeroTier/Hamachi, Port Forwarding)](#networking-options-lan-zerotierhamachi-port-forwarding)
+    - [Firewall Rules (Windows, Linux, macOS)](#firewall-rules-windows-linux-macos)
+    - [Template Matching (compute_template_goal_hash)](#template-matching-compute_template_goal_hash)
+    - [Goal Merging Rules](#goal-merging-rules)
+    - [The Player Dropdown](#the-player-dropdown)
+    - [Connection Error Codes](#connection-error-codes)
 - [Extensive Version Support](#extensive-version-support)
 - [Officially Added Templates](#officially-added-templates)
 - [Known Limitations](#known-limitations)
@@ -565,6 +575,15 @@ Advancely has two separate hiding systems that target different layout modes:
 In `Hide All Completed` mode, completed goals fully disappear from the manual layout. In `Hide Template-Hidden Only`
 mode, completed goals are greyed out but remain visible.
 
+### The Player Dropdown (Co-op)
+
+When a co-op lobby is active (either as Host or Receiver), the tracker shows a **Player Dropdown** with entries for
+`All Players` and every individual player in the roster. Switching to an individual player shows that player's raw
+progress (as if you were looking at their singleplayer tracker), and edits to checkboxes/custom goals in that view
+only affect that player. The `All Players` view applies the configured merge rules instead. The `RUN COMPLETED!`
+banner and frozen timer are tracked per view. See [The Player Dropdown](#the-player-dropdown) for the full
+behavior.
+
 ### The Info Bar
 
 A transparent info bar at the top of the window provides a live summary of your run. It includes:
@@ -888,37 +907,321 @@ templates._
 <summary><strong>View Full Settings List</strong></summary>
 <br>
 
-| Tab & Setting Group     | Options & Features                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-|:------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Paths & Templates**   |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Path Settings           | Choose how Advancely finds your saves. `Auto-Detect` finds the default Minecraft path. `Track Custom Saves Folder` lets you specify a manual path. `Auto-Track Active Instance` automatically finds and follows the instance you are playing from **Prism Launcher**, **MultiMC** etc. You may also track a `Fixed World` path and the `Open Instances Folder` button helps you quickly navigate to your launcher's instance directory.                                                                                                                                                                                                                                                                                                                                                                                              |
-| Template Settings       | Select the `Template Version` (functional version), `Display Version` (visual-only), enable `Using StatsPerWorld Mod` compatibility for legacy Minecraft versions (1.0 - 1.6.4) as well as `Using Hermes Mod` for real-time updates, `Category`, `Optional Flag`, `Display Category` (visual-only), and `Language`. Changing the `Template Version`, `Category`, or `Optional Flag` will automatically pre-fill the `Display Category` text. **You can check the `Lock` box next to the display name to prevent this auto-update behavior.** Templates that contain manual position data are marked with **(has layout)** in the Category or Optional Flag dropdowns. Enable the `Manual Layout` checkbox to use these positions instead of the automatic grid. You can also use the `Open Template Folder` button for quick access. |
-| **Tracker Visuals**     |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Window & Behavior       | Set the `Tracker FPS Limit` and keep the tracker `Always On Top`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Goal Visibility         | Fine-tune which completed goals are displayed on the tracker with three modes: `Hide All Completed` (strictest), `Hide Template-Hidden Only`, or `Show All`. This setting also affects which items are counted in the section completion counters.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Layout & Spacing        | Drag and drop to reorder the sections (`Advancements`, `Stats`, `Unlocks`, etc.) in the main tracker window. Adjust the `Tracker Vertical Spacing` (in pixels) between rows of items. You can also enable `Custom Section Item Width` to adjust the horizontal width (in pixels) for *each item* within a specific section (e.g., set "Advancements" to 150px), overriding the dynamic width calculation.                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Level of Detail & Lists | Adjust the zoom thresholds at which elements disappear to declutter the view and improve performance (`Hide Sub-Item Text`, `Hide Main Text/Checkbox`, `Simplify Icons`). Control how long lists are handled by setting the `Scrollable List Threshold` to determine when a list becomes a scrollable box, and adjust the `List Scroll Speed`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Fonts & Aesthetics      | Independently set the font and sizes (`Main`, `Sub`, `UI`) for the Tracker window. Full RGBA color customization for the tracker `background` and `text`. Customize the `Default`, `Half-Done`, and `Done` background textures by selecting `.png` or `.gif` files from the `resources/gui` folder.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| **UI Visuals**          |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| UI Fonts                | Select the font and size for UI windows (Settings, Editor, Notes). *Note: Requires an application restart.*                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| UI Colors               | Customize the appearance of the interface (Settings, Editor, Notes windows). Adjust colors for `UI Text`, `Window Background`, `Frame Background` (and its hovered/active states), `Active Title Bar`, `Button` (and states), `Header` (collapsible sections), and `Check Mark`. *Note: Requires an application restart.*                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| **Overlay**             |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| General                 | `Enable Overlay` and set the `Overlay FPS Limit` independently from the tracker.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Content & Behavior      | Configure which `Overlay Text Sections` to display (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`). Choose whether to `Hide Completed Row 3 Goals`. Set the `Sub-Stat Cycle Interval` for multi-stat animations and adjust the `Overlay Scroll Speed` (negative values reverse the direction).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Layout & Spacing        | Adjust the `Overlay Width` with a pixel-perfect slider and align the top progress text (`Left`, `Center`, or `Right`). Configure the horizontal spacing for `Row 1 Icon Spacing`, adjust `Row 1 Shared Icon Size`, or enable a fixed custom width for Row 2 and Row 3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| Aesthetics              | Customize the `Overlay Font`, `Overlay Background Color`, and `Overlay Text Color`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| **Co-op**               |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Co-op                   | Coming Soon...                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| **Hotkeys**             |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Hotkey Settings         | This section appears if your template contains custom counters using a target value different from 0. Assign keyboard hotkeys to increment or decrement any counter (hotkeys only work when the tracker window is focused).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| **System & Debug**      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| System & Developer      | Toggle `Auto-Check for Updates` on startup. Toggle `Print Debug To Console` for detailed status updates in your terminal or `advancely_log.txt` and `advancely_overlay_log.txt` for the overlay.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| **(Bottom Bar)**        |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Action Buttons          | `Apply Settings` (Enter or Ctrl/Cmd+S), `Revert Changes` (Ctrl/Cmd+Z), `Reset To Defaults`, `Restart Advancely` (required for ui/font/size changes), and the `Support Advancely!` button. If you try to close Advancely with unsaved changes in Settings or the Template Editor, a confirmation popup will appear telling you exactly what has unsaved changes and letting you choose to exit (Enter) or cancel (Escape).                                                                                                                                                                                                                                                                                                                                                                                                            | 
+| Tab & Setting Group     | Options & Features                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+|:------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Paths & Templates**   |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Path Settings           | Choose how Advancely finds your saves. `Auto-Detect` finds the default Minecraft path. `Track Custom Saves Folder` lets you specify a manual path. `Auto-Track Active Instance` automatically finds and follows the instance you are playing from **Prism Launcher**, **MultiMC** etc. You may also track a `Fixed World` path and the `Open Instances Folder` button helps you quickly navigate to your launcher's instance directory.                                                                                                                                                                                                                                                                                                                                                                                               |
+| Template Settings       | Select the `Template Version` (functional version), `Display Version` (visual-only), enable `Using StatsPerWorld Mod` compatibility for legacy Minecraft versions (1.0 - 1.6.4) as well as `Using Hermes Mod` for real-time updates, `Category`, `Optional Flag`, `Display Category` (visual-only), and `Language`. Changing the `Template Version`, `Category`, or `Optional Flag` will automatically pre-fill the `Display Category` text. **You can check the `Lock` box next to the display name to prevent this auto-update behavior.** Templates that contain manual position data are marked with **(has layout)** in the Category or Optional Flag dropdowns. Enable the `Manual Layout` checkbox to use these positions instead of the automatic grid. You can also use the `Open Template Folder` button for quick access.  |
+| **Tracker Visuals**     |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Window & Behavior       | Set the `Tracker FPS Limit` and keep the tracker `Always On Top`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Goal Visibility         | Fine-tune which completed goals are displayed on the tracker with three modes: `Hide All Completed` (strictest), `Hide Template-Hidden Only`, or `Show All`. This setting also affects which items are counted in the section completion counters.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Layout & Spacing        | Drag and drop to reorder the sections (`Advancements`, `Stats`, `Unlocks`, etc.) in the main tracker window. Adjust the `Tracker Vertical Spacing` (in pixels) between rows of items. You can also enable `Custom Section Item Width` to adjust the horizontal width (in pixels) for *each item* within a specific section (e.g., set "Advancements" to 150px), overriding the dynamic width calculation.                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Level of Detail & Lists | Adjust the zoom thresholds at which elements disappear to declutter the view and improve performance (`Hide Sub-Item Text`, `Hide Main Text/Checkbox`, `Simplify Icons`). Control how long lists are handled by setting the `Scrollable List Threshold` to determine when a list becomes a scrollable box, and adjust the `List Scroll Speed`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Fonts & Aesthetics      | Independently set the font and sizes (`Main`, `Sub`, `UI`) for the Tracker window. Full RGBA color customization for the tracker `background` and `text`. Customize the `Default`, `Half-Done`, and `Done` background textures by selecting `.png` or `.gif` files from the `resources/gui` folder.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **UI Visuals**          |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| UI Fonts                | Select the font and size for UI windows (Settings, Editor, Notes). *Note: Requires an application restart.*                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| UI Colors               | Customize the appearance of the interface (Settings, Editor, Notes windows). Adjust colors for `UI Text`, `Window Background`, `Frame Background` (and its hovered/active states), `Active Title Bar`, `Button` (and states), `Header` (collapsible sections), and `Check Mark`. *Note: Requires an application restart.*                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **Overlay**             |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| General                 | `Enable Overlay` and set the `Overlay FPS Limit` independently from the tracker.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Content & Behavior      | Configure which `Overlay Text Sections` to display (`World`, `Run Details`, `Progress`, `IGT`, `Update Timer`). Choose whether to `Hide Completed Row 3 Goals`. Set the `Sub-Stat Cycle Interval` for multi-stat animations and adjust the `Overlay Scroll Speed` (negative values reverse the direction).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Layout & Spacing        | Adjust the `Overlay Width` with a pixel-perfect slider and align the top progress text (`Left`, `Center`, or `Right`). Configure the horizontal spacing for `Row 1 Icon Spacing`, adjust `Row 1 Shared Icon Size`, or enable a fixed custom width for Row 2 and Row 3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Aesthetics              | Customize the `Overlay Font`, `Overlay Background Color`, and `Overlay Text Color`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **Co-op**               |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Account                 | Identifies you to the lobby. Pick `Online` (enter your Minecraft username and click `Fetch UUID` to pull your real Mojang UUID via the public Mojang API) or `Offline` (enter username + UUID manually for cracked/TLauncher/LAN setups). Optional `Display Name` is shown in the Player Dropdown. Stored under `"account"` in `settings.json`. Duplicate usernames within the same lobby are rejected.                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Network Mode            | Toggle between `Singleplayer` (co-op disabled), `Host` (run a lobby), or `Receiver` (join someone else's lobby). Defaults to `Singleplayer`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Create a Lobby (Host)   | `IP Address` sets the local bind address; `Port` defaults to `12345`; optional `Public IP` is embedded in the generated room code (use with port forwarding to advertise your public IP while binding locally). `Start Lobby` begins listening; `Copy Room Code` produces a shareable encoded string; the `Waiting Room` lets you `Accept`/`Decline` each incoming join request before the player appears in the roster.                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Join a Lobby (Receiver) | `Paste Room Code` decodes the Host's shared code and sends a join request. While connected, the Receiver's tracker skips local save-file reads and mirrors the Host's broadcasts directly. Disconnect at any time with the `Disconnect` button.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Goal Merging Rules      | `Stat Merge Mode` (`Highest` or `Cumulative`) controls how stats combine in the All Players view. `Stat Completion` (`Any Player` or `Host Only`) decides whose stat counts toward the auto-checkbox completion. `Custom Goal Mode` (`Any Player` or `Host Only`) does the same for manual/custom goals. Advancements/achievements/recipes always merge with `OR` (any player); `25w14craftmine` unlocks always merge with `AND` (every player must have it). See [Goal Merging Rules](#goal-merging-rules) for the full breakdown.                                                                                                                                                                                                                                                                                                   |
+| Player Dropdown         | Available on both the Host and every Receiver while a lobby is active. Switches between the merged `All Players` view and each individual player's view. Checkboxes and custom goals in an individual view edit only that player's state; in the All Players view they route per the merge-mode settings. See [The Player Dropdown](#the-player-dropdown).                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| **Hotkeys**             |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Hotkey Settings         | This section appears if your template contains custom counters using a target value different from 0. Assign keyboard hotkeys to increment or decrement any counter (hotkeys only work when the tracker window is focused).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **System & Debug**      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| System & Developer      | Toggle `Auto-Check for Updates` on startup. Toggle `Print Debug To Console` for detailed status updates in your terminal or `advancely_log.txt` and `advancely_overlay_log.txt` for the overlay.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **(Bottom Bar)**        |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Action Buttons          | `Apply Settings` (Enter or Ctrl/Cmd+S), `Revert Changes` (Ctrl/Cmd+Z), `Reset To Defaults`, `Restart Advancely` (required for ui/font/size changes), and the `Support Advancely!` button. If you try to close Advancely with unsaved changes in Settings or the Template Editor, a confirmation popup will appear telling you exactly what has unsaved changes and letting you choose to exit (Enter) or cancel (Escape).                                                                                                                                                                                                                                                                                                                                                                                                             | 
 
 > You can find the default settings in the `resources/reference_files` folder as `settings.json` and
 `Default_Settings.png`. The [Help](https://github.com/LNXSeus/Advancely#the-help-button) button within
 > the [template editor](https://github.com/LNXSeus/Advancely#the-template-editor-esc--edit-templates) opens this folder.
+</details>
+
+***
+
+## Co-op Multiplayer
+
+> 📺 **Video Guide:** 
+
+Advancely has built-in co-op support so a group of players can share a single tracker/overlay view of their combined
+progress. One player runs the tracker as the **Host**; everyone else runs it as a **Receiver**. The Host merges
+everyone's save files into one view and broadcasts the result back to each Receiver, so every player (and their
+stream) sees identical numbers in real time.
+
+The entire co-op UI lives in the **Co-op** tab of the Settings window (`ESC`).
+
+<details>
+<summary><strong>View Full Co-op Documentation</strong></summary>
+<br>
+
+### How Co-op Works
+
+* **Host:** Reads every player's save files from disk (plus any data pushed over the network for legacy versions,
+  see below), merges progress into a single view, and broadcasts the merged state plus a per-player snapshot to all
+  Receivers every update tick.
+* **Receivers:** Skip reading their local save files while connected. They apply the Host's broadcasts directly to
+  their tracker/overlay, so every Receiver's window mirrors the Host's view exactly (modulo the Player Dropdown
+  selection).
+* **Transport:** Plain TCP. Default port `12345`. Room codes encode the Host's IP + port so Receivers can paste a
+  single string to join. The Host must explicitly approve each join request from the Waiting Room.
+* **Legacy versions (≤ 1.6.4):** These versions store stats globally (per-launcher) rather than per-world, so a
+  Receiver's stats file exists only on their own machine. Receivers automatically upload their stats file to the
+  Host over the network (throttled to 1/second, deduplicated by content) so the Host can merge it. _The host can
+  still toggle `Using StatsPerWorld Mod` as if they were in singleplayer, but Receivers always fall back to the
+  global stats file regardless of the setting, because no per-world folder exists on the Receiver side._
+
+### Account & Player Identity
+
+The top of the Co-op tab has an **Account** section that identifies *you* to the lobby (host or receiver). This is
+separate from the co-op lobby itself and is saved under the new `"account"` object in `settings.json`.
+
+* **Online account:** Enter your in-game username and click **Fetch UUID** to pull your real Mojang UUID via the
+  public Mojang API. Use this if you play on official Minecraft accounts.
+* **Offline account:** Enter a username and a UUID manually. Useful for cracked clients, TLauncher, LAN-only setups,
+  or servers where the Mojang API can't resolve your name.
+* **Display Name:** Optional friendly name shown in the player dropdown. Falls back to the username if empty.
+
+**How identity is used in the [Hermes Mod](https://github.com/DuncanRuns/Hermes) integration:** Hermes events contain
+the player's username, which Advancely maps to the configured **UUID** for each roster entry. Both fields matter —
+the UUID is the stable key used in all merge/diff/caching logic, while the username is what the mod reports at
+runtime. _Duplicate usernames in the roster are rejected with an error when a Receiver tries to join._
+
+### Lobby Setup Walkthrough
+
+**For the Host:**
+
+1. Open the **Co-op** tab in Settings (`ESC`).
+2. Fill in your Account section (Online + Fetch UUID, or Offline + manual UUID).
+3. Select **Host** as the network mode.
+4. Under **Create a Lobby**, enter the `IP Address` you want to bind to (your local IP, e.g. `192.168.1.50`) and the
+   port (default `12345`). Optionally enter a **Public IP** or **Domain** that will be embedded in the room code instead of the
+   local bind IP (used for port forwarding - see below).
+5. Click **Start Lobby**. Your firewall may prompt you - allow the connection for both **Private** and **Public**
+   network profiles (ZeroTier/Hamachi adapters register as Public on Windows).
+6. Click **Copy Room Code** and share that string privately with each Receiver (Discord DM, etc.).
+7. When a Receiver sends a join request, a **Waiting Room** entry appears. Review their username/UUID and click
+   **Accept** or **Decline**. Accepted players appear in the Player Roster.
+
+**For Receivers:**
+
+1. Open the **Co-op** tab and fill in your Account section.
+2. Select **Receiver** as the network mode.
+3. Click **Paste Room Code** to auto-fill the IP/port from the Host's shared code.
+4. A join request is sent. Once the Host accepts, your tracker switches to broadcast mode and mirrors the Host's
+   view in real time.
+5. If your template does not match the Host's (see below), you will be rejected with a clear error status. Fix your
+   Category / Optional Flag / Template Version / Hermes setting in the Template Settings and try again.
+
+### Networking Options (LAN, ZeroTier/Hamachi, Port Forwarding)
+
+Co-op uses a single TCP port (default `12345`) between each Receiver and the Host. Port `25565` is the port that the `Force Port Mod`
+uses as default, but Advancely itself should **not** use it, but it's important to allow both the `12345` and `25565` as
+an incoming public port connection as a rule in the firewall settings on a Windows machine.
+
+**Option 1 - Same LAN:** Nothing special. The Host binds to their local IP (e.g. `192.168.1.50`), Receivers paste
+the room code, done. _No port forwarding or VPN required._
+
+**Option 2 - ZeroTier or LogMeIn Hamachi (VPN-over-Internet):** Every player joins the same virtual network; their
+VPN client assigns each machine a virtual IPv4 address on that network. The Host binds to **their own ZeroTier
+IPv4**, not their public internet IP. Receivers paste the room code as usual.
+
+_Finding your ZeroTier IPv4 address:_ Open the ZeroTier Desktop UI or system tray, click the network you're on, and
+look for **Managed Addresses**. On Windows you can also run `ipconfig` and look for the adapter
+labeled `ZeroTier One [...]` - its IPv4 address is what you want (typically in `10.x.x.x` or `172.x.x.x` range).
+_Never share your ZeroTier **Network ID** publicly - it's effectively a join token for your network (the host of that
+network still has to authorize the device). Share it
+privately the same way you'd share a Discord invite._
+
+_LogMeIn Hamachi_ works the same way: install on every player's machine, create/join a network, use the Hamachi-
+assigned IPv4 (shown in the Hamachi UI) as the Host's bind IP.
+
+**Option 3 - Port Forwarding (direct internet connection):**
+
+Port forwarding lets players connect to your lobby over the internet without needing a VPN like ZeroTier or Hamachi.
+
+_How it works:_
+
+1. Your computer has a **local IP** (e.g. `192.168.1.50`) on your home network.
+2. Your router has a **public IP** (e.g. `85.123.45.67`) visible to the internet.
+3. Port forwarding tells your router: "any traffic arriving on port `12345`, send it to `192.168.1.50:12345`".
+4. You put your **local IP** in the `IP Address` field (for binding) and your **public IP** in the `Public IP`
+   field (embedded in the room code that Receivers use to connect).
+
+_Setup steps:_
+
+1. **Find your local IP** — run `ipconfig` (Windows), `ifconfig` (macOS), or `ip addr` (Linux).
+2. **Find your public IP** — search "what is my IP" in a browser.
+3. **Log into your router** (usually `192.168.1.1` or `192.168.0.1` in a browser).
+4. **Find the port forwarding section** (often under "NAT", "Virtual Servers", or "Firewall").
+5. **Add a rule:** external port `12345` TCP → internal IP `<your local IP>` port `12345`.
+6. **In Advancely**, enter your local IP as the `IP Address` and your public IP as the `Public IP`.
+
+General port forwarding tutorial (router-agnostic):
+[nordvpn.com/blog/open-ports-on-router](https://nordvpn.com/blog/open-ports-on-router/).
+
+_Note:_ Port forwarding won't work if your ISP uses **CGNAT** (carrier-grade NAT). You can check by comparing the
+WAN IP shown in your router's admin page with your public IP - if they differ, you're behind CGNAT and will need a
+VPN solution instead (ZeroTier/Hamachi).
+
+### Firewall Rules (Windows, Linux, macOS)
+
+The Host's OS firewall must allow inbound TCP connections on the co-op port. Receivers don't need inbound rules —
+they only make outbound connections — but some corporate firewalls restrict outbound ports as well.
+
+**Windows (Defender Firewall):**
+
+The Host's firewall rule **must allow the Public network profile** — ZeroTier and Hamachi adapters register as
+Public on Windows, not Private.
+
+_Fast path (command line, run as Administrator):_
+
+```
+netsh advfirewall firewall add rule name="Advancely Coop 12345" dir=in action=allow protocol=TCP localport=12345
+```
+
+_And for the minecraft port additionally use `25565`:_
+
+```
+netsh advfirewall firewall add rule name="Minecraft Coop 25565" dir=in action=allow protocol=TCP localport=25565
+```
+
+_GUI path:_ Windows Security → Firewall & network protection → Advanced settings → Inbound Rules → New Rule → Port
+→ TCP → Specific local ports `12345` (and `25565` for MC) → Allow the connection → tick **Domain**, **Private**, **AND
+Public** (Public might be enough) → name it "Advancely Coop".
+
+_If Windows Defender Firewall prompted you when you first clicked **Start Lobby**_ and you dismissed it: delete the
+app-based rule it auto-created (`wf.msc` → Inbound Rules → look for Advancely) and create the port-based rule
+above. Port rules are easier to troubleshoot than app rules.
+
+**Linux (ufw):**
+
+```
+sudo ufw allow 12345/tcp
+```
+
+**Linux (firewalld, Fedora/RHEL):**
+
+```
+sudo firewall-cmd --permanent --add-port=12345/tcp
+sudo firewall-cmd --reload
+```
+
+**macOS:** The built-in Application Firewall is off by default. If enabled, System Settings → Network → Firewall →
+Options → add Advancely and allow incoming connections. Alternatively use `pfctl` if you maintain your own ruleset.
+
+### Template Matching (compute_template_goal_hash)
+
+When a Receiver joins, Advancely hashes the *structural* content of both players' template files with a 64-bit
+FNV-1a hash and refuses to connect unless the hashes are identical. The hash is
+computed from the raw template `.json` so language file differences are irrelevant.
+
+_The hash **INCLUDES** (these must match exactly on host and receiver):_
+
+* **Advancements:** each root_name (key), the `is_recipe` flag, every criterion key, and each criterion's `target`.
+* **Stats:** each category key, each `root_name`, each `target`, every sub-stat key + target, and the
+  `linked_goals` array + `linked_goal_mode` (both at the category level and per sub-stat).
+* **Unlocks:** every `root_name`.
+* **Custom goals:** each `root_name`, each `target`, and — only when `target <= 0` (manual/infinite) - the
+  `linked_goals` array and `linked_goal_mode`.
+* **Multi-stage goals:** each goal's `root_name`, every stage's `stage_id`, `type`, `root_name`,
+  `parent_advancement`, and `target`.
+* **Counter goals:** each `root_name` and its `linked_goals` array.
+
+_The hash **IGNORES** (cosmetic/layout-only, free to differ between host and receiver):_
+
+* **Display names** and any language file contents.
+* **Icon paths** (both top-level and per-goal).
+* **Manual Layout positions** (`x`/`y` coordinates for icons, text, progress) and per-position `Hide` flags.
+* **Decorations** - text headers, lines, arrows, their positions, colors, opacities, linked start/end goals.
+* **Row 2 / Row 3 overlay flags** and any other overlay-only fields.
+* **`Hidden` flag** (automatic layout visibility).
+* **Display order / sort order** fields.
+
+In short: the ruleset (what gets tracked, against what targets, with what linked completion logic) must match. How
+it's drawn or labeled does not. If you rearrange the layout or translate display names for your stream, joining a
+lobby using the same underlying template still works.
+
+### Goal Merging Rules
+
+How the Host combines multiple players' progress into the **All Players** view depends on the goal type:
+
+* **Advancements / Achievements / Recipes (all eras):** `OR` - once *any* player completes it, it's marked done in
+  the merged view.
+* **Advancement criteria:** `OR` - once any player has the criterion, it's done globally.
+* **Unlocks (25w14craftmine):** `AND` - an unlock counts only when *every* roster player has obtained it. Pre-
+  initialized to done; each player's merge flips it back to false if that player is missing it.
+* **Stats:** Configurable per lobby via **Stat Merge Mode** in Settings:
+    * `Highest` _(default)_: the group's value is the maximum across players.
+    * `Cumulative`: values are summed across players.
+* **Stat auto-complete checkbox** (applies once the combined stat reaches its target): configurable via **Stat
+  Completion** - `Any Player` (OR, default) vs `Host Only` (only the Host's own subtree counts toward the auto-
+  tick).
+* **Custom Goals / Manual Goals:** Stored **per-player** in `settings.json` (separated by UUID). Each player has
+  their own independent progress for manual checklists and counters. The **All Players** view combines them via
+  the **Custom Goal Mode**: `Any Player` (OR) or `Host Only`. Switching the Player Dropdown to a specific player
+  shows only that player's custom-goal state and lets you edit it without affecting others.
+* **Multi-Stage Goals:** Merged globally - any player reaching any stage advances the group. _(Receivers sync the
+  current stage from the Host's broadcast.)_
+* **Counters:** Derived from their linked goals' merged state, so they follow whichever rule applies to each linked
+  goal.
+* **Play Time / IGT:** Taken from the Host's own world. The merged run-completion timer freezes the first time the
+  view hits 100% (per-view, so a per-player view and the All Players view each have their own frozen timer - see
+  the Player Dropdown section below).
+
+### The Player Dropdown
+
+While connected to a lobby (or hosting one), the tracker shows a **Player Dropdown** with entries for **All
+Players** and every individual player in the roster. Each view is fully populated - not just a filter - and
+behaves consistently across the Host and every Receiver:
+
+* **All Players (default):** the merged view defined by the Goal Merging Rules above. Checkboxes in this view
+  affect whichever player(s) the rules route the edit to - see below.
+* **Individual Player:** that single player's raw progress, as if you were looking at their singleplayer tracker.
+  Advancements/stats/unlocks/multi-stage goals come from their save files; custom goals come from their per-UUID
+  subtree in `settings.json`.
+
+**What each view lets you edit:**
+
+* **Advancement / stat manual-override checkboxes in an individual player's view** edit only that player's
+  override (stored under their UUID in `settings.json`). Other players are untouched.
+* **Custom goals in an individual player's view** edit only that player's custom-goal state.
+* **Checkboxes in the All Players view** follow the corresponding merge-mode setting: with `Any Player`, ticking
+  it counts as the *local* player completing it; with `Host Only`, only the Host's checkbox matters.
+* **"RUN COMPLETED!" banner and the frozen run timer** are tracked **per view** - the first time the All Players
+  view hits 100%, it freezes an All-Players final time; each individual view similarly freezes its own final time
+  the first time *that* player reaches 100%. Switching the dropdown may forget the frozen state if the latch
+  for the new view hasn't been populated yet (by design - this is a lightweight per-view cache, not persistent).
+
+### Connection Error Codes
+
+If the Host or Receiver can't connect (or disconnects unexpectedly), the Co-op tab shows a colored error status
+line. The error text already includes a friendly hint, but the underlying socket error code is sometimes more
+specific. That code is then found in the `advanely_log.txt` file (you might have to enable the debug print).
+Advancely translates the most common codes as follows:
+
+| Code (Windows / POSIX)            | Meaning & what to check                                                                          |
+|:----------------------------------|:-------------------------------------------------------------------------------------------------|
+| `10060` / `ETIMEDOUT`             | Connection timed out. The Host's firewall is likely blocking the port (or the IP/port is wrong). |
+| `10061` / `ECONNREFUSED`          | Connection refused. The Host isn't listening, the port is wrong, or the Host hasn't started yet. |
+| `10065` / `EHOSTUNREACH`          | Host unreachable. Check your network/VPN (ZeroTier/Hamachi up? correct network joined?).         |
+| `10051` / `ENETUNREACH`           | Network unreachable. Your machine has no route to the target network.                            |
+| `10064` / `EHOSTDOWN`             | Host is down - the target machine is offline.                                                    |
+| `10048` / `EADDRINUSE`            | Port already in use. Another process (or a previous Advancely instance) is holding the port.     |
+| `10049` / `EADDRNOTAVAIL`         | The IP address you entered isn't available on this machine. Re-check the bind IP.                |
+
+_Codes starting with `10xxx` are Windows Sockets (WSA); the POSIX column covers Linux and macOS._ Any other code
+is shown as `Connection failed (error N).` - search the number online (`WSA <code>` on Windows, `errno <code>` on
+POSIX) for details. If connection errors persist, the in-app error status links straight back to this section of
+the README.
+
 </details>
 
 ***
@@ -942,6 +1245,12 @@ all April Fool's snapshots.
     * **StatsPerWorld Mod Support**: If you are using [Legacy Fabric](https://legacyfabric.net) with
       the [StatsPerWorld Mod](https://github.com/RedLime/StatsPerWorld/releases), Advancely can be configured to
       read local `.dat` stat files directly, just like in modern versions. Playtime is tracked via the ID: `1100`.
+    * **Co-op note**: In these versions the stats file is saved **locally per launcher** for every player rather
+      than inside the world folder, so the Host cannot read any Receiver's stats from disk. Receivers automatically
+      upload their stats file to the Host over the network (1/sec, deduplicated by content), and the Host merges
+      those uploads into the All Players view. Only the Host can benefit from `Using StatsPerWorld Mod` - Receivers
+      always fall back to the global stats file regardless of the setting because no per-world folder exists on
+      the Receiver side. See [Co-op Multiplayer](#co-op-multiplayer).
 * **1.7.2 – 1.11.2 (Mid-Era)**: Reads achievements and stats from the per-world stats JSON file. Playtime is tracked
   via `stat.playOneMinute`.
 * **1.12 – 1.12.2 (Hybrid)**: Reads from separate, per-world modern advancements and mid-era stats files. Playtime
@@ -949,7 +1258,9 @@ all April Fool's snapshots.
 * **1.13 – 1.16.5 (Modern)**: Reads from separate, per-world advancements and stats files. Playtime is tracked via
   `minecraft:play_one_minute`.
 * **1.17-1.21.11**: Same as above, but playtime is tracked via the renamed `minecraft:play_time` statistic.
-* **25w14craftmine**: Fully supports the unique advancements, stats, and unlocks files of this snapshot.
+* **25w14craftmine**: Fully supports the unique advancements, stats, and unlocks files of this snapshot. In co-op,
+  advancements/recipes merge with `OR` (any player) while **unlocks merge with `AND`** - an unlock counts in the
+  All Players view only when *every* roster player has obtained it.
 * **26.1+**: Players' advancements and statistic files are now within the `players/advancements` and `players/stats`
   folders instead of `advancements` and `stats`.
 
@@ -1016,11 +1327,13 @@ _(Submit your template through the [official discord](https://discord.gg/TyNgXDz
   language. Simply import your own `.ttf` or `.otf` file if needed (has to be within the `resources/fonts` folder).
 * **UI Language Support**: The UI language is hardcoded to english only the language files of display names can be
   changed.
-* **No Coop/Server Support**: Unfortunately this tracker doesn't fully support coop speedruns as it always updates based
-  on the
-  player file that has most recently been modified. This means Advancely doesn't `combine` progress of multiple
-  players. (e.g., each player completes different advancements). If you're playing on a server then the required player
-  files are not saved locally so Advancely can't read them.
+* **Local Co-op Support Only (No External Servers)**: Advancely now supports full co-op when one player runs a **lobby
+  as the Host** (see [Co-op Multiplayer](#co-op-multiplayer)) and the other players connect as Receivers on the same
+  LAN, via a VPN like ZeroTier/Hamachi, or through port forwarding. This means every Receiver mirrors the Host's
+  merged view of everyone's progress. It does **not** work on a fully external dedicated server where the players'
+  save files live remotely on the server - Advancely reads each player's local save files (for modern versions) or
+  relies on each Receiver uploading their own legacy stats file, and a hosted server never writes those files to any
+  player's machine.
 * **Overlay Recording**: Especially on a Windows machine and OBS you must use **Gamecapture** to capture the overlay.
   Window capture can cause weird issues.
 * **PNG Image Compatibility**: On Linux and macOS, custom icons must be standard **8-bit per channel (32-bit RGBA)**
