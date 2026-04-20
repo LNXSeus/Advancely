@@ -2653,14 +2653,17 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
             coop_host_input_error = false; // Reset each frame
 
-            if (ImGui::Button("Co-op Documentation")) {
-                open_content("https://github.com/LNXSeus/Advancely#co-op-multiplayer");
-            }
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.6f, 1.0f, 1.0f));
+            ImGui::Text("Co-op Documentation");
+            ImGui::PopStyleColor();
             if (ImGui::IsItemHovered()) {
                 char coop_doc_tooltip_buf[128];
                 snprintf(coop_doc_tooltip_buf, sizeof(coop_doc_tooltip_buf),
                          "Opens the full Co-op setup guide in your browser.");
                 ImGui::SetTooltip("%s", coop_doc_tooltip_buf);
+            }
+            if (ImGui::IsItemClicked()) {
+                open_content("https://github.com/LNXSeus/Advancely#co-op-multiplayer");
             }
             ImGui::Separator();
             ImGui::Spacing();
