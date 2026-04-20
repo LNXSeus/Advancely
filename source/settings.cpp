@@ -809,19 +809,28 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                       hermes_net_state == COOP_NET_CONNECTING);
 
             // Only show the StatsPerWorld checkbox for legacy versions.
-            // Disable for receivers (they always read global stats from host);
-            // hosts may toggle freely and it applies to their own local reads.
+            // Disable for receivers (they always fall back to global stats and sync
+            // to the host regardless), and also for hosts once a lobby is active
+            // so the setting can't change mid-session.
             if (selected_version <= MC_VERSION_1_6_4) {
                 const bool spw_is_receiver = (hermes_net_state == COOP_NET_CONNECTED);
-                if (spw_is_receiver) ImGui::BeginDisabled();
+                const bool spw_host_locked = !spw_is_receiver && hermes_net_active;
+                const bool spw_disabled = spw_is_receiver || spw_host_locked;
+                if (spw_disabled) ImGui::BeginDisabled();
                 ImGui::Checkbox("Using StatsPerWorld Mod", &temp_settings.using_stats_per_world_legacy);
-                if (spw_is_receiver) ImGui::EndDisabled();
-                if (ImGui::IsItemHovered(spw_is_receiver ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
+                if (spw_disabled) ImGui::EndDisabled();
+                if (ImGui::IsItemHovered(spw_disabled ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
                     char stats_per_world_tooltip_buffer[1024];
                     if (spw_is_receiver) {
                         snprintf(stats_per_world_tooltip_buffer, sizeof(stats_per_world_tooltip_buffer),
-                                 "Receivers always sync from the host's stats.\n"
+                                 "Receivers always fall back to global stats even with the mod active\n"
+                                 "(no world is created on the receiver side), and they sync their stats\n"
+                                 "up to the host rather than syncing from the host's stats.\n"
                                  "This setting only applies when running as host or in singleplayer.");
+                    } else if (spw_host_locked) {
+                        snprintf(stats_per_world_tooltip_buffer, sizeof(stats_per_world_tooltip_buffer),
+                                 "Cannot change while a lobby is active.\n"
+                                 "Stop the lobby first if you need to toggle this.");
                     } else {
                         snprintf(stats_per_world_tooltip_buffer, sizeof(stats_per_world_tooltip_buffer),
                                  "The StatsPerWorld Mod (with Legacy Fabric) allows legacy Minecraft versions\n"
@@ -2945,8 +2954,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::BulletText("Unlocks (25w14craftmine): Every player must obtain it (AND).");
                             if (ImGui::IsItemHovered()) {
                                 snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                         "Unlocks are per-player in craftmine. An unlock only counts as "
-                                         "complete when all players have obtained it.\n"
+                                         "Unlocks are per-player in craftmine.\n"
+                                         "An unlock only counts as complete when all players have obtained it.\n"
                                          "Use the player dropdown to see each player's individual unlocks.");
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
