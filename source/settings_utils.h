@@ -241,7 +241,6 @@ struct AppSettings {
     // --- Constructed Paths (from above settings) ---
     char template_path[MAX_PATH_LENGTH]; // The final, constructed path to the template .json file.
     char lang_path[MAX_PATH_LENGTH]; // The final, constructed path to the language .json file.
-    char snapshot_path[MAX_PATH_LENGTH]; // The final, constructed path to the legacy snapshot .json file.
     char notes_path[MAX_PATH_LENGTH]; // The final, constructed path to the notes .txt file.
 
     // --- Hotkeys ---
@@ -428,6 +427,32 @@ cJSON *settings_get_player_progress_subobj(cJSON *parent_obj, const char *uuid, 
  * and which will be updated with the constructed paths.
  */
 void construct_template_paths(AppSettings *settings);
+
+/**
+ * @brief Builds the base template path (without extension) that all template-related
+ * files share. Used as the prefix for template .json, lang, notes, and per-player
+ * legacy snapshot files.
+ *
+ * Output form: "<resources>/templates/<version>/<category>/<version_fmt>_<category><optional_flag>"
+ *
+ * @param settings The app settings (reads version_str, category, optional_flag).
+ * @param out      Output buffer.
+ * @param out_size Size of the output buffer.
+ */
+void construct_template_base_path(const AppSettings *settings, char *out, size_t out_size);
+
+/**
+ * @brief Builds a per-player legacy snapshot file path: "<template_base>_<lowercase_username>_snapshot.json".
+ * Username is lowercased to match the on-disk .dat filename convention and to avoid
+ * case-sensitivity issues on some filesystems. Case-insensitive uniqueness of usernames
+ * is enforced at co-op join time, so collisions in-session are impossible.
+ *
+ * @param template_base Base path (from construct_template_base_path).
+ * @param username      Player username (any case).
+ * @param out           Output buffer.
+ * @param out_size      Size of the output buffer.
+ */
+void build_player_snapshot_path(const char *template_base, const char *username, char *out, size_t out_size);
 
 #ifdef __cplusplus
 }

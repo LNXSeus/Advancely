@@ -147,7 +147,12 @@ struct Tracker {
     char advancements_path[MAX_PATH_LENGTH]; // Full path to the player's advancements .json file for the current world.
     char unlocks_path[MAX_PATH_LENGTH]; // Full path to the player's unlocks .json file (if applicable).
     char stats_path[MAX_PATH_LENGTH]; // Full path to the player's stats file (.json or .dat) for the current world.
-    char snapshot_path[MAX_PATH_LENGTH]; // Full path to the snapshot file for legacy stat tracking.
+
+    // Per-player legacy stat/achievement baselines. Replaces the old single-file snapshot
+    // system — each coop player gets their own baseline so merged progress subtracts the
+    // correct starting values. File-backed via {template_base}_{lowercase_username}_snapshot.json.
+    // Type: std::unordered_map<std::string, PlayerLegacySnapshot>* (managed in tracker.cpp).
+    void *legacy_player_snapshots;
 
     // Hermes live-update support
     HermesRotator hermes_rotator; // cipher tables, built once

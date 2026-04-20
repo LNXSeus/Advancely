@@ -1756,8 +1756,8 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
 }
 
 
-void construct_template_paths(AppSettings *settings) {
-    if (!settings) return;
+void construct_template_base_path(const AppSettings *settings, char *out, size_t out_size) {
+    if (!settings || !out || out_size == 0) return;
 
     // Create the filename version string by replacing '.' with '_'
     char mc_version_filename[MAX_PATH_LENGTH];
@@ -1767,18 +1767,38 @@ void construct_template_paths(AppSettings *settings) {
         if (*p == '.') *p = '_';
     }
 
-    // The directory is the same as the version string
-    char *mc_version_dir = settings->version_str;
-
-    char base_path[MAX_PATH_LENGTH];
-    snprintf(base_path, sizeof(base_path), "%s/templates/%s/%s/%s_%s%s",
+    snprintf(out, out_size, "%s/templates/%s/%s/%s_%s%s",
              get_resources_path(),
-             mc_version_dir,
+             settings->version_str,
              settings->category,
              mc_version_filename,
              settings->category,
-             settings->optional_flag
-    );
+             settings->optional_flag);
+}
+
+void build_player_snapshot_path(const char *template_base, const char *username, char *out, size_t out_size) {
+    if (!out || out_size == 0) return;
+    if (!template_base || !username || username[0] == '\0') {
+        out[0] = '\0';
+        return;
+    }
+
+    char lower_name[128];
+    size_t i = 0;
+    for (; username[i] != '\0' && i < sizeof(lower_name) - 1; i++) {
+        unsigned char c = (unsigned char) username[i];
+        lower_name[i] = (char) ((c >= 'A' && c <= 'Z') ? c + ('a' - 'A') : c);
+    }
+    lower_name[i] = '\0';
+
+    snprintf(out, out_size, "%s_%s_snapshot.json", template_base, lower_name);
+}
+
+void construct_template_paths(AppSettings *settings) {
+    if (!settings) return;
+
+    char base_path[MAX_PATH_LENGTH];
+    construct_template_base_path(settings, base_path, sizeof(base_path));
 
     // Construct the language file suffix (e.g., "_eng" or "")
     char lang_suffix[70];
@@ -1788,9 +1808,7 @@ void construct_template_paths(AppSettings *settings) {
         lang_suffix[0] = '\0';
     }
 
-    // Construct the main template, language file and (if needed) legacy snapshot paths
     snprintf(settings->template_path, MAX_PATH_LENGTH, "%s.json", base_path);
     snprintf(settings->lang_path, MAX_PATH_LENGTH, "%s_lang%s.json", base_path, lang_suffix);
-    snprintf(settings->snapshot_path, MAX_PATH_LENGTH, "%s_snapshot.json", base_path);
     snprintf(settings->notes_path, MAX_PATH_LENGTH, "%s_notes.txt", base_path);
 }

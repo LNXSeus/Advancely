@@ -195,7 +195,7 @@ Advancements" run to a heavily modded playthrough with hundreds of custom milest
       Supports nested "sub-stats" under a single category and allows for manual completion overrides via an in-app
       checkbox. Stats and sub-stats can also be auto-completed by linking them to other goals (advancements, unlocks,
       counters, etc.) with an `AND` (all must be completed) or `OR` (at least one) mode.
-    * **Unlocks**: Fully tracks the unique "unlocks" progression system from the `25w14craftmine` snapshot.
+    * **Unlocks**: Fully tracks the unique "unlocks" progression system of the `25w14craftmine` snapshot.
 * **Advanced Goal Types**:
     * **Custom Counters & Manual Goals**: For objectives that can't be automatically tracked (like counting structures
       visited), you can create manual checklist goals or counters with target values. You may link other goals to these

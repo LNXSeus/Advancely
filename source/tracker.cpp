@@ -492,239 +492,204 @@ static void tracker_reload_background_textures(Tracker *t, const AppSettings *se
 
 // FOR VERSION-SPECIFIC PARSERS
 
-/**
- * @brief (Era 1: 1.0-1.6.4) Save snapshot to file to simulate local stats.
- *
- * Thus remembers the snapshot even if the tracker is closed.
- *
- * @param t A pointer to the Tracker struct.
- */
-static void tracker_save_snapshot_to_file(Tracker *t) {
+// -------------------------------------------------------------------
+// Per-player legacy baseline snapshots (Era 1: 1.0-1.6.4, no StatsPerWorld).
+//
+// Stats in this era accumulate across worlds; to report per-world progress we
+// snapshot each player's stat values at world load and subtract that baseline
+// from live values. Each co-op player has their own baseline persisted to
+// {template_base}_{lowercase_username}_snapshot.json so merged progress
+// subtracts the correct starting values per player (not the host's for all).
+// -------------------------------------------------------------------
+struct PlayerLegacySnapshot {
+    std::unordered_map<std::string, int> stat_baselines;  // stat root_name -> baseline value
+    std::unordered_set<std::string> ach_baseline_done;    // achievement root_names earned at snapshot
+    long long playtime_snapshot = 0;                      // stat 1100 at snapshot
+    std::string snapshot_world_name;                      // world this baseline belongs to
+};
+
+static std::unordered_map<std::string, PlayerLegacySnapshot> *
+tracker_legacy_snap_map(Tracker *t) {
+    if (!t || !t->legacy_player_snapshots) return nullptr;
+    return static_cast<std::unordered_map<std::string, PlayerLegacySnapshot> *>(t->legacy_player_snapshots);
+}
+
+static std::string tracker_lower_username(const char *username) {
+    std::string s;
+    if (!username) return s;
+    s.reserve(strlen(username));
+    for (const char *p = username; *p != '\0'; p++) {
+        unsigned char c = (unsigned char) *p;
+        s.push_back((char) ((c >= 'A' && c <= 'Z') ? c + ('a' - 'A') : c));
+    }
+    return s;
+}
+
+static void tracker_build_legacy_snapshot_path(const AppSettings *settings, const char *lower_username,
+                                               char *out, size_t out_size) {
+    if (!out || out_size == 0) return;
+    out[0] = '\0';
+    if (!settings) return;
+    char base[MAX_PATH_LENGTH];
+    construct_template_base_path(settings, base, sizeof(base));
+    build_player_snapshot_path(base, lower_username, out, out_size);
+}
+
+static void tracker_save_player_snapshot_to_file(const AppSettings *settings,
+                                                 const std::string &lower_username,
+                                                 const PlayerLegacySnapshot &snap) {
+    char path[MAX_PATH_LENGTH];
+    tracker_build_legacy_snapshot_path(settings, lower_username.c_str(), path, sizeof(path));
+    if (path[0] == '\0') return;
+
     cJSON *root = cJSON_CreateObject();
     if (!root) return;
 
-    // Save metadata
-    cJSON_AddStringToObject(root, "snapshot_world_name", t->template_data->snapshot_world_name);
-    cJSON_AddNumberToObject(root, "playtime_snapshot", t->template_data->playtime_snapshot);
+    cJSON_AddStringToObject(root, "snapshot_world_name", snap.snapshot_world_name.c_str());
+    cJSON_AddNumberToObject(root, "playtime_snapshot", (double) snap.playtime_snapshot);
 
-    // Save achievement snapshot
-    cJSON *ach_snapshot = cJSON_CreateObject();
-    for (int i = 0; i < t->template_data->advancement_count; i++) {
-        TrackableCategory *ach = t->template_data->advancements[i];
-        // Add the achievement to the snapshot with its status
-        cJSON_AddBoolToObject(ach_snapshot, ach->root_name, ach->done_in_snapshot);
+    cJSON *ach_obj = cJSON_CreateObject();
+    for (const auto &name : snap.ach_baseline_done) {
+        cJSON_AddBoolToObject(ach_obj, name.c_str(), true);
     }
-    cJSON_AddItemToObject(root, "achievements", ach_snapshot);
+    cJSON_AddItemToObject(root, "achievements", ach_obj);
 
-    // Save stat snapshot
-    cJSON *stat_snapshot = cJSON_CreateObject();
-    for (int i = 0; i < t->template_data->stat_count; i++) {
-        for (int j = 0; j < t->template_data->stats[i]->criteria_count; j++) {
-            TrackableItem *sub_stat = t->template_data->stats[i]->criteria[j];
-
-            // IMPORTANT Preventing duplicate entries in snapshot file
-            if (!cJSON_HasObjectItem(stat_snapshot, sub_stat->root_name)) {
-                cJSON_AddNumberToObject(stat_snapshot, sub_stat->root_name, sub_stat->initial_progress);
-            }
-        }
+    cJSON *stat_obj = cJSON_CreateObject();
+    for (const auto &kv : snap.stat_baselines) {
+        cJSON_AddNumberToObject(stat_obj, kv.first.c_str(), kv.second);
     }
-    cJSON_AddItemToObject(root, "stats", stat_snapshot);
+    cJSON_AddItemToObject(root, "stats", stat_obj);
 
-    // Write to file
-    FILE *file = fopen(t->snapshot_path, "w");
+    FILE *file = fopen(path, "w");
     if (file) {
         char *json_str = cJSON_Print(root);
-        fputs(json_str, file);
+        if (json_str) {
+            fputs(json_str, file);
+            free(json_str);
+        }
         fclose(file);
-        free(json_str);
-        json_str = nullptr;
-        log_message(LOG_INFO, "[TRACKER] Snapshot saved to %s\n", t->snapshot_path);
+        log_message(LOG_INFO, "[TRACKER] Legacy snapshot saved to %s\n", path);
     }
-    cJSON_Delete(root); // Clean up
+    cJSON_Delete(root);
 }
 
-/**
- * @brief (Era 1: 1.0-1.6.4) Load snapshot from file to simulate local stats.
- *
- * This is important when the tracker gets re-opened so it can "remember" the snapshot.
- *
- * @param t A pointer to the Tracker struct.
- */
-static void tracker_load_snapshot_from_file(Tracker *t, const AppSettings *settings) {
-    (void) settings;
+static bool tracker_load_player_snapshot_from_file(const AppSettings *settings,
+                                                   const std::string &lower_username,
+                                                   PlayerLegacySnapshot *out) {
+    if (!out) return false;
+    char path[MAX_PATH_LENGTH];
+    tracker_build_legacy_snapshot_path(settings, lower_username.c_str(), path, sizeof(path));
+    if (path[0] == '\0') return false;
 
-    cJSON *snapshot_json = cJSON_from_file(t->snapshot_path);
-    if (!snapshot_json) {
-        log_message(LOG_INFO, "[TRACKER] No existing snapshot file found for this configuration.\n");
+    cJSON *json = cJSON_from_file(path);
+    if (!json) return false;
 
-        return;
-    }
+    out->stat_baselines.clear();
+    out->ach_baseline_done.clear();
+    out->playtime_snapshot = 0;
+    out->snapshot_world_name.clear();
 
-    // Load metadata
-    // It should keep the snapshot as long as player is on the same world
-    cJSON *world_name_json = cJSON_GetObjectItem(snapshot_json, "snapshot_world_name");
-    if (cJSON_IsString(world_name_json)) {
-        strncpy(t->template_data->snapshot_world_name, world_name_json->valuestring, MAX_PATH_LENGTH - 1);
-        t->template_data->snapshot_world_name[MAX_PATH_LENGTH - 1] = '\0';
-    }
-    cJSON *playtime_json = cJSON_GetObjectItem(snapshot_json, "playtime_snapshot");
-    if (cJSON_IsNumber(playtime_json)) {
-        t->template_data->playtime_snapshot = playtime_json->valuedouble;
-    }
+    cJSON *world = cJSON_GetObjectItem(json, "snapshot_world_name");
+    if (cJSON_IsString(world)) out->snapshot_world_name = world->valuestring;
 
-    // Load achievement snapshot
-    cJSON *ach_snapshot = cJSON_GetObjectItem(snapshot_json, "achievements");
-    if (ach_snapshot) {
-        for (int i = 0; i < t->template_data->advancement_count; i++) {
-            TrackableCategory *ach = t->template_data->advancements[i];
-            ach->done_in_snapshot = cJSON_IsTrue(cJSON_GetObjectItem(ach_snapshot, ach->root_name));
+    cJSON *pt = cJSON_GetObjectItem(json, "playtime_snapshot");
+    if (cJSON_IsNumber(pt)) out->playtime_snapshot = (long long) pt->valuedouble;
+
+    cJSON *ach_obj = cJSON_GetObjectItem(json, "achievements");
+    if (cJSON_IsObject(ach_obj)) {
+        for (cJSON *c = ach_obj->child; c; c = c->next) {
+            if (cJSON_IsTrue(c) && c->string) out->ach_baseline_done.insert(c->string);
         }
     }
 
-    // Load stat snapshot
-    cJSON *stat_snapshot = cJSON_GetObjectItem(snapshot_json, "stats");
-    if (stat_snapshot) {
-        for (int i = 0; i < t->template_data->stat_count; i++) {
-            for (int j = 0; j < t->template_data->stats[i]->criteria_count; j++) {
-                TrackableItem *sub_stat = t->template_data->stats[i]->criteria[j];
-                cJSON *stat_val = cJSON_GetObjectItem(stat_snapshot, sub_stat->root_name);
-                if (cJSON_IsNumber(stat_val)) {
-                    sub_stat->initial_progress = stat_val->valueint;
-                }
+    cJSON *stat_obj = cJSON_GetObjectItem(json, "stats");
+    if (cJSON_IsObject(stat_obj)) {
+        for (cJSON *c = stat_obj->child; c; c = c->next) {
+            if (cJSON_IsNumber(c) && c->string) {
+                out->stat_baselines[c->string] = c->valueint;
             }
         }
     }
-    cJSON_Delete(snapshot_json);
-    log_message(LOG_INFO, "[TRACKER] Snapshot successfully loaded from %s\n", t->snapshot_path);
+
+    cJSON_Delete(json);
+    log_message(LOG_INFO, "[TRACKER] Legacy snapshot loaded from %s\n", path);
+    return true;
 }
 
-/**
- * @brief (Era 1: 1.0-1.6.4) Takes a snapshot of the current global stats including achievements.
- * This is called when a new world is loaded to establish a baseline for progress.
- */
-static void tracker_snapshot_legacy_stats(Tracker *t, const AppSettings *settings) {
-    (void) settings;
-    cJSON *player_stats_json = cJSON_from_file(t->stats_path);
-    if (!player_stats_json) {
-        log_message(LOG_ERROR, "[TRACKER] Could not read stats file to create snapshot.\n");
-        return;
-    }
+// Captures a fresh baseline for one player from their stats .dat. Writes to map + disk.
+static const PlayerLegacySnapshot *
+tracker_capture_player_legacy_snapshot(Tracker *t, const AppSettings *settings,
+                                       const std::string &lower_username,
+                                       const char *stats_path, const char *world_name) {
+    auto *map = tracker_legacy_snap_map(t);
+    if (!map) return nullptr;
 
-    // Get the stats-change array within the stats object
-    cJSON *stats_change = cJSON_GetObjectItem(player_stats_json, "stats-change");
-    if (!cJSON_IsArray(stats_change)) {
-        cJSON_Delete(player_stats_json);
-        return;
-    }
+    PlayerLegacySnapshot snap;
+    snap.snapshot_world_name = world_name ? world_name : "";
 
-    // Set the snapshot world name
-    strncpy(t->template_data->snapshot_world_name, t->world_name, MAX_PATH_LENGTH - 1);
-    t->template_data->snapshot_world_name[MAX_PATH_LENGTH - 1] = '\0';
-    t->template_data->playtime_snapshot = 0;
-
-    // Reset all initial progress fields first
-    for (int i = 0; i < t->template_data->stat_count; i++) {
-        for (int j = 0; j < t->template_data->stats[i]->criteria_count; j++) {
-            t->template_data->stats[i]->criteria[j]->initial_progress = 0;
-        }
-    }
-    for (int i = 0; i < t->template_data->advancement_count; i++) {
-        t->template_data->advancements[i]->done_in_snapshot = false;
-    }
-
-
-    // Iterate the live stats and store them as the initial values
-    cJSON *stat_entry;
-    cJSON_ArrayForEach(stat_entry, stats_change) {
-        cJSON *item = stat_entry->child; // Then we go into the curly brackets
-        if (item) {
-            const char *key = item->string;
-            int value = item->valueint;
-
-            // Snapshot playtime
-            if (strcmp(key, "1100") == 0) {
-                t->template_data->playtime_snapshot = value;
-            }
-
-            // Snapshot other tracked stats (including playtime)
-            for (int i = 0; i < t->template_data->stat_count; i++) {
-                for (int j = 0; j < t->template_data->stats[i]->criteria_count; j++) {
-                    TrackableItem *sub_stat = t->template_data->stats[i]->criteria[j];
-                    if (strcmp(sub_stat->root_name, key) == 0) {
-                        sub_stat->initial_progress = value;
-                    }
-                }
-            }
-
-            // Snapshot achievements
-            for (int i = 0; i < t->template_data->advancement_count; i++) {
-                TrackableCategory *ach = t->template_data->advancements[i];
-                if (strcmp(ach->root_name, key) == 0 && value >= 1) {
-                    ach->done_in_snapshot = true;
-                }
-            }
-        }
-    }
-    cJSON_Delete(player_stats_json);
-
-    // SAVE TO SNAPSHOT FILE
-    tracker_save_snapshot_to_file(t);
-
-    // ---- DEBUGGING CODE TO PRINT WHAT THE SNAPSHOT LOOKS LIKE ----
-    log_message(LOG_INFO, "\n--- STARTING SNAPSHOT FOR WORLD: %s ---\n", t->template_data->snapshot_world_name);
-
-    // Re-load the JSON file just for this debug print (this is inefficient but simple for debugging)
-    cJSON *debug_json = cJSON_from_file(t->stats_path);
-    if (debug_json) {
-        cJSON *stats_change = cJSON_GetObjectItem(debug_json, "stats-change");
+    cJSON *stats_json = (stats_path && stats_path[0] != '\0') ? cJSON_from_file(stats_path) : nullptr;
+    if (stats_json) {
+        cJSON *stats_change = cJSON_GetObjectItem(stats_json, "stats-change");
         if (cJSON_IsArray(stats_change)) {
-            log_message(LOG_INFO, "\n--- LEGACY ACHIEVEMENT CHECK ---\n");
-            // Loop through achievements from the template
-            for (int i = 0; i < t->template_data->advancement_count; i++) {
-                TrackableCategory *ach = t->template_data->advancements[i];
-                bool found = false;
-                int value = 0;
+            cJSON *entry;
+            cJSON_ArrayForEach(entry, stats_change) {
+                cJSON *item = entry->child;
+                if (!item || !item->string) continue;
+                const char *key = item->string;
+                int value = item->valueint;
 
-                // Search for this achievement in the player's stats data
-                cJSON *stat_entry;
-                cJSON_ArrayForEach(stat_entry, stats_change) {
-                    cJSON *item = stat_entry->child;
-                    if (item && strcmp(item->string, ach->root_name) == 0) {
-                        found = true;
-                        value = item->valueint;
-                        break;
-                    }
-                }
-
-                if (found) {
-                    log_message(LOG_INFO, "  - Achievement '%s' (ID: %s): FOUND with value: %d\n", ach->display_name,
-                                ach->root_name,
-                                value);
-                } else {
-                    log_message(LOG_INFO, "  - Achievement '%s' (ID: %s): NOT FOUND in player data\n",
-                                ach->display_name,
-                                ach->root_name);
-                }
+                if (strcmp(key, "1100") == 0) snap.playtime_snapshot = value;
+                snap.stat_baselines[key] = value;
+                // Legacy achievements share the stats-change array (value >= 1 means earned).
+                // We record any entry that's earned; the merge step filters to template IDs.
+                if (value >= 1) snap.ach_baseline_done.insert(key);
             }
         }
-        cJSON_Delete(debug_json);
+        cJSON_Delete(stats_json);
+    } else if (stats_path && stats_path[0] != '\0') {
+        log_message(LOG_INFO, "[TRACKER] No legacy stats file yet for baseline capture: %s\n", stats_path);
     }
 
+    (*map)[lower_username] = std::move(snap);
+    tracker_save_player_snapshot_to_file(settings, lower_username, (*map)[lower_username]);
+    log_message(LOG_INFO, "[TRACKER] Captured legacy baseline for '%s' (world '%s').\n",
+                lower_username.c_str(), world_name ? world_name : "");
+    return &(*map)[lower_username];
+}
 
-    log_message(LOG_INFO, "\n--- LEGACY STAT SNAPSHOT ---\n");
-    log_message(LOG_INFO, "Playtime Snapshot: %lld ticks\n", t->template_data->playtime_snapshot);
+// Returns an up-to-date baseline for `username` + `world_name`. Loads from disk if
+// a matching file exists; otherwise captures fresh from stats_path.
+static const PlayerLegacySnapshot *
+tracker_ensure_player_legacy_baseline(Tracker *t, const AppSettings *settings,
+                                      const char *username, const char *stats_path,
+                                      const char *world_name) {
+    if (!t || !settings || !username || username[0] == '\0') return nullptr;
+    auto *map = tracker_legacy_snap_map(t);
+    if (!map) return nullptr;
 
-    // Use a nested loop to print the stats
-    for (int i = 0; i < t->template_data->stat_count; i++) {
-        TrackableCategory *stat_cat = t->template_data->stats[i];
-        log_message(LOG_INFO, "  - Category '%s':\n", stat_cat->display_name);
-        for (int j = 0; j < stat_cat->criteria_count; j++) {
-            TrackableItem *sub_stat = stat_cat->criteria[j];
-            log_message(LOG_INFO, "    - Sub-Stat '%s' (ID: %s): Snapshot Value = %d\n",
-                        sub_stat->display_name, sub_stat->root_name, sub_stat->initial_progress);
+    std::string lower = tracker_lower_username(username);
+    const std::string world = world_name ? world_name : "";
+
+    auto it = map->find(lower);
+    if (it != map->end() && it->second.snapshot_world_name == world) {
+        return &it->second;
+    }
+
+    if (it == map->end()) {
+        PlayerLegacySnapshot disk_snap;
+        if (tracker_load_player_snapshot_from_file(settings, lower, &disk_snap) &&
+            disk_snap.snapshot_world_name == world) {
+            auto ins = map->emplace(lower, std::move(disk_snap));
+            return &ins.first->second;
         }
     }
-    log_message(LOG_INFO, "--- END OF SNAPSHOT ---\n\n");
+
+    return tracker_capture_player_legacy_snapshot(t, settings, lower, stats_path, world_name);
+}
+
+static void tracker_clear_legacy_player_snapshots(Tracker *t) {
+    auto *map = tracker_legacy_snap_map(t);
+    if (map) map->clear();
 }
 
 /**
@@ -807,8 +772,13 @@ static bool tracker_view_editable_by_self(const Tracker *t, const AppSettings *s
 
 /**
  * @brief (Era 1: 1.0-1.6.4) Parses legacy .dat stats files.
+ *
+ * `baseline` is the local player's pre-world baseline (or nullptr when
+ * StatsPerWorld is enabled and no baseline is used). Stats are baseline-
+ * subtracted; done_in_snapshot is set from the baseline's achievement set.
  */
-static void tracker_update_stats_legacy(Tracker *t, const cJSON *player_stats_json, const char *uuid) {
+static void tracker_update_stats_legacy(Tracker *t, const cJSON *player_stats_json, const char *uuid,
+                                        const PlayerLegacySnapshot *baseline) {
     if (!player_stats_json) return;
 
     cJSON *stats_change = cJSON_GetObjectItem(player_stats_json, "stats-change");
@@ -831,10 +801,12 @@ static void tracker_update_stats_legacy(Tracker *t, const cJSON *player_stats_js
             }
         }
         ach->done = is_currently_done;
+        ach->done_in_snapshot = baseline &&
+                                baseline->ach_baseline_done.find(ach->root_name) !=
+                                baseline->ach_baseline_done.end();
 
         // If the achievement is marked as done in the player's file,
         // it should always count towards the total, regardless of the snapshot.
-        // Previously it was with !ach->done_in_snapshot
         if (ach->done) t->template_data->advancements_completed_count++;
     }
 
@@ -866,7 +838,12 @@ static void tracker_update_stats_legacy(Tracker *t, const cJSON *player_stats_js
             cJSON_ArrayForEach(stat_entry, stats_change) {
                 cJSON *item = stat_entry->child;
                 if (item && strcmp(item->string, sub_stat->root_name) == 0) {
-                    int diff = item->valueint - sub_stat->initial_progress; // Difference to snapshot
+                    int baseline_val = 0;
+                    if (baseline) {
+                        auto it = baseline->stat_baselines.find(sub_stat->root_name);
+                        if (it != baseline->stat_baselines.end()) baseline_val = it->second;
+                    }
+                    int diff = item->valueint - baseline_val;
                     sub_stat->progress = diff > 0 ? diff : 0;
                     break;
                 }
@@ -919,7 +896,8 @@ static void tracker_update_stats_legacy(Tracker *t, const cJSON *player_stats_js
     cJSON_ArrayForEach(stat_entry, stats_change) {
         cJSON *item = stat_entry->child;
         if (item && strcmp(item->string, "1100") == 0) {
-            long long diff = item->valueint - t->template_data->playtime_snapshot;
+            long long baseline_pt = baseline ? baseline->playtime_snapshot : 0;
+            long long diff = item->valueint - baseline_pt;
             t->template_data->play_time_ticks = (diff > 0) ? diff : 0;
             break;
         }
@@ -3376,7 +3354,8 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     t->advancements_path[0] = '\0';
     t->unlocks_path[0] = '\0';
     t->stats_path[0] = '\0';
-    t->snapshot_path[0] = '\0';
+
+    t->legacy_player_snapshots = new std::unordered_map<std::string, PlayerLegacySnapshot>();
 
     // Initialize camera and zoom from settings.json
     t->camera_offset = ImVec2(settings->view_pan_x, settings->view_pan_y);
@@ -3678,8 +3657,14 @@ static void coop_merge_achievements_mid(TemplateData *td, const cJSON *player_st
 /**
  * @brief Merges one player's legacy achievement data into TemplateData (accumulative).
  * Legacy (<=1.6.4): achievements are in stats-change array.
+ *
+ * `ach_baseline_done` is this player's baseline: achievements they had before
+ * the current world. Caller must pre-initialize each ach->done_in_snapshot = true
+ * before the first call; we flip to false here for any player missing the ach
+ * from their baseline, yielding "done_in_snapshot = true iff ALL players held it".
  */
-static void coop_merge_achievements_legacy(TemplateData *td, const cJSON *player_stats_json) {
+static void coop_merge_achievements_legacy(TemplateData *td, const cJSON *player_stats_json,
+                                           const std::unordered_set<std::string> *ach_baseline_done) {
     if (!player_stats_json) return;
 
     cJSON *stats_change = cJSON_GetObjectItem(player_stats_json, "stats-change");
@@ -3695,6 +3680,11 @@ static void coop_merge_achievements_legacy(TemplateData *td, const cJSON *player
                 ach->done = true; // OR across players
                 break;
             }
+        }
+
+        // AND across players: if any player lacks this in their baseline, it's "new".
+        if (!ach_baseline_done || ach_baseline_done->find(ach->root_name) == ach_baseline_done->end()) {
+            ach->done_in_snapshot = false;
         }
     }
 }
@@ -3791,20 +3781,31 @@ static void coop_merge_stats_mid(TemplateData *td, const cJSON *player_stats_jso
 /**
  * @brief Merges one player's stat data using legacy .dat format (<=1.6.4).
  * Legacy stats are in "stats-change" array with numeric IDs.
+ *
+ * `stat_baselines` is this player's per-stat baseline (from their baseline
+ * snapshot). Each raw stat value has the baseline subtracted before merging so
+ * each player contributes only session progress.
  */
 static void coop_merge_stats_legacy(TemplateData *td, const cJSON *player_stats_json,
-                                    CoopStatMerge merge_mode) {
+                                    CoopStatMerge merge_mode,
+                                    const std::unordered_map<std::string, int> *stat_baselines) {
     if (!player_stats_json) return;
 
     cJSON *stats_change = cJSON_GetObjectItem(player_stats_json, "stats-change");
     if (!cJSON_IsArray(stats_change)) return;
 
-    // Merge legacy playtime (stat ID 1100)
+    // Merge legacy playtime (stat ID 1100), max across players, baseline-subtracted.
     cJSON *stat_entry_iter;
     cJSON_ArrayForEach(stat_entry_iter, stats_change) {
         cJSON *item = stat_entry_iter->child;
         if (item && strcmp(item->string, "1100") == 0) {
-            long long player_time = (long long) item->valueint;
+            long long baseline_pt = 0;
+            if (stat_baselines) {
+                auto it = stat_baselines->find("1100");
+                if (it != stat_baselines->end()) baseline_pt = it->second;
+            }
+            long long player_time = (long long) item->valueint - baseline_pt;
+            if (player_time < 0) player_time = 0;
             if (player_time > td->play_time_ticks) {
                 td->play_time_ticks = player_time;
             }
@@ -3822,7 +3823,12 @@ static void coop_merge_stats_legacy(TemplateData *td, const cJSON *player_stats_
             cJSON_ArrayForEach(stat_entry, stats_change) {
                 cJSON *item_inner = stat_entry->child;
                 if (item_inner && strcmp(item_inner->string, sub_stat->root_name) == 0) {
-                    int player_value = item_inner->valueint - sub_stat->initial_progress;
+                    int baseline = 0;
+                    if (stat_baselines) {
+                        auto it = stat_baselines->find(sub_stat->root_name);
+                        if (it != stat_baselines->end()) baseline = it->second;
+                    }
+                    int player_value = item_inner->valueint - baseline;
                     if (player_value < 0) player_value = 0;
                     if (merge_mode == COOP_STAT_CUMULATIVE) {
                         sub_stat->progress += player_value;
@@ -4121,17 +4127,23 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
 
     // Legacy Snapshot Logic
     // ONLY USING SNAPSHOTTING LOGIC IF *NOT* USING StatsPerWorld MOD
-    // If StatsPerWorld is enabled, we don't need to take snapshots, but read directly from the
-    // per-world stat files, like mid-era versions, but still reading with IDs and not strings
-    // If the version is legacy and the current world name doesn't match the snapshot's world name,
-    // it means we've loaded a new world and need to take a new snapshot of the global stats
-    if (version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy && strcmp(
-            t->world_name, t->template_data->snapshot_world_name) != 0) {
-        log_message(LOG_INFO, "[TRACKER] Legacy world change detected. Taking new stat snapshot for world: %s\n",
-                    t->world_name);
-
-        tracker_snapshot_legacy_stats(t, settings);
-        // Take a new snapshot when StatsPerWorld is disabled in legacy version
+    // If StatsPerWorld is enabled, we read directly from per-world stat files (no baseline needed).
+    // Otherwise, each player has their own baseline captured/loaded on world change.
+    const PlayerLegacySnapshot *legacy_baseline = nullptr;
+    if (version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy) {
+        if (strcmp(t->world_name, t->template_data->snapshot_world_name) != 0) {
+            log_message(LOG_INFO, "[TRACKER] Legacy world change detected. Invalidating baselines for world: %s\n",
+                        t->world_name);
+            tracker_clear_legacy_player_snapshots(t);
+            strncpy(t->template_data->snapshot_world_name, t->world_name, MAX_PATH_LENGTH - 1);
+            t->template_data->snapshot_world_name[MAX_PATH_LENGTH - 1] = '\0';
+            t->template_data->playtime_snapshot = 0;
+        }
+        legacy_baseline = tracker_ensure_player_legacy_baseline(
+            t, settings, settings->local_player.username, t->stats_path, t->world_name);
+        if (legacy_baseline) {
+            t->template_data->playtime_snapshot = legacy_baseline->playtime_snapshot;
+        }
     }
 
     // Load all necessary player files ONCE
@@ -4145,7 +4157,7 @@ void tracker_update(Tracker *t, const AppSettings *settings) {
     const char *self_uuid = settings->local_player.uuid;
     if (version <= MC_VERSION_1_6_4) {
         // If StatsPerWorld mod is enabled, stats file is per-world, still using IDs
-        tracker_update_stats_legacy(t, player_stats_json, self_uuid);
+        tracker_update_stats_legacy(t, player_stats_json, self_uuid, legacy_baseline);
     } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_11_2) {
         // Mid-Era: 1.7.2 through 1.11.2
         // This function handles both achievements and stats for this range.
@@ -4207,16 +4219,28 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
             sizeof(t->template_data->last_known_world_name) - 1);
     t->template_data->last_known_world_name[sizeof(t->template_data->last_known_world_name) - 1] = '\0';
 
-    // Legacy snapshot logic (applies to host's own files for world-change detection)
-    if (version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy &&
-        strcmp(t->world_name, t->template_data->snapshot_world_name) != 0) {
-        log_message(LOG_INFO, "[COOP] Legacy world change detected. Taking new stat snapshot for world: %s\n",
+    // Legacy baselines: on world change, invalidate all per-player baselines so each
+    // player gets a fresh capture from their own stats file on first-seen this tick.
+    const bool legacy_mode = (version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy);
+    if (legacy_mode && strcmp(t->world_name, t->template_data->snapshot_world_name) != 0) {
+        log_message(LOG_INFO, "[COOP] Legacy world change detected. Invalidating baselines for world: %s\n",
                     t->world_name);
-        tracker_snapshot_legacy_stats(t, settings);
+        tracker_clear_legacy_player_snapshots(t);
+        strncpy(t->template_data->snapshot_world_name, t->world_name, MAX_PATH_LENGTH - 1);
+        t->template_data->snapshot_world_name[MAX_PATH_LENGTH - 1] = '\0';
+        t->template_data->playtime_snapshot = 0;
     }
 
     // 1. Reset all progress to zero before merging
     coop_reset_template_progress(t->template_data);
+
+    // done_in_snapshot = AND across players ("(Old)" only if everyone held it pre-session).
+    // Start true; per-player merge flips to false for any player missing it from baseline.
+    if (legacy_mode) {
+        for (int i = 0; i < t->template_data->advancement_count; i++) {
+            t->template_data->advancements[i]->done_in_snapshot = true;
+        }
+    }
 
     // Clear the Hermes per-player stat cache — the file-based merge is authoritative.
     // It will be re-seeded below with each player's values from their JSON files.
@@ -4247,8 +4271,17 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
 
         // Merge advancements/achievements
         if (version <= MC_VERSION_1_6_4) {
-            coop_merge_achievements_legacy(t->template_data, player_stats_json);
-            coop_merge_stats_legacy(t->template_data, player_stats_json, settings->coop_stat_merge);
+            const PlayerLegacySnapshot *player_baseline = nullptr;
+            if (legacy_mode) {
+                player_baseline = tracker_ensure_player_legacy_baseline(
+                    t, settings, player->username, player_stats_path, t->world_name);
+            }
+            coop_merge_achievements_legacy(
+                t->template_data, player_stats_json,
+                player_baseline ? &player_baseline->ach_baseline_done : nullptr);
+            coop_merge_stats_legacy(
+                t->template_data, player_stats_json, settings->coop_stat_merge,
+                player_baseline ? &player_baseline->stat_baselines : nullptr);
         } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_11_2) {
             coop_merge_achievements_mid(t->template_data, player_stats_json);
             coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge);
@@ -4386,8 +4419,30 @@ void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, 
     cJSON *player_unlocks_json = (player_unlocks_path[0] != '\0') ? cJSON_from_file(player_unlocks_path) : nullptr;
 
     if (version <= MC_VERSION_1_6_4) {
-        coop_merge_achievements_legacy(t->template_data, player_stats_json);
-        coop_merge_stats_legacy(t->template_data, player_stats_json, settings->coop_stat_merge);
+        const bool legacy_mode = !settings->using_stats_per_world_legacy;
+        // Invalidate on world change; then initialize done_in_snapshot to true for AND semantics.
+        if (legacy_mode && strcmp(t->world_name, t->template_data->snapshot_world_name) != 0) {
+            tracker_clear_legacy_player_snapshots(t);
+            strncpy(t->template_data->snapshot_world_name, t->world_name, MAX_PATH_LENGTH - 1);
+            t->template_data->snapshot_world_name[MAX_PATH_LENGTH - 1] = '\0';
+            t->template_data->playtime_snapshot = 0;
+        }
+        if (legacy_mode) {
+            for (int i = 0; i < t->template_data->advancement_count; i++) {
+                t->template_data->advancements[i]->done_in_snapshot = true;
+            }
+        }
+        const PlayerLegacySnapshot *player_baseline = nullptr;
+        if (legacy_mode) {
+            player_baseline = tracker_ensure_player_legacy_baseline(
+                t, settings, player->username, player_stats_path, t->world_name);
+        }
+        coop_merge_achievements_legacy(
+            t->template_data, player_stats_json,
+            player_baseline ? &player_baseline->ach_baseline_done : nullptr);
+        coop_merge_stats_legacy(
+            t->template_data, player_stats_json, settings->coop_stat_merge,
+            player_baseline ? &player_baseline->stat_baselines : nullptr);
     } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_11_2) {
         coop_merge_achievements_mid(t->template_data, player_stats_json);
         coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge);
@@ -9496,14 +9551,25 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     ImVec2 notes_text_size = ImGui::CalcTextSize("Notes");
     float notes_checkbox_width = frame_height + style.ItemInnerSpacing.x + notes_text_size.x + frame_padding_x * 0.5f;
 
+    // Player dropdown is conditionally rendered between search box and Lock Layout
+    // when a co-op lobby is active. Reserve its width (must match the SetNextItemWidth
+    // used below) so subsequent controls don't get shoved off-screen.
+    const float player_dropdown_width = 160.0f;
+    CoopNetState controls_coop_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
+    const bool controls_show_dropdown =
+        (controls_coop_state == COOP_NET_LISTENING || controls_coop_state == COOP_NET_CONNECTED) &&
+        settings->coop_player_count > 0;
+
     // Calculate total width using ImGui's ItemSpacing
-    // 6 elements = 5 gaps between them
     float controls_total_width = clear_button_width + button_padding_x +
                                  search_box_width + button_padding_x +
                                  lock_checkbox_width + button_padding_x +
                                  reset_checkbox_width + button_padding_x +
                                  manual_layout_checkbox_width + button_padding_x +
                                  notes_checkbox_width;
+    if (controls_show_dropdown) {
+        controls_total_width += player_dropdown_width + button_padding_x;
+    }
 
     // Calculate button height consistently
     float control_height = frame_height; // All controls should share the same height
@@ -9958,6 +10024,11 @@ void tracker_reinit_template(Tracker *t, AppSettings *settings) {
     // swap would misalign fields or drop goals.
     tracker_clear_coop_snapshot_cache(t);
 
+    // Legacy per-player baselines are keyed to template_base in their filenames,
+    // so a template change effectively orphans them. Clear in-memory state so
+    // the next update re-loads / re-captures against the new template.
+    tracker_clear_legacy_player_snapshots(t);
+
     // --- BACKUP SCROLL STATE ---
     // We use a map to store the scroll_y value keyed by the category's root_name.
     // This ensures we restore the correct scroll position to the correct category
@@ -10030,13 +10101,11 @@ void tracker_reinit_template(Tracker *t, AppSettings *settings) {
 void tracker_reinit_paths(Tracker *t, const AppSettings *settings) {
     if (!t || !settings) return;
 
-    // Copy the template and lang paths and snapshot path (for legacy snapshots if needed)
+    // Copy the template and lang paths (legacy snapshot paths are per-player, built on demand)
     strncpy(t->advancement_template_path, settings->template_path, MAX_PATH_LENGTH - 1);
     t->advancement_template_path[MAX_PATH_LENGTH - 1] = '\0';
     strncpy(t->lang_path, settings->lang_path, MAX_PATH_LENGTH - 1);
     t->lang_path[MAX_PATH_LENGTH - 1] = '\0';
-    strncpy(t->snapshot_path, settings->snapshot_path, MAX_PATH_LENGTH - 1);
-    t->snapshot_path[MAX_PATH_LENGTH - 1] = '\0';
 
 
     MC_Version version = settings_get_version_from_string(settings->version_str);
@@ -10934,9 +11003,6 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
         strncpy(t->lang_path, settings->lang_path, MAX_PATH_LENGTH - 1);
         t->lang_path[MAX_PATH_LENGTH - 1] = '\0';
 
-        strncpy(t->snapshot_path, settings->snapshot_path, MAX_PATH_LENGTH - 1);
-        t->snapshot_path[MAX_PATH_LENGTH - 1] = '\0';
-
         strncpy(t->notes_path, settings->notes_path, MAX_PATH_LENGTH - 1);
         t->notes_path[MAX_PATH_LENGTH - 1] = '\0';
 
@@ -11216,10 +11282,8 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
     }
     cJSON_Delete(settings_root);
 
-    // LOADING SNAPSHOT FROM FILE - ONLY FOR VERSION 1.0-1.6.4 WITHOUT StatsPerWorld MOD
-    if (version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy) {
-        tracker_load_snapshot_from_file(t, settings);
-    }
+    // Legacy baselines are loaded lazily per-player in tracker_update /
+    // tracker_update_coop_merged. Nothing to preload here.
 
     cJSON_Delete(template_json);
     if (lang_json) {
@@ -11314,6 +11378,11 @@ void tracker_free(Tracker **tracker, AppSettings *settings) {
         if (t->hermes_coop_stat_cache) {
             delete static_cast<std::unordered_map<std::string, int> *>(t->hermes_coop_stat_cache);
             t->hermes_coop_stat_cache = nullptr;
+        }
+
+        if (t->legacy_player_snapshots) {
+            delete static_cast<std::unordered_map<std::string, PlayerLegacySnapshot> *>(t->legacy_player_snapshots);
+            t->legacy_player_snapshots = nullptr;
         }
 
         // Free coop snapshot caches

@@ -2395,6 +2395,7 @@ int main(int argc, char *argv[]) {
                         cJSON *cg = cJSON_GetObjectItem(root, "custom_goal_mode");
                         cJSON *th = cJSON_GetObjectItem(root, "template_hash");
                         cJSON *hm = cJSON_GetObjectItem(root, "using_hermes");
+                        cJSON *spw = cJSON_GetObjectItem(root, "using_stats_per_world");
 
                         // Validate template match on join: version/category/flag must match
                         // and the goal structure hash must be identical.
@@ -2457,6 +2458,28 @@ int main(int argc, char *argv[]) {
                                 snprintf(coop_mismatch_msg, sizeof(coop_mismatch_msg),
                                          "You have the Hermes Mod enabled, but the host is not using it.\n\n"
                                          "Disable 'Using Hermes Mod (Live Tracking)' in the Paths & Templates "
+                                         "tab and try joining again.");
+                                mismatch = true;
+                            }
+                        }
+
+                        // Check StatsPerWorld mismatch. Only meaningful for legacy (<=1.6.4); on
+                        // other versions the flag has no effect, so skip the check to avoid
+                        // spurious rejections. Version already verified to match above.
+                        if (!mismatch && spw && cJSON_IsBool(spw) &&
+                            settings_get_version_from_string(app_settings.version_str) <= MC_VERSION_1_6_4) {
+                            bool host_spw = cJSON_IsTrue(spw);
+                            if (host_spw && !app_settings.using_stats_per_world_legacy) {
+                                snprintf(coop_mismatch_msg, sizeof(coop_mismatch_msg),
+                                         "The host is using the StatsPerWorld Mod, but you don't "
+                                         "have it enabled.\n\n"
+                                         "Enable 'Using StatsPerWorld Mod' in the Paths & Templates "
+                                         "tab and try joining again.");
+                                mismatch = true;
+                            } else if (!host_spw && app_settings.using_stats_per_world_legacy) {
+                                snprintf(coop_mismatch_msg, sizeof(coop_mismatch_msg),
+                                         "You have the StatsPerWorld Mod enabled, but the host is not using it.\n\n"
+                                         "Disable 'Using StatsPerWorld Mod' in the Paths & Templates "
                                          "tab and try joining again.");
                                 mismatch = true;
                             }

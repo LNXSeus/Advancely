@@ -50,11 +50,12 @@ static void update_coop_template_sync(const AppSettings *s) {
     snprintf(buf, sizeof(buf),
              "{\"version\":\"%s\",\"category\":\"%s\",\"optional_flag\":\"%s\","
              "\"stat_merge\":\"%s\",\"stat_checkbox\":\"%s\",\"custom_goal_mode\":\"%s\","
-             "\"template_hash\":\"%016llx\",\"using_hermes\":%s}",
+             "\"template_hash\":\"%016llx\",\"using_hermes\":%s,\"using_stats_per_world\":%s}",
              s->version_str, s->category, s->optional_flag,
              stat_merge, stat_cb, custom,
              (unsigned long long) goal_hash,
-             s->using_hermes ? "true" : "false");
+             s->using_hermes ? "true" : "false",
+             s->using_stats_per_world_legacy ? "true" : "false");
     coop_net_set_template_sync(g_coop_ctx, buf);
 }
 
