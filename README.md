@@ -49,7 +49,7 @@
     - [Lobby Setup Walkthrough](#lobby-setup-walkthrough)
     - [Networking Options (LAN, ZeroTier/Hamachi, Port Forwarding)](#networking-options-lan-zerotierhamachi-port-forwarding)
     - [Firewall Rules (Windows, Linux, macOS)](#firewall-rules-windows-linux-macos)
-    - [Template Matching (compute_template_goal_hash)](#template-matching-compute_template_goal_hash)
+    - [Template Matching](#template-matching)
     - [Goal Merging Rules](#goal-merging-rules)
     - [The Player Dropdown](#the-player-dropdown)
     - [Connection Error Codes](#connection-error-codes)
@@ -1121,7 +1121,7 @@ sudo firewall-cmd --reload
 **macOS:** The built-in Application Firewall is off by default. If enabled, System Settings → Network → Firewall →
 Options → add Advancely and allow incoming connections. Alternatively use `pfctl` if you maintain your own ruleset.
 
-### Template Matching (compute_template_goal_hash)
+### Template Matching
 
 When a Receiver joins, Advancely hashes the *structural* content of both players' template files with a 64-bit
 FNV-1a hash and refuses to connect unless the hashes are identical. The hash is
