@@ -50,12 +50,11 @@ static void update_coop_template_sync(const AppSettings *s) {
     snprintf(buf, sizeof(buf),
              "{\"version\":\"%s\",\"category\":\"%s\",\"optional_flag\":\"%s\","
              "\"stat_merge\":\"%s\",\"stat_checkbox\":\"%s\",\"custom_goal_mode\":\"%s\","
-             "\"template_hash\":\"%016llx\",\"using_hermes\":%s,\"using_stats_per_world\":%s}",
+             "\"template_hash\":\"%016llx\",\"using_hermes\":%s}",
              s->version_str, s->category, s->optional_flag,
              stat_merge, stat_cb, custom,
              (unsigned long long) goal_hash,
-             s->using_hermes ? "true" : "false",
-             s->using_stats_per_world_legacy ? "true" : "false");
+             s->using_hermes ? "true" : "false");
     coop_net_set_template_sync(g_coop_ctx, buf);
 }
 
@@ -809,18 +808,20 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                       hermes_net_state == COOP_NET_CONNECTED ||
                                       hermes_net_state == COOP_NET_CONNECTING);
 
-            // Only show the StatsPerWorld checkbox for legacy versions
-            // Disable when lobby is active (must be synced across all players)
+            // Only show the StatsPerWorld checkbox for legacy versions.
+            // Disable for receivers (they always read global stats from host);
+            // hosts may toggle freely and it applies to their own local reads.
             if (selected_version <= MC_VERSION_1_6_4) {
-                if (hermes_net_active) ImGui::BeginDisabled();
+                const bool spw_is_receiver = (hermes_net_state == COOP_NET_CONNECTED);
+                if (spw_is_receiver) ImGui::BeginDisabled();
                 ImGui::Checkbox("Using StatsPerWorld Mod", &temp_settings.using_stats_per_world_legacy);
-                if (hermes_net_active) ImGui::EndDisabled();
-                if (ImGui::IsItemHovered(hermes_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
+                if (spw_is_receiver) ImGui::EndDisabled();
+                if (ImGui::IsItemHovered(spw_is_receiver ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
                     char stats_per_world_tooltip_buffer[1024];
-                    if (hermes_net_active) {
+                    if (spw_is_receiver) {
                         snprintf(stats_per_world_tooltip_buffer, sizeof(stats_per_world_tooltip_buffer),
-                                 "Cannot change while a lobby is active.\n"
-                                 "All players must use the same setting.");
+                                 "Receivers always sync from the host's stats.\n"
+                                 "This setting only applies when running as host or in singleplayer.");
                     } else {
                         snprintf(stats_per_world_tooltip_buffer, sizeof(stats_per_world_tooltip_buffer),
                                  "The StatsPerWorld Mod (with Legacy Fabric) allows legacy Minecraft versions\n"

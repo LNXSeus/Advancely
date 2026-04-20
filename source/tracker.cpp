@@ -4219,28 +4219,8 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
             sizeof(t->template_data->last_known_world_name) - 1);
     t->template_data->last_known_world_name[sizeof(t->template_data->last_known_world_name) - 1] = '\0';
 
-    // Legacy baselines: on world change, invalidate all per-player baselines so each
-    // player gets a fresh capture from their own stats file on first-seen this tick.
-    const bool legacy_mode = (version <= MC_VERSION_1_6_4 && !settings->using_stats_per_world_legacy);
-    if (legacy_mode && strcmp(t->world_name, t->template_data->snapshot_world_name) != 0) {
-        log_message(LOG_INFO, "[COOP] Legacy world change detected. Invalidating baselines for world: %s\n",
-                    t->world_name);
-        tracker_clear_legacy_player_snapshots(t);
-        strncpy(t->template_data->snapshot_world_name, t->world_name, MAX_PATH_LENGTH - 1);
-        t->template_data->snapshot_world_name[MAX_PATH_LENGTH - 1] = '\0';
-        t->template_data->playtime_snapshot = 0;
-    }
-
     // 1. Reset all progress to zero before merging
     coop_reset_template_progress(t->template_data);
-
-    // done_in_snapshot = AND across players ("(Old)" only if everyone held it pre-session).
-    // Start true; per-player merge flips to false for any player missing it from baseline.
-    if (legacy_mode) {
-        for (int i = 0; i < t->template_data->advancement_count; i++) {
-            t->template_data->advancements[i]->done_in_snapshot = true;
-        }
-    }
 
     // Clear the Hermes per-player stat cache — the file-based merge is authoritative.
     // It will be re-seeded below with each player's values from their JSON files.
@@ -4271,17 +4251,8 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
 
         // Merge advancements/achievements
         if (version <= MC_VERSION_1_6_4) {
-            const PlayerLegacySnapshot *player_baseline = nullptr;
-            if (legacy_mode) {
-                player_baseline = tracker_ensure_player_legacy_baseline(
-                    t, settings, player->username, player_stats_path, t->world_name);
-            }
-            coop_merge_achievements_legacy(
-                t->template_data, player_stats_json,
-                player_baseline ? &player_baseline->ach_baseline_done : nullptr);
-            coop_merge_stats_legacy(
-                t->template_data, player_stats_json, settings->coop_stat_merge,
-                player_baseline ? &player_baseline->stat_baselines : nullptr);
+            coop_merge_achievements_legacy(t->template_data, player_stats_json, nullptr);
+            coop_merge_stats_legacy(t->template_data, player_stats_json, settings->coop_stat_merge, nullptr);
         } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_11_2) {
             coop_merge_achievements_mid(t->template_data, player_stats_json);
             coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge);
@@ -4419,30 +4390,8 @@ void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, 
     cJSON *player_unlocks_json = (player_unlocks_path[0] != '\0') ? cJSON_from_file(player_unlocks_path) : nullptr;
 
     if (version <= MC_VERSION_1_6_4) {
-        const bool legacy_mode = !settings->using_stats_per_world_legacy;
-        // Invalidate on world change; then initialize done_in_snapshot to true for AND semantics.
-        if (legacy_mode && strcmp(t->world_name, t->template_data->snapshot_world_name) != 0) {
-            tracker_clear_legacy_player_snapshots(t);
-            strncpy(t->template_data->snapshot_world_name, t->world_name, MAX_PATH_LENGTH - 1);
-            t->template_data->snapshot_world_name[MAX_PATH_LENGTH - 1] = '\0';
-            t->template_data->playtime_snapshot = 0;
-        }
-        if (legacy_mode) {
-            for (int i = 0; i < t->template_data->advancement_count; i++) {
-                t->template_data->advancements[i]->done_in_snapshot = true;
-            }
-        }
-        const PlayerLegacySnapshot *player_baseline = nullptr;
-        if (legacy_mode) {
-            player_baseline = tracker_ensure_player_legacy_baseline(
-                t, settings, player->username, player_stats_path, t->world_name);
-        }
-        coop_merge_achievements_legacy(
-            t->template_data, player_stats_json,
-            player_baseline ? &player_baseline->ach_baseline_done : nullptr);
-        coop_merge_stats_legacy(
-            t->template_data, player_stats_json, settings->coop_stat_merge,
-            player_baseline ? &player_baseline->stat_baselines : nullptr);
+        coop_merge_achievements_legacy(t->template_data, player_stats_json, nullptr);
+        coop_merge_stats_legacy(t->template_data, player_stats_json, settings->coop_stat_merge, nullptr);
     } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_11_2) {
         coop_merge_achievements_mid(t->template_data, player_stats_json);
         coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge);
