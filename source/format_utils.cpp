@@ -91,7 +91,7 @@ void format_time(long long ticks, char *output, size_t max_len, bool unit_spacin
 }
 
 
-void format_time_since_update(float total_seconds, char *output, size_t max_len) {
+void format_time_since_update(float total_seconds, char *output, size_t max_len, bool unit_spacing) {
     if (!output || max_len == 0) return;
 
     int total_sec_int = (int) total_seconds;
@@ -99,11 +99,13 @@ void format_time_since_update(float total_seconds, char *output, size_t max_len)
     int minutes = (total_sec_int % 3600) / 60;
     int seconds = total_sec_int % 60;
 
+    const char *sp = unit_spacing ? " " : "";
+
     if (hours > 0) {
-        snprintf(output, max_len, "%dh %dm %ds ago", hours, minutes, seconds);
+        snprintf(output, max_len, "%d%sh %d%sm %d%ss ago", hours, sp, minutes, sp, seconds, sp);
     } else if (minutes > 0) {
-        snprintf(output, max_len, "%dm %ds ago", minutes, seconds);
+        snprintf(output, max_len, "%d%sm %d%ss ago", minutes, sp, seconds, sp);
     } else {
-        snprintf(output, max_len, "%ds ago", seconds);
+        snprintf(output, max_len, "%d%ss ago", seconds, sp);
     }
 }

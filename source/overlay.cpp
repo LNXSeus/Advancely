@@ -633,7 +633,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                 char formatted_update_time[64];
                 float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
                 format_time_since_update(last_update_time_5_seconds, formatted_update_time,
-                                         sizeof(formatted_update_time));
+                                         sizeof(formatted_update_time), settings->igt_unit_spacing);
                 // When Hermes is active the label changes to "Synced:" to reflect that
                 // real-time updates are coming from Hermes and this timer only represents
                 // the time since the last full game-save sync from disk.

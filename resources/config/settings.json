@@ -28,6 +28,8 @@
 		"overlay_show_run_details":	true,
 		"overlay_show_progress":	true,
 		"overlay_show_igt":	true,
+		"igt_unit_spacing":	false,
+		"igt_always_show_ms":	false,
 		"overlay_show_update_timer":	true
 	},
 	"stat_progress_override":	{

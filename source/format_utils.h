@@ -42,8 +42,9 @@ void format_time(long long ticks, char *output, size_t max_len, bool unit_spacin
  * @param total_seconds The total number of seconds.
  * @param output The buffer to write the formatted time string to.
  * @param max_len The size of the output buffer.
+ * @param unit_spacing If true, a space is inserted before every unit suffix (e.g. "1 h 2 m 3 s ago").
  */
-void format_time_since_update(float total_seconds, char *output, size_t max_len);
+void format_time_since_update(float total_seconds, char *output, size_t max_len, bool unit_spacing);
 
 #ifdef __cplusplus
 }

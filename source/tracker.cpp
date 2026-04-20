@@ -9474,7 +9474,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         char formatted_update_time[64];
         const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
         float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
-        format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time));
+        format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time), settings->igt_unit_spacing);
 
         char temp_chunk[256];
         bool show_adv_counter = (t->template_data->advancement_goal_count > 0);
@@ -11513,7 +11513,7 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
 
     // Format the time since last update (snapped to 5s intervals like the overlay)
     float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
-    format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time));
+    format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time), settings->igt_unit_spacing);
 
     // Displaying Ach or Adv depending on the version
     // Get version from string

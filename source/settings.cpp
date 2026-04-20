@@ -2146,11 +2146,12 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::SetTooltip("%s", overlay_text_timer_tooltip_buffer);
                 }
 
-                ImGui::Checkbox("IGT Unit Spacing", &temp_settings.igt_unit_spacing);
+                ImGui::Checkbox("Timers Unit Spacing", &temp_settings.igt_unit_spacing);
                 if (ImGui::IsItemHovered()) {
                     char igt_spacing_tooltip_buffer[256];
                     snprintf(igt_spacing_tooltip_buffer, sizeof(igt_spacing_tooltip_buffer),
-                             "Adds a space between every number and its unit in the IGT display.\n"
+                             "Adds a space between every number and its unit in the IGT\n"
+                             "and Update Timer display.\n"
                              "Example: \"02m 04.500s\" becomes \"02 m 04 s 500 ms\".");
                     ImGui::SetTooltip("%s", igt_spacing_tooltip_buffer);
                 }
@@ -2651,6 +2652,18 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             // coop_identity_status_is_error, coop_room_code_buf, coop_room_code_error, coop_ip_revealed
 
             coop_host_input_error = false; // Reset each frame
+
+            if (ImGui::Button("Co-op Documentation")) {
+                open_content("https://github.com/LNXSeus/Advancely#co-op-multiplayer");
+            }
+            if (ImGui::IsItemHovered()) {
+                char coop_doc_tooltip_buf[128];
+                snprintf(coop_doc_tooltip_buf, sizeof(coop_doc_tooltip_buf),
+                         "Opens the full Co-op setup guide in your browser.");
+                ImGui::SetTooltip("%s", coop_doc_tooltip_buf);
+            }
+            ImGui::Separator();
+            ImGui::Spacing();
 
             // Get current networking state
             CoopNetState net_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
@@ -3711,10 +3724,17 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
     ImGui::Spacing();
     ImGui::TextDisabled("Supporters - Thank you! luvv <3");
     ImGui::BeginChild("SupportersBox", ImVec2(0, 72), true);
-    for (int i = 0; i < NUM_SUPPORTERS; ++i) {
-        char supporter_buf[128];
-        snprintf(supporter_buf, sizeof(supporter_buf), "%s  $%.0f", SUPPORTERS[i].name, SUPPORTERS[i].amount);
-        ImGui::TextUnformatted(supporter_buf);
+    {
+        int sorted[NUM_SUPPORTERS];
+        for (int i = 0; i < NUM_SUPPORTERS; ++i) sorted[i] = i;
+        for (int i = 0; i < NUM_SUPPORTERS - 1; ++i)
+            for (int j = i + 1; j < NUM_SUPPORTERS; ++j)
+                if (SUPPORTERS[sorted[j]].amount > SUPPORTERS[sorted[i]].amount) { int tmp = sorted[i]; sorted[i] = sorted[j]; sorted[j] = tmp; }
+        for (int i = 0; i < NUM_SUPPORTERS; ++i) {
+            char supporter_buf[128];
+            snprintf(supporter_buf, sizeof(supporter_buf), "%s  $%.0f", SUPPORTERS[sorted[i]].name, SUPPORTERS[sorted[i]].amount);
+            ImGui::TextUnformatted(supporter_buf);
+        }
     }
     ImGui::EndChild();
     if (ImGui::IsItemHovered()) {
@@ -3948,7 +3968,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
     }
     // TODO: Add default values always to this tooltip here
     if (ImGui::IsItemHovered()) {
-        char tooltip_buffer[3072];
+        char tooltip_buffer[4096];
 
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                  "Resets all settings (besides window size/position & hotkeys) in this window to their default values.\n"
@@ -3975,6 +3995,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                  "[Overlay]\n"
                  "  - Enable Overlay: %s; Overlay FPS Limit: %d\n"
                  "  - Overlay Text Sections: All Enabled\n"
+                 "  - Timer Formatting: Both Disabled\n"
                  "  - Hide Completed Row 3 Goals: %s\n"
                  "  - Sub-Stat Cycle Interval: %.1f s; Overlay Scroll Speed: %.2f\n"
                  "  - Overlay Width: %dpx; Overlay Title Alignment: Left\n"
