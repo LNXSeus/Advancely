@@ -44,15 +44,6 @@
 - [The Template Editor](#the-template-editor-esc--edit-templates)
 - [The Settings Window](#the-settings-window-esc)
 - [Co-op Multiplayer](#co-op-multiplayer)
-    - [How Co-op Works](#how-co-op-works)
-    - [Account & Player Identity](#account--player-identity)
-    - [Lobby Setup Walkthrough](#lobby-setup-walkthrough)
-    - [Networking Options (LAN, ZeroTier/Hamachi, Port Forwarding)](#networking-options-lan-zerotierhamachi-port-forwarding)
-    - [Firewall Rules (Windows, Linux, macOS)](#firewall-rules-windows-linux-macos)
-    - [Template Matching](#template-matching)
-    - [Goal Merging Rules](#goal-merging-rules)
-    - [The Player Dropdown](#the-player-dropdown)
-    - [Connection Error Codes](#connection-error-codes)
 - [Extensive Version Support](#extensive-version-support)
 - [Officially Added Templates](#officially-added-templates)
 - [Known Limitations](#known-limitations)
@@ -965,6 +956,18 @@ The entire co-op UI lives in the **Co-op** tab of the Settings window (`ESC`).
 <details>
 <summary><strong>View Full Co-op Documentation</strong></summary>
 <br>
+
+### Chapters
+
+ - [How Co-op Works](#how-co-op-works)
+ - [Account & Player Identity](#account--player-identity)
+ - [Lobby Setup Walkthrough](#lobby-setup-walkthrough)
+ - [Networking Options (LAN, ZeroTier/Hamachi, Port Forwarding)](#networking-options-lan-zerotierhamachi-port-forwarding)
+ - [Firewall Rules (Windows, Linux, macOS)](#firewall-rules-windows-linux-macos)
+ - [Template Matching](#template-matching)
+ - [Goal Merging Rules](#goal-merging-rules)
+ - [The Player Dropdown](#the-player-dropdown)
+ - [Connection Error Codes](#connection-error-codes)
 
 ### How Co-op Works
 
