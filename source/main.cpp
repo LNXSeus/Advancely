@@ -583,6 +583,58 @@ void show_error_message(const char *title, const char *message) {
 }
 
 
+// LEGACY (<=1.6.4) ONLY. Receivers push their global stats .dat to the host so
+// it can merge all players' progress. Mid-era and modern versions store data
+// inside the shared save folder, which the host reads directly, so this path
+// is skipped for those versions. Throttled to at most once per second unless
+// `force` is true (used for dmon-driven change events).
+static void receiver_maybe_upload_legacy_stats(const Tracker *tracker,
+                                               const AppSettings *app_settings,
+                                               bool force) {
+    if (!tracker || !app_settings) return;
+    if (app_settings->network_mode != NETWORK_RECEIVER) return;
+    if (!g_coop_ctx || coop_net_get_state(g_coop_ctx) != COOP_NET_CONNECTED) return;
+
+    MC_Version version = settings_get_version_from_string(app_settings->version_str);
+    if (version > MC_VERSION_1_6_4) return; // Legacy-only path.
+
+    static Uint64 s_last_upload_ms = 0;
+    Uint64 now = SDL_GetTicks();
+    if (!force && s_last_upload_ms != 0 && (now - s_last_upload_ms) < 1000) return;
+
+    // Locate the receiver's own global stats .dat. SPW is ignored for receivers
+    // (they always upload the global file); pass false to force global lookup.
+    char world_name[MAX_PATH_LENGTH] = {};
+    char adv_path[MAX_PATH_LENGTH] = {};
+    char stats_path[MAX_PATH_LENGTH] = {};
+    char unlocks_path[MAX_PATH_LENGTH] = {};
+    find_player_data_files(
+        tracker->saves_path, version, /*use_stats_per_world_mod*/ false,
+        app_settings, world_name, adv_path, stats_path, unlocks_path, MAX_PATH_LENGTH
+    );
+    if (stats_path[0] == '\0') return;
+
+    FILE *fp = fopen(stats_path, "rb");
+    if (!fp) return;
+    fseek(fp, 0, SEEK_END);
+    long fsize = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    if (fsize <= 0 || fsize > 4 * 1024 * 1024) { fclose(fp); return; }
+    void *bytes = malloc((size_t) fsize);
+    if (!bytes) { fclose(fp); return; }
+    size_t rd = fread(bytes, 1, (size_t) fsize, fp);
+    fclose(fp);
+    if (rd != (size_t) fsize) { free(bytes); return; }
+
+    if (coop_net_send_legacy_stats_upload(g_coop_ctx,
+                                          app_settings->local_player.uuid,
+                                          world_name,
+                                          bytes, (uint32_t) fsize)) {
+        s_last_upload_ms = now;
+    }
+    free(bytes);
+}
+
 /**
  * @brief Callback function for dmon file watcher.
  * This function is called by dmon in a separate thread whenever a file event occurs.
@@ -2395,7 +2447,7 @@ int main(int argc, char *argv[]) {
                         cJSON *cg = cJSON_GetObjectItem(root, "custom_goal_mode");
                         cJSON *th = cJSON_GetObjectItem(root, "template_hash");
                         cJSON *hm = cJSON_GetObjectItem(root, "using_hermes");
-f
+
                         // Validate template match on join: version/category/flag must match
                         // and the goal structure hash must be identical.
                         bool mismatch = false;
@@ -2667,6 +2719,19 @@ f
                 }
             }
 
+            // Legacy (<=1.6.4) receivers: 1/sec fallback upload in case dmon misses a
+            // change. The helper throttles internally and no-ops for non-legacy versions.
+            receiver_maybe_upload_legacy_stats(tracker, &app_settings, /*force*/ false);
+
+            // Legacy (<=1.6.4) host: if a receiver just pushed new stats bytes into the
+            // cache, force a full re-merge so their progress shows up without waiting
+            // for the host's own files to change.
+            if (app_settings.network_mode == NETWORK_HOST && g_coop_ctx &&
+                coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
+                coop_net_legacy_upload_consume(g_coop_ctx)) {
+                SDL_SetAtomicInt(&g_needs_update, 1);
+            }
+
             // Check if dmon (or manual update through custom goal) has requested an update
             // Use SDL_SetAtomicInt to check AND reset the flag atomically.
             if (SDL_SetAtomicInt(&g_needs_update, 0) == 1) {
@@ -2679,6 +2744,11 @@ f
                 // Receiver mode: skip file reading when connected (data comes from host)
                 bool receiver_connected = (app_settings.network_mode == NETWORK_RECEIVER &&
                                            g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+                // Legacy (<=1.6.4) receivers push their stats .dat to the host on every
+                // dmon-driven update so the host can merge all players' progress.
+                if (receiver_connected) {
+                    receiver_maybe_upload_legacy_stats(tracker, &app_settings, /*force*/ true);
+                }
                 if (!receiver_connected) {
                     MC_Version version = settings_get_version_from_string(app_settings.version_str);
 

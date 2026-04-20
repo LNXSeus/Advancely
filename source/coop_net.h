@@ -48,7 +48,13 @@ enum CoopMsgType {
     COOP_MSG_PLAYER_LIST = 9, // Host -> All receivers: JSON player list on any change
     COOP_MSG_KICK = 10, // Host -> Receiver: reason string, then close
     COOP_MSG_CUSTOM_GOAL_MOD = 11, // Receiver -> Host: custom goal/stat checkbox modification
-    COOP_MSG_PLAYER_STATES = 12 // Host -> All receivers: per-player progress snapshots
+    COOP_MSG_PLAYER_STATES = 12, // Host -> All receivers: per-player progress snapshots
+    // Receiver -> Host: raw stats file upload for legacy (<=1.6.4) merging ONLY.
+    // Payload: [2B uuid_len][uuid_utf8][2B world_len][world_utf8][4B file_len][file_bytes].
+    // Mid-era and modern versions do not use this path (the host reads receiver files
+    // directly via the world folder on a shared save). Legacy stores global .dat files
+    // per-player under the launcher install dir, so the host must pull them over the wire.
+    COOP_MSG_LEGACY_STATS_UPLOAD = 13
 };
 
 #define COOP_MSG_HEADER_SIZE 8 // 4 bytes type + 4 bytes length
@@ -191,6 +197,23 @@ typedef struct {
     CoopCustomGoalModMsg custom_mod_queue[COOP_MAX_CUSTOM_MODS];
     int custom_mod_count;
 
+    // -- Legacy stats upload cache (host only, mutex-protected) --
+    // LEGACY (<=1.6.4) ONLY. Each connected receiver pushes their raw stats .dat
+    // to the host here so merge can read every player's global stats without
+    // touching disk. Latest-wins per UUID.
+    SDL_Mutex *legacy_upload_mutex;
+    struct LegacyUploadEntry {
+        char uuid[48];
+        char world_name[256];
+        void *bytes;          // malloc'd, freed on replace or context destroy
+        uint32_t size;
+        Uint64 last_update_ms;
+    } legacy_uploads[COOP_MAX_CLIENTS];
+    int legacy_upload_count;
+    // Set by the net thread on a new legacy upload; main thread check-and-clears
+    // it each frame to force a tracker re-merge (see coop_net_legacy_upload_consume).
+    SDL_AtomicInt legacy_upload_pending;
+
     // -- Template sync (host sets, sent on approve; receiver receives and stores) --
     SDL_Mutex *template_sync_mutex;
     char template_sync_payload[1024]; // JSON string with version, category, optional_flag, merge settings
@@ -290,6 +313,32 @@ void coop_net_broadcast_template_sync(CoopNetContext *ctx);
 // Receiver: send a DISCONNECT message with an optional reason string, then stop.
 // The host will display the reason in its status area.
 void coop_net_disconnect_with_reason(CoopNetContext *ctx, const char *reason);
+
+// ---- Legacy Stats Upload API ----
+// LEGACY (<=1.6.4) ONLY. Mid-era and modern versions read receiver data from a
+// shared save folder; legacy stats live outside the save in the launcher install
+// dir, so receivers must push their file bytes to the host for merging.
+
+// Receiver: upload raw stats file bytes to the host. Safe to call when not connected
+// or on non-legacy versions (returns false without sending).
+bool coop_net_send_legacy_stats_upload(CoopNetContext *ctx,
+                                       const char *uuid,
+                                       const char *world_name,
+                                       const void *file_bytes,
+                                       uint32_t file_len);
+
+// Host: copy the latest uploaded stats bytes for a given UUID into out_bytes (malloc'd,
+// caller frees). Returns false if no upload exists for that UUID. Legacy-only.
+bool coop_net_get_legacy_stats_upload(CoopNetContext *ctx,
+                                      const char *uuid,
+                                      void **out_bytes,
+                                      uint32_t *out_size,
+                                      char *out_world_name,
+                                      size_t world_name_cap);
+
+// Host: atomically check-and-clear the "new legacy upload arrived" flag. Main thread
+// calls this every frame and triggers a re-merge when it returns true. Legacy-only.
+bool coop_net_legacy_upload_consume(CoopNetContext *ctx);
 
 // ---- Room Code (Base64-encoded IP:PORT) ----
 

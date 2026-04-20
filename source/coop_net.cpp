@@ -794,6 +794,75 @@ static int SDLCALL host_thread_func(void *data) {
                             }
                             SDL_UnlockMutex(ctx->custom_mod_mutex);
                         }
+                    } else if (msg_type == COOP_MSG_LEGACY_STATS_UPLOAD) {
+                        // LEGACY (<=1.6.4) ONLY. Receiver shipped their raw global stats
+                        // .dat so the host can merge everyone. Parse the framed payload
+                        // and stash the latest per-UUID blob for the main thread.
+                        if (ctx->clients[i].handshake_done && payload && payload_len >= 2 + 2 + 4) {
+                            const uint8_t *p = (const uint8_t *) payload;
+                            uint32_t remaining = payload_len;
+                            uint16_t uuid_len = 0; memcpy(&uuid_len, p, 2); uuid_len = ntohs(uuid_len);
+                            p += 2; remaining -= 2;
+                            if (uuid_len < 48 && remaining >= (uint32_t) uuid_len + 2 + 4) {
+                                char uuid_buf[48] = {};
+                                memcpy(uuid_buf, p, uuid_len); uuid_buf[uuid_len] = '\0';
+                                p += uuid_len; remaining -= uuid_len;
+                                uint16_t world_len = 0; memcpy(&world_len, p, 2); world_len = ntohs(world_len);
+                                p += 2; remaining -= 2;
+                                if (world_len < 256 && remaining >= (uint32_t) world_len + 4) {
+                                    char world_buf[256] = {};
+                                    memcpy(world_buf, p, world_len); world_buf[world_len] = '\0';
+                                    p += world_len; remaining -= world_len;
+                                    uint32_t file_len = 0; memcpy(&file_len, p, 4); file_len = ntohl(file_len);
+                                    p += 4; remaining -= 4;
+                                    if (file_len > 0 && file_len <= remaining && file_len <= 4 * 1024 * 1024) {
+                                        void *copy = malloc(file_len);
+                                        if (copy) {
+                                            memcpy(copy, p, file_len);
+                                            bool content_changed = false;
+                                            SDL_LockMutex(ctx->legacy_upload_mutex);
+                                            int slot = -1;
+                                            for (int k = 0; k < ctx->legacy_upload_count; k++) {
+                                                if (strcmp(ctx->legacy_uploads[k].uuid, uuid_buf) == 0) {
+                                                    slot = k; break;
+                                                }
+                                            }
+                                            if (slot < 0 && ctx->legacy_upload_count < COOP_MAX_CLIENTS) {
+                                                slot = ctx->legacy_upload_count++;
+                                                strncpy(ctx->legacy_uploads[slot].uuid, uuid_buf, 47);
+                                                ctx->legacy_uploads[slot].uuid[47] = '\0';
+                                                ctx->legacy_uploads[slot].bytes = nullptr;
+                                                ctx->legacy_uploads[slot].size = 0;
+                                            }
+                                            if (slot >= 0) {
+                                                // Only signal a re-merge when the content actually changed.
+                                                // Receivers upload every 1s as a fallback; identical bytes
+                                                // would otherwise thrash host -> receiver broadcasts.
+                                                content_changed = (ctx->legacy_uploads[slot].size != file_len) ||
+                                                                  (ctx->legacy_uploads[slot].bytes == nullptr) ||
+                                                                  (memcmp(ctx->legacy_uploads[slot].bytes,
+                                                                          copy, file_len) != 0);
+                                                free(ctx->legacy_uploads[slot].bytes);
+                                                ctx->legacy_uploads[slot].bytes = copy;
+                                                ctx->legacy_uploads[slot].size = file_len;
+                                                strncpy(ctx->legacy_uploads[slot].world_name, world_buf,
+                                                        sizeof(ctx->legacy_uploads[slot].world_name) - 1);
+                                                ctx->legacy_uploads[slot].world_name[
+                                                    sizeof(ctx->legacy_uploads[slot].world_name) - 1] = '\0';
+                                                ctx->legacy_uploads[slot].last_update_ms = SDL_GetTicks();
+                                                copy = nullptr;
+                                            }
+                                            SDL_UnlockMutex(ctx->legacy_upload_mutex);
+                                            free(copy); // non-null only if we failed to slot it
+                                            // Only tell the main thread to re-merge on a real change.
+                                            if (content_changed) {
+                                                SDL_SetAtomicInt(&ctx->legacy_upload_pending, 1);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     } else if (msg_type == COOP_MSG_DISCONNECT) {
                         // Check if the disconnect includes a reason payload
                         if (payload && payload_len > 0) {
@@ -1387,8 +1456,9 @@ bool coop_net_init(CoopNetContext *ctx) {
     ctx->lobby_mutex = SDL_CreateMutex();
     ctx->custom_mod_mutex = SDL_CreateMutex();
     ctx->template_sync_mutex = SDL_CreateMutex();
+    ctx->legacy_upload_mutex = SDL_CreateMutex();
     if (!ctx->status_mutex || !ctx->recv_mutex || !ctx->lobby_mutex || !ctx->custom_mod_mutex || !ctx->
-        template_sync_mutex) {
+        template_sync_mutex || !ctx->legacy_upload_mutex) {
         log_message(LOG_ERROR, "[COOP NET] Failed to create mutexes.\n");
         return false;
     }
@@ -1433,6 +1503,18 @@ void coop_net_shutdown(CoopNetContext *ctx) {
     if (ctx->template_sync_mutex) {
         SDL_DestroyMutex(ctx->template_sync_mutex);
         ctx->template_sync_mutex = nullptr;
+    }
+    // Free any cached legacy stats uploads (LEGACY <=1.6.4 only).
+    if (ctx->legacy_upload_mutex) {
+        SDL_LockMutex(ctx->legacy_upload_mutex);
+        for (int i = 0; i < ctx->legacy_upload_count; i++) {
+            free(ctx->legacy_uploads[i].bytes);
+            ctx->legacy_uploads[i].bytes = nullptr;
+        }
+        ctx->legacy_upload_count = 0;
+        SDL_UnlockMutex(ctx->legacy_upload_mutex);
+        SDL_DestroyMutex(ctx->legacy_upload_mutex);
+        ctx->legacy_upload_mutex = nullptr;
     }
     free(ctx->recv_buffer);
     ctx->recv_buffer = nullptr;
@@ -1844,6 +1926,92 @@ bool coop_net_kick_client(CoopNetContext *ctx, int client_slot, const char *reas
     ctx->clients[client_slot].pending_action_reason[sizeof(ctx->clients[client_slot].pending_action_reason) - 1] = '\0';
     SDL_SetAtomicInt(&ctx->clients[client_slot].pending_action, COOP_ACTION_KICK);
     return true;
+}
+
+// LEGACY (<=1.6.4) ONLY. See header for rationale; mid-era and modern versions
+// do not use this path.
+bool coop_net_send_legacy_stats_upload(CoopNetContext *ctx,
+                                       const char *uuid,
+                                       const char *world_name,
+                                       const void *file_bytes,
+                                       uint32_t file_len) {
+    if (!ctx || !uuid || !world_name) return false;
+    if (!file_bytes || file_len == 0) return false;
+    if (coop_net_get_state(ctx) != COOP_NET_CONNECTED) return false;
+    if (ctx->client_fd == COOP_INVALID_SOCKET) return false;
+
+    const size_t uuid_len = strlen(uuid);
+    const size_t world_len = strlen(world_name);
+    if (uuid_len > 0xFFFF || world_len > 0xFFFF) return false;
+
+    // Payload: [2B uuid_len][uuid][2B world_len][world][4B file_len][file_bytes]
+    const size_t total = 2 + uuid_len + 2 + world_len + 4 + file_len;
+    uint8_t *buf = (uint8_t *) malloc(total);
+    if (!buf) return false;
+
+    size_t off = 0;
+    uint16_t u16;
+    uint32_t u32;
+
+    u16 = htons((uint16_t) uuid_len);
+    memcpy(buf + off, &u16, 2); off += 2;
+    memcpy(buf + off, uuid, uuid_len); off += uuid_len;
+
+    u16 = htons((uint16_t) world_len);
+    memcpy(buf + off, &u16, 2); off += 2;
+    memcpy(buf + off, world_name, world_len); off += world_len;
+
+    u32 = htonl(file_len);
+    memcpy(buf + off, &u32, 4); off += 4;
+    memcpy(buf + off, file_bytes, file_len); off += file_len;
+
+    bool ok = send_message(ctx->client_fd, COOP_MSG_LEGACY_STATS_UPLOAD,
+                           buf, (uint32_t) total);
+    free(buf);
+    return ok;
+}
+
+// LEGACY (<=1.6.4) ONLY. Atomic check-and-clear for the "new upload arrived" flag.
+bool coop_net_legacy_upload_consume(CoopNetContext *ctx) {
+    if (!ctx) return false;
+    return SDL_SetAtomicInt(&ctx->legacy_upload_pending, 0) == 1;
+}
+
+// LEGACY (<=1.6.4) ONLY. Host-side cache accessor.
+bool coop_net_get_legacy_stats_upload(CoopNetContext *ctx,
+                                      const char *uuid,
+                                      void **out_bytes,
+                                      uint32_t *out_size,
+                                      char *out_world_name,
+                                      size_t world_name_cap) {
+    if (!ctx || !uuid || !out_bytes || !out_size) return false;
+    if (!ctx->legacy_upload_mutex) return false;
+
+    *out_bytes = nullptr;
+    *out_size = 0;
+    if (out_world_name && world_name_cap > 0) out_world_name[0] = '\0';
+
+    bool found = false;
+    SDL_LockMutex(ctx->legacy_upload_mutex);
+    for (int i = 0; i < ctx->legacy_upload_count; i++) {
+        if (strcmp(ctx->legacy_uploads[i].uuid, uuid) == 0 &&
+            ctx->legacy_uploads[i].bytes && ctx->legacy_uploads[i].size > 0) {
+            void *copy = malloc(ctx->legacy_uploads[i].size);
+            if (copy) {
+                memcpy(copy, ctx->legacy_uploads[i].bytes, ctx->legacy_uploads[i].size);
+                *out_bytes = copy;
+                *out_size = ctx->legacy_uploads[i].size;
+                if (out_world_name && world_name_cap > 0) {
+                    strncpy(out_world_name, ctx->legacy_uploads[i].world_name, world_name_cap - 1);
+                    out_world_name[world_name_cap - 1] = '\0';
+                }
+                found = true;
+            }
+            break;
+        }
+    }
+    SDL_UnlockMutex(ctx->legacy_upload_mutex);
+    return found;
 }
 
 bool coop_net_send_custom_goal_mod(CoopNetContext *ctx, const CoopCustomGoalModMsg *msg) {

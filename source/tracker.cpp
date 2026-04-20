@@ -4249,6 +4249,26 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
         cJSON *player_stats_json = (player_stats_path[0] != '\0') ? cJSON_from_file(player_stats_path) : nullptr;
         cJSON *player_unlocks_json = (player_unlocks_path[0] != '\0') ? cJSON_from_file(player_unlocks_path) : nullptr;
 
+        // LEGACY (<=1.6.4) ONLY: for non-host players, override the stats JSON with
+        // whatever the receiver uploaded over the wire. Legacy stats live outside
+        // the world folder (per-launcher), so the on-disk file here belongs to the
+        // host and can't represent any receiver's progress.
+        void *uploaded_bytes = nullptr;
+        if (version <= MC_VERSION_1_6_4 && g_coop_ctx &&
+            strcmp(player->uuid, settings->local_player.uuid) != 0) {
+            uint32_t uploaded_size = 0;
+            if (coop_net_get_legacy_stats_upload(g_coop_ctx, player->uuid,
+                                                 &uploaded_bytes, &uploaded_size,
+                                                 nullptr, 0)) {
+                cJSON *parsed = cJSON_ParseWithLength((const char *) uploaded_bytes,
+                                                      (size_t) uploaded_size);
+                if (parsed) {
+                    cJSON_Delete(player_stats_json);
+                    player_stats_json = parsed;
+                }
+            }
+        }
+
         // Merge advancements/achievements
         if (version <= MC_VERSION_1_6_4) {
             coop_merge_achievements_legacy(t->template_data, player_stats_json, nullptr);
@@ -4329,6 +4349,7 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
         cJSON_Delete(player_adv_json);
         cJSON_Delete(player_stats_json);
         cJSON_Delete(player_unlocks_json);
+        free(uploaded_bytes); // LEGACY cache copy; no-op if not used.
     }
 
     // 3. Finalize after all players are merged
@@ -4389,6 +4410,24 @@ void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, 
     cJSON *player_stats_json = (player_stats_path[0] != '\0') ? cJSON_from_file(player_stats_path) : nullptr;
     cJSON *player_unlocks_json = (player_unlocks_path[0] != '\0') ? cJSON_from_file(player_unlocks_path) : nullptr;
 
+    // LEGACY (<=1.6.4) ONLY: for non-host players, override the stats JSON with
+    // whatever the receiver uploaded over the wire (see tracker_update_coop_merged).
+    void *uploaded_bytes = nullptr;
+    if (version <= MC_VERSION_1_6_4 && g_coop_ctx &&
+        strcmp(player->uuid, settings->local_player.uuid) != 0) {
+        uint32_t uploaded_size = 0;
+        if (coop_net_get_legacy_stats_upload(g_coop_ctx, player->uuid,
+                                             &uploaded_bytes, &uploaded_size,
+                                             nullptr, 0)) {
+            cJSON *parsed = cJSON_ParseWithLength((const char *) uploaded_bytes,
+                                                  (size_t) uploaded_size);
+            if (parsed) {
+                cJSON_Delete(player_stats_json);
+                player_stats_json = parsed;
+            }
+        }
+    }
+
     if (version <= MC_VERSION_1_6_4) {
         coop_merge_achievements_legacy(t->template_data, player_stats_json, nullptr);
         coop_merge_stats_legacy(t->template_data, player_stats_json, settings->coop_stat_merge, nullptr);
@@ -4409,6 +4448,7 @@ void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, 
     cJSON_Delete(player_adv_json);
     cJSON_Delete(player_stats_json);
     cJSON_Delete(player_unlocks_json);
+    free(uploaded_bytes); // LEGACY cache copy; no-op if not used.
 
     // Finalize
     cJSON *settings_json = cJSON_from_file(get_settings_file_path());
