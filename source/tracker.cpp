@@ -704,6 +704,11 @@ static void tracker_reset_progress_on_world_change(Tracker *t, const AppSettings
 
     log_message(LOG_INFO, "[TRACKER] World change detected. Resetting custom progress and manual overrides.\n");
 
+    for (int i = 0; i < MAX_COOP_PLAYERS + 1; i++) {
+        t->coop_latched_run_completed[i] = false;
+        t->coop_latched_frozen_ticks[i] = 0;
+    }
+
     // Reset custom goals
     for (int i = 0; i < t->template_data->custom_goal_count; i++) {
         TrackableItem *item = t->template_data->custom_goals[i];
@@ -3331,6 +3336,10 @@ bool tracker_new(Tracker **tracker, AppSettings *settings) {
     t->coop_merged_snapshot_size = 0;
     t->coop_view_dirty = 0;
     t->coop_recv_resync_needed = 0;
+    for (int i = 0; i < MAX_COOP_PLAYERS + 1; i++) {
+        t->coop_latched_run_completed[i] = false;
+        t->coop_latched_frozen_ticks[i] = 0;
+    }
 
 
     // Explicitly initialize all members
@@ -4427,7 +4436,15 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
         } while (changed && ++guard < 32);
     }
 
+    // Preserve prior completion latch for the All-Players view so the frozen
+    // timer doesn't re-freeze to the latest play time on every merge cycle.
+    if (t->coop_latched_run_completed[0]) {
+        t->template_data->run_completed = true;
+        t->template_data->frozen_play_time_ticks = t->coop_latched_frozen_ticks[0];
+    }
     tracker_calculate_overall_progress(t, version, settings);
+    t->coop_latched_run_completed[0] = t->template_data->run_completed;
+    t->coop_latched_frozen_ticks[0] = t->template_data->frozen_play_time_ticks;
 
     cJSON_Delete(settings_json);
 }
@@ -4523,7 +4540,20 @@ void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, 
         } while (changed && ++guard < 32);
     }
 
+    // Preserve prior completion latch for this per-player view so the frozen
+    // timer doesn't re-freeze to the latest play time on every merge cycle.
+    int slot = player_idx + 1;
+    if (slot >= 0 && slot < MAX_COOP_PLAYERS + 1) {
+        if (t->coop_latched_run_completed[slot]) {
+            t->template_data->run_completed = true;
+            t->template_data->frozen_play_time_ticks = t->coop_latched_frozen_ticks[slot];
+        }
+    }
     tracker_calculate_overall_progress(t, version, settings);
+    if (slot >= 0 && slot < MAX_COOP_PLAYERS + 1) {
+        t->coop_latched_run_completed[slot] = t->template_data->run_completed;
+        t->coop_latched_frozen_ticks[slot] = t->template_data->frozen_play_time_ticks;
+    }
 
     cJSON_Delete(settings_json);
 }

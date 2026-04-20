@@ -131,6 +131,15 @@ struct Tracker {
     int coop_view_dirty; // set when the dropdown changes; main loop re-applies the cached snapshot
     int coop_recv_resync_needed; // receiver: set after template reinit to force re-apply of cached recv snapshots
 
+    // Per-view completion latch for coop. Without this, each merge cycle zeroes
+    // run_completed/frozen_play_time_ticks (via coop_reset_template_progress) and
+    // calculate_overall_progress immediately re-freezes to the current play time,
+    // so the "frozen" timer keeps ticking. Slot 0 = All Players (merged),
+    // slots 1..MAX_COOP_PLAYERS = individual player idx (0..N-1). Host runs
+    // per-player updates every frame, so a single-slot cache wouldn't survive.
+    bool coop_latched_run_completed[MAX_COOP_PLAYERS + 1];
+    long long coop_latched_frozen_ticks[MAX_COOP_PLAYERS + 1];
+
     // --- Fonts ---
     ImFont *roboto_font; // ImGui font for the settings window UI. Now loaded from ui_font_name.
     ImFont *tracker_font; // ImGui font for the main tracker grid display. Loaded from tracker_font_name.
