@@ -3845,10 +3845,44 @@ static void coop_merge_stats_legacy(TemplateData *td, const cJSON *player_stats_
 }
 
 /**
- * @brief Merges one player's unlock data into TemplateData (OR across players).
+ * @brief Merges one player's unlock data into TemplateData using AND semantics.
+ * CRAFTMINE (25w14) ONLY — unlocks only exist for that snapshot. An unlock is
+ * considered "done" for the group only if every player has obtained it. Caller
+ * MUST pre-initialize all unlocks[i]->done = true before the first player is
+ * merged (see tracker_update_coop_merged). Each player call flips done to false
+ * for any unlock they are missing.
  */
-// Note: coop_merge_unlocks was removed — co-op is disabled for craftmine (the only
-// version with unlocks), so unlock merging is not needed.
+static void coop_merge_unlocks_and(TemplateData *td, const cJSON *player_unlocks_json) {
+    if (!td || !player_unlocks_json) return;
+    cJSON *obtained = cJSON_GetObjectItem(player_unlocks_json, "obtained");
+    for (int i = 0; i < td->unlock_count; i++) {
+        TrackableItem *u = td->unlocks[i];
+        if (!u || !u->done) continue; // Already flipped false by a prior player.
+        cJSON *status = obtained ? cJSON_GetObjectItem(obtained, u->root_name) : nullptr;
+        if (!cJSON_IsTrue(status)) u->done = false;
+    }
+}
+
+// CRAFTMINE ONLY. Per-player view: copy one player's raw unlocks into the template.
+static void coop_apply_unlocks_single_player(TemplateData *td, const cJSON *player_unlocks_json) {
+    if (!td) return;
+    cJSON *obtained = player_unlocks_json ? cJSON_GetObjectItem(player_unlocks_json, "obtained") : nullptr;
+    for (int i = 0; i < td->unlock_count; i++) {
+        TrackableItem *u = td->unlocks[i];
+        if (!u) continue;
+        cJSON *status = obtained ? cJSON_GetObjectItem(obtained, u->root_name) : nullptr;
+        u->done = cJSON_IsTrue(status);
+    }
+}
+
+// CRAFTMINE ONLY. Count unlocks after merge for overall-progress math.
+static void coop_finalize_unlocks(TemplateData *td) {
+    if (!td) return;
+    td->unlocks_completed_count = 0;
+    for (int i = 0; i < td->unlock_count; i++) {
+        if (td->unlocks[i] && td->unlocks[i]->done) td->unlocks_completed_count++;
+    }
+}
 /**
  * @brief Accumulates one player's data into multi-stage goals for co-op merge.
  *
@@ -4222,6 +4256,14 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
     // 1. Reset all progress to zero before merging
     coop_reset_template_progress(t->template_data);
 
+    // CRAFTMINE (25w14) ONLY: unlocks merge with AND semantics — pre-init all
+    // unlocks to done=true; each player's merge flips them false if they're missing.
+    if (version == MC_VERSION_25W14CRAFTMINE) {
+        for (int i = 0; i < t->template_data->unlock_count; i++) {
+            if (t->template_data->unlocks[i]) t->template_data->unlocks[i]->done = true;
+        }
+    }
+
     // Clear the Hermes per-player stat cache — the file-based merge is authoritative.
     // It will be re-seeded below with each player's values from their JSON files.
     auto *hermes_cache = t->hermes_coop_stat_cache
@@ -4282,6 +4324,11 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
         } else if (version >= MC_VERSION_1_13) {
             coop_merge_advancements_modern(t->template_data, player_adv_json);
             coop_merge_stats_modern(t->template_data, player_stats_json, settings->coop_stat_merge, version);
+        }
+
+        // CRAFTMINE ONLY: AND-merge this player's unlocks into the group result.
+        if (version == MC_VERSION_25W14CRAFTMINE) {
+            coop_merge_unlocks_and(t->template_data, player_unlocks_json);
         }
 
         // Merge multi-stage goals (global — any player any stage)
@@ -4362,6 +4409,7 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
                                 : settings->local_player.uuid;
     coop_finalize_stats(t->template_data, settings_json, stat_uuid);
     coop_finalize_multi_stage(t->template_data);
+    if (version == MC_VERSION_25W14CRAFTMINE) coop_finalize_unlocks(t->template_data);
 
     const char *custom_uuid = (settings->coop_custom_goal_mode == COOP_CUSTOM_ANY_PLAYER)
                                   ? nullptr
@@ -4440,6 +4488,12 @@ void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, 
     } else if (version >= MC_VERSION_1_13) {
         coop_merge_advancements_modern(t->template_data, player_adv_json);
         coop_merge_stats_modern(t->template_data, player_stats_json, settings->coop_stat_merge, version);
+    }
+
+    // CRAFTMINE ONLY: single-player view mirrors that player's unlocks as-is.
+    if (version == MC_VERSION_25W14CRAFTMINE) {
+        coop_apply_unlocks_single_player(t->template_data, player_unlocks_json);
+        coop_finalize_unlocks(t->template_data);
     }
 
     coop_merge_multi_stage(t->template_data, player_adv_json, player_stats_json,

@@ -2629,25 +2629,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             // ============================================================
             // Step 1: Enable Co-op
             // ============================================================
-            bool is_craftmine = (selected_version == MC_VERSION_25W14CRAFTMINE);
-            if (is_craftmine) {
-                temp_settings.coop_enabled = false;
-                ImGui::BeginDisabled();
-            }
             ImGui::Checkbox("Enable Co-op", &temp_settings.coop_enabled);
-            if (is_craftmine) ImGui::EndDisabled();
-            if (ImGui::IsItemHovered(is_craftmine ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
+            if (ImGui::IsItemHovered()) {
                 char tooltip_buf[256];
-                if (is_craftmine) {
-                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                             "Co-op is not available for 25w14craftmine.\n"
-                             "Unlocks don't work correctly in co-op mode.");
-                } else {
-                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                             "Enable cooperative multiplayer tracking.\n"
-                             "Requires all players to be on the same local network.\n"
-                             "Use ZeroTier (zerotier.com) to create a virtual LAN.");
-                }
+                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                         "Enable cooperative multiplayer tracking.\n"
+                         "Requires all players to be on the same local network.\n"
+                         "Use ZeroTier (zerotier.com) to create a virtual LAN.");
                 ImGui::SetTooltip("%s", tooltip_buf);
             }
             if (temp_settings.coop_enabled) {
@@ -2954,6 +2942,14 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
                             ImGui::BulletText("Counters: Derived automatically from linked goals.");
+                            ImGui::BulletText("Unlocks (25w14craftmine): Every player must obtain it (AND).");
+                            if (ImGui::IsItemHovered()) {
+                                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                         "Unlocks are per-player in craftmine. An unlock only counts as "
+                                         "complete when all players have obtained it.\n"
+                                         "Use the player dropdown to see each player's individual unlocks.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
                         }
 
                         ImGui::Spacing();
