@@ -196,15 +196,17 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
 static void open_content(const char *target) {
     if (!target || target[0] == '\0') return;
 
-    // Try SDL's cross-platform function first (Handles HTTPS links perfectly)
-    if (SDL_OpenURL(target) == 0) {
-        return; // Success
+    // SDL_OpenURL covers all URLs and most local paths cross-platform.
+    // On Windows it maps to ShellExecuteW internally, so for URLs we never
+    // fall through to the ShellExecute fallback (which would open a second tab).
+    bool is_url = (strncmp(target, "http://", 7) == 0 || strncmp(target, "https://", 8) == 0);
+    if (SDL_OpenURL(target) == 0 || is_url) {
+        return;
     }
 
     // Fallback for local directories if SDL_OpenURL fails (common on macOS/Linux for file paths)
 #ifdef _WIN32
-    // Windows: ShellExecute handles paths and URLs
-    // (SDL_OpenURL usually maps to this anyway, but just in case)
+    // Windows: ShellExecute for local paths only (URLs already handled above)
     ShellExecuteA(nullptr, "open", target, nullptr, nullptr, SW_SHOW);
 #elif defined(__APPLE__)
     // macOS: The 'open' command is non-blocking and handles both URLs and Paths
