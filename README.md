@@ -1300,7 +1300,6 @@ This way templates don't need to be copied for each subversion.
 | `all_advancements` | 1.16.1                                                  | `_categorical`, `_aatool_optimized` | Default, ger, zh_cn |
 | `all_advancements` | 1.17                                                    | `_aatool_optimized`                 | Default, ger, zh_cn |
 | `all_advancements` | 1.21.3, 1.21.6, 1.21.11, 26.1, 26.2                     | `_optimized`                        | Default, ger, zh_cn |
-| `all_advancements` | 1.16.1                                                  | `_ssg_blackcat`                     | Default             |
 | `miku%`            | 1.21                                                    |                                     | Default             |
 | `all_trims`        | 1.21                                                    |                                     | Default             |
 | `test`             | 1.0, 1.6.4, 1.11.2, 1.16.1, 25w14craftmine              | `1`                                 | Default             |

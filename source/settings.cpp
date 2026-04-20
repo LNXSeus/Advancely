@@ -2873,7 +2873,10 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             bool has_dot = false;
                             for (size_t i = 0; i < len; i++) {
                                 char c = host[i];
-                                if (c == '.') { has_dot = true; continue; }
+                                if (c == '.') {
+                                    has_dot = true;
+                                    continue;
+                                }
                                 if (c == '-') continue;
                                 if (c >= '0' && c <= '9') continue;
                                 if (c >= 'a' && c <= 'z') continue;
@@ -3660,16 +3663,20 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         bool dec_j_active = (strcmp(dec_j, "None") != 0);
 
                         if (inc_active && inc_j_active && strcmp(inc_i, inc_j) == 0) {
-                            hotkey_duplicate_error = true; break;
+                            hotkey_duplicate_error = true;
+                            break;
                         }
                         if (inc_active && dec_j_active && strcmp(inc_i, dec_j) == 0) {
-                            hotkey_duplicate_error = true; break;
+                            hotkey_duplicate_error = true;
+                            break;
                         }
                         if (dec_active && inc_j_active && strcmp(dec_i, inc_j) == 0) {
-                            hotkey_duplicate_error = true; break;
+                            hotkey_duplicate_error = true;
+                            break;
                         }
                         if (dec_active && dec_j_active && strcmp(dec_i, dec_j) == 0) {
-                            hotkey_duplicate_error = true; break;
+                            hotkey_duplicate_error = true;
+                            break;
                         }
                     }
                 }
@@ -3728,16 +3735,20 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
     ImGui::Separator();
     ImGui::Spacing();
     ImGui::TextDisabled("Supporters - Thank you! luvv <3");
-    ImGui::BeginChild("SupportersBox", ImVec2(0, 72), true);
-    {
+    ImGui::BeginChild("SupportersBox", ImVec2(0, 72), true); {
         int sorted[NUM_SUPPORTERS];
         for (int i = 0; i < NUM_SUPPORTERS; ++i) sorted[i] = i;
         for (int i = 0; i < NUM_SUPPORTERS - 1; ++i)
             for (int j = i + 1; j < NUM_SUPPORTERS; ++j)
-                if (SUPPORTERS[sorted[j]].amount > SUPPORTERS[sorted[i]].amount) { int tmp = sorted[i]; sorted[i] = sorted[j]; sorted[j] = tmp; }
+                if (SUPPORTERS[sorted[j]].amount > SUPPORTERS[sorted[i]].amount) {
+                    int tmp = sorted[i];
+                    sorted[i] = sorted[j];
+                    sorted[j] = tmp;
+                }
         for (int i = 0; i < NUM_SUPPORTERS; ++i) {
             char supporter_buf[128];
-            snprintf(supporter_buf, sizeof(supporter_buf), "%s  $%.0f", SUPPORTERS[sorted[i]].name, SUPPORTERS[sorted[i]].amount);
+            snprintf(supporter_buf, sizeof(supporter_buf), "%s  $%.0f", SUPPORTERS[sorted[i]].name,
+                     SUPPORTERS[sorted[i]].amount);
             ImGui::TextUnformatted(supporter_buf);
         }
     }
@@ -3763,7 +3774,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
     // Disable "Apply Settings" button on visual editing mode or unsaved template editor changes
     bool visual_editing = t && t->is_visual_layout_editing;
     bool template_unsaved = t && t->template_editor_has_unsaved_changes;
-    bool apply_disabled = visual_editing || template_unsaved || coop_host_input_error || hotkey_duplicate_error || account_validation_error;
+    bool apply_disabled = visual_editing || template_unsaved || coop_host_input_error || hotkey_duplicate_error ||
+                          account_validation_error;
 
     // Apply the changes or pressing Enter or Ctrl/Cmd + S keys in the settings window when NO popup is shown
 

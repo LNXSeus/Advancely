@@ -801,20 +801,33 @@ static int SDLCALL host_thread_func(void *data) {
                         if (ctx->clients[i].handshake_done && payload && payload_len >= 2 + 2 + 4) {
                             const uint8_t *p = (const uint8_t *) payload;
                             uint32_t remaining = payload_len;
-                            uint16_t uuid_len = 0; memcpy(&uuid_len, p, 2); uuid_len = ntohs(uuid_len);
-                            p += 2; remaining -= 2;
+                            uint16_t uuid_len = 0;
+                            memcpy(&uuid_len, p, 2);
+                            uuid_len = ntohs(uuid_len);
+                            p += 2;
+                            remaining -= 2;
                             if (uuid_len < 48 && remaining >= (uint32_t) uuid_len + 2 + 4) {
                                 char uuid_buf[48] = {};
-                                memcpy(uuid_buf, p, uuid_len); uuid_buf[uuid_len] = '\0';
-                                p += uuid_len; remaining -= uuid_len;
-                                uint16_t world_len = 0; memcpy(&world_len, p, 2); world_len = ntohs(world_len);
-                                p += 2; remaining -= 2;
+                                memcpy(uuid_buf, p, uuid_len);
+                                uuid_buf[uuid_len] = '\0';
+                                p += uuid_len;
+                                remaining -= uuid_len;
+                                uint16_t world_len = 0;
+                                memcpy(&world_len, p, 2);
+                                world_len = ntohs(world_len);
+                                p += 2;
+                                remaining -= 2;
                                 if (world_len < 256 && remaining >= (uint32_t) world_len + 4) {
                                     char world_buf[256] = {};
-                                    memcpy(world_buf, p, world_len); world_buf[world_len] = '\0';
-                                    p += world_len; remaining -= world_len;
-                                    uint32_t file_len = 0; memcpy(&file_len, p, 4); file_len = ntohl(file_len);
-                                    p += 4; remaining -= 4;
+                                    memcpy(world_buf, p, world_len);
+                                    world_buf[world_len] = '\0';
+                                    p += world_len;
+                                    remaining -= world_len;
+                                    uint32_t file_len = 0;
+                                    memcpy(&file_len, p, 4);
+                                    file_len = ntohl(file_len);
+                                    p += 4;
+                                    remaining -= 4;
                                     if (file_len > 0 && file_len <= remaining && file_len <= 4 * 1024 * 1024) {
                                         void *copy = malloc(file_len);
                                         if (copy) {
@@ -824,7 +837,8 @@ static int SDLCALL host_thread_func(void *data) {
                                             int slot = -1;
                                             for (int k = 0; k < ctx->legacy_upload_count; k++) {
                                                 if (strcmp(ctx->legacy_uploads[k].uuid, uuid_buf) == 0) {
-                                                    slot = k; break;
+                                                    slot = k;
+                                                    break;
                                                 }
                                             }
                                             if (slot < 0 && ctx->legacy_upload_count < COOP_MAX_CLIENTS) {
@@ -1358,7 +1372,9 @@ static int SDLCALL receiver_thread_func(void *data) {
                     if (payload && payload_len >= 4) {
                         const char *p = payload;
                         uint32_t pc;
-                        memcpy(&pc, p, 4); pc = ntohl(pc); p += 4;
+                        memcpy(&pc, p, 4);
+                        pc = ntohl(pc);
+                        p += 4;
                         SDL_LockMutex(ctx->recv_mutex);
                         // Free all old per-player buffers
                         for (int pi = 0; pi < COOP_MAX_LOBBY; pi++) {
@@ -1367,18 +1383,22 @@ static int SDLCALL receiver_thread_func(void *data) {
                             ctx->recv_player_buffer_sizes[pi] = 0;
                         }
                         ctx->recv_player_snapshot_count = 0;
-                        for (uint32_t pi = 0; pi < pc && (size_t)(p - payload) + 8 <= payload_len; pi++) {
+                        for (uint32_t pi = 0; pi < pc && (size_t) (p - payload) + 8 <= payload_len; pi++) {
                             uint32_t idx, sz;
-                            memcpy(&idx, p, 4); idx = ntohl(idx); p += 4;
-                            memcpy(&sz, p, 4);  sz  = ntohl(sz);  p += 4;
-                            if ((size_t)(p - payload) + sz > payload_len) break;
+                            memcpy(&idx, p, 4);
+                            idx = ntohl(idx);
+                            p += 4;
+                            memcpy(&sz, p, 4);
+                            sz = ntohl(sz);
+                            p += 4;
+                            if ((size_t) (p - payload) + sz > payload_len) break;
                             if (idx < COOP_MAX_LOBBY) {
                                 ctx->recv_player_buffers[idx] = (char *) malloc(sz);
                                 if (ctx->recv_player_buffers[idx]) {
                                     memcpy(ctx->recv_player_buffers[idx], p, sz);
                                     ctx->recv_player_buffer_sizes[idx] = sz;
-                                    if ((int)(idx + 1) > ctx->recv_player_snapshot_count)
-                                        ctx->recv_player_snapshot_count = (int)(idx + 1);
+                                    if ((int) (idx + 1) > ctx->recv_player_snapshot_count)
+                                        ctx->recv_player_snapshot_count = (int) (idx + 1);
                                 }
                             }
                             p += sz;
@@ -1802,14 +1822,18 @@ bool coop_net_broadcast_player_states(CoopNetContext *ctx,
 
     char *p = payload;
     uint32_t net_pc = htonl((uint32_t) player_count);
-    memcpy(p, &net_pc, 4); p += 4;
+    memcpy(p, &net_pc, 4);
+    p += 4;
 
     for (int i = 0; i < player_count; i++) {
         uint32_t net_idx = htonl((uint32_t) i);
         uint32_t net_sz = htonl((uint32_t) player_sizes[i]);
-        memcpy(p, &net_idx, 4); p += 4;
-        memcpy(p, &net_sz, 4);  p += 4;
-        memcpy(p, player_buffers[i], player_sizes[i]); p += player_sizes[i];
+        memcpy(p, &net_idx, 4);
+        p += 4;
+        memcpy(p, &net_sz, 4);
+        p += 4;
+        memcpy(p, player_buffers[i], player_sizes[i]);
+        p += player_sizes[i];
     }
 
     bool all_ok = true;
@@ -1954,16 +1978,22 @@ bool coop_net_send_legacy_stats_upload(CoopNetContext *ctx,
     uint32_t u32;
 
     u16 = htons((uint16_t) uuid_len);
-    memcpy(buf + off, &u16, 2); off += 2;
-    memcpy(buf + off, uuid, uuid_len); off += uuid_len;
+    memcpy(buf + off, &u16, 2);
+    off += 2;
+    memcpy(buf + off, uuid, uuid_len);
+    off += uuid_len;
 
     u16 = htons((uint16_t) world_len);
-    memcpy(buf + off, &u16, 2); off += 2;
-    memcpy(buf + off, world_name, world_len); off += world_len;
+    memcpy(buf + off, &u16, 2);
+    off += 2;
+    memcpy(buf + off, world_name, world_len);
+    off += world_len;
 
     u32 = htonl(file_len);
-    memcpy(buf + off, &u32, 4); off += 4;
-    memcpy(buf + off, file_bytes, file_len); off += file_len;
+    memcpy(buf + off, &u32, 4);
+    off += 4;
+    memcpy(buf + off, file_bytes, file_len);
+    off += file_len;
 
     bool ok = send_message(ctx->client_fd, COOP_MSG_LEGACY_STATS_UPLOAD,
                            buf, (uint32_t) total);

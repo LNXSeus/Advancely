@@ -619,12 +619,21 @@ static void receiver_maybe_upload_legacy_stats(const Tracker *tracker,
     fseek(fp, 0, SEEK_END);
     long fsize = ftell(fp);
     fseek(fp, 0, SEEK_SET);
-    if (fsize <= 0 || fsize > 4 * 1024 * 1024) { fclose(fp); return; }
+    if (fsize <= 0 || fsize > 4 * 1024 * 1024) {
+        fclose(fp);
+        return;
+    }
     void *bytes = malloc((size_t) fsize);
-    if (!bytes) { fclose(fp); return; }
+    if (!bytes) {
+        fclose(fp);
+        return;
+    }
     size_t rd = fread(bytes, 1, (size_t) fsize, fp);
     fclose(fp);
-    if (rd != (size_t) fsize) { free(bytes); return; }
+    if (rd != (size_t) fsize) {
+        free(bytes);
+        return;
+    }
 
     if (coop_net_send_legacy_stats_upload(g_coop_ctx,
                                           app_settings->local_player.uuid,
@@ -2601,7 +2610,7 @@ int main(int argc, char *argv[]) {
                             bool fresh_from_host = (new_data || new_player_data);
                             if (fresh_from_host) {
                                 tracker->time_since_last_update =
-                                    tracker->template_data->host_time_since_last_update;
+                                        tracker->template_data->host_time_since_last_update;
                             }
                             SDL_SetAtomicInt(&g_needs_update, 1);
                             SDL_SetAtomicInt(&g_game_data_changed, 1);
@@ -2671,7 +2680,7 @@ int main(int argc, char *argv[]) {
                         DWORD wait_result = WaitForSingleObject(tracker->h_mutex, 50);
                         if (wait_result == WAIT_OBJECT_0) {
 #else
-                        if (sem_wait(tracker->mutex) == 0) {
+                            if (sem_wait(tracker->mutex) == 0) {
 #endif
                             OverlayIPCHeader header;
                             if (!tracker_build_coop_sync_label(tracker, &app_settings,
@@ -2824,16 +2833,16 @@ int main(int argc, char *argv[]) {
 
                         // Broadcast merged state to all receivers and save a copy for restore
                         char *merged_snapshot = nullptr;
-                        size_t merged_snapshot_size = 0;
-                        {
+                        size_t merged_snapshot_size = 0; {
                             char *broadcast_buf = (char *) malloc(4 * 1024 * 1024);
                             if (broadcast_buf) {
                                 size_t broadcast_size = serialize_template_data(tracker->template_data, broadcast_buf);
-                                log_message(LOG_INFO, "[COOP DEBUG] Host: broadcast_size=%zu, overall_progress=%.1f%%\n",
-                                            broadcast_size,
-                                            tracker->template_data
-                                                ? tracker->template_data->overall_progress_percentage
-                                                : -1.0f);
+                                log_message(
+                                    LOG_INFO, "[COOP DEBUG] Host: broadcast_size=%zu, overall_progress=%.1f%%\n",
+                                    broadcast_size,
+                                    tracker->template_data
+                                        ? tracker->template_data->overall_progress_percentage
+                                        : -1.0f);
                                 if (broadcast_size > 0) {
                                     coop_net_broadcast(g_coop_ctx, broadcast_buf, broadcast_size);
                                     // Keep a copy so we can restore merged view without re-reading disk
@@ -2923,7 +2932,7 @@ int main(int argc, char *argv[]) {
                     // Reset the timer as the update has happened
                     // Receivers mirror the host's timer (set during merge), so skip the reset
                     bool rcv_connected = (app_settings.network_mode == NETWORK_RECEIVER &&
-                        g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+                                          g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
                     if (!rcv_connected) {
                         tracker->time_since_last_update = 0.0f;
                     }

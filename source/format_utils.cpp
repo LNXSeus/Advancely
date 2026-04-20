@@ -67,7 +67,8 @@ void format_time(long long ticks, char *output, size_t max_len, bool unit_spacin
     } else if (hours > 0) {
         if (show_ms_separate) {
             if (unit_spacing)
-                snprintf(output, max_len, "%02lld h %02lld m %02lld s %03lld ms", hours, minutes, seconds, milliseconds);
+                snprintf(output, max_len, "%02lld h %02lld m %02lld s %03lld ms", hours, minutes, seconds,
+                         milliseconds);
             else
                 snprintf(output, max_len, "%02lldh %02lldm %02lld.%03llds", hours, minutes, seconds, milliseconds);
         } else {

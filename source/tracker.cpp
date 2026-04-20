@@ -502,10 +502,10 @@ static void tracker_reload_background_textures(Tracker *t, const AppSettings *se
 // subtracts the correct starting values per player (not the host's for all).
 // -------------------------------------------------------------------
 struct PlayerLegacySnapshot {
-    std::unordered_map<std::string, int> stat_baselines;  // stat root_name -> baseline value
-    std::unordered_set<std::string> ach_baseline_done;    // achievement root_names earned at snapshot
-    long long playtime_snapshot = 0;                      // stat 1100 at snapshot
-    std::string snapshot_world_name;                      // world this baseline belongs to
+    std::unordered_map<std::string, int> stat_baselines; // stat root_name -> baseline value
+    std::unordered_set<std::string> ach_baseline_done; // achievement root_names earned at snapshot
+    long long playtime_snapshot = 0; // stat 1100 at snapshot
+    std::string snapshot_world_name; // world this baseline belongs to
 };
 
 static std::unordered_map<std::string, PlayerLegacySnapshot> *
@@ -549,13 +549,13 @@ static void tracker_save_player_snapshot_to_file(const AppSettings *settings,
     cJSON_AddNumberToObject(root, "playtime_snapshot", (double) snap.playtime_snapshot);
 
     cJSON *ach_obj = cJSON_CreateObject();
-    for (const auto &name : snap.ach_baseline_done) {
+    for (const auto &name: snap.ach_baseline_done) {
         cJSON_AddBoolToObject(ach_obj, name.c_str(), true);
     }
     cJSON_AddItemToObject(root, "achievements", ach_obj);
 
     cJSON *stat_obj = cJSON_CreateObject();
-    for (const auto &kv : snap.stat_baselines) {
+    for (const auto &kv: snap.stat_baselines) {
         cJSON_AddNumberToObject(stat_obj, kv.first.c_str(), kv.second);
     }
     cJSON_AddItemToObject(root, "stats", stat_obj);
@@ -1050,7 +1050,8 @@ static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *p
  * @brief (Era 2/3: 1.7.2-1.12.2) Parses mid-era flat JSON stats files.
  * Specifically used for 1.12-1.12.2 as it has modern advancements, but mid-era stats formats.
  */
-static void tracker_update_stats_mid(Tracker *t, const cJSON *player_stats_json, cJSON *settings_json, const char *uuid) {
+static void tracker_update_stats_mid(Tracker *t, const cJSON *player_stats_json, cJSON *settings_json,
+                                     const char *uuid) {
     if (!player_stats_json) return;
 
     // Stats logic with sub-stats
@@ -3892,6 +3893,7 @@ static void coop_finalize_unlocks(TemplateData *td) {
         if (td->unlocks[i] && td->unlocks[i]->done) td->unlocks_completed_count++;
     }
 }
+
 /**
  * @brief Accumulates one player's data into multi-stage goals for co-op merge.
  *
@@ -4528,9 +4530,7 @@ void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, 
     coop_finalize_stats(t->template_data, settings_json, player->uuid);
     coop_finalize_multi_stage(t->template_data);
 
-    tracker_update_custom_progress(t, settings_json, settings, player->uuid);
-
-    {
+    tracker_update_custom_progress(t, settings_json, settings, player->uuid); {
         bool changed;
         int guard = 0;
         do {
@@ -6304,7 +6304,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->
                                 is_visual_layout_editing && view_editable_self) {
                                 bool rcv_in_lobby = (settings->network_mode == NETWORK_RECEIVER &&
-                                    g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+                                                     g_coop_ctx && coop_net_get_state(g_coop_ctx) ==
+                                                     COOP_NET_CONNECTED);
                                 if (rcv_in_lobby &&
                                     settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY) {
                                     // Host-only mode: clicking disabled for receivers
@@ -6315,7 +6316,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                     snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", crit->root_name);
                                     snprintf(mod.parent_root_name, sizeof(mod.parent_root_name), "%s", cat->root_name);
                                     mod.action = COOP_MOD_TOGGLE;
-                                    snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", settings->local_player.uuid);
+                                    snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s",
+                                             settings->local_player.uuid);
                                     coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
                                 } else if (settings->network_mode == NETWORK_HOST &&
                                            g_coop_ctx &&
@@ -6326,7 +6328,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                     snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", crit->root_name);
                                     snprintf(mod.parent_root_name, sizeof(mod.parent_root_name), "%s", cat->root_name);
                                     mod.action = COOP_MOD_TOGGLE;
-                                    snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", settings->local_player.uuid);
+                                    snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s",
+                                             settings->local_player.uuid);
                                     tracker_apply_coop_mods(t, settings, &mod, 1);
                                     SDL_SetAtomicInt(&g_needs_update, 1);
                                 } else {
@@ -6588,7 +6591,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     if (is_hovered_parent && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->
                         is_visual_layout_editing && view_editable_self_p) {
                         bool rcv_in_lobby = (settings->network_mode == NETWORK_RECEIVER &&
-                            g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+                                             g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
                         if (rcv_in_lobby &&
                             settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY) {
                             // Host-only mode: clicking disabled for receivers
@@ -7596,7 +7599,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 // Co-op: Receivers respect custom goal permission
                 // Co-op: Show tooltip for host-only custom goals
                 bool rcv_in_lobby = (settings->network_mode == NETWORK_RECEIVER &&
-                    g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
+                                     g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
                 bool view_editable_self_cg = tracker_view_editable_by_self(t, settings);
                 bool rcv_host_only_cg = (settings->network_mode == NETWORK_RECEIVER &&
                                          settings->coop_custom_goal_mode == COOP_CUSTOM_HOST_ONLY);
@@ -9474,7 +9477,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         char formatted_update_time[64];
         const char *adv_ach_label = (version >= MC_VERSION_1_12) ? "Adv" : "Ach";
         float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
-        format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time), settings->igt_unit_spacing);
+        format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time),
+                                 settings->igt_unit_spacing);
 
         char temp_chunk[256];
         bool show_adv_counter = (t->template_data->advancement_goal_count > 0);
@@ -9535,7 +9539,7 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         ImGui::TextUnformatted("Progress Text");
 
         ImGui::BulletText("World: Shows the current world name, or 'Syncing with <Host>' / 'Syncing for <Player>'\n"
-                          "depending on the player dropdown selection when in receiver mode.");
+            "depending on the player dropdown selection when in receiver mode.");
         ImGui::BulletText("Run Details: Shows the Display Version & Display Category.");
         ImGui::BulletText("Progress: Shows the main adv/ach counter and overall percentage.");
         ImGui::BulletText("IGT: Displays the in-game time from the stats file (ticks).");
@@ -9631,8 +9635,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     const float player_dropdown_width = 160.0f;
     CoopNetState controls_coop_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
     const bool controls_show_dropdown =
-        (controls_coop_state == COOP_NET_LISTENING || controls_coop_state == COOP_NET_CONNECTED) &&
-        settings->coop_player_count > 0;
+            (controls_coop_state == COOP_NET_LISTENING || controls_coop_state == COOP_NET_CONNECTED) &&
+            settings->coop_player_count > 0;
 
     // Calculate total width using ImGui's ItemSpacing
     float controls_total_width = clear_button_width + button_padding_x +
@@ -10731,6 +10735,7 @@ void tracker_recalculate_progress(Tracker *t, const AppSettings *settings) {
 // Defined in main.cpp. Shared so the host-side Hermes path can update the
 // per-player and merged snapshot caches directly without re-reading disk.
 extern size_t serialize_template_data(TemplateData *td, char *buffer);
+
 extern bool merge_coop_progress(const char *buffer, TemplateData *target);
 
 
@@ -10986,9 +10991,9 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
             } else if (is_coop_host) {
                 // HIGHEST mode: use higher-wins for regular stats, but multi-stage
                 // stages must always be cumulative (summed across all players)
-                if (hermes_apply_stat_event(t, data, true))  // skip_multi_stage
+                if (hermes_apply_stat_event(t, data, true)) // skip_multi_stage
                     any_changed = true;
-                if (hermes_apply_stat_event_cumulative(t, data, event_player_uuid, true))  // multi_stage_only
+                if (hermes_apply_stat_event_cumulative(t, data, event_player_uuid, true)) // multi_stage_only
                     any_changed = true;
             } else {
                 // Singleplayer: direct apply (only one player, highest == actual)
@@ -11190,7 +11195,10 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
         bool old_is_flat = false;
         if (old_custom_progress) {
             for (cJSON *c = old_custom_progress->child; c; c = c->next) {
-                if (!cJSON_IsObject(c)) { old_is_flat = true; break; }
+                if (!cJSON_IsObject(c)) {
+                    old_is_flat = true;
+                    break;
+                }
             }
         }
 
@@ -11241,7 +11249,10 @@ bool tracker_load_and_parse_data(Tracker *t, AppSettings *settings) {
         bool old_is_flat = false;
         if (old_stat_override) {
             for (cJSON *c = old_stat_override->child; c; c = c->next) {
-                if (!cJSON_IsObject(c)) { old_is_flat = true; break; }
+                if (!cJSON_IsObject(c)) {
+                    old_is_flat = true;
+                    break;
+                }
             }
         }
 
@@ -11513,7 +11524,8 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
 
     // Format the time since last update (snapped to 5s intervals like the overlay)
     float last_update_time_5_seconds = floorf(t->time_since_last_update / 5.0f) * 5.0f;
-    format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time), settings->igt_unit_spacing);
+    format_time_since_update(last_update_time_5_seconds, formatted_update_time, sizeof(formatted_update_time),
+                             settings->igt_unit_spacing);
 
     // Displaying Ach or Adv depending on the version
     // Get version from string
@@ -11600,7 +11612,8 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings) {
     if (!t || !t->template_data) return;
 
     cJSON *settings_json = cJSON_from_file(get_settings_file_path());
-    cJSON *override_obj = get_per_uuid_progress_obj(settings_json, "stat_progress_override", settings->local_player.uuid);
+    cJSON *override_obj = get_per_uuid_progress_obj(settings_json, "stat_progress_override",
+                                                    settings->local_player.uuid);
 
     // Also load the current game version used
     MC_Version version = settings_get_version_from_string(settings->version_str);

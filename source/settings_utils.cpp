@@ -828,12 +828,20 @@ bool settings_load(AppSettings *settings) {
         }
 
         const cJSON *igt_unit_spacing = cJSON_GetObjectItem(general_settings, "igt_unit_spacing");
-        if (igt_unit_spacing && cJSON_IsBool(igt_unit_spacing)) settings->igt_unit_spacing = cJSON_IsTrue(igt_unit_spacing);
-        else { settings->igt_unit_spacing = false; defaults_were_used = true; }
+        if (igt_unit_spacing && cJSON_IsBool(igt_unit_spacing))
+            settings->igt_unit_spacing = cJSON_IsTrue(igt_unit_spacing);
+        else {
+            settings->igt_unit_spacing = false;
+            defaults_were_used = true;
+        }
 
         const cJSON *igt_always_show_ms = cJSON_GetObjectItem(general_settings, "igt_always_show_ms");
-        if (igt_always_show_ms && cJSON_IsBool(igt_always_show_ms)) settings->igt_always_show_ms = cJSON_IsTrue(igt_always_show_ms);
-        else { settings->igt_always_show_ms = false; defaults_were_used = true; }
+        if (igt_always_show_ms && cJSON_IsBool(igt_always_show_ms))
+            settings->igt_always_show_ms = cJSON_IsTrue(igt_always_show_ms);
+        else {
+            settings->igt_always_show_ms = false;
+            defaults_were_used = true;
+        }
 
         const cJSON *show_update = cJSON_GetObjectItem(general_settings, "overlay_show_update_timer");
         if (show_update && cJSON_IsBool(show_update)) settings->overlay_show_update_timer = cJSON_IsTrue(show_update);

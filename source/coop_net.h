@@ -202,13 +202,15 @@ typedef struct {
     // to the host here so merge can read every player's global stats without
     // touching disk. Latest-wins per UUID.
     SDL_Mutex *legacy_upload_mutex;
+
     struct LegacyUploadEntry {
         char uuid[48];
         char world_name[256];
-        void *bytes;          // malloc'd, freed on replace or context destroy
+        void *bytes; // malloc'd, freed on replace or context destroy
         uint32_t size;
         Uint64 last_update_ms;
     } legacy_uploads[COOP_MAX_CLIENTS];
+
     int legacy_upload_count;
     // Set by the net thread on a new legacy upload; main thread check-and-clears
     // it each frame to force a tracker re-merge (see coop_net_legacy_upload_consume).
