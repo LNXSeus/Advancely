@@ -2099,6 +2099,10 @@ int main(int argc, char *argv[]) {
                 log_message(LOG_INFO, "[COOP] Synced lobby to roster: %d player(s).\n",
                             app_settings.coop_player_count);
 
+                // Remove UUID entries from settings.json that no longer belong to
+                // any player in the current roster so stale progress doesn't linger.
+                settings_prune_stale_coop_progress(&app_settings);
+
                 // Roster changed — slot N may now hold a different player, so
                 // drop the cached per-player snapshots. (The following
                 // g_settings_changed=1 would clear them via tracker_reinit_template
@@ -2705,26 +2709,45 @@ int main(int argc, char *argv[]) {
             }
 
             // --- Co-op Host: check for queued custom goal mods every frame ---
-            // Receivers send checkbox toggles to the host, but the host only processes
-            // them inside g_needs_update (which requires a file change). Poll here so
-            // mods are applied promptly even when no game file changes.
-            if (app_settings.network_mode == NETWORK_HOST && g_coop_ctx &&
-                coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
-                coop_net_get_client_count(g_coop_ctx) > 0 && tracker->template_data) {
-                CoopCustomGoalModMsg mods[COOP_MAX_CUSTOM_MODS];
-                int mod_count = coop_net_drain_custom_mods(g_coop_ctx, mods, COOP_MAX_CUSTOM_MODS);
-                if (mod_count > 0) {
-                    // Persist each mod under its source_uuid's subtree in settings.json
-                    // and mutate in-memory state for instant feedback on the host's view.
-                    tracker_apply_coop_mods(tracker, &app_settings, mods, mod_count);
-                    log_message(LOG_INFO, "[COOP] Applied %d custom goal modification(s) from receiver.\n", mod_count);
+            // Drain the mod queue every frame so it never overflows, but batch the
+            // actual apply+broadcast into at most one full update per 150ms. Without
+            // this, rapid checkbox clicks from a receiver on a slow connection flood
+            // the host with large state-update broadcasts that fill the TCP send
+            // buffer and cause send_all timeouts, which disconnect the client.
+            {
+                static CoopCustomGoalModMsg pending_rcv_mods[COOP_MAX_CUSTOM_MODS * 4];
+                static int pending_rcv_mod_count = 0;
+                static Uint64 rcv_mod_batch_deadline_ms = 0;
 
-                    // Force a full update so the host rebuilds merged + per-player snapshots
-                    // from the (now-persisted) settings.json and broadcasts both to every
-                    // receiver. Broadcasting template_data directly here would send the
-                    // host's currently-filtered dropdown view, not the authoritative merged
-                    // state, so receivers would see the wrong data.
-                    SDL_SetAtomicInt(&g_needs_update, 1);
+                bool host_has_clients = (app_settings.network_mode == NETWORK_HOST && g_coop_ctx &&
+                                         coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
+                                         coop_net_get_client_count(g_coop_ctx) > 0 && tracker->template_data);
+
+                if (host_has_clients) {
+                    CoopCustomGoalModMsg drained[COOP_MAX_CUSTOM_MODS];
+                    int drained_count = coop_net_drain_custom_mods(g_coop_ctx, drained, COOP_MAX_CUSTOM_MODS);
+                    for (int mi = 0; mi < drained_count; mi++) {
+                        if (pending_rcv_mod_count < (int)(sizeof(pending_rcv_mods) / sizeof(pending_rcv_mods[0])))
+                            pending_rcv_mods[pending_rcv_mod_count++] = drained[mi];
+                    }
+                    if (drained_count > 0 && rcv_mod_batch_deadline_ms == 0)
+                        rcv_mod_batch_deadline_ms = SDL_GetTicks() + 150;
+
+                    Uint64 now_ms = SDL_GetTicks();
+                    if (pending_rcv_mod_count > 0 && rcv_mod_batch_deadline_ms > 0 &&
+                        now_ms >= rcv_mod_batch_deadline_ms) {
+                        tracker_apply_coop_mods(tracker, &app_settings, pending_rcv_mods, pending_rcv_mod_count);
+                        log_message(LOG_INFO, "[COOP] Applied %d batched custom goal modification(s) from receiver(s).\n",
+                                    pending_rcv_mod_count);
+                        pending_rcv_mod_count = 0;
+                        rcv_mod_batch_deadline_ms = 0;
+                        SDL_SetAtomicInt(&g_needs_update, 1);
+                    }
+                } else {
+                    // Lobby ended or no clients; discard any mods that accumulated
+                    // before the lobby dropped so they don't apply to a future session.
+                    pending_rcv_mod_count = 0;
+                    rcv_mod_batch_deadline_ms = 0;
                 }
             }
 

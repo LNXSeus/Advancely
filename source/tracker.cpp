@@ -6319,6 +6319,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                     snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s",
                                              settings->local_player.uuid);
                                     coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
+                                    // Optimistic local apply so the receiver sees instant feedback
+                                    // without waiting for the full host round-trip.
+                                    tracker_apply_coop_mods(t, settings, &mod, 1);
+                                    SDL_SetAtomicInt(&g_needs_update, 1);
                                 } else if (settings->network_mode == NETWORK_HOST &&
                                            g_coop_ctx &&
                                            coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING) {
@@ -6604,6 +6608,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             mod.action = COOP_MOD_TOGGLE;
                             snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", settings->local_player.uuid);
                             coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
+                            tracker_apply_coop_mods(t, settings, &mod, 1);
+                            SDL_SetAtomicInt(&g_needs_update, 1);
                         } else if (settings->network_mode == NETWORK_HOST &&
                                    g_coop_ctx &&
                                    coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING) {
@@ -7637,6 +7643,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                         mod.action = COOP_MOD_TOGGLE;
                         snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", settings->local_player.uuid);
                         coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
+                        tracker_apply_coop_mods(t, settings, &mod, 1);
+                        SDL_SetAtomicInt(&g_needs_update, 1);
                     } else if (settings->network_mode == NETWORK_HOST &&
                                g_coop_ctx &&
                                coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING) {

@@ -180,6 +180,57 @@ cJSON *settings_get_player_progress_subobj(cJSON *parent_obj, const char *uuid,
     return sub;
 }
 
+void settings_prune_stale_coop_progress(const AppSettings *settings) {
+    if (!settings || settings->coop_player_count <= 0) return;
+
+    cJSON *root = cJSON_from_file(get_settings_file_path());
+    if (!root) return;
+
+    const char *sections[] = {"custom_progress", "stat_progress_override"};
+    bool changed = false;
+
+    for (int s = 0; s < 2; s++) {
+        cJSON *section = cJSON_GetObjectItem(root, sections[s]);
+        if (!cJSON_IsObject(section)) continue;
+
+        cJSON *child = section->child;
+        while (child) {
+            cJSON *next = child->next;
+            const char *uuid_key = child->string;
+            if (uuid_key && cJSON_IsObject(child)) {
+                bool in_roster = false;
+                for (int i = 0; i < settings->coop_player_count; i++) {
+                    if (strcmp(uuid_key, settings->coop_players[i].uuid) == 0) {
+                        in_roster = true;
+                        break;
+                    }
+                }
+                if (!in_roster) {
+                    cJSON_DeleteItemFromObject(section, uuid_key);
+                    changed = true;
+                    log_message(LOG_INFO, "[COOP] Pruned stale UUID '%s' from %s in settings.json\n",
+                                uuid_key, sections[s]);
+                }
+            }
+            child = next;
+        }
+    }
+
+    if (changed) {
+        SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
+        FILE *file = fopen(get_settings_file_path(), "w");
+        if (file) {
+            char *json_str = cJSON_Print(root);
+            if (json_str) {
+                fputs(json_str, file);
+                free(json_str);
+            }
+            fclose(file);
+        }
+    }
+    cJSON_Delete(root);
+}
+
 /**
  * @brief Loads a window rect from a cJSON object and uses defaults if rect struct is empty: e.g., WindowRect rect = {}
  * @param parent Parent cJSON object

@@ -419,6 +419,14 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
 cJSON *settings_get_player_progress_subobj(cJSON *parent_obj, const char *uuid, const char *migration_uuid);
 
 /**
+ * @brief Removes UUID entries from `custom_progress` and `stat_progress_override`
+ * in settings.json that do not belong to any player currently in the roster.
+ * Called whenever the lobby player list changes so stale player data does not
+ * accumulate on disk.
+ */
+void settings_prune_stale_coop_progress(const AppSettings *settings);
+
+/**
  * @brief Constructs the full paths to the template, language, snapshot JSON and notes TXT files. Does NOT CREATE the files or load them.
  *
  * Based on the version, category, and optional flag settings, this function
