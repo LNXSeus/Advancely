@@ -554,16 +554,36 @@ static int SDLCALL host_thread_func(void *data) {
 
         fd_set read_fds;
         FD_ZERO(&read_fds);
-        FD_SET(ctx->server_fd, &read_fds);
 
-        coop_socket_t max_fd = ctx->server_fd;
+        // Build the fd_set, skipping invalid fds. On Linux FD_SET(-1, ...) is
+        // undefined behavior (writes via negative index into fds_bits, smashing
+        // the stack). The main thread sets server_fd / client socket_fd to
+        // COOP_INVALID_SOCKET when tearing down, so we MUST validate before
+        // inserting.
+        coop_socket_t max_fd = 0;
+        bool any_fd_valid = false;
+
+        if (ctx->server_fd != COOP_INVALID_SOCKET) {
+            FD_SET(ctx->server_fd, &read_fds);
+            max_fd = ctx->server_fd;
+            any_fd_valid = true;
+        }
         for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
-            if (ctx->clients[i].active) {
+            if (ctx->clients[i].active &&
+                ctx->clients[i].socket_fd != COOP_INVALID_SOCKET) {
                 FD_SET(ctx->clients[i].socket_fd, &read_fds);
-                if (ctx->clients[i].socket_fd > max_fd) {
+                if (!any_fd_valid || ctx->clients[i].socket_fd > max_fd) {
                     max_fd = ctx->clients[i].socket_fd;
                 }
+                any_fd_valid = true;
             }
+        }
+
+        if (!any_fd_valid) {
+            // All sockets have been closed by the main thread during shutdown.
+            // Spin-sleep briefly so the while-loop condition re-checks should_stop.
+            SDL_Delay(10);
+            continue;
         }
 
         struct timeval tv;
@@ -1098,17 +1118,20 @@ static int SDLCALL receiver_thread_func(void *data) {
             FD_ZERO(&write_fds);
             FD_ZERO(&err_fds);
 
-            // Check if socket was closed by coop_net_stop
-            if (ctx->client_fd == COOP_INVALID_SOCKET) break;
+            // Snapshot the fd once; the main thread may race close_socket() with us.
+            // FD_SET(-1, ...) is UB on Linux (negative index into fds_bits smashes
+            // the stack), so we must validate a local copy, not ctx->client_fd.
+            coop_socket_t fd = ctx->client_fd;
+            if (fd == COOP_INVALID_SOCKET) break;
 
-            FD_SET(ctx->client_fd, &write_fds);
-            FD_SET(ctx->client_fd, &err_fds);
+            FD_SET(fd, &write_fds);
+            FD_SET(fd, &err_fds);
 
             struct timeval tv;
             tv.tv_sec = 0;
             tv.tv_usec = 200000; // 200ms poll interval
 
-            int ready = select((int) (ctx->client_fd + 1), nullptr, &write_fds, &err_fds, &tv);
+            int ready = select((int) (fd + 1), nullptr, &write_fds, &err_fds, &tv);
             if (ready < 0) break;
             if (ready == 0) continue; // Timeout, loop and check should_stop
 
@@ -1178,17 +1201,19 @@ static int SDLCALL receiver_thread_func(void *data) {
     // ---- Wait for JOIN_ACCEPT / JOIN_REJECT ----
     bool accepted = false;
     while (!should_stop(ctx)) {
-        if (ctx->client_fd == COOP_INVALID_SOCKET) break;
+        // Snapshot fd locally to close the TOCTOU window with coop_net_stop.
+        coop_socket_t fd = ctx->client_fd;
+        if (fd == COOP_INVALID_SOCKET) break;
 
         fd_set read_fds;
         FD_ZERO(&read_fds);
-        FD_SET(ctx->client_fd, &read_fds);
+        FD_SET(fd, &read_fds);
 
         struct timeval tv;
         tv.tv_sec = 0;
         tv.tv_usec = 200000; // 200ms
 
-        int ready = select((int) (ctx->client_fd + 1), &read_fds, nullptr, nullptr, &tv);
+        int ready = select((int) (fd + 1), &read_fds, nullptr, nullptr, &tv);
         if (ready < 0) break;
         if (ready == 0) continue;
 
@@ -1254,12 +1279,13 @@ static int SDLCALL receiver_thread_func(void *data) {
         while (!should_stop(ctx) && (SDL_GetTicks() - sync_start) < 3000) {
             fd_set sync_fds;
             FD_ZERO(&sync_fds);
-            if (ctx->client_fd == COOP_INVALID_SOCKET) break;
-            FD_SET(ctx->client_fd, &sync_fds);
+            coop_socket_t fd = ctx->client_fd;
+            if (fd == COOP_INVALID_SOCKET) break;
+            FD_SET(fd, &sync_fds);
             struct timeval stv;
             stv.tv_sec = 0;
             stv.tv_usec = 200000;
-            int sr = select((int) (ctx->client_fd + 1), &sync_fds, nullptr, nullptr, &stv);
+            int sr = select((int) (fd + 1), &sync_fds, nullptr, nullptr, &stv);
             if (sr <= 0) continue;
             uint32_t sync_type;
             char *sync_payload;
@@ -1296,14 +1322,15 @@ static int SDLCALL receiver_thread_func(void *data) {
     while (!should_stop(ctx)) {
         fd_set read_fds;
         FD_ZERO(&read_fds);
-        if (ctx->client_fd == COOP_INVALID_SOCKET) break;
-        FD_SET(ctx->client_fd, &read_fds);
+        coop_socket_t fd = ctx->client_fd;
+        if (fd == COOP_INVALID_SOCKET) break;
+        FD_SET(fd, &read_fds);
 
         struct timeval tv;
         tv.tv_sec = 0;
         tv.tv_usec = 100000; // 100ms
 
-        int ready = select((int) (ctx->client_fd + 1), &read_fds, nullptr, nullptr, &tv);
+        int ready = select((int) (fd + 1), &read_fds, nullptr, nullptr, &tv);
         if (ready < 0) {
 #ifdef _WIN32
             if (WSAGetLastError() == WSAEINTR) continue;
