@@ -10496,6 +10496,14 @@ static bool hermes_apply_stat_event_cumulative(Tracker *t, const cJSON *data,
         old_value = it->second;
     }
     int delta = new_value - old_value;
+
+    // Skip stale / rewinding values. Live Hermes stats are monotonically
+    // non-decreasing per player, so a negative delta here only happens when
+    // replaying old events whose totals are already baked into the disk
+    // baseline we just reseeded the cache from. Applying them would wrongly
+    // subtract from the merged cumulative sum.
+    if (delta < 0) return false;
+
     (*cache)[cache_key] = new_value;
 
     if (delta == 0) return false;
@@ -10848,6 +10856,133 @@ static bool hermes_apply_event_to_coop_snapshots(
 }
 
 
+// Shared per-event dispatch used by both the live Hermes poll
+// (tracker_poll_hermes_log) and the rebuild-time replay
+// (tracker_hermes_replay_window). Identity filter + apply helpers match
+// exactly - any difference between "live" and "replayed" events must live
+// in the apply helpers (e.g. the negative-delta guard in
+// hermes_apply_stat_event_cumulative), not here.
+//
+// *workbuf_ptr is allocated lazily on first snapshot mutation and owned by
+// the caller; *snapshots_changed is OR'd (never cleared) when the per-player
+// or merged snapshot caches are mutated so the caller can schedule a
+// receiver broadcast. Returns true if any state changed.
+static bool hermes_process_decrypted_line(
+    Tracker *t, const AppSettings *settings,
+    const std::string &decrypted,
+    char **workbuf_ptr, size_t workbuf_size,
+    bool *snapshots_changed) {
+    cJSON *event = cJSON_ParseWithLength(decrypted.c_str(), decrypted.size());
+    if (!event) {
+        log_message(LOG_ERROR, "[TRACKER - HERMES] Failed to parse decrypted line (len=%zu)\n",
+                    decrypted.size());
+        return false;
+    }
+
+    cJSON *type_json = cJSON_GetObjectItem(event, "type");
+    cJSON *data = cJSON_GetObjectItem(event, "data");
+
+    if (!cJSON_IsString(type_json) || !data) {
+        cJSON_Delete(event);
+        return false;
+    }
+
+    const char *type = type_json->valuestring;
+
+    // --- Player identity filter ---
+    // Hermes events include a "player" object with "name" and "uuid".
+    // Coop host accepts events from any roster player and remembers which
+    // slot they came from so the event applies to that player's snapshot.
+    // Singleplayer / receiver accepts only the local player's events.
+    // UUID match first (authoritative, case-insensitive), then username.
+    const char *event_player_uuid = nullptr;
+    int matched_player_idx = -1;
+    cJSON *player_json = cJSON_GetObjectItem(data, "player");
+    if (cJSON_IsObject(player_json)) {
+        cJSON *uuid_json = cJSON_GetObjectItem(player_json, "uuid");
+        cJSON *name_json = cJSON_GetObjectItem(player_json, "name");
+        const char *ev_uuid = cJSON_IsString(uuid_json) ? uuid_json->valuestring : nullptr;
+        const char *ev_name = cJSON_IsString(name_json) ? name_json->valuestring : nullptr;
+
+        bool player_match = false;
+
+        if (settings->network_mode == NETWORK_HOST && settings->coop_player_count > 0) {
+            for (int p = 0; p < settings->coop_player_count; p++) {
+                const CoopPlayer *rp = &settings->coop_players[p];
+                if (ev_uuid && rp->uuid[0] != '\0' &&
+                    strcasecmp(ev_uuid, rp->uuid) == 0) {
+                    player_match = true;
+                    event_player_uuid = ev_uuid;
+                    matched_player_idx = p;
+                    break;
+                }
+                if (!player_match && ev_name && rp->username[0] != '\0' &&
+                    strcasecmp(ev_name, rp->username) == 0) {
+                    player_match = true;
+                    event_player_uuid = ev_uuid; // may be null, that's OK
+                    matched_player_idx = p;
+                    break;
+                }
+            }
+        } else {
+            if (settings->local_player.uuid[0] != '\0' && ev_uuid) {
+                player_match = (strcasecmp(ev_uuid, settings->local_player.uuid) == 0);
+            }
+            if (!player_match && settings->local_player.username[0] != '\0' && ev_name) {
+                player_match = (strcasecmp(ev_name, settings->local_player.username) == 0);
+            }
+            if (player_match) event_player_uuid = ev_uuid;
+        }
+
+        if (!player_match) {
+            cJSON_Delete(event);
+            return false;
+        }
+    }
+    // If no player object, allow it through (older Hermes versions).
+
+    // --- Dispatch event ---
+    bool is_coop_host = (settings->network_mode == NETWORK_HOST &&
+                         t->hermes_coop_stat_cache);
+    bool have_snapshots = (matched_player_idx >= 0 &&
+                           matched_player_idx < MAX_COOP_PLAYERS &&
+                           t->coop_player_snapshots[matched_player_idx] &&
+                           t->coop_merged_snapshot);
+
+    bool any_changed = false;
+
+    if (is_coop_host && have_snapshots &&
+        (strcmp(type, "stat") == 0 || strcmp(type, "advancement") == 0)) {
+        // Per-player isolation path: update the source player's snapshot and
+        // the merged snapshot, then restore the selected view.
+        if (!*workbuf_ptr) *workbuf_ptr = (char *) malloc(workbuf_size);
+        if (*workbuf_ptr &&
+            hermes_apply_event_to_coop_snapshots(t, settings, matched_player_idx,
+                                                 type, data, *workbuf_ptr, workbuf_size)) {
+            any_changed = true;
+            if (snapshots_changed) *snapshots_changed = true;
+        }
+    } else if (strcmp(type, "stat") == 0) {
+        if (is_coop_host && settings->coop_stat_merge == COOP_STAT_CUMULATIVE) {
+            if (hermes_apply_stat_event_cumulative(t, data, event_player_uuid))
+                any_changed = true;
+        } else if (is_coop_host) {
+            if (hermes_apply_stat_event(t, data, true)) any_changed = true;
+            if (hermes_apply_stat_event_cumulative(t, data, event_player_uuid, true))
+                any_changed = true;
+        } else {
+            if (hermes_apply_stat_event(t, data)) any_changed = true;
+        }
+    } else if (strcmp(type, "advancement") == 0) {
+        if (hermes_apply_advancement_event(t, data)) any_changed = true;
+    }
+    // ALL OTHER EVENT TYPES ARE IGNORED - speedrun legal this way.
+
+    cJSON_Delete(event);
+    return any_changed;
+}
+
+
 void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
     if (!settings->using_hermes || !t->hermes_active || !t->hermes_play_log)
         return;
@@ -10878,7 +11013,7 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
         }
 
         if (!newline_found) {
-            // Incomplete line — Minecraft is still writing or we reached EOF. Retry next frame.
+            // Incomplete line - Minecraft is still writing or we reached EOF. Retry next frame.
             // Reset to start of this line so we read it completely next time.
             fseek(t->hermes_play_log, start_offset, SEEK_SET);
             break;
@@ -10887,135 +11022,17 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
         // Commit read position past this complete line.
         t->hermes_file_offset = ftell(t->hermes_play_log);
 
-        // Strip trailing CR/LF.
         while (!line_buf.empty() && (line_buf.back() == '\n' || line_buf.back() == '\r')) {
             line_buf.pop_back();
         }
-
         if (line_buf.empty()) continue;
 
-        // Decrypt.
         std::string decrypted = t->hermes_rotator.processLine(line_buf);
 
-        cJSON *event = cJSON_ParseWithLength(decrypted.c_str(), decrypted.size());
-        if (!event) {
-            log_message(LOG_ERROR, "[TRACKER - HERMES] Failed to parse decrypted line (len=%zu)\n", line_buf.size());
-            continue;
+        if (hermes_process_decrypted_line(t, settings, decrypted,
+                                          &workbuf, workbuf_size, &snapshots_changed)) {
+            any_changed = true;
         }
-
-        cJSON *type_json = cJSON_GetObjectItem(event, "type");
-        cJSON *data = cJSON_GetObjectItem(event, "data");
-
-        if (!cJSON_IsString(type_json) || !data) {
-            cJSON_Delete(event);
-            continue;
-        }
-
-        const char *type = type_json->valuestring;
-
-        // --- Player identity filter ---
-        // Hermes events include a "player" object with "name" and "uuid".
-        // In coop HOST mode: accept events from any player in the lobby roster,
-        //   and remember which roster slot they came from so the event can be
-        //   applied to that player's snapshot specifically.
-        // In singleplayer/receiver: accept only the local player's events.
-        // Match by UUID first (authoritative, case-insensitive hex), then
-        // fall back to case-insensitive username (Hermes "name" may differ
-        // in case; legacy stats files are fully lowercase).
-        const char *event_player_uuid = nullptr; // Used for stat cache key
-        int matched_player_idx = -1; // Roster index of the source player (coop host)
-        cJSON *player_json = cJSON_GetObjectItem(data, "player");
-        if (cJSON_IsObject(player_json)) {
-            cJSON *uuid_json = cJSON_GetObjectItem(player_json, "uuid");
-            cJSON *name_json = cJSON_GetObjectItem(player_json, "name");
-            const char *ev_uuid = cJSON_IsString(uuid_json) ? uuid_json->valuestring : nullptr;
-            const char *ev_name = cJSON_IsString(name_json) ? name_json->valuestring : nullptr;
-
-            bool player_match = false;
-
-            if (settings->network_mode == NETWORK_HOST && settings->coop_player_count > 0) {
-                // Coop host: match against any player in the roster
-                for (int p = 0; p < settings->coop_player_count; p++) {
-                    const CoopPlayer *rp = &settings->coop_players[p];
-                    if (ev_uuid && rp->uuid[0] != '\0' &&
-                        strcasecmp(ev_uuid, rp->uuid) == 0) {
-                        player_match = true;
-                        event_player_uuid = ev_uuid;
-                        matched_player_idx = p;
-                        break;
-                    }
-                    if (!player_match && ev_name && rp->username[0] != '\0' &&
-                        strcasecmp(ev_name, rp->username) == 0) {
-                        player_match = true;
-                        event_player_uuid = ev_uuid; // may be null, that's OK
-                        matched_player_idx = p;
-                        break;
-                    }
-                }
-            } else {
-                // Singleplayer or receiver: match local player only
-                if (settings->local_player.uuid[0] != '\0' && ev_uuid) {
-                    player_match = (strcasecmp(ev_uuid, settings->local_player.uuid) == 0);
-                }
-                if (!player_match && settings->local_player.username[0] != '\0' && ev_name) {
-                    player_match = (strcasecmp(ev_name, settings->local_player.username) == 0);
-                }
-                if (player_match) event_player_uuid = ev_uuid;
-            }
-
-            if (!player_match) {
-                cJSON_Delete(event);
-                continue; // Skip events from players not in roster / not local
-            }
-        }
-        // If no player object in event, allow it through (older Hermes versions)
-
-        // --- Dispatch event ---
-        bool is_coop_host = (settings->network_mode == NETWORK_HOST &&
-                             t->hermes_coop_stat_cache);
-        bool have_snapshots = (matched_player_idx >= 0 &&
-                               matched_player_idx < MAX_COOP_PLAYERS &&
-                               t->coop_player_snapshots[matched_player_idx] &&
-                               t->coop_merged_snapshot);
-
-        if (is_coop_host && have_snapshots &&
-            (strcmp(type, "stat") == 0 || strcmp(type, "advancement") == 0)) {
-            // Per-player isolation path: update the source player's snapshot
-            // and the merged snapshot, then restore the selected view.
-            if (!workbuf) {
-                workbuf = (char *) malloc(workbuf_size);
-            }
-            if (workbuf &&
-                hermes_apply_event_to_coop_snapshots(t, settings, matched_player_idx,
-                                                     type, data, workbuf, workbuf_size)) {
-                any_changed = true;
-                snapshots_changed = true;
-            }
-        } else if (strcmp(type, "stat") == 0) {
-            if (is_coop_host && settings->coop_stat_merge == COOP_STAT_CUMULATIVE) {
-                // CUMULATIVE mode: track per-player deltas for everything
-                if (hermes_apply_stat_event_cumulative(t, data, event_player_uuid))
-                    any_changed = true;
-            } else if (is_coop_host) {
-                // HIGHEST mode: use higher-wins for regular stats, but multi-stage
-                // stages must always be cumulative (summed across all players)
-                if (hermes_apply_stat_event(t, data, true)) // skip_multi_stage
-                    any_changed = true;
-                if (hermes_apply_stat_event_cumulative(t, data, event_player_uuid, true)) // multi_stage_only
-                    any_changed = true;
-            } else {
-                // Singleplayer: direct apply (only one player, highest == actual)
-                if (hermes_apply_stat_event(t, data))
-                    any_changed = true;
-            }
-        } else if (strcmp(type, "advancement") == 0) {
-            // Advancements are always OR-merged: any player completing = done
-            if (hermes_apply_advancement_event(t, data))
-                any_changed = true;
-        }
-        // ALL OTHER EVENT TYPES ARE IGNORED!!! - Fully speedrun legal this way
-
-        cJSON_Delete(event);
     }
 
     if (any_changed) {
@@ -11026,15 +11043,128 @@ void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings) {
             tracker_recalculate_progress(t, settings);
         }
         t->hermes_wants_ipc_flush = true;
-        // If we updated coop snapshots, broadcast the new merged view to
-        // receivers. The main loop's g_coop_broadcast_needed handler takes
-        // care of serialization + coop_net_broadcast.
         if (snapshots_changed) {
             SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
         }
     }
 
     if (workbuf) free(workbuf);
+}
+
+
+// Replay Hermes events from the already-processed portion of the log whose
+// "time" field is within window_ms of the newest event's time. Called after
+// the disk-rebuild path (tracker_update / tracker_update_coop_merged +
+// tracker_update_coop_single_player) to restore in-memory progress that disk
+// files don't yet reflect because Minecraft's autosave hasn't fired.
+//
+// We read [0, hermes_file_offset) - events past the offset are future events
+// that live polling will pick up normally. The window is driven off the
+// newest event's time (not wall-clock) so paused / AFK sessions still pick
+// the right cutoff. HermesRotator is stateless, so seeking is safe.
+//
+// Safety:
+//   - Stats (HIGHEST): hermes_apply_stat_event only accepts new_value > progress.
+//   - Stats (CUMULATIVE): hermes_apply_stat_event_cumulative skips delta<0.
+//   - Advancements: only set done=true. Revocations come from disk only, so
+//     an adv revoked within the window can get re-set by a replayed event.
+//     Acceptable: revocation is rare, and the next disk rebuild corrects it.
+//   - Manual completions: is_manually_completed gates the done-flip in
+//     hermes_apply_stat_event, so manual state is preserved.
+void tracker_hermes_replay_window(Tracker *t, const AppSettings *settings,
+                                  long long window_ms) {
+    if (!t || !settings) return;
+    if (!settings->using_hermes || !t->hermes_active || !t->hermes_play_log) return;
+    if (t->hermes_file_offset <= 0) return;
+
+    long saved_offset = t->hermes_file_offset;
+    if (fseek(t->hermes_play_log, 0, SEEK_SET) != 0) return;
+
+    struct ReplayEntry {
+        std::string line;
+        long long time_ms;
+    };
+    std::vector<ReplayEntry> entries;
+    long long max_time = 0;
+
+    while (true) {
+        long pos = ftell(t->hermes_play_log);
+        if (pos < 0 || pos >= saved_offset) break;
+
+        std::string line_buf;
+        char chunk[8192];
+        bool newline_found = false;
+        while (fgets(chunk, sizeof(chunk), t->hermes_play_log)) {
+            line_buf += chunk;
+            if (!line_buf.empty() && line_buf.back() == '\n') {
+                newline_found = true;
+                break;
+            }
+            if (ftell(t->hermes_play_log) >= saved_offset) break;
+        }
+        if (!newline_found && line_buf.empty()) break;
+
+        while (!line_buf.empty() && (line_buf.back() == '\n' || line_buf.back() == '\r'))
+            line_buf.pop_back();
+        if (line_buf.empty()) continue;
+
+        std::string decrypted = t->hermes_rotator.processLine(line_buf);
+        cJSON *peek = cJSON_ParseWithLength(decrypted.c_str(), decrypted.size());
+        if (!peek) continue;
+
+        cJSON *type_json = cJSON_GetObjectItem(peek, "type");
+        cJSON *time_json = cJSON_GetObjectItem(peek, "time");
+        bool keep = cJSON_IsString(type_json) && cJSON_IsNumber(time_json) &&
+                    (strcmp(type_json->valuestring, "stat") == 0 ||
+                     strcmp(type_json->valuestring, "advancement") == 0);
+        if (keep) {
+            long long tm = (long long) time_json->valuedouble;
+            if (tm > max_time) max_time = tm;
+            ReplayEntry e;
+            e.line = std::move(decrypted);
+            e.time_ms = tm;
+            entries.push_back(std::move(e));
+        }
+        cJSON_Delete(peek);
+    }
+
+    // Forward-polling must resume exactly where it left off.
+    fseek(t->hermes_play_log, saved_offset, SEEK_SET);
+
+    if (entries.empty() || max_time == 0) return;
+    long long cutoff = max_time - window_ms;
+
+    char *workbuf = nullptr;
+    const size_t workbuf_size = 4 * 1024 * 1024;
+    bool any_changed = false;
+    bool snapshots_changed = false;
+    size_t applied = 0;
+
+    for (auto &e : entries) {
+        if (e.time_ms < cutoff) continue;
+        if (hermes_process_decrypted_line(t, settings, e.line,
+                                          &workbuf, workbuf_size, &snapshots_changed)) {
+            any_changed = true;
+        }
+        applied++;
+    }
+
+    if (workbuf) free(workbuf);
+
+    log_message(LOG_INFO,
+                "[TRACKER - HERMES] Replay window: scanned %zu event(s), applied %zu within %lldms "
+                "(cutoff=%lld, newest=%lld).\n",
+                entries.size(), applied, window_ms, cutoff, max_time);
+
+    if (any_changed) {
+        if (!snapshots_changed) {
+            tracker_recalculate_progress(t, settings);
+        }
+        t->hermes_wants_ipc_flush = true;
+        if (snapshots_changed) {
+            SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
+        }
+    }
 }
 
 // =============================================================================

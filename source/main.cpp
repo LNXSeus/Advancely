@@ -2940,9 +2940,18 @@ int main(int argc, char *argv[]) {
                         tracker->coop_merged_snapshot = merged_snapshot;
                         tracker->coop_merged_snapshot_size = merged_snapshot_size;
                         merged_snapshot = nullptr;
+
+                        // Manual toggles / custom goal changes drove us through a full
+                        // disk rebuild, which wiped any Hermes progress that hadn't yet
+                        // autosaved. Re-apply the last 5 minutes of Hermes events on top
+                        // of the fresh per-player and merged snapshots so the UI doesn't
+                        // regress to stale disk state. Sets g_coop_broadcast_needed if
+                        // anything changed so receivers get the corrected view.
+                        tracker_hermes_replay_window(tracker, &app_settings, 5LL * 60 * 1000);
                     } else {
                         // Singleplayer or host with no clients: normal update
                         tracker_update(tracker, &app_settings);
+                        tracker_hermes_replay_window(tracker, &app_settings, 5LL * 60 * 1000);
                     }
                 }
 

@@ -443,6 +443,28 @@ void tracker_print_debug_status(Tracker *t, const AppSettings *settings);
 void tracker_poll_hermes_log(Tracker *t, const AppSettings *settings);
 
 /**
+ * @brief Replay recent Hermes events after a disk-rebuild wiped in-memory state.
+ *
+ * The disk-rebuild path (tracker_update / tracker_update_coop_merged +
+ * tracker_update_coop_single_player) runs when a manual goal toggle, stat
+ * checkbox, or custom goal change sets g_needs_update. That rebuild reads
+ * only the game files, which lag behind Hermes by up to one autosave interval
+ * (~5 min in coop). This function re-applies Hermes events from the last
+ * window_ms of the already-processed log segment so in-memory progress
+ * reflects live Hermes data even immediately after a rebuild.
+ *
+ * The "time" field on each event (unix ms) is used as the window reference,
+ * so paused / AFK sessions don't wrongly expire the window. The hermes file
+ * offset is left untouched - forward polling resumes exactly where it was.
+ *
+ * @param t          Tracker.
+ * @param settings   Application settings.
+ * @param window_ms  Replay window in milliseconds (typically 5 minutes).
+ */
+void tracker_hermes_replay_window(Tracker *t, const AppSettings *settings,
+                                  long long window_ms);
+
+/**
  * @brief Reads all co-op roster players' data files and merges into the tracker's TemplateData.
  *
  * Called by the Host instead of the normal tracker_update() path. Resets all progress,
