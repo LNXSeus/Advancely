@@ -978,8 +978,11 @@ static int SDLCALL host_thread_func(void *data) {
     }
 
     // Graceful shutdown: notify all clients
+    log_message(LOG_ERROR, "[CRASH-DEBUG H#1] Host thread: graceful shutdown loop start. client_count=%d\n", ctx->client_count);
     for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
         if (ctx->clients[i].active) {
+            log_message(LOG_ERROR, "[CRASH-DEBUG H#2] Host thread: sending DISCONNECT to client[%d] fd=%d label='%s'\n",
+                        i, (int) ctx->clients[i].socket_fd, ctx->clients[i].label);
             send_message(ctx->clients[i].socket_fd, COOP_MSG_DISCONNECT, nullptr, 0);
             close_socket(&ctx->clients[i].socket_fd);
             ctx->clients[i].active = false;
@@ -987,8 +990,10 @@ static int SDLCALL host_thread_func(void *data) {
     }
     ctx->client_count = 0;
     close_socket(&ctx->server_fd);
+    log_message(LOG_ERROR, "[CRASH-DEBUG H#3] Host thread: all client sockets + server_fd closed.\n");
 
     log_message(LOG_INFO, "[COOP NET] Host thread exiting.\n");
+    log_message(LOG_ERROR, "[CRASH-DEBUG H#4] Host thread: returning 0.\n");
     return 0;
 }
 
@@ -1441,19 +1446,27 @@ static int SDLCALL receiver_thread_func(void *data) {
         }
     }
 
-    // Graceful disconnect — include reason if one was set by coop_net_disconnect_with_reason
+    // Graceful disconnect - include reason if one was set by coop_net_disconnect_with_reason
+    log_message(LOG_ERROR, "[CRASH-DEBUG R#1] Receiver thread: entering graceful shutdown. client_fd=%d reason='%s'\n",
+                (int) ctx->client_fd, ctx->disconnect_reason);
     if (ctx->client_fd != COOP_INVALID_SOCKET) {
         if (ctx->disconnect_reason[0] != '\0') {
+            log_message(LOG_ERROR, "[CRASH-DEBUG R#2] Receiver thread: sending DISCONNECT with reason.\n");
             send_message(ctx->client_fd, COOP_MSG_DISCONNECT,
                          ctx->disconnect_reason, (uint32_t) strlen(ctx->disconnect_reason));
             ctx->disconnect_reason[0] = '\0';
         } else {
+            log_message(LOG_ERROR, "[CRASH-DEBUG R#3] Receiver thread: sending empty DISCONNECT.\n");
             send_message(ctx->client_fd, COOP_MSG_DISCONNECT, nullptr, 0);
         }
         close_socket(&ctx->client_fd);
+        log_message(LOG_ERROR, "[CRASH-DEBUG R#4] Receiver thread: client_fd closed.\n");
+    } else {
+        log_message(LOG_ERROR, "[CRASH-DEBUG R#4] Receiver thread: client_fd already closed; skipping graceful send.\n");
     }
 
     log_message(LOG_INFO, "[COOP NET] Receiver thread exiting.\n");
+    log_message(LOG_ERROR, "[CRASH-DEBUG R#5] Receiver thread: returning 0.\n");
     return 0;
 }
 
@@ -1695,19 +1708,35 @@ bool coop_net_start_receiver(CoopNetContext *ctx, const char *ip, int port,
 }
 
 void coop_net_stop(CoopNetContext *ctx) {
-    if (!ctx->thread) return;
+    log_message(LOG_ERROR, "[CRASH-DEBUG S#1] coop_net_stop entered. ctx=%p thread=%p server_fd=%d client_fd=%d disconnect_reason='%s'\n",
+                (void *) ctx,
+                ctx ? (void *) ctx->thread : nullptr,
+                ctx ? (int) ctx->server_fd : -1,
+                ctx ? (int) ctx->client_fd : -1,
+                ctx ? ctx->disconnect_reason : "(null ctx)");
+    if (!ctx->thread) {
+        log_message(LOG_ERROR, "[CRASH-DEBUG S#2] coop_net_stop: no thread, early return.\n");
+        return;
+    }
 
     SDL_SetAtomicInt(&ctx->should_stop, 1);
+    log_message(LOG_ERROR, "[CRASH-DEBUG S#3] coop_net_stop: should_stop set.\n");
 
     // Close sockets from outside the thread to unblock select() / non-blocking connect().
     // If a disconnect reason is pending, keep client_fd open so the receiver thread can
     // send the reason before closing it. The thread will exit via should_stop within ~200ms.
     close_socket(&ctx->server_fd);
+    log_message(LOG_ERROR, "[CRASH-DEBUG S#4] coop_net_stop: server_fd closed.\n");
     if (ctx->disconnect_reason[0] == '\0') {
         close_socket(&ctx->client_fd);
+        log_message(LOG_ERROR, "[CRASH-DEBUG S#5] coop_net_stop: client_fd closed (no reason pending).\n");
+    } else {
+        log_message(LOG_ERROR, "[CRASH-DEBUG S#5] coop_net_stop: client_fd left open for thread to flush reason.\n");
     }
 
+    log_message(LOG_ERROR, "[CRASH-DEBUG S#6] coop_net_stop: waiting for thread...\n");
     SDL_WaitThread(ctx->thread, nullptr);
+    log_message(LOG_ERROR, "[CRASH-DEBUG S#7] coop_net_stop: SDL_WaitThread returned.\n");
     ctx->thread = nullptr;
 
     // Clean up any remaining client sockets (should already be closed by thread)
@@ -1719,9 +1748,12 @@ void coop_net_stop(CoopNetContext *ctx) {
     }
     ctx->client_count = 0;
     close_socket(&ctx->client_fd);
+    log_message(LOG_ERROR, "[CRASH-DEBUG S#8] coop_net_stop: remaining sockets closed.\n");
 
     // Free receive buffers
     SDL_LockMutex(ctx->recv_mutex);
+    log_message(LOG_ERROR, "[CRASH-DEBUG S#9] coop_net_stop: recv_mutex locked; freeing buffers (recv_buffer=%p merged=%p).\n",
+                (void *) ctx->recv_buffer, (void *) ctx->recv_merged_snapshot);
     free(ctx->recv_buffer);
     ctx->recv_buffer = nullptr;
     ctx->recv_buffer_size = 0;
@@ -1737,6 +1769,7 @@ void coop_net_stop(CoopNetContext *ctx) {
     ctx->recv_player_snapshot_count = 0;
     ctx->recv_player_data_ready = false;
     SDL_UnlockMutex(ctx->recv_mutex);
+    log_message(LOG_ERROR, "[CRASH-DEBUG S#10] coop_net_stop: recv_mutex unlocked.\n");
 
     // Clear lobby and pending requests
     SDL_LockMutex(ctx->lobby_mutex);
@@ -1745,11 +1778,13 @@ void coop_net_stop(CoopNetContext *ctx) {
     ctx->pending_request_count = 0;
     ctx->pending_requests_changed = true;
     SDL_UnlockMutex(ctx->lobby_mutex);
+    log_message(LOG_ERROR, "[CRASH-DEBUG S#11] coop_net_stop: lobby cleared.\n");
 
     set_state(ctx, COOP_NET_IDLE);
     set_status(ctx, "Idle");
 
     log_message(LOG_INFO, "[COOP NET] Networking stopped.\n");
+    log_message(LOG_ERROR, "[CRASH-DEBUG S#12] coop_net_stop exiting cleanly.\n");
 }
 
 void coop_net_disconnect_with_reason(CoopNetContext *ctx, const char *reason) {
