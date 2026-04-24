@@ -2124,7 +2124,6 @@ int main(int argc, char *argv[]) {
             // Overlay Restart Logic (triggered ONLY by Apply button)
             if (SDL_SetAtomicInt(&g_apply_button_clicked, 0) == 1) {
                 log_message(LOG_INFO, "[MAIN] 'Apply Settings' clicked. Re-initializing overlay process.\n");
-                log_message(LOG_ERROR, "[CRASH-DEBUG A#1] Apply-button cascade entered.\n");
 
                 // First, check if an overlay process is currently running.
                 bool overlay_is_running = false;
@@ -2133,12 +2132,10 @@ int main(int argc, char *argv[]) {
 #else
                 overlay_is_running = tracker->overlay_pid > 0;
 #endif
-                log_message(LOG_ERROR, "[CRASH-DEBUG A#2] Apply: overlay_is_running=%d\n", overlay_is_running ? 1 : 0);
 
                 // Graceful Shutdown Sequence
                 if (overlay_is_running) {
                     log_message(LOG_INFO, "[MAIN] Requesting graceful shutdown of overlay...\n");
-                    log_message(LOG_ERROR, "[CRASH-DEBUG A#3] Apply: requesting overlay shutdown via shared memory.\n");
 
                     // 1. Request shutdown via Shared Memory
                     if (tracker->p_shared_data) {
@@ -2152,7 +2149,6 @@ int main(int argc, char *argv[]) {
                         sem_post(tracker->mutex);
 #endif
                     }
-                    log_message(LOG_ERROR, "[CRASH-DEBUG A#4] Apply: shutdown flag set in shared memory.\n");
 
                     // 2. Wait for the process to exit cleanly (up to 500ms)
 #ifdef _WIN32
@@ -2178,13 +2174,11 @@ int main(int argc, char *argv[]) {
 
                     if (!exited) {
                         log_message(LOG_INFO, "[MAIN] Overlay shutdown timed out. Forcing termination.\n");
-                        log_message(LOG_ERROR, "[CRASH-DEBUG A#5] Apply: overlay didn't exit; SIGKILL pid=%d\n", tracker->overlay_pid);
                         kill(tracker->overlay_pid, SIGKILL);
                         waitpid(tracker->overlay_pid, &status, 0); // Clean up zombie
                     }
                     tracker->overlay_pid = 0;
 #endif
-                    log_message(LOG_ERROR, "[CRASH-DEBUG A#6] Apply: overlay process cleaned up.\n");
                 }
 
                 // Reset the shutdown flag so the NEW process doesn't immediately exit
@@ -2199,8 +2193,6 @@ int main(int argc, char *argv[]) {
                     sem_post(tracker->mutex);
 #endif
                 }
-                log_message(LOG_ERROR, "[CRASH-DEBUG A#7] Apply: shutdown flag cleared; about to relaunch overlay if enabled. enable_overlay=%d\n",
-                            app_settings.enable_overlay ? 1 : 0);
 
                 // Now, check if the NEW settings require the overlay to be enabled.
                 if (app_settings.enable_overlay) {
@@ -2243,7 +2235,6 @@ int main(int argc, char *argv[]) {
                         log_message(LOG_INFO, "[MAIN] Overlay remains disabled as per new settings.\n");
                     }
                 }
-                log_message(LOG_ERROR, "[CRASH-DEBUG A#8] Apply-button cascade exiting.\n");
             }
 
 

@@ -2702,9 +2702,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
             // If co-op was just unchecked while networking is active, stop it
             if (!temp_settings.coop_enabled && net_is_active && g_coop_ctx) {
-                log_message(LOG_ERROR, "[CRASH-DEBUG D#7] Enable Co-op unchecked while active; calling coop_net_stop.\n");
                 coop_net_stop(g_coop_ctx);
-                log_message(LOG_ERROR, "[CRASH-DEBUG D#8] Enable Co-op unchecked: coop_net_stop returned.\n");
                 net_state = COOP_NET_IDLE;
                 net_is_active = false;
                 coop_room_code_buf[0] = '\0';
@@ -3228,12 +3226,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             if (net_state == COOP_NET_CONNECTING) {
                                 // Show disconnect + status while connecting
                                 if (ImGui::Button("Disconnect")) {
-                                    log_message(LOG_ERROR, "[CRASH-DEBUG D#1] Receiver 'Disconnect' (while connecting) pressed; calling coop_net_stop.\n");
                                     coop_net_stop(g_coop_ctx);
-                                    log_message(LOG_ERROR, "[CRASH-DEBUG D#2] Receiver 'Disconnect' (while connecting): coop_net_stop returned.\n");
                                     SDL_SetAtomicInt(&g_settings_changed, 1);
                                     SDL_SetAtomicInt(&g_apply_button_clicked, 1);
-                                    log_message(LOG_ERROR, "[CRASH-DEBUG D#3] Receiver 'Disconnect' (while connecting): apply + settings flags set.\n");
                                 }
                                 ImGui::Spacing();
                                 char status_buf[256];
@@ -3377,14 +3372,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             }
                             ImGui::SameLine();
                             if (ImGui::SmallButton("Disconnect##lobby")) {
-                                log_message(LOG_ERROR, "[CRASH-DEBUG D#4] Lobby 'Disconnect' pressed; calling coop_net_stop. net_state=%d\n", (int) net_state);
                                 coop_net_stop(g_coop_ctx);
-                                log_message(LOG_ERROR, "[CRASH-DEBUG D#5] Lobby 'Disconnect': coop_net_stop returned.\n");
                                 coop_room_code_buf[0] = '\0';
                                 // Apply settings to trigger a proper reload
                                 SDL_SetAtomicInt(&g_settings_changed, 1);
                                 SDL_SetAtomicInt(&g_apply_button_clicked, 1);
-                                log_message(LOG_ERROR, "[CRASH-DEBUG D#6] Lobby 'Disconnect': apply + settings flags set.\n");
                             }
                         }
 
