@@ -557,15 +557,16 @@ static int SDLCALL host_thread_func(void *data) {
 
         // Build the fd_set, skipping invalid fds. On Linux FD_SET(-1, ...) is
         // undefined behavior (writes via negative index into fds_bits, smashing
-        // the stack). The main thread sets server_fd / client socket_fd to
-        // COOP_INVALID_SOCKET when tearing down, so we MUST validate before
-        // inserting.
+        // the stack). The main thread sets server_fd to COOP_INVALID_SOCKET
+        // during coop_net_stop, so we MUST snapshot once and validate before
+        // inserting, then use the snapshot for FD_ISSET / accept below.
+        coop_socket_t server_fd_snap = ctx->server_fd;
         coop_socket_t max_fd = 0;
         bool any_fd_valid = false;
 
-        if (ctx->server_fd != COOP_INVALID_SOCKET) {
-            FD_SET(ctx->server_fd, &read_fds);
-            max_fd = ctx->server_fd;
+        if (server_fd_snap != COOP_INVALID_SOCKET) {
+            FD_SET(server_fd_snap, &read_fds);
+            max_fd = server_fd_snap;
             any_fd_valid = true;
         }
         for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
@@ -610,11 +611,13 @@ static int SDLCALL host_thread_func(void *data) {
             break;
         }
 
-        // Accept new connections (not yet handshaked)
-        if (ready > 0 && FD_ISSET(ctx->server_fd, &read_fds)) {
+        // Accept new connections (not yet handshaked). Use the snapshot so
+        // FD_ISSET never sees a just-closed -1 (UB on Linux).
+        if (ready > 0 && server_fd_snap != COOP_INVALID_SOCKET &&
+            FD_ISSET(server_fd_snap, &read_fds)) {
             struct sockaddr_in client_addr;
             socklen_t addr_len = sizeof(client_addr);
-            coop_socket_t new_fd = accept(ctx->server_fd, (struct sockaddr *) &client_addr, &addr_len);
+            coop_socket_t new_fd = accept(server_fd_snap, (struct sockaddr *) &client_addr, &addr_len);
 
             if (new_fd != COOP_INVALID_SOCKET) {
                 set_nonblocking(new_fd);
@@ -1135,17 +1138,17 @@ static int SDLCALL receiver_thread_func(void *data) {
             if (ready < 0) break;
             if (ready == 0) continue; // Timeout, loop and check should_stop
 
-            if (FD_ISSET(ctx->client_fd, &err_fds)) {
+            if (FD_ISSET(fd, &err_fds)) {
                 socklen_t len = sizeof(connect_err);
-                getsockopt(ctx->client_fd, SOL_SOCKET, SO_ERROR, (char *) &connect_err, &len);
+                getsockopt(fd, SOL_SOCKET, SO_ERROR, (char *) &connect_err, &len);
                 log_message(LOG_ERROR, "[COOP NET] Connect error fd_set triggered (SO_ERROR=%d)\n", connect_err);
                 break; // Connection failed
             }
 
-            if (FD_ISSET(ctx->client_fd, &write_fds)) {
+            if (FD_ISSET(fd, &write_fds)) {
                 // Check if connect actually succeeded via SO_ERROR
                 socklen_t len = sizeof(connect_err);
-                getsockopt(ctx->client_fd, SOL_SOCKET, SO_ERROR, (char *) &connect_err, &len);
+                getsockopt(fd, SOL_SOCKET, SO_ERROR, (char *) &connect_err, &len);
                 if (connect_err == 0) {
                     connected = true;
                 } else {
@@ -1343,13 +1346,13 @@ static int SDLCALL receiver_thread_func(void *data) {
             break;
         }
 
-        if (ready > 0 && FD_ISSET(ctx->client_fd, &read_fds)) {
+        if (ready > 0 && FD_ISSET(fd, &read_fds)) {
             uint32_t msg_type;
             char *payload;
             uint32_t payload_len;
             bool disconnected;
 
-            if (read_message(ctx->client_fd, &msg_type, &payload, &payload_len, &disconnected)) {
+            if (read_message(fd, &msg_type, &payload, &payload_len, &disconnected)) {
                 if (msg_type == COOP_MSG_HEARTBEAT) {
                     send_message(ctx->client_fd, COOP_MSG_HEARTBEAT_ACK, nullptr, 0);
                     last_heartbeat_recv = SDL_GetTicks();
