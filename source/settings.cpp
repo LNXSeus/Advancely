@@ -3002,13 +3002,15 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
                             ImGui::BulletText("Counters: Derived automatically from linked goals.");
-                            ImGui::BulletText("Unlocks (25w14craftmine): Every player must obtain it (AND).");
-                            if (ImGui::IsItemHovered()) {
-                                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                         "Unlocks are per-player in craftmine.\n"
-                                         "An unlock only counts as complete when all players have obtained it.\n"
-                                         "Use the player dropdown to see each player's individual unlocks.");
-                                ImGui::SetTooltip("%s", tooltip_buf);
+                            if (selected_version == MC_VERSION_25W14CRAFTMINE) {
+                                ImGui::BulletText("Unlocks (25w14craftmine): Every player must obtain it (AND).");
+                                if (ImGui::IsItemHovered()) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Unlocks are per-player in craftmine.\n"
+                                             "An unlock only counts as complete when all players have obtained it.\n"
+                                             "Use the player dropdown to see each player's individual unlocks.");
+                                    ImGui::SetTooltip("%s", tooltip_buf);
+                                }
                             }
                         }
 
