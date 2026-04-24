@@ -2678,13 +2678,21 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             // ============================================================
             // Step 1: Enable Co-op
             // ============================================================
+            // Can't flip the master toggle while a lobby is live - stop it first.
+            ImGui::BeginDisabled(net_is_active);
             ImGui::Checkbox("Enable Co-op", &temp_settings.coop_enabled);
+            ImGui::EndDisabled();
             if (ImGui::IsItemHovered()) {
-                char tooltip_buf[256];
-                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                         "Enable cooperative multiplayer tracking.\n"
-                         "Requires all players to be on the same local network.\n"
-                         "Use ZeroTier (zerotier.com) to create a virtual LAN.");
+                char tooltip_buf[320];
+                if (net_is_active) {
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Stop hosting or leave the lobby before changing this.");
+                } else {
+                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                             "Enable cooperative multiplayer tracking.\n"
+                             "Requires all players to be on the same local network.\n"
+                             "Use ZeroTier (zerotier.com) to create a virtual LAN.");
+                }
                 ImGui::SetTooltip("%s", tooltip_buf);
             }
             if (temp_settings.coop_enabled) {
