@@ -89,6 +89,20 @@ static NetworkMode string_to_network_mode(const char *str) {
     return NETWORK_SINGLEPLAYER; // Fallback
 }
 
+static const char *coop_transport_to_string(CoopTransport t) {
+    switch (t) {
+        case COOP_TRANSPORT_DIRECT: return "direct";
+        case COOP_TRANSPORT_RELAY:
+        default: return "relay";
+    }
+}
+
+static CoopTransport string_to_coop_transport(const char *str) {
+    if (!str) return DEFAULT_COOP_TRANSPORT;
+    if (strcmp(str, "direct") == 0) return COOP_TRANSPORT_DIRECT;
+    return COOP_TRANSPORT_RELAY;
+}
+
 static const char *coop_stat_merge_to_string(CoopStatMerge mode) {
     switch (mode) {
         case COOP_STAT_CUMULATIVE: return "cumulative";
@@ -558,6 +572,7 @@ void settings_set_defaults(AppSettings *settings) {
     settings->coop_enabled = DEFAULT_COOP_ENABLED;
     settings->coop_auto_accept = DEFAULT_COOP_AUTO_ACCEPT;
     settings->network_mode = DEFAULT_NETWORK_MODE;
+    settings->coop_transport = DEFAULT_COOP_TRANSPORT;
     settings->coop_stat_merge = DEFAULT_COOP_STAT_MERGE;
     settings->coop_stat_checkbox = DEFAULT_COOP_STAT_CHECKBOX;
     settings->coop_custom_goal_mode = DEFAULT_COOP_CUSTOM_GOAL_MODE;
@@ -1288,6 +1303,14 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
+        const cJSON *transport = cJSON_GetObjectItem(coop_settings, "transport");
+        if (transport && cJSON_IsString(transport))
+            settings->coop_transport = string_to_coop_transport(transport->valuestring);
+        else {
+            settings->coop_transport = DEFAULT_COOP_TRANSPORT;
+            defaults_were_used = true;
+        }
+
         // Merge settings sub-object (replaces old "goal_logic" single enum)
         const cJSON *merge_obj = cJSON_GetObjectItem(coop_settings, "merge_settings");
         if (merge_obj && cJSON_IsObject(merge_obj)) {
@@ -1595,6 +1618,9 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(coop_obj, "network_mode");
         cJSON_AddItemToObject(coop_obj, "network_mode",
                               cJSON_CreateString(network_mode_to_string(settings->network_mode)));
+        cJSON_DeleteItemFromObject(coop_obj, "transport");
+        cJSON_AddItemToObject(coop_obj, "transport",
+                              cJSON_CreateString(coop_transport_to_string(settings->coop_transport)));
         // Remove old "goal_logic" key if present (backward compat cleanup)
         cJSON_DeleteItemFromObject(coop_obj, "goal_logic");
 

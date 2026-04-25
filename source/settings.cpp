@@ -157,6 +157,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->coop_enabled != b->coop_enabled ||
         a->coop_auto_accept != b->coop_auto_accept ||
         a->network_mode != b->network_mode ||
+        a->coop_transport != b->coop_transport ||
         a->coop_stat_merge != b->coop_stat_merge ||
         a->coop_stat_checkbox != b->coop_stat_checkbox ||
         a->coop_custom_goal_mode != b->coop_custom_goal_mode ||
@@ -2786,6 +2787,36 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     ImGui::Spacing();
 
                     // ============================================================
+                    // Transport selection (relay vs direct LAN/VPN)
+                    // ============================================================
+                    {
+                        bool host_locally = (temp_settings.coop_transport == COOP_TRANSPORT_DIRECT);
+                        ImGui::BeginDisabled(net_is_active);
+                        if (ImGui::Checkbox("Host locally (LAN / VPN)", &host_locally)) {
+                            temp_settings.coop_transport = host_locally
+                                ? COOP_TRANSPORT_DIRECT
+                                : COOP_TRANSPORT_RELAY;
+                        }
+                        ImGui::EndDisabled();
+                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            char tt[384];
+                            if (net_is_active) {
+                                snprintf(tt, sizeof(tt),
+                                         "Disconnect before changing the transport.");
+                            } else {
+                                snprintf(tt, sizeof(tt),
+                                         "Off (default): connect through the Advancely relay server.\n"
+                                         "On: classic LAN / VPN hosting with a direct IP + port.\n"
+                                         "Use this if everyone is on the same network or VPN.");
+                            }
+                            ImGui::SetTooltip("%s", tt);
+                        }
+                    }
+                    ImGui::Spacing();
+
+                    bool transport_direct = (temp_settings.coop_transport == COOP_TRANSPORT_DIRECT);
+
+                    // ============================================================
                     // Step 4a: Host a Lobby
                     // ============================================================
                     if (temp_settings.network_mode == NETWORK_HOST) {
@@ -2845,11 +2876,37 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             return value >= 1;
                         };
 
+                        auto is_valid_domain = [](const char *host) -> bool {
+                            if (!host || host[0] == '\0') return false;
+                            size_t len = strlen(host);
+                            if (len > 253) return false;
+                            bool has_dot = false;
+                            for (size_t i = 0; i < len; i++) {
+                                char c = host[i];
+                                if (c == '.') {
+                                    has_dot = true;
+                                    continue;
+                                }
+                                if (c == '-') continue;
+                                if (c >= '0' && c <= '9') continue;
+                                if (c >= 'a' && c <= 'z') continue;
+                                if (c >= 'A' && c <= 'Z') continue;
+                                return false;
+                            }
+                            return has_dot && host[0] != '.' && host[len - 1] != '.';
+                        };
+
                         bool ip_filled = temp_settings.host_ip[0] != '\0';
                         bool ip_valid = is_valid_ipv4(temp_settings.host_ip);
                         bool port_filled = temp_settings.host_port[0] != '\0';
                         bool port_valid = is_valid_port(temp_settings.host_port);
+                        bool pub_ip_filled = temp_settings.host_public_ip[0] != '\0';
+                        bool pub_ip_valid = !pub_ip_filled || is_valid_ipv4(temp_settings.host_public_ip)
+                                            || is_valid_domain(temp_settings.host_public_ip);
+                        bool pub_ip_duplicate = pub_ip_filled && ip_filled
+                                                && strcmp(temp_settings.host_public_ip, temp_settings.host_ip) == 0;
 
+                        if (transport_direct) {
                         if (net_is_active) ImGui::BeginDisabled();
                         ImGui::SetNextItemWidth(200.0f);
                         ImGuiInputTextFlags ip_flags = coop_ip_revealed ? 0 : ImGuiInputTextFlags_Password;
@@ -2896,32 +2953,6 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         }
 
                         // Optional public IP or domain for the room code
-                        auto is_valid_domain = [](const char *host) -> bool {
-                            if (!host || host[0] == '\0') return false;
-                            size_t len = strlen(host);
-                            if (len > 253) return false;
-                            // Must contain at least one dot and not start/end with dot or hyphen
-                            bool has_dot = false;
-                            for (size_t i = 0; i < len; i++) {
-                                char c = host[i];
-                                if (c == '.') {
-                                    has_dot = true;
-                                    continue;
-                                }
-                                if (c == '-') continue;
-                                if (c >= '0' && c <= '9') continue;
-                                if (c >= 'a' && c <= 'z') continue;
-                                if (c >= 'A' && c <= 'Z') continue;
-                                return false; // Invalid character
-                            }
-                            return has_dot && host[0] != '.' && host[len - 1] != '.';
-                        };
-                        bool pub_ip_filled = temp_settings.host_public_ip[0] != '\0';
-                        bool pub_ip_valid = !pub_ip_filled || is_valid_ipv4(temp_settings.host_public_ip)
-                                            || is_valid_domain(temp_settings.host_public_ip);
-                        bool pub_ip_duplicate = pub_ip_filled && ip_filled
-                                                && strcmp(temp_settings.host_public_ip, temp_settings.host_ip) == 0;
-
                         if (net_is_active) ImGui::BeginDisabled();
                         ImGui::SetNextItemWidth(200.0f);
                         ImGuiInputTextFlags pub_ip_flags = coop_public_ip_revealed ? 0 : ImGuiInputTextFlags_Password;
@@ -2999,9 +3030,15 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid port (1-65535)");
                         }
                         if (net_is_active) ImGui::EndDisabled();
+                        } else {
+                            ImGui::TextDisabled("Hosting via Advancely relay.");
+                            ImGui::TextDisabled("Players will see your room in the public list.");
+                            ImGui::TextDisabled("(Relay backend coming in the next update.)");
+                        }
 
-                        coop_host_input_error = (ip_filled && !ip_valid) || (port_filled && !port_valid)
-                                                || (pub_ip_filled && !pub_ip_valid) || pub_ip_duplicate;
+                        coop_host_input_error = transport_direct
+                            && ((ip_filled && !ip_valid) || (port_filled && !port_valid)
+                                || (pub_ip_filled && !pub_ip_valid) || pub_ip_duplicate);
 
                         // --- Goal Merging Rules (above Start Lobby so host configures before starting) ---
                         ImGui::Spacing();
@@ -3142,7 +3179,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         // Start Lobby button (disabled when already hosting, invalid input, unsaved changes, or template editor open)
                         {
                             bool editor_open = p_temp_creator_open && *p_temp_creator_open;
-                            bool can_start = ip_valid && port_valid && pub_ip_valid && !pub_ip_duplicate
+                            bool can_start = transport_direct
+                                             && ip_valid && port_valid && pub_ip_valid && !pub_ip_duplicate
                                              && g_coop_ctx && !net_is_active && !has_unsaved_changes && !editor_open;
                             if (!can_start) ImGui::BeginDisabled();
                             if (ImGui::Button("Start Lobby")) {
@@ -3165,7 +3203,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             }
                             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && !can_start) {
                                 char tooltip_buf[256];
-                                if (net_is_active) {
+                                if (!transport_direct) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Relay hosting is not implemented yet.\n"
+                                             "Enable 'Host locally (LAN / VPN)' to start a direct lobby.");
+                                } else if (net_is_active) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf), "The lobby has already been started.");
                                 } else if (has_unsaved_changes) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
@@ -3258,6 +3300,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 char status_buf[256];
                                 coop_net_get_status_msg(g_coop_ctx, status_buf, sizeof(status_buf));
                                 ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "%s", status_buf);
+                            } else if (!transport_direct) {
+                                ImGui::TextDisabled("Browsing public rooms via Advancely relay.");
+                                ImGui::TextDisabled("(Room browser coming in the next update.)");
                             } else {
                                 // Idle / Error / Disconnected — show paste button
                                 bool join_editor_open = p_temp_creator_open && *p_temp_creator_open;
