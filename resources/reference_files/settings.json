@@ -196,6 +196,7 @@
 	},
 	"coop":	{
 		"enabled":	false,
+		"auto_accept":	false,
 		"network_mode":	"singleplayer",
 		"merge_settings":	{
 			"stat_merge":	"highest",

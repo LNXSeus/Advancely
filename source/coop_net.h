@@ -145,6 +145,7 @@ typedef struct {
     char host_username[64];
     char host_uuid[48];
     char host_display_name[64];
+    bool auto_accept; // Host: approve incoming join requests without UI prompt
 
     // -- Receiver fields --
     coop_socket_t client_fd; // Connection to host (COOP_INVALID_SOCKET when unused)
@@ -234,8 +235,11 @@ bool coop_net_init(CoopNetContext *ctx);
 void coop_net_shutdown(CoopNetContext *ctx);
 
 // Start hosting with the host's identity. Spawns the host thread.
+// If auto_accept is true, join requests are approved immediately without
+// populating the pending-approval queue or showing an approval UI.
 bool coop_net_start_host(CoopNetContext *ctx, const char *ip, int port,
-                         const char *username, const char *uuid, const char *display_name);
+                         const char *username, const char *uuid, const char *display_name,
+                         bool auto_accept);
 
 // Connect to a host with the receiver's identity. Spawns the receiver thread.
 bool coop_net_start_receiver(CoopNetContext *ctx, const char *ip, int port,

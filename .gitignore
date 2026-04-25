@@ -10,3 +10,9 @@ build/
 .claude/
 CLAUDE.md
 
+# Real relay endpoint + pinned cert fingerprint. Never committed.
+# Template lives at source/relay_config.example.h.
+source/relay_config.h
+relay/cert.pem
+relay/key.pem
+

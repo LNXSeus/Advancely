@@ -159,6 +159,18 @@ find_package(SDL3_image REQUIRED)
 find_package(SDL3_ttf REQUIRED)
 find_package(CURL REQUIRED)
 
+# --- mbedTLS (vendored at source/external/mbedtls, v4.1.0) for the relay transport ---
+# Tests/programs/docs pruned from the vendored tree. To upgrade: re-clone with
+# --recurse-submodules at the new tag, then prune tests/docs/programs/extras.
+set(ENABLE_PROGRAMS OFF CACHE BOOL "" FORCE)
+set(ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+set(MBEDTLS_FATAL_WARNINGS OFF CACHE BOOL "" FORCE)
+# Force codegen ON. Generated files (error.c, version_features.c, ssl_debug_helpers_generated.c,
+# psa_crypto_driver_wrappers_no_static.c) are not committed in this vendored tree; mbedTLS
+# regenerates them at build time via Python + Perl. Both ship with msys64.
+set(GEN_FILES ON CACHE BOOL "" FORCE)
+add_subdirectory(source/external/mbedtls EXCLUDE_FROM_ALL)
+
 # The official SDL3_mixer is not yet released. If you are using an unofficial build
 # or the older SDL2_mixer, you would find it here. For now, it's commented out.
 # find_package(SDL2_mixer REQUIRED)
@@ -171,6 +183,9 @@ target_link_libraries(${EXECUTABLE_NAME} PRIVATE
         SDL3_image::SDL3_image
         SDL3_ttf::SDL3_ttf
         CURL::libcurl
+        MbedTLS::mbedtls
+        MbedTLS::mbedx509
+        TF-PSA-Crypto::tfpsacrypto
 )
 
 # Add platform-specific system libraries

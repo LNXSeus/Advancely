@@ -556,6 +556,7 @@ void settings_set_defaults(AppSettings *settings) {
 
     // Co-op Defaults
     settings->coop_enabled = DEFAULT_COOP_ENABLED;
+    settings->coop_auto_accept = DEFAULT_COOP_AUTO_ACCEPT;
     settings->network_mode = DEFAULT_NETWORK_MODE;
     settings->coop_stat_merge = DEFAULT_COOP_STAT_MERGE;
     settings->coop_stat_checkbox = DEFAULT_COOP_STAT_CHECKBOX;
@@ -1271,6 +1272,14 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
+        const cJSON *auto_accept = cJSON_GetObjectItem(coop_settings, "auto_accept");
+        if (auto_accept && cJSON_IsBool(auto_accept))
+            settings->coop_auto_accept = cJSON_IsTrue(auto_accept);
+        else {
+            settings->coop_auto_accept = DEFAULT_COOP_AUTO_ACCEPT;
+            defaults_were_used = true;
+        }
+
         const cJSON *net_mode = cJSON_GetObjectItem(coop_settings, "network_mode");
         if (net_mode && cJSON_IsString(net_mode))
             settings->network_mode = string_to_network_mode(net_mode->valuestring);
@@ -1579,6 +1588,9 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON *coop_obj = get_or_create_object(root, "coop");
         cJSON_DeleteItemFromObject(coop_obj, "enabled");
         cJSON_AddItemToObject(coop_obj, "enabled", cJSON_CreateBool(settings->coop_enabled));
+
+        cJSON_DeleteItemFromObject(coop_obj, "auto_accept");
+        cJSON_AddItemToObject(coop_obj, "auto_accept", cJSON_CreateBool(settings->coop_auto_accept));
 
         cJSON_DeleteItemFromObject(coop_obj, "network_mode");
         cJSON_AddItemToObject(coop_obj, "network_mode",

@@ -1485,6 +1485,7 @@ and [cJSON](https://github.com/DaveGamble/cJSON).
 *This project uses the [miniz](https://github.com/mongoose-os-libs/miniz) compression library to unzip the downloaded
 files.*
 *This project uses [tiny file dialogs](https://sourceforge.net/projects/tinyfiledialogs) to open file dialogs.*
+*This project uses [Mbed TLS](https://github.com/Mbed-TLS/mbedtls) (Apache-2.0) for the encrypted co-op relay transport.*
 *More information can be found in the LICENSES.txt file.*
 
 *Lots of assistance was provided by Gemini Pro and Claude.*

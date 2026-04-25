@@ -776,7 +776,7 @@ static int SDLCALL host_thread_func(void *data) {
                                     log_message(LOG_INFO, "[COOP NET] Rejected %s: duplicate username '%s'.\n",
                                                 ctx->clients[i].label, req_username);
                                 } else {
-                                    // Store identity, add to pending approval queue
+                                    // Store identity.
                                     strncpy(ctx->clients[i].username, req_username,
                                             sizeof(ctx->clients[i].username) - 1);
                                     strncpy(ctx->clients[i].uuid, req_uuid, sizeof(ctx->clients[i].uuid) - 1);
@@ -784,23 +784,35 @@ static int SDLCALL host_thread_func(void *data) {
                                             sizeof(ctx->clients[i].display_name) - 1);
                                     ctx->clients[i].pending_approval = true;
 
-                                    // Add to pending requests for UI
-                                    SDL_LockMutex(ctx->lobby_mutex);
-                                    if (ctx->pending_request_count < COOP_MAX_CLIENTS) {
-                                        CoopJoinRequest *req = &ctx->pending_requests[ctx->pending_request_count++];
-                                        req->client_slot = i;
-                                        strncpy(req->username, req_username, sizeof(req->username) - 1);
-                                        strncpy(req->uuid, req_uuid, sizeof(req->uuid) - 1);
-                                        strncpy(req->display_name, req_display, sizeof(req->display_name) - 1);
-                                        ctx->pending_requests_changed = true;
-                                    }
-                                    SDL_UnlockMutex(ctx->lobby_mutex);
+                                    if (ctx->auto_accept) {
+                                        // Approve immediately - reuse the same promotion logic as the
+                                        // UI approval path so JOIN_ACCEPT / TEMPLATE_SYNC / lobby
+                                        // broadcasts stay identical.
+                                        coop_net_approve_request(ctx, i);
+                                        log_message(
+                                            LOG_INFO,
+                                            "[COOP NET] Auto-accepted join from %s (%s, UUID: %s).\n",
+                                            ctx->clients[i].label, req_username, req_uuid);
+                                        set_status(ctx, "Auto-accepted %s", req_username);
+                                    } else {
+                                        // Queue for host approval via the UI.
+                                        SDL_LockMutex(ctx->lobby_mutex);
+                                        if (ctx->pending_request_count < COOP_MAX_CLIENTS) {
+                                            CoopJoinRequest *req = &ctx->pending_requests[ctx->pending_request_count++];
+                                            req->client_slot = i;
+                                            strncpy(req->username, req_username, sizeof(req->username) - 1);
+                                            strncpy(req->uuid, req_uuid, sizeof(req->uuid) - 1);
+                                            strncpy(req->display_name, req_display, sizeof(req->display_name) - 1);
+                                            ctx->pending_requests_changed = true;
+                                        }
+                                        SDL_UnlockMutex(ctx->lobby_mutex);
 
-                                    log_message(
-                                        LOG_INFO,
-                                        "[COOP NET] Join request from %s (%s, UUID: %s). Waiting for host approval.\n",
-                                        ctx->clients[i].label, req_username, req_uuid);
-                                    set_status(ctx, "Join request from %s", req_username);
+                                        log_message(
+                                            LOG_INFO,
+                                            "[COOP NET] Join request from %s (%s, UUID: %s). Waiting for host approval.\n",
+                                            ctx->clients[i].label, req_username, req_uuid);
+                                        set_status(ctx, "Join request from %s", req_username);
+                                    }
                                 }
                             }
                         }
@@ -1587,7 +1599,8 @@ void coop_net_shutdown(CoopNetContext *ctx) {
 }
 
 bool coop_net_start_host(CoopNetContext *ctx, const char *ip, int port,
-                         const char *username, const char *uuid, const char *display_name) {
+                         const char *username, const char *uuid, const char *display_name,
+                         bool auto_accept) {
     // Stop any existing session
     coop_net_stop(ctx);
 
@@ -1595,6 +1608,7 @@ bool coop_net_start_host(CoopNetContext *ctx, const char *ip, int port,
     strncpy(ctx->host_username, username ? username : "", sizeof(ctx->host_username) - 1);
     strncpy(ctx->host_uuid, uuid ? uuid : "", sizeof(ctx->host_uuid) - 1);
     strncpy(ctx->host_display_name, display_name ? display_name : "", sizeof(ctx->host_display_name) - 1);
+    ctx->auto_accept = auto_accept;
 
     // Clear lobby and pending requests
     SDL_LockMutex(ctx->lobby_mutex);

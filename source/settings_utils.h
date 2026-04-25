@@ -123,6 +123,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 
 // Co-op Defaults
 #define DEFAULT_COOP_ENABLED false
+#define DEFAULT_COOP_AUTO_ACCEPT false
 #define DEFAULT_NETWORK_MODE NETWORK_SINGLEPLAYER
 #define DEFAULT_COOP_STAT_MERGE COOP_STAT_HIGHEST
 #define DEFAULT_COOP_STAT_CHECKBOX COOP_STAT_CHECKBOX_ANY_PLAYER
@@ -352,6 +353,7 @@ struct AppSettings {
 
     // --- Co-op Settings ---
     bool coop_enabled; // Master toggle for co-op mode
+    bool coop_auto_accept; // Host: auto-approve incoming join requests without showing an approval prompt
     NetworkMode network_mode; // Runtime state: Singleplayer, Host, or Receiver (set programmatically)
     CoopStatMerge coop_stat_merge; // How to merge stat values: highest or cumulative
     CoopStatCheckbox coop_stat_checkbox; // Who can check off stats: host only or any player

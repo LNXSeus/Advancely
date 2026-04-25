@@ -155,6 +155,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
 
         // Co-op settings
         a->coop_enabled != b->coop_enabled ||
+        a->coop_auto_accept != b->coop_auto_accept ||
         a->network_mode != b->network_mode ||
         a->coop_stat_merge != b->coop_stat_merge ||
         a->coop_stat_checkbox != b->coop_stat_checkbox ||
@@ -2793,6 +2794,28 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ImGui::Text("Host Settings");
                         ImGui::Spacing();
 
+                        // Auto-accept toggle. Locked while a lobby is live because
+                        // the host thread captures this flag per incoming request
+                        // and flipping mid-session would be inconsistent with the
+                        // pending-approval queue.
+                        ImGui::BeginDisabled(net_is_active);
+                        ImGui::Checkbox("Auto-accept join requests", &temp_settings.coop_auto_accept);
+                        ImGui::EndDisabled();
+                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                            char aa_tip[320];
+                            if (net_is_active) {
+                                snprintf(aa_tip, sizeof(aa_tip),
+                                         "Stop hosting before changing this.");
+                            } else {
+                                snprintf(aa_tip, sizeof(aa_tip),
+                                         "When enabled, any valid join request is\n"
+                                         "instantly accepted without an approval prompt.\n"
+                                         "Useful for trusted local groups.");
+                            }
+                            ImGui::SetTooltip("%s", aa_tip);
+                        }
+                        ImGui::Spacing();
+
                         // IPv4 validation
                         auto is_valid_ipv4 = [](const char *ip) -> bool {
                             if (!ip || ip[0] == '\0') return false;
@@ -3127,7 +3150,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 if (coop_net_start_host(g_coop_ctx, temp_settings.host_ip, port,
                                                         temp_settings.local_player.username,
                                                         temp_settings.local_player.uuid,
-                                                        temp_settings.local_player.display_name)) {
+                                                        temp_settings.local_player.display_name,
+                                                        temp_settings.coop_auto_accept)) {
                                     // Set template sync payload for receivers
                                     update_coop_template_sync(&temp_settings);
 
