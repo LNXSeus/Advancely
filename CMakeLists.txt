@@ -67,6 +67,7 @@ set(SOURCE_FILES
         "source/logger.cpp"
         "source/dialog_utils.cpp"
         "source/coop_net.cpp"
+        "source/coop_net_relay.cpp"
 
         # External libraries included as source and stay in C
         "source/external/cJSON.c"

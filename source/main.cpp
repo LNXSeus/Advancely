@@ -60,6 +60,7 @@ extern "C" {
 #include "logger.h"
 #include "update_checker.h" // For update checker
 #include "coop_net.h" // For co-op networking
+#include "coop_net_relay.h" // For the --relay-test smoke test
 #include "template_scanner.h" // For compute_template_goal_hash
 
 // ImGUI imports
@@ -979,6 +980,10 @@ int main(int argc, char *argv[]) {
             // Prints version string
             printf("Advancely version: %s\n", ADVANCELY_VERSION);
             return 0; // Exit Advancely
+        } else if (strcmp(argv[i], "--relay-test") == 0) {
+            // Self-contained TLS+pinning smoke test against the configured relay.
+            // Used while standing up the relay transport; harmless to keep around.
+            return relay_smoke_test() ? 0 : 1;
         } else if (strcmp(argv[i], "--test-mode") == 0) {
             is_test_mode = true;
         } else if (strcmp(argv[i], "--updated") == 0) {
