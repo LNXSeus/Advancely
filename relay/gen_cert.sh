@@ -12,8 +12,8 @@
 #   4. Ship an Advancely release with the new pin BEFORE swapping the cert on the server,
 #      otherwise old clients will fail to connect.
 #
-# Cert generated:  <fill in date when you run this>
-# Expires:         <fill in expiry>
+# Cert generated:  <25.04.26>
+# Expires:         <23.04.36>
 
 set -euo pipefail
 
