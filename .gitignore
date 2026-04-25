@@ -10,6 +10,10 @@ build/
 .claude/
 CLAUDE.md
 
+# Python bytecode (mbedtls build scripts generate these)
+__pycache__/
+*.pyc
+
 # Real relay endpoint + pinned cert fingerprint. Never committed.
 # Template lives at source/relay_config.example.h.
 source/relay_config.h
