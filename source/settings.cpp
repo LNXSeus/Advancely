@@ -259,6 +259,10 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     static char coop_room_code_error[256] = "";
     static bool coop_ip_revealed = false;
     static bool coop_public_ip_revealed = false;
+    // Relay session inputs (intentionally NOT persisted to settings.json).
+    static char coop_relay_password_host[128] = "";
+    static char coop_relay_room_code_recv[16] = "";
+    static char coop_relay_password_recv[128] = "";
 
     // Holds temporary copy of the settings for editing
     static AppSettings temp_settings;
@@ -2825,25 +2829,30 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         ImGui::Text("Host Settings");
                         ImGui::Spacing();
 
-                        // Auto-accept toggle. Locked while a lobby is live because
-                        // the host thread captures this flag per incoming request
-                        // and flipping mid-session would be inconsistent with the
-                        // pending-approval queue.
-                        ImGui::BeginDisabled(net_is_active);
-                        ImGui::Checkbox("Auto-accept join requests", &temp_settings.coop_auto_accept);
-                        ImGui::EndDisabled();
-                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                            char aa_tip[320];
-                            if (net_is_active) {
-                                snprintf(aa_tip, sizeof(aa_tip),
-                                         "Stop hosting before changing this.");
-                            } else {
-                                snprintf(aa_tip, sizeof(aa_tip),
-                                         "When enabled, any valid join request is\n"
-                                         "instantly accepted without an approval prompt.\n"
-                                         "Useful for trusted local groups.");
+                        // Auto-accept toggle. Direct path only — on the relay path,
+                        // the password is the gate and auto-accept is implicitly on.
+                        // Hidden entirely on relay so users aren't confused by a
+                        // setting that has no effect.
+                        if (transport_direct) {
+                            ImGui::BeginDisabled(net_is_active);
+                            ImGui::Checkbox("Auto-accept join requests", &temp_settings.coop_auto_accept);
+                            ImGui::EndDisabled();
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                char aa_tip[320];
+                                if (net_is_active) {
+                                    snprintf(aa_tip, sizeof(aa_tip),
+                                             "Stop hosting before changing this.");
+                                } else {
+                                    snprintf(aa_tip, sizeof(aa_tip),
+                                             "When enabled, any valid join request is\n"
+                                             "instantly accepted without an approval prompt.\n"
+                                             "Useful for trusted local groups.");
+                                }
+                                ImGui::SetTooltip("%s", aa_tip);
                             }
-                            ImGui::SetTooltip("%s", aa_tip);
+                        } else {
+                            ImGui::TextDisabled(
+                                "Auto-accept is always on for relay hosting. The password is the gate.");
                         }
                         ImGui::Spacing();
 
@@ -3031,9 +3040,23 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         }
                         if (net_is_active) ImGui::EndDisabled();
                         } else {
-                            ImGui::TextDisabled("Hosting via Advancely relay.");
-                            ImGui::TextDisabled("Players will see your room in the public list.");
-                            ImGui::TextDisabled("(Relay backend coming in the next update.)");
+                            // Relay host: just a password (optional). Room code is
+                            // assigned by the relay on Start Lobby and displayed below.
+                            if (net_is_active) ImGui::BeginDisabled();
+                            ImGui::SetNextItemWidth(200.0f);
+                            ImGui::InputTextWithHint("Room Password##relay_host", "(optional)",
+                                                     coop_relay_password_host,
+                                                     sizeof(coop_relay_password_host),
+                                                     ImGuiInputTextFlags_Password);
+                            if (net_is_active) ImGui::EndDisabled();
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                char tt[320];
+                                snprintf(tt, sizeof(tt),
+                                         "Optional password for the room.\n"
+                                         "Hashed locally before being sent to the relay.\n"
+                                         "Leave empty to allow anyone with the room code in.");
+                                ImGui::SetTooltip("%s", tt);
+                            }
                         }
 
                         coop_host_input_error = transport_direct
@@ -3179,35 +3202,45 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         // Start Lobby button (disabled when already hosting, invalid input, unsaved changes, or template editor open)
                         {
                             bool editor_open = p_temp_creator_open && *p_temp_creator_open;
-                            bool can_start = transport_direct
-                                             && ip_valid && port_valid && pub_ip_valid && !pub_ip_duplicate
+                            bool inputs_ok = transport_direct
+                                             ? (ip_valid && port_valid && pub_ip_valid && !pub_ip_duplicate)
+                                             : true; // Relay: no ip/port; password is optional.
+                            bool can_start = inputs_ok
                                              && g_coop_ctx && !net_is_active && !has_unsaved_changes && !editor_open;
                             if (!can_start) ImGui::BeginDisabled();
                             if (ImGui::Button("Start Lobby")) {
-                                int port = atoi(temp_settings.host_port);
-                                if (coop_net_start_host(g_coop_ctx, temp_settings.host_ip, port,
-                                                        temp_settings.local_player.username,
-                                                        temp_settings.local_player.uuid,
-                                                        temp_settings.local_player.display_name,
-                                                        temp_settings.coop_auto_accept)) {
-                                    // Set template sync payload for receivers
-                                    update_coop_template_sync(&temp_settings);
-
-                                    // Use public IP for room code if provided, otherwise use bind IP
-                                    const char *room_code_ip = pub_ip_filled
-                                                                   ? temp_settings.host_public_ip
-                                                                   : temp_settings.host_ip;
-                                    coop_encode_room_code(room_code_ip, port,
-                                                          coop_room_code_buf, sizeof(coop_room_code_buf));
+                                if (transport_direct) {
+                                    int port = atoi(temp_settings.host_port);
+                                    if (coop_net_start_host(g_coop_ctx, temp_settings.host_ip, port,
+                                                            temp_settings.local_player.username,
+                                                            temp_settings.local_player.uuid,
+                                                            temp_settings.local_player.display_name,
+                                                            temp_settings.coop_auto_accept)) {
+                                        update_coop_template_sync(&temp_settings);
+                                        const char *room_code_ip = pub_ip_filled
+                                                                       ? temp_settings.host_public_ip
+                                                                       : temp_settings.host_ip;
+                                        coop_encode_room_code(room_code_ip, port,
+                                                              coop_room_code_buf, sizeof(coop_room_code_buf));
+                                    }
+                                } else {
+                                    // Relay path: use selected MC version as the room's mc_version tag.
+                                    if (coop_net_start_host_relay(g_coop_ctx, temp_settings.version_str,
+                                                                  coop_relay_password_host,
+                                                                  temp_settings.local_player.username,
+                                                                  temp_settings.local_player.uuid,
+                                                                  temp_settings.local_player.display_name)) {
+                                        update_coop_template_sync(&temp_settings);
+                                        // Surface the relay-assigned room code in the same UI slot the
+                                        // direct path uses, so the existing Copy / display logic works.
+                                        coop_net_get_room_code(g_coop_ctx, coop_room_code_buf,
+                                                               sizeof(coop_room_code_buf));
+                                    }
                                 }
                             }
                             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && !can_start) {
                                 char tooltip_buf[256];
-                                if (!transport_direct) {
-                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Relay hosting is not implemented yet.\n"
-                                             "Enable 'Host locally (LAN / VPN)' to start a direct lobby.");
-                                } else if (net_is_active) {
+                                if (net_is_active) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf), "The lobby has already been started.");
                                 } else if (has_unsaved_changes) {
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
@@ -3301,8 +3334,63 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 coop_net_get_status_msg(g_coop_ctx, status_buf, sizeof(status_buf));
                                 ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "%s", status_buf);
                             } else if (!transport_direct) {
-                                ImGui::TextDisabled("Browsing public rooms via Advancely relay.");
-                                ImGui::TextDisabled("(Room browser coming in the next update.)");
+                                bool join_editor_open = p_temp_creator_open && *p_temp_creator_open;
+                                bool can_join_relay = !has_unsaved_changes && !join_editor_open
+                                                       && coop_relay_room_code_recv[0] != '\0';
+
+                                ImGui::SetNextItemWidth(120.0f);
+                                ImGui::InputTextWithHint("Room Code##relay_recv", "ABC123",
+                                                         coop_relay_room_code_recv,
+                                                         sizeof(coop_relay_room_code_recv),
+                                                         ImGuiInputTextFlags_CharsUppercase);
+                                if (ImGui::IsItemHovered()) {
+                                    char tt[256];
+                                    snprintf(tt, sizeof(tt),
+                                             "6-character code shared by the host.\n"
+                                             "Get it from whoever is hosting the room.");
+                                    ImGui::SetTooltip("%s", tt);
+                                }
+
+                                ImGui::SetNextItemWidth(200.0f);
+                                ImGui::InputTextWithHint("Password##relay_recv", "(if required)",
+                                                         coop_relay_password_recv,
+                                                         sizeof(coop_relay_password_recv),
+                                                         ImGuiInputTextFlags_Password);
+                                if (ImGui::IsItemHovered()) {
+                                    char tt[256];
+                                    snprintf(tt, sizeof(tt),
+                                             "Password set by the host (if any).\n"
+                                             "Hashed locally before sending to the relay.");
+                                    ImGui::SetTooltip("%s", tt);
+                                }
+
+                                if (!can_join_relay) ImGui::BeginDisabled();
+                                if (ImGui::Button("Join via Relay")) {
+                                    if (g_coop_ctx) {
+                                        coop_net_start_receiver_relay(g_coop_ctx,
+                                                                      coop_relay_room_code_recv,
+                                                                      coop_relay_password_recv,
+                                                                      temp_settings.local_player.username,
+                                                                      temp_settings.local_player.uuid,
+                                                                      temp_settings.local_player.display_name);
+                                    }
+                                }
+                                if (!can_join_relay) {
+                                    ImGui::EndDisabled();
+                                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                        char tt[256];
+                                        if (join_editor_open)
+                                            snprintf(tt, sizeof(tt),
+                                                     "Close the Template Editor before joining a lobby.");
+                                        else if (has_unsaved_changes)
+                                            snprintf(tt, sizeof(tt),
+                                                     "Apply settings before joining a lobby.");
+                                        else
+                                            snprintf(tt, sizeof(tt),
+                                                     "Enter a room code first.");
+                                        ImGui::SetTooltip("%s", tt);
+                                    }
+                                }
                             } else {
                                 // Idle / Error / Disconnected — show paste button
                                 bool join_editor_open = p_temp_creator_open && *p_temp_creator_open;

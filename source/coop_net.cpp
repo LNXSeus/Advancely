@@ -29,6 +29,7 @@ static bool wsa_initialized = false;
 #endif
 
 #include "coop_net.h"
+#include "coop_net_relay.h"
 #include "main.h"
 #include "logger.h"
 
@@ -462,15 +463,39 @@ static void parse_lobby_json(CoopNetContext *ctx, const char *json_str) {
 }
 
 // Broadcast the lobby player list to all approved clients.
+// Transport-agnostic broadcast. On the direct path, iterates client sockets.
+// On the relay path, writes once to the TLS connection (the relay fans out).
+// Direct path failures close the offending socket; relay failures are atomic
+// (the whole connection drops).
+static bool coop_broadcast_internal(CoopNetContext *ctx, uint32_t msg_type,
+                                    const void *payload, uint32_t payload_len) {
+    if (coop_net_is_relay(ctx)) {
+        if (!ctx->relay_conn) return false;
+        SDL_LockMutex(ctx->relay_send_mutex);
+        bool ok = relay_send_frame(ctx->relay_conn, msg_type, payload, payload_len);
+        SDL_UnlockMutex(ctx->relay_send_mutex);
+        return ok;
+    }
+
+    bool all_ok = true;
+    for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
+        if (!ctx->clients[i].active || !ctx->clients[i].handshake_done) continue;
+        if (!send_message(ctx->clients[i].socket_fd, msg_type, payload, payload_len)) {
+            log_message(LOG_ERROR, "[COOP NET] Broadcast send failed to %s.\n",
+                        ctx->clients[i].label);
+            close_socket(&ctx->clients[i].socket_fd);
+            ctx->clients[i].active = false;
+            ctx->client_count--;
+            all_ok = false;
+        }
+    }
+    return all_ok;
+}
+
 static void broadcast_player_list(CoopNetContext *ctx) {
     char *json = build_lobby_json(ctx);
     if (!json) return;
-
-    uint32_t len = (uint32_t) strlen(json);
-    for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
-        if (!ctx->clients[i].active || !ctx->clients[i].handshake_done) continue;
-        send_message(ctx->clients[i].socket_fd, COOP_MSG_PLAYER_LIST, json, len);
-    }
+    coop_broadcast_internal(ctx, COOP_MSG_PLAYER_LIST, json, (uint32_t) strlen(json));
     free(json);
 }
 
@@ -523,9 +548,20 @@ static int SDLCALL host_thread_func(void *data) {
                 SDL_SetAtomicInt(&ctx->clients[i].pending_action, COOP_ACTION_NONE);
 
                 if (action == COOP_ACTION_KICK) {
-                    send_message(ctx->clients[i].socket_fd, COOP_MSG_KICK,
-                                 ctx->clients[i].pending_action_reason,
-                                 (uint32_t) strlen(ctx->clients[i].pending_action_reason));
+                    // KICK payload format: JSON {target_uuid, reason}. Receivers
+                    // self-filter on target_uuid (this matters on the relay path
+                    // where the host can't unicast — every receiver in the room
+                    // sees the frame and only the matching UUID self-disconnects).
+                    cJSON *kick_obj = cJSON_CreateObject();
+                    cJSON_AddStringToObject(kick_obj, "target_uuid", ctx->clients[i].uuid);
+                    cJSON_AddStringToObject(kick_obj, "reason", ctx->clients[i].pending_action_reason);
+                    char *kick_json = cJSON_PrintUnformatted(kick_obj);
+                    cJSON_Delete(kick_obj);
+                    if (kick_json) {
+                        send_message(ctx->clients[i].socket_fd, COOP_MSG_KICK,
+                                     kick_json, (uint32_t) strlen(kick_json));
+                        free(kick_json);
+                    }
                     log_message(LOG_INFO, "[COOP NET] Kicked %s (%s): %s\n",
                                 ctx->clients[i].username, ctx->clients[i].label,
                                 ctx->clients[i].pending_action_reason);
@@ -1027,6 +1063,185 @@ static int SDLCALL host_thread_func(void *data) {
     return 0;
 }
 
+// ---- Receiver-side helpers (shared between direct and relay paths) ----
+
+// Send a single frame to the host. Direct = socket; relay = TLS.
+static bool receiver_send_to_host(CoopNetContext *ctx, uint32_t msg_type,
+                                  const void *payload, uint32_t payload_len) {
+    if (coop_net_is_relay(ctx)) {
+        if (!ctx->relay_conn) return false;
+        SDL_LockMutex(ctx->relay_send_mutex);
+        bool ok = relay_send_frame(ctx->relay_conn, msg_type, payload, payload_len);
+        SDL_UnlockMutex(ctx->relay_send_mutex);
+        return ok;
+    }
+    if (ctx->client_fd == COOP_INVALID_SOCKET) return false;
+    return send_message(ctx->client_fd, msg_type, payload, payload_len);
+}
+
+// Dispatches a single received message during the receiver's CONNECTED loop.
+// Takes ownership of `payload` (frees it or transfers to ctx). Returns:
+//   0 = continue main loop,
+//   1 = caller should break out of the main loop (state was set by handler).
+static int receiver_dispatch_message(CoopNetContext *ctx, uint32_t msg_type,
+                                     char *payload, uint32_t payload_len,
+                                     Uint32 *last_heartbeat_recv) {
+    if (msg_type == COOP_MSG_HEARTBEAT) {
+        receiver_send_to_host(ctx, COOP_MSG_HEARTBEAT_ACK, nullptr, 0);
+        *last_heartbeat_recv = SDL_GetTicks();
+        free(payload);
+        return 0;
+    }
+    if (msg_type == COOP_MSG_DISCONNECT) {
+        free(payload);
+        log_message(LOG_INFO, "[COOP NET] Host shut down the lobby.\n");
+        set_state(ctx, COOP_NET_DISCONNECTED);
+        set_status(ctx, "Host shut down the lobby");
+        return 1;
+    }
+    if (msg_type == COOP_MSG_KICK) {
+        // KICK is JSON {target_uuid, reason}. Self-filter — relay broadcasts so
+        // every receiver in the room sees this; only the matching UUID acts.
+        char reason[256] = "Kicked by host";
+        bool for_me = false;
+        if (payload_len > 0 && payload) {
+            char *json_str = (char *) malloc(payload_len + 1);
+            if (json_str) {
+                memcpy(json_str, payload, payload_len);
+                json_str[payload_len] = '\0';
+                cJSON *json = cJSON_Parse(json_str);
+                free(json_str);
+                if (json) {
+                    cJSON *tu = cJSON_GetObjectItem(json, "target_uuid");
+                    cJSON *rs = cJSON_GetObjectItem(json, "reason");
+                    if (tu && cJSON_IsString(tu) &&
+                        strcmp(tu->valuestring, ctx->connect_uuid) == 0) {
+                        for_me = true;
+                        if (rs && cJSON_IsString(rs)) {
+                            strncpy(reason, rs->valuestring, sizeof(reason) - 1);
+                            reason[sizeof(reason) - 1] = '\0';
+                        }
+                    }
+                    cJSON_Delete(json);
+                }
+            }
+        }
+        free(payload);
+        if (!for_me) return 0;
+        log_message(LOG_INFO, "[COOP NET] Kicked: %s\n", reason);
+        set_state(ctx, COOP_NET_DISCONNECTED);
+        set_status(ctx, "Kicked: %s", reason);
+        return 1;
+    }
+    if (msg_type == COOP_MSG_JOIN_ACCEPT) {
+        // On the relay path, JOIN_ACCEPT can arrive again after we're CONNECTED
+        // (the relay broadcasts host frames to every receiver in the room, so we
+        // see other joiners' accepts too). Refresh lobby from it but do not
+        // re-trigger any state transition.
+        char *json_str = (char *) malloc(payload_len + 1);
+        if (json_str) {
+            memcpy(json_str, payload, payload_len);
+            json_str[payload_len] = '\0';
+            parse_lobby_json(ctx, json_str);
+            free(json_str);
+        }
+        free(payload);
+        return 0;
+    }
+    if (msg_type == COOP_MSG_PLAYER_LIST) {
+        char *json_str = (char *) malloc(payload_len + 1);
+        if (json_str) {
+            memcpy(json_str, payload, payload_len);
+            json_str[payload_len] = '\0';
+            parse_lobby_json(ctx, json_str);
+            free(json_str);
+        }
+        free(payload);
+        *last_heartbeat_recv = SDL_GetTicks();
+        return 0;
+    }
+    if (msg_type == COOP_MSG_STATE_UPDATE) {
+        SDL_LockMutex(ctx->recv_mutex);
+        free(ctx->recv_buffer);
+        ctx->recv_buffer = payload;
+        ctx->recv_buffer_size = payload_len;
+        ctx->recv_data_ready = true;
+        free(ctx->recv_merged_snapshot);
+        ctx->recv_merged_snapshot = (char *) malloc(payload_len);
+        if (ctx->recv_merged_snapshot) {
+            memcpy(ctx->recv_merged_snapshot, payload, payload_len);
+            ctx->recv_merged_snapshot_size = payload_len;
+        } else {
+            ctx->recv_merged_snapshot_size = 0;
+        }
+        SDL_UnlockMutex(ctx->recv_mutex);
+        // Ownership transferred to ctx->recv_buffer; do not free.
+        *last_heartbeat_recv = SDL_GetTicks();
+        return 0;
+    }
+    if (msg_type == COOP_MSG_PLAYER_STATES) {
+        if (payload && payload_len >= 4) {
+            const char *p = payload;
+            uint32_t pc;
+            memcpy(&pc, p, 4);
+            pc = ntohl(pc);
+            p += 4;
+            SDL_LockMutex(ctx->recv_mutex);
+            for (int pi = 0; pi < COOP_MAX_LOBBY; pi++) {
+                free(ctx->recv_player_buffers[pi]);
+                ctx->recv_player_buffers[pi] = nullptr;
+                ctx->recv_player_buffer_sizes[pi] = 0;
+            }
+            ctx->recv_player_snapshot_count = 0;
+            for (uint32_t pi = 0; pi < pc && (size_t) (p - payload) + 8 <= payload_len; pi++) {
+                uint32_t idx, sz;
+                memcpy(&idx, p, 4);
+                idx = ntohl(idx);
+                p += 4;
+                memcpy(&sz, p, 4);
+                sz = ntohl(sz);
+                p += 4;
+                if ((size_t) (p - payload) + sz > payload_len) break;
+                if (idx < COOP_MAX_LOBBY) {
+                    ctx->recv_player_buffers[idx] = (char *) malloc(sz);
+                    if (ctx->recv_player_buffers[idx]) {
+                        memcpy(ctx->recv_player_buffers[idx], p, sz);
+                        ctx->recv_player_buffer_sizes[idx] = sz;
+                        if ((int) (idx + 1) > ctx->recv_player_snapshot_count)
+                            ctx->recv_player_snapshot_count = (int) (idx + 1);
+                    }
+                }
+                p += sz;
+            }
+            ctx->recv_player_data_ready = true;
+            SDL_UnlockMutex(ctx->recv_mutex);
+            log_message(LOG_INFO, "[COOP NET] Received %u per-player snapshots from host.\n", pc);
+        }
+        free(payload);
+        *last_heartbeat_recv = SDL_GetTicks();
+        return 0;
+    }
+    if (msg_type == COOP_MSG_TEMPLATE_SYNC) {
+        if (payload && payload_len > 0) {
+            SDL_LockMutex(ctx->template_sync_mutex);
+            size_t copy_len = payload_len < sizeof(ctx->template_sync_payload) - 1
+                                  ? payload_len
+                                  : sizeof(ctx->template_sync_payload) - 1;
+            memcpy(ctx->template_sync_payload, payload, copy_len);
+            ctx->template_sync_payload[copy_len] = '\0';
+            ctx->template_sync_ready = true;
+            SDL_UnlockMutex(ctx->template_sync_mutex);
+            log_message(LOG_INFO, "[COOP NET] Received template sync update from host.\n");
+        }
+        free(payload);
+        *last_heartbeat_recv = SDL_GetTicks();
+        return 0;
+    }
+    // Unknown / unhandled message: drop.
+    free(payload);
+    return 0;
+}
+
 // ---- Receiver Thread ----
 
 static int SDLCALL receiver_thread_func(void *data) {
@@ -1360,112 +1575,9 @@ static int SDLCALL receiver_thread_func(void *data) {
             bool disconnected;
 
             if (read_message(fd, &msg_type, &payload, &payload_len, &disconnected)) {
-                if (msg_type == COOP_MSG_HEARTBEAT) {
-                    send_message(ctx->client_fd, COOP_MSG_HEARTBEAT_ACK, nullptr, 0);
-                    last_heartbeat_recv = SDL_GetTicks();
-                } else if (msg_type == COOP_MSG_DISCONNECT) {
-                    free(payload);
-                    log_message(LOG_INFO, "[COOP NET] Host shut down the lobby.\n");
-                    set_state(ctx, COOP_NET_DISCONNECTED);
-                    set_status(ctx, "Host shut down the lobby");
-                    break;
-                } else if (msg_type == COOP_MSG_KICK) {
-                    char reason[256] = "Kicked by host";
-                    if (payload_len > 0 && payload) {
-                        size_t copy_len = (payload_len < sizeof(reason) - 1) ? payload_len : sizeof(reason) - 1;
-                        memcpy(reason, payload, copy_len);
-                        reason[copy_len] = '\0';
-                    }
-                    free(payload);
-                    log_message(LOG_INFO, "[COOP NET] Kicked: %s\n", reason);
-                    set_state(ctx, COOP_NET_DISCONNECTED);
-                    set_status(ctx, "Kicked: %s", reason);
-                    break;
-                } else if (msg_type == COOP_MSG_PLAYER_LIST) {
-                    char *json_str = (char *) malloc(payload_len + 1);
-                    if (json_str) {
-                        memcpy(json_str, payload, payload_len);
-                        json_str[payload_len] = '\0';
-                        parse_lobby_json(ctx, json_str);
-                        free(json_str);
-                    }
-                    last_heartbeat_recv = SDL_GetTicks();
-                } else if (msg_type == COOP_MSG_STATE_UPDATE) {
-                    SDL_LockMutex(ctx->recv_mutex);
-                    free(ctx->recv_buffer);
-                    ctx->recv_buffer = payload;
-                    ctx->recv_buffer_size = payload_len;
-                    ctx->recv_data_ready = true;
-                    // Also keep a persistent copy of the merged snapshot
-                    free(ctx->recv_merged_snapshot);
-                    ctx->recv_merged_snapshot = (char *) malloc(payload_len);
-                    if (ctx->recv_merged_snapshot) {
-                        memcpy(ctx->recv_merged_snapshot, payload, payload_len);
-                        ctx->recv_merged_snapshot_size = payload_len;
-                    } else {
-                        ctx->recv_merged_snapshot_size = 0;
-                    }
-                    SDL_UnlockMutex(ctx->recv_mutex);
-                    payload = nullptr; // Ownership transferred
-                    last_heartbeat_recv = SDL_GetTicks();
-                } else if (msg_type == COOP_MSG_PLAYER_STATES) {
-                    // Parse batched per-player snapshots:
-                    // [4B player_count] then for each: [4B idx][4B size][data]
-                    if (payload && payload_len >= 4) {
-                        const char *p = payload;
-                        uint32_t pc;
-                        memcpy(&pc, p, 4);
-                        pc = ntohl(pc);
-                        p += 4;
-                        SDL_LockMutex(ctx->recv_mutex);
-                        // Free all old per-player buffers
-                        for (int pi = 0; pi < COOP_MAX_LOBBY; pi++) {
-                            free(ctx->recv_player_buffers[pi]);
-                            ctx->recv_player_buffers[pi] = nullptr;
-                            ctx->recv_player_buffer_sizes[pi] = 0;
-                        }
-                        ctx->recv_player_snapshot_count = 0;
-                        for (uint32_t pi = 0; pi < pc && (size_t) (p - payload) + 8 <= payload_len; pi++) {
-                            uint32_t idx, sz;
-                            memcpy(&idx, p, 4);
-                            idx = ntohl(idx);
-                            p += 4;
-                            memcpy(&sz, p, 4);
-                            sz = ntohl(sz);
-                            p += 4;
-                            if ((size_t) (p - payload) + sz > payload_len) break;
-                            if (idx < COOP_MAX_LOBBY) {
-                                ctx->recv_player_buffers[idx] = (char *) malloc(sz);
-                                if (ctx->recv_player_buffers[idx]) {
-                                    memcpy(ctx->recv_player_buffers[idx], p, sz);
-                                    ctx->recv_player_buffer_sizes[idx] = sz;
-                                    if ((int) (idx + 1) > ctx->recv_player_snapshot_count)
-                                        ctx->recv_player_snapshot_count = (int) (idx + 1);
-                                }
-                            }
-                            p += sz;
-                        }
-                        ctx->recv_player_data_ready = true;
-                        SDL_UnlockMutex(ctx->recv_mutex);
-                        log_message(LOG_INFO, "[COOP NET] Received %u per-player snapshots from host.\n", pc);
-                    }
-                    last_heartbeat_recv = SDL_GetTicks();
-                } else if (msg_type == COOP_MSG_TEMPLATE_SYNC) {
-                    if (payload && payload_len > 0) {
-                        SDL_LockMutex(ctx->template_sync_mutex);
-                        size_t copy_len = payload_len < sizeof(ctx->template_sync_payload) - 1
-                                              ? payload_len
-                                              : sizeof(ctx->template_sync_payload) - 1;
-                        memcpy(ctx->template_sync_payload, payload, copy_len);
-                        ctx->template_sync_payload[copy_len] = '\0';
-                        ctx->template_sync_ready = true;
-                        SDL_UnlockMutex(ctx->template_sync_mutex);
-                        log_message(LOG_INFO, "[COOP NET] Received template sync update from host.\n");
-                    }
-                    last_heartbeat_recv = SDL_GetTicks();
-                }
-
-                free(payload); // Free if not transferred
+                int rc = receiver_dispatch_message(ctx, msg_type, payload, payload_len,
+                                                   &last_heartbeat_recv);
+                if (rc == 1) break;
             } else if (disconnected) {
                 log_message(LOG_INFO, "[COOP NET] Lost connection to host.\n");
                 set_state(ctx, COOP_NET_DISCONNECTED);
@@ -1499,6 +1611,431 @@ static int SDLCALL receiver_thread_func(void *data) {
     return 0;
 }
 
+// ---- Receiver Relay Thread ----
+// Reads frames from the TLS connection and dispatches via the shared
+// receiver_dispatch_message helper. Skips the heartbeat-timeout check that
+// the direct path uses — TCP/TLS error surfacing is the relay-path liveness
+// signal (the relay closes the conn when the host disconnects).
+static int SDLCALL receiver_relay_thread_func(void *data) {
+    CoopNetContext *ctx = (CoopNetContext *) data;
+
+    log_message(LOG_INFO, "[COOP NET] Receiver relay thread started.\n");
+
+    // Send JOIN_REQUEST as the first app frame. The relay forwards this to the
+    // host, which auto-accepts (or rejects on version/duplicate).
+    {
+        cJSON *req = cJSON_CreateObject();
+        cJSON_AddStringToObject(req, "version", ADVANCELY_VERSION);
+        cJSON_AddStringToObject(req, "uuid", ctx->connect_uuid);
+        cJSON_AddStringToObject(req, "username", ctx->connect_username);
+        cJSON_AddStringToObject(req, "display_name", ctx->connect_display_name);
+        char *json_str = cJSON_PrintUnformatted(req);
+        cJSON_Delete(req);
+
+        SDL_LockMutex(ctx->relay_send_mutex);
+        bool sent = json_str && relay_send_frame(ctx->relay_conn, COOP_MSG_JOIN_REQUEST,
+                                                 json_str, (uint32_t) strlen(json_str));
+        SDL_UnlockMutex(ctx->relay_send_mutex);
+        free(json_str);
+
+        if (!sent) {
+            log_message(LOG_ERROR, "[COOP NET] Failed to send JOIN_REQUEST over relay.\n");
+            set_state(ctx, COOP_NET_ERROR);
+            set_status(ctx, "Failed to send join request");
+            return 1;
+        }
+    }
+
+    set_status(ctx, "Waiting for host approval...");
+
+    // Wait for JOIN_ACCEPT or JOIN_REJECT. Note: relay broadcasts host frames,
+    // so we may also see other receivers' JOIN_ACCEPT messages here; we accept
+    // the first one (it carries our lobby snapshot regardless).
+    bool accepted = false;
+    while (!should_stop(ctx)) {
+        if (!ctx->relay_conn) break;
+        uint32_t msg_type = 0;
+        void *payload = nullptr;
+        uint32_t payload_len = 0;
+        if (!relay_recv_frame(ctx->relay_conn, &msg_type, &payload, &payload_len, 0)) {
+            log_message(LOG_INFO, "[COOP NET] Relay connection closed before approval.\n");
+            set_state(ctx, COOP_NET_DISCONNECTED);
+            set_status(ctx, "Relay connection lost");
+            return 1;
+        }
+
+        if (msg_type == COOP_MSG_JOIN_ACCEPT) {
+            char *json_str = (char *) malloc(payload_len + 1);
+            if (json_str) {
+                memcpy(json_str, payload, payload_len);
+                json_str[payload_len] = '\0';
+                parse_lobby_json(ctx, json_str);
+                free(json_str);
+            }
+            free(payload);
+            accepted = true;
+            break;
+        }
+        if (msg_type == COOP_MSG_JOIN_REJECT) {
+            // JOIN_REJECT on relay is JSON {target_uuid, reason}. Self-filter.
+            char reason[256] = "Rejected by host";
+            bool for_me = false;
+            if (payload && payload_len > 0) {
+                char *js = (char *) malloc(payload_len + 1);
+                if (js) {
+                    memcpy(js, payload, payload_len);
+                    js[payload_len] = '\0';
+                    cJSON *json = cJSON_Parse(js);
+                    free(js);
+                    if (json) {
+                        cJSON *tu = cJSON_GetObjectItem(json, "target_uuid");
+                        cJSON *r = cJSON_GetObjectItem(json, "reason");
+                        if (tu && cJSON_IsString(tu) &&
+                            strcmp(tu->valuestring, ctx->connect_uuid) == 0) {
+                            for_me = true;
+                            if (r && cJSON_IsString(r)) {
+                                strncpy(reason, r->valuestring, sizeof(reason) - 1);
+                                reason[sizeof(reason) - 1] = '\0';
+                            }
+                        }
+                        cJSON_Delete(json);
+                    }
+                }
+            }
+            free(payload);
+            if (!for_me) continue; // Reject was for someone else; keep waiting.
+            log_message(LOG_INFO, "[COOP NET] Relay join rejected: %s\n", reason);
+            set_state(ctx, COOP_NET_ERROR);
+            set_status(ctx, "%s", reason);
+            return 1;
+        }
+        // Other frames (TEMPLATE_SYNC, PLAYER_LIST, etc.) before JOIN_ACCEPT —
+        // dispatch them so we don't drop state. last_heartbeat_recv unused here.
+        Uint32 dummy = SDL_GetTicks();
+        receiver_dispatch_message(ctx, msg_type, (char *) payload, payload_len, &dummy);
+    }
+
+    if (!accepted) {
+        return 1;
+    }
+
+    set_state(ctx, COOP_NET_CONNECTED);
+    set_status(ctx, "Connected via relay (room %s)", ctx->relay_room_code);
+    log_message(LOG_INFO, "[COOP NET] Joined relay room %s.\n", ctx->relay_room_code);
+
+    Uint32 last_heartbeat_recv = SDL_GetTicks();
+
+    while (!should_stop(ctx)) {
+        if (!ctx->relay_conn) break;
+        uint32_t msg_type = 0;
+        void *payload = nullptr;
+        uint32_t payload_len = 0;
+        if (!relay_recv_frame(ctx->relay_conn, &msg_type, &payload, &payload_len, 0)) {
+            if (should_stop(ctx)) break;
+            log_message(LOG_INFO, "[COOP NET] Relay connection lost.\n");
+            set_state(ctx, COOP_NET_DISCONNECTED);
+            set_status(ctx, "Connection lost");
+            break;
+        }
+        int rc = receiver_dispatch_message(ctx, msg_type, (char *) payload, payload_len,
+                                           &last_heartbeat_recv);
+        if (rc == 1) break;
+    }
+
+    // Graceful disconnect with UUID so the host can identify our slot.
+    if (ctx->relay_conn) {
+        cJSON *bye = cJSON_CreateObject();
+        cJSON_AddStringToObject(bye, "uuid", ctx->connect_uuid);
+        cJSON_AddStringToObject(bye, "reason",
+                                ctx->disconnect_reason[0] ? ctx->disconnect_reason : "");
+        char *js = cJSON_PrintUnformatted(bye);
+        cJSON_Delete(bye);
+        if (js) {
+            SDL_LockMutex(ctx->relay_send_mutex);
+            relay_send_frame(ctx->relay_conn, COOP_MSG_DISCONNECT, js, (uint32_t) strlen(js));
+            SDL_UnlockMutex(ctx->relay_send_mutex);
+            free(js);
+        }
+        ctx->disconnect_reason[0] = '\0';
+    }
+
+    log_message(LOG_INFO, "[COOP NET] Receiver relay thread exiting.\n");
+    return 0;
+}
+
+// ---- Host Relay Thread ----
+// Single blocking read loop on the TLS connection. The relay forwards frames
+// from receivers to us; we don't see per-receiver TCP connections at all.
+// Slots are keyed by UUID (set on JOIN_REQUEST), not socket fd.
+//
+// Keepalive: receivers send periodic HEARTBEAT; we broadcast HEARTBEAT_ACK so
+// every receiver in the room sees liveness traffic. We do NOT broadcast our
+// own heartbeat — that would require a non-blocking read loop, and the
+// receiver-driven model is sufficient.
+static int SDLCALL host_relay_thread_func(void *data) {
+    CoopNetContext *ctx = (CoopNetContext *) data;
+
+    rebuild_lobby_list(ctx);
+    log_message(LOG_INFO, "[COOP NET] Host relay thread started (room %s).\n",
+                ctx->relay_room_code);
+
+    while (!should_stop(ctx)) {
+        // Process pending kick actions (no rejects on relay - auto-accept always).
+        bool lobby_dirty = false;
+        for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
+            if (!ctx->clients[i].active) continue;
+            int action = SDL_GetAtomicInt(&ctx->clients[i].pending_action);
+            if (action == COOP_ACTION_NONE) continue;
+            SDL_SetAtomicInt(&ctx->clients[i].pending_action, COOP_ACTION_NONE);
+            if (action == COOP_ACTION_KICK) {
+                cJSON *kick_obj = cJSON_CreateObject();
+                cJSON_AddStringToObject(kick_obj, "target_uuid", ctx->clients[i].uuid);
+                cJSON_AddStringToObject(kick_obj, "reason", ctx->clients[i].pending_action_reason);
+                char *kick_json = cJSON_PrintUnformatted(kick_obj);
+                cJSON_Delete(kick_obj);
+                if (kick_json) {
+                    coop_broadcast_internal(ctx, COOP_MSG_KICK, kick_json,
+                                            (uint32_t) strlen(kick_json));
+                    free(kick_json);
+                }
+                log_message(LOG_INFO, "[COOP NET] Kicked %s (relay): %s\n",
+                            ctx->clients[i].username,
+                            ctx->clients[i].pending_action_reason);
+                set_status(ctx, "Kicked %s", ctx->clients[i].username);
+                ctx->clients[i].active = false;
+                if (ctx->clients[i].handshake_done) ctx->client_count--;
+                lobby_dirty = true;
+            }
+        }
+        if (lobby_dirty) {
+            rebuild_lobby_list(ctx);
+            broadcast_player_list(ctx);
+        }
+
+        if (!ctx->relay_conn) break;
+
+        uint32_t msg_type = 0;
+        void *payload = nullptr;
+        uint32_t payload_len = 0;
+        if (!relay_recv_frame(ctx->relay_conn, &msg_type, &payload, &payload_len, 0)) {
+            if (should_stop(ctx)) break;
+            log_message(LOG_INFO, "[COOP NET] Relay connection closed (host).\n");
+            set_state(ctx, COOP_NET_DISCONNECTED);
+            set_status(ctx, "Relay connection lost");
+            break;
+        }
+
+        if (msg_type == COOP_MSG_JOIN_REQUEST) {
+            char *json_str = (char *) malloc(payload_len + 1);
+            if (json_str) {
+                memcpy(json_str, payload, payload_len);
+                json_str[payload_len] = '\0';
+                cJSON *json = cJSON_Parse(json_str);
+                free(json_str);
+
+                char req_uuid[48] = {0}, req_username[64] = {0}, req_display[64] = {0};
+                bool valid_payload = false;
+                bool version_mismatch = false;
+                char their_version[32] = "unknown";
+
+                if (json) {
+                    cJSON *v = cJSON_GetObjectItem(json, "version");
+                    if (v && cJSON_IsString(v)) {
+                        strncpy(their_version, v->valuestring, sizeof(their_version) - 1);
+                        if (strcmp(v->valuestring, ADVANCELY_VERSION) != 0) version_mismatch = true;
+                    } else {
+                        version_mismatch = true;
+                    }
+                    if (!version_mismatch) {
+                        cJSON *u = cJSON_GetObjectItem(json, "uuid");
+                        cJSON *n = cJSON_GetObjectItem(json, "username");
+                        cJSON *d = cJSON_GetObjectItem(json, "display_name");
+                        if (u && cJSON_IsString(u) && n && cJSON_IsString(n)) {
+                            strncpy(req_uuid, u->valuestring, sizeof(req_uuid) - 1);
+                            strncpy(req_username, n->valuestring, sizeof(req_username) - 1);
+                            if (d && cJSON_IsString(d))
+                                strncpy(req_display, d->valuestring, sizeof(req_display) - 1);
+                            valid_payload = true;
+                        }
+                    }
+                    cJSON_Delete(json);
+                }
+
+                if (version_mismatch) {
+                    cJSON *rej = cJSON_CreateObject();
+                    cJSON_AddStringToObject(rej, "target_uuid",
+                                            req_uuid[0] ? req_uuid : their_version);
+                    char buf[256];
+                    snprintf(buf, sizeof(buf),
+                             "Version mismatch: host is %s, you are %s",
+                             ADVANCELY_VERSION, their_version);
+                    cJSON_AddStringToObject(rej, "reason", buf);
+                    char *js = cJSON_PrintUnformatted(rej);
+                    cJSON_Delete(rej);
+                    if (js) {
+                        coop_broadcast_internal(ctx, COOP_MSG_JOIN_REJECT, js, (uint32_t) strlen(js));
+                        free(js);
+                    }
+                    log_message(LOG_INFO, "[COOP NET] Relay rejected join: version mismatch (theirs %s, ours %s).\n",
+                                their_version, ADVANCELY_VERSION);
+                } else if (!valid_payload) {
+                    log_message(LOG_INFO, "[COOP NET] Relay JOIN_REQUEST: invalid payload.\n");
+                } else {
+                    // Allocate slot keyed by UUID. Reject duplicate UUID/username.
+                    bool dup_uuid = (strcmp(req_uuid, ctx->host_uuid) == 0);
+                    bool dup_user = (strcasecmp(req_username, ctx->host_username) == 0);
+                    int slot = -1;
+                    for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
+                        if (!ctx->clients[i].active) {
+                            if (slot < 0) slot = i;
+                            continue;
+                        }
+                        if (strcmp(ctx->clients[i].uuid, req_uuid) == 0) dup_uuid = true;
+                        if (strcasecmp(ctx->clients[i].username, req_username) == 0) dup_user = true;
+                    }
+
+                    if (dup_uuid || dup_user || slot < 0) {
+                        const char *reason =
+                            slot < 0 ? "Server full"
+                                     : (dup_uuid ? "A player with this UUID is already in the lobby"
+                                                 : "Username already in lobby");
+                        cJSON *rej = cJSON_CreateObject();
+                        cJSON_AddStringToObject(rej, "target_uuid", req_uuid);
+                        cJSON_AddStringToObject(rej, "reason", reason);
+                        char *js = cJSON_PrintUnformatted(rej);
+                        cJSON_Delete(rej);
+                        if (js) {
+                            coop_broadcast_internal(ctx, COOP_MSG_JOIN_REJECT, js, (uint32_t) strlen(js));
+                            free(js);
+                        }
+                        log_message(LOG_INFO, "[COOP NET] Relay rejected %s: %s\n", req_username, reason);
+                    } else {
+                        memset(&ctx->clients[slot], 0, sizeof(CoopClient));
+                        ctx->clients[slot].socket_fd = COOP_INVALID_SOCKET; // No socket on relay
+                        ctx->clients[slot].active = true;
+                        ctx->clients[slot].handshake_done = true; // Auto-accept
+                        ctx->clients[slot].pending_approval = false;
+                        ctx->clients[slot].connect_time = SDL_GetTicks();
+                        strncpy(ctx->clients[slot].uuid, req_uuid, sizeof(ctx->clients[slot].uuid) - 1);
+                        strncpy(ctx->clients[slot].username, req_username, sizeof(ctx->clients[slot].username) - 1);
+                        strncpy(ctx->clients[slot].display_name, req_display,
+                                sizeof(ctx->clients[slot].display_name) - 1);
+                        snprintf(ctx->clients[slot].label, sizeof(ctx->clients[slot].label),
+                                 "relay:%s", req_uuid);
+                        ctx->client_count++;
+
+                        rebuild_lobby_list(ctx);
+
+                        // JOIN_ACCEPT carries the lobby snapshot. Receivers self-filter
+                        // (the new joiner consumes it; existing receivers refresh and
+                        // ignore — handled in receiver_dispatch_message).
+                        char *lobby_json = build_lobby_json(ctx);
+                        if (lobby_json) {
+                            coop_broadcast_internal(ctx, COOP_MSG_JOIN_ACCEPT, lobby_json,
+                                                    (uint32_t) strlen(lobby_json));
+                            free(lobby_json);
+                        }
+
+                        // TEMPLATE_SYNC immediately after, so the new joiner picks up
+                        // the host's template settings.
+                        SDL_LockMutex(ctx->template_sync_mutex);
+                        if (ctx->template_sync_payload[0] != '\0') {
+                            coop_broadcast_internal(ctx, COOP_MSG_TEMPLATE_SYNC,
+                                                    ctx->template_sync_payload,
+                                                    (uint32_t) strlen(ctx->template_sync_payload));
+                        }
+                        SDL_UnlockMutex(ctx->template_sync_mutex);
+
+                        broadcast_player_list(ctx);
+
+                        log_message(LOG_INFO, "[COOP NET] Relay auto-accepted %s (%s).\n",
+                                    req_username, req_uuid);
+                        set_status(ctx, "Joined: %s", req_username);
+                    }
+                }
+            }
+        } else if (msg_type == COOP_MSG_HEARTBEAT) {
+            // Receiver liveness ping. ACK to the whole room (cheap; relay fans out).
+            coop_broadcast_internal(ctx, COOP_MSG_HEARTBEAT_ACK, nullptr, 0);
+        } else if (msg_type == COOP_MSG_HEARTBEAT_ACK) {
+            // Receiver ack to a host-initiated heartbeat. We don't initiate any in
+            // the relay model, but we tolerate it in case anyone bridges.
+        } else if (msg_type == COOP_MSG_CUSTOM_GOAL_MOD) {
+            if (payload_len == sizeof(CoopCustomGoalModMsg)) {
+                SDL_LockMutex(ctx->custom_mod_mutex);
+                if (ctx->custom_mod_count < COOP_MAX_CUSTOM_MODS) {
+                    memcpy(&ctx->custom_mod_queue[ctx->custom_mod_count],
+                           payload, sizeof(CoopCustomGoalModMsg));
+                    ctx->custom_mod_count++;
+                }
+                SDL_UnlockMutex(ctx->custom_mod_mutex);
+            }
+        } else if (msg_type == COOP_MSG_DISCONNECT) {
+            // Relay receivers send DISCONNECT as JSON {uuid, reason} so we can
+            // identify the slot to free. Bare-string DISCONNECT (legacy direct
+            // format) won't parse and we'll just log it.
+            char src_uuid[48] = {0};
+            char reason[256] = {0};
+            if (payload && payload_len > 0) {
+                char *js = (char *) malloc(payload_len + 1);
+                if (js) {
+                    memcpy(js, payload, payload_len);
+                    js[payload_len] = '\0';
+                    cJSON *json = cJSON_Parse(js);
+                    free(js);
+                    if (json) {
+                        cJSON *u = cJSON_GetObjectItem(json, "uuid");
+                        cJSON *r = cJSON_GetObjectItem(json, "reason");
+                        if (u && cJSON_IsString(u))
+                            strncpy(src_uuid, u->valuestring, sizeof(src_uuid) - 1);
+                        if (r && cJSON_IsString(r))
+                            strncpy(reason, r->valuestring, sizeof(reason) - 1);
+                        cJSON_Delete(json);
+                    }
+                }
+            }
+            if (src_uuid[0]) {
+                for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
+                    if (ctx->clients[i].active &&
+                        strcmp(ctx->clients[i].uuid, src_uuid) == 0) {
+                        const char *dn = ctx->clients[i].display_name[0] != '\0'
+                                             ? ctx->clients[i].display_name
+                                             : ctx->clients[i].username;
+                        if (reason[0])
+                            set_status(ctx, "%s disconnected: %s", dn, reason);
+                        else
+                            set_status(ctx, "%s disconnected", dn);
+                        log_message(LOG_INFO, "[COOP NET] Relay receiver %s disconnected: %s\n",
+                                    ctx->clients[i].username, reason[0] ? reason : "(no reason)");
+                        ctx->clients[i].active = false;
+                        if (ctx->clients[i].handshake_done) ctx->client_count--;
+                        rebuild_lobby_list(ctx);
+                        broadcast_player_list(ctx);
+                        break;
+                    }
+                }
+            }
+        }
+
+        free(payload);
+    }
+
+    // Cleanup: notify the lobby we're closing if the connection is still up.
+    // relay_close() is performed by coop_net_stop() from the calling thread.
+    if (ctx->relay_conn) {
+        SDL_LockMutex(ctx->relay_send_mutex);
+        relay_send_frame(ctx->relay_conn, COOP_MSG_DISCONNECT, nullptr, 0);
+        SDL_UnlockMutex(ctx->relay_send_mutex);
+    }
+    for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
+        ctx->clients[i].active = false;
+    }
+    ctx->client_count = 0;
+
+    log_message(LOG_INFO, "[COOP NET] Host relay thread exiting.\n");
+    return 0;
+}
+
 // ---- Public API Implementation ----
 
 bool coop_net_init(CoopNetContext *ctx) {
@@ -1519,8 +2056,9 @@ bool coop_net_init(CoopNetContext *ctx) {
     ctx->custom_mod_mutex = SDL_CreateMutex();
     ctx->template_sync_mutex = SDL_CreateMutex();
     ctx->legacy_upload_mutex = SDL_CreateMutex();
+    ctx->relay_send_mutex = SDL_CreateMutex();
     if (!ctx->status_mutex || !ctx->recv_mutex || !ctx->lobby_mutex || !ctx->custom_mod_mutex || !ctx->
-        template_sync_mutex || !ctx->legacy_upload_mutex) {
+        template_sync_mutex || !ctx->legacy_upload_mutex || !ctx->relay_send_mutex) {
         log_message(LOG_ERROR, "[COOP NET] Failed to create mutexes.\n");
         return false;
     }
@@ -1565,6 +2103,10 @@ void coop_net_shutdown(CoopNetContext *ctx) {
     if (ctx->template_sync_mutex) {
         SDL_DestroyMutex(ctx->template_sync_mutex);
         ctx->template_sync_mutex = nullptr;
+    }
+    if (ctx->relay_send_mutex) {
+        SDL_DestroyMutex(ctx->relay_send_mutex);
+        ctx->relay_send_mutex = nullptr;
     }
     // Free any cached legacy stats uploads (LEGACY <=1.6.4 only).
     if (ctx->legacy_upload_mutex) {
@@ -1704,6 +2246,99 @@ bool coop_net_start_host(CoopNetContext *ctx, const char *ip, int port,
     return true;
 }
 
+bool coop_net_start_host_relay(CoopNetContext *ctx, const char *mc_version,
+                               const char *password_plain,
+                               const char *username, const char *uuid, const char *display_name) {
+    coop_net_stop(ctx);
+
+    strncpy(ctx->host_username, username ? username : "", sizeof(ctx->host_username) - 1);
+    strncpy(ctx->host_uuid, uuid ? uuid : "", sizeof(ctx->host_uuid) - 1);
+    strncpy(ctx->host_display_name, display_name ? display_name : "", sizeof(ctx->host_display_name) - 1);
+    ctx->auto_accept = true; // Relay path is always auto-accept; password is the gate.
+    ctx->transport = 1;
+
+    SDL_LockMutex(ctx->lobby_mutex);
+    ctx->lobby_player_count = 0;
+    ctx->lobby_changed = false;
+    ctx->pending_request_count = 0;
+    ctx->pending_requests_changed = false;
+    SDL_UnlockMutex(ctx->lobby_mutex);
+
+    // Hash password (empty allowed = open room).
+    if (!relay_hash_password(password_plain, ctx->relay_password_hash)) {
+        set_state(ctx, COOP_NET_ERROR);
+        set_status(ctx, "Failed to hash password");
+        return false;
+    }
+
+    set_state(ctx, COOP_NET_CONNECTING);
+    set_status(ctx, "Connecting to relay...");
+    SDL_SetAtomicInt(&ctx->should_stop, 0);
+
+    char err[256];
+    ctx->relay_conn = relay_connect(err, sizeof(err));
+    if (!ctx->relay_conn) {
+        log_message(LOG_ERROR, "[COOP NET] Relay connect failed: %s\n", err);
+        set_state(ctx, COOP_NET_ERROR);
+        set_status(ctx, "Relay connect failed: %s", err);
+        return false;
+    }
+
+    // CREATE_ROOM control round-trip
+    size_t enc_len = 0;
+    char *enc = relay_encode_create_room(ctx->relay_password_hash,
+                                         mc_version ? mc_version : "", &enc_len);
+    if (!enc || !relay_send_frame(ctx->relay_conn, COOP_MSG_RELAY_CREATE_ROOM,
+                                  enc, (uint32_t) enc_len)) {
+        free(enc);
+        log_message(LOG_ERROR, "[COOP NET] Failed to send CREATE_ROOM.\n");
+        relay_close(ctx->relay_conn);
+        ctx->relay_conn = nullptr;
+        set_state(ctx, COOP_NET_ERROR);
+        set_status(ctx, "Failed to create room on relay");
+        return false;
+    }
+    free(enc);
+
+    uint32_t resp_type = 0;
+    void *resp_payload = nullptr;
+    uint32_t resp_len = 0;
+    if (!relay_recv_frame(ctx->relay_conn, &resp_type, &resp_payload, &resp_len, 0)) {
+        log_message(LOG_ERROR, "[COOP NET] No response to CREATE_ROOM.\n");
+        relay_close(ctx->relay_conn);
+        ctx->relay_conn = nullptr;
+        set_state(ctx, COOP_NET_ERROR);
+        set_status(ctx, "Relay did not respond");
+        return false;
+    }
+    if (resp_type != COOP_MSG_RELAY_ROOM_CREATED ||
+        !relay_decode_room_created((const char *) resp_payload, resp_len, ctx->relay_room_code)) {
+        log_message(LOG_ERROR, "[COOP NET] CREATE_ROOM response invalid (type=%u).\n", resp_type);
+        free(resp_payload);
+        relay_close(ctx->relay_conn);
+        ctx->relay_conn = nullptr;
+        set_state(ctx, COOP_NET_ERROR);
+        set_status(ctx, "Relay rejected room creation");
+        return false;
+    }
+    free(resp_payload);
+
+    log_message(LOG_INFO, "[COOP NET] Relay room created: %s\n", ctx->relay_room_code);
+    set_state(ctx, COOP_NET_LISTENING);
+    set_status(ctx, "Hosting via relay (room %s)", ctx->relay_room_code);
+
+    ctx->thread = SDL_CreateThread(host_relay_thread_func, "CoopHostRelay", ctx);
+    if (!ctx->thread) {
+        log_message(LOG_ERROR, "[COOP NET] Failed to create host relay thread.\n");
+        relay_close(ctx->relay_conn);
+        ctx->relay_conn = nullptr;
+        set_state(ctx, COOP_NET_ERROR);
+        set_status(ctx, "Failed to start host thread");
+        return false;
+    }
+    return true;
+}
+
 bool coop_net_start_receiver(CoopNetContext *ctx, const char *ip, int port,
                              const char *username, const char *uuid, const char *display_name) {
     coop_net_stop(ctx);
@@ -1738,6 +2373,110 @@ bool coop_net_start_receiver(CoopNetContext *ctx, const char *ip, int port,
     return true;
 }
 
+bool coop_net_start_receiver_relay(CoopNetContext *ctx, const char *room_code,
+                                   const char *password_plain,
+                                   const char *username, const char *uuid, const char *display_name) {
+    coop_net_stop(ctx);
+
+    strncpy(ctx->connect_username, username ? username : "", sizeof(ctx->connect_username) - 1);
+    strncpy(ctx->connect_uuid, uuid ? uuid : "", sizeof(ctx->connect_uuid) - 1);
+    strncpy(ctx->connect_display_name, display_name ? display_name : "", sizeof(ctx->connect_display_name) - 1);
+    ctx->transport = 1;
+
+    if (!room_code || strlen(room_code) > 7) {
+        set_state(ctx, COOP_NET_ERROR);
+        set_status(ctx, "Invalid room code");
+        return false;
+    }
+    strncpy(ctx->relay_room_code, room_code, sizeof(ctx->relay_room_code) - 1);
+    ctx->relay_room_code[sizeof(ctx->relay_room_code) - 1] = '\0';
+
+    if (!relay_hash_password(password_plain, ctx->relay_password_hash)) {
+        set_state(ctx, COOP_NET_ERROR);
+        set_status(ctx, "Failed to hash password");
+        return false;
+    }
+
+    SDL_LockMutex(ctx->lobby_mutex);
+    ctx->lobby_player_count = 0;
+    ctx->lobby_changed = false;
+    SDL_UnlockMutex(ctx->lobby_mutex);
+
+    set_state(ctx, COOP_NET_CONNECTING);
+    set_status(ctx, "Connecting to relay...");
+    SDL_SetAtomicInt(&ctx->should_stop, 0);
+
+    char err[256];
+    ctx->relay_conn = relay_connect(err, sizeof(err));
+    if (!ctx->relay_conn) {
+        log_message(LOG_ERROR, "[COOP NET] Relay connect failed: %s\n", err);
+        set_state(ctx, COOP_NET_ERROR);
+        set_status(ctx, "Relay connect failed: %s", err);
+        return false;
+    }
+
+    // JOIN_ROOM control round-trip.
+    size_t enc_len = 0;
+    char *enc = relay_encode_join_room(ctx->relay_room_code, ctx->relay_password_hash, &enc_len);
+    if (!enc || !relay_send_frame(ctx->relay_conn, COOP_MSG_RELAY_JOIN_ROOM,
+                                  enc, (uint32_t) enc_len)) {
+        free(enc);
+        relay_close(ctx->relay_conn);
+        ctx->relay_conn = nullptr;
+        set_state(ctx, COOP_NET_ERROR);
+        set_status(ctx, "Failed to send join request to relay");
+        return false;
+    }
+    free(enc);
+
+    uint32_t resp_type = 0;
+    void *resp_payload = nullptr;
+    uint32_t resp_len = 0;
+    if (!relay_recv_frame(ctx->relay_conn, &resp_type, &resp_payload, &resp_len, 0)) {
+        relay_close(ctx->relay_conn);
+        ctx->relay_conn = nullptr;
+        set_state(ctx, COOP_NET_ERROR);
+        set_status(ctx, "Relay did not respond");
+        return false;
+    }
+    if (resp_type == COOP_MSG_RELAY_JOIN_ROOM_DENIED) {
+        char reason[256] = "Join denied by relay";
+        if (resp_payload && resp_len > 0) {
+            size_t copy_len = resp_len < sizeof(reason) - 1 ? resp_len : sizeof(reason) - 1;
+            memcpy(reason, resp_payload, copy_len);
+            reason[copy_len] = '\0';
+        }
+        free(resp_payload);
+        relay_close(ctx->relay_conn);
+        ctx->relay_conn = nullptr;
+        set_state(ctx, COOP_NET_ERROR);
+        set_status(ctx, "%s", reason);
+        return false;
+    }
+    if (resp_type != COOP_MSG_RELAY_JOIN_ROOM_OK) {
+        free(resp_payload);
+        relay_close(ctx->relay_conn);
+        ctx->relay_conn = nullptr;
+        set_state(ctx, COOP_NET_ERROR);
+        set_status(ctx, "Unexpected relay response");
+        return false;
+    }
+    free(resp_payload);
+
+    log_message(LOG_INFO, "[COOP NET] Relay JOIN_ROOM_OK for %s.\n", ctx->relay_room_code);
+
+    ctx->thread = SDL_CreateThread(receiver_relay_thread_func, "CoopRecvRelay", ctx);
+    if (!ctx->thread) {
+        log_message(LOG_ERROR, "[COOP NET] Failed to create receiver relay thread.\n");
+        relay_close(ctx->relay_conn);
+        ctx->relay_conn = nullptr;
+        set_state(ctx, COOP_NET_ERROR);
+        set_status(ctx, "Failed to start receiver thread");
+        return false;
+    }
+    return true;
+}
+
 void coop_net_stop(CoopNetContext *ctx) {
     if (!ctx->thread) return;
 
@@ -1749,6 +2488,14 @@ void coop_net_stop(CoopNetContext *ctx) {
     close_socket(&ctx->server_fd);
     if (ctx->disconnect_reason[0] == '\0') {
         close_socket(&ctx->client_fd);
+    }
+
+    // On the relay path: closing the TLS connection wakes the read loop in the
+    // host/receiver relay thread. Done unconditionally; threads check the conn
+    // pointer before each operation.
+    if (ctx->relay_conn) {
+        relay_close(ctx->relay_conn);
+        ctx->relay_conn = nullptr;
     }
 
     SDL_WaitThread(ctx->thread, nullptr);
@@ -1790,10 +2537,27 @@ void coop_net_stop(CoopNetContext *ctx) {
     ctx->pending_requests_changed = true;
     SDL_UnlockMutex(ctx->lobby_mutex);
 
+    // Reset relay session state
+    ctx->transport = 0;
+    ctx->relay_room_code[0] = '\0';
+    ctx->relay_password_hash[0] = '\0';
+
     set_state(ctx, COOP_NET_IDLE);
     set_status(ctx, "Idle");
 
     log_message(LOG_INFO, "[COOP NET] Networking stopped.\n");
+}
+
+bool coop_net_is_relay(CoopNetContext *ctx) {
+    return ctx && ctx->transport == 1;
+}
+
+void coop_net_get_room_code(CoopNetContext *ctx, char *out, size_t out_size) {
+    if (!out || out_size == 0) return;
+    out[0] = '\0';
+    if (!ctx) return;
+    strncpy(out, ctx->relay_room_code, out_size - 1);
+    out[out_size - 1] = '\0';
 }
 
 void coop_net_disconnect_with_reason(CoopNetContext *ctx, const char *reason) {
@@ -1834,19 +2598,7 @@ int coop_net_get_client_count(CoopNetContext *ctx) {
 bool coop_net_broadcast(CoopNetContext *ctx, const void *data, size_t size) {
     if (coop_net_get_state(ctx) != COOP_NET_LISTENING) return false;
     if (ctx->client_count == 0) return true;
-
-    bool all_ok = true;
-    for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
-        if (!ctx->clients[i].active || !ctx->clients[i].handshake_done) continue;
-        if (!send_message(ctx->clients[i].socket_fd, COOP_MSG_STATE_UPDATE, data, (uint32_t) size)) {
-            log_message(LOG_ERROR, "[COOP NET] Failed to broadcast to client %s.\n", ctx->clients[i].label);
-            close_socket(&ctx->clients[i].socket_fd);
-            ctx->clients[i].active = false;
-            ctx->client_count--;
-            all_ok = false;
-        }
-    }
-    return all_ok;
+    return coop_broadcast_internal(ctx, COOP_MSG_STATE_UPDATE, data, (uint32_t) size);
 }
 
 bool coop_net_broadcast_player_states(CoopNetContext *ctx,
@@ -1880,19 +2632,7 @@ bool coop_net_broadcast_player_states(CoopNetContext *ctx,
         p += player_sizes[i];
     }
 
-    bool all_ok = true;
-    for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
-        if (!ctx->clients[i].active || !ctx->clients[i].handshake_done) continue;
-        if (!send_message(ctx->clients[i].socket_fd, COOP_MSG_PLAYER_STATES, payload, (uint32_t) total_size)) {
-            log_message(LOG_ERROR, "[COOP NET] Failed to broadcast player states to client %s.\n",
-                        ctx->clients[i].label);
-            close_socket(&ctx->clients[i].socket_fd);
-            ctx->clients[i].active = false;
-            ctx->client_count--;
-            all_ok = false;
-        }
-    }
-
+    bool all_ok = coop_broadcast_internal(ctx, COOP_MSG_PLAYER_STATES, payload, (uint32_t) total_size);
     free(payload);
     return all_ok;
 }
@@ -2162,10 +2902,5 @@ void coop_net_broadcast_template_sync(CoopNetContext *ctx) {
     payload[sizeof(payload) - 1] = '\0';
     SDL_UnlockMutex(ctx->template_sync_mutex);
 
-    uint32_t len = (uint32_t) strlen(payload);
-    for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
-        if (ctx->clients[i].active && ctx->clients[i].handshake_done) {
-            send_message(ctx->clients[i].socket_fd, COOP_MSG_TEMPLATE_SYNC, payload, len);
-        }
-    }
+    coop_broadcast_internal(ctx, COOP_MSG_TEMPLATE_SYNC, payload, (uint32_t) strlen(payload));
 }
