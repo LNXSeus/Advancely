@@ -14,9 +14,8 @@ CLAUDE.md
 __pycache__/
 *.pyc
 
-# Real relay endpoint + pinned cert fingerprint. Never committed.
-# Template lives at source/relay_config.example.h.
-source/relay_config.h
+# Relay cert/key. cert.pem is public but regenerated per rotation (no need
+# to track). key.pem is the private key and MUST NEVER be committed.
 relay/cert.pem
 relay/key.pem
 
