@@ -1621,6 +1621,11 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
 
     log_message(LOG_INFO, "[COOP NET] Receiver relay thread started.\n");
 
+    // Apply read timeout up front so the join-phase loop can also wake on
+    // should_stop. Without this, a stop while waiting for JOIN_ACCEPT would
+    // hang the thread (coop_net_stop no longer closes the conn from outside).
+    relay_set_read_timeout(ctx->relay_conn, 1000);
+
     // Send JOIN_REQUEST as the first app frame. The relay forwards this to the
     // host, which auto-accepts (or rejects on version/duplicate).
     {
@@ -1657,11 +1662,16 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
         uint32_t msg_type = 0;
         void *payload = nullptr;
         uint32_t payload_len = 0;
-        if (!relay_recv_frame(ctx->relay_conn, &msg_type, &payload, &payload_len, 0)) {
+        int join_rc = relay_recv_frame_timed(ctx->relay_conn, &msg_type, &payload, &payload_len, 0);
+        if (join_rc < 0) {
             log_message(LOG_INFO, "[COOP NET] Relay connection closed before approval.\n");
             set_state(ctx, COOP_NET_DISCONNECTED);
             set_status(ctx, "Relay connection lost");
             return 1;
+        }
+        if (join_rc == 0) {
+            // Idle tick during join wait — just re-check should_stop.
+            continue;
         }
 
         if (msg_type == COOP_MSG_JOIN_ACCEPT) {
@@ -1723,26 +1733,53 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
     set_status(ctx, "Connected via relay (room %s)", ctx->relay_room_code);
     log_message(LOG_INFO, "[COOP NET] Joined relay room %s.\n", ctx->relay_room_code);
 
+    // Periodic read timeout so we can wake to send heartbeats and check
+    // should_stop. 1s is short enough for a snappy disconnect on user-stop.
+    const uint32_t RELAY_READ_TIMEOUT_MS = 1000;
+    const uint32_t RELAY_HEARTBEAT_INTERVAL_MS = 5000;
+    relay_set_read_timeout(ctx->relay_conn, RELAY_READ_TIMEOUT_MS);
+
     Uint32 last_heartbeat_recv = SDL_GetTicks();
+    Uint32 last_heartbeat_send = SDL_GetTicks();
 
     while (!should_stop(ctx)) {
         if (!ctx->relay_conn) break;
         uint32_t msg_type = 0;
         void *payload = nullptr;
         uint32_t payload_len = 0;
-        if (!relay_recv_frame(ctx->relay_conn, &msg_type, &payload, &payload_len, 0)) {
+        int rc = relay_recv_frame_timed(ctx->relay_conn, &msg_type, &payload, &payload_len, 0);
+        if (rc < 0) {
             if (should_stop(ctx)) break;
             log_message(LOG_INFO, "[COOP NET] Relay connection lost.\n");
             set_state(ctx, COOP_NET_DISCONNECTED);
             set_status(ctx, "Connection lost");
             break;
         }
-        int rc = receiver_dispatch_message(ctx, msg_type, (char *) payload, payload_len,
-                                           &last_heartbeat_recv);
-        if (rc == 1) break;
+        if (rc == 0) {
+            // Timeout tick: emit periodic heartbeat so the relay sees us as alive.
+            Uint32 now = SDL_GetTicks();
+            if (now - last_heartbeat_send >= RELAY_HEARTBEAT_INTERVAL_MS) {
+                SDL_LockMutex(ctx->relay_send_mutex);
+                bool ok = relay_send_frame(ctx->relay_conn, COOP_MSG_HEARTBEAT, nullptr, 0);
+                SDL_UnlockMutex(ctx->relay_send_mutex);
+                last_heartbeat_send = now;
+                if (!ok) {
+                    log_message(LOG_INFO, "[COOP NET] Relay heartbeat send failed.\n");
+                    set_state(ctx, COOP_NET_DISCONNECTED);
+                    set_status(ctx, "Connection lost");
+                    break;
+                }
+            }
+            continue;
+        }
+        int drc = receiver_dispatch_message(ctx, msg_type, (char *) payload, payload_len,
+                                            &last_heartbeat_recv);
+        if (drc == 1) break;
     }
 
     // Graceful disconnect with UUID so the host can identify our slot.
+    // Owns the relay_conn cleanup on the relay path: coop_net_stop() now
+    // skips relay_close so the DISCONNECT frame can actually be sent.
     if (ctx->relay_conn) {
         cJSON *bye = cJSON_CreateObject();
         cJSON_AddStringToObject(bye, "uuid", ctx->connect_uuid);
@@ -1757,6 +1794,8 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
             free(js);
         }
         ctx->disconnect_reason[0] = '\0';
+        relay_close(ctx->relay_conn);
+        ctx->relay_conn = nullptr;
     }
 
     log_message(LOG_INFO, "[COOP NET] Receiver relay thread exiting.\n");
@@ -1778,6 +1817,11 @@ static int SDLCALL host_relay_thread_func(void *data) {
     rebuild_lobby_list(ctx);
     log_message(LOG_INFO, "[COOP NET] Host relay thread started (room %s).\n",
                 ctx->relay_room_code);
+
+    const uint32_t RELAY_READ_TIMEOUT_MS = 1000;
+    const uint32_t RELAY_HEARTBEAT_INTERVAL_MS = 5000;
+    relay_set_read_timeout(ctx->relay_conn, RELAY_READ_TIMEOUT_MS);
+    Uint32 last_heartbeat_send = SDL_GetTicks();
 
     while (!should_stop(ctx)) {
         // Process pending kick actions (no rejects on relay - auto-accept always).
@@ -1817,12 +1861,32 @@ static int SDLCALL host_relay_thread_func(void *data) {
         uint32_t msg_type = 0;
         void *payload = nullptr;
         uint32_t payload_len = 0;
-        if (!relay_recv_frame(ctx->relay_conn, &msg_type, &payload, &payload_len, 0)) {
+        int rc = relay_recv_frame_timed(ctx->relay_conn, &msg_type, &payload, &payload_len, 0);
+        if (rc < 0) {
             if (should_stop(ctx)) break;
             log_message(LOG_INFO, "[COOP NET] Relay connection closed (host).\n");
             set_state(ctx, COOP_NET_DISCONNECTED);
             set_status(ctx, "Relay connection lost");
             break;
+        }
+        if (rc == 0) {
+            // Timeout tick: emit periodic heartbeat so the relay sees us as alive.
+            // Receivers also broadcast HEARTBEAT_ACK on receipt (handled below)
+            // which doubles as room-wide liveness traffic.
+            Uint32 now = SDL_GetTicks();
+            if (now - last_heartbeat_send >= RELAY_HEARTBEAT_INTERVAL_MS) {
+                SDL_LockMutex(ctx->relay_send_mutex);
+                bool ok = relay_send_frame(ctx->relay_conn, COOP_MSG_HEARTBEAT, nullptr, 0);
+                SDL_UnlockMutex(ctx->relay_send_mutex);
+                last_heartbeat_send = now;
+                if (!ok) {
+                    log_message(LOG_INFO, "[COOP NET] Relay heartbeat send failed (host).\n");
+                    set_state(ctx, COOP_NET_DISCONNECTED);
+                    set_status(ctx, "Relay connection lost");
+                    break;
+                }
+            }
+            continue;
         }
 
         if (msg_type == COOP_MSG_JOIN_REQUEST) {
@@ -2020,12 +2084,15 @@ static int SDLCALL host_relay_thread_func(void *data) {
         free(payload);
     }
 
-    // Cleanup: notify the lobby we're closing if the connection is still up.
-    // relay_close() is performed by coop_net_stop() from the calling thread.
+    // Cleanup: notify the lobby we're closing if the connection is still up,
+    // then close the relay conn from this thread. coop_net_stop() now defers
+    // the relay_close so this DISCONNECT frame can actually go out.
     if (ctx->relay_conn) {
         SDL_LockMutex(ctx->relay_send_mutex);
         relay_send_frame(ctx->relay_conn, COOP_MSG_DISCONNECT, nullptr, 0);
         SDL_UnlockMutex(ctx->relay_send_mutex);
+        relay_close(ctx->relay_conn);
+        ctx->relay_conn = nullptr;
     }
     for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
         ctx->clients[i].active = false;
@@ -2490,16 +2557,23 @@ void coop_net_stop(CoopNetContext *ctx) {
         close_socket(&ctx->client_fd);
     }
 
-    // On the relay path: closing the TLS connection wakes the read loop in the
-    // host/receiver relay thread. Done unconditionally; threads check the conn
-    // pointer before each operation.
+    // On the relay path: do NOT close the TLS connection from here. The
+    // relay threads now drive read timeouts (see relay_set_read_timeout)
+    // so they wake within ~1s of should_stop being set, send a final
+    // DISCONNECT frame (with disconnect_reason if any), then close the
+    // conn themselves. Closing here would race the DISCONNECT send and
+    // leave the receiver's slot lingering on the host. Mirrors the
+    // direct-path disconnect_reason flow for client_fd above.
+
+    SDL_WaitThread(ctx->thread, nullptr);
+    ctx->thread = nullptr;
+
+    // Fallback: if a relay thread exited before reaching its cleanup block
+    // (e.g. failed during join phase), close the conn here to avoid leaking.
     if (ctx->relay_conn) {
         relay_close(ctx->relay_conn);
         ctx->relay_conn = nullptr;
     }
-
-    SDL_WaitThread(ctx->thread, nullptr);
-    ctx->thread = nullptr;
 
     // Clean up any remaining client sockets (should already be closed by thread)
     for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
@@ -2831,8 +2905,17 @@ bool coop_net_get_legacy_stats_upload(CoopNetContext *ctx,
 bool coop_net_send_custom_goal_mod(CoopNetContext *ctx, const CoopCustomGoalModMsg *msg) {
     if (!ctx || !msg) return false;
     if (coop_net_get_state(ctx) != COOP_NET_CONNECTED) return false;
-    if (ctx->client_fd == COOP_INVALID_SOCKET) return false;
 
+    if (coop_net_is_relay(ctx)) {
+        if (!ctx->relay_conn) return false;
+        SDL_LockMutex(ctx->relay_send_mutex);
+        bool ok = relay_send_frame(ctx->relay_conn, COOP_MSG_CUSTOM_GOAL_MOD,
+                                   msg, (uint32_t) sizeof(CoopCustomGoalModMsg));
+        SDL_UnlockMutex(ctx->relay_send_mutex);
+        return ok;
+    }
+
+    if (ctx->client_fd == COOP_INVALID_SOCKET) return false;
     return send_message(ctx->client_fd, COOP_MSG_CUSTOM_GOAL_MOD,
                         msg, (uint32_t) sizeof(CoopCustomGoalModMsg));
 }

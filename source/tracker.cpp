@@ -775,6 +775,18 @@ static bool tracker_view_editable_by_self(const Tracker *t, const AppSettings *s
            strcmp(view_uuid, settings->local_player.uuid) == 0;
 }
 
+// True only when the player dropdown is on the local player's specific UUID
+// (not All-Players, not singleplayer). HOST_ONLY policies must yield to this:
+// each player can always edit their own per-UUID view.
+static bool tracker_view_is_own_uuid(const Tracker *t, const AppSettings *settings) {
+    if (!t || !settings) return false;
+    if (settings->network_mode == NETWORK_SINGLEPLAYER) return false;
+    const char *view_uuid = tracker_current_view_uuid(t, settings);
+    if (!view_uuid) return false;
+    return settings->local_player.uuid[0] != '\0' &&
+           strcmp(view_uuid, settings->local_player.uuid) == 0;
+}
+
 /**
  * @brief (Era 1: 1.0-1.6.4) Parses legacy .dat stats files.
  *
@@ -6278,8 +6290,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             }
 
                             bool view_editable_self = tracker_view_editable_by_self(t, settings);
+                            bool viewing_own_uuid = tracker_view_is_own_uuid(t, settings);
+                            // HOST_ONLY blocks receivers except on their own per-UUID view.
                             bool rcv_host_only_stat = (settings->network_mode == NETWORK_RECEIVER &&
-                                                       settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY);
+                                                       settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY &&
+                                                       !viewing_own_uuid);
                             // Co-op: Show tooltip for host-only stat checkboxes and/or cross-player view
                             if (is_hovered && (rcv_host_only_stat || !view_editable_self)) {
                                 char tooltip_buf[224];
@@ -6306,11 +6321,12 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                 bool rcv_in_lobby = (settings->network_mode == NETWORK_RECEIVER &&
                                                      g_coop_ctx && coop_net_get_state(g_coop_ctx) ==
                                                      COOP_NET_CONNECTED);
-                                if (rcv_in_lobby &&
-                                    settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY) {
-                                    // Host-only mode: clicking disabled for receivers
-                                } else if (rcv_in_lobby &&
-                                           settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_ANY_PLAYER) {
+                                bool rcv_can_send = rcv_in_lobby &&
+                                                    (settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_ANY_PLAYER ||
+                                                     viewing_own_uuid);
+                                if (rcv_in_lobby && !rcv_can_send) {
+                                    // Host-only mode + not viewing own UUID: clicking disabled for receivers
+                                } else if (rcv_can_send) {
                                     // Any-player mode: send toggle request to host
                                     CoopCustomGoalModMsg mod = {};
                                     snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", crit->root_name);
@@ -6569,8 +6585,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     }
 
                     bool view_editable_self_p = tracker_view_editable_by_self(t, settings);
+                    bool viewing_own_uuid_p = tracker_view_is_own_uuid(t, settings);
                     bool rcv_host_only_stat_p = (settings->network_mode == NETWORK_RECEIVER &&
-                                                 settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY);
+                                                 settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY &&
+                                                 !viewing_own_uuid_p);
                     // Co-op: Show tooltip for host-only stat checkboxes and/or cross-player view
                     if (is_hovered_parent && (rcv_host_only_stat_p || !view_editable_self_p)) {
                         char tooltip_buf[224];
@@ -6596,12 +6614,13 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         is_visual_layout_editing && view_editable_self_p) {
                         bool rcv_in_lobby = (settings->network_mode == NETWORK_RECEIVER &&
                                              g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
-                        if (rcv_in_lobby &&
-                            settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_HOST_ONLY) {
-                            // Host-only mode: clicking disabled for receivers
-                        } else if (rcv_in_lobby &&
-                                   settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_ANY_PLAYER) {
-                            // Any-player mode: send toggle request to host (parent stat)
+                        bool rcv_can_send_p = rcv_in_lobby &&
+                                              (settings->coop_stat_checkbox == COOP_STAT_CHECKBOX_ANY_PLAYER ||
+                                               viewing_own_uuid_p);
+                        if (rcv_in_lobby && !rcv_can_send_p) {
+                            // Host-only mode + not viewing own UUID: clicking disabled for receivers
+                        } else if (rcv_can_send_p) {
+                            // Any-player mode (or self-view under host-only): send toggle request to host (parent stat)
                             CoopCustomGoalModMsg mod = {};
                             snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", cat->root_name);
                             mod.parent_root_name[0] = '\0';
@@ -7607,8 +7626,10 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 bool rcv_in_lobby = (settings->network_mode == NETWORK_RECEIVER &&
                                      g_coop_ctx && coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED);
                 bool view_editable_self_cg = tracker_view_editable_by_self(t, settings);
+                bool viewing_own_uuid_cg = tracker_view_is_own_uuid(t, settings);
                 bool rcv_host_only_cg = (settings->network_mode == NETWORK_RECEIVER &&
-                                         settings->coop_custom_goal_mode == COOP_CUSTOM_HOST_ONLY);
+                                         settings->coop_custom_goal_mode == COOP_CUSTOM_HOST_ONLY &&
+                                         !viewing_own_uuid_cg);
                 if (is_hovered && (rcv_host_only_cg || !view_editable_self_cg)) {
                     char tooltip_buf[224];
                     if (rcv_host_only_cg && !view_editable_self_cg) {
@@ -7631,12 +7652,13 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
 
                 if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !t->is_visual_layout_editing &&
                     view_editable_self_cg) {
-                    if (rcv_in_lobby &&
-                        settings->coop_custom_goal_mode == COOP_CUSTOM_HOST_ONLY) {
-                        // Host-only mode: clicking disabled for receivers
-                    } else if (rcv_in_lobby &&
-                               settings->coop_custom_goal_mode == COOP_CUSTOM_ANY_PLAYER) {
-                        // Any-player mode: send toggle request to host
+                    bool rcv_can_send_cg = rcv_in_lobby &&
+                                           (settings->coop_custom_goal_mode == COOP_CUSTOM_ANY_PLAYER ||
+                                            viewing_own_uuid_cg);
+                    if (rcv_in_lobby && !rcv_can_send_cg) {
+                        // Host-only mode + not viewing own UUID: clicking disabled for receivers
+                    } else if (rcv_can_send_cg) {
+                        // Any-player mode (or self-view under host-only): send toggle request to host
                         CoopCustomGoalModMsg mod = {};
                         snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", item->root_name);
                         mod.parent_root_name[0] = '\0';

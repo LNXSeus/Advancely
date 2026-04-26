@@ -125,7 +125,10 @@ RelayConn *relay_connect(char *out_err, size_t err_size) {
     rc = mbedtls_ssl_set_hostname(&c->ssl, RELAY_HOST);
     if (rc) { write_err(out_err, err_size, "set_hostname", rc); relay_close(c); return nullptr; }
 
-    mbedtls_ssl_set_bio(&c->ssl, &c->net, mbedtls_net_send, mbedtls_net_recv, nullptr);
+    // Provide f_recv_timeout so relay_set_read_timeout can drive timed reads
+    // post-handshake. mbedtls_net_recv_timeout uses select() under the hood.
+    mbedtls_ssl_set_bio(&c->ssl, &c->net, mbedtls_net_send, mbedtls_net_recv,
+                        mbedtls_net_recv_timeout);
 
     while ((rc = mbedtls_ssl_handshake(&c->ssl)) != 0) {
         if (rc != MBEDTLS_ERR_SSL_WANT_READ && rc != MBEDTLS_ERR_SSL_WANT_WRITE) {
@@ -212,8 +215,13 @@ static bool ssl_write_all(mbedtls_ssl_context *ssl, const void *data, size_t len
     return true;
 }
 
-static bool ssl_read_exact(mbedtls_ssl_context *ssl, void *buf, size_t len) {
+// Returns 1 on full read, 0 on timeout (only meaningful if read_timeout is
+// configured AND zero bytes had been read so far for the current call), -1
+// on connection error. A timeout that occurs mid-buffer is treated as an
+// error since we can't preserve partial frame state across calls.
+static int ssl_read_exact(mbedtls_ssl_context *ssl, void *buf, size_t len) {
     unsigned char *p = (unsigned char *) buf;
+    size_t total = len;
     while (len > 0) {
         int n = mbedtls_ssl_read(ssl, p, len);
         if (n > 0) {
@@ -226,6 +234,12 @@ static bool ssl_read_exact(mbedtls_ssl_context *ssl, void *buf, size_t len) {
         // message before any application data. mbedTLS surfaces that to the
         // app; we just want to retry the read.
         if (n == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET) continue;
+        if (n == MBEDTLS_ERR_SSL_TIMEOUT) {
+            // Only surface as timeout when nothing was consumed yet; otherwise
+            // we'd lose mid-frame bytes by retrying from scratch later.
+            if (len == total) return 0;
+            continue;
+        }
         char rcbuf[128] = "?";
         if (n == 0) {
             snprintf(rcbuf, sizeof(rcbuf), "EOF");
@@ -233,9 +247,9 @@ static bool ssl_read_exact(mbedtls_ssl_context *ssl, void *buf, size_t len) {
             mbedtls_strerror(n, rcbuf, sizeof(rcbuf));
         }
         fprintf(stderr, "[Relay] ssl_read: %s (n=%d)\n", rcbuf, n);
-        return false;
+        return -1;
     }
-    return true;
+    return 1;
 }
 
 bool relay_send_frame(RelayConn *c, uint32_t type, const void *payload, uint32_t payload_len) {
@@ -250,32 +264,47 @@ bool relay_send_frame(RelayConn *c, uint32_t type, const void *payload, uint32_t
     return true;
 }
 
-bool relay_recv_frame(RelayConn *c, uint32_t *out_type, void **out_payload,
-                      uint32_t *out_len, uint32_t max_payload) {
-    if (!c || !out_type || !out_payload || !out_len) return false;
+int relay_recv_frame_timed(RelayConn *c, uint32_t *out_type, void **out_payload,
+                           uint32_t *out_len, uint32_t max_payload) {
+    if (!c || !out_type || !out_payload || !out_len) return -1;
     *out_payload = nullptr;
     *out_len = 0;
     // Default cap matches relay/frame.go's maxFrameSize.
     if (max_payload == 0) max_payload = 4 * 1024 * 1024;
 
     unsigned char hdr[8];
-    if (!ssl_read_exact(&c->ssl, hdr, 8)) return false;
+    int rc = ssl_read_exact(&c->ssl, hdr, 8);
+    if (rc <= 0) return rc;
     uint32_t type = get_be32(hdr);
     uint32_t length = get_be32(hdr + 4);
-    if (length > max_payload) return false;
+    if (length > max_payload) return -1;
 
     if (length > 0) {
         void *buf = malloc(length);
-        if (!buf) return false;
-        if (!ssl_read_exact(&c->ssl, buf, length)) {
+        if (!buf) return -1;
+        // Header is fully consumed; mid-frame timeouts are fatal here (treated
+        // as -1 by ssl_read_exact since len != total on the second call).
+        rc = ssl_read_exact(&c->ssl, buf, length);
+        if (rc <= 0) {
             free(buf);
-            return false;
+            return rc < 0 ? -1 : -1;
         }
         *out_payload = buf;
         *out_len = length;
     }
     *out_type = type;
-    return true;
+    return 1;
+}
+
+bool relay_recv_frame(RelayConn *c, uint32_t *out_type, void **out_payload,
+                      uint32_t *out_len, uint32_t max_payload) {
+    int rc = relay_recv_frame_timed(c, out_type, out_payload, out_len, max_payload);
+    return rc == 1;
+}
+
+void relay_set_read_timeout(RelayConn *c, uint32_t ms) {
+    if (!c) return;
+    mbedtls_ssl_conf_read_timeout(&c->conf, ms);
 }
 
 // ---- Password hashing ----

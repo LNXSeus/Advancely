@@ -259,6 +259,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
     static char coop_room_code_error[256] = "";
     static bool coop_ip_revealed = false;
     static bool coop_public_ip_revealed = false;
+    static bool coop_relay_password_host_revealed = false;
+    static bool coop_relay_password_recv_revealed = false;
     // Relay session inputs (intentionally NOT persisted to settings.json).
     static char coop_relay_password_host[128] = "";
     static char coop_relay_room_code_recv[16] = "";
@@ -412,6 +414,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         // Reset co-op tab transient state
         coop_ip_revealed = false;
         coop_public_ip_revealed = false;
+        coop_relay_password_host_revealed = false;
+        coop_relay_password_recv_revealed = false;
         coop_identity_status_msg[0] = '\0';
         coop_identity_status_is_error = false;
         coop_room_code_error[0] = '\0';
@@ -448,6 +452,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
         coop_identity_status_is_error = false;
         coop_ip_revealed = false;
         coop_public_ip_revealed = false;
+        coop_relay_password_host_revealed = false;
+        coop_relay_password_recv_revealed = false;
         coop_room_code_error[0] = '\0';
     }
 
@@ -3044,10 +3050,13 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             // assigned by the relay on Start Lobby and displayed below.
                             if (net_is_active) ImGui::BeginDisabled();
                             ImGui::SetNextItemWidth(200.0f);
+                            ImGuiInputTextFlags relay_host_pw_flags = coop_relay_password_host_revealed
+                                                                          ? 0
+                                                                          : ImGuiInputTextFlags_Password;
                             ImGui::InputTextWithHint("Room Password##relay_host", "(optional)",
                                                      coop_relay_password_host,
                                                      sizeof(coop_relay_password_host),
-                                                     ImGuiInputTextFlags_Password);
+                                                     relay_host_pw_flags);
                             if (net_is_active) ImGui::EndDisabled();
                             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                                 char tt[320];
@@ -3055,6 +3064,35 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                          "Optional password for the room.\n"
                                          "Hashed locally before being sent to the relay.\n"
                                          "Leave empty to allow anyone with the room code in.");
+                                ImGui::SetTooltip("%s", tt);
+                            }
+                            // Reveal/Hide button — same warning popup pattern as Reveal IP.
+                            ImGui::SameLine();
+                            if (coop_relay_password_host_revealed) {
+                                if (ImGui::SmallButton("Hide##relay_host_pw")) {
+                                    coop_relay_password_host_revealed = false;
+                                }
+                            } else {
+                                if (ImGui::SmallButton("Reveal##relay_host_pw")) {
+                                    ImGui::OpenPopup("Reveal Password?##coop_relay_host");
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tt[256];
+                                    snprintf(tt, sizeof(tt),
+                                             "Show the password in plain text.\n"
+                                             "WARNING: Do not reveal this while streaming or screen sharing.");
+                                    ImGui::SetTooltip("%s", tt);
+                                }
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::SmallButton("Copy##relay_host_pw")) {
+                                SDL_SetClipboardText(coop_relay_password_host);
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tt[256];
+                                snprintf(tt, sizeof(tt),
+                                         "Copy the password to your clipboard.\n"
+                                         "Share it privately with players joining your room.");
                                 ImGui::SetTooltip("%s", tt);
                             }
                         }
@@ -3352,15 +3390,45 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                 }
 
                                 ImGui::SetNextItemWidth(200.0f);
+                                ImGuiInputTextFlags relay_recv_pw_flags = coop_relay_password_recv_revealed
+                                                                              ? 0
+                                                                              : ImGuiInputTextFlags_Password;
                                 ImGui::InputTextWithHint("Password##relay_recv", "(if required)",
                                                          coop_relay_password_recv,
                                                          sizeof(coop_relay_password_recv),
-                                                         ImGuiInputTextFlags_Password);
+                                                         relay_recv_pw_flags);
                                 if (ImGui::IsItemHovered()) {
                                     char tt[256];
                                     snprintf(tt, sizeof(tt),
                                              "Password set by the host (if any).\n"
                                              "Hashed locally before sending to the relay.");
+                                    ImGui::SetTooltip("%s", tt);
+                                }
+                                ImGui::SameLine();
+                                if (coop_relay_password_recv_revealed) {
+                                    if (ImGui::SmallButton("Hide##relay_recv_pw")) {
+                                        coop_relay_password_recv_revealed = false;
+                                    }
+                                } else {
+                                    if (ImGui::SmallButton("Reveal##relay_recv_pw")) {
+                                        ImGui::OpenPopup("Reveal Password?##coop_relay_recv");
+                                    }
+                                    if (ImGui::IsItemHovered()) {
+                                        char tt[256];
+                                        snprintf(tt, sizeof(tt),
+                                                 "Show the password in plain text.\n"
+                                                 "WARNING: Do not reveal this while streaming or screen sharing.");
+                                        ImGui::SetTooltip("%s", tt);
+                                    }
+                                }
+                                ImGui::SameLine();
+                                if (ImGui::SmallButton("Copy##relay_recv_pw")) {
+                                    SDL_SetClipboardText(coop_relay_password_recv);
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tt[256];
+                                    snprintf(tt, sizeof(tt),
+                                             "Copy the password to your clipboard.");
                                     ImGui::SetTooltip("%s", tt);
                                 }
 
@@ -3539,6 +3607,31 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                         ImGui::Spacing();
 
+                        // Prominent room code (relay sessions only). Both host and
+                        // receiver see the code they're using so it's easy to share
+                        // again or confirm the right room.
+                        if (g_coop_ctx && coop_net_is_relay(g_coop_ctx)) {
+                            char active_room_code[16] = "";
+                            coop_net_get_room_code(g_coop_ctx, active_room_code, sizeof(active_room_code));
+                            if (active_room_code[0] != '\0') {
+                                ImGui::TextDisabled("Room Code:");
+                                ImGui::SameLine();
+                                ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f),
+                                                   "%s", active_room_code);
+                                ImGui::SameLine();
+                                if (ImGui::SmallButton("Copy##active_room_code")) {
+                                    SDL_SetClipboardText(active_room_code);
+                                }
+                                if (ImGui::IsItemHovered()) {
+                                    char tt[160];
+                                    snprintf(tt, sizeof(tt),
+                                             "Copy the room code to your clipboard.");
+                                    ImGui::SetTooltip("%s", tt);
+                                }
+                                ImGui::Spacing();
+                            }
+                        }
+
                         // Player list
                         CoopLobbyPlayer lobby[COOP_MAX_LOBBY];
                         int lobby_count = coop_net_get_lobby_players(g_coop_ctx, lobby, COOP_MAX_LOBBY);
@@ -3625,6 +3718,44 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                  "Keep the IP address hidden.\n"
                                  "You can also press 'ESCAPE'.");
                         ImGui::SetTooltip("%s", tooltip_buf);
+                    }
+
+                    ImGui::EndPopup();
+                }
+            }
+
+            // --- Reveal Relay Password Confirmation Popups ---
+            for (int relay_pw_idx = 0; relay_pw_idx < 2; ++relay_pw_idx) {
+                const char *popup_id   = relay_pw_idx == 0
+                                             ? "Reveal Password?##coop_relay_host"
+                                             : "Reveal Password?##coop_relay_recv";
+                bool *revealed_ptr     = relay_pw_idx == 0
+                                             ? &coop_relay_password_host_revealed
+                                             : &coop_relay_password_recv_revealed;
+
+                ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+                ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+                if (ImGui::BeginPopupModal(popup_id, nullptr,
+                                           ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+                    ImGui::Text("Are you sure you want to reveal the room password?");
+                    ImGui::Spacing();
+                    ImGui::TextDisabled("Make sure you are not streaming or screen sharing.");
+                    ImGui::Spacing();
+                    ImGui::Separator();
+                    ImGui::Spacing();
+
+                    bool enter_pressed = ImGui::IsKeyPressed(ImGuiKey_Enter) ||
+                                         ImGui::IsKeyPressed(ImGuiKey_KeypadEnter);
+                    if (ImGui::Button("Reveal") || enter_pressed) {
+                        *revealed_ptr = true;
+                        ImGui::CloseCurrentPopup();
+                    }
+
+                    ImGui::SameLine();
+                    bool esc_pressed = ImGui::IsKeyPressed(ImGuiKey_Escape);
+                    if (ImGui::Button("Cancel") || esc_pressed) {
+                        ImGui::CloseCurrentPopup();
                     }
 
                     ImGui::EndPopup();

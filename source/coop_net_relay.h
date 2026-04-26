@@ -77,6 +77,18 @@ RelayConn *relay_connect(char *out_err, size_t err_size);
 
 void relay_close(RelayConn *conn);
 
+// Set the per-read timeout in milliseconds (0 disables, blocking forever).
+// Backed by mbedtls_ssl_conf_read_timeout. After this, relay_recv_frame may
+// return false with the connection still healthy on timeout; use
+// relay_recv_frame_timed to distinguish.
+void relay_set_read_timeout(RelayConn *c, uint32_t ms);
+
+// Tri-state recv: returns 1 on success (frame received, *out_payload owned by
+// caller), 0 on timeout (no frame; conn still usable; out_type/out_len untouched),
+// -1 on connection error. Same payload semantics as relay_recv_frame.
+int relay_recv_frame_timed(RelayConn *c, uint32_t *out_type, void **out_payload,
+                           uint32_t *out_len, uint32_t max_payload);
+
 // Send a framed message over the TLS connection. Same wire format as
 // coop_net.cpp's send_message: [type BE 4B][length BE 4B][payload]. Retries
 // MBEDTLS_ERR_SSL_WANT_READ/WANT_WRITE internally. Returns false on
