@@ -1403,6 +1403,7 @@ maintainers or advanced users who want to override default behaviors.
 | `--version`              | Prints the current version of Advancely to the console and exits.                                                                                                                    |
 | `--overlay`              | Launches the application in "Overlay Mode". **Note:** This is primarily used internally by the main process to spawn the overlay window.                                             |
 | `--test-mode`            | Enables test mode for debugging and development purposes. This is mainly used by the github action runners to assure functionality and forcing termination after 5 seconds.          |
+| `--relay-test`           | Performs a one-shot TLS handshake + cert-pin check against the configured Advancely relay server, prints the result, and exits. Useful for verifying relay connectivity from a host. |
 | `--updated`              | **Internal Flag:** Signals to the application that it has just been updated, triggering the release notes popup.                                                                     |
 
 </details>

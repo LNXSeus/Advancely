@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026 LNXSeus. All Rights Reserved.
+#
+# This project is proprietary software. You are granted a license to use the software as-is.
+# You may not copy, distribute, modify, reverse-engineer, maintain a fork, or use this software
+# or its source code in any way without the express written permission of the copyright holder.
+#
 # Generate the self-signed cert the relay server uses.
 #
 # The Advancely client pins the SHA-256 fingerprint of this cert.
