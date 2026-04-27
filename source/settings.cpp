@@ -3353,21 +3353,6 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                             ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f)
                                             : ImVec4(1.0f, 0.6f, 0.4f, 1.0f);
                             ImGui::TextColored(sc, "%s", status_buf);
-
-                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.6f, 1.0f, 1.0f));
-                            ImGui::Text("(Co-op Chapter - Connection Error Codes at the end)");
-                            ImGui::PopStyleColor();
-                            if (ImGui::IsItemHovered()) {
-                                char coop_err_tooltip_buf[512];
-                                snprintf(coop_err_tooltip_buf, sizeof(coop_err_tooltip_buf),
-                                         "Opens the Co-op Multiplayer chapter in your browser.\n"
-                                         "Expand the chapter and scroll to the bottom for the\n"
-                                         "'Connection Error Codes' table to look up the status above.");
-                                ImGui::SetTooltip("%s", coop_err_tooltip_buf);
-                            }
-                            if (ImGui::IsItemClicked()) {
-                                open_content("https://github.com/LNXSeus/Advancely#co-op-multiplayer");
-                            }
                         }
                     }
 
@@ -3547,21 +3532,6 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                 ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f)
                                                 : ImVec4(1.0f, 0.6f, 0.4f, 1.0f);
                                 ImGui::TextColored(sc, "%s", status_buf);
-
-                                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.6f, 1.0f, 1.0f));
-                                ImGui::Text("(Co-op Chapter - Connection Error Codes at the end)");
-                                ImGui::PopStyleColor();
-                                if (ImGui::IsItemHovered()) {
-                                    char coop_err_tooltip_buf[512];
-                                    snprintf(coop_err_tooltip_buf, sizeof(coop_err_tooltip_buf),
-                                             "Opens the Co-op Multiplayer chapter in your browser.\n"
-                                             "Expand the chapter and scroll to the bottom for the\n"
-                                             "'Connection Error Codes' table to look up the status above.");
-                                    ImGui::SetTooltip("%s", coop_err_tooltip_buf);
-                                }
-                                if (ImGui::IsItemClicked()) {
-                                    open_content("https://github.com/LNXSeus/Advancely#co-op-multiplayer");
-                                }
                             }
                         }
                     }
@@ -4439,6 +4409,21 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                  "supporter showcase after a completed run and receive a\n"
                  "special role on discord!");
         ImGui::SetTooltip("%s", tooltip_buffer);
+    }
+
+    ImGui::SameLine();
+
+    if (ImGui::Button("Report Issue")) {
+        open_content("https://discord.gg/TyNgXDz");
+    }
+    if (ImGui::IsItemHovered()) {
+        char report_tooltip[512];
+        snprintf(report_tooltip, sizeof(report_tooltip),
+                 "Opens the official Advancely Discord.\n\n"
+                 "There's a channel dedicated to the Advancely tracker where\n"
+                 "issues, feedback, and criticism are welcome. It's the most\n"
+                 "direct way to be in touch with LNXS.");
+        ImGui::SetTooltip("%s", report_tooltip);
     }
 
     if (roboto_font) {
