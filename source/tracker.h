@@ -498,6 +498,62 @@ void tracker_apply_coop_mods(Tracker *t, const AppSettings *settings,
                              const CoopCustomGoalModMsg *mods, int mod_count);
 
 /**
+ * @brief Optimistically mutate the on-screen merged view (template_data) for a
+ * single mod, without touching settings.json. Used on receivers to give
+ * instant click/hotkey feedback before the host's broadcast comes back —
+ * the receiver renders from network snapshots, so writing to local
+ * settings.json (as tracker_apply_coop_mods does) doesn't change anything
+ * visible. The host's eventual snapshot will overwrite this with the
+ * authoritative state.
+ */
+void tracker_apply_mod_to_view(Tracker *t, const CoopCustomGoalModMsg *mod);
+
+/**
+ * @brief Receiver-side: register a goal as having a pending in-flight mod.
+ *
+ * After tracker_apply_mod_to_view, the receiver's optimistic state survives
+ * only until the next host snapshot arrives (especially under Hermes activity
+ * where snapshots are frequent). Until the host has actually processed the
+ * mod and echoed it back, that snapshot reflects the *pre-mod* state, which
+ * would visually revert the click.
+ *
+ * Calling this registers (parent_root, goal_root) as "skip me in merges" for
+ * `ttl_ms` milliseconds. merge_coop_progress consults this list and leaves
+ * matching items untouched. On the next snapshot after expiry, the host's
+ * authoritative state wins.
+ */
+void tracker_pending_mod_register(const char *parent_root, const char *goal_root,
+                                  uint32_t ttl_ms);
+
+/**
+ * @brief Receiver-side: should merge_coop_progress skip writing this item?
+ *
+ * Returns true if (parent_root, goal_root) has an unexpired pending mod.
+ * `parent_root` may be empty for top-level items (custom goals, top-level stat
+ * checkboxes); pass "" not nullptr.
+ */
+bool tracker_pending_mod_should_skip(const char *parent_root, const char *goal_root);
+
+/**
+ * @brief Host-side: enqueue host's own click/hotkey mod for batched persistence.
+ *
+ * Replaces direct tracker_apply_coop_mods calls in click sites — those rewrite
+ * the entire settings.json on the UI thread, so spamming a counter stalls
+ * frames. Instead, this just appends to an in-memory queue (cheap), and
+ * main.cpp's existing receiver-mod batching path drains it alongside receiver
+ * mods every 150ms.
+ *
+ * Caller must still call tracker_apply_mod_to_view for instant UI feedback,
+ * since this function deliberately does not touch template_data.
+ */
+void tracker_queue_host_mod(const CoopCustomGoalModMsg *mod);
+
+/**
+ * @brief Host-side: drain queued host mods into `out`. Returns count drained.
+ */
+int tracker_drain_host_mods(CoopCustomGoalModMsg *out, int max_mods);
+
+/**
  * @brief Recalculates overall progress percentage from current in-memory state.
  *
  * Called after a Hermes fast-path update so the overlay sees an up-to-date

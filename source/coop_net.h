@@ -22,6 +22,11 @@
 extern "C" {
 #endif
 
+// Forward decl: defined in coop_net_relay.h. We only need a pointer here so
+// CoopNetContext can carry the relay connection without dragging mbedTLS into
+// every translation unit that includes coop_net.h.
+typedef struct RelayConn RelayConn;
+
 // ---- Connection States ----
 
 enum CoopNetState {
@@ -46,7 +51,9 @@ enum CoopMsgType {
     COOP_MSG_JOIN_ACCEPT = 7, // Host -> Receiver: JSON lobby player list
     COOP_MSG_JOIN_REJECT = 8, // Host -> Receiver: reason string, then close
     COOP_MSG_PLAYER_LIST = 9, // Host -> All receivers: JSON player list on any change
-    COOP_MSG_KICK = 10, // Host -> Receiver: reason string, then close
+    COOP_MSG_KICK = 10, // Host -> All Receivers: JSON {target_uuid, reason}.
+                        //   Receivers self-filter on target_uuid (relay broadcasts;
+                        //   direct also uses this format for consistency).
     COOP_MSG_CUSTOM_GOAL_MOD = 11, // Receiver -> Host: custom goal/stat checkbox modification
     COOP_MSG_PLAYER_STATES = 12, // Host -> All receivers: per-player progress snapshots
     // Receiver -> Host: raw stats file upload for legacy (<=1.6.4) merging ONLY.
@@ -119,6 +126,7 @@ typedef struct {
     char uuid[48]; // From handshake
     char display_name[64]; // From handshake
     Uint32 connect_time; // When the socket was accepted (for handshake timeout)
+    Uint32 last_seen_ms;          // SDL_GetTicks of the most recent inbound frame (relay path)
     SDL_AtomicInt pending_action; // CoopClientAction: set by UI thread, processed by host thread
     char pending_action_reason[128]; // Reason string for kick/reject
 } CoopClient;
@@ -145,6 +153,7 @@ typedef struct {
     char host_username[64];
     char host_uuid[48];
     char host_display_name[64];
+    bool auto_accept; // Host: approve incoming join requests without UI prompt
 
     // -- Receiver fields --
     coop_socket_t client_fd; // Connection to host (COOP_INVALID_SOCKET when unused)
@@ -223,6 +232,16 @@ typedef struct {
 
     // -- Disconnect reason (receiver sets before stopping, sent in the thread's cleanup path) --
     char disconnect_reason[128]; // Non-empty = include as payload in DISCONNECT message
+
+    // -- Relay transport (NULL on direct path) --
+    // 0 = direct (LAN/VPN), 1 = relay (TLS to advancely-relay). Mirrors
+    // AppSettings::coop_transport (RELAY=0, DIRECT=1) — the values diverge so the
+    // context uses its own scheme. Always check via coop_net_is_relay(ctx).
+    int transport;
+    RelayConn *relay_conn;
+    SDL_Mutex *relay_send_mutex; // Serializes writes; multiple threads broadcast on the same TLS conn.
+    char relay_room_code[8];     // Set after CREATE_ROOM/JOIN_ROOM; 6 chars + NUL + slack.
+    char relay_password_hash[65]; // SHA-256 hex; sent in CREATE_ROOM (host) or JOIN_ROOM (receiver).
 } CoopNetContext;
 
 // ---- Public API ----
@@ -234,12 +253,38 @@ bool coop_net_init(CoopNetContext *ctx);
 void coop_net_shutdown(CoopNetContext *ctx);
 
 // Start hosting with the host's identity. Spawns the host thread.
+// If auto_accept is true, join requests are approved immediately without
+// populating the pending-approval queue or showing an approval UI.
 bool coop_net_start_host(CoopNetContext *ctx, const char *ip, int port,
-                         const char *username, const char *uuid, const char *display_name);
+                         const char *username, const char *uuid, const char *display_name,
+                         bool auto_accept);
 
 // Connect to a host with the receiver's identity. Spawns the receiver thread.
 bool coop_net_start_receiver(CoopNetContext *ctx, const char *ip, int port,
                              const char *username, const char *uuid, const char *display_name);
+
+// Relay variants. Connect to the Advancely relay server over TLS, do the
+// CREATE_ROOM / JOIN_ROOM control handshake, then run a transport-specific
+// thread that handles the same COOP_MSG_* protocol over the TLS connection.
+//
+// Auto-accept is implicit on the relay path (the relay password is the gate);
+// the auto_accept context flag is forced true regardless of the user setting.
+//
+// On host start, the 6-char room code is written into ctx->relay_room_code so
+// the UI can display it. password_plain may be empty / NULL for an open room.
+bool coop_net_start_host_relay(CoopNetContext *ctx, const char *mc_version,
+                               const char *password_plain,
+                               const char *username, const char *uuid, const char *display_name);
+
+bool coop_net_start_receiver_relay(CoopNetContext *ctx, const char *room_code,
+                                   const char *password_plain,
+                                   const char *username, const char *uuid, const char *display_name);
+
+// Returns true if the active session is using the relay transport.
+bool coop_net_is_relay(CoopNetContext *ctx);
+
+// Copy the active room code (relay path only). Out is empty on direct or idle.
+void coop_net_get_room_code(CoopNetContext *ctx, char *out, size_t out_size);
 
 // Gracefully stop the current session (host or receiver). Blocks until the thread exits.
 void coop_net_stop(CoopNetContext *ctx);

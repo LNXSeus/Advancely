@@ -38,6 +38,14 @@ enum NetworkMode {
     NETWORK_RECEIVER // Receiver: connects to host, receives co-op state
 };
 
+// Co-op transport: where do host/receiver actually connect?
+// RELAY (default) routes through the Advancely relay server. DIRECT means a
+// raw TCP socket on the LAN/VPN like the original implementation.
+enum CoopTransport {
+    COOP_TRANSPORT_RELAY,
+    COOP_TRANSPORT_DIRECT
+};
+
 // Co-op merge settings (per goal type)
 enum CoopStatMerge {
     COOP_STAT_HIGHEST, // Use whichever player has the highest stat value
@@ -123,7 +131,9 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 
 // Co-op Defaults
 #define DEFAULT_COOP_ENABLED false
+#define DEFAULT_COOP_AUTO_ACCEPT false
 #define DEFAULT_NETWORK_MODE NETWORK_SINGLEPLAYER
+#define DEFAULT_COOP_TRANSPORT COOP_TRANSPORT_RELAY
 #define DEFAULT_COOP_STAT_MERGE COOP_STAT_HIGHEST
 #define DEFAULT_COOP_STAT_CHECKBOX COOP_STAT_CHECKBOX_ANY_PLAYER
 #define DEFAULT_COOP_CUSTOM_GOAL_MODE COOP_CUSTOM_ANY_PLAYER
@@ -352,7 +362,9 @@ struct AppSettings {
 
     // --- Co-op Settings ---
     bool coop_enabled; // Master toggle for co-op mode
+    bool coop_auto_accept; // Host: auto-approve incoming join requests without showing an approval prompt
     NetworkMode network_mode; // Runtime state: Singleplayer, Host, or Receiver (set programmatically)
+    CoopTransport coop_transport; // RELAY (default, via relay server) or DIRECT (LAN/VPN)
     CoopStatMerge coop_stat_merge; // How to merge stat values: highest or cumulative
     CoopStatCheckbox coop_stat_checkbox; // Who can check off stats: host only or any player
     CoopCustomGoalMode coop_custom_goal_mode; // Who can modify custom goals: host only or any player

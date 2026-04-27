@@ -60,6 +60,7 @@ extern "C" {
 #include "logger.h"
 #include "update_checker.h" // For update checker
 #include "coop_net.h" // For co-op networking
+#include "coop_net_relay.h" // For the --relay-test smoke test
 #include "template_scanner.h" // For compute_template_goal_hash
 
 // ImGUI imports
@@ -413,12 +414,18 @@ bool merge_coop_progress(const char *buffer, TemplateData *target) {
             log_message(LOG_ERROR, "[COOP] Merge skipped: criteria count mismatch for stat %d.\n", i);
             return false;
         }
-        dst->done = in_cat.done;
-        dst->is_manually_completed = in_cat.is_manually_completed;
-        dst->all_template_criteria_met = in_cat.all_template_criteria_met;
-        dst->done_in_snapshot = in_cat.done_in_snapshot;
-        dst->progress = in_cat.progress;
-        dst->completed_criteria_count = in_cat.completed_criteria_count;
+        // Skip the top-level stat checkbox if the receiver has an in-flight
+        // toggle for it — otherwise the host's pre-mod snapshot would briefly
+        // revert the user's click before the host's echo arrives.
+        bool skip_top = tracker_pending_mod_should_skip("", dst->root_name);
+        if (!skip_top) {
+            dst->done = in_cat.done;
+            dst->is_manually_completed = in_cat.is_manually_completed;
+            dst->all_template_criteria_met = in_cat.all_template_criteria_met;
+            dst->done_in_snapshot = in_cat.done_in_snapshot;
+            dst->progress = in_cat.progress;
+            dst->completed_criteria_count = in_cat.completed_criteria_count;
+        }
 
         for (int j = 0; j < in_cat.criteria_count; j++) {
             TrackableItem in_item;
@@ -426,6 +433,8 @@ bool merge_coop_progress(const char *buffer, TemplateData *target) {
             head += sizeof(TrackableItem);
             TrackableItem *dst_item = dst->criteria ? dst->criteria[j] : nullptr;
             if (!dst_item) continue;
+            // Skip per-criterion if a pending mod targets it under this stat.
+            if (tracker_pending_mod_should_skip(dst->root_name, dst_item->root_name)) continue;
             dst_item->done = in_item.done;
             dst_item->progress = in_item.progress;
             dst_item->initial_progress = in_item.initial_progress;
@@ -473,6 +482,8 @@ bool merge_coop_progress(const char *buffer, TemplateData *target) {
         head += sizeof(TrackableItem);
         TrackableItem *dst_item = target->custom_goals[i];
         if (!dst_item) continue;
+        // Skip if the receiver has an in-flight click/increment on this goal.
+        if (tracker_pending_mod_should_skip("", dst_item->root_name)) continue;
         dst_item->done = in_item.done;
         dst_item->progress = in_item.progress;
         dst_item->initial_progress = in_item.initial_progress;
@@ -979,6 +990,10 @@ int main(int argc, char *argv[]) {
             // Prints version string
             printf("Advancely version: %s\n", ADVANCELY_VERSION);
             return 0; // Exit Advancely
+        } else if (strcmp(argv[i], "--relay-test") == 0) {
+            // Self-contained TLS+pinning smoke test against the configured relay.
+            // Used while standing up the relay transport; harmless to keep around.
+            return relay_smoke_test() ? 0 : 1;
         } else if (strcmp(argv[i], "--test-mode") == 0) {
             is_test_mode = true;
         } else if (strcmp(argv[i], "--updated") == 0) {
@@ -2616,7 +2631,13 @@ int main(int argc, char *argv[]) {
                                 tracker->time_since_last_update =
                                         tracker->template_data->host_time_since_last_update;
                             }
-                            SDL_SetAtomicInt(&g_needs_update, 1);
+                            // Lightweight broadcast (recalculates % + IPC writes overlay
+                            // header). Was g_needs_update, but on receiver_connected the
+                            // heavy path skips file I/O yet still runs broadcast/merge
+                            // bookkeeping the receiver doesn't need. At the host's 7Hz
+                            // STATE_UPDATE cadence the heavy path was costing frame budget
+                            // even with file ops skipped.
+                            SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
                             SDL_SetAtomicInt(&g_game_data_changed, 1);
                             rcv_last_applied_player_idx = sel;
                             tracker->coop_recv_resync_needed = 0;
@@ -2719,35 +2740,83 @@ int main(int argc, char *argv[]) {
                 static int pending_rcv_mod_count = 0;
                 static Uint64 rcv_mod_batch_deadline_ms = 0;
 
-                bool host_has_clients = (app_settings.network_mode == NETWORK_HOST && g_coop_ctx &&
-                                         coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
-                                         coop_net_get_client_count(g_coop_ctx) > 0 && tracker->template_data);
+                bool host_listening = (app_settings.network_mode == NETWORK_HOST && g_coop_ctx &&
+                                       coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
+                                       tracker->template_data);
 
-                if (host_has_clients) {
+                if (host_listening) {
+                    // Drain inbound (from receivers) + outbound (host's own clicks/hotkeys)
+                    // and batch them together. Both paths now feed this loop instead of
+                    // calling tracker_apply_coop_mods directly per-event, which used to
+                    // stall the UI thread on per-click settings.json rewrites.
                     CoopCustomGoalModMsg drained[COOP_MAX_CUSTOM_MODS];
                     int drained_count = coop_net_drain_custom_mods(g_coop_ctx, drained, COOP_MAX_CUSTOM_MODS);
                     for (int mi = 0; mi < drained_count; mi++) {
                         if (pending_rcv_mod_count < (int)(sizeof(pending_rcv_mods) / sizeof(pending_rcv_mods[0])))
                             pending_rcv_mods[pending_rcv_mod_count++] = drained[mi];
                     }
-                    if (drained_count > 0 && rcv_mod_batch_deadline_ms == 0)
+                    CoopCustomGoalModMsg host_drained[COOP_MAX_CUSTOM_MODS];
+                    int host_drained_count = tracker_drain_host_mods(host_drained, COOP_MAX_CUSTOM_MODS);
+                    for (int mi = 0; mi < host_drained_count; mi++) {
+                        if (pending_rcv_mod_count < (int)(sizeof(pending_rcv_mods) / sizeof(pending_rcv_mods[0])))
+                            pending_rcv_mods[pending_rcv_mod_count++] = host_drained[mi];
+                    }
+                    if ((drained_count > 0 || host_drained_count > 0) && rcv_mod_batch_deadline_ms == 0)
                         rcv_mod_batch_deadline_ms = SDL_GetTicks() + 150;
 
                     Uint64 now_ms = SDL_GetTicks();
                     if (pending_rcv_mod_count > 0 && rcv_mod_batch_deadline_ms > 0 &&
                         now_ms >= rcv_mod_batch_deadline_ms) {
                         tracker_apply_coop_mods(tracker, &app_settings, pending_rcv_mods, pending_rcv_mod_count);
-                        log_message(LOG_INFO, "[COOP] Applied %d batched custom goal modification(s) from receiver(s).\n",
+
+                        // Apply each receiver-originated mod to the host's merged view too,
+                        // so the host's "All Players" dropdown shows the change immediately
+                        // without waiting for a heavy g_needs_update re-read. Host's own
+                        // mods were already applied at click time via tracker_apply_mod_to_view,
+                        // so we'd double-apply if we processed those again — skip them.
+                        // Per-player view (selected_coop_player_idx >= 0) shows that one
+                        // player's data; foreign receivers' mods don't belong in it.
+                        bool host_viewing_merged =
+                            (tracker->selected_coop_player_idx < 0);
+                        if (host_viewing_merged) {
+                            for (int mi = 0; mi < pending_rcv_mod_count; mi++) {
+                                const CoopCustomGoalModMsg *m = &pending_rcv_mods[mi];
+                                if (strcmp(m->source_uuid, app_settings.local_player.uuid) == 0)
+                                    continue;
+                                tracker_apply_mod_to_view(tracker, m);
+                            }
+                        }
+
+                        // Recalculate aggregates so the % bar reflects the new state.
+                        tracker_recalculate_progress(tracker, &app_settings);
+
+                        // Invalidate the cached merged snapshot so the lightweight
+                        // broadcast falls back to a fresh serialization of the
+                        // just-mutated template_data. Without this the broadcast
+                        // would send the pre-mod cached bytes.
+                        free(tracker->coop_merged_snapshot);
+                        tracker->coop_merged_snapshot = nullptr;
+                        tracker->coop_merged_snapshot_size = 0;
+
+                        log_message(LOG_INFO, "[COOP] Applied %d batched custom goal modification(s).\n",
                                     pending_rcv_mod_count);
                         pending_rcv_mod_count = 0;
                         rcv_mod_batch_deadline_ms = 0;
-                        SDL_SetAtomicInt(&g_needs_update, 1);
+                        // Lightweight broadcast (NOT g_needs_update). The heavy path
+                        // re-reads settings.json AND every game file from disk + does
+                        // the full per-player merge — way too expensive to run at the
+                        // 7Hz cadence of clicks. dmon will still trigger heavy updates
+                        // for actual game-data changes.
+                        SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
                     }
                 } else {
-                    // Lobby ended or no clients; discard any mods that accumulated
-                    // before the lobby dropped so they don't apply to a future session.
+                    // Lobby ended; discard any mods that accumulated before the lobby
+                    // dropped so they don't apply to a future session.
                     pending_rcv_mod_count = 0;
                     rcv_mod_batch_deadline_ms = 0;
+                    // Also drop any host mods that were queued but never flushed.
+                    CoopCustomGoalModMsg sink[COOP_MAX_CUSTOM_MODS];
+                    while (tracker_drain_host_mods(sink, COOP_MAX_CUSTOM_MODS) > 0) {}
                 }
             }
 

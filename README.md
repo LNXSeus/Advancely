@@ -924,8 +924,10 @@ templates._
 | **Co-op**               |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Account                 | Identifies you to the lobby. Pick `Online` (enter your Minecraft username and click `Fetch UUID` to pull your real Mojang UUID via the public Mojang API) or `Offline` (enter username + UUID manually for cracked/TLauncher/LAN setups). Optional `Display Name` is shown in the Player Dropdown. Stored under `"account"` in `settings.json`. Duplicate usernames within the same lobby are rejected.                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | Network Mode            | Toggle between `Singleplayer` (co-op disabled), `Host` (run a lobby), or `Receiver` (join someone else's lobby). Defaults to `Singleplayer`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Create a Lobby (Host)   | `IP Address` sets the local bind address; `Port` defaults to `12345`; optional `Public IP` is embedded in the generated room code (use with port forwarding to advertise your public IP while binding locally). `Start Lobby` begins listening; `Copy Room Code` produces a shareable encoded string; the `Waiting Room` lets you `Accept`/`Decline` each incoming join request before the player appears in the roster.                                                                                                                                                                                                                                                                                                                                                                                                             |
-| Join a Lobby (Receiver) | `Paste Room Code` decodes the Host's shared code and sends a join request. While connected, the Receiver's tracker skips local save-file reads and mirrors the Host's broadcasts directly. Disconnect at any time with the `Disconnect` button.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Transport               | `Host locally (LAN / VPN)` checkbox. **Off (default):** routes through the official Advancely **relay server** (TLS, hosted in New York). No port forwarding, no VPN, just a 6-character room code + optional password. **On:** classic LAN / VPN hosting where the Host binds a local port and Receivers connect by IP. Persisted under `coop.transport` in `settings.json` (`"relay"` / `"direct"`). The setting is locked while a lobby is active — disconnect first to switch.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Create a Lobby (Host)   | **Relay path:** click `Start Lobby` to ask the relay for a fresh 6-char room code; optionally set a `Password` (hashed client-side before send). Share `Room Code: ABC123 - Password: 12345` with the `Copy Room Code` button. **Direct path:** `IP Address` sets the local bind address; `Port` defaults to `12345`; optional `Public IP` is embedded in the room code (port forwarding case). `Start Lobby` begins listening. The `Waiting Room` (direct path only) lets you `Accept`/`Decline` each incoming join request; the relay path always auto-accepts because the password is the gate.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Auto-accept join requests | **Direct (LAN / VPN) path only.** Checkbox in the Host section. **On:** every join request that passes the template/version check is auto-accepted, the Waiting Room is bypassed. **Off (default for direct):** join requests appear in the Waiting Room and require manual `Accept`. The relay path is always auto-accept (the password is the gate) and the checkbox is force-disabled there.                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Join a Lobby (Receiver) | **Relay path:** type the host's 6-char room code, enter the password if set, click `Join`. **Direct path:** `Paste Room Code` decodes the Host's shared code and sends a join request. While connected, the Receiver's tracker skips local save-file reads and mirrors the Host's broadcasts. Disconnect at any time with the `Disconnect` button.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Goal Merging Rules      | `Stat Merge Mode` (`Highest` or `Cumulative`) controls how stats combine in the All Players view. `Stat Completion` (`Any Player` or `Host Only`) decides whose stat counts toward the auto-checkbox completion. `Custom Goal Mode` (`Any Player` or `Host Only`) does the same for manual/custom goals. Advancements/achievements/recipes always merge with `OR` (any player); `25w14craftmine` unlocks always merge with `AND` (every player must have it). See [Goal Merging Rules](#goal-merging-rules) for the full breakdown.                                                                                                                                                                                                                                                                                                  |
 | Player Dropdown         | Available on both the Host and every Receiver while a lobby is active. Switches between the merged `All Players` view and each individual player's view. Checkboxes and custom goals in an individual view edit only that player's state; in the All Players view they route per the merge-mode settings. See [The Player Dropdown](#the-player-dropdown).                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | **Hotkeys**             |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -951,6 +953,16 @@ progress. One player runs the tracker as the **Host**; everyone else runs it as 
 everyone's save files into one view and broadcasts the result back to each Receiver, so every player (and their
 stream) sees identical numbers in real time.
 
+**Default transport (relay):** Out of the box, Advancely connects through the official **Advancely relay server**
+(TLS, hosted in New York). The Host gets a fresh 6-character room code from the relay and shares that code (plus an
+optional password) with each Receiver. **No port forwarding, no VPN, no firewall rules required.** The relay only
+forwards encrypted bytes, thus never sees your save files or progress; that data is exchanged end-to-end between Host
+and Receivers.
+
+**Offline / direct hosting (opt-in):** If you'd rather not use the relay (e.g. everyone is already on the same LAN
+or VPN), tick `Host locally (LAN / VPN)` in the **Co-op** tab. This switches to classic IP+port hosting with the
+Waiting Room flow. See [Networking Options](#networking-options-lan-zerotierhamachi-port-forwarding).
+
 The entire co-op UI lives in the **Co-op** tab of the Settings window (`ESC`).
 
 <details>
@@ -967,7 +979,6 @@ The entire co-op UI lives in the **Co-op** tab of the Settings window (`ESC`).
  - [Template Matching](#template-matching)
  - [Goal Merging Rules](#goal-merging-rules)
  - [The Player Dropdown](#the-player-dropdown)
- - [Connection Error Codes](#connection-error-codes)
 
 ### How Co-op Works
 
@@ -1207,28 +1218,6 @@ behaves consistently across the Host and every Receiver:
   the first time *that* player reaches 100%. Switching the dropdown may forget the frozen state if the latch
   for the new view hasn't been populated yet (by design - this is a lightweight per-view cache, not persistent).
 
-### Connection Error Codes
-
-If the Host or Receiver can't connect (or disconnects unexpectedly), the Co-op tab shows a colored error status
-line. The error text already includes a friendly hint, but the underlying socket error code is sometimes more
-specific. That code is then found in the `advanely_log.txt` file (you might have to enable the debug print).
-Advancely translates the most common codes as follows:
-
-| Code (Windows / POSIX)            | Meaning & what to check                                                                          |
-|:----------------------------------|:-------------------------------------------------------------------------------------------------|
-| `10060` / `ETIMEDOUT`             | Connection timed out. The Host's firewall is likely blocking the port (or the IP/port is wrong). |
-| `10061` / `ECONNREFUSED`          | Connection refused. The Host isn't listening, the port is wrong, or the Host hasn't started yet. |
-| `10065` / `EHOSTUNREACH`          | Host unreachable. Check your network/VPN (ZeroTier/Hamachi up? correct network joined?).         |
-| `10051` / `ENETUNREACH`           | Network unreachable. Your machine has no route to the target network.                            |
-| `10064` / `EHOSTDOWN`             | Host is down - the target machine is offline.                                                    |
-| `10048` / `EADDRINUSE`            | Port already in use. Another process (or a previous Advancely instance) is holding the port.     |
-| `10049` / `EADDRNOTAVAIL`         | The IP address you entered isn't available on this machine. Re-check the bind IP.                |
-
-_Codes starting with `10xxx` are Windows Sockets (WSA); the POSIX column covers Linux and macOS._ Any other code
-is shown as `Connection failed (error N).` - search the number online (`WSA <code>` on Windows, `errno <code>` on
-POSIX) for details. If connection errors persist, the in-app error status links straight back to this section of
-the README.
-
 </details>
 
 ***
@@ -1403,6 +1392,7 @@ maintainers or advanced users who want to override default behaviors.
 | `--version`              | Prints the current version of Advancely to the console and exits.                                                                                                                    |
 | `--overlay`              | Launches the application in "Overlay Mode". **Note:** This is primarily used internally by the main process to spawn the overlay window.                                             |
 | `--test-mode`            | Enables test mode for debugging and development purposes. This is mainly used by the github action runners to assure functionality and forcing termination after 5 seconds.          |
+| `--relay-test`           | Performs a one-shot TLS handshake + cert-pin check against the configured Advancely relay server, prints the result, and exits. Useful for verifying relay connectivity from a host. |
 | `--updated`              | **Internal Flag:** Signals to the application that it has just been updated, triggering the release notes popup.                                                                     |
 
 </details>
@@ -1485,6 +1475,7 @@ and [cJSON](https://github.com/DaveGamble/cJSON).
 *This project uses the [miniz](https://github.com/mongoose-os-libs/miniz) compression library to unzip the downloaded
 files.*
 *This project uses [tiny file dialogs](https://sourceforge.net/projects/tinyfiledialogs) to open file dialogs.*
+*This project uses [Mbed TLS](https://github.com/Mbed-TLS/mbedtls) (Apache-2.0) for the encrypted co-op relay transport.*
 *More information can be found in the LICENSES.txt file.*
 
 *Lots of assistance was provided by Gemini Pro and Claude.*

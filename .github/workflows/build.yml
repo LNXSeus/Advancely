@@ -12,7 +12,7 @@ name: Build and Package
 # This workflow runs on pushes and pull requests to the main branches.
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, 'coop-*' ]
   pull_request:
     branches: [ main, master ]
 
@@ -59,7 +59,7 @@ jobs:
         run: |
           sudo apt-get update
           # Added 'rpm' here so CPack can generate Fedora packages
-          sudo apt-get install -y build-essential cmake git libcurl4-openssl-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libwayland-dev libdecor-0-dev libxkbcommon-dev libfreetype6-dev libharfbuzz-dev libasound2-dev libxtst-dev rpm
+          sudo apt-get install -y build-essential cmake git libcurl4-openssl-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libwayland-dev libdecor-0-dev libxkbcommon-dev libfreetype6-dev libharfbuzz-dev libasound2-dev libxtst-dev rpm perl python3-jsonschema python3-jinja2
           git clone https://github.com/libsdl-org/SDL.git -b main && cd SDL && cmake -B build && cmake --build build && sudo cmake --install build && cd ..
           git clone https://github.com/libsdl-org/SDL_image.git -b main && cd SDL_image && cmake -B build && cmake --build build && sudo cmake --install build && cd ..
           git clone https://github.com/libsdl-org/SDL_ttf.git -b main && cd SDL_ttf && cmake -B build && cmake --build build && sudo cmake --install build && cd ..
@@ -142,6 +142,8 @@ jobs:
         run: |
           arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           /usr/local/bin/brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
+          # mbedTLS codegen needs these Python modules
+          python3 -m pip install --break-system-packages jsonschema jinja2
       - name: Configure CMake (macOS)
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="/usr/local" -DCMAKE_OSX_DEPLOYMENT_TARGET="13.0" -DCMAKE_OSX_ARCHITECTURES="x86_64"
       - name: Build Project
@@ -213,7 +215,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Install dependencies (macOS)
-        run: brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
+        run: |
+          brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
+          # mbedTLS codegen needs these Python modules
+          python3 -m pip install --break-system-packages jsonschema jinja2
       - name: Configure CMake (macOS)
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$(brew --prefix) -DCMAKE_OSX_DEPLOYMENT_TARGET="13.0"
       - name: Build Project
@@ -285,7 +290,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Install dependencies (macOS)
-        run: brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
+        run: |
+          brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
+          # mbedTLS codegen needs these Python modules
+          python3 -m pip install --break-system-packages jsonschema jinja2
       - name: Configure CMake to get version
         run: cmake -B build -DCMAKE_PREFIX_PATH=$(brew --prefix)
       - name: Download Intel build
@@ -366,7 +374,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Install dependencies (macOS)
-        run: brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
+        run: |
+          brew install sdl3 sdl3_image sdl3_ttf curl jpeg-xl webp
+          # mbedTLS codegen needs these Python modules
+          python3 -m pip install --break-system-packages jsonschema jinja2
       - name: Configure CMake to get version
         run: cmake -B build -DCMAKE_PREFIX_PATH=$(brew --prefix)
       - name: Download Universal macOS Artifact

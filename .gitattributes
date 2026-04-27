@@ -2,3 +2,9 @@
 *.gif binary
 readme_assets/ export-ignore
 LICENSE export-ignore
+
+# Force LF for shell/perl/python scripts so they run on Linux/macOS CI even if
+# edited on Windows. Mbed TLS codegen invokes these at build time.
+*.sh   text eol=lf
+*.pl   text eol=lf
+*.py   text eol=lf

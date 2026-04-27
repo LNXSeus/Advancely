@@ -10,3 +10,12 @@ build/
 .claude/
 CLAUDE.md
 
+# Python bytecode (mbedtls build scripts generate these)
+__pycache__/
+*.pyc
+
+# Relay cert/key. cert.pem is public but regenerated per rotation (no need
+# to track). key.pem is the private key and MUST NEVER be committed.
+relay/cert.pem
+relay/key.pem
+
