@@ -2702,16 +2702,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 } else {
                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                              "Enable cooperative multiplayer tracking.\n"
-                             "Requires all players to be on the same local network.\n"
-                             "Use ZeroTier (zerotier.com) to create a virtual LAN.");
+                             "Defaults to the Advancely relay server (no port forwarding required).\n"
+                             "Toggle 'Host locally (LAN / VPN)' below to opt into direct hosting instead.");
                 }
                 ImGui::SetTooltip("%s", tooltip_buf);
             }
-            if (temp_settings.coop_enabled) {
-                ImGui::TextDisabled("Co-op requires all players to be on the same local network.\n"
-                    "Use ZeroTier (zerotier.com) to create a virtual LAN.");
-            }
-
             // If co-op was just unchecked while networking is active, stop it
             if (!temp_settings.coop_enabled && net_is_active && g_coop_ctx) {
                 coop_net_stop(g_coop_ctx);
