@@ -16,6 +16,20 @@
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
 
   <releases>
+    <release version="1.4.0" date="2026-04-28">
+      <description>
+        <ul>
+          <li>Co-op multiplayer: full Host/Receiver model with lobbies via relay server or directly through LAN. Coop supports EVERY minecraft version including legacy.</li>
+          <li>Co-op relay server: new official Advancely relay (TLS + cert pinning, hosted in New York) is now the default transport; no port forwarding or VPN required, just a 6-character room code and optional password.</li>
+          <li>Active Lobbies browser to discover open public rooms.</li>
+          <li>New timer formatting options: unit spacing (02 m 04 s 500 ms) and always-show-milliseconds.</li>
+          <li>Supporters list shown on every settings tab, sorted by donation amount.</li>
+          <li>Updated 1.16 all_advancements_categorical template.</li>
+          <li>Various fixes: browser links no longer open twice on Windows, "Run Completed" text respects the active view, moving windows no longer triggers a full file reload.</li>
+          <li>New '--relay-test' CLI flag for a one-shot TLS + cert-pin connectivity check.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.3.1" date="2026-04-01">
       <description>
         <ul>
