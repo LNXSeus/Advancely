@@ -319,7 +319,7 @@ Three packages are available on the AUR — pick whichever suits you:
 |-------------------------------------------------------------------|--------------------------------------------------------------|
 | [advancely](https://aur.archlinux.org/packages/advancely)         | Compiles from the latest release                             |
 | [advancely-bin](https://aur.archlinux.org/packages/advancely-bin) | Precompiled binary from the latest release (fastest install) |
-| [advancely-git](https://aur.archlinux.org/packages/advancely-git) | Compiles from the latest commit                              |
+| [advancely-git](https://aur.archlinux.org/packages/advancely-git) | Compiles from the latest commit _(might be outdated)_        |
 
 Use your favorite AUR helper, e.g.:
 
