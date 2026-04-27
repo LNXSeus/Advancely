@@ -2631,7 +2631,13 @@ int main(int argc, char *argv[]) {
                                 tracker->time_since_last_update =
                                         tracker->template_data->host_time_since_last_update;
                             }
-                            SDL_SetAtomicInt(&g_needs_update, 1);
+                            // Lightweight broadcast (recalculates % + IPC writes overlay
+                            // header). Was g_needs_update, but on receiver_connected the
+                            // heavy path skips file I/O yet still runs broadcast/merge
+                            // bookkeeping the receiver doesn't need. At the host's 7Hz
+                            // STATE_UPDATE cadence the heavy path was costing frame budget
+                            // even with file ops skipped.
+                            SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
                             SDL_SetAtomicInt(&g_game_data_changed, 1);
                             rcv_last_applied_player_idx = sel;
                             tracker->coop_recv_resync_needed = 0;
@@ -2762,11 +2768,46 @@ int main(int argc, char *argv[]) {
                     if (pending_rcv_mod_count > 0 && rcv_mod_batch_deadline_ms > 0 &&
                         now_ms >= rcv_mod_batch_deadline_ms) {
                         tracker_apply_coop_mods(tracker, &app_settings, pending_rcv_mods, pending_rcv_mod_count);
+
+                        // Apply each receiver-originated mod to the host's merged view too,
+                        // so the host's "All Players" dropdown shows the change immediately
+                        // without waiting for a heavy g_needs_update re-read. Host's own
+                        // mods were already applied at click time via tracker_apply_mod_to_view,
+                        // so we'd double-apply if we processed those again — skip them.
+                        // Per-player view (selected_coop_player_idx >= 0) shows that one
+                        // player's data; foreign receivers' mods don't belong in it.
+                        bool host_viewing_merged =
+                            (tracker->selected_coop_player_idx < 0);
+                        if (host_viewing_merged) {
+                            for (int mi = 0; mi < pending_rcv_mod_count; mi++) {
+                                const CoopCustomGoalModMsg *m = &pending_rcv_mods[mi];
+                                if (strcmp(m->source_uuid, app_settings.local_player.uuid) == 0)
+                                    continue;
+                                tracker_apply_mod_to_view(tracker, m);
+                            }
+                        }
+
+                        // Recalculate aggregates so the % bar reflects the new state.
+                        tracker_recalculate_progress(tracker, &app_settings);
+
+                        // Invalidate the cached merged snapshot so the lightweight
+                        // broadcast falls back to a fresh serialization of the
+                        // just-mutated template_data. Without this the broadcast
+                        // would send the pre-mod cached bytes.
+                        free(tracker->coop_merged_snapshot);
+                        tracker->coop_merged_snapshot = nullptr;
+                        tracker->coop_merged_snapshot_size = 0;
+
                         log_message(LOG_INFO, "[COOP] Applied %d batched custom goal modification(s).\n",
                                     pending_rcv_mod_count);
                         pending_rcv_mod_count = 0;
                         rcv_mod_batch_deadline_ms = 0;
-                        SDL_SetAtomicInt(&g_needs_update, 1);
+                        // Lightweight broadcast (NOT g_needs_update). The heavy path
+                        // re-reads settings.json AND every game file from disk + does
+                        // the full per-player merge — way too expensive to run at the
+                        // 7Hz cadence of clicks. dmon will still trigger heavy updates
+                        // for actual game-data changes.
+                        SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);
                     }
                 } else {
                     // Lobby ended; discard any mods that accumulated before the lobby
