@@ -1446,7 +1446,7 @@ Massive thanks to all people involved in improving and shaping Advancely:
 * **[ScrambledMC](https://www.youtube.com/@scrambledmc3772)**: Made the fantastic `_categorical` `all_advancements` template for 1.16.
 * **[3emis](https://www.twitch.tv/3emis)**: Made the 1.11 `all_achievements` template and optimized the 1.12 and 1.13 `all_advancements` templates. Helped testing coop on Windows.
 * **[Ercha](https://www.twitch.tv/ErchamionMC)**: Made the `_ssg_blackcat` `all_advancements` template for 1.16.
-* **Jaykeycakey**: Windows coop tester.
+* **Jaykeycakey** (`jaykeycakey_` on Discord): Windows coop tester.
 * **[Lune](https://www.twitch.tv/lunemcsr)**: Fantastic Linux coop tester.
 * **[Duncan](https://linktr.ee/DuncanRuns)**: Creator of the `Hermes` mod and important coop tester.
 
