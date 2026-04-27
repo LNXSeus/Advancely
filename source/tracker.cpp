@@ -4676,6 +4676,87 @@ void tracker_apply_coop_mods(Tracker *t, const AppSettings *settings,
     cJSON_Delete(root);
 }
 
+void tracker_apply_mod_to_view(Tracker *t, const CoopCustomGoalModMsg *mod) {
+    if (!t || !t->template_data || !mod) return;
+    TemplateData *td = t->template_data;
+
+    if (mod->parent_root_name[0] != '\0') {
+        // Stat criterion
+        for (int i = 0; i < td->stat_count; i++) {
+            TrackableCategory *cat = td->stats[i];
+            if (!cat || strcmp(cat->root_name, mod->parent_root_name) != 0) continue;
+            for (int j = 0; j < cat->criteria_count; j++) {
+                TrackableItem *crit = cat->criteria[j];
+                if (!crit || strcmp(crit->root_name, mod->goal_root_name) != 0) continue;
+                if (mod->action == COOP_MOD_TOGGLE) {
+                    crit->is_manually_completed = !crit->is_manually_completed;
+                    bool nat = (crit->goal > 0 && crit->progress >= crit->goal);
+                    crit->done = crit->is_manually_completed || nat;
+                    cat->completed_criteria_count = 0;
+                    for (int k = 0; k < cat->criteria_count; k++) {
+                        if (cat->criteria[k]->done) cat->completed_criteria_count++;
+                    }
+                    bool all_done = (cat->criteria_count > 0 &&
+                                     cat->completed_criteria_count >= cat->criteria_count);
+                    cat->done = cat->is_manually_completed || all_done;
+                }
+                return;
+            }
+            return;
+        }
+        return;
+    }
+
+    // No parent: custom goal first, then top-level stat checkbox.
+    for (int i = 0; i < td->custom_goal_count; i++) {
+        TrackableItem *it = td->custom_goals[i];
+        if (!it || strcmp(it->root_name, mod->goal_root_name) != 0) continue;
+        switch (mod->action) {
+            case COOP_MOD_TOGGLE:
+                it->is_manually_completed = !it->is_manually_completed;
+                if (it->is_manually_completed) {
+                    it->done = true;
+                } else {
+                    it->done = (it->goal > 0 && it->progress >= it->goal);
+                }
+                if (it->goal == 0 || it->goal == 1) it->progress = it->done ? 1 : 0;
+                break;
+            case COOP_MOD_INCREMENT:
+                it->progress++;
+                if (it->goal > 0) it->done = (it->progress >= it->goal);
+                break;
+            case COOP_MOD_DECREMENT:
+                it->progress--;
+                if (it->goal > 0) it->done = (it->progress >= it->goal);
+                break;
+            default:
+                break;
+        }
+        return;
+    }
+
+    for (int i = 0; i < td->stat_count; i++) {
+        TrackableCategory *cat = td->stats[i];
+        if (!cat || strcmp(cat->root_name, mod->goal_root_name) != 0) continue;
+        if (mod->action == COOP_MOD_TOGGLE) {
+            cat->is_manually_completed = !cat->is_manually_completed;
+            for (int j = 0; j < cat->criteria_count; j++) {
+                TrackableItem *crit = cat->criteria[j];
+                bool nat = (crit->goal > 0 && crit->progress >= crit->goal);
+                crit->done = cat->is_manually_completed || crit->is_manually_completed || nat;
+            }
+            cat->completed_criteria_count = 0;
+            for (int k = 0; k < cat->criteria_count; k++) {
+                if (cat->criteria[k]->done) cat->completed_criteria_count++;
+            }
+            bool all_done = (cat->criteria_count > 0 &&
+                             cat->completed_criteria_count >= cat->criteria_count);
+            cat->done = cat->is_manually_completed || all_done;
+        }
+        return;
+    }
+}
+
 // UNUSED
 void tracker_render(Tracker *t, const AppSettings *settings) {
     (void) t;
@@ -6335,10 +6416,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                     snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s",
                                              settings->local_player.uuid);
                                     coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
-                                    // Optimistic local apply so the receiver sees instant feedback
-                                    // without waiting for the full host round-trip.
-                                    tracker_apply_coop_mods(t, settings, &mod, 1);
-                                    SDL_SetAtomicInt(&g_needs_update, 1);
+                                    // Optimistic in-memory mutation: receivers render from
+                                    // host snapshots, so we have to update template_data
+                                    // directly to get instant feedback. Host's broadcast
+                                    // will overwrite this with the authoritative state.
+                                    tracker_apply_mod_to_view(t, &mod);
                                 } else if (settings->network_mode == NETWORK_HOST &&
                                            g_coop_ctx &&
                                            coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING) {
@@ -6627,8 +6709,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             mod.action = COOP_MOD_TOGGLE;
                             snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", settings->local_player.uuid);
                             coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
-                            tracker_apply_coop_mods(t, settings, &mod, 1);
-                            SDL_SetAtomicInt(&g_needs_update, 1);
+                            tracker_apply_mod_to_view(t, &mod);
                         } else if (settings->network_mode == NETWORK_HOST &&
                                    g_coop_ctx &&
                                    coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING) {
@@ -7665,8 +7746,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                         mod.action = COOP_MOD_TOGGLE;
                         snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", settings->local_player.uuid);
                         coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
-                        tracker_apply_coop_mods(t, settings, &mod, 1);
-                        SDL_SetAtomicInt(&g_needs_update, 1);
+                        tracker_apply_mod_to_view(t, &mod);
                     } else if (settings->network_mode == NETWORK_HOST &&
                                g_coop_ctx &&
                                coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING) {

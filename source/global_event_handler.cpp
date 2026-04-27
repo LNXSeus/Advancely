@@ -129,6 +129,8 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                                 snprintf(mod.source_uuid, sizeof(mod.source_uuid),
                                          "%s", app_settings->local_player.uuid);
                                 coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
+                                // Optimistic in-memory mutation for instant feedback.
+                                tracker_apply_mod_to_view(t, &mod);
                             } else {
                                 bool host_in_lobby = (app_settings->network_mode == NETWORK_HOST &&
                                                       g_coop_ctx &&

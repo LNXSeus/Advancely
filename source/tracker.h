@@ -498,6 +498,17 @@ void tracker_apply_coop_mods(Tracker *t, const AppSettings *settings,
                              const CoopCustomGoalModMsg *mods, int mod_count);
 
 /**
+ * @brief Optimistically mutate the on-screen merged view (template_data) for a
+ * single mod, without touching settings.json. Used on receivers to give
+ * instant click/hotkey feedback before the host's broadcast comes back —
+ * the receiver renders from network snapshots, so writing to local
+ * settings.json (as tracker_apply_coop_mods does) doesn't change anything
+ * visible. The host's eventual snapshot will overwrite this with the
+ * authoritative state.
+ */
+void tracker_apply_mod_to_view(Tracker *t, const CoopCustomGoalModMsg *mod);
+
+/**
  * @brief Recalculates overall progress percentage from current in-memory state.
  *
  * Called after a Hermes fast-path update so the overlay sees an up-to-date

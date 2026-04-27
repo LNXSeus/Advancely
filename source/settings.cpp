@@ -3306,18 +3306,40 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             }
                             if (!can_start) ImGui::EndDisabled();
                         }
-                        // Copy Room Code button (shown next to Start Lobby when hosting)
+                        // Copy Room Code button (shown next to Start Lobby when hosting).
+                        // On relay we include the room password (if set) in the
+                        // copied text so it's a single shareable line.
                         if (net_state == COOP_NET_LISTENING && coop_room_code_buf[0] != '\0') {
                             ImGui::SameLine();
                             if (ImGui::Button("Copy Room Code")) {
-                                SDL_SetClipboardText(coop_room_code_buf);
+                                if (!transport_direct && coop_relay_password_host[0] != '\0') {
+                                    char clipbuf[256];
+                                    snprintf(clipbuf, sizeof(clipbuf),
+                                             "Room Code: %s - Password: %s",
+                                             coop_room_code_buf, coop_relay_password_host);
+                                    SDL_SetClipboardText(clipbuf);
+                                } else if (!transport_direct) {
+                                    char clipbuf[128];
+                                    snprintf(clipbuf, sizeof(clipbuf),
+                                             "Room Code: %s - No Password",
+                                             coop_room_code_buf);
+                                    SDL_SetClipboardText(clipbuf);
+                                } else {
+                                    SDL_SetClipboardText(coop_room_code_buf);
+                                }
                             }
                             if (ImGui::IsItemHovered()) {
                                 char tooltip_buf[512];
-                                snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                         "Copy the room code to your clipboard.\n"
-                                         "Share this code privately with players on the same VPN/LAN.\n"
-                                         "They can paste it in the Receiver tab to send a join request.");
+                                if (!transport_direct) {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Copy the room code (and password if set) to your clipboard.\n"
+                                             "Share the line privately with players joining your room.");
+                                } else {
+                                    snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                             "Copy the room code to your clipboard.\n"
+                                             "Share this code privately with players on the same VPN/LAN.\n"
+                                             "They can paste it in the Receiver tab to send a join request.");
+                                }
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
                         }
@@ -3607,37 +3629,25 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
 
                         ImGui::Spacing();
 
-                        // Prominent room code (relay sessions only). Both host and
-                        // receiver see the code they're using so it's easy to share
-                        // again or confirm the right room.
-                        if (g_coop_ctx && coop_net_is_relay(g_coop_ctx)) {
-                            char active_room_code[16] = "";
-                            coop_net_get_room_code(g_coop_ctx, active_room_code, sizeof(active_room_code));
-                            if (active_room_code[0] != '\0') {
-                                ImGui::TextDisabled("Room Code:");
-                                ImGui::SameLine();
-                                ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f),
-                                                   "%s", active_room_code);
-                                ImGui::SameLine();
-                                if (ImGui::SmallButton("Copy##active_room_code")) {
-                                    SDL_SetClipboardText(active_room_code);
-                                }
-                                if (ImGui::IsItemHovered()) {
-                                    char tt[160];
-                                    snprintf(tt, sizeof(tt),
-                                             "Copy the room code to your clipboard.");
-                                    ImGui::SetTooltip("%s", tt);
-                                }
-                                ImGui::Spacing();
-                            }
-                        }
-
-                        // Player list
+                        // Player list. Header inlines the relay room code (when on
+                        // relay) so it's visible at a glance: "ABC123 - Players (1/32)".
                         CoopLobbyPlayer lobby[COOP_MAX_LOBBY];
                         int lobby_count = coop_net_get_lobby_players(g_coop_ctx, lobby, COOP_MAX_LOBBY);
 
-                        char player_header[64];
-                        snprintf(player_header, sizeof(player_header), "Players (%d/%d)", lobby_count, COOP_MAX_LOBBY);
+                        char active_room_code[16] = "";
+                        if (g_coop_ctx && coop_net_is_relay(g_coop_ctx)) {
+                            coop_net_get_room_code(g_coop_ctx, active_room_code, sizeof(active_room_code));
+                        }
+
+                        char player_header[96];
+                        if (active_room_code[0] != '\0') {
+                            snprintf(player_header, sizeof(player_header),
+                                     "%s - Players (%d/%d)",
+                                     active_room_code, lobby_count, COOP_MAX_LOBBY);
+                        } else {
+                            snprintf(player_header, sizeof(player_header),
+                                     "Players (%d/%d)", lobby_count, COOP_MAX_LOBBY);
+                        }
                         ImGui::Text("%s", player_header);
                         ImGui::Spacing();
 

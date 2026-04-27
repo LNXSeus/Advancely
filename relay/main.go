@@ -94,7 +94,7 @@ func handleConn(conn net.Conn, rooms *RoomTable) {
 			return
 		}
 		if room.PasswordHash != req.PasswordHash {
-			_ = writeFrame(conn, MsgJoinRoomDenied, []byte("bad password"))
+			_ = writeFrame(conn, MsgJoinRoomDenied, []byte("incorrect password"))
 			return
 		}
 		room.AddReceiver(conn)

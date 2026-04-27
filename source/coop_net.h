@@ -126,6 +126,7 @@ typedef struct {
     char uuid[48]; // From handshake
     char display_name[64]; // From handshake
     Uint32 connect_time; // When the socket was accepted (for handshake timeout)
+    Uint32 last_seen_ms;          // SDL_GetTicks of the most recent inbound frame (relay path)
     SDL_AtomicInt pending_action; // CoopClientAction: set by UI thread, processed by host thread
     char pending_action_reason[128]; // Reason string for kick/reject
 } CoopClient;

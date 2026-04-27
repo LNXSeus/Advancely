@@ -1099,6 +1099,15 @@ static int receiver_dispatch_message(CoopNetContext *ctx, uint32_t msg_type,
         set_status(ctx, "Host shut down the lobby");
         return 1;
     }
+    if (msg_type == COOP_MSG_RELAY_ROOM_CLOSED) {
+        // Relay-side notification: the host's connection went away or the
+        // room was removed. Tear down the same way as a host DISCONNECT.
+        free(payload);
+        log_message(LOG_INFO, "[COOP NET] Relay reports room closed (host disconnected).\n");
+        set_state(ctx, COOP_NET_DISCONNECTED);
+        set_status(ctx, "Host disconnected");
+        return 1;
+    }
     if (msg_type == COOP_MSG_KICK) {
         // KICK is JSON {target_uuid, reason}. Self-filter — relay broadcasts so
         // every receiver in the room sees this; only the matching UUID acts.
@@ -1756,12 +1765,23 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
             break;
         }
         if (rc == 0) {
-            // Timeout tick: emit periodic heartbeat so the relay sees us as alive.
+            // Timeout tick: emit periodic heartbeat so the relay sees us as alive
+            // AND the host can track per-UUID liveness (the UUID rides along in
+            // the payload; otherwise the relay strips identity on the wire).
             Uint32 now = SDL_GetTicks();
             if (now - last_heartbeat_send >= RELAY_HEARTBEAT_INTERVAL_MS) {
+                cJSON *hb = cJSON_CreateObject();
+                cJSON_AddStringToObject(hb, "uuid", ctx->connect_uuid);
+                char *hb_js = cJSON_PrintUnformatted(hb);
+                cJSON_Delete(hb);
                 SDL_LockMutex(ctx->relay_send_mutex);
-                bool ok = relay_send_frame(ctx->relay_conn, COOP_MSG_HEARTBEAT, nullptr, 0);
+                bool ok = false;
+                if (hb_js) {
+                    ok = relay_send_frame(ctx->relay_conn, COOP_MSG_HEARTBEAT,
+                                          hb_js, (uint32_t) strlen(hb_js));
+                }
                 SDL_UnlockMutex(ctx->relay_send_mutex);
+                free(hb_js);
                 last_heartbeat_send = now;
                 if (!ok) {
                     log_message(LOG_INFO, "[COOP NET] Relay heartbeat send failed.\n");
@@ -1797,6 +1817,13 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
         relay_close(ctx->relay_conn);
         ctx->relay_conn = nullptr;
     }
+
+    // Clear the lobby so the UI doesn't keep displaying the stale host/peer
+    // after we lose connection (host went down, kicked, room closed).
+    SDL_LockMutex(ctx->lobby_mutex);
+    ctx->lobby_player_count = 0;
+    ctx->lobby_changed = true;
+    SDL_UnlockMutex(ctx->lobby_mutex);
 
     log_message(LOG_INFO, "[COOP NET] Receiver relay thread exiting.\n");
     return 0;
@@ -1885,6 +1912,30 @@ static int SDLCALL host_relay_thread_func(void *data) {
                     set_status(ctx, "Relay connection lost");
                     break;
                 }
+            }
+            // Stale-slot expiration: if a receiver hasn't sent any traffic
+            // (heartbeat, mod, etc.) for STALE_MS, drop the slot. Catches
+            // crashed/abruptly-killed receivers that never got to send a
+            // graceful DISCONNECT, and the failed-template-sync ghost-join
+            // case where the receiver self-aborts before completing its end.
+            const Uint32 STALE_MS = 25000;
+            bool any_stale = false;
+            for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
+                if (!ctx->clients[i].active) continue;
+                if (ctx->clients[i].last_seen_ms == 0) continue;
+                if (now - ctx->clients[i].last_seen_ms < STALE_MS) continue;
+                log_message(LOG_INFO, "[COOP NET] Relay slot %d (%s) timed out (no traffic for %ums).\n",
+                            i, ctx->clients[i].username, now - ctx->clients[i].last_seen_ms);
+                set_status(ctx, "%s timed out",
+                           ctx->clients[i].display_name[0] ? ctx->clients[i].display_name
+                                                           : ctx->clients[i].username);
+                ctx->clients[i].active = false;
+                if (ctx->clients[i].handshake_done) ctx->client_count--;
+                any_stale = true;
+            }
+            if (any_stale) {
+                rebuild_lobby_list(ctx);
+                broadcast_player_list(ctx);
             }
             continue;
         }
@@ -1980,6 +2031,7 @@ static int SDLCALL host_relay_thread_func(void *data) {
                         ctx->clients[slot].handshake_done = true; // Auto-accept
                         ctx->clients[slot].pending_approval = false;
                         ctx->clients[slot].connect_time = SDL_GetTicks();
+                        ctx->clients[slot].last_seen_ms = SDL_GetTicks();
                         strncpy(ctx->clients[slot].uuid, req_uuid, sizeof(ctx->clients[slot].uuid) - 1);
                         strncpy(ctx->clients[slot].username, req_username, sizeof(ctx->clients[slot].username) - 1);
                         strncpy(ctx->clients[slot].display_name, req_display,
@@ -2019,13 +2071,48 @@ static int SDLCALL host_relay_thread_func(void *data) {
                 }
             }
         } else if (msg_type == COOP_MSG_HEARTBEAT) {
-            // Receiver liveness ping. ACK to the whole room (cheap; relay fans out).
+            // Receiver liveness ping. The payload carries {uuid:...} so we can
+            // refresh per-slot last_seen_ms; the relay strips identity, so this
+            // is the only way to track which receiver is still alive.
+            if (payload && payload_len > 0) {
+                char *js = (char *) malloc(payload_len + 1);
+                if (js) {
+                    memcpy(js, payload, payload_len);
+                    js[payload_len] = '\0';
+                    cJSON *json = cJSON_Parse(js);
+                    free(js);
+                    if (json) {
+                        cJSON *u = cJSON_GetObjectItem(json, "uuid");
+                        if (u && cJSON_IsString(u)) {
+                            for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
+                                if (ctx->clients[i].active &&
+                                    strcmp(ctx->clients[i].uuid, u->valuestring) == 0) {
+                                    ctx->clients[i].last_seen_ms = SDL_GetTicks();
+                                    break;
+                                }
+                            }
+                        }
+                        cJSON_Delete(json);
+                    }
+                }
+            }
+            // ACK to the whole room (cheap; relay fans out).
             coop_broadcast_internal(ctx, COOP_MSG_HEARTBEAT_ACK, nullptr, 0);
         } else if (msg_type == COOP_MSG_HEARTBEAT_ACK) {
             // Receiver ack to a host-initiated heartbeat. We don't initiate any in
             // the relay model, but we tolerate it in case anyone bridges.
         } else if (msg_type == COOP_MSG_CUSTOM_GOAL_MOD) {
             if (payload_len == sizeof(CoopCustomGoalModMsg)) {
+                CoopCustomGoalModMsg *mm = (CoopCustomGoalModMsg *) payload;
+                if (mm->source_uuid[0]) {
+                    for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
+                        if (ctx->clients[i].active &&
+                            strcmp(ctx->clients[i].uuid, mm->source_uuid) == 0) {
+                            ctx->clients[i].last_seen_ms = SDL_GetTicks();
+                            break;
+                        }
+                    }
+                }
                 SDL_LockMutex(ctx->custom_mod_mutex);
                 if (ctx->custom_mod_count < COOP_MAX_CUSTOM_MODS) {
                     memcpy(&ctx->custom_mod_queue[ctx->custom_mod_count],
@@ -2098,6 +2185,13 @@ static int SDLCALL host_relay_thread_func(void *data) {
         ctx->clients[i].active = false;
     }
     ctx->client_count = 0;
+
+    // Clear the lobby so the UI doesn't keep displaying stale receivers
+    // after the host's relay session ends (clean shutdown or relay drop).
+    SDL_LockMutex(ctx->lobby_mutex);
+    ctx->lobby_player_count = 0;
+    ctx->lobby_changed = true;
+    SDL_UnlockMutex(ctx->lobby_mutex);
 
     log_message(LOG_INFO, "[COOP NET] Host relay thread exiting.\n");
     return 0;
