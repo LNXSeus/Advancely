@@ -67,12 +67,7 @@
 	"advancement.minecraft.adventure.barrel_roll":	"Barrel Roll",
 	"advancement.minecraft.adventure.nether_barrel_roll":	"Nether Roll",
 	"advancement.minecraft.adventure.end_barrel_roll":	"End Roll",
-	"stat.punch_action":	"Punch",
-	"stat.follow_action":	"Follow",
-	"stat.move_action":	"Move",
-	"stat.attack_action":	"Attack",
 	"stat.crafting_action":	"Crafting",
-	"stat.build_action":	"Build",
 	"stat.group_action":	"Group",
-	"stat.highlight_action":	"Highlight"
+	"stat.w_skellies":	"W Skellies"
 }
