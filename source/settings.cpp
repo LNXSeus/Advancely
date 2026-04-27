@@ -2815,7 +2815,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                          "Disconnect before changing the transport.");
                             } else {
                                 snprintf(tt, sizeof(tt),
-                                         "Off (default): connect through the Advancely relay server.\n"
+                                         "Off (default): connect through the Advancely relay server (hosted in New York).\n"
                                          "On: classic LAN / VPN hosting with a direct IP + port.\n"
                                          "Use this if everyone is on the same network or VPN.");
                             }

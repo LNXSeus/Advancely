@@ -1750,6 +1750,7 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
 
     Uint32 last_heartbeat_recv = SDL_GetTicks();
     Uint32 last_heartbeat_send = SDL_GetTicks();
+    Uint32 last_inbound_ms = SDL_GetTicks(); // ANY frame from the host counts as liveness
 
     while (!should_stop(ctx)) {
         if (!ctx->relay_conn) break;
@@ -1790,8 +1791,22 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
                     break;
                 }
             }
+            // Host-liveness watchdog: the host heartbeats every 5s and the relay
+            // forwards them. If we don't see ANY inbound frame for HOST_TIMEOUT_MS,
+            // the host is gone (process killed, network died, relay dropped us)
+            // and the MsgRoomClosed broadcast didn't reach us. Tear down so the
+            // UI doesn't show a ghost lobby.
+            const Uint32 HOST_TIMEOUT_MS = 20000;
+            if (now - last_inbound_ms > HOST_TIMEOUT_MS) {
+                log_message(LOG_INFO, "[COOP NET] Host silent for %ums; treating as disconnected.\n",
+                            now - last_inbound_ms);
+                set_state(ctx, COOP_NET_DISCONNECTED);
+                set_status(ctx, "Host disconnected");
+                break;
+            }
             continue;
         }
+        last_inbound_ms = SDL_GetTicks();
         int drc = receiver_dispatch_message(ctx, msg_type, (char *) payload, payload_len,
                                             &last_heartbeat_recv);
         if (drc == 1) break;
@@ -2120,6 +2135,97 @@ static int SDLCALL host_relay_thread_func(void *data) {
                     ctx->custom_mod_count++;
                 }
                 SDL_UnlockMutex(ctx->custom_mod_mutex);
+            }
+        } else if (msg_type == COOP_MSG_LEGACY_STATS_UPLOAD) {
+            // Legacy MC (<=1.6.4) per-receiver stats.dat upload. Same wire shape
+            // as the direct path (parsed in the per-client read loop): the relay
+            // forwards the framed bytes as-is, so we reuse the same parser here.
+            // Keyed by UUID embedded in the payload (the relay strips identity,
+            // so we need the UUID inside the frame).
+            if (payload && payload_len >= 2 + 2 + 4) {
+                const uint8_t *p = (const uint8_t *) payload;
+                uint32_t remaining = payload_len;
+                uint16_t uuid_len = 0;
+                memcpy(&uuid_len, p, 2);
+                uuid_len = ntohs(uuid_len);
+                p += 2;
+                remaining -= 2;
+                if (uuid_len < 48 && remaining >= (uint32_t) uuid_len + 2 + 4) {
+                    char uuid_buf[48] = {};
+                    memcpy(uuid_buf, p, uuid_len);
+                    uuid_buf[uuid_len] = '\0';
+                    p += uuid_len;
+                    remaining -= uuid_len;
+                    uint16_t world_len = 0;
+                    memcpy(&world_len, p, 2);
+                    world_len = ntohs(world_len);
+                    p += 2;
+                    remaining -= 2;
+                    if (world_len < 256 && remaining >= (uint32_t) world_len + 4) {
+                        char world_buf[256] = {};
+                        memcpy(world_buf, p, world_len);
+                        world_buf[world_len] = '\0';
+                        p += world_len;
+                        remaining -= world_len;
+                        uint32_t file_len = 0;
+                        memcpy(&file_len, p, 4);
+                        file_len = ntohl(file_len);
+                        p += 4;
+                        remaining -= 4;
+                        if (file_len > 0 && file_len <= remaining && file_len <= 4 * 1024 * 1024) {
+                            void *copy = malloc(file_len);
+                            if (copy) {
+                                memcpy(copy, p, file_len);
+                                bool content_changed = false;
+                                SDL_LockMutex(ctx->legacy_upload_mutex);
+                                int slot = -1;
+                                for (int k = 0; k < ctx->legacy_upload_count; k++) {
+                                    if (strcmp(ctx->legacy_uploads[k].uuid, uuid_buf) == 0) {
+                                        slot = k;
+                                        break;
+                                    }
+                                }
+                                if (slot < 0 && ctx->legacy_upload_count < COOP_MAX_CLIENTS) {
+                                    slot = ctx->legacy_upload_count++;
+                                    strncpy(ctx->legacy_uploads[slot].uuid, uuid_buf, 47);
+                                    ctx->legacy_uploads[slot].uuid[47] = '\0';
+                                    ctx->legacy_uploads[slot].bytes = nullptr;
+                                    ctx->legacy_uploads[slot].size = 0;
+                                }
+                                if (slot >= 0) {
+                                    content_changed = (ctx->legacy_uploads[slot].size != file_len) ||
+                                                      (ctx->legacy_uploads[slot].bytes == nullptr) ||
+                                                      (memcmp(ctx->legacy_uploads[slot].bytes,
+                                                              copy, file_len) != 0);
+                                    free(ctx->legacy_uploads[slot].bytes);
+                                    ctx->legacy_uploads[slot].bytes = copy;
+                                    ctx->legacy_uploads[slot].size = file_len;
+                                    strncpy(ctx->legacy_uploads[slot].world_name, world_buf,
+                                            sizeof(ctx->legacy_uploads[slot].world_name) - 1);
+                                    ctx->legacy_uploads[slot].world_name[
+                                        sizeof(ctx->legacy_uploads[slot].world_name) - 1] = '\0';
+                                    ctx->legacy_uploads[slot].last_update_ms = SDL_GetTicks();
+                                    copy = nullptr;
+                                    // Bump per-UUID liveness — legacy uploads are 1Hz, so
+                                    // they double as a heartbeat from receivers without
+                                    // their own heartbeat traffic.
+                                    for (int j = 0; j < COOP_MAX_CLIENTS; j++) {
+                                        if (ctx->clients[j].active &&
+                                            strcmp(ctx->clients[j].uuid, uuid_buf) == 0) {
+                                            ctx->clients[j].last_seen_ms = SDL_GetTicks();
+                                            break;
+                                        }
+                                    }
+                                }
+                                SDL_UnlockMutex(ctx->legacy_upload_mutex);
+                                free(copy);
+                                if (content_changed) {
+                                    SDL_SetAtomicInt(&ctx->legacy_upload_pending, 1);
+                                }
+                            }
+                        }
+                    }
+                }
             }
         } else if (msg_type == COOP_MSG_DISCONNECT) {
             // Relay receivers send DISCONNECT as JSON {uuid, reason} so we can
@@ -2914,7 +3020,12 @@ bool coop_net_send_legacy_stats_upload(CoopNetContext *ctx,
     if (!ctx || !uuid || !world_name) return false;
     if (!file_bytes || file_len == 0) return false;
     if (coop_net_get_state(ctx) != COOP_NET_CONNECTED) return false;
-    if (ctx->client_fd == COOP_INVALID_SOCKET) return false;
+
+    // Direct path uses client_fd; relay path uses the TLS conn. Reject if neither
+    // is up so callers can't accidentally fall through.
+    const bool relay = coop_net_is_relay(ctx);
+    if (!relay && ctx->client_fd == COOP_INVALID_SOCKET) return false;
+    if (relay && !ctx->relay_conn) return false;
 
     const size_t uuid_len = strlen(uuid);
     const size_t world_len = strlen(world_name);
@@ -2947,8 +3058,16 @@ bool coop_net_send_legacy_stats_upload(CoopNetContext *ctx,
     memcpy(buf + off, file_bytes, file_len);
     off += file_len;
 
-    bool ok = send_message(ctx->client_fd, COOP_MSG_LEGACY_STATS_UPLOAD,
-                           buf, (uint32_t) total);
+    bool ok;
+    if (relay) {
+        SDL_LockMutex(ctx->relay_send_mutex);
+        ok = relay_send_frame(ctx->relay_conn, COOP_MSG_LEGACY_STATS_UPLOAD,
+                              buf, (uint32_t) total);
+        SDL_UnlockMutex(ctx->relay_send_mutex);
+    } else {
+        ok = send_message(ctx->client_fd, COOP_MSG_LEGACY_STATS_UPLOAD,
+                          buf, (uint32_t) total);
+    }
     free(buf);
     return ok;
 }
