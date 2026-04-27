@@ -170,7 +170,10 @@ set(MBEDTLS_FATAL_WARNINGS OFF CACHE BOOL "" FORCE)
 # psa_crypto_driver_wrappers_no_static.c) are not committed in this vendored tree; mbedTLS
 # regenerates them at build time via Python + Perl. Both ship with msys64.
 set(GEN_FILES ON CACHE BOOL "" FORCE)
+# Silence cmake_minimum_required deprecation warnings from vendored mbedtls.
+set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "" FORCE)
 add_subdirectory(source/external/mbedtls EXCLUDE_FROM_ALL)
+unset(CMAKE_WARN_DEPRECATED CACHE)
 
 # The official SDL3_mixer is not yet released. If you are using an unofficial build
 # or the older SDL2_mixer, you would find it here. For now, it's commented out.
