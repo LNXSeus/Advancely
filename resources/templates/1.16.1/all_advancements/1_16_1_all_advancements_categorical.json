@@ -2508,12 +2508,9 @@
 			"root_name":	"minecraft:picked_up/minecraft:tnt",
 			"target":	-1,
 			"linked_goals":	[{
-					"root_name":	"minecraft:nether/netherite_armor"
-				}, {
-					"root_name":	"minecraft:husbandry/obtain_netherite_hoe"
-				}, {
-					"root_name":	"minecraft:nether/use_lodestone"
+					"root_name":	"tnt2"
 				}],
+			"linked_goal_mode":	"or",
 			"icon_pos":	{
 				"x":	2195,
 				"y":	50
@@ -2525,10 +2522,7 @@
 			"root_name":	"minecraft:picked_up/minecraft:azure_bluet",
 			"target":	-1,
 			"linked_goals":	[{
-					"root_name":	"minecraft:bee",
-					"parent_root":	"minecraft:husbandry/bred_all_animals"
-				}, {
-					"root_name":	"minecraft:nether/all_effects"
+					"root_name":	"sus_stew"
 				}],
 			"icon_pos":	{
 				"x":	945,
@@ -2555,11 +2549,6 @@
 				}, {
 					"root_name":	"minecraft:mule",
 					"parent_root":	"minecraft:husbandry/bred_all_animals"
-				}, {
-					"root_name":	"minecraft:pig",
-					"parent_root":	"minecraft:husbandry/bred_all_animals"
-				}, {
-					"root_name":	"minecraft:nether/all_effects"
 				}],
 			"icon_pos":	{
 				"x":	1215,
@@ -2587,8 +2576,9 @@
 			"linked_goals":	[{
 					"root_name":	"minecraft:husbandry/bred_all_animals"
 				}, {
-					"root_name":	"minecraft:nether/all_effects"
+					"root_name":	"leads2"
 				}],
+			"linked_goal_mode":	"or",
 			"icon_pos":	{
 				"x":	1760,
 				"y":	400
@@ -2600,13 +2590,9 @@
 			"root_name":	"minecraft:picked_up/minecraft:bee_nest",
 			"target":	-1,
 			"linked_goals":	[{
-					"root_name":	"minecraft:husbandry/safely_harvest_honey"
-				}, {
-					"root_name":	"minecraft:adventure/honey_block_slide"
-				}, {
-					"root_name":	"honey_bottle",
-					"parent_root":	"minecraft:husbandry/balanced_diet"
+					"root_name":	"hives2"
 				}],
+			"linked_goal_mode":	"or",
 			"icon_pos":	{
 				"x":	1215,
 				"y":	1010
@@ -2618,7 +2604,7 @@
 			"root_name":	"minecraft:picked_up/minecraft:ghast_tear",
 			"target":	4,
 			"linked_goals":	[{
-					"root_name":	"minecraft:end/respawn_dragon"
+					"root_name":	"end_crystals"
 				}],
 			"icon_pos":	{
 				"x":	935,
@@ -2711,7 +2697,7 @@
 			"icon":	"blocks/Conduit_unoptimized.gif",
 			"hidden":	true,
 			"in_2nd_row":	true,
-			"root_name":	"minecraft:placed/minecraft:conduit",
+			"root_name":	"minecraft:used/minecraft:conduit",
 			"target":	1,
 			"linked_goals":	[{
 					"root_name":	"minecraft:nether/all_effects"
@@ -2766,7 +2752,7 @@
 				}
 			},
 			"linked_goals":	[{
-					"root_name":	"minecraft:nether/all_effects"
+					"root_name":	"conduits"
 				}],
 			"icon_pos":	{
 				"x":	1490,
@@ -2779,12 +2765,9 @@
 			"root_name":	"minecraft:picked_up/minecraft:tnt",
 			"target":	-1,
 			"linked_goals":	[{
-					"root_name":	"minecraft:nether/netherite_armor"
-				}, {
-					"root_name":	"minecraft:husbandry/obtain_netherite_hoe"
-				}, {
-					"root_name":	"minecraft:nether/use_lodestone"
+					"root_name":	"tnt2"
 				}],
+			"linked_goal_mode":	"or",
 			"icon_pos":	{
 				"x":	1895,
 				"y":	860
@@ -2822,6 +2805,99 @@
 				"x":	1760,
 				"y":	135
 			}
+		},
+		"end_crystals":	{
+			"icon":	"blocks/placeholder.png",
+			"hidden":	true,
+			"root_name":	"minecraft:crafted/minecraft:end_crystal",
+			"target":	4,
+			"icon_pos":	{
+				"x":	-3000,
+				"y":	-3000,
+				"hidden":	true
+			},
+			"text_pos":	{
+				"hidden":	true
+			},
+			"progress_pos":	{
+				"hidden":	true
+			}
+		},
+		"conduits":	{
+			"icon":	"blocks/placeholder.png",
+			"hidden":	true,
+			"root_name":	"minecraft:crafted/minecraft:conduit",
+			"target":	1,
+			"icon_pos":	{
+				"x":	-3000,
+				"y":	-3000,
+				"hidden":	true
+			},
+			"text_pos":	{
+				"hidden":	true
+			},
+			"progress_pos":	{
+				"hidden":	true
+			}
+		},
+		"hives2":	{
+			"icon":	"blocks/placeholder.png",
+			"hidden":	true,
+			"root_name":	"minecraft:picked_up/minecraft:bee_nest",
+			"target":	2,
+			"linked_goals":	[{
+					"root_name":	"minecraft:adventure/honey_block_slide"
+				}],
+			"icon_pos":	{
+				"x":	-3000,
+				"y":	-3000,
+				"hidden":	true
+			},
+			"text_pos":	{
+				"hidden":	true
+			},
+			"progress_pos":	{
+				"hidden":	true
+			}
+		},
+		"tnt2":	{
+			"icon":	"blocks/placeholder.png",
+			"hidden":	true,
+			"root_name":	"minecraft:picked_up/minecraft:tnt",
+			"target":	64,
+			"linked_goals":	[{
+					"root_name":	"minecraft:nether/netherite_armor"
+				}, {
+					"root_name":	"minecraft:husbandry/obtain_netherite_hoe"
+				}],
+			"icon_pos":	{
+				"x":	-3000,
+				"y":	-3000,
+				"hidden":	true
+			},
+			"text_pos":	{
+				"hidden":	true
+			},
+			"progress_pos":	{
+				"hidden":	true
+			}
+		},
+		"leads2":	{
+			"icon":	"blocks/placeholder.png",
+			"hidden":	true,
+			"root_name":	"minecraft:crafted/minecraft:lead",
+			"target":	1,
+			"icon_pos":	{
+				"x":	-3000,
+				"y":	-3000,
+				"hidden":	true
+			},
+			"text_pos":	{
+				"hidden":	true
+			},
+			"progress_pos":	{
+				"hidden":	true
+			}
 		}
 	},
 	"unlocks":	[],
@@ -2850,11 +2926,6 @@
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:enchanted_golden_apple",
 					"target":	1
-				}, {
-					"stage_id":	"3",
-					"type":	"advancement",
-					"root_name":	"minecraft:nether/all_effects",
-					"target":	0
 				}, {
 					"stage_id":	"final",
 					"type":	"final",
@@ -2904,10 +2975,16 @@
 					"target":	1
 				}, {
 					"stage_id":	"3",
-					"icon":	"blocks/Conduit_unoptimized.gif",
+					"icon":	"blocks/Conduit_JE1_BE1.png",
 					"type":	"stat",
 					"root_name":	"minecraft:used/minecraft:conduit",
 					"target":	1
+				}, {
+					"stage_id":	"4",
+					"icon":	"blocks/Conduit_unoptimized.gif",
+					"type":	"advancement",
+					"root_name":	"minecraft:nether/all_effects",
+					"target":	0
 				}, {
 					"stage_id":	"final",
 					"icon":	"items/bucket_3d_shareware_v1.34.png",
@@ -3239,7 +3316,7 @@
 				}, {
 					"root_name":	"trident"
 				}, {
-					"root_name":	"conduit"
+					"root_name":	"conduits"
 				}, {
 					"root_name":	"minecraft:husbandry/fishy_business"
 				}, {
@@ -3288,7 +3365,7 @@
 					"root_name":	"textures/entity/cat/all_black.png",
 					"parent_root":	"minecraft:husbandry/complete_catalogue"
 				}, {
-					"root_name":	"leads"
+					"root_name":	"leads2"
 				}],
 			"icon_pos":	{
 				"x":	815,
@@ -4079,13 +4156,13 @@
 				}, {
 					"root_name":	"minecraft:husbandry/fishy_business"
 				}, {
-					"root_name":	"conduit"
+					"root_name":	"conduits"
 				}, {
 					"root_name":	"minecraft:picked_up/minecraft:heart_of_the_sea",
-					"parent_root":	"conduit"
+					"parent_root":	"conduits"
 				}, {
 					"root_name":	"minecraft:picked_up/minecraft:nautilus_shell",
-					"parent_root":	"conduit"
+					"parent_root":	"conduits"
 				}, {
 					"root_name":	"pufferfish"
 				}, {
@@ -4133,7 +4210,7 @@
 					"parent_root":	"minecraft:husbandry/complete_catalogue"
 				}, {
 					"root_name":	"minecraft:crafted/minecraft:lead",
-					"parent_root":	"leads"
+					"parent_root":	"leads2"
 				}],
 			"pos":	{
 				"x":	1760,
