@@ -129,16 +129,21 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                                 snprintf(mod.source_uuid, sizeof(mod.source_uuid),
                                          "%s", app_settings->local_player.uuid);
                                 coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
-                                // Optimistic in-memory mutation for instant feedback.
+                                // Optimistic in-memory mutation for instant feedback,
+                                // plus pending-mod registration so the next host
+                                // STATE_UPDATE doesn't visually revert the increment
+                                // before the host's echo arrives.
                                 tracker_apply_mod_to_view(t, &mod);
+                                tracker_pending_mod_register(mod.parent_root_name,
+                                                             mod.goal_root_name, 2000);
                             } else {
                                 bool host_in_lobby = (app_settings->network_mode == NETWORK_HOST &&
                                                       g_coop_ctx &&
                                                       coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING);
                                 if (host_in_lobby) {
-                                    // Route host's own hotkey through the same per-UUID persistence
-                                    // path used for receiver mods, so host's increments only affect
-                                    // host's subtree (not the merged view stored in template_data).
+                                    // Host's own hotkey: optimistic view mutation +
+                                    // queue for batched persistence. Direct settings.json
+                                    // writes per-keypress stalled the UI while panning.
                                     CoopCustomGoalModMsg mod = {};
                                     snprintf(mod.goal_root_name, sizeof(mod.goal_root_name),
                                              "%s", target_goal->root_name);
@@ -146,8 +151,8 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                                     mod.action = mod_action;
                                     snprintf(mod.source_uuid, sizeof(mod.source_uuid),
                                              "%s", app_settings->local_player.uuid);
-                                    tracker_apply_coop_mods(t, app_settings, &mod, 1);
-                                    SDL_SetAtomicInt(&g_needs_update, 1);
+                                    tracker_apply_mod_to_view(t, &mod);
+                                    tracker_queue_host_mod(&mod);
                                 } else {
                                     // Singleplayer: direct in-memory mutation + save.
                                     if (mod_action == COOP_MOD_INCREMENT) {

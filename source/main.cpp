@@ -414,12 +414,18 @@ bool merge_coop_progress(const char *buffer, TemplateData *target) {
             log_message(LOG_ERROR, "[COOP] Merge skipped: criteria count mismatch for stat %d.\n", i);
             return false;
         }
-        dst->done = in_cat.done;
-        dst->is_manually_completed = in_cat.is_manually_completed;
-        dst->all_template_criteria_met = in_cat.all_template_criteria_met;
-        dst->done_in_snapshot = in_cat.done_in_snapshot;
-        dst->progress = in_cat.progress;
-        dst->completed_criteria_count = in_cat.completed_criteria_count;
+        // Skip the top-level stat checkbox if the receiver has an in-flight
+        // toggle for it — otherwise the host's pre-mod snapshot would briefly
+        // revert the user's click before the host's echo arrives.
+        bool skip_top = tracker_pending_mod_should_skip("", dst->root_name);
+        if (!skip_top) {
+            dst->done = in_cat.done;
+            dst->is_manually_completed = in_cat.is_manually_completed;
+            dst->all_template_criteria_met = in_cat.all_template_criteria_met;
+            dst->done_in_snapshot = in_cat.done_in_snapshot;
+            dst->progress = in_cat.progress;
+            dst->completed_criteria_count = in_cat.completed_criteria_count;
+        }
 
         for (int j = 0; j < in_cat.criteria_count; j++) {
             TrackableItem in_item;
@@ -427,6 +433,8 @@ bool merge_coop_progress(const char *buffer, TemplateData *target) {
             head += sizeof(TrackableItem);
             TrackableItem *dst_item = dst->criteria ? dst->criteria[j] : nullptr;
             if (!dst_item) continue;
+            // Skip per-criterion if a pending mod targets it under this stat.
+            if (tracker_pending_mod_should_skip(dst->root_name, dst_item->root_name)) continue;
             dst_item->done = in_item.done;
             dst_item->progress = in_item.progress;
             dst_item->initial_progress = in_item.initial_progress;
@@ -474,6 +482,8 @@ bool merge_coop_progress(const char *buffer, TemplateData *target) {
         head += sizeof(TrackableItem);
         TrackableItem *dst_item = target->custom_goals[i];
         if (!dst_item) continue;
+        // Skip if the receiver has an in-flight click/increment on this goal.
+        if (tracker_pending_mod_should_skip("", dst_item->root_name)) continue;
         dst_item->done = in_item.done;
         dst_item->progress = in_item.progress;
         dst_item->initial_progress = in_item.initial_progress;
@@ -2724,35 +2734,48 @@ int main(int argc, char *argv[]) {
                 static int pending_rcv_mod_count = 0;
                 static Uint64 rcv_mod_batch_deadline_ms = 0;
 
-                bool host_has_clients = (app_settings.network_mode == NETWORK_HOST && g_coop_ctx &&
-                                         coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
-                                         coop_net_get_client_count(g_coop_ctx) > 0 && tracker->template_data);
+                bool host_listening = (app_settings.network_mode == NETWORK_HOST && g_coop_ctx &&
+                                       coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
+                                       tracker->template_data);
 
-                if (host_has_clients) {
+                if (host_listening) {
+                    // Drain inbound (from receivers) + outbound (host's own clicks/hotkeys)
+                    // and batch them together. Both paths now feed this loop instead of
+                    // calling tracker_apply_coop_mods directly per-event, which used to
+                    // stall the UI thread on per-click settings.json rewrites.
                     CoopCustomGoalModMsg drained[COOP_MAX_CUSTOM_MODS];
                     int drained_count = coop_net_drain_custom_mods(g_coop_ctx, drained, COOP_MAX_CUSTOM_MODS);
                     for (int mi = 0; mi < drained_count; mi++) {
                         if (pending_rcv_mod_count < (int)(sizeof(pending_rcv_mods) / sizeof(pending_rcv_mods[0])))
                             pending_rcv_mods[pending_rcv_mod_count++] = drained[mi];
                     }
-                    if (drained_count > 0 && rcv_mod_batch_deadline_ms == 0)
+                    CoopCustomGoalModMsg host_drained[COOP_MAX_CUSTOM_MODS];
+                    int host_drained_count = tracker_drain_host_mods(host_drained, COOP_MAX_CUSTOM_MODS);
+                    for (int mi = 0; mi < host_drained_count; mi++) {
+                        if (pending_rcv_mod_count < (int)(sizeof(pending_rcv_mods) / sizeof(pending_rcv_mods[0])))
+                            pending_rcv_mods[pending_rcv_mod_count++] = host_drained[mi];
+                    }
+                    if ((drained_count > 0 || host_drained_count > 0) && rcv_mod_batch_deadline_ms == 0)
                         rcv_mod_batch_deadline_ms = SDL_GetTicks() + 150;
 
                     Uint64 now_ms = SDL_GetTicks();
                     if (pending_rcv_mod_count > 0 && rcv_mod_batch_deadline_ms > 0 &&
                         now_ms >= rcv_mod_batch_deadline_ms) {
                         tracker_apply_coop_mods(tracker, &app_settings, pending_rcv_mods, pending_rcv_mod_count);
-                        log_message(LOG_INFO, "[COOP] Applied %d batched custom goal modification(s) from receiver(s).\n",
+                        log_message(LOG_INFO, "[COOP] Applied %d batched custom goal modification(s).\n",
                                     pending_rcv_mod_count);
                         pending_rcv_mod_count = 0;
                         rcv_mod_batch_deadline_ms = 0;
                         SDL_SetAtomicInt(&g_needs_update, 1);
                     }
                 } else {
-                    // Lobby ended or no clients; discard any mods that accumulated
-                    // before the lobby dropped so they don't apply to a future session.
+                    // Lobby ended; discard any mods that accumulated before the lobby
+                    // dropped so they don't apply to a future session.
                     pending_rcv_mod_count = 0;
                     rcv_mod_batch_deadline_ms = 0;
+                    // Also drop any host mods that were queued but never flushed.
+                    CoopCustomGoalModMsg sink[COOP_MAX_CUSTOM_MODS];
+                    while (tracker_drain_host_mods(sink, COOP_MAX_CUSTOM_MODS) > 0) {}
                 }
             }
 

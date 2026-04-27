@@ -4676,6 +4676,125 @@ void tracker_apply_coop_mods(Tracker *t, const AppSettings *settings,
     cJSON_Delete(root);
 }
 
+// ---- Pending-mod tracking (receiver merge skip + host batched save) ----
+//
+// Two mechanisms with different goals share this section:
+//   (a) receiver: keep optimistic clicks visible until the host echoes back,
+//       even if a STATE_UPDATE arrives mid-flight (Hermes-fresh case).
+//   (b) host: avoid per-click settings.json rewrites that stall the UI thread
+//       when the user spams a counter while panning the camera.
+//
+// (a) is a small fixed-size linear array (lookup is O(N) with N<=32 — fine for
+// per-click and per-merged-item costs). (b) is a producer/consumer queue.
+struct PendingViewMod {
+    char parent_root[192];
+    char goal_root[192];
+    Uint32 expiry_ms;
+};
+static PendingViewMod g_pending_view_mods[32];
+static int g_pending_view_mod_count = 0;
+static SDL_Mutex *g_pending_view_mods_mutex = nullptr;
+
+static CoopCustomGoalModMsg g_host_pending_mods[256];
+static int g_host_pending_mod_count = 0;
+static SDL_Mutex *g_host_pending_mods_mutex = nullptr;
+
+static void ensure_pending_mutexes(void) {
+    if (!g_pending_view_mods_mutex) g_pending_view_mods_mutex = SDL_CreateMutex();
+    if (!g_host_pending_mods_mutex) g_host_pending_mods_mutex = SDL_CreateMutex();
+}
+
+void tracker_pending_mod_register(const char *parent_root, const char *goal_root,
+                                  uint32_t ttl_ms) {
+    if (!goal_root || !goal_root[0]) return;
+    ensure_pending_mutexes();
+    SDL_LockMutex(g_pending_view_mods_mutex);
+    Uint32 now = SDL_GetTicks();
+    Uint32 expiry = now + (ttl_ms > 0 ? ttl_ms : 2000);
+    const char *p = parent_root ? parent_root : "";
+    int slot = -1;
+    for (int i = 0; i < g_pending_view_mod_count; i++) {
+        if (strcmp(g_pending_view_mods[i].parent_root, p) == 0 &&
+            strcmp(g_pending_view_mods[i].goal_root, goal_root) == 0) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot < 0) {
+        // Compact expired entries before appending.
+        int w = 0;
+        for (int r = 0; r < g_pending_view_mod_count; r++) {
+            if (g_pending_view_mods[r].expiry_ms > now) {
+                if (w != r) g_pending_view_mods[w] = g_pending_view_mods[r];
+                w++;
+            }
+        }
+        g_pending_view_mod_count = w;
+        if (g_pending_view_mod_count < (int)(sizeof(g_pending_view_mods) / sizeof(g_pending_view_mods[0]))) {
+            slot = g_pending_view_mod_count++;
+        }
+    }
+    if (slot >= 0) {
+        strncpy(g_pending_view_mods[slot].parent_root, p,
+                sizeof(g_pending_view_mods[slot].parent_root) - 1);
+        g_pending_view_mods[slot].parent_root[sizeof(g_pending_view_mods[slot].parent_root) - 1] = '\0';
+        strncpy(g_pending_view_mods[slot].goal_root, goal_root,
+                sizeof(g_pending_view_mods[slot].goal_root) - 1);
+        g_pending_view_mods[slot].goal_root[sizeof(g_pending_view_mods[slot].goal_root) - 1] = '\0';
+        g_pending_view_mods[slot].expiry_ms = expiry;
+    }
+    SDL_UnlockMutex(g_pending_view_mods_mutex);
+}
+
+bool tracker_pending_mod_should_skip(const char *parent_root, const char *goal_root) {
+    if (!goal_root || !goal_root[0]) return false;
+    if (!g_pending_view_mods_mutex) return false; // never registered
+    SDL_LockMutex(g_pending_view_mods_mutex);
+    Uint32 now = SDL_GetTicks();
+    const char *p = parent_root ? parent_root : "";
+    bool skip = false;
+    for (int i = 0; i < g_pending_view_mod_count; i++) {
+        if (g_pending_view_mods[i].expiry_ms <= now) continue;
+        if (strcmp(g_pending_view_mods[i].parent_root, p) == 0 &&
+            strcmp(g_pending_view_mods[i].goal_root, goal_root) == 0) {
+            skip = true;
+            break;
+        }
+    }
+    SDL_UnlockMutex(g_pending_view_mods_mutex);
+    return skip;
+}
+
+void tracker_queue_host_mod(const CoopCustomGoalModMsg *mod) {
+    if (!mod) return;
+    ensure_pending_mutexes();
+    SDL_LockMutex(g_host_pending_mods_mutex);
+    if (g_host_pending_mod_count <
+        (int)(sizeof(g_host_pending_mods) / sizeof(g_host_pending_mods[0]))) {
+        g_host_pending_mods[g_host_pending_mod_count++] = *mod;
+    }
+    SDL_UnlockMutex(g_host_pending_mods_mutex);
+}
+
+int tracker_drain_host_mods(CoopCustomGoalModMsg *out, int max_mods) {
+    if (!out || max_mods <= 0) return 0;
+    if (!g_host_pending_mods_mutex) return 0;
+    SDL_LockMutex(g_host_pending_mods_mutex);
+    int count = g_host_pending_mod_count;
+    if (count > max_mods) count = max_mods;
+    if (count > 0) {
+        memcpy(out, g_host_pending_mods, count * sizeof(CoopCustomGoalModMsg));
+        int remaining = g_host_pending_mod_count - count;
+        if (remaining > 0) {
+            memmove(g_host_pending_mods, &g_host_pending_mods[count],
+                    remaining * sizeof(CoopCustomGoalModMsg));
+        }
+        g_host_pending_mod_count = remaining;
+    }
+    SDL_UnlockMutex(g_host_pending_mods_mutex);
+    return count;
+}
+
 void tracker_apply_mod_to_view(Tracker *t, const CoopCustomGoalModMsg *mod) {
     if (!t || !t->template_data || !mod) return;
     TemplateData *td = t->template_data;
@@ -6417,23 +6536,30 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                              settings->local_player.uuid);
                                     coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
                                     // Optimistic in-memory mutation: receivers render from
-                                    // host snapshots, so we have to update template_data
-                                    // directly to get instant feedback. Host's broadcast
-                                    // will overwrite this with the authoritative state.
+                                    // host snapshots, so update template_data directly for
+                                    // instant feedback, AND register the goal as pending so
+                                    // the next merge_coop_progress doesn't revert it before
+                                    // the host's echo arrives (Hermes-fresh case).
                                     tracker_apply_mod_to_view(t, &mod);
+                                    tracker_pending_mod_register(mod.parent_root_name,
+                                                                 mod.goal_root_name, 2000);
                                 } else if (settings->network_mode == NETWORK_HOST &&
                                            g_coop_ctx &&
                                            coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING) {
-                                    // Host in coop: route through per-UUID persistence so the
-                                    // toggle lands under host's subtree (not the merged view).
+                                    // Host in coop: optimistic view mutation + queue for
+                                    // batched persistence (drained in main.cpp's host-mod
+                                    // loop). Direct settings.json writes per-click stalled
+                                    // the UI when spamming counters during camera pans.
                                     CoopCustomGoalModMsg mod = {};
                                     snprintf(mod.goal_root_name, sizeof(mod.goal_root_name), "%s", crit->root_name);
                                     snprintf(mod.parent_root_name, sizeof(mod.parent_root_name), "%s", cat->root_name);
                                     mod.action = COOP_MOD_TOGGLE;
                                     snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s",
                                              settings->local_player.uuid);
-                                    tracker_apply_coop_mods(t, settings, &mod, 1);
-                                    SDL_SetAtomicInt(&g_needs_update, 1);
+                                    tracker_apply_mod_to_view(t, &mod);
+                                    tracker_queue_host_mod(&mod);
+                                    // No g_needs_update here: the batched drain in
+                                    // main.cpp will trigger the re-read once it flushes.
                                 } else {
                                     // Singleplayer: toggle locally
                                     crit->is_manually_completed = !crit->is_manually_completed;
@@ -6710,6 +6836,8 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", settings->local_player.uuid);
                             coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
                             tracker_apply_mod_to_view(t, &mod);
+                            tracker_pending_mod_register(mod.parent_root_name,
+                                                         mod.goal_root_name, 2000);
                         } else if (settings->network_mode == NETWORK_HOST &&
                                    g_coop_ctx &&
                                    coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING) {
@@ -6718,11 +6846,22 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             mod.parent_root_name[0] = '\0';
                             mod.action = COOP_MOD_TOGGLE;
                             snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", settings->local_player.uuid);
-                            tracker_apply_coop_mods(t, settings, &mod, 1);
-                            SDL_SetAtomicInt(&g_needs_update, 1);
+                            tracker_apply_mod_to_view(t, &mod);
+                            tracker_queue_host_mod(&mod);
                         } else {
                             // Singleplayer: toggle locally
                             cat->is_manually_completed = !cat->is_manually_completed;
+
+                            // For a "simple stat" the template hides a single criterion
+                            // behind the parent (criteria_count == 1); parent and that
+                            // child share one stat_progress_override entry. Without
+                            // mirroring the toggle onto the child, unticking the parent
+                            // leaves child->is_manually_completed = true, so child->done
+                            // stays true, completed_criteria_count == criteria_count, and
+                            // the parent's background still renders as complete.
+                            if (cat->criteria_count == 1 && cat->criteria[0]) {
+                                cat->criteria[0]->is_manually_completed = cat->is_manually_completed;
+                            }
 
                             // Recalculate children FIRST so completed_criteria_count is correct
                             for (int j = 0; j < cat->criteria_count; ++j) {
@@ -7747,6 +7886,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                         snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", settings->local_player.uuid);
                         coop_net_send_custom_goal_mod(g_coop_ctx, &mod);
                         tracker_apply_mod_to_view(t, &mod);
+                        tracker_pending_mod_register(mod.parent_root_name,
+                                                     mod.goal_root_name, 2000);
                     } else if (settings->network_mode == NETWORK_HOST &&
                                g_coop_ctx &&
                                coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING) {
@@ -7755,8 +7896,8 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                         mod.parent_root_name[0] = '\0';
                         mod.action = COOP_MOD_TOGGLE;
                         snprintf(mod.source_uuid, sizeof(mod.source_uuid), "%s", settings->local_player.uuid);
-                        tracker_apply_coop_mods(t, settings, &mod, 1);
-                        SDL_SetAtomicInt(&g_needs_update, 1);
+                        tracker_apply_mod_to_view(t, &mod);
+                        tracker_queue_host_mod(&mod);
                     } else {
                         // Singleplayer: toggle locally
                         item->is_manually_completed = !item->is_manually_completed;
