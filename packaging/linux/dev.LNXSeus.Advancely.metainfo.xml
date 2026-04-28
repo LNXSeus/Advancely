@@ -16,6 +16,13 @@
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
 
   <releases>
+    <release version="1.4.1" date="2026-04-28">
+      <description>
+        <ul>
+          <li>Small update to the Herdcraft template and a quick Hotfix for both the AUR Linux installers and NixOS distribution.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.4.0" date="2026-04-28">
       <description>
         <ul>
