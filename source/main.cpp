@@ -2769,34 +2769,85 @@ int main(int argc, char *argv[]) {
                         now_ms >= rcv_mod_batch_deadline_ms) {
                         tracker_apply_coop_mods(tracker, &app_settings, pending_rcv_mods, pending_rcv_mod_count);
 
-                        // Apply each receiver-originated mod to the host's merged view too,
-                        // so the host's "All Players" dropdown shows the change immediately
-                        // without waiting for a heavy g_needs_update re-read. Host's own
-                        // mods were already applied at click time via tracker_apply_mod_to_view,
-                        // so we'd double-apply if we processed those again — skip them.
-                        // Per-player view (selected_coop_player_idx >= 0) shows that one
-                        // player's data; foreign receivers' mods don't belong in it.
-                        bool host_viewing_merged =
-                            (tracker->selected_coop_player_idx < 0);
-                        if (host_viewing_merged) {
-                            for (int mi = 0; mi < pending_rcv_mod_count; mi++) {
-                                const CoopCustomGoalModMsg *m = &pending_rcv_mods[mi];
-                                if (strcmp(m->source_uuid, app_settings.local_player.uuid) == 0)
-                                    continue;
-                                tracker_apply_mod_to_view(tracker, m);
+                        // Build the dirty-player set (one entry per distinct source_uuid
+                        // in the batch). Only those players' settings.json subtrees and
+                        // therefore their per-player snapshots are affected by this batch.
+                        int dirty_idx[COOP_MAX_CUSTOM_MODS];
+                        int dirty_count = 0;
+                        for (int mi = 0; mi < pending_rcv_mod_count; mi++) {
+                            const char *suuid = pending_rcv_mods[mi].source_uuid;
+                            if (suuid[0] == '\0') continue;
+                            int pi = -1;
+                            for (int p = 0; p < app_settings.coop_player_count; p++) {
+                                if (strcmp(app_settings.coop_players[p].uuid, suuid) == 0) {
+                                    pi = p;
+                                    break;
+                                }
                             }
+                            if (pi < 0) continue;
+                            bool seen = false;
+                            for (int d = 0; d < dirty_count; d++) {
+                                if (dirty_idx[d] == pi) { seen = true; break; }
+                            }
+                            if (!seen) dirty_idx[dirty_count++] = pi;
                         }
 
-                        // Recalculate aggregates so the % bar reflects the new state.
-                        tracker_recalculate_progress(tracker, &app_settings);
+                        // Save the host's current view bytes. tracker_update_coop_*
+                        // helpers below clobber template_data with each player's
+                        // computed view, so we serialize first and restore at the end.
+                        char *saved_view = (char *) malloc(4 * 1024 * 1024);
+                        char *pp_work = (char *) malloc(4 * 1024 * 1024);
+                        size_t saved_view_size = 0;
+                        if (saved_view && pp_work) {
+                            saved_view_size = serialize_template_data(tracker->template_data,
+                                                                      saved_view);
 
-                        // Invalidate the cached merged snapshot so the lightweight
-                        // broadcast falls back to a fresh serialization of the
-                        // just-mutated template_data. Without this the broadcast
-                        // would send the pre-mod cached bytes.
-                        free(tracker->coop_merged_snapshot);
-                        tracker->coop_merged_snapshot = nullptr;
-                        tracker->coop_merged_snapshot_size = 0;
+                            // Refresh per-player snapshots for dirty players only.
+                            for (int d = 0; d < dirty_count; d++) {
+                                int pi = dirty_idx[d];
+                                tracker_update_coop_single_player(tracker, &app_settings, pi);
+                                size_t sz = serialize_template_data(tracker->template_data, pp_work);
+                                char *buf = (char *) malloc(sz);
+                                if (buf) {
+                                    memcpy(buf, pp_work, sz);
+                                    free(tracker->coop_player_snapshots[pi]);
+                                    tracker->coop_player_snapshots[pi] = buf;
+                                    tracker->coop_player_snapshot_sizes[pi] = sz;
+                                }
+                            }
+
+                            // Rebuild the merged snapshot using the canonical merge
+                            // function so the All-Players view honors the configured
+                            // merge rules (Any Player / Host Only / Cumulative /
+                            // Highest) instead of an optimistic per-click overwrite.
+                            tracker_update_coop_merged(tracker, &app_settings);
+                            size_t merged_sz = serialize_template_data(tracker->template_data, pp_work);
+                            char *merged_buf = (char *) malloc(merged_sz);
+                            if (merged_buf) {
+                                memcpy(merged_buf, pp_work, merged_sz);
+                                free(tracker->coop_merged_snapshot);
+                                tracker->coop_merged_snapshot = merged_buf;
+                                tracker->coop_merged_snapshot_size = merged_sz;
+                            }
+
+                            // Restore the host's display. For All-Players, the merged
+                            // rebuild already left template_data in the right state.
+                            // For an individual view, pull from that player's snapshot
+                            // (just refreshed if dirty, otherwise still valid since
+                            // its disk + settings.json subtree didn't change).
+                            int sel = tracker->selected_coop_player_idx;
+                            if (sel >= 0 && sel < MAX_COOP_PLAYERS &&
+                                tracker->coop_player_snapshots[sel] &&
+                                tracker->coop_player_snapshot_sizes[sel] >= sizeof(TemplateData)) {
+                                merge_coop_progress(tracker->coop_player_snapshots[sel],
+                                                    tracker->template_data);
+                            } else if (sel >= 0 && saved_view_size > 0) {
+                                merge_coop_progress(saved_view, tracker->template_data);
+                            }
+                            tracker_recalculate_progress(tracker, &app_settings);
+                        }
+                        free(saved_view);
+                        free(pp_work);
 
                         log_message(LOG_INFO, "[COOP] Applied %d batched custom goal modification(s).\n",
                                     pending_rcv_mod_count);
