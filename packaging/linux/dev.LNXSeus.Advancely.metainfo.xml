@@ -23,6 +23,7 @@
           <li>Fixed the "All Players" view sometimes showing the wrong progress after toggling things, and not updating until the dropdown was clicked again.</li>
           <li>Added a small warning under the Room Code field when the entered code doesn't match the expected format (6 letters/numbers).</li>
           <li>Closing Advancely via the X on the Overlay window now properly asks for confirmation if a lobby is active or there are unsaved changes, and the overlay comes back if you cancel.</li>
+          <li>The merged player view now actually tracks the player with the most criteria for each advancement.</li>
         </ul>
       </description>
     </release>
