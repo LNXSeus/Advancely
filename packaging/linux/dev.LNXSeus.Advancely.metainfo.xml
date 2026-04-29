@@ -16,6 +16,16 @@
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
 
   <releases>
+    <release version="1.4.2" date="2026-04-29">
+      <description>
+        <ul>
+          <li>Fixed co-op sync issues where stat checkboxes and custom goal toggles wouldn't update properly between the host's view and the receiver's view, especially on individual player views.</li>
+          <li>Fixed the "All Players" view sometimes showing the wrong progress after toggling things, and not updating until the dropdown was clicked again.</li>
+          <li>Added a small warning under the Room Code field when the entered code doesn't match the expected format (6 letters/numbers).</li>
+          <li>Closing Advancely via the X on the Overlay window now properly asks for confirmation if a lobby is active or there are unsaved changes, and the overlay comes back if you cancel.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.4.1" date="2026-04-28">
       <description>
         <ul>
