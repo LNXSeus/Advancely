@@ -4691,6 +4691,7 @@ struct PendingViewMod {
     char goal_root[192];
     Uint32 expiry_ms;
 };
+
 static PendingViewMod g_pending_view_mods[32];
 static int g_pending_view_mod_count = 0;
 static SDL_Mutex *g_pending_view_mods_mutex = nullptr;
@@ -4730,7 +4731,7 @@ void tracker_pending_mod_register(const char *parent_root, const char *goal_root
             }
         }
         g_pending_view_mod_count = w;
-        if (g_pending_view_mod_count < (int)(sizeof(g_pending_view_mods) / sizeof(g_pending_view_mods[0]))) {
+        if (g_pending_view_mod_count < (int) (sizeof(g_pending_view_mods) / sizeof(g_pending_view_mods[0]))) {
             slot = g_pending_view_mod_count++;
         }
     }
@@ -4770,7 +4771,7 @@ void tracker_queue_host_mod(const CoopCustomGoalModMsg *mod) {
     ensure_pending_mutexes();
     SDL_LockMutex(g_host_pending_mods_mutex);
     if (g_host_pending_mod_count <
-        (int)(sizeof(g_host_pending_mods) / sizeof(g_host_pending_mods[0]))) {
+        (int) (sizeof(g_host_pending_mods) / sizeof(g_host_pending_mods[0]))) {
         g_host_pending_mods[g_host_pending_mod_count++] = *mod;
     }
     SDL_UnlockMutex(g_host_pending_mods_mutex);
@@ -11065,7 +11066,81 @@ static bool hermes_apply_event_to_coop_snapshots(
                     changed = c1 || c2;
                 }
             } else {
-                changed = hermes_apply_advancement_event(t, data);
+                cJSON *id_j = cJSON_GetObjectItem(data, "id");
+                const char *adv_id = (id_j && cJSON_IsString(id_j)) ? id_j->valuestring : nullptr;
+                TrackableCategory *adv = nullptr;
+                int adv_idx = -1;
+                if (adv_id) {
+                    for (int i = 0; i < t->template_data->advancement_count; i++) {
+                        if (strcmp(t->template_data->advancements[i]->root_name, adv_id) == 0) {
+                            adv = t->template_data->advancements[i];
+                            adv_idx = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (adv && adv->criteria_count > 0) {
+                    // Let the standard handler update multi-stage goals normally
+                    changed = hermes_apply_advancement_event(t, data);
+
+                    // Overwrite the OR-merged criteria with the "player with most criteria wins" rule
+                    int best_count = -1;
+                    bool best_done = false;
+                    bool best_all_met = false;
+                    bool *best_crit_done = (bool *) malloc(adv->criteria_count * sizeof(bool));
+
+                    if (best_crit_done) {
+                        for (int j = 0; j < adv->criteria_count; j++) best_crit_done[j] = false;
+
+                        for (int p = 0; p < settings->coop_player_count; p++) {
+                            if (t->coop_player_snapshots[p] && t->coop_player_snapshot_sizes[p] >= sizeof(
+                                    TemplateData)) {
+                                merge_coop_progress(t->coop_player_snapshots[p], t->template_data);
+                                TrackableCategory *p_adv = t->template_data->advancements[adv_idx];
+                                if (p_adv->completed_criteria_count > best_count) {
+                                    best_count = p_adv->completed_criteria_count;
+                                    best_done = p_adv->done;
+                                    best_all_met = p_adv->all_template_criteria_met;
+                                    for (int j = 0; j < p_adv->criteria_count; j++) {
+                                        best_crit_done[j] = p_adv->criteria[j]->done;
+                                    }
+                                } else if (p_adv->done && !best_done) {
+                                    best_done = true;
+                                    best_all_met = true;
+                                }
+                            }
+                        }
+
+                        // Restore the merged snapshot and apply the best player's exact state
+                        merge_coop_progress(t->coop_merged_snapshot, t->template_data);
+                        adv = t->template_data->advancements[adv_idx];
+
+                        adv->completed_criteria_count = (best_count == -1) ? 0 : best_count;
+                        adv->done = best_done;
+                        adv->all_template_criteria_met = best_all_met;
+                        for (int j = 0; j < adv->criteria_count; j++) {
+                            adv->criteria[j]->done = best_crit_done[j];
+                        }
+
+                        free(best_crit_done);
+
+                        // Recalculate global advancement totals
+                        t->template_data->advancements_completed_count = 0;
+                        t->template_data->completed_criteria_count = 0;
+                        for (int i = 0; i < t->template_data->advancement_count; i++) {
+                            if (t->template_data->advancements[i]->done && !t->template_data->advancements[i]->
+                                is_recipe) {
+                                t->template_data->advancements_completed_count++;
+                            }
+                            t->template_data->completed_criteria_count += t->template_data->advancements[i]->
+                                    completed_criteria_count;
+                        }
+                    }
+                } else {
+                    // It's a simple advancement with no criteria, regular OR-merge is fine
+                    changed = hermes_apply_advancement_event(t, data);
+                }
             }
             if (changed) {
                 tracker_recalculate_progress(t, settings);
@@ -11383,7 +11458,7 @@ void tracker_hermes_replay_window(Tracker *t, const AppSettings *settings,
     bool snapshots_changed = false;
     size_t applied = 0;
 
-    for (auto &e : entries) {
+    for (auto &e: entries) {
         if (e.time_ms < cutoff) continue;
         if (hermes_process_decrypted_line(t, settings, e.line,
                                           &workbuf, workbuf_size, &snapshots_changed)) {

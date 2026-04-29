@@ -947,7 +947,7 @@ templates._
 
 ## Co-op Multiplayer
 
-> 📺 **Video Guide:** 
+> 📺 **Video Guide:** [Full Advancely Coop Guide](https://youtu.be/qBglJWOdhGk)
 
 Advancely has built-in co-op support so a group of players can share a single tracker/overlay view of their combined
 progress. One player runs the tracker as the **Host**; everyone else runs it as a **Receiver**. The Host merges
@@ -1479,6 +1479,7 @@ Massive thanks to all people involved in improving and shaping Advancely:
 * **[3emis](https://www.twitch.tv/3emis)**: Made the 1.11 `all_achievements` template and optimized the 1.12 and 1.13 `all_advancements` templates. Helped testing coop on Windows.
 * **[Ercha](https://www.twitch.tv/ErchamionMC)**: Made the `_ssg_blackcat` `all_advancements` template for 1.16.
 * **Jaykeycakey** (`jaykeycakey_` on Discord): Windows coop tester.
+* **[DCMii](https://www.twitch.tv/dcmii)**: Windows coop tester.
 * **[Lune](https://www.twitch.tv/lunemcsr)**: Fantastic Linux coop tester.
 * **[Duncan](https://linktr.ee/DuncanRuns)**: Creator of the `Hermes` mod and important coop tester.
 
