@@ -3391,6 +3391,20 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                     ImGui::SetTooltip("%s", tt);
                                 }
 
+                                size_t rc_len = strlen(coop_relay_room_code_recv);
+                                bool rc_chars_valid = true;
+                                for (size_t ci = 0; ci < rc_len; ci++) {
+                                    char c = coop_relay_room_code_recv[ci];
+                                    if (!((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))) {
+                                        rc_chars_valid = false;
+                                        break;
+                                    }
+                                }
+                                if (rc_len > 0 && (!rc_chars_valid || rc_len != 6)) {
+                                    ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
+                                                       "Invalid room code (6 characters, A-Z and 0-9)");
+                                }
+
                                 ImGui::SetNextItemWidth(200.0f);
                                 ImGuiInputTextFlags relay_recv_pw_flags = coop_relay_password_recv_revealed
                                                                               ? 0

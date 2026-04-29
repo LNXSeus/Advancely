@@ -1997,7 +1997,22 @@ int main(int argc, char *argv[]) {
 
                 if (overlay_has_terminated) {
                     log_message(LOG_INFO, "[MAIN] Overlay process terminated. Shutting down tracker.\n");
-                    is_running = false; // Signal the tracker's main loop to shut down
+                    // Mirror the tracker window's close-button popup logic so the user
+                    // can't accidentally drop an active lobby or unsaved changes by
+                    // closing the overlay window. If the user cancels the popup the
+                    // tracker keeps running without an overlay; they can re-enable it
+                    // from settings.
+                    CoopNetState ov_quit_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
+                    bool ov_lobby_active = (ov_quit_state == COOP_NET_LISTENING ||
+                                            ov_quit_state == COOP_NET_CONNECTED ||
+                                            ov_quit_state == COOP_NET_CONNECTING);
+                    if (tracker && (tracker->settings_has_unsaved_changes ||
+                                    tracker->template_editor_has_unsaved_changes ||
+                                    ov_lobby_active)) {
+                        tracker->quit_requested = true;
+                    } else {
+                        is_running = false; // Signal the tracker's main loop to shut down
+                    }
                 }
             }
 
@@ -3373,6 +3388,19 @@ int main(int argc, char *argv[]) {
                 // Cancel button (ESC to cancel)
                 bool esc_pressed = ImGui::IsKeyPressed(ImGuiKey_Escape);
                 if (ImGui::Button("Cancel") || esc_pressed) {
+                    // If the popup was triggered by closing the overlay window,
+                    // the overlay process is already gone but settings still say
+                    // it should be enabled. Re-spawn it via the apply flag so
+                    // cancelling actually returns the user to a working state.
+                    bool overlay_alive = false;
+#ifdef _WIN32
+                    overlay_alive = tracker && tracker->overlay_process_info.hProcess != nullptr;
+#else
+                    overlay_alive = tracker && tracker->overlay_pid > 0;
+#endif
+                    if (app_settings.enable_overlay && !overlay_alive) {
+                        SDL_SetAtomicInt(&g_apply_button_clicked, 1);
+                    }
                     ImGui::CloseCurrentPopup();
                 }
                 if (ImGui::IsItemHovered()) {
