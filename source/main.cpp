@@ -886,6 +886,14 @@ const char *get_resources_path() {
     return get_application_dir();
 }
 
+const char *get_cert_bundle_path() {
+    static char path[MAX_PATH_LENGTH] = "";
+    if (path[0] == '\0') {
+        snprintf(path, sizeof(path), "%s/ca_certificates/cacert.pem", get_resources_path());
+    }
+    return path;
+}
+
 // For Application files we want to get the Application directory.
 const char *get_application_dir() {
     static char path[MAX_PATH_LENGTH] = "";

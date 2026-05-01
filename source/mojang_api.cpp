@@ -9,14 +9,12 @@
 
 #include "mojang_api.h"
 #include "logger.h"
+#include "main.h"
 #include <cJSON.h>
 #include <curl/curl.h>
 #include <string>
 #include <cstring>
 #include <cstdio>
-
-// Path to the CA certificate bundle (same as update_checker.cpp)
-#define CERT_BUNDLE_PATH "resources/ca_certificates/cacert.pem"
 
 // Callback function for libcurl to write received data into a std::string
 static size_t mojang_write_callback(void *contents, size_t size, size_t nmemb, std::string *s) {
@@ -58,7 +56,7 @@ bool mojang_fetch_uuid(const char *username, char *out_uuid, size_t uuid_max_len
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "Advancely/1.0");
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, mojang_write_callback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &read_buffer);
-    curl_easy_setopt(curl, CURLOPT_CAINFO, CERT_BUNDLE_PATH);
+    curl_easy_setopt(curl, CURLOPT_CAINFO, get_cert_bundle_path());
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L); // 10 second timeout
 

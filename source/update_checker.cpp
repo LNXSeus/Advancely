@@ -27,9 +27,6 @@
 #endif
 
 
-// Path to the CA certificate bundle
-#define CERT_BUNDLE_PATH "resources/ca_certificates/cacert.pem"
-
 // New helper function to numerically compare version strings (e.g., "v0.9.100")
 static int compare_versions(const char *version1, const char *version2) {
     int major1 = 0, minor1 = 0, patch1 = 0;
@@ -132,7 +129,7 @@ bool check_for_updates(const char *current_version, char *out_latest_version, si
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &read_buffer);
 
         // Use the bundled certificate file on ALL platforms for consistency.
-        curl_easy_setopt(curl, CURLOPT_CAINFO, CERT_BUNDLE_PATH);
+        curl_easy_setopt(curl, CURLOPT_CAINFO, get_cert_bundle_path());
         // Also ensure peer verification is enabled.
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
 
@@ -230,7 +227,7 @@ bool download_update_zip(const char *url) {
             curl_easy_setopt(curl, CURLOPT_USERAGENT, "AdvancelyUpdateChecker/1.0");
             curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_callback);
             curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
-            curl_easy_setopt(curl, CURLOPT_CAINFO, CERT_BUNDLE_PATH);
+            curl_easy_setopt(curl, CURLOPT_CAINFO, get_cert_bundle_path());
             curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
             res = curl_easy_perform(curl);
