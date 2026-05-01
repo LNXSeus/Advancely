@@ -198,25 +198,24 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
 static void open_content(const char *target) {
     if (!target || target[0] == '\0') return;
 
-    // SDL_OpenURL covers all URLs and most local paths cross-platform.
-    // On Windows it maps to ShellExecuteW internally, so for URLs we never
-    // fall through to the ShellExecute fallback (which would open a second tab).
     bool is_url = (strncmp(target, "http://", 7) == 0 || strncmp(target, "https://", 8) == 0);
-    if (SDL_OpenURL(target) == 0 || is_url) {
+
+    // URLs go through SDL_OpenURL on every platform.
+    if (is_url) {
+        SDL_OpenURL(target);
         return;
     }
 
-    // Fallback for local directories if SDL_OpenURL fails (common on macOS/Linux for file paths)
+    // Local paths use the native opener directly. On Linux SDL_OpenURL may
+    // launch xdg-open AND return nonzero (based on xdg-open's exit code),
+    // which previously caused the fallback to fire and open the folder twice.
 #ifdef _WIN32
-    // Windows: ShellExecute for local paths only (URLs already handled above)
     ShellExecuteA(nullptr, "open", target, nullptr, nullptr, SW_SHOW);
 #elif defined(__APPLE__)
-    // macOS: The 'open' command is non-blocking and handles both URLs and Paths
     char command[MAX_PATH_LENGTH + 16];
     snprintf(command, sizeof(command), "open \"%s\"", target);
     system(command);
 #else
-    // Linux: 'xdg-open' is the standard
     char command[MAX_PATH_LENGTH + 16];
     snprintf(command, sizeof(command), "xdg-open \"%s\"", target);
     system(command);

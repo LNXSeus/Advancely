@@ -41,23 +41,23 @@
 static void open_content(const char *target) {
     if (!target || target[0] == '\0') return;
 
-    // Try SDL's cross-platform function first (Handles HTTPS links perfectly)
-    if (SDL_OpenURL(target) == 0) {
-        return; // Success
+    bool is_url = (strncmp(target, "http://", 7) == 0 || strncmp(target, "https://", 8) == 0);
+
+    if (is_url) {
+        SDL_OpenURL(target);
+        return;
     }
 
-    // Fallback for local directories if SDL_OpenURL fails (common on macOS/Linux for file paths)
+    // Local paths use the native opener directly. On Linux SDL_OpenURL may
+    // launch xdg-open AND return nonzero (based on xdg-open's exit code),
+    // which previously caused the fallback to fire and open the folder twice.
 #ifdef _WIN32
-    // Windows: ShellExecute handles paths and URLs
-    // (SDL_OpenURL usually maps to this anyway, but just in case)
     ShellExecuteA(nullptr, "open", target, nullptr, nullptr, SW_SHOW);
 #elif defined(__APPLE__)
-    // macOS: The 'open' command is non-blocking and handles both URLs and Paths
     char command[MAX_PATH_LENGTH + 16];
     snprintf(command, sizeof(command), "open \"%s\"", target);
     system(command);
 #else
-    // Linux: 'xdg-open' is the standard
     char command[MAX_PATH_LENGTH + 16];
     snprintf(command, sizeof(command), "xdg-open \"%s\"", target);
     system(command);
