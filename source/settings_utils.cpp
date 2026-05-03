@@ -673,7 +673,8 @@ bool settings_load(AppSettings *settings) {
                 sizeof(settings->optional_flag) - 1);
         settings->optional_flag[sizeof(settings->optional_flag) - 1] = '\0';
     } else {
-        settings->optional_flag[0] = '\0';
+        strncpy(settings->optional_flag, "_aatool_optimized", sizeof(settings->optional_flag) - 1);
+        settings->optional_flag[sizeof(settings->optional_flag) - 1] = '\0';
         defaults_were_used = true;
     }
 

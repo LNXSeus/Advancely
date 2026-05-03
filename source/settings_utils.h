@@ -142,7 +142,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 // DEFINE DEFAULT SETTINGS
 #define DEFAULT_VERSION "1.16.1"  // Also needs to be changed in settings_load()
 #define DEFAULT_CATEGORY "all_advancements" // Also needs to be changed in settings_load()
-#define DEFAULT_OPTIONAL_FLAG ""  // Also needs to be changed in settings_load()
+#define DEFAULT_OPTIONAL_FLAG "_aatool_optimized"  // Also needs to be changed in settings_load()
 #define DEFAULT_DISPLAY_CATEGORY "All Advancements"
 #define DEFAULT_LOCK_CATEGORY_DISPLAY_NAME false // Fixing Display name when changing templates
 
@@ -170,7 +170,7 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_TRACKER_VIEW_ZOOM 1.0f
 #define DEFAULT_TRACKER_VIEW_LOCKED false
 #define DEFAULT_TRACKER_VIEW_LOCKED_WIDTH 0.0f
-#define DEFAULT_TRACKER_USE_MANUAL_LAYOUT false
+#define DEFAULT_TRACKER_USE_MANUAL_LAYOUT true
 
 // Default window positions/sizes. -1 means centered or default size.
 #define DEFAULT_WINDOW_POS (-1)
