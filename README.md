@@ -1352,7 +1352,7 @@ _(Submit your template through the [official discord](https://discord.gg/TyNgXDz
   `.minecraft/saves` folder is a symbolic link. For best results, please provide a direct path to your saves folder in
   the settings if you use a custom location.
 * **Font Support**: The default `Minecraft.ttf` font doesn't support many more characters beyond the standard english
-  language. Simply import your own `.ttf` or `.otf` file if needed (has to be within the `resources/fonts` folder).
+  language. Simply import your own `.ttf`, `.otf` or `.ttc` file if needed (has to be within the `resources/fonts` folder).
 * **UI Language Support**: The UI language is hardcoded to english only the language files of display names can be
   changed.
 * **Local Co-op Support Only (No External Servers)**: Advancely now supports full co-op when one player runs a **lobby

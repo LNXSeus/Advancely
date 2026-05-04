@@ -181,9 +181,9 @@
 	"lang_flag":	"",
 	"hotkeys":	[],
 	"view_state":	{
-		"pan_x":	0,
-		"pan_y":	0,
-		"zoom":	1,
+		"pan_x":	24.296531677246094,
+		"pan_y":	25.363815307617188,
+		"zoom":	0.714492917060852,
 		"locked":	false,
 		"locked_width":	0,
 		"use_manual_layout":	true

@@ -138,18 +138,18 @@ bool open_font_file_dialog(char *out_filename, size_t max_len) {
         normalize_path(start_path);
     }
 #ifdef __APPLE__
-    const char *filter_patterns[4] = {"*.ttf", "*.otf", "public.truetype-ttf-font", "public.opentype-font"};
-    int filter_count = 4;
+    const char *filter_patterns[6] = {"*.ttf", "*.otf", "*.ttc", "public.truetype-ttf-font", "public.opentype-font", "public.truetype-collection-font"};
+    int filter_count = 6;
 #else
-    const char *filter_patterns[2] = {"*.ttf", "*.otf"};
-    int filter_count = 2;
+    const char *filter_patterns[3] = {"*.ttf", "*.otf", "*.ttc"};
+    int filter_count = 3;
 #endif
     const char *selected_path = tinyfd_openFileDialog(
         "Select Font File",
         start_path.c_str(),
         filter_count,
         filter_patterns,
-        "Font Files (.ttf, .otf)",
+        "Font Files (.ttf, .otf, .ttc)",
         0
     );
 
