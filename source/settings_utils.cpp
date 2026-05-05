@@ -563,6 +563,8 @@ void settings_set_defaults(AppSettings *settings) {
     settings->igt_unit_spacing = false;
     settings->igt_always_show_ms = false;
     settings->overlay_show_update_timer = true;
+    strncpy(settings->overlay_progress_separator, "|", sizeof(settings->overlay_progress_separator) - 1);
+    settings->overlay_progress_separator[sizeof(settings->overlay_progress_separator) - 1] = '\0';
 
     // Account Defaults
     settings->account_type = DEFAULT_ACCOUNT_TYPE;
@@ -915,6 +917,17 @@ bool settings_load(AppSettings *settings) {
         if (show_update && cJSON_IsBool(show_update)) settings->overlay_show_update_timer = cJSON_IsTrue(show_update);
         else {
             settings->overlay_show_update_timer = true;
+            defaults_were_used = true;
+        }
+
+        const cJSON *progress_sep = cJSON_GetObjectItem(general_settings, "overlay_progress_separator");
+        if (progress_sep && cJSON_IsString(progress_sep) && progress_sep->valuestring[0] != '\0') {
+            strncpy(settings->overlay_progress_separator, progress_sep->valuestring,
+                    sizeof(settings->overlay_progress_separator) - 1);
+            settings->overlay_progress_separator[sizeof(settings->overlay_progress_separator) - 1] = '\0';
+        } else {
+            strncpy(settings->overlay_progress_separator, "|", sizeof(settings->overlay_progress_separator) - 1);
+            settings->overlay_progress_separator[sizeof(settings->overlay_progress_separator) - 1] = '\0';
             defaults_were_used = true;
         }
 
@@ -1590,6 +1603,9 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_DeleteItemFromObject(general_obj, "overlay_show_update_timer");
         cJSON_AddItemToObject(general_obj, "overlay_show_update_timer",
                               cJSON_CreateBool(settings->overlay_show_update_timer));
+        cJSON_DeleteItemFromObject(general_obj, "overlay_progress_separator");
+        cJSON_AddItemToObject(general_obj, "overlay_progress_separator",
+                              cJSON_CreateString(settings->overlay_progress_separator));
 
         // --- Save Account Settings ---
         cJSON *account_obj = get_or_create_object(root, "account");

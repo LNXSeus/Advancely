@@ -115,6 +115,7 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->igt_unit_spacing != b->igt_unit_spacing ||
         a->igt_always_show_ms != b->igt_always_show_ms ||
         a->overlay_show_update_timer != b->overlay_show_update_timer ||
+        strcmp(a->overlay_progress_separator, b->overlay_progress_separator) != 0 ||
 
         strcmp(a->tracker_font_name, b->tracker_font_name) != 0 ||
         a->tracker_font_size != b->tracker_font_size ||
@@ -2160,6 +2161,21 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                              "When Hermes is active this timer only represents the time\n"
                              "since the last full game-save sync from disk.");
                     ImGui::SetTooltip("%s", overlay_text_timer_tooltip_buffer);
+                }
+
+                ImGui::SetNextItemWidth(80.0f);
+                ImGui::InputText("Segment Separator", temp_settings.overlay_progress_separator,
+                                 sizeof(temp_settings.overlay_progress_separator));
+                if (ImGui::IsItemHovered()) {
+                    char separator_tooltip_buffer[512];
+                    snprintf(separator_tooltip_buffer, sizeof(separator_tooltip_buffer),
+                             "The character(s) drawn between segments anywhere a separator is shown:\n"
+                             "the overlay's top bar, the tracker info bar, the tracker info window's\n"
+                             "title bar, and the OS window title.\n"
+                             "Default is \"|\". Replace it if your tracker/overlay font does not have\n"
+                             "the pipe glyph. Up to %zu characters.",
+                             sizeof(temp_settings.overlay_progress_separator) - 1);
+                    ImGui::SetTooltip("%s", separator_tooltip_buffer);
                 }
 
                 ImGui::Checkbox("Timers Unit Spacing", &temp_settings.igt_unit_spacing);

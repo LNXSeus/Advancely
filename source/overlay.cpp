@@ -560,9 +560,17 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
         char temp_chunk[256];
         bool first_item_added = false;
 
+        // Build the separator string ("|" by default, configurable for fonts that
+        // lack the pipe glyph) padded with surrounding spaces for readability.
+        char segment_sep[16];
+        const char *sep_char = (settings && settings->overlay_progress_separator[0] != '\0')
+                                   ? settings->overlay_progress_separator
+                                   : "|";
+        snprintf(segment_sep, sizeof(segment_sep), " %s ", sep_char);
+
         auto add_component = [&](const char *component_str) {
             if (first_item_added) {
-                strcat(info_buffer, " | ");
+                strcat(info_buffer, segment_sep);
             }
             strcat(info_buffer, component_str);
             first_item_added = true;
@@ -578,8 +586,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
             format_time(t->template_data->frozen_play_time_ticks, formatted_time, sizeof(formatted_time),
                         settings->igt_unit_spacing, settings->igt_always_show_ms);
             snprintf(info_buffer, sizeof(info_buffer),
-                     "*** RUN COMPLETED! *** | Final Time: %s | Donate (mentioning 'Advancely') to be featured!",
-                     formatted_time);
+                     "*** RUN COMPLETED! ***%sFinal Time: %s%sDonate (mentioning 'Advancely') to be featured!",
+                     segment_sep, formatted_time, segment_sep);
         } else {
             // Conditionally build the progress string section by section
             if (settings->overlay_show_world && t->world_name[0] != '\0') {
@@ -645,7 +653,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
 
         // Always append the rotating social media text to the prepared message
         if (info_buffer[0] != '\0') {
-            snprintf(final_buffer, sizeof(final_buffer), "%s | %s", info_buffer, SOCIALS[o->current_social_index]);
+            snprintf(final_buffer, sizeof(final_buffer), "%s%s%s", info_buffer, segment_sep,
+                     SOCIALS[o->current_social_index]);
         } else {
             // If all sections are turned off, just show the socials
             strncpy(final_buffer, SOCIALS[o->current_social_index], sizeof(final_buffer) - 1);

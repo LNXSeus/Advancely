@@ -353,6 +353,7 @@ struct AppSettings {
     bool igt_unit_spacing; // If true, a space is inserted before every time unit suffix (e.g. "02 m 04 s").
     bool igt_always_show_ms; // If true, milliseconds are always shown regardless of the time magnitude.
     bool overlay_show_update_timer; // If true, the update timer is shown in the overlay.
+    char overlay_progress_separator[9]; // Separator string drawn between top-bar segments. Default "|". Up to 8 visible characters.
     bool check_for_updates; // If true, checks for new versions on startup
     bool show_welcome_on_startup; // If true, shows the welcome message on startup
 

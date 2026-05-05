@@ -9715,9 +9715,16 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     }
     ImGui::PushStyleColor(ImGuiCol_Text, title_text_color);
 
-    // Enforce minimum width for the title bar
-    const char *info_window_title =
-            "Info | ESC: Settings | SPACE: Lock | Pan: RMB/MMB Drag | Zoom: Wheel | Click: LMB | Move Win: LMB Drag";
+    // Enforce minimum width for the title bar. The pipe between hint chunks is
+    // user-configurable (overlay_progress_separator) so fonts that lack it can
+    // be replaced.
+    const char *title_sep_char = (settings->overlay_progress_separator[0] != '\0')
+                                     ? settings->overlay_progress_separator
+                                     : "|";
+    char info_window_title[256];
+    snprintf(info_window_title, sizeof(info_window_title),
+             "Info %s ESC: Settings %s SPACE: Lock %s Pan: RMB/MMB Drag %s Zoom: Wheel %s Click: LMB %s Move Win: LMB Drag",
+             title_sep_char, title_sep_char, title_sep_char, title_sep_char, title_sep_char, title_sep_char);
     ImVec2 title_size = ImGui::CalcTextSize(info_window_title);
     // Add padding (WindowPadding * 2 + extra for safety/frame borders)
     float min_info_width = title_size.x + (ImGui::GetStyle().WindowPadding.x * 2.0f) + 40.0f;
@@ -9752,6 +9759,14 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
     char info_buffer[512];
     char formatted_time[64];
 
+    // User-configurable segment separator (defaults to "|"). Tracker info bar
+    // pads it with two spaces on each side; matches the original "  |  " visual.
+    const char *info_sep_char = (settings->overlay_progress_separator[0] != '\0')
+                                    ? settings->overlay_progress_separator
+                                    : "|";
+    char info_sep[24];
+    snprintf(info_sep, sizeof(info_sep), "  %s  ", info_sep_char);
+
     // Check if the run is 100% complete.
     bool is_run_complete = t->template_data->advancements_completed_count >= t->template_data->advancement_count &&
                            t->template_data->overall_progress_percentage >= 100.0f;
@@ -9765,8 +9780,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
     if (is_run_complete) {
         snprintf(info_buffer, sizeof(info_buffer),
-                 "*** RUN COMPLETED! *** |   Final Time: %s",
-                 formatted_time);
+                 "*** RUN COMPLETED! ***%sFinal Time: %s",
+                 info_sep, formatted_time);
     } else {
         // This is the original info string for when the run is in progress.
         char formatted_update_time[64];
@@ -9788,36 +9803,39 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
         // Start with the world name and run details
         if (settings->category_display_name[0] != '\0') {
-            snprintf(info_buffer, sizeof(info_buffer), "%s  |  %s - %s",
+            snprintf(info_buffer, sizeof(info_buffer), "%s%s%s - %s",
                      info_world,
+                     info_sep,
                      settings->display_version_str,
                      settings->category_display_name);
         } else {
-            snprintf(info_buffer, sizeof(info_buffer), "%s  |  %s",
+            snprintf(info_buffer, sizeof(info_buffer), "%s%s%s",
                      info_world,
+                     info_sep,
                      settings->display_version_str);
         }
 
         // Conditionally add the progress part
         if (show_adv_counter && show_prog_percent) {
-            snprintf(temp_chunk, sizeof(temp_chunk), "  |  %s: %d/%d  -  Prog: %.2f%%",
-                     adv_ach_label, t->template_data->advancements_completed_count,
+            snprintf(temp_chunk, sizeof(temp_chunk), "%s%s: %d/%d  -  Prog: %.2f%%",
+                     info_sep, adv_ach_label, t->template_data->advancements_completed_count,
                      t->template_data->advancement_goal_count, t->template_data->overall_progress_percentage);
             strncat(info_buffer, temp_chunk, sizeof(info_buffer) - strlen(info_buffer) - 1);
         } else if (show_adv_counter) {
-            snprintf(temp_chunk, sizeof(temp_chunk), "  |  %s: %d/%d",
-                     adv_ach_label, t->template_data->advancements_completed_count,
+            snprintf(temp_chunk, sizeof(temp_chunk), "%s%s: %d/%d",
+                     info_sep, adv_ach_label, t->template_data->advancements_completed_count,
                      t->template_data->advancement_goal_count);
             strncat(info_buffer, temp_chunk, sizeof(info_buffer) - strlen(info_buffer) - 1);
         } else if (show_prog_percent) {
-            snprintf(temp_chunk, sizeof(temp_chunk), "  |  Prog: %.2f%%",
-                     t->template_data->overall_progress_percentage);
+            snprintf(temp_chunk, sizeof(temp_chunk), "%sProg: %.2f%%",
+                     info_sep, t->template_data->overall_progress_percentage);
             strncat(info_buffer, temp_chunk, sizeof(info_buffer) - strlen(info_buffer) - 1);
         }
 
         // Add the IGT and Update Timer
-        snprintf(temp_chunk, sizeof(temp_chunk), "  |  %s IGT  |  %s %s",
-                 formatted_time,
+        snprintf(temp_chunk, sizeof(temp_chunk), "%s%s IGT%s%s %s",
+                 info_sep, formatted_time,
+                 info_sep,
                  settings->using_hermes ? "Synced:" : "Upd:",
                  formatted_update_time);
         strncat(info_buffer, temp_chunk, sizeof(info_buffer) - strlen(info_buffer) - 1);
@@ -12035,17 +12053,24 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
     bool show_adv_counter = (t->template_data->advancement_goal_count > 0);
     bool show_prog_percent = (t->template_data->total_progress_steps > 0);
 
+    // OS window title uses 4 spaces around the configured separator.
+    const char *title_sep_char = (settings->overlay_progress_separator[0] != '\0')
+                                     ? settings->overlay_progress_separator
+                                     : "|";
+    char title_sep[24];
+    snprintf(title_sep, sizeof(title_sep), "    %s    ", title_sep_char);
+
     if (show_adv_counter && show_prog_percent) {
-        snprintf(progress_chunk, sizeof(progress_chunk), "    |    %s: %d/%d    -    Progress: %.2f%%",
-                 adv_ach_label, t->template_data->advancements_completed_count,
+        snprintf(progress_chunk, sizeof(progress_chunk), "%s%s: %d/%d    -    Progress: %.2f%%",
+                 title_sep, adv_ach_label, t->template_data->advancements_completed_count,
                  t->template_data->advancement_goal_count, t->template_data->overall_progress_percentage);
     } else if (show_adv_counter) {
-        snprintf(progress_chunk, sizeof(progress_chunk), "    |    %s: %d/%d",
-                 adv_ach_label, t->template_data->advancements_completed_count,
+        snprintf(progress_chunk, sizeof(progress_chunk), "%s%s: %d/%d",
+                 title_sep, adv_ach_label, t->template_data->advancements_completed_count,
                  t->template_data->advancement_goal_count);
     } else if (show_prog_percent) {
-        snprintf(progress_chunk, sizeof(progress_chunk), "    |    Progress: %.2f%%",
-                 t->template_data->overall_progress_percentage);
+        snprintf(progress_chunk, sizeof(progress_chunk), "%sProgress: %.2f%%",
+                 title_sep, t->template_data->overall_progress_percentage);
     }
 
     char category_chunk[MAX_PATH_LENGTH + 10] = "";
@@ -12061,11 +12086,12 @@ void tracker_update_title(Tracker *t, const AppSettings *settings) {
     }
 
     snprintf(title_buffer, sizeof(title_buffer),
-             "  Advancely  %s    |    %s    -    %s%s%s    |    %s IGT    |    %s %s",
-             ADVANCELY_VERSION, world_display,
+             "  Advancely  %s%s%s    -    %s%s%s%s%s IGT%s%s %s",
+             ADVANCELY_VERSION, title_sep, world_display,
              settings->display_version_str,
              category_chunk,
-             progress_chunk, formatted_time,
+             progress_chunk, title_sep, formatted_time,
+             title_sep,
              settings->using_hermes ? "Synced:" : "Upd:",
              formatted_update_time);
 
