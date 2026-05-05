@@ -37,6 +37,9 @@
 #include "update_checker.h"
 #include "coop_net.h" // For co-op networking status display
 #include <SDL3/SDL_clipboard.h> // For room code copy/paste
+#include <SDL3/SDL_keyboard.h>
+#include <SDL3/SDL_keycode.h>
+#include <SDL3/SDL_scancode.h>
 
 // Build and set the template sync JSON payload on the co-op context.
 // Called when host starts and when settings are applied while hosting.
@@ -3805,24 +3808,22 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 "Select a template with custom goals using target values different from 0 to adjust their hotkeys here.");
             // --- Hotkey Settings ---
 
-            // This section is only displayed if the current template has custom counters.
-            static const char *key_names[] = {
-                "None", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S",
-                "T",
-                "U",
-                "V", "W", "X", "Y", "Z",
-                "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9",
-                "F10",
-                "F11", "F12",
-                "PrintScreen", "ScrollLock", "Pause", "Insert", "Home", "PageUp", "Delete", "End", "PageDown",
-                "Right", "Left", "Down", "Up", "Numlock", "Keypad /", "Keypad *", "Keypad -", "Keypad +",
-                "Keypad Enter",
-                "Keypad 1", "Keypad 2", "Keypad 3", "Keypad 4", "Keypad 5", "Keypad 6", "Keypad 7", "Keypad 8",
-                "Keypad 9",
-                "Keypad 0", "Keypad ."
-            };
+            // Capture state: which goal+slot is currently waiting for a key press.
+            // Slot 0 = decrement, Slot 1 = increment.
+            static char capturing_target_goal[192] = "";
+            static int capturing_slot = -1; // -1 = idle
 
-            const int key_names_count = sizeof(key_names) / sizeof(char *);
+            // Helper: convert a stored scancode-name (US layout) to a layout-aware
+            // keycap label so EU keyboards display the key the user actually presses.
+            auto display_label_for_key = [](const char *stored) -> std::string {
+                if (!stored || stored[0] == '\0' || strcmp(stored, "None") == 0) return "None";
+                SDL_Scancode sc = SDL_GetScancodeFromName(stored);
+                if (sc == SDL_SCANCODE_UNKNOWN) return stored; // Fallback to whatever we stored
+                SDL_Keycode kc = SDL_GetKeyFromScancode(sc, SDL_KMOD_NONE, false);
+                const char *name = SDL_GetKeyName(kc);
+                if (name && name[0] != '\0') return name;
+                return stored;
+            };
 
             // Create a temporary vector of counters to display
             std::vector<TrackableItem *> custom_counters;
@@ -3835,6 +3836,54 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 }
             }
 
+            // If a capture is in flight and the event handler has reported a scancode,
+            // apply it to the binding for the captured goal+slot.
+            if (capturing_slot >= 0 && SDL_GetAtomicInt(&g_hotkey_capture_armed) == 0) {
+                int captured = SDL_GetAtomicInt(&g_hotkey_captured_scancode);
+
+                // Resolve the new key name (US-layout scancode name, or "None").
+                const char *new_key = "None";
+                if (captured != 0) {
+                    const char *sc_name = SDL_GetScancodeName((SDL_Scancode) captured);
+                    if (sc_name && sc_name[0] != '\0') new_key = sc_name;
+                }
+
+                HotkeyBinding *binding = nullptr;
+                for (int i = 0; i < temp_settings.hotkey_count; ++i) {
+                    if (strcmp(temp_settings.hotkeys[i].target_goal, capturing_target_goal) == 0) {
+                        binding = &temp_settings.hotkeys[i];
+                        break;
+                    }
+                }
+
+                // Skip the write entirely if the new value matches the current one,
+                // so binding "None" over an already-None slot doesn't dirty the form.
+                const char *prev_key = "None";
+                if (binding) {
+                    prev_key = (capturing_slot == 1) ? binding->increment_key : binding->decrement_key;
+                }
+
+                if (strcmp(prev_key, new_key) != 0) {
+                    if (!binding && temp_settings.hotkey_count < MAX_HOTKEYS) {
+                        binding = &temp_settings.hotkeys[temp_settings.hotkey_count++];
+                        strncpy(binding->target_goal, capturing_target_goal, sizeof(binding->target_goal) - 1);
+                        binding->target_goal[sizeof(binding->target_goal) - 1] = '\0';
+                        strcpy(binding->increment_key, "None");
+                        strcpy(binding->decrement_key, "None");
+                    }
+                    if (binding) {
+                        char *target = (capturing_slot == 1) ? binding->increment_key : binding->decrement_key;
+                        size_t target_size = (capturing_slot == 1)
+                                                 ? sizeof(binding->increment_key)
+                                                 : sizeof(binding->decrement_key);
+                        strncpy(target, new_key, target_size - 1);
+                        target[target_size - 1] = '\0';
+                    }
+                }
+                capturing_target_goal[0] = '\0';
+                capturing_slot = -1;
+            }
+
             if (!custom_counters.empty()) {
                 ImGui::Text("Hotkey Settings for Custom Counters");
                 if (ImGui::IsItemHovered()) {
@@ -3842,15 +3891,16 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                     snprintf(hotkey_settings_tooltip_buffer, sizeof(hotkey_settings_tooltip_buffer),
                              "IMPORTANT: Hotkeys are remembered between templates.\n"
                              "You might have to restart the settings window for the hotkeys to appear.\n\n"
-                             "Assign keys to increment/decrement custom counters\n"
-                             "(only work when tabbed into the tracker). Maximum of %d hotkeys are supported.",
+                             "Click a button and press a key to bind it. Press Escape, Backspace,\n"
+                             "or Delete during capture to clear the binding back to None.\n"
+                             "Hotkeys only work when tabbed into the tracker.\n"
+                             "Maximum of %d hotkeys are supported.",
                              MAX_HOTKEYS);
                     ImGui::SetTooltip("%s", hotkey_settings_tooltip_buffer);
                 }
 
                 // Loop through the counters provided by the LIVE TEMPLATE to build the UI rows
                 for (const auto &counter: custom_counters) {
-                    // For each counter, find its corresponding binding in our editable temp_settings
                     HotkeyBinding *binding = nullptr;
                     for (int i = 0; i < temp_settings.hotkey_count; ++i) {
                         if (strcmp(temp_settings.hotkeys[i].target_goal, counter->root_name) == 0) {
@@ -3859,71 +3909,60 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         }
                     }
 
+                    const char *dec_stored = binding ? binding->decrement_key : "None";
+                    const char *inc_stored = binding ? binding->increment_key : "None";
+
+                    bool capturing_dec = (capturing_slot == 0 &&
+                                          strcmp(capturing_target_goal, counter->root_name) == 0);
+                    bool capturing_inc = (capturing_slot == 1 &&
+                                          strcmp(capturing_target_goal, counter->root_name) == 0);
+
                     ImGui::Text("%s", counter->display_name);
                     ImGui::SameLine();
 
-                    // --- Increment Key Combo ---
-                    char *inc_key_val = binding ? binding->increment_key : (char *) "None";
-                    int current_inc_key_idx = 0;
-                    for (int k = 0; k < key_names_count; ++k) {
-                        if (strcmp(inc_key_val, key_names[k]) == 0) {
-                            current_inc_key_idx = k;
-                            break;
-                        }
-                    }
+                    // --- Decrement first, then Increment (per UX request) ---
+                    ImGui::TextDisabled("Decr.");
+                    ImGui::SameLine();
 
-                    char inc_label[64];
-                    snprintf(inc_label, sizeof(inc_label), "##inc_%s", counter->root_name);
-                    if (ImGui::Combo(inc_label, &current_inc_key_idx, key_names, key_names_count)) {
-                        // User made a change. We now modify temp_settings.
-                        if (!binding) {
-                            // If binding didn't exist, add a new one.
-                            if (temp_settings.hotkey_count < MAX_HOTKEYS) {
-                                binding = &temp_settings.hotkeys[temp_settings.hotkey_count++];
-                                strncpy(binding->target_goal, counter->root_name, sizeof(binding->target_goal) - 1);
-                                binding->target_goal[sizeof(binding->target_goal) - 1] = '\0';
-                                strcpy(binding->decrement_key, "None"); // Set default for the other key
-                                binding->decrement_key[sizeof(binding->decrement_key) - 1] = '\0';
-                            }
-                        }
-                        if (binding) {
-                            strncpy(binding->increment_key, key_names[current_inc_key_idx],
-                                    sizeof(binding->increment_key) - 1);
-                            binding->increment_key[sizeof(binding->increment_key) - 1] = '\0';
-                        }
+                    char dec_btn_label[256];
+                    if (capturing_dec) {
+                        snprintf(dec_btn_label, sizeof(dec_btn_label),
+                                 "Press a key...##dec_%s", counter->root_name);
+                    } else {
+                        std::string label = display_label_for_key(dec_stored);
+                        snprintf(dec_btn_label, sizeof(dec_btn_label),
+                                 "%s##dec_%s", label.c_str(), counter->root_name);
+                    }
+                    if (ImGui::Button(dec_btn_label, ImVec2(140, 0))) {
+                        // Arm capture for this slot.
+                        strncpy(capturing_target_goal, counter->root_name,
+                                sizeof(capturing_target_goal) - 1);
+                        capturing_target_goal[sizeof(capturing_target_goal) - 1] = '\0';
+                        capturing_slot = 0;
+                        SDL_SetAtomicInt(&g_hotkey_captured_scancode, 0);
+                        SDL_SetAtomicInt(&g_hotkey_capture_armed, 1);
                     }
 
                     ImGui::SameLine();
+                    ImGui::TextDisabled("Incr.");
+                    ImGui::SameLine();
 
-                    // --- Decrement Key Combo ---
-                    char *dec_key_val = binding ? binding->decrement_key : (char *) "None";
-                    int current_dec_key_idx = 0;
-                    for (int k = 0; k < key_names_count; ++k) {
-                        if (strcmp(dec_key_val, key_names[k]) == 0) {
-                            current_dec_key_idx = k;
-                            break;
-                        }
+                    char inc_btn_label[256];
+                    if (capturing_inc) {
+                        snprintf(inc_btn_label, sizeof(inc_btn_label),
+                                 "Press a key...##inc_%s", counter->root_name);
+                    } else {
+                        std::string label = display_label_for_key(inc_stored);
+                        snprintf(inc_btn_label, sizeof(inc_btn_label),
+                                 "%s##inc_%s", label.c_str(), counter->root_name);
                     }
-
-                    char dec_label[64];
-                    snprintf(dec_label, sizeof(dec_label), "##dec_%s", counter->root_name);
-                    if (ImGui::Combo(dec_label, &current_dec_key_idx, key_names, key_names_count)) {
-                        // User made a change. We now modify temp_settings.
-                        if (!binding) {
-                            // If binding didn't exist, add a new one.
-                            if (temp_settings.hotkey_count < MAX_HOTKEYS) {
-                                binding = &temp_settings.hotkeys[temp_settings.hotkey_count++];
-                                strncpy(binding->target_goal, counter->root_name, sizeof(binding->target_goal) - 1);
-                                binding->target_goal[sizeof(binding->target_goal) - 1] = '\0';
-                                strcpy(binding->increment_key, "None"); // Set default for the other key
-                                binding->increment_key[sizeof(binding->increment_key) - 1] = '\0';
-                            }
-                        }
-                        if (binding) {
-                            strncpy(binding->decrement_key, key_names[current_dec_key_idx],
-                                    sizeof(binding->decrement_key) - 1);
-                            binding->decrement_key[sizeof(binding->decrement_key) - 1] = '\0';
-                        }
+                    if (ImGui::Button(inc_btn_label, ImVec2(140, 0))) {
+                        strncpy(capturing_target_goal, counter->root_name,
+                                sizeof(capturing_target_goal) - 1);
+                        capturing_target_goal[sizeof(capturing_target_goal) - 1] = '\0';
+                        capturing_slot = 1;
+                        SDL_SetAtomicInt(&g_hotkey_captured_scancode, 0);
+                        SDL_SetAtomicInt(&g_hotkey_capture_armed, 1);
                     }
                 }
 

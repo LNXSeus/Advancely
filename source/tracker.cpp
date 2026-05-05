@@ -2440,10 +2440,24 @@ static void apply_custom_progress_subtree(Tracker *t, cJSON *progress_obj, bool 
         if (!j) continue;
 
         if (item->goal == -1) {
-            if (cJSON_IsTrue(j)) {
+            if (cJSON_IsObject(j)) {
+                // New schema: separate completion + progress so toggling the checkbox
+                // does not destroy the running counter.
+                cJSON *completed = cJSON_GetObjectItem(j, "completed");
+                cJSON *progress = cJSON_GetObjectItem(j, "progress");
+                bool is_completed = cJSON_IsBool(completed) && cJSON_IsTrue(completed);
+                if (is_completed) {
+                    item->done = true;
+                    item->is_manually_completed = true;
+                }
+                if (cJSON_IsNumber(progress)) {
+                    if (merge) item->progress += progress->valueint;
+                    else item->progress = progress->valueint;
+                }
+            } else if (cJSON_IsTrue(j)) {
+                // Legacy bool-true: treated as completion only, no implied progress bump.
                 item->done = true;
                 item->is_manually_completed = true;
-                if (item->progress < 1) item->progress = 1;
             } else if (cJSON_IsNumber(j)) {
                 if (merge) item->progress += j->valueint;
                 else item->progress = j->valueint;
@@ -4617,17 +4631,37 @@ void tracker_apply_coop_mods(Tracker *t, const AppSettings *settings,
             // Read the source player's previous value, apply the action, write back.
             cJSON *prev = cJSON_GetObjectItem(uuid_obj, mod->goal_root_name);
             if (cg_item->goal == -1) {
-                // Target -1: number counter with optional manual-complete override.
-                if (mod->action == COOP_MOD_TOGGLE) {
-                    bool prev_bool = cJSON_IsBool(prev) && cJSON_IsTrue(prev);
-                    cJSON_DeleteItemFromObject(uuid_obj, mod->goal_root_name);
-                    cJSON_AddItemToObject(uuid_obj, mod->goal_root_name, cJSON_CreateBool(!prev_bool));
-                } else {
-                    int cur = cJSON_IsNumber(prev) ? prev->valueint : 0;
-                    int nv = (mod->action == COOP_MOD_INCREMENT) ? cur + 1 : cur - 1;
-                    cJSON_DeleteItemFromObject(uuid_obj, mod->goal_root_name);
-                    cJSON_AddItemToObject(uuid_obj, mod->goal_root_name, cJSON_CreateNumber(nv));
+                // Target -1: structured {completed, progress} so the toggle and counter
+                // stay independent. Read previous values from the new object schema,
+                // falling back to the legacy bool/number forms.
+                bool prev_completed = false;
+                int prev_progress = 0;
+                if (cJSON_IsObject(prev)) {
+                    cJSON *pc = cJSON_GetObjectItem(prev, "completed");
+                    cJSON *pp = cJSON_GetObjectItem(prev, "progress");
+                    prev_completed = cJSON_IsBool(pc) && cJSON_IsTrue(pc);
+                    if (cJSON_IsNumber(pp)) prev_progress = pp->valueint;
+                } else if (cJSON_IsBool(prev)) {
+                    prev_completed = cJSON_IsTrue(prev);
+                } else if (cJSON_IsNumber(prev)) {
+                    prev_progress = prev->valueint;
                 }
+
+                bool new_completed = prev_completed;
+                int new_progress = prev_progress;
+                if (mod->action == COOP_MOD_TOGGLE) {
+                    new_completed = !prev_completed;
+                } else if (mod->action == COOP_MOD_INCREMENT) {
+                    new_progress = prev_progress + 1;
+                } else if (mod->action == COOP_MOD_DECREMENT) {
+                    new_progress = prev_progress - 1;
+                }
+
+                cJSON *obj = cJSON_CreateObject();
+                cJSON_AddBoolToObject(obj, "completed", new_completed);
+                cJSON_AddNumberToObject(obj, "progress", new_progress);
+                cJSON_DeleteItemFromObject(uuid_obj, mod->goal_root_name);
+                cJSON_AddItemToObject(uuid_obj, mod->goal_root_name, obj);
             } else if (cg_item->goal > 0) {
                 // Bounded counter.
                 int cur = cJSON_IsNumber(prev) ? prev->valueint : 0;
@@ -7110,8 +7144,9 @@ static void render_simple_item_section(Tracker *t, const AppSettings *settings, 
             snprintf(progress_text, sizeof(progress_text), "(%d / %d)", item->progress, item->goal);
             has_progress_text = true;
         }
-        // For infinite counters, only show progress if not manually overridden/done
-        else if (item->goal == -1 && !item->done) {
+        // For infinite counters, always show the running counter so users can see
+        // their progress even when the goal is manually marked complete.
+        else if (item->goal == -1) {
             snprintf(progress_text, sizeof(progress_text), "(%d)", item->progress);
             has_progress_text = true;
         }
@@ -7495,7 +7530,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 if (item->goal > 0) {
                     snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d / %d)", item->progress,
                              item->goal);
-                } else if (item->goal == -1 && !item->done) {
+                } else if (item->goal == -1) {
                     snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d)", item->progress);
                 }
 
@@ -7569,7 +7604,9 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
         if (item->goal > 0) {
             snprintf(progress_text, sizeof(progress_text), "(%d / %d)", item->progress, item->goal);
             has_progress_text = true;
-        } else if (item->goal == -1 && !item->done) {
+        } else if (item->goal == -1) {
+            // Keep the running counter visible even when the goal is manually
+            // marked complete so progress remains readable.
             snprintf(progress_text, sizeof(progress_text), "(%d)", item->progress);
             has_progress_text = true;
         }
@@ -7910,7 +7947,13 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                                                                        item->linked_goal_count,
                                                                        item->linked_goal_mode));
                         }
-                        item->progress = item->done ? 1 : 0;
+                        // For goal == -1 (infinite counter), keep the running counter
+                        // independent of the checkbox toggle. Simple toggles (goal == 0/1)
+                        // still mirror progress to done so they round-trip through the
+                        // legacy boolean schema.
+                        if (item->goal != -1) {
+                            item->progress = item->done ? 1 : 0;
+                        }
                         SDL_SetAtomicInt(&g_suppress_settings_watch, 1);
                         settings_save(settings, t->template_data, SAVE_CONTEXT_ALL);
                         SDL_SetAtomicInt(&g_coop_broadcast_needed, 1);

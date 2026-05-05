@@ -1774,11 +1774,12 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
 
                 // 3-way logic for custom progress, -1, greater than 0, or 0 and not set
                 if (item->goal == -1) {
-                    if (item->is_manually_completed) {
-                        cJSON_AddItemToObject(progress_obj, item->root_name, cJSON_CreateBool(true));
-                    } else {
-                        cJSON_AddItemToObject(progress_obj, item->root_name, cJSON_CreateNumber(item->progress));
-                    }
+                    // Target -1: store completion and progress as a structured object so the
+                    // checkbox state and the running counter remain independent.
+                    cJSON *obj = cJSON_CreateObject();
+                    cJSON_AddBoolToObject(obj, "completed", item->is_manually_completed);
+                    cJSON_AddNumberToObject(obj, "progress", item->progress);
+                    cJSON_AddItemToObject(progress_obj, item->root_name, obj);
                 } else if (item->goal > 0) {
                     cJSON_AddItemToObject(progress_obj, item->root_name, cJSON_CreateNumber(item->progress));
                 } else {

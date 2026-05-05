@@ -96,6 +96,8 @@ SDL_AtomicInt g_notes_changed;
 SDL_AtomicInt g_apply_button_clicked;
 SDL_AtomicInt g_templates_changed;
 SDL_AtomicInt g_coop_broadcast_needed; // Custom goal change: broadcast + IPC without full file re-merge
+SDL_AtomicInt g_hotkey_capture_armed;
+SDL_AtomicInt g_hotkey_captured_scancode;
 
 // Change the global flag from a bool to our new enum.
 ForceOpenReason g_force_open_reason = FORCE_OPEN_NONE;

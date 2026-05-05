@@ -1332,7 +1332,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 if (goal->goal > 0)
                                     snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
                                              goal->progress, goal->goal);
-                                else if (goal->goal == -1 && !goal->done)
+                                else if (goal->goal == -1)
                                     snprintf(
                                         progress_buf, sizeof(progress_buf), "(%d)", goal->progress);
                                 break;
@@ -1827,7 +1827,7 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             name_buf[sizeof(name_buf) - 1] = '\0';
                             if (goal->goal > 0) {
                                 snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)", goal->progress, goal->goal);
-                            } else if (goal->goal == -1 && !goal->done) {
+                            } else if (goal->goal == -1) {
                                 snprintf(progress_buf, sizeof(progress_buf), "(%d)", goal->progress);
                             }
                             break;

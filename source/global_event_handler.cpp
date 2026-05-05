@@ -39,6 +39,28 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
             break;
         }
 
+        // Hotkey capture: while the settings dialog is waiting for a binding,
+        // consume the next non-modifier key press and report its scancode.
+        if (event.type == SDL_EVENT_KEY_DOWN && event.key.repeat == 0 &&
+            SDL_GetAtomicInt(&g_hotkey_capture_armed) == 1) {
+            SDL_Scancode sc = event.key.scancode;
+            // Ignore pure modifiers so users can hold shift/ctrl without binding them.
+            bool is_pure_modifier = (sc == SDL_SCANCODE_LSHIFT || sc == SDL_SCANCODE_RSHIFT ||
+                                     sc == SDL_SCANCODE_LCTRL || sc == SDL_SCANCODE_RCTRL ||
+                                     sc == SDL_SCANCODE_LALT || sc == SDL_SCANCODE_RALT ||
+                                     sc == SDL_SCANCODE_LGUI || sc == SDL_SCANCODE_RGUI);
+            if (!is_pure_modifier) {
+                if (sc == SDL_SCANCODE_ESCAPE || sc == SDL_SCANCODE_BACKSPACE ||
+                    sc == SDL_SCANCODE_DELETE) {
+                    SDL_SetAtomicInt(&g_hotkey_captured_scancode, 0); // Clear to "None"
+                } else {
+                    SDL_SetAtomicInt(&g_hotkey_captured_scancode, (int) sc);
+                }
+                SDL_SetAtomicInt(&g_hotkey_capture_armed, 0);
+                continue; // do not let the captured key propagate as a hotkey
+            }
+        }
+
         // Event-based HOTKEY HANDLING
         if (event.type == SDL_EVENT_KEY_DOWN && event.key.repeat == 0) {
             // Hotkey for UI control (e.g., focusing the search box)
@@ -103,6 +125,14 @@ void handle_global_events(Tracker *t, Overlay *o, AppSettings *app_settings,
                             }
                         }
                         if (!target_goal) continue;
+
+                        // Block increment/decrement on infinite counters (goal == -1) once
+                        // the user has manually marked the goal complete. The toggle stays
+                        // independent of progress, but accidentally bumping a "completed"
+                        // counter is unwanted noise
+                        if (target_goal->goal == -1 && target_goal->is_manually_completed) {
+                            continue;
+                        }
 
                         // Convert key names from settings to scancodes for comparison
                         SDL_Scancode inc_scancode = SDL_GetScancodeFromName(hb->increment_key);
