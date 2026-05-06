@@ -10202,7 +10202,9 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
         char tooltip_buffer[256];
         snprintf(tooltip_buffer, sizeof(tooltip_buffer),
                  "Toggles between procedural 'Auto Layout' and 'Manual Layout'.\n"
-                 "Any non-manually placed goals get pushed to the right.");
+                 "Any non-manually placed goals get pushed to the right.\n"
+                 "Repositioning for the manual layout is done through the\n"
+                 "Template Editor's Visual Layout Editor.");
         ImGui::SetTooltip("%s", tooltip_buffer);
     }
     ImGui::EndDisabled();

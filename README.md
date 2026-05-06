@@ -686,7 +686,7 @@ Nearly every aspect of the overlay can be tailored to your liking from the setti
 
 ***
 
-## The Template Editor (`ESC` ▶ Edit Templates)
+## The Template Editor (`ESC` ▶ Open Template Editor)
 
 <details>
 <summary>📺 <strong>Video Guide: Template Editor Chapters (Click to View)</strong></summary>
@@ -712,7 +712,7 @@ Nearly every aspect of the overlay can be tailored to your liking from the setti
 
 This is the heart of Advancely's customization. The in-app editor gives you complete control to define, modify, and
 share the rulesets or `templates` that the tracker uses. You can access it by opening the settings (`ESC`) and clicking
-the `Edit Templates` button.
+the `Open Template Editor` button.
 
 <p align="center">
   <img src="readme_assets/v1.2.0_Template_Editor.png" alt="Template_Editor">

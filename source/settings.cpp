@@ -710,7 +710,8 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                          "resources/templates/Version/Category/Version_CategoryOptionalFlag.json\n\n"
                          "Each template has one or more language files (e.g., ..._lang.json for default, ..._lang_eng.json for English)\n"
                          "that store all the display names shown in the UI.\n\n"
-                         "Use the 'Edit Templates' button to build new templates, edit existing ones, and manage their language files.");
+                         "Use the 'Open Template Editor' button to build new templates,\n"
+                         "edit existing ones, and manage their language files.");
                 ImGui::SetTooltip(
                     "%s", template_settings_tooltip_buffer);
             }
@@ -1073,7 +1074,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                     snprintf(category_tooltip_buffer, sizeof(category_tooltip_buffer),
                              "Choose between available categories for the selected version.\n"
                              "If the category you're looking for isn't available you can create it\n"
-                             "by clicking the 'Edit Templates' button or view the list of officially added\n"
+                             "by clicking the 'Open Template Editor' button or view the list of officially added\n"
                              "templates by clicking the '(Learn more)' button next to the 'Template Settings'.\n\n"
                              "Templates marked with '(has layout)' include pre-defined positions for goals.\n"
                              "Enable the 'Manual Layout' checkbox to use them.");
@@ -1278,7 +1279,7 @@ void settings_render_gui(bool *p_open, AppSettings *app_settings, ImFont *roboto
                                         coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTED ||
                                         coop_net_get_state(g_coop_ctx) == COOP_NET_CONNECTING);
             if (coop_session_active) ImGui::BeginDisabled();
-            if (ImGui::Button("Edit Templates")) {
+            if (ImGui::Button("Open Template Editor")) {
                 *p_temp_creator_open = true; // Open the template creator window
             }
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
@@ -1984,7 +1985,11 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             // General Settings
             ImGui::Text("General");
 
+#ifdef _WIN32
+            ImGui::Checkbox("Enable Overlay (use Game Capture)", &temp_settings.enable_overlay);
+#else
             ImGui::Checkbox("Enable Overlay", &temp_settings.enable_overlay);
+#endif
             if (ImGui::IsItemHovered()) {
                 char enable_overlay_tooltip_buffer[2048];
                 if (selected_version <= MC_VERSION_1_6_4) {
