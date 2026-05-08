@@ -2234,6 +2234,13 @@ int main(int argc, char *argv[]) {
 #endif
                 }
 
+                // The overlay's exit-save just wrote its actual SDL window geometry.
+                // The width there does NOT reflect a width change made via the
+                // settings dialog (we never push width into the overlay process),
+                // so rewrite just the width subkey using the tracker's authoritative
+                // value before the new overlay process starts.
+                settings_save_overlay_width_only(app_settings.overlay_window.w);
+
                 // Now, check if the NEW settings require the overlay to be enabled.
                 if (app_settings.enable_overlay) {
                     log_message(LOG_INFO, "[MAIN] Starting overlay process with new settings.\n");

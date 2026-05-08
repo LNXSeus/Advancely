@@ -1884,6 +1884,31 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
     cJSON_Delete(root);
 }
 
+void settings_save_overlay_width_only(int width) {
+    cJSON *root = cJSON_from_file(get_settings_file_path());
+    if (!root) root = cJSON_CreateObject();
+
+    cJSON *visuals_obj = get_or_create_object(root, "visuals");
+    cJSON *overlay_obj = get_or_create_object(visuals_obj, "overlay_window");
+    cJSON_DeleteItemFromObject(overlay_obj, "w");
+    cJSON_AddItemToObject(overlay_obj, "w", cJSON_CreateNumber(width));
+
+    FILE *file = fopen(get_settings_file_path(), "w");
+    if (file) {
+        char *json_str = cJSON_Print(root);
+        if (json_str) {
+            fputs(json_str, file);
+            free(json_str);
+        }
+        fclose(file);
+    } else {
+        log_message(LOG_ERROR,
+                    "[SETTINGS UTILS] Failed to open settings file for writing overlay width: %s\n",
+                    get_settings_file_path());
+    }
+    cJSON_Delete(root);
+}
+
 
 void construct_template_base_path(const AppSettings *settings, char *out, size_t out_size) {
     if (!settings || !out || out_size == 0) return;

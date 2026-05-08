@@ -423,6 +423,8 @@ bool settings_load(AppSettings *settings);
  */
 void settings_save(const AppSettings *settings, const TemplateData *td, SettingsSaveContext context);
 
+void settings_save_overlay_width_only(int width);
+
 /**
  * @brief Returns the per-UUID sub-object from a `custom_progress` or
  * `stat_progress_override` parent object, migrating legacy flat schema in-place

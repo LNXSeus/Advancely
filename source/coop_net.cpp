@@ -127,45 +127,77 @@ static bool send_message(coop_socket_t fd, uint32_t type, const void *payload, u
     return true;
 }
 
+// Format the most recent socket error code into `buf` (e.g. "WSA 10054" or
+// "errno 104 (Connection reset by peer)"). Used to enrich disconnect reasons
+// for both the log file and the user-facing status message.
+static void format_socket_error(char *buf, size_t buf_size) {
+    if (!buf || buf_size == 0) return;
+#ifdef _WIN32
+    snprintf(buf, buf_size, "WSA %d", WSAGetLastError());
+#else
+    snprintf(buf, buf_size, "errno %d (%s)", errno, strerror(errno));
+#endif
+}
+
 // Try to receive exactly `len` bytes (non-blocking friendly).
 // Returns: >0 = bytes read (may be < len), 0 = connection closed, -1 = would block, -2 = error
-static int recv_exact(coop_socket_t fd, void *buf, size_t len) {
+// On a real error (-2), `out_err` (if non-null) is filled with the OS error code description.
+static int recv_exact(coop_socket_t fd, void *buf, size_t len, char *out_err, size_t out_err_size) {
     int result = recv(fd, (char *) buf, (int) len, 0);
     if (result > 0) return result;
     if (result == 0) return 0; // Connection closed
 #ifdef _WIN32
     int err = WSAGetLastError();
     if (err == WSAEWOULDBLOCK) return -1;
-    log_message(LOG_ERROR, "[COOP NET] recv() error: WSA %d\n", err);
 #else
     if (errno == EAGAIN || errno == EWOULDBLOCK) return -1;
-    log_message(LOG_ERROR, "[COOP NET] recv() error: errno %d (%s)\n", errno, strerror(errno));
 #endif
+    if (out_err) format_socket_error(out_err, out_err_size);
     return -2; // Real error
 }
 
 // Read a complete framed message from a socket.
 // Returns true if a message was read. Sets out_type, out_payload (caller must free), out_payload_len.
 // Returns false if no complete message available yet or error.
-// Sets *disconnected = true if the remote side closed the connection.
+// Sets *disconnected = true if the remote side closed the connection or an error occurred.
+// On disconnect, fills `out_reason` (if non-null) with a short description and logs LOG_ERROR.
 static bool read_message(coop_socket_t fd, uint32_t *out_type, char **out_payload, uint32_t *out_payload_len,
-                         bool *disconnected) {
+                         bool *disconnected, char *out_reason, size_t reason_size) {
     *disconnected = false;
     *out_payload = nullptr;
     *out_payload_len = 0;
+    if (out_reason && reason_size > 0) out_reason[0] = '\0';
+
+    // Helper macro: write reason (if buffer provided) and emit LOG_ERROR with the same text.
+#define COOP_FAIL_REASON(...)                                                                                \
+    do {                                                                                                     \
+        char _reason_buf[160];                                                                               \
+        snprintf(_reason_buf, sizeof(_reason_buf), __VA_ARGS__);                                             \
+        log_message(LOG_ERROR, "[COOP NET] read_message disconnect: %s\n", _reason_buf);                     \
+        if (out_reason && reason_size > 0) {                                                                 \
+            strncpy(out_reason, _reason_buf, reason_size - 1);                                               \
+            out_reason[reason_size - 1] = '\0';                                                              \
+        }                                                                                                    \
+    } while (0)
 
     // Read header
     uint32_t header[2];
     size_t header_read = 0;
     while (header_read < sizeof(header)) {
-        int r = recv_exact(fd, (char *) header + header_read, sizeof(header) - header_read);
+        char err_buf[96] = {0};
+        int r = recv_exact(fd, (char *) header + header_read, sizeof(header) - header_read,
+                           err_buf, sizeof(err_buf));
         if (r == 0) {
             *disconnected = true;
+            COOP_FAIL_REASON("peer closed connection (FIN before header, %zu/%zu bytes read)",
+                             header_read, sizeof(header));
             return false;
         }
         if (r == -1) return false; // Would block, no data yet
         if (r == -2) {
             *disconnected = true;
+            COOP_FAIL_REASON("socket error during header read (%s, %zu/%zu bytes)",
+                             err_buf, header_read, sizeof(header));
             return false;
         }
         header_read += (size_t) r;
@@ -177,6 +209,8 @@ static bool read_message(coop_socket_t fd, uint32_t *out_type, char **out_payloa
     // Sanity check payload size (16 MB max)
     if (*out_payload_len > 16 * 1024 * 1024) {
         *disconnected = true;
+        COOP_FAIL_REASON("oversize payload (%u bytes, type=%u) - dropping connection",
+                         *out_payload_len, *out_type);
         return false;
     }
 
@@ -184,17 +218,22 @@ static bool read_message(coop_socket_t fd, uint32_t *out_type, char **out_payloa
         *out_payload = (char *) malloc(*out_payload_len);
         if (!*out_payload) {
             *disconnected = true;
+            COOP_FAIL_REASON("malloc failed for payload (%u bytes, type=%u)",
+                             *out_payload_len, *out_type);
             return false;
         }
 
         size_t payload_read = 0;
         while (payload_read < *out_payload_len) {
-            int r = recv_exact(fd, *out_payload + payload_read, *out_payload_len - payload_read);
+            char err_buf[96] = {0};
+            int r = recv_exact(fd, *out_payload + payload_read, *out_payload_len - payload_read,
+                               err_buf, sizeof(err_buf));
             if (r == 0) {
-                // Connection closed
                 free(*out_payload);
                 *out_payload = nullptr;
                 *disconnected = true;
+                COOP_FAIL_REASON("peer closed connection mid-payload (%zu/%u bytes, type=%u)",
+                                 payload_read, *out_payload_len, *out_type);
                 return false;
             }
             if (r == -1) {
@@ -203,16 +242,18 @@ static bool read_message(coop_socket_t fd, uint32_t *out_type, char **out_payloa
                 continue;
             }
             if (r == -2) {
-                // Real error
                 free(*out_payload);
                 *out_payload = nullptr;
                 *disconnected = true;
+                COOP_FAIL_REASON("socket error mid-payload (%s, %zu/%u bytes, type=%u)",
+                                 err_buf, payload_read, *out_payload_len, *out_type);
                 return false;
             }
             payload_read += (size_t) r;
         }
     }
 
+#undef COOP_FAIL_REASON
     return true;
 }
 
@@ -705,7 +746,9 @@ static int SDLCALL host_thread_func(void *data) {
                 uint32_t payload_len;
                 bool disconnected;
 
-                if (read_message(ctx->clients[i].socket_fd, &msg_type, &payload, &payload_len, &disconnected)) {
+                char disc_reason[160] = {0};
+                if (read_message(ctx->clients[i].socket_fd, &msg_type, &payload, &payload_len,
+                                 &disconnected, disc_reason, sizeof(disc_reason))) {
                     if (msg_type == COOP_MSG_JOIN_REQUEST && !ctx->clients[i].handshake_done) {
                         // Parse identity from JSON payload
                         char *json_str = (char *) malloc(payload_len + 1);
@@ -981,11 +1024,17 @@ static int SDLCALL host_thread_func(void *data) {
                     }
                     free(payload);
                 } else if (disconnected) {
-                    log_message(LOG_INFO, "[COOP NET] Client %s connection lost.\n", ctx->clients[i].label); {
-                        const char *dn = ctx->clients[i].display_name[0] != '\0'
-                                             ? ctx->clients[i].display_name
-                                             : ctx->clients[i].username;
-                        set_status(ctx, "%s: connection lost", dn);
+                    const char *dn = ctx->clients[i].display_name[0] != '\0'
+                                         ? ctx->clients[i].display_name
+                                         : ctx->clients[i].username;
+                    log_message(LOG_ERROR, "[COOP NET] Client %s (%s) connection lost: %s\n",
+                                ctx->clients[i].label,
+                                dn[0] ? dn : "unknown",
+                                disc_reason[0] ? disc_reason : "no reason captured");
+                    if (disc_reason[0]) {
+                        set_status(ctx, "%s disconnected: %s", dn[0] ? dn : "Client", disc_reason);
+                    } else {
+                        set_status(ctx, "%s disconnected (connection lost)", dn[0] ? dn : "Client");
                     }
                     bool was_approved = ctx->clients[i].handshake_done;
                     bool was_pending = ctx->clients[i].pending_approval;
@@ -1456,7 +1505,9 @@ static int SDLCALL receiver_thread_func(void *data) {
         uint32_t payload_len;
         bool disconnected;
 
-        if (read_message(ctx->client_fd, &msg_type, &payload, &payload_len, &disconnected)) {
+        char disc_reason[160] = {0};
+        if (read_message(ctx->client_fd, &msg_type, &payload, &payload_len, &disconnected,
+                         disc_reason, sizeof(disc_reason))) {
             if (msg_type == COOP_MSG_JOIN_ACCEPT) {
                 // Parse lobby player list
                 char *json_str = (char *) malloc(payload_len + 1);
@@ -1492,10 +1543,15 @@ static int SDLCALL receiver_thread_func(void *data) {
             }
             free(payload);
         } else if (disconnected) {
-            log_message(LOG_INFO, "[COOP NET] Lost connection while waiting for approval. "
-                        "The host may have rejected the request or closed the connection.\n");
+            log_message(LOG_ERROR,
+                        "[COOP NET] Lost connection while waiting for approval: %s\n",
+                        disc_reason[0] ? disc_reason : "no reason captured");
             set_state(ctx, COOP_NET_DISCONNECTED);
-            set_status(ctx, "Connection lost (host closed connection)");
+            if (disc_reason[0]) {
+                set_status(ctx, "Connection lost while waiting for approval: %s", disc_reason);
+            } else {
+                set_status(ctx, "Connection lost (host closed connection)");
+            }
             close_socket(&ctx->client_fd);
             return 1;
         }
@@ -1525,7 +1581,9 @@ static int SDLCALL receiver_thread_func(void *data) {
             char *sync_payload;
             uint32_t sync_len;
             bool sync_disc;
-            if (read_message(ctx->client_fd, &sync_type, &sync_payload, &sync_len, &sync_disc)) {
+            char sync_reason[160] = {0};
+            if (read_message(ctx->client_fd, &sync_type, &sync_payload, &sync_len, &sync_disc,
+                             sync_reason, sizeof(sync_reason))) {
                 if (sync_type == COOP_MSG_TEMPLATE_SYNC && sync_payload) {
                     SDL_LockMutex(ctx->template_sync_mutex);
                     size_t copy_len = sync_len < sizeof(ctx->template_sync_payload) - 1
@@ -1540,6 +1598,14 @@ static int SDLCALL receiver_thread_func(void *data) {
                 free(sync_payload);
                 break;
             } else if (sync_disc) {
+                log_message(LOG_ERROR,
+                            "[COOP NET] Disconnected while waiting for template sync: %s\n",
+                            sync_reason[0] ? sync_reason : "no reason captured");
+                if (sync_reason[0]) {
+                    set_status(ctx, "Disconnected during template sync: %s", sync_reason);
+                } else {
+                    set_status(ctx, "Disconnected during template sync");
+                }
                 break;
             }
         }
@@ -1571,9 +1637,11 @@ static int SDLCALL receiver_thread_func(void *data) {
 #else
             if (errno == EINTR) continue;
 #endif
-            log_message(LOG_ERROR, "[COOP NET] Receiver select() error.\n");
+            char sel_err[96];
+            format_socket_error(sel_err, sizeof(sel_err));
+            log_message(LOG_ERROR, "[COOP NET] Receiver select() error: %s\n", sel_err);
             set_state(ctx, COOP_NET_ERROR);
-            set_status(ctx, "Connection error");
+            set_status(ctx, "Connection error (%s)", sel_err);
             break;
         }
 
@@ -1583,23 +1651,34 @@ static int SDLCALL receiver_thread_func(void *data) {
             uint32_t payload_len;
             bool disconnected;
 
-            if (read_message(fd, &msg_type, &payload, &payload_len, &disconnected)) {
+            char disc_reason[160] = {0};
+            if (read_message(fd, &msg_type, &payload, &payload_len, &disconnected,
+                             disc_reason, sizeof(disc_reason))) {
                 int rc = receiver_dispatch_message(ctx, msg_type, payload, payload_len,
                                                    &last_heartbeat_recv);
                 if (rc == 1) break;
             } else if (disconnected) {
-                log_message(LOG_INFO, "[COOP NET] Lost connection to host.\n");
+                log_message(LOG_ERROR,
+                            "[COOP NET] Lost connection to host: %s\n",
+                            disc_reason[0] ? disc_reason : "no reason captured");
                 set_state(ctx, COOP_NET_DISCONNECTED);
-                set_status(ctx, "Connection lost");
+                if (disc_reason[0]) {
+                    set_status(ctx, "Connection lost: %s", disc_reason);
+                } else {
+                    set_status(ctx, "Connection lost");
+                }
                 break;
             }
         }
 
         Uint32 now = SDL_GetTicks();
         if (now - last_heartbeat_recv > HEARTBEAT_TIMEOUT_MS) {
-            log_message(LOG_INFO, "[COOP NET] Host heartbeat timeout.\n");
+            Uint32 silent_ms = now - last_heartbeat_recv;
+            log_message(LOG_ERROR,
+                        "[COOP NET] Host heartbeat timeout: no traffic for %u ms (limit %u ms)\n",
+                        silent_ms, HEARTBEAT_TIMEOUT_MS);
             set_state(ctx, COOP_NET_DISCONNECTED);
-            set_status(ctx, "Host timed out");
+            set_status(ctx, "Host timed out (no traffic for %u s)", silent_ms / 1000);
             break;
         }
     }
