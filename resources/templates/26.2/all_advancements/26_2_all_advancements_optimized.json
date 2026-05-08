@@ -698,6 +698,11 @@
 			"criteria":	{
 			}
 		},
+		"minecraft:husbandry/uh_oh":	{
+			"icon":	"blocks/TNT_JE3_BE2.png",
+			"criteria":	{
+			}
+		},
 		"minecraft:adventure/root":	{
 			"icon":	"items/map_empty_1.11.png",
 			"hidden":	true,
