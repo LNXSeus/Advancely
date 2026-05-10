@@ -336,15 +336,6 @@ Use your favorite AUR helper, e.g.:
 
 _Massive thanks to [R0dn3yS](https://github.com/R0dn3yS) for the AUR packages!_
 
-If the build fails with `ModuleNotFoundError: No module named 'jsonschema'` and the CMake output shows a Python from `~/.local/bin` (e.g. `/home/<user>/.local/bin/python3.14`), that user-local Python is shadowing the system one and the `python-jsonschema` / `python-jinja` pacman packages aren't visible to it. Install the modules into that specific Python and rebuild:
-
-  ```
-  ~/.local/bin/python3.14 -m pip install jsonschema jinja2
-  paru -S advancely --rebuild
-  ```
-
-(Adjust the Python path/version to match the one shown in the CMake output.) If pip refuses with `externally-managed-environment` because the Python is managed by `uv`, install the modules through `uv` instead (e.g. `uv pip install --python ~/.local/bin/python3.14 jsonschema jinja2`).
-
 * **NixOS:**
 
 Advancely is available via [mcsr-nixos](https://git.uku3lig.net/uku/mcsr-nixos), a collection of NixOS packages for Minecraft speedrunning.
