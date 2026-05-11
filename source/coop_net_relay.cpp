@@ -13,6 +13,7 @@
 
 #include "coop_net_relay.h"
 #include "relay_config.h"
+#include "logger.h"
 
 #include <mbedtls/ssl.h>
 #include <mbedtls/net_sockets.h>
@@ -197,6 +198,24 @@ static uint32_t get_be32(const unsigned char *p) {
     return ((uint32_t) p[0] << 24) | ((uint32_t) p[1] << 16) | ((uint32_t) p[2] << 8) | p[3];
 }
 
+static thread_local char tls_last_error[192] = {0};
+
+const char *relay_last_error(void) { return tls_last_error; }
+
+void relay_clear_last_error(void) { tls_last_error[0] = '\0'; }
+
+static void set_last_error(const char *where, int n) {
+    char strbuf[128] = "?";
+    if (n == 0) {
+        snprintf(strbuf, sizeof(strbuf), "EOF");
+    } else {
+        mbedtls_strerror(n, strbuf, sizeof(strbuf));
+    }
+    snprintf(tls_last_error, sizeof(tls_last_error),
+             "%s: %s (n=%d, -0x%04x)", where, strbuf, n, (unsigned) -n);
+    log_message(LOG_ERROR, "[Relay] %s\n", tls_last_error);
+}
+
 static bool ssl_write_all(mbedtls_ssl_context *ssl, const void *data, size_t len) {
     const unsigned char *p = (const unsigned char *) data;
     while (len > 0) {
@@ -207,9 +226,7 @@ static bool ssl_write_all(mbedtls_ssl_context *ssl, const void *data, size_t len
             continue;
         }
         if (n == MBEDTLS_ERR_SSL_WANT_READ || n == MBEDTLS_ERR_SSL_WANT_WRITE) continue;
-        char rcbuf[128] = "?";
-        mbedtls_strerror(n, rcbuf, sizeof(rcbuf));
-        fprintf(stderr, "[Relay] ssl_write: %s (-0x%04x)\n", rcbuf, (unsigned) -n);
+        set_last_error("ssl_write", n);
         return false;
     }
     return true;
@@ -240,13 +257,7 @@ static int ssl_read_exact(mbedtls_ssl_context *ssl, void *buf, size_t len) {
             if (len == total) return 0;
             continue;
         }
-        char rcbuf[128] = "?";
-        if (n == 0) {
-            snprintf(rcbuf, sizeof(rcbuf), "EOF");
-        } else {
-            mbedtls_strerror(n, rcbuf, sizeof(rcbuf));
-        }
-        fprintf(stderr, "[Relay] ssl_read: %s (n=%d)\n", rcbuf, n);
+        set_last_error(len == total ? "ssl_read(header)" : "ssl_read(midframe)", n);
         return -1;
     }
     return 1;
@@ -277,7 +288,12 @@ int relay_recv_frame_timed(RelayConn *c, uint32_t *out_type, void **out_payload,
     if (rc <= 0) return rc;
     uint32_t type = get_be32(hdr);
     uint32_t length = get_be32(hdr + 4);
-    if (length > max_payload) return -1;
+    if (length > max_payload) {
+        snprintf(tls_last_error, sizeof(tls_last_error),
+                 "frame oversize: type=%u len=%u cap=%u", type, length, max_payload);
+        log_message(LOG_ERROR, "[Relay] %s\n", tls_last_error);
+        return -1;
+    }
 
     if (length > 0) {
         void *buf = malloc(length);

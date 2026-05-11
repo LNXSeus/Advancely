@@ -1216,6 +1216,34 @@ static int receiver_dispatch_message(CoopNetContext *ctx, uint32_t msg_type,
         }
         free(payload);
         *last_heartbeat_recv = SDL_GetTicks();
+        // Self-eviction detection: the host's stale-slot watchdog (25s of no
+        // traffic) drops the receiver and broadcasts a refreshed PLAYER_LIST.
+        // The relay forwards that broadcast to every conn in the room - including
+        // the just-evicted receiver. Without this check, the receiver keeps its
+        // TLS conn open, keeps seeing host heartbeats, and shows a stale lobby
+        // with no clue it was kicked. If our UUID is missing from the list,
+        // tear down the same way as a host disconnect.
+        if (ctx->connect_uuid[0]) {
+            SDL_LockMutex(ctx->lobby_mutex);
+            bool self_present = false;
+            for (int i = 0; i < ctx->lobby_player_count; i++) {
+                if (strcmp(ctx->lobby_players[i].uuid, ctx->connect_uuid) == 0) {
+                    self_present = true;
+                    break;
+                }
+            }
+            int lobby_count = ctx->lobby_player_count;
+            SDL_UnlockMutex(ctx->lobby_mutex);
+            if (!self_present && lobby_count > 0) {
+                log_message(LOG_ERROR,
+                            "[COOP NET] PLAYER_LIST no longer contains our UUID %s "
+                            "(host evicted us, likely stale-slot timeout).\n",
+                            ctx->connect_uuid);
+                set_state(ctx, COOP_NET_DISCONNECTED);
+                set_status(ctx, "Removed from lobby by host (timed out)");
+                return 1;
+            }
+        }
         return 0;
     }
     if (msg_type == COOP_MSG_STATE_UPDATE) {
@@ -1750,11 +1778,18 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
         uint32_t msg_type = 0;
         void *payload = nullptr;
         uint32_t payload_len = 0;
+        relay_clear_last_error();
         int join_rc = relay_recv_frame_timed(ctx->relay_conn, &msg_type, &payload, &payload_len, 0);
         if (join_rc < 0) {
-            log_message(LOG_INFO, "[COOP NET] Relay connection closed before approval.\n");
+            const char *reason = relay_last_error();
+            log_message(LOG_ERROR,
+                        "[COOP NET] Relay connection closed before approval: %s\n",
+                        reason && reason[0] ? reason : "no reason captured");
             set_state(ctx, COOP_NET_DISCONNECTED);
-            set_status(ctx, "Relay connection lost");
+            if (reason && reason[0])
+                set_status(ctx, "Relay connection lost: %s", reason);
+            else
+                set_status(ctx, "Relay connection lost");
             return 1;
         }
         if (join_rc == 0) {
@@ -1836,12 +1871,18 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
         uint32_t msg_type = 0;
         void *payload = nullptr;
         uint32_t payload_len = 0;
+        relay_clear_last_error();
         int rc = relay_recv_frame_timed(ctx->relay_conn, &msg_type, &payload, &payload_len, 0);
         if (rc < 0) {
             if (should_stop(ctx)) break;
-            log_message(LOG_INFO, "[COOP NET] Relay connection lost.\n");
+            const char *reason = relay_last_error();
+            log_message(LOG_ERROR, "[COOP NET] Relay connection lost: %s\n",
+                        reason && reason[0] ? reason : "no reason captured");
             set_state(ctx, COOP_NET_DISCONNECTED);
-            set_status(ctx, "Connection lost");
+            if (reason && reason[0])
+                set_status(ctx, "Connection lost: %s", reason);
+            else
+                set_status(ctx, "Connection lost");
             break;
         }
         if (rc == 0) {
@@ -1864,9 +1905,15 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
                 free(hb_js);
                 last_heartbeat_send = now;
                 if (!ok) {
-                    log_message(LOG_INFO, "[COOP NET] Relay heartbeat send failed.\n");
+                    const char *reason = relay_last_error();
+                    log_message(LOG_ERROR,
+                                "[COOP NET] Relay heartbeat send failed: %s\n",
+                                reason && reason[0] ? reason : "no reason captured");
                     set_state(ctx, COOP_NET_DISCONNECTED);
-                    set_status(ctx, "Connection lost");
+                    if (reason && reason[0])
+                        set_status(ctx, "Heartbeat send failed: %s", reason);
+                    else
+                        set_status(ctx, "Heartbeat send failed");
                     break;
                 }
             }
@@ -1877,10 +1924,12 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
             // UI doesn't show a ghost lobby.
             const Uint32 HOST_TIMEOUT_MS = 20000;
             if (now - last_inbound_ms > HOST_TIMEOUT_MS) {
-                log_message(LOG_INFO, "[COOP NET] Host silent for %ums; treating as disconnected.\n",
-                            now - last_inbound_ms);
+                log_message(LOG_ERROR,
+                            "[COOP NET] Host silent for %ums (limit %ums); treating as disconnected.\n",
+                            now - last_inbound_ms, HOST_TIMEOUT_MS);
                 set_state(ctx, COOP_NET_DISCONNECTED);
-                set_status(ctx, "Host disconnected");
+                set_status(ctx, "Host silent for %us (no traffic)",
+                           (now - last_inbound_ms) / 1000);
                 break;
             }
             continue;

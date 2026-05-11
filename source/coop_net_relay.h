@@ -102,6 +102,17 @@ bool relay_send_frame(RelayConn *c, uint32_t type, const void *payload, uint32_t
 bool relay_recv_frame(RelayConn *c, uint32_t *out_type, void **out_payload,
                       uint32_t *out_len, uint32_t max_payload);
 
+// Returns a pointer to a thread-local buffer holding the most recent low-level
+// relay/TLS error string (e.g. "EOF", mbedtls strerror text, "frame oversize").
+// Empty string when no error has been recorded on this thread. The buffer is
+// stable until the next ssl_read/ssl_write/relay_recv/relay_send call on the
+// same thread.
+const char *relay_last_error(void);
+
+// Clear the thread-local last-error buffer. Call before a new operation so a
+// later read of relay_last_error() reflects only that operation.
+void relay_clear_last_error(void);
+
 // One-shot diagnostic: connect, verify, disconnect. Prints to stdout/stderr
 // (intentionally not log_message so it works before log_init). Returns true
 // on success.
