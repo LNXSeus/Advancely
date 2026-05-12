@@ -1066,6 +1066,8 @@ Tick `Host locally (LAN / VPN)` on both sides before starting. Use this when eve
 7. When a Receiver sends a join request, a **Waiting Room** entry appears. Review their username/UUID and click
    **Accept** or **Decline**. Accepted players appear in the Player Roster.
 
+Each player in the **Player Roster** is shown with their Minecraft skin face next to their name (fetched from Mojang on first sight, then cached locally for 24h under `resources/cache/skins/`). Offline accounts and unresolvable UUIDs fall back to Notch's face.
+
 **For Receivers:**
 
 1. Open the **Co-op** tab and fill in your Account section.

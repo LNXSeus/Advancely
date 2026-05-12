@@ -30,6 +30,38 @@ extern "C" {
  */
 bool mojang_fetch_uuid(const char *username, char *out_uuid, size_t uuid_max_len);
 
+/**
+ * @brief Resolves a player UUID to their current skin texture URL.
+ *
+ * Calls https://sessionserver.mojang.com/session/minecraft/profile/<uuid>,
+ * base64-decodes the textures property, and extracts the SKIN url. The returned
+ * URL points to a 64x64 (or legacy 64x32) PNG on textures.minecraft.net.
+ *
+ * Synchronous; intended to be called from a background worker. Returns false
+ * on 404 (UUID not registered with Mojang -> caller should fall back to Notch),
+ * network failure, or malformed response.
+ *
+ * @param uuid Hyphenated or unhyphenated UUID string.
+ * @param out_url Buffer for the resulting URL.
+ * @param url_max_len Size of out_url (at least 256 recommended).
+ * @return true on success, false on any failure.
+ */
+bool mojang_fetch_skin_url(const char *uuid, char *out_url, size_t url_max_len);
+
+/**
+ * @brief Downloads a binary blob over HTTPS into a malloc'd buffer.
+ *
+ * Generic GET helper used by the skin cache to fetch the texture PNG once we
+ * know its URL. Caller frees *out_data via free(). Synchronous; intended to be
+ * called from a background worker.
+ *
+ * @param url The HTTPS URL to fetch.
+ * @param out_data Receives a heap-allocated buffer (NULL on failure).
+ * @param out_size Receives the byte length of the buffer.
+ * @return true on HTTP 200 with non-empty body, false otherwise.
+ */
+bool mojang_download_url(const char *url, unsigned char **out_data, size_t *out_size);
+
 #ifdef __cplusplus
 }
 #endif

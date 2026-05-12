@@ -19,3 +19,6 @@ __pycache__/
 relay/cert.pem
 relay/key.pem
 
+# Player skin face cache (regenerated automatically; safe to delete)
+resources/cache/
+

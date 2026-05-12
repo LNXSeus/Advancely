@@ -36,6 +36,7 @@
 #include "temp_creator.h"
 #include "update_checker.h"
 #include "coop_net.h" // For co-op networking status display
+#include "skin_cache.h" // For player face textures in lobby roster
 #include <SDL3/SDL_clipboard.h> // For room code copy/paste
 #include <SDL3/SDL_keyboard.h>
 #include <SDL3/SDL_keycode.h>
@@ -2670,8 +2671,18 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
             ImGui::Spacing();
             bool identity_ready = !account_validation_error;
             if (identity_ready) {
+                // Show the linked player's face once a valid UUID is set.
+                // Offline accounts skip the network round-trip and show Notch.
+                SDL_Texture *acc_face = skin_cache_get_face(temp_settings.local_player.uuid,
+                                                            temp_settings.account_type);
+                if (acc_face) {
+                    ImGui::Image((ImTextureID) acc_face, ImVec2(32, 32));
+                    ImGui::SameLine();
+                }
+                ImGui::BeginGroup();
                 ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "Account configured.");
                 ImGui::TextDisabled("Advancely will use your UUID to read the correct player files.");
+                ImGui::EndGroup();
             } else if (uuid_bad_format) {
                 ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "Invalid UUID format.");
                 ImGui::TextDisabled("The UUID must be in the format 8-4-4-4-12 hex digits with dashes.");
@@ -3657,6 +3668,22 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                         for (int i = 0; i < lobby_count; i++) {
                             ImGui::PushID(3000 + i);
                             const char *name = lobby[i].display_name[0] ? lobby[i].display_name : lobby[i].username;
+
+                            // Player face (8x8 native, rendered at 16x16 for visibility).
+                            // Local player uses our known account_type; remote players
+                            // pass ACCOUNT_ONLINE for now and rely on Mojang 404 -> Notch
+                            // (Step 1b will add account_type to the lobby protocol).
+                            AccountType type = ACCOUNT_ONLINE;
+                            if (strcmp(lobby[i].uuid, temp_settings.local_player.uuid) == 0) {
+                                type = temp_settings.account_type;
+                            }
+                            SDL_Texture *face = skin_cache_get_face(lobby[i].uuid, type);
+                            if (face) {
+                                ImGui::Image((ImTextureID) face, ImVec2(16, 16));
+                            } else {
+                                ImGui::Dummy(ImVec2(16, 16));
+                            }
+                            ImGui::SameLine();
 
                             if (lobby[i].is_host) {
                                 ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s", name);

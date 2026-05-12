@@ -61,6 +61,7 @@ extern "C" {
 #include "update_checker.h" // For update checker
 #include "coop_net.h" // For co-op networking
 #include "coop_net_relay.h" // For the --relay-test smoke test
+#include "skin_cache.h" // For coop player face textures
 #include "template_scanner.h" // For compute_template_goal_hash
 
 // ImGUI imports
@@ -1771,6 +1772,9 @@ int main(int argc, char *argv[]) {
         ImGui_ImplSDL3_InitForSDLRenderer(tracker->window, tracker->renderer);
         ImGui_ImplSDLRenderer3_Init(tracker->renderer);
 
+        // Skin face cache for coop player indicators. Pre-warms Notch fallback.
+        skin_cache_init(tracker->renderer);
+
         // Load the logo texture once at statup
         char logo_path[MAX_PATH_LENGTH];
         snprintf(logo_path, sizeof(logo_path), "%s%s", get_application_dir(), ADVANCELY_LOGO_PATH);
@@ -3467,6 +3471,8 @@ int main(int argc, char *argv[]) {
 
             ImGui::Render();
 
+            skin_cache_pump();
+
             SDL_SetRenderDrawColor(tracker->renderer, (Uint8) (app_settings.tracker_bg_color.r),
                                    (Uint8) (app_settings.tracker_bg_color.g), (Uint8) (app_settings.tracker_bg_color.b),
                                    (Uint8) (app_settings.tracker_bg_color.a));
@@ -3562,6 +3568,8 @@ int main(int argc, char *argv[]) {
     if (g_logo_texture) {
         SDL_DestroyTexture(g_logo_texture);
     }
+
+    skin_cache_shutdown();
 
     // Shut down co-op networking before SDL_Quit
     coop_net_shutdown(&coop_ctx);

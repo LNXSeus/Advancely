@@ -12,9 +12,11 @@
 #include "main.h"
 #include <cJSON.h>
 #include <curl/curl.h>
+#include <mbedtls/base64.h>
 #include <string>
 #include <cstring>
 #include <cstdio>
+#include <cstdlib>
 
 // Callback function for libcurl to write received data into a std::string
 static size_t mojang_write_callback(void *contents, size_t size, size_t nmemb, std::string *s) {
@@ -92,4 +94,167 @@ bool mojang_fetch_uuid(const char *username, char *out_uuid, size_t uuid_max_len
 
     curl_easy_cleanup(curl);
     return success;
+}
+
+static void strip_uuid_hyphens(const char *in, char out[33]) {
+    int oi = 0;
+    for (int i = 0; in[i] && oi < 32; i++) {
+        if (in[i] != '-') out[oi++] = in[i];
+    }
+    out[oi] = '\0';
+}
+
+bool mojang_fetch_skin_url(const char *uuid, char *out_url, size_t url_max_len) {
+    if (!uuid || !out_url || url_max_len < 64) return false;
+    out_url[0] = '\0';
+
+    char raw_uuid[33];
+    strip_uuid_hyphens(uuid, raw_uuid);
+    if (strlen(raw_uuid) != 32) return false;
+
+    char url[256];
+    snprintf(url, sizeof(url),
+             "https://sessionserver.mojang.com/session/minecraft/profile/%s",
+             raw_uuid);
+
+    CURL *curl = curl_easy_init();
+    if (!curl) return false;
+
+    std::string body;
+    bool success = false;
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "Advancely/1.0");
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, mojang_write_callback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &body);
+    curl_easy_setopt(curl, CURLOPT_CAINFO, get_cert_bundle_path());
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+
+    CURLcode res = curl_easy_perform(curl);
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK) {
+        log_message(LOG_ERROR, "[MOJANG API] profile fetch failed for %s: %s\n",
+                    uuid, curl_easy_strerror(res));
+        return false;
+    }
+    if (http_code == 404) {
+        log_message(LOG_INFO, "[MOJANG API] UUID %s not found (404, likely offline account).\n", uuid);
+        return false;
+    }
+    if (http_code != 200) {
+        log_message(LOG_ERROR, "[MOJANG API] profile fetch HTTP %ld for %s.\n", http_code, uuid);
+        return false;
+    }
+
+    cJSON *json = cJSON_Parse(body.c_str());
+    if (!json) {
+        log_message(LOG_ERROR, "[MOJANG API] profile JSON parse failed for %s.\n", uuid);
+        return false;
+    }
+
+    const cJSON *props = cJSON_GetObjectItem(json, "properties");
+    if (cJSON_IsArray(props)) {
+        cJSON *prop;
+        cJSON_ArrayForEach(prop, props) {
+            const cJSON *pname = cJSON_GetObjectItem(prop, "name");
+            const cJSON *pval = cJSON_GetObjectItem(prop, "value");
+            if (!cJSON_IsString(pname) || !cJSON_IsString(pval)) continue;
+            if (strcmp(pname->valuestring, "textures") != 0) continue;
+
+            size_t b64_len = strlen(pval->valuestring);
+            size_t decoded_max = (b64_len * 3) / 4 + 4;
+            unsigned char *decoded = (unsigned char *) malloc(decoded_max + 1);
+            if (!decoded) break;
+            size_t decoded_len = 0;
+            int rc = mbedtls_base64_decode(decoded, decoded_max, &decoded_len,
+                                           (const unsigned char *) pval->valuestring, b64_len);
+            if (rc != 0) {
+                free(decoded);
+                break;
+            }
+            decoded[decoded_len] = '\0';
+
+            cJSON *tex_json = cJSON_Parse((const char *) decoded);
+            free(decoded);
+            if (!tex_json) break;
+
+            const cJSON *tex = cJSON_GetObjectItem(tex_json, "textures");
+            const cJSON *skin = tex ? cJSON_GetObjectItem(tex, "SKIN") : nullptr;
+            const cJSON *url_json = skin ? cJSON_GetObjectItem(skin, "url") : nullptr;
+            if (cJSON_IsString(url_json) && url_json->valuestring) {
+                strncpy(out_url, url_json->valuestring, url_max_len - 1);
+                out_url[url_max_len - 1] = '\0';
+                success = true;
+            }
+            cJSON_Delete(tex_json);
+            break;
+        }
+    }
+    cJSON_Delete(json);
+
+    if (!success) {
+        log_message(LOG_ERROR, "[MOJANG API] No SKIN url in profile for %s.\n", uuid);
+    }
+    return success;
+}
+
+struct DownloadAccumulator {
+    unsigned char *data;
+    size_t size;
+    size_t cap;
+};
+
+static size_t download_write_cb(void *contents, size_t size, size_t nmemb, DownloadAccumulator *acc) {
+    size_t add = size * nmemb;
+    if (acc->size + add > acc->cap) {
+        size_t new_cap = acc->cap ? acc->cap * 2 : 4096;
+        while (new_cap < acc->size + add) new_cap *= 2;
+        unsigned char *grown = (unsigned char *) realloc(acc->data, new_cap);
+        if (!grown) return 0;
+        acc->data = grown;
+        acc->cap = new_cap;
+    }
+    memcpy(acc->data + acc->size, contents, add);
+    acc->size += add;
+    return add;
+}
+
+bool mojang_download_url(const char *url, unsigned char **out_data, size_t *out_size) {
+    if (!url || !out_data || !out_size) return false;
+    *out_data = nullptr;
+    *out_size = 0;
+
+    CURL *curl = curl_easy_init();
+    if (!curl) return false;
+
+    DownloadAccumulator acc = {nullptr, 0, 0};
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "Advancely/1.0");
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, download_write_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &acc);
+    curl_easy_setopt(curl, CURLOPT_CAINFO, get_cert_bundle_path());
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+
+    CURLcode res = curl_easy_perform(curl);
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK || http_code != 200 || acc.size == 0) {
+        free(acc.data);
+        log_message(LOG_ERROR, "[MOJANG API] download failed for %s: curl=%s http=%ld bytes=%zu\n",
+                    url, curl_easy_strerror(res), http_code, acc.size);
+        return false;
+    }
+
+    *out_data = acc.data;
+    *out_size = acc.size;
+    return true;
 }

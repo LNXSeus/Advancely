@@ -68,6 +68,7 @@ set(SOURCE_FILES
         "source/dialog_utils.cpp"
         "source/coop_net.cpp"
         "source/coop_net_relay.cpp"
+        "source/skin_cache.cpp"
 
         # External libraries included as source and stay in C
         "source/external/cJSON.c"
