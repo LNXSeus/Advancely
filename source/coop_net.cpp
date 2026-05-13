@@ -434,6 +434,7 @@ static void rebuild_lobby_list(CoopNetContext *ctx) {
     strncpy(host_entry->uuid, ctx->host_uuid, sizeof(host_entry->uuid) - 1);
     strncpy(host_entry->display_name, ctx->host_display_name, sizeof(host_entry->display_name) - 1);
     host_entry->is_host = true;
+    host_entry->is_offline = ctx->host_is_offline;
 
     // Add each approved client
     for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
@@ -445,6 +446,7 @@ static void rebuild_lobby_list(CoopNetContext *ctx) {
         strncpy(entry->uuid, ctx->clients[i].uuid, sizeof(entry->uuid) - 1);
         strncpy(entry->display_name, ctx->clients[i].display_name, sizeof(entry->display_name) - 1);
         entry->is_host = false;
+        entry->is_offline = ctx->clients[i].is_offline;
     }
 
     ctx->lobby_changed = true;
@@ -463,6 +465,8 @@ static char *build_lobby_json(CoopNetContext *ctx) {
         cJSON_AddStringToObject(obj, "uuid", ctx->lobby_players[i].uuid);
         cJSON_AddStringToObject(obj, "display_name", ctx->lobby_players[i].display_name);
         cJSON_AddBoolToObject(obj, "is_host", ctx->lobby_players[i].is_host);
+        cJSON_AddStringToObject(obj, "account_type",
+                                ctx->lobby_players[i].is_offline ? "offline" : "online");
         cJSON_AddItemToArray(arr, obj);
     }
     SDL_UnlockMutex(ctx->lobby_mutex);
@@ -496,6 +500,8 @@ static void parse_lobby_json(CoopNetContext *ctx, const char *json_str) {
         if (d && cJSON_IsString(d)) strncpy(entry->display_name, d->valuestring, sizeof(entry->display_name) - 1);
         cJSON *h = cJSON_GetObjectItem(item, "is_host");
         entry->is_host = (h && cJSON_IsTrue(h));
+        cJSON *at = cJSON_GetObjectItem(item, "account_type");
+        entry->is_offline = (at && cJSON_IsString(at) && strcmp(at->valuestring, "offline") == 0);
     }
     ctx->lobby_changed = true;
     SDL_UnlockMutex(ctx->lobby_mutex);
@@ -762,6 +768,7 @@ static int SDLCALL host_thread_func(void *data) {
                             bool valid = false;
                             bool version_mismatch = false;
                             char req_uuid[48] = {0}, req_username[64] = {0}, req_display[64] = {0};
+                            bool req_is_offline = false;
 
                             if (json) {
                                 // Check version first
@@ -788,11 +795,14 @@ static int SDLCALL host_thread_func(void *data) {
                                     cJSON *u = cJSON_GetObjectItem(json, "uuid");
                                     cJSON *n = cJSON_GetObjectItem(json, "username");
                                     cJSON *d = cJSON_GetObjectItem(json, "display_name");
+                                    cJSON *at = cJSON_GetObjectItem(json, "account_type");
                                     if (u && cJSON_IsString(u) && n && cJSON_IsString(n)) {
                                         strncpy(req_uuid, u->valuestring, sizeof(req_uuid) - 1);
                                         strncpy(req_username, n->valuestring, sizeof(req_username) - 1);
                                         if (d && cJSON_IsString(d))
                                             strncpy(req_display, d->valuestring, sizeof(req_display) - 1);
+                                        req_is_offline = (at && cJSON_IsString(at) &&
+                                                          strcmp(at->valuestring, "offline") == 0);
                                         valid = true;
                                     }
                                 }
@@ -861,6 +871,7 @@ static int SDLCALL host_thread_func(void *data) {
                                     strncpy(ctx->clients[i].uuid, req_uuid, sizeof(ctx->clients[i].uuid) - 1);
                                     strncpy(ctx->clients[i].display_name, req_display,
                                             sizeof(ctx->clients[i].display_name) - 1);
+                                    ctx->clients[i].is_offline = req_is_offline;
                                     ctx->clients[i].pending_approval = true;
 
                                     if (ctx->auto_accept) {
@@ -882,6 +893,7 @@ static int SDLCALL host_thread_func(void *data) {
                                             strncpy(req->username, req_username, sizeof(req->username) - 1);
                                             strncpy(req->uuid, req_uuid, sizeof(req->uuid) - 1);
                                             strncpy(req->display_name, req_display, sizeof(req->display_name) - 1);
+                                            req->is_offline = req_is_offline;
                                             ctx->pending_requests_changed = true;
                                         }
                                         SDL_UnlockMutex(ctx->lobby_mutex);
@@ -1492,6 +1504,7 @@ static int SDLCALL receiver_thread_func(void *data) {
         cJSON_AddStringToObject(req, "uuid", ctx->connect_uuid);
         cJSON_AddStringToObject(req, "username", ctx->connect_username);
         cJSON_AddStringToObject(req, "display_name", ctx->connect_display_name);
+        cJSON_AddStringToObject(req, "account_type", ctx->connect_is_offline ? "offline" : "online");
         char *json_str = cJSON_PrintUnformatted(req);
         cJSON_Delete(req);
 
@@ -1750,6 +1763,7 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
         cJSON_AddStringToObject(req, "uuid", ctx->connect_uuid);
         cJSON_AddStringToObject(req, "username", ctx->connect_username);
         cJSON_AddStringToObject(req, "display_name", ctx->connect_display_name);
+        cJSON_AddStringToObject(req, "account_type", ctx->connect_is_offline ? "offline" : "online");
         char *json_str = cJSON_PrintUnformatted(req);
         cJSON_Delete(req);
 
@@ -2092,6 +2106,7 @@ static int SDLCALL host_relay_thread_func(void *data) {
                 free(json_str);
 
                 char req_uuid[48] = {0}, req_username[64] = {0}, req_display[64] = {0};
+                bool req_is_offline = false;
                 bool valid_payload = false;
                 bool version_mismatch = false;
                 char their_version[32] = "unknown";
@@ -2108,11 +2123,14 @@ static int SDLCALL host_relay_thread_func(void *data) {
                         cJSON *u = cJSON_GetObjectItem(json, "uuid");
                         cJSON *n = cJSON_GetObjectItem(json, "username");
                         cJSON *d = cJSON_GetObjectItem(json, "display_name");
+                        cJSON *at = cJSON_GetObjectItem(json, "account_type");
                         if (u && cJSON_IsString(u) && n && cJSON_IsString(n)) {
                             strncpy(req_uuid, u->valuestring, sizeof(req_uuid) - 1);
                             strncpy(req_username, n->valuestring, sizeof(req_username) - 1);
                             if (d && cJSON_IsString(d))
                                 strncpy(req_display, d->valuestring, sizeof(req_display) - 1);
+                            req_is_offline = (at && cJSON_IsString(at) &&
+                                              strcmp(at->valuestring, "offline") == 0);
                             valid_payload = true;
                         }
                     }
@@ -2179,6 +2197,7 @@ static int SDLCALL host_relay_thread_func(void *data) {
                         strncpy(ctx->clients[slot].username, req_username, sizeof(ctx->clients[slot].username) - 1);
                         strncpy(ctx->clients[slot].display_name, req_display,
                                 sizeof(ctx->clients[slot].display_name) - 1);
+                        ctx->clients[slot].is_offline = req_is_offline;
                         snprintf(ctx->clients[slot].label, sizeof(ctx->clients[slot].label),
                                  "relay:%s", req_uuid);
                         ctx->client_count++;
@@ -2537,7 +2556,7 @@ void coop_net_shutdown(CoopNetContext *ctx) {
 
 bool coop_net_start_host(CoopNetContext *ctx, const char *ip, int port,
                          const char *username, const char *uuid, const char *display_name,
-                         bool auto_accept) {
+                         bool is_offline, bool auto_accept) {
     // Stop any existing session
     coop_net_stop(ctx);
 
@@ -2545,6 +2564,7 @@ bool coop_net_start_host(CoopNetContext *ctx, const char *ip, int port,
     strncpy(ctx->host_username, username ? username : "", sizeof(ctx->host_username) - 1);
     strncpy(ctx->host_uuid, uuid ? uuid : "", sizeof(ctx->host_uuid) - 1);
     strncpy(ctx->host_display_name, display_name ? display_name : "", sizeof(ctx->host_display_name) - 1);
+    ctx->host_is_offline = is_offline;
     ctx->auto_accept = auto_accept;
 
     // Clear lobby and pending requests
@@ -2643,12 +2663,14 @@ bool coop_net_start_host(CoopNetContext *ctx, const char *ip, int port,
 
 bool coop_net_start_host_relay(CoopNetContext *ctx, const char *mc_version,
                                const char *password_plain,
-                               const char *username, const char *uuid, const char *display_name) {
+                               const char *username, const char *uuid, const char *display_name,
+                               bool is_offline) {
     coop_net_stop(ctx);
 
     strncpy(ctx->host_username, username ? username : "", sizeof(ctx->host_username) - 1);
     strncpy(ctx->host_uuid, uuid ? uuid : "", sizeof(ctx->host_uuid) - 1);
     strncpy(ctx->host_display_name, display_name ? display_name : "", sizeof(ctx->host_display_name) - 1);
+    ctx->host_is_offline = is_offline;
     ctx->auto_accept = true; // Relay path is always auto-accept; password is the gate.
     ctx->transport = 1;
 
@@ -2735,7 +2757,8 @@ bool coop_net_start_host_relay(CoopNetContext *ctx, const char *mc_version,
 }
 
 bool coop_net_start_receiver(CoopNetContext *ctx, const char *ip, int port,
-                             const char *username, const char *uuid, const char *display_name) {
+                             const char *username, const char *uuid, const char *display_name,
+                             bool is_offline) {
     coop_net_stop(ctx);
 
     // Store target address and identity for the thread
@@ -2745,6 +2768,7 @@ bool coop_net_start_receiver(CoopNetContext *ctx, const char *ip, int port,
     strncpy(ctx->connect_username, username ? username : "", sizeof(ctx->connect_username) - 1);
     strncpy(ctx->connect_uuid, uuid ? uuid : "", sizeof(ctx->connect_uuid) - 1);
     strncpy(ctx->connect_display_name, display_name ? display_name : "", sizeof(ctx->connect_display_name) - 1);
+    ctx->connect_is_offline = is_offline;
 
     // Clear lobby
     SDL_LockMutex(ctx->lobby_mutex);
@@ -2770,12 +2794,14 @@ bool coop_net_start_receiver(CoopNetContext *ctx, const char *ip, int port,
 
 bool coop_net_start_receiver_relay(CoopNetContext *ctx, const char *room_code,
                                    const char *password_plain,
-                                   const char *username, const char *uuid, const char *display_name) {
+                                   const char *username, const char *uuid, const char *display_name,
+                                   bool is_offline) {
     coop_net_stop(ctx);
 
     strncpy(ctx->connect_username, username ? username : "", sizeof(ctx->connect_username) - 1);
     strncpy(ctx->connect_uuid, uuid ? uuid : "", sizeof(ctx->connect_uuid) - 1);
     strncpy(ctx->connect_display_name, display_name ? display_name : "", sizeof(ctx->connect_display_name) - 1);
+    ctx->connect_is_offline = is_offline;
     ctx->transport = 1;
 
     if (!room_code || strlen(room_code) > 7) {

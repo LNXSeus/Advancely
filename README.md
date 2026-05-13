@@ -580,7 +580,8 @@ mode, completed goals are greyed out but remain visible.
 ### The Player Dropdown (Co-op)
 
 When a co-op lobby is active (either as Host or Receiver), the tracker shows a **Player Dropdown** with entries for
-`All Players` and every individual player in the roster. Switching to an individual player shows that player's raw
+`All Players` and every individual player in the roster. Each player entry is shown with their Minecraft skin face
+(offline accounts fall back to Notch). Switching to an individual player shows that player's raw
 progress (as if you were looking at their singleplayer tracker), and edits to checkboxes/custom goals in that view
 only affect that player. The `All Players` view applies the configured merge rules instead. The `RUN COMPLETED!`
 banner and frozen timer are tracked per view. See [The Player Dropdown](#the-player-dropdown) for the full

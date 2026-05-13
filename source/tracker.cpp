@@ -33,6 +33,7 @@
 #include "template_scanner.h" // For parse_manual_pos
 #include "temp_creator_utils.h"
 #include "coop_net.h"
+#include "skin_cache.h"
 #include "global_event_handler.h"
 #include "format_utils.h"
 #include "logger.h"
@@ -10104,8 +10105,15 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
             ImGui::SetNextItemWidth(160.0f);
             if (ImGui::BeginCombo("##PlayerView", preview, ImGuiComboFlags_None)) {
+                // Fetch the live lobby so each entry can carry the correct
+                // account_type (offline players resolve to the Notch face).
+                CoopLobbyPlayer dd_lobby[COOP_MAX_LOBBY];
+                int dd_lobby_count = coop_net_get_lobby_players(g_coop_ctx, dd_lobby, COOP_MAX_LOBBY);
+
                 // "All Players" entry
                 bool is_all = (t->selected_coop_player_idx == -1);
+                ImGui::Dummy(ImVec2(16, 16));
+                ImGui::SameLine();
                 if (ImGui::Selectable("All Players", is_all)) {
                     if (!is_all) {
                         t->selected_coop_player_idx = -1;
@@ -10121,6 +10129,22 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
                 for (int pi = 0; pi < settings->coop_player_count; pi++) {
                     const CoopPlayer *p = &settings->coop_players[pi];
                     const char *label = p->display_name[0] != '\0' ? p->display_name : p->username;
+
+                    AccountType acc_type = ACCOUNT_ONLINE;
+                    for (int li = 0; li < dd_lobby_count; li++) {
+                        if (strcmp(dd_lobby[li].uuid, p->uuid) == 0) {
+                            acc_type = dd_lobby[li].is_offline ? ACCOUNT_OFFLINE : ACCOUNT_ONLINE;
+                            break;
+                        }
+                    }
+                    SDL_Texture *face = skin_cache_get_face(p->uuid, acc_type);
+                    if (face) {
+                        ImGui::Image((ImTextureID) face, ImVec2(16, 16));
+                    } else {
+                        ImGui::Dummy(ImVec2(16, 16));
+                    }
+                    ImGui::SameLine();
+
                     char player_label[128];
                     snprintf(player_label, sizeof(player_label), "%s##player_%d", label, pi);
                     bool is_selected = (t->selected_coop_player_idx == pi);

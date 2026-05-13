@@ -89,6 +89,7 @@ typedef struct {
     char uuid[48];
     char display_name[64];
     bool is_host;
+    bool is_offline; // True if the player uses an offline account (skip Mojang skin fetch -> Notch face)
 } CoopLobbyPlayer;
 
 // Custom goal/stat checkbox modification actions (Receiver -> Host)
@@ -125,6 +126,7 @@ typedef struct {
     char username[64]; // From handshake
     char uuid[48]; // From handshake
     char display_name[64]; // From handshake
+    bool is_offline; // From handshake (offline accounts skip Mojang skin fetch)
     Uint32 connect_time; // When the socket was accepted (for handshake timeout)
     Uint32 last_seen_ms;          // SDL_GetTicks of the most recent inbound frame (relay path)
     SDL_AtomicInt pending_action; // CoopClientAction: set by UI thread, processed by host thread
@@ -137,6 +139,7 @@ typedef struct {
     char username[64];
     char uuid[48];
     char display_name[64];
+    bool is_offline;
 } CoopJoinRequest;
 
 typedef struct {
@@ -153,6 +156,7 @@ typedef struct {
     char host_username[64];
     char host_uuid[48];
     char host_display_name[64];
+    bool host_is_offline; // Host's account type (broadcast to receivers via lobby JSON)
     bool auto_accept; // Host: approve incoming join requests without UI prompt
 
     // -- Receiver fields --
@@ -164,6 +168,7 @@ typedef struct {
     char connect_username[64];
     char connect_uuid[48];
     char connect_display_name[64];
+    bool connect_is_offline; // Receiver's account type (sent in JOIN_REQUEST)
 
     // -- Threading --
     SDL_Thread *thread; // The network thread (host or receiver)
@@ -257,11 +262,12 @@ void coop_net_shutdown(CoopNetContext *ctx);
 // populating the pending-approval queue or showing an approval UI.
 bool coop_net_start_host(CoopNetContext *ctx, const char *ip, int port,
                          const char *username, const char *uuid, const char *display_name,
-                         bool auto_accept);
+                         bool is_offline, bool auto_accept);
 
 // Connect to a host with the receiver's identity. Spawns the receiver thread.
 bool coop_net_start_receiver(CoopNetContext *ctx, const char *ip, int port,
-                             const char *username, const char *uuid, const char *display_name);
+                             const char *username, const char *uuid, const char *display_name,
+                             bool is_offline);
 
 // Relay variants. Connect to the Advancely relay server over TLS, do the
 // CREATE_ROOM / JOIN_ROOM control handshake, then run a transport-specific
@@ -274,11 +280,13 @@ bool coop_net_start_receiver(CoopNetContext *ctx, const char *ip, int port,
 // the UI can display it. password_plain may be empty / NULL for an open room.
 bool coop_net_start_host_relay(CoopNetContext *ctx, const char *mc_version,
                                const char *password_plain,
-                               const char *username, const char *uuid, const char *display_name);
+                               const char *username, const char *uuid, const char *display_name,
+                               bool is_offline);
 
 bool coop_net_start_receiver_relay(CoopNetContext *ctx, const char *room_code,
                                    const char *password_plain,
-                                   const char *username, const char *uuid, const char *display_name);
+                                   const char *username, const char *uuid, const char *display_name,
+                                   bool is_offline);
 
 // Returns true if the active session is using the relay transport.
 bool coop_net_is_relay(CoopNetContext *ctx);

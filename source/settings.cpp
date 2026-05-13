@@ -2489,21 +2489,24 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                 } else {
                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                              "Java Edition account. UUID is fetched automatically\n"
-                             "from the Mojang API based on your username.");
+                             "from the Mojang API based on your username.\n"
+                             "Your Minecraft skin face is shown next to you in Co-op views.");
                 }
                 ImGui::SetTooltip("%s", tooltip_buf);
             }
             ImGui::SameLine();
             ImGui::RadioButton("Offline##acc_type", &acc_type, ACCOUNT_OFFLINE);
             if (ImGui::IsItemHovered(acc_net_active ? ImGuiHoveredFlags_AllowWhenDisabled : 0)) {
-                char tooltip_buf[256];
+                char tooltip_buf[320];
                 if (acc_net_active) {
                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                              "Cannot change while a lobby is active.");
                 } else {
                     snprintf(tooltip_buf, sizeof(tooltip_buf),
                              "Offline/cracked account. You must enter your UUID manually.\n"
-                             "Find it through your world's advancements or stats files.");
+                             "Find it through your world's advancements or stats files.\n"
+                             "Offline accounts have no Mojang skin, so the Notch face is\n"
+                             "shown next to you in Co-op views.");
                 }
                 ImGui::SetTooltip("%s", tooltip_buf);
             }
@@ -3282,6 +3285,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                             temp_settings.local_player.username,
                                                             temp_settings.local_player.uuid,
                                                             temp_settings.local_player.display_name,
+                                                            temp_settings.account_type == ACCOUNT_OFFLINE,
                                                             temp_settings.coop_auto_accept)) {
                                         update_coop_template_sync(&temp_settings);
                                         const char *room_code_ip = pub_ip_filled
@@ -3296,7 +3300,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                                   coop_relay_password_host,
                                                                   temp_settings.local_player.username,
                                                                   temp_settings.local_player.uuid,
-                                                                  temp_settings.local_player.display_name)) {
+                                                                  temp_settings.local_player.display_name,
+                                                                  temp_settings.account_type == ACCOUNT_OFFLINE)) {
                                         update_coop_template_sync(&temp_settings);
                                         // Surface the relay-assigned room code in the same UI slot the
                                         // direct path uses, so the existing Copy / display logic works.
@@ -3490,7 +3495,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                                       coop_relay_password_recv,
                                                                       temp_settings.local_player.username,
                                                                       temp_settings.local_player.uuid,
-                                                                      temp_settings.local_player.display_name);
+                                                                      temp_settings.local_player.display_name,
+                                                                      temp_settings.account_type == ACCOUNT_OFFLINE);
                                     }
                                 }
                                 if (!can_join_relay) {
@@ -3529,7 +3535,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                                 coop_net_start_receiver(g_coop_ctx, decoded_ip, decoded_port,
                                                                         temp_settings.local_player.username,
                                                                         temp_settings.local_player.uuid,
-                                                                        temp_settings.local_player.display_name);
+                                                                        temp_settings.local_player.display_name,
+                                                                        temp_settings.account_type == ACCOUNT_OFFLINE);
                                             }
                                         } else {
                                             snprintf(coop_room_code_error, sizeof(coop_room_code_error),
@@ -3670,13 +3677,9 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             const char *name = lobby[i].display_name[0] ? lobby[i].display_name : lobby[i].username;
 
                             // Player face (8x8 native, rendered at 16x16 for visibility).
-                            // Local player uses our known account_type; remote players
-                            // pass ACCOUNT_ONLINE for now and rely on Mojang 404 -> Notch
-                            // (Step 1b will add account_type to the lobby protocol).
-                            AccountType type = ACCOUNT_ONLINE;
-                            if (strcmp(lobby[i].uuid, temp_settings.local_player.uuid) == 0) {
-                                type = temp_settings.account_type;
-                            }
+                            // account_type is carried in the lobby protocol so offline remote
+                            // players skip the Mojang fetch and resolve directly to Notch.
+                            AccountType type = lobby[i].is_offline ? ACCOUNT_OFFLINE : ACCOUNT_ONLINE;
                             SDL_Texture *face = skin_cache_get_face(lobby[i].uuid, type);
                             if (face) {
                                 ImGui::Image((ImTextureID) face, ImVec2(16, 16));
