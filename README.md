@@ -1251,6 +1251,11 @@ How the Host combines multiple players' progress into the **All Players** view d
 The `Show Contributor Faces` toggle (Co-op tab) controls whether any of these face indicators render. When enabled,
 the corner placement, face size (16-48 px, default 28), and LOD threshold (default 0.25) for non-checkbox faces
 are individually configurable per user. They're local visual preferences, not pushed to other lobby members.
+
+Note that the `Goal Visibility` setting still applies on top of this. In `Remove Completed Goals` mode (the default),
+goals that have been finished are hidden from the tracker entirely, so their faces disappear with them. This is most
+visible for completed simple advancements and for goals whose only remaining state is a ticked manual checkbox. Set
+`Goal Visibility` to one of the other modes if you want completed goals (and their contributor faces) to stay on screen.
 * **Play Time / IGT:** Taken from the Host's own world. The merged run-completion timer freezes the first time the
   view hits 100% (per-view, so a per-player view and the All Players view each have their own frozen timer - see
   the Player Dropdown section below).
