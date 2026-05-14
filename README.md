@@ -1227,7 +1227,8 @@ How the Host combines multiple players' progress into the **All Players** view d
   initialized to done; each player's merge flips it back to false if that player is missing it.
 * **Stats:** Configurable per lobby via **Stat Merge Mode** in Settings:
     * `Highest` _(default)_: the group's value is the maximum across players. In the `All Players` view, the
-      current leader's face is drawn next to each sub-stat checkbox (ties keep the previous leader).
+      current leader's face is drawn next to each sub-stat checkbox (ties keep the previous leader). For a
+      simple stat (no sub-stats) the same leader face is drawn in the bottom-right corner of the goal.
     * `Cumulative`: values are summed across players.
 * **Stat auto-complete checkbox** (applies once the combined stat reaches its target): configurable via **Stat
   Completion** - `Any Player` (OR, default) vs `Host Only` (only the Host's own subtree counts toward the auto-
@@ -1237,7 +1238,11 @@ How the Host combines multiple players' progress into the **All Players** view d
 * **Custom Goals / Manual Goals:** Stored **per-player** in `settings.json` (separated by UUID). Each player has
   their own independent progress for manual checklists and counters. The **All Players** view combines them via
   the **Custom Goal Mode**: `Any Player` (OR) or `Host Only`. Switching the Player Dropdown to a specific player
-  shows only that player's custom-goal state and lets you edit it without affecting others.
+  shows only that player's custom-goal state and lets you edit it without affecting others. In the `All Players`
+  view contributor faces follow two independent rules: counter-value contributors get a face in the bottom-right
+  corner of the goal, and manual-checkbox completers get a face _underneath_ the checkbox. Infinite counters
+  (target `-1`) can show both faces simultaneously when different players drove each. Multi-contributor in either
+  dimension hides that face; `Host Only` shows the host once they've contributed.
 * **Multi-Stage Goals:** Merged globally - any player reaching any stage advances the group. _(Receivers sync the
   current stage from the Host's broadcast.)_
 * **Counters:** Derived from their linked goals' merged state, so they follow whichever rule applies to each linked

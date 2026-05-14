@@ -499,6 +499,10 @@ bool merge_coop_progress(const char *buffer, TemplateData *target) {
         dst_item->progress = in_item.progress;
         dst_item->initial_progress = in_item.initial_progress;
         dst_item->is_manually_completed = in_item.is_manually_completed;
+        memcpy(dst_item->custom_contributor_uuid, in_item.custom_contributor_uuid,
+               sizeof(dst_item->custom_contributor_uuid));
+        memcpy(dst_item->manual_completer_uuid, in_item.manual_completer_uuid,
+               sizeof(dst_item->manual_completer_uuid));
     }
 
     for (int i = 0; i < target->counter_goal_count; i++) {

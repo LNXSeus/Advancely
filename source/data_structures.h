@@ -248,6 +248,11 @@ struct TrackableItem {
     // manual-completion checkbox. Empty when nobody manually completed it
     // OR when more than one player did (multi-manual = no face).
     char manual_completer_uuid[48];
+
+    // Coop (custom goals only): UUID of the sole player who contributed to
+    // this custom goal (progress > 0 or done). HOST_ONLY mode: host UUID iff
+    // host contributed. ANY_PLAYER mode: lone contributor or empty if 0/2+.
+    char custom_contributor_uuid[48];
 };
 
 

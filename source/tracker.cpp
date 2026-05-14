@@ -2479,6 +2479,70 @@ static void apply_custom_progress_subtree(Tracker *t, cJSON *progress_obj, bool 
     }
 }
 
+// Numeric counter contribution: subtree has progress > 0 (object-schema "progress"
+// field OR a plain number value). The cJSON_IsTrue legacy bool is *not* a value
+// contribution; it's a manual completion only.
+static bool custom_subtree_value_contributes(cJSON *sub, const char *root_name) {
+    if (!cJSON_IsObject(sub)) return false;
+    cJSON *j = cJSON_GetObjectItem(sub, root_name);
+    if (!j) return false;
+    if (cJSON_IsObject(j)) {
+        cJSON *progress = cJSON_GetObjectItem(j, "progress");
+        return cJSON_IsNumber(progress) && progress->valueint > 0;
+    }
+    return cJSON_IsNumber(j) && j->valueint > 0;
+}
+
+// Manual completion: subtree has the checkbox ticked (object-schema "completed":true
+// or legacy cJSON_IsTrue). Numeric progress alone is not a manual completion.
+static bool custom_subtree_manual_completes(cJSON *sub, const char *root_name) {
+    if (!cJSON_IsObject(sub)) return false;
+    cJSON *j = cJSON_GetObjectItem(sub, root_name);
+    if (!j) return false;
+    if (cJSON_IsObject(j)) {
+        cJSON *completed = cJSON_GetObjectItem(j, "completed");
+        return cJSON_IsBool(completed) && cJSON_IsTrue(completed);
+    }
+    return cJSON_IsTrue(j);
+}
+
+typedef bool (*custom_subtree_pred)(cJSON *, const char *);
+
+// Identifies the sole contributor UUID for a custom goal using the supplied
+// predicate. uuid_filter non-null = HOST_ONLY mode (only that subtree counts);
+// uuid_filter null = ANY_PLAYER mode (lone contributor, empty for 0 or 2+).
+static void compute_custom_lone_contributor(cJSON *section_obj, const char *uuid_filter,
+                                            const char *root_name, custom_subtree_pred pred,
+                                            char *out, size_t out_size) {
+    if (out_size == 0) return;
+    out[0] = '\0';
+    if (!section_obj || !cJSON_IsObject(section_obj) || !root_name || !pred) return;
+
+    if (uuid_filter && uuid_filter[0] != '\0') {
+        cJSON *sub = cJSON_GetObjectItem(section_obj, uuid_filter);
+        if (sub && pred(sub, root_name)) {
+            strncpy(out, uuid_filter, out_size - 1);
+            out[out_size - 1] = '\0';
+        }
+        return;
+    }
+
+    int hits = 0;
+    const char *match = nullptr;
+    for (cJSON *child = section_obj->child; child; child = child->next) {
+        if (!cJSON_IsObject(child)) continue;
+        if (pred(child, root_name)) {
+            hits++;
+            if (hits == 1) match = child->string;
+            if (hits > 1) return;
+        }
+    }
+    if (hits == 1 && match) {
+        strncpy(out, match, out_size - 1);
+        out[out_size - 1] = '\0';
+    }
+}
+
 // uuid == nullptr (or empty) means "merge across all UUIDs in custom_progress" (used
 // for the host's All-Players view when coop_custom_goal_mode == ANY_PLAYER). Otherwise
 // read from the specific UUID's subtree (falling back to legacy flat schema).
@@ -2492,6 +2556,8 @@ static void tracker_update_custom_progress(Tracker *t, cJSON *settings_json, con
         item->done = false;
         item->is_manually_completed = false;
         item->progress = 0;
+        item->custom_contributor_uuid[0] = '\0';
+        item->manual_completer_uuid[0] = '\0';
     }
 
     if (!settings_json) {
@@ -2525,6 +2591,30 @@ static void tracker_update_custom_progress(Tracker *t, cJSON *settings_json, con
         }
         if (!merged_any_subtree) {
             apply_custom_progress_subtree(t, section_obj, false);
+        }
+    }
+
+    // Coop: stamp per-goal contributor UUIDs. Two independent dimensions:
+    //   - custom_contributor_uuid: lone counter-value contributor (progress > 0).
+    //   - manual_completer_uuid: lone manual-checkbox completer (done flag).
+    // HOST_ONLY mode passes the host's UUID as a filter; ANY_PLAYER mode passes
+    // nullptr (lone-contributor logic returns empty if 0 or 2+ players).
+    for (int i = 0; i < t->template_data->custom_goal_count; i++) {
+        TrackableItem *item = t->template_data->custom_goals[i];
+        // Value face only applies to counter goals (goal != 0).
+        if (item->goal != 0) {
+            compute_custom_lone_contributor(section_obj, uuid, item->root_name,
+                                            custom_subtree_value_contributes,
+                                            item->custom_contributor_uuid,
+                                            sizeof(item->custom_contributor_uuid));
+        }
+        // Manual checkbox face applies to anything with a manual override
+        // (goal <= 0 or goal == -1 — same condition as the rendered checkbox).
+        if (item->goal <= 0 || item->goal == -1) {
+            compute_custom_lone_contributor(section_obj, uuid, item->root_name,
+                                            custom_subtree_manual_completes,
+                                            item->manual_completer_uuid,
+                                            sizeof(item->manual_completer_uuid));
         }
     }
 }
@@ -6415,27 +6505,41 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     // --- End Icon Scaling and Centering Logic (Main Icon) ---
                 }
 
-                // Coop: contributor face in the merged view.
-                // Simple advancement: face = first player to complete it.
-                // Complex advancement: face = current leader (most criteria, ties go to
-                // lowest roster index). Shown once any criterion is earned.
-                bool show_face = !is_stat_section && cat->first_contributor_uuid[0] != '\0' &&
-                                 (cat->criteria_count == 0
-                                      ? cat->done
-                                      : cat->completed_criteria_count > 0);
-                if (show_face &&
+                // Coop: contributor face in the merged view, bottom-right of the
+                // 96x96 background. Advancements use cat->first_contributor_uuid
+                // (simple = first completer; complex = current leader). Simple
+                // stats (criteria_count == 1) have no per-criterion checkbox so
+                // step 4's right-of-checkbox face never fires for them — show the
+                // sole-criterion's highest_contributor_uuid here instead, gated on
+                // HIGHEST merge mode.
+                const char *face_uuid = nullptr;
+                if (!is_stat_section) {
+                    bool adv_credit = (cat->criteria_count == 0)
+                                          ? cat->done
+                                          : cat->completed_criteria_count > 0;
+                    if (adv_credit && cat->first_contributor_uuid[0] != '\0') {
+                        face_uuid = cat->first_contributor_uuid;
+                    }
+                } else if (cat->criteria_count == 1 &&
+                           settings->coop_stat_merge == COOP_STAT_HIGHEST) {
+                    TrackableItem *only = cat->criteria[0];
+                    if (only && only->progress > 0 && only->highest_contributor_uuid[0] != '\0') {
+                        face_uuid = only->highest_contributor_uuid;
+                    }
+                }
+                if (face_uuid &&
                     t->selected_coop_player_idx == -1 && !hide_icon_in_layout &&
                     g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE) {
                     CoopLobbyPlayer face_lobby[COOP_MAX_LOBBY];
                     int face_lc = coop_net_get_lobby_players(g_coop_ctx, face_lobby, COOP_MAX_LOBBY);
                     AccountType face_acc = ACCOUNT_ONLINE;
                     for (int li = 0; li < face_lc; li++) {
-                        if (strcmp(face_lobby[li].uuid, cat->first_contributor_uuid) == 0) {
+                        if (strcmp(face_lobby[li].uuid, face_uuid) == 0) {
                             face_acc = face_lobby[li].is_offline ? ACCOUNT_OFFLINE : ACCOUNT_ONLINE;
                             break;
                         }
                     }
-                    SDL_Texture *face_tex = skin_cache_get_face(cat->first_contributor_uuid, face_acc);
+                    SDL_Texture *face_tex = skin_cache_get_face(face_uuid, face_acc);
                     if (face_tex) {
                         const float face_native = 24.0f;
                         const float face_pad = 4.0f;
@@ -8056,6 +8160,34 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                                           item->icon_pos, "Custom Goal", item->display_name, "Icon",
                                           item->root_name);
 
+            // Coop: counter-value contributor face in bottom-right of the 96x96
+            // background. Only meaningful for counter goals (goal != 0); pure
+            // manual checkboxes (goal == 0) show their face under the checkbox.
+            if (item->goal != 0 && item->custom_contributor_uuid[0] != '\0' &&
+                t->selected_coop_player_idx == -1 && !hide_item_icon_in_layout &&
+                g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE) {
+                CoopLobbyPlayer cg_lobby[COOP_MAX_LOBBY];
+                int cg_lc = coop_net_get_lobby_players(g_coop_ctx, cg_lobby, COOP_MAX_LOBBY);
+                AccountType cg_acc = ACCOUNT_ONLINE;
+                for (int li = 0; li < cg_lc; li++) {
+                    if (strcmp(cg_lobby[li].uuid, item->custom_contributor_uuid) == 0) {
+                        cg_acc = cg_lobby[li].is_offline ? ACCOUNT_OFFLINE : ACCOUNT_ONLINE;
+                        break;
+                    }
+                }
+                SDL_Texture *cg_face = skin_cache_get_face(item->custom_contributor_uuid, cg_acc);
+                if (cg_face) {
+                    const float face_native = 24.0f;
+                    const float face_pad = 4.0f;
+                    ImVec2 face_min = ImVec2(
+                        screen_pos.x + (bg_size.x - face_native - face_pad) * t->zoom_level,
+                        screen_pos.y + (bg_size.y - face_native - face_pad) * t->zoom_level);
+                    ImVec2 face_max = ImVec2(face_min.x + face_native * t->zoom_level,
+                                             face_min.y + face_native * t->zoom_level);
+                    draw_list->AddImage((void *) cg_face, face_min, face_max);
+                }
+            }
+
             // Render Text
             // LOD: Check if zoom level is sufficient for text
             if (t->zoom_level > LOD_TEXT_MAIN_THRESHOLD && !hide_item_text_in_layout) {
@@ -8137,6 +8269,29 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 ImRect checkbox_rect(check_pos, ImVec2(check_pos.x + check_size.x, check_pos.y + check_size.y));
 
                 bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
+
+                // Coop: face under the manual-completion checkbox when a single
+                // player ticked it. Drawn before the semi-transparent fill so the
+                // checkbox tint blends over the face.
+                if (item->is_manually_completed &&
+                    item->manual_completer_uuid[0] != '\0' &&
+                    t->selected_coop_player_idx == -1 &&
+                    g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE) {
+                    CoopLobbyPlayer cg_mc_lobby[COOP_MAX_LOBBY];
+                    int cg_mc_lc = coop_net_get_lobby_players(g_coop_ctx, cg_mc_lobby, COOP_MAX_LOBBY);
+                    AccountType cg_mc_acc = ACCOUNT_ONLINE;
+                    for (int li = 0; li < cg_mc_lc; li++) {
+                        if (strcmp(cg_mc_lobby[li].uuid, item->manual_completer_uuid) == 0) {
+                            cg_mc_acc = cg_mc_lobby[li].is_offline ? ACCOUNT_OFFLINE : ACCOUNT_ONLINE;
+                            break;
+                        }
+                    }
+                    SDL_Texture *cg_mc_tex = skin_cache_get_face(item->manual_completer_uuid, cg_mc_acc);
+                    if (cg_mc_tex) {
+                        draw_list->AddImage((void *) cg_mc_tex, checkbox_rect.Min, checkbox_rect.Max);
+                    }
+                }
+
                 ImU32 check_fill_color = is_hovered ? checkbox_hover_color : checkbox_fill_color;
                 draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill_color, 3.0f * t->zoom_level);
                 draw_list->AddRect(checkbox_rect.Min, checkbox_rect.Max, text_color,
