@@ -827,6 +827,28 @@ static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker 
     ImGui::Text(".");
     ImGui::Spacing();
 
+    ImGui::Separator();
+    ImGui::TextWrapped("Please consider supporting the project at");
+    ImGui::SameLine();
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.6f, 1.0f, 1.0f));
+    ImGui::Text("streamlabs.com/lnxseus/tip");
+    ImGui::PopStyleColor();
+    if (ImGui::IsItemClicked()) {
+        SDL_OpenURL("https://streamlabs.com/lnxseus/tip");
+    }
+    if (ImGui::IsItemHovered()) {
+        char donate_tooltip[1024];
+        snprintf(donate_tooltip, sizeof(donate_tooltip),
+                 "Opens the donation page in your browser.\n"
+                 "Mention \"Advancely\" with your tip to get your name listed permanently\n"
+                 "in the Settings window and Overlay.");
+        ImGui::SetTooltip("%s", donate_tooltip);
+    }
+    ImGui::SameLine();
+    ImGui::Text(".");
+    ImGui::Text("Thank you!");
+    ImGui::Spacing();
+
     ImGui::Checkbox("Don't show this again", &dont_show_again);
 
     if (ImGui::Button("Close")) {
