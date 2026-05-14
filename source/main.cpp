@@ -444,6 +444,8 @@ bool merge_coop_progress(const char *buffer, TemplateData *target) {
             dst_item->progress = in_item.progress;
             dst_item->initial_progress = in_item.initial_progress;
             dst_item->is_manually_completed = in_item.is_manually_completed;
+            memcpy(dst_item->highest_contributor_uuid, in_item.highest_contributor_uuid,
+                   sizeof(dst_item->highest_contributor_uuid));
         }
     }
 
@@ -3110,6 +3112,15 @@ int main(int argc, char *argv[]) {
                         // Singleplayer or host with no clients: normal update
                         tracker_update(tracker, &app_settings);
                         tracker_hermes_replay_window(tracker, &app_settings, 5LL * 60 * 1000);
+                        // Host alone in a lobby: the singleplayer rebuild doesn't
+                        // stamp contributor UUIDs, so post-stamp the local player
+                        // so faces still render in the All Players view.
+                        if (app_settings.network_mode == NETWORK_HOST &&
+                            g_coop_ctx &&
+                            coop_net_get_state(g_coop_ctx) == COOP_NET_LISTENING &&
+                            app_settings.local_player.uuid[0] != '\0') {
+                            tracker_stamp_solo_coop_contributor(tracker, app_settings.local_player.uuid);
+                        }
                     }
                 }
 

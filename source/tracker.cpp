@@ -3550,6 +3550,7 @@ static void coop_reset_template_progress(TemplateData *td) {
         for (int j = 0; j < stat_cat->criteria_count; j++) {
             stat_cat->criteria[j]->progress = 0;
             stat_cat->criteria[j]->done = false;
+            stat_cat->criteria[j]->highest_contributor_uuid[0] = '\0';
         }
     }
 
@@ -3767,7 +3768,8 @@ static void coop_merge_achievements_legacy(TemplateData *td, const cJSON *player
  * Supports HIGHEST (max) or CUMULATIVE (sum) merge modes.
  */
 static void coop_merge_stats_modern(TemplateData *td, const cJSON *player_stats_json,
-                                    CoopStatMerge merge_mode, MC_Version version) {
+                                    CoopStatMerge merge_mode, MC_Version version,
+                                    const char *player_uuid) {
     if (!player_stats_json) return;
 
     cJSON *stats_obj = cJSON_GetObjectItem(player_stats_json, "stats");
@@ -3801,9 +3803,17 @@ static void coop_merge_stats_modern(TemplateData *td, const cJSON *player_stats_
                         if (merge_mode == COOP_STAT_CUMULATIVE) {
                             sub_stat->progress += player_value;
                         } else {
-                            // COOP_STAT_HIGHEST
+                            // COOP_STAT_HIGHEST: strict-greater so ties keep the
+                            // current leader (lowest roster index since we iterate
+                            // players in roster order in the caller).
                             if (player_value > sub_stat->progress) {
                                 sub_stat->progress = player_value;
+                                if (player_uuid && player_uuid[0] != '\0') {
+                                    strncpy(sub_stat->highest_contributor_uuid, player_uuid,
+                                            sizeof(sub_stat->highest_contributor_uuid) - 1);
+                                    sub_stat->highest_contributor_uuid[
+                                        sizeof(sub_stat->highest_contributor_uuid) - 1] = '\0';
+                                }
                             }
                         }
                     }
@@ -3818,7 +3828,7 @@ static void coop_merge_stats_modern(TemplateData *td, const cJSON *player_stats_
  * Flat JSON with stat keys at top level.
  */
 static void coop_merge_stats_mid(TemplateData *td, const cJSON *player_stats_json,
-                                 CoopStatMerge merge_mode) {
+                                 CoopStatMerge merge_mode, const char *player_uuid) {
     if (!player_stats_json) return;
 
     // Merge mid-era playtime
@@ -3844,6 +3854,12 @@ static void coop_merge_stats_mid(TemplateData *td, const cJSON *player_stats_jso
                 } else {
                     if (player_value > sub_stat->progress) {
                         sub_stat->progress = player_value;
+                        if (player_uuid && player_uuid[0] != '\0') {
+                            strncpy(sub_stat->highest_contributor_uuid, player_uuid,
+                                    sizeof(sub_stat->highest_contributor_uuid) - 1);
+                            sub_stat->highest_contributor_uuid[
+                                sizeof(sub_stat->highest_contributor_uuid) - 1] = '\0';
+                        }
                     }
                 }
             }
@@ -3861,7 +3877,8 @@ static void coop_merge_stats_mid(TemplateData *td, const cJSON *player_stats_jso
  */
 static void coop_merge_stats_legacy(TemplateData *td, const cJSON *player_stats_json,
                                     CoopStatMerge merge_mode,
-                                    const std::unordered_map<std::string, int> *stat_baselines) {
+                                    const std::unordered_map<std::string, int> *stat_baselines,
+                                    const char *player_uuid) {
     if (!player_stats_json) return;
 
     cJSON *stats_change = cJSON_GetObjectItem(player_stats_json, "stats-change");
@@ -3908,6 +3925,12 @@ static void coop_merge_stats_legacy(TemplateData *td, const cJSON *player_stats_
                     } else {
                         if (player_value > sub_stat->progress) {
                             sub_stat->progress = player_value;
+                            if (player_uuid && player_uuid[0] != '\0') {
+                                strncpy(sub_stat->highest_contributor_uuid, player_uuid,
+                                        sizeof(sub_stat->highest_contributor_uuid) - 1);
+                                sub_stat->highest_contributor_uuid[
+                                    sizeof(sub_stat->highest_contributor_uuid) - 1] = '\0';
+                            }
                         }
                     }
                     break;
@@ -4388,16 +4411,16 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
         // Merge advancements/achievements
         if (version <= MC_VERSION_1_6_4) {
             coop_merge_achievements_legacy(t->template_data, player_stats_json, nullptr, player->uuid);
-            coop_merge_stats_legacy(t->template_data, player_stats_json, settings->coop_stat_merge, nullptr);
+            coop_merge_stats_legacy(t->template_data, player_stats_json, settings->coop_stat_merge, nullptr, player->uuid);
         } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_11_2) {
             coop_merge_achievements_mid(t->template_data, player_stats_json, player->uuid);
-            coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge);
+            coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge, player->uuid);
         } else if (version >= MC_VERSION_1_12 && version <= MC_VERSION_1_12_2) {
             coop_merge_advancements_modern(t->template_data, player_adv_json, player->uuid);
-            coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge);
+            coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge, player->uuid);
         } else if (version >= MC_VERSION_1_13) {
             coop_merge_advancements_modern(t->template_data, player_adv_json, player->uuid);
-            coop_merge_stats_modern(t->template_data, player_stats_json, settings->coop_stat_merge, version);
+            coop_merge_stats_modern(t->template_data, player_stats_json, settings->coop_stat_merge, version, player->uuid);
         }
 
         // CRAFTMINE ONLY: AND-merge this player's unlocks into the group result.
@@ -4560,16 +4583,16 @@ void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, 
 
     if (version <= MC_VERSION_1_6_4) {
         coop_merge_achievements_legacy(t->template_data, player_stats_json, nullptr, player->uuid);
-        coop_merge_stats_legacy(t->template_data, player_stats_json, settings->coop_stat_merge, nullptr);
+        coop_merge_stats_legacy(t->template_data, player_stats_json, settings->coop_stat_merge, nullptr, player->uuid);
     } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_11_2) {
         coop_merge_achievements_mid(t->template_data, player_stats_json, player->uuid);
-        coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge);
+        coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge, player->uuid);
     } else if (version >= MC_VERSION_1_12 && version <= MC_VERSION_1_12_2) {
         coop_merge_advancements_modern(t->template_data, player_adv_json, player->uuid);
-        coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge);
+        coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge, player->uuid);
     } else if (version >= MC_VERSION_1_13) {
         coop_merge_advancements_modern(t->template_data, player_adv_json, player->uuid);
-        coop_merge_stats_modern(t->template_data, player_stats_json, settings->coop_stat_merge, version);
+        coop_merge_stats_modern(t->template_data, player_stats_json, settings->coop_stat_merge, version, player->uuid);
     }
 
     // CRAFTMINE ONLY: single-player view mirrors that player's unlocks as-is.
@@ -4619,6 +4642,40 @@ void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, 
     }
 
     cJSON_Delete(settings_json);
+}
+
+void tracker_stamp_solo_coop_contributor(Tracker *t, const char *uuid) {
+    if (!t || !t->template_data || !uuid || uuid[0] == '\0') return;
+    TemplateData *td = t->template_data;
+
+    for (int i = 0; i < td->advancement_count; i++) {
+        TrackableCategory *adv = td->advancements[i];
+        if (!adv) continue;
+        bool credit = (adv->criteria_count == 0) ? adv->done : (adv->completed_criteria_count > 0);
+        if (credit) {
+            strncpy(adv->first_contributor_uuid, uuid,
+                    sizeof(adv->first_contributor_uuid) - 1);
+            adv->first_contributor_uuid[sizeof(adv->first_contributor_uuid) - 1] = '\0';
+        } else {
+            adv->first_contributor_uuid[0] = '\0';
+        }
+    }
+
+    for (int i = 0; i < td->stat_count; i++) {
+        TrackableCategory *stat_cat = td->stats[i];
+        if (!stat_cat) continue;
+        for (int j = 0; j < stat_cat->criteria_count; j++) {
+            TrackableItem *sub = stat_cat->criteria[j];
+            if (!sub) continue;
+            if (sub->progress > 0) {
+                strncpy(sub->highest_contributor_uuid, uuid,
+                        sizeof(sub->highest_contributor_uuid) - 1);
+                sub->highest_contributor_uuid[sizeof(sub->highest_contributor_uuid) - 1] = '\0';
+            } else {
+                sub->highest_contributor_uuid[0] = '\0';
+            }
+        }
+    }
 }
 
 void tracker_apply_coop_mods(Tracker *t, const AppSettings *settings,
@@ -6692,6 +6749,39 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         if (is_stat_section && cat->criteria_count > 1) {
                             current_element_x_screen += 20.0f * t->zoom_level + 4.0f * t->zoom_level;
                             // Checkbox width + padding
+                        }
+
+                        // Coop: highest-contributor face right of sub-stat checkbox.
+                        // HIGHEST mode only; cumulative mode credits no single player.
+                        // Per-row layout: only advance when a face is actually rendered,
+                        // so rows without a leader don't show a gap before the text.
+                        bool stat_face_eligible = is_stat_section && cat->criteria_count > 1 &&
+                                                  settings->coop_stat_merge == COOP_STAT_HIGHEST &&
+                                                  t->selected_coop_player_idx == -1 &&
+                                                  g_coop_ctx &&
+                                                  coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE &&
+                                                  crit->highest_contributor_uuid[0] != '\0' &&
+                                                  crit->progress > 0;
+                        if (stat_face_eligible) {
+                            CoopLobbyPlayer face_lobby[COOP_MAX_LOBBY];
+                            int face_lc = coop_net_get_lobby_players(g_coop_ctx, face_lobby, COOP_MAX_LOBBY);
+                            AccountType face_acc = ACCOUNT_ONLINE;
+                            for (int li = 0; li < face_lc; li++) {
+                                if (strcmp(face_lobby[li].uuid, crit->highest_contributor_uuid) == 0) {
+                                    face_acc = face_lobby[li].is_offline ? ACCOUNT_OFFLINE : ACCOUNT_ONLINE;
+                                    break;
+                                }
+                            }
+                            SDL_Texture *face_tex = skin_cache_get_face(crit->highest_contributor_uuid, face_acc);
+                            if (face_tex) {
+                                const float face_size = 20.0f;
+                                ImVec2 face_min = ImVec2(current_element_x_screen,
+                                                         crit_base_pos_screen.y + 6.0f * t->zoom_level);
+                                ImVec2 face_max = ImVec2(face_min.x + face_size * t->zoom_level,
+                                                         face_min.y + face_size * t->zoom_level);
+                                draw_list->AddImage((void *) face_tex, face_min, face_max);
+                                current_element_x_screen += face_size * t->zoom_level + 4.0f * t->zoom_level;
+                            }
                         }
 
 
@@ -10732,7 +10822,8 @@ static bool hermes_parse_stat_key(const char *hermes_key,
  *
  * Returns true if at least one in-memory value changed.
  */
-static bool hermes_apply_stat_event(Tracker *t, const cJSON *data, bool skip_multi_stage = false) {
+static bool hermes_apply_stat_event(Tracker *t, const cJSON *data, bool skip_multi_stage = false,
+                                    const char *player_uuid = nullptr) {
     cJSON *stat_key_json = cJSON_GetObjectItem(data, "stat");
     cJSON *value_json = cJSON_GetObjectItem(data, "value");
 
@@ -10776,6 +10867,11 @@ static bool hermes_apply_stat_event(Tracker *t, const cJSON *data, bool skip_mul
             // In coop HIGHEST mode: only apply if higher (preserves max across players).
             if (new_value <= sub->progress) continue;
             sub->progress = new_value;
+            if (player_uuid && player_uuid[0] != '\0') {
+                strncpy(sub->highest_contributor_uuid, player_uuid,
+                        sizeof(sub->highest_contributor_uuid) - 1);
+                sub->highest_contributor_uuid[sizeof(sub->highest_contributor_uuid) - 1] = '\0';
+            }
 
             if (!sub->is_manually_completed) {
                 if (sub->goal > 0) sub->done = (sub->progress >= sub->goal);
@@ -11227,7 +11323,7 @@ static bool hermes_apply_event_to_coop_snapshots(
                 if (settings->coop_stat_merge == COOP_STAT_CUMULATIVE) {
                     changed = hermes_apply_stat_event_cumulative(t, data, ev_uuid, false);
                 } else {
-                    bool c1 = hermes_apply_stat_event(t, data, true);
+                    bool c1 = hermes_apply_stat_event(t, data, true, ev_uuid);
                     bool c2 = hermes_apply_stat_event_cumulative(t, data, ev_uuid, true);
                     changed = c1 || c2;
                 }
@@ -11461,7 +11557,7 @@ static bool hermes_process_decrypted_line(
             if (hermes_apply_stat_event_cumulative(t, data, event_player_uuid))
                 any_changed = true;
         } else if (is_coop_host) {
-            if (hermes_apply_stat_event(t, data, true)) any_changed = true;
+            if (hermes_apply_stat_event(t, data, true, event_player_uuid)) any_changed = true;
             if (hermes_apply_stat_event_cumulative(t, data, event_player_uuid, true))
                 any_changed = true;
         } else {

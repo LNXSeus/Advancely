@@ -239,6 +239,10 @@ struct TrackableItem {
     ManualPos icon_pos;
     ManualPos text_pos;
     ManualPos progress_pos; // For custom goals to separate progress, not for unlocks
+
+    // Coop (sub-stats, HIGHEST mode only): UUID of the current highest-value
+    // player. Empty when no player has contributed yet. Cleared on reset.
+    char highest_contributor_uuid[48];
 };
 
 

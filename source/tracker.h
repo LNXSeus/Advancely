@@ -484,6 +484,14 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings);
 void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, int player_idx);
 
 /**
+ * @brief Post-stamps the given UUID as the contributor on all completed
+ * advancements and progressed sub-stats. Used by the singleplayer rebuild
+ * path when the host is alone in a coop lobby, so contributor faces still
+ * render in the All Players view.
+ */
+void tracker_stamp_solo_coop_contributor(Tracker *t, const char *uuid);
+
+/**
  * @brief Applies a batch of custom goal/stat checkbox modifications from receivers.
  *
  * Called by the host after draining the custom mod queue. Modifies the template data

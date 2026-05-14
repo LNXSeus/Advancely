@@ -1226,7 +1226,8 @@ How the Host combines multiple players' progress into the **All Players** view d
 * **Unlocks (25w14craftmine):** `AND` - an unlock counts only when *every* roster player has obtained it. Pre-
   initialized to done; each player's merge flips it back to false if that player is missing it.
 * **Stats:** Configurable per lobby via **Stat Merge Mode** in Settings:
-    * `Highest` _(default)_: the group's value is the maximum across players.
+    * `Highest` _(default)_: the group's value is the maximum across players. In the `All Players` view, the
+      current leader's face is drawn next to each sub-stat checkbox (ties keep the previous leader).
     * `Cumulative`: values are summed across players.
 * **Stat auto-complete checkbox** (applies once the combined stat reaches its target): configurable via **Stat
   Completion** - `Any Player` (OR, default) vs `Host Only` (only the Host's own subtree counts toward the auto-

@@ -3187,7 +3187,8 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                              "Goal merging rules are locked while a lobby is active");
                                 else
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Use whichever player has the highest value for each stat.");
+                                             "Use whichever player has the highest value for each stat. "
+                                             "In the All Players view, their face is shown next to the sub-stat checkbox.");
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
                             ImGui::SameLine();
