@@ -795,7 +795,22 @@ static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker 
 
     ImGui::TextWrapped("Thank you for using Advancely!");
     ImGui::TextWrapped("A highly customizable and interactive tool to track your Minecraft progress.");
-    ImGui::TextWrapped("If you have any issues/suggestions you can find more info on the GitHub page.");
+    ImGui::TextWrapped("If you have any issues/suggestions you can find more info on the");
+    ImGui::SameLine();
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.6f, 1.0f, 1.0f));
+    ImGui::Text("GitHub Page");
+    ImGui::PopStyleColor();
+    if (ImGui::IsItemClicked()) {
+        SDL_OpenURL("https://github.com/LNXSeus/Advancely");
+    }
+    if (ImGui::IsItemHovered()) {
+        char project_main_page_tooltip_buffer[1024];
+        snprintf(project_main_page_tooltip_buffer, sizeof(project_main_page_tooltip_buffer),
+                 "Opens the project's main page in your browser.");
+        ImGui::SetTooltip("%s", project_main_page_tooltip_buffer);
+    }
+    ImGui::SameLine();
+    ImGui::Text(".");
     ImGui::Separator();
     ImGui::Text("Getting Started:");
     ImGui::BulletText("Pan the View: Hold Right-Click or Middle-Click and drag.");
@@ -806,28 +821,6 @@ static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker 
     ImGui::BulletText("A lot more info can be found when hovering over certain elements.");
     ImGui::Separator();
 
-    ImGui::Text("For more information, visit the main");
-    ImGui::SameLine();
-    // Style the text to look like a link
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.6f, 1.0f, 1.0f));
-    ImGui::Text("GitHub Page");
-    ImGui::PopStyleColor();
-    // Make the text clickable
-    if (ImGui::IsItemClicked()) {
-        SDL_OpenURL("https://github.com/LNXSeus/Advancely");
-    }
-    if (ImGui::IsItemHovered()) {
-        char project_main_page_tooltip_buffer[1024];
-        snprintf(project_main_page_tooltip_buffer, sizeof(project_main_page_tooltip_buffer),
-                 "Opens the project's main page in your browser.");
-        ImGui::SetTooltip("%s", project_main_page_tooltip_buffer);
-        // ALWAYS SET TOOLTIPS LIKE THIS WITH %s for macOS compiler
-    }
-    ImGui::SameLine();
-    ImGui::Text(".");
-    ImGui::Spacing();
-
-    ImGui::Separator();
     ImGui::TextWrapped("Please consider supporting the project at");
     ImGui::SameLine();
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.6f, 1.0f, 1.0f));
@@ -845,8 +838,7 @@ static void welcome_render_gui(bool *p_open, AppSettings *app_settings, Tracker 
         ImGui::SetTooltip("%s", donate_tooltip);
     }
     ImGui::SameLine();
-    ImGui::Text(".");
-    ImGui::Text("Thank you!");
+    ImGui::Text(". Thank you!");
     ImGui::Spacing();
 
     ImGui::Checkbox("Don't show this again", &dont_show_again);

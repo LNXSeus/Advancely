@@ -1487,6 +1487,11 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                         strncpy(new_crit->root_name, crit_item->string, sizeof(new_crit->root_name) - 1);
                         new_crit->root_name[sizeof(new_crit->root_name) - 1] = '\0';
 
+                        // Sub-stat progress can be positioned independently from its display text
+                        if (is_stat_category) {
+                            parse_manual_pos(crit_item, "progress_pos", &new_crit->progress_pos);
+                        }
+
                         // Add pre-parsing for multi-criteria stats
                         if (is_stat_category) {
                             const char *slash = strchr(new_crit->root_name, '/');
@@ -7087,9 +7092,32 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                 }
 
                                 if (crit_progress_text[0] != '\0') {
+                                    ImGui::PushFont(t->tracker_font);
+                                    ImGui::SetWindowFontScale(scale_factor);
+                                    ImVec2 crit_progress_size = ImGui::CalcTextSize(crit_progress_text);
+                                    ImGui::SetWindowFontScale(1.0f);
+                                    ImGui::PopFont();
+
                                     ImVec2 crit_progress_pos = ImVec2(current_element_x_screen, child_text_pos.y);
+                                    if (settings->use_manual_layout && crit->progress_pos.is_set) {
+                                        ImVec2 prog_anchor_off = get_anchor_offset(
+                                            crit->progress_pos.anchor, crit_progress_size.x, crit_progress_size.y);
+                                        crit_progress_pos = ImVec2(
+                                            ((crit->progress_pos.x + prog_anchor_off.x) * t->zoom_level) + t->camera_offset.x,
+                                            ((crit->progress_pos.y + prog_anchor_off.y) * t->zoom_level) + t->camera_offset.y);
+                                    }
+
                                     draw_list->AddText(nullptr, sub_font_size * t->zoom_level, crit_progress_pos,
                                                        current_child_text_color, crit_progress_text);
+
+                                    snprintf(drag_id, sizeof(drag_id), "drag_crit_prog_%s_%s",
+                                             cat->root_name, crit->root_name);
+                                    handle_visual_layout_dragging(t, drag_id, crit_progress_pos,
+                                                                  ImVec2(crit_progress_size.x * t->zoom_level,
+                                                                         crit_progress_size.y * t->zoom_level),
+                                                                  crit->progress_pos, crit_type, crit->display_name,
+                                                                  "Progress", crit->root_name,
+                                                                  cat->display_name, cat->root_name);
                                 }
                             }
                         }

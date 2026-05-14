@@ -1300,6 +1300,7 @@ static void parse_editor_stats(cJSON *json_object, std::vector<EditorTrackableCa
                 // Parse manual positions for the criteria
                 parse_editor_manual_pos(criterion_json, "icon_pos", &new_crit.icon_pos);
                 parse_editor_manual_pos(criterion_json, "text_pos", &new_crit.text_pos);
+                parse_editor_manual_pos(criterion_json, "progress_pos", &new_crit.progress_pos);
 
                 // Parse sub-stat linked goals
                 parse_linked_goals(criterion_json, new_crit.linked_goals, new_crit.linked_goal_mode);
@@ -1830,6 +1831,7 @@ static void serialize_editor_stats(cJSON *parent, const std::vector<EditorTracka
                 serialize_linked_goals(crit_json, crit.linked_goals, crit.linked_goal_mode);
                 save_editor_manual_pos(crit_json, "icon_pos", crit.icon_pos);
                 save_editor_manual_pos(crit_json, "text_pos", crit.text_pos);
+                save_editor_manual_pos(crit_json, "progress_pos", crit.progress_pos);
                 cJSON_AddItemToObject(criteria_object, crit.root_name, crit_json);
             }
             cJSON_AddItemToObject(cat_json, "criteria", criteria_object);
@@ -7307,6 +7309,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     render_manual_pos_ui("sc_icon", "sub-stat", "Icon Pos.", &crit.icon_pos,
                                                          save_message_type);
                                     render_manual_pos_ui("sc_text", "sub-stat", "Text Pos.", &crit.text_pos,
+                                                         save_message_type);
+                                    render_manual_pos_ui("sc_prog", "sub-stat", "Progress Pos.", &crit.progress_pos,
                                                          save_message_type);
                                 }
 

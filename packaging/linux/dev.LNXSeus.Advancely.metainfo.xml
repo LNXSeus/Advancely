@@ -16,6 +16,22 @@
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
 
   <releases>
+    <release version="1.4.3" date="2026-05-14">
+      <description>
+        <ul>
+          <li>Added Player Faces for Coop.</li>
+          <li>Some networking fixes and more detailed error codes.</li>
+          <li>Added 'Uh Oh' advancement to 26.2 template.</li>
+          <li>Added new MSYHBD.TTC font along with .ttc support. Hotkeys use key-capture input.</li>
+          <li>'Edit Templates' renamed to 'Open Template Editor'.</li>
+          <li>Overlay width saves properly again.</li>
+          <li>Supporters shown in welcome message.</li>
+          <li>Fixed folders opening up twice.</li>
+          <li>Fixed Linux certification path issue for installers.</li>
+          <li>Sub-stat progress text is now its own positionable element.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.4.2" date="2026-04-29">
       <description>
         <ul>
