@@ -1231,7 +1231,9 @@ How the Host combines multiple players' progress into the **All Players** view d
     * `Cumulative`: values are summed across players.
 * **Stat auto-complete checkbox** (applies once the combined stat reaches its target): configurable via **Stat
   Completion** - `Any Player` (OR, default) vs `Host Only` (only the Host's own subtree counts toward the auto-
-  tick).
+  tick). When exactly one player has manually ticked a stat's checkbox (full-goal or sub-stat), their face is
+  shown _underneath_ that checkbox in the `All Players` view; if two or more players ticked the same checkbox, no
+  face is shown.
 * **Custom Goals / Manual Goals:** Stored **per-player** in `settings.json` (separated by UUID). Each player has
   their own independent progress for manual checklists and counters. The **All Players** view combines them via
   the **Custom Goal Mode**: `Any Player` (OR) or `Host Only`. Switching the Player Dropdown to a specific player

@@ -243,6 +243,11 @@ struct TrackableItem {
     // Coop (sub-stats, HIGHEST mode only): UUID of the current highest-value
     // player. Empty when no player has contributed yet. Cleared on reset.
     char highest_contributor_uuid[48];
+
+    // Coop: UUID of the sole player who manually checked this sub-stat's
+    // manual-completion checkbox. Empty when nobody manually completed it
+    // OR when more than one player did (multi-manual = no face).
+    char manual_completer_uuid[48];
 };
 
 
@@ -294,6 +299,11 @@ struct TrackableCategory {
     // Empty when not yet completed by any player. Cleared on goal reset / world change.
     // For simple advancements (criteria_count == 0) only; complex advancements use their own logic.
     char first_contributor_uuid[48];
+
+    // Coop (stat categories): UUID of the sole player who manually checked the
+    // full-goal manual-completion checkbox. Empty when nobody manually completed
+    // it OR when more than one player did (multi-manual = no face).
+    char manual_completer_uuid[48];
 
     // Animation State
     float alpha; // Current transparency (1.0f = opaque, 0.0f = transparent)

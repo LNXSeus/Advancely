@@ -430,6 +430,8 @@ bool merge_coop_progress(const char *buffer, TemplateData *target) {
             dst->done_in_snapshot = in_cat.done_in_snapshot;
             dst->progress = in_cat.progress;
             dst->completed_criteria_count = in_cat.completed_criteria_count;
+            memcpy(dst->manual_completer_uuid, in_cat.manual_completer_uuid,
+                   sizeof(dst->manual_completer_uuid));
         }
 
         for (int j = 0; j < in_cat.criteria_count; j++) {
@@ -446,6 +448,8 @@ bool merge_coop_progress(const char *buffer, TemplateData *target) {
             dst_item->is_manually_completed = in_item.is_manually_completed;
             memcpy(dst_item->highest_contributor_uuid, in_item.highest_contributor_uuid,
                    sizeof(dst_item->highest_contributor_uuid));
+            memcpy(dst_item->manual_completer_uuid, in_item.manual_completer_uuid,
+                   sizeof(dst_item->manual_completer_uuid));
         }
     }
 

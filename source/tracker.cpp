@@ -3547,10 +3547,12 @@ static void coop_reset_template_progress(TemplateData *td) {
         TrackableCategory *stat_cat = td->stats[i];
         stat_cat->done = false;
         stat_cat->completed_criteria_count = 0;
+        stat_cat->manual_completer_uuid[0] = '\0';
         for (int j = 0; j < stat_cat->criteria_count; j++) {
             stat_cat->criteria[j]->progress = 0;
             stat_cat->criteria[j]->done = false;
             stat_cat->criteria[j]->highest_contributor_uuid[0] = '\0';
+            stat_cat->criteria[j]->manual_completer_uuid[0] = '\0';
         }
     }
 
@@ -4173,6 +4175,48 @@ static bool stat_override_is_true(cJSON *section_obj, const char *uuid, const ch
     return false;
 }
 
+// Identify the sole UUID subtree under `section_obj` whose `key` is set to true.
+// uuid_filter: when non-null, only that subtree is consulted (HOST_ONLY mode); the
+// returned UUID is the filter itself if it has the key set, else empty.
+// uuid_filter null: ANY_PLAYER mode; returns the lone completer's UUID or empty if
+// zero or more-than-one player has the key set (multi-manual = no face).
+static void compute_stat_manual_completer(cJSON *section_obj,
+                                          const char *uuid_filter,
+                                          const char *key,
+                                          char *out, size_t out_size) {
+    if (out_size == 0) return;
+    out[0] = '\0';
+    if (!section_obj || !cJSON_IsObject(section_obj) || !key) return;
+
+    if (uuid_filter && uuid_filter[0] != '\0') {
+        cJSON *sub = cJSON_GetObjectItem(section_obj, uuid_filter);
+        if (cJSON_IsObject(sub)) {
+            cJSON *v = cJSON_GetObjectItem(sub, key);
+            if (cJSON_IsBool(v) && cJSON_IsTrue(v)) {
+                strncpy(out, uuid_filter, out_size - 1);
+                out[out_size - 1] = '\0';
+            }
+        }
+        return;
+    }
+
+    int hits = 0;
+    const char *match = nullptr;
+    for (cJSON *child = section_obj->child; child; child = child->next) {
+        if (!cJSON_IsObject(child)) continue;
+        cJSON *v = cJSON_GetObjectItem(child, key);
+        if (cJSON_IsBool(v) && cJSON_IsTrue(v)) {
+            hits++;
+            if (hits == 1) match = child->string;
+            if (hits > 1) return; // multi-manual: leave out empty
+        }
+    }
+    if (hits == 1 && match) {
+        strncpy(out, match, out_size - 1);
+        out[out_size - 1] = '\0';
+    }
+}
+
 static void coop_finalize_stats(TemplateData *td, cJSON *settings_json, const char *uuid) {
     cJSON *section_obj = settings_json ? cJSON_GetObjectItem(settings_json, "stat_progress_override") : nullptr;
 
@@ -4185,6 +4229,9 @@ static void coop_finalize_stats(TemplateData *td, cJSON *settings_json, const ch
 
         bool parent_forced_true = stat_override_is_true(section_obj, uuid, stat_cat->root_name);
         stat_cat->is_manually_completed = parent_forced_true;
+        compute_stat_manual_completer(section_obj, uuid, stat_cat->root_name,
+                                      stat_cat->manual_completer_uuid,
+                                      sizeof(stat_cat->manual_completer_uuid));
 
         for (int j = 0; j < stat_cat->criteria_count; j++) {
             TrackableItem *sub_stat = stat_cat->criteria[j];
@@ -4193,11 +4240,18 @@ static void coop_finalize_stats(TemplateData *td, cJSON *settings_json, const ch
             bool sub_forced_true;
             if (stat_cat->criteria_count == 1) {
                 sub_forced_true = parent_forced_true;
+                // Single-stat category shares the parent override key, so the
+                // sub-stat's manual completer is the parent's by definition.
+                memcpy(sub_stat->manual_completer_uuid, stat_cat->manual_completer_uuid,
+                       sizeof(sub_stat->manual_completer_uuid));
             } else {
                 char sub_stat_key[512];
                 snprintf(sub_stat_key, sizeof(sub_stat_key), "%s.criteria.%s",
                          stat_cat->root_name, sub_stat->root_name);
                 sub_forced_true = stat_override_is_true(section_obj, uuid, sub_stat_key);
+                compute_stat_manual_completer(section_obj, uuid, sub_stat_key,
+                                              sub_stat->manual_completer_uuid,
+                                              sizeof(sub_stat->manual_completer_uuid));
             }
             sub_stat->is_manually_completed = sub_forced_true;
 
@@ -4664,6 +4718,13 @@ void tracker_stamp_solo_coop_contributor(Tracker *t, const char *uuid) {
     for (int i = 0; i < td->stat_count; i++) {
         TrackableCategory *stat_cat = td->stats[i];
         if (!stat_cat) continue;
+        if (stat_cat->is_manually_completed) {
+            strncpy(stat_cat->manual_completer_uuid, uuid,
+                    sizeof(stat_cat->manual_completer_uuid) - 1);
+            stat_cat->manual_completer_uuid[sizeof(stat_cat->manual_completer_uuid) - 1] = '\0';
+        } else {
+            stat_cat->manual_completer_uuid[0] = '\0';
+        }
         for (int j = 0; j < stat_cat->criteria_count; j++) {
             TrackableItem *sub = stat_cat->criteria[j];
             if (!sub) continue;
@@ -4673,6 +4734,13 @@ void tracker_stamp_solo_coop_contributor(Tracker *t, const char *uuid) {
                 sub->highest_contributor_uuid[sizeof(sub->highest_contributor_uuid) - 1] = '\0';
             } else {
                 sub->highest_contributor_uuid[0] = '\0';
+            }
+            if (sub->is_manually_completed) {
+                strncpy(sub->manual_completer_uuid, uuid,
+                        sizeof(sub->manual_completer_uuid) - 1);
+                sub->manual_completer_uuid[sizeof(sub->manual_completer_uuid) - 1] = '\0';
+            } else {
+                sub->manual_completer_uuid[0] = '\0';
             }
         }
     }
@@ -6637,6 +6705,29 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             ImRect checkbox_rect(
                                 check_pos, ImVec2(check_pos.x + 20 * t->zoom_level, check_pos.y + 20 * t->zoom_level));
                             bool is_hovered = ImGui::IsMouseHoveringRect(checkbox_rect.Min, checkbox_rect.Max);
+
+                            // Coop: face under the manual-completion checkbox when a
+                            // single player ticked it. Drawn before the semi-transparent
+                            // fill so the checkbox tint blends over the face.
+                            if (crit->is_manually_completed &&
+                                crit->manual_completer_uuid[0] != '\0' &&
+                                t->selected_coop_player_idx == -1 &&
+                                g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE) {
+                                CoopLobbyPlayer mc_lobby[COOP_MAX_LOBBY];
+                                int mc_lc = coop_net_get_lobby_players(g_coop_ctx, mc_lobby, COOP_MAX_LOBBY);
+                                AccountType mc_acc = ACCOUNT_ONLINE;
+                                for (int li = 0; li < mc_lc; li++) {
+                                    if (strcmp(mc_lobby[li].uuid, crit->manual_completer_uuid) == 0) {
+                                        mc_acc = mc_lobby[li].is_offline ? ACCOUNT_OFFLINE : ACCOUNT_ONLINE;
+                                        break;
+                                    }
+                                }
+                                SDL_Texture *mc_tex = skin_cache_get_face(crit->manual_completer_uuid, mc_acc);
+                                if (mc_tex) {
+                                    draw_list->AddImage((void *) mc_tex, checkbox_rect.Min, checkbox_rect.Max);
+                                }
+                            }
+
                             ImU32 check_fill = is_hovered ? checkbox_hover_color : checkbox_fill_color;
                             draw_list->AddRectFilled(checkbox_rect.Min, checkbox_rect.Max, check_fill,
                                                      3.0f * t->zoom_level);
@@ -6751,7 +6842,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             // Checkbox width + padding
                         }
 
-                        // Coop: highest-contributor face right of sub-stat checkbox.
+                                            // Coop: highest-contributor face right of sub-stat checkbox.
                         // HIGHEST mode only; cumulative mode credits no single player.
                         // Per-row layout: only advance when a face is actually rendered,
                         // so rows without a leader don't show a gap before the text.
@@ -6969,6 +7060,29 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                                        check_pos_parent.y + 20 * t->zoom_level));
                     bool is_hovered_parent = ImGui::IsMouseHoveringRect(checkbox_rect_parent.Min,
                                                                         checkbox_rect_parent.Max);
+
+                    // Coop: face under the full-goal manual-completion checkbox when
+                    // a single player ticked it. Drawn before the semi-transparent
+                    // fill so the checkbox tint blends over the face.
+                    if (cat->is_manually_completed &&
+                        cat->manual_completer_uuid[0] != '\0' &&
+                        t->selected_coop_player_idx == -1 &&
+                        g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE) {
+                        CoopLobbyPlayer mcp_lobby[COOP_MAX_LOBBY];
+                        int mcp_lc = coop_net_get_lobby_players(g_coop_ctx, mcp_lobby, COOP_MAX_LOBBY);
+                        AccountType mcp_acc = ACCOUNT_ONLINE;
+                        for (int li = 0; li < mcp_lc; li++) {
+                            if (strcmp(mcp_lobby[li].uuid, cat->manual_completer_uuid) == 0) {
+                                mcp_acc = mcp_lobby[li].is_offline ? ACCOUNT_OFFLINE : ACCOUNT_ONLINE;
+                                break;
+                            }
+                        }
+                        SDL_Texture *mcp_tex = skin_cache_get_face(cat->manual_completer_uuid, mcp_acc);
+                        if (mcp_tex) {
+                            draw_list->AddImage((void *) mcp_tex, checkbox_rect_parent.Min, checkbox_rect_parent.Max);
+                        }
+                    }
+
                     ImU32 check_fill_parent = is_hovered_parent ? checkbox_hover_color : checkbox_fill_color;
                     draw_list->AddRectFilled(checkbox_rect_parent.Min, checkbox_rect_parent.Max, check_fill_parent,
                                              3.0f * t->zoom_level);
