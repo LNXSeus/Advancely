@@ -286,6 +286,11 @@ struct TrackableCategory {
     int completed_criteria_count; // Track completed criteria for that advancement
     TrackableItem **criteria; // An array of sub-items
 
+    // Coop: UUID of the player who first completed this goal in the merged "All Players" view.
+    // Empty when not yet completed by any player. Cleared on goal reset / world change.
+    // For simple advancements (criteria_count == 0) only; complex advancements use their own logic.
+    char first_contributor_uuid[48];
+
     // Animation State
     float alpha; // Current transparency (1.0f = opaque, 0.0f = transparent)
     bool is_visible_on_overlay; // Tracks if the category should be rendered

@@ -393,6 +393,8 @@ bool merge_coop_progress(const char *buffer, TemplateData *target) {
         dst->done_in_snapshot = in_cat.done_in_snapshot;
         dst->progress = in_cat.progress;
         dst->completed_criteria_count = in_cat.completed_criteria_count;
+        memcpy(dst->first_contributor_uuid, in_cat.first_contributor_uuid,
+               sizeof(dst->first_contributor_uuid));
 
         for (int j = 0; j < in_cat.criteria_count; j++) {
             TrackableItem in_item;

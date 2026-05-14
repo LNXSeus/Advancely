@@ -3537,6 +3537,7 @@ static void coop_reset_template_progress(TemplateData *td) {
         adv->done = false;
         adv->all_template_criteria_met = false;
         adv->completed_criteria_count = 0;
+        adv->first_contributor_uuid[0] = '\0';
         for (int j = 0; j < adv->criteria_count; j++) {
             adv->criteria[j]->done = false;
         }
@@ -3569,7 +3570,8 @@ static void coop_reset_template_progress(TemplateData *td) {
  *
  * Works for both modern advancements (1.12+) and mid-era achievements (1.7-1.11.2).
  */
-static void coop_merge_advancements_modern(TemplateData *td, const cJSON *player_adv_json) {
+static void coop_merge_advancements_modern(TemplateData *td, const cJSON *player_adv_json,
+                                            const char *player_uuid) {
     if (!player_adv_json) return;
 
     for (int i = 0; i < td->advancement_count; i++) {
@@ -3581,8 +3583,15 @@ static void coop_merge_advancements_modern(TemplateData *td, const cJSON *player
         bool game_is_done = cJSON_IsTrue(cJSON_GetObjectItem(player_entry, "done"));
 
         if (adv->criteria_count == 0) {
-            // Simple advancement: OR across players
+            // Simple advancement: OR across players. First-completer (in roster
+            // iteration order) is stamped for the "All Players" face render.
             if (game_is_done) {
+                if (!adv->done && player_uuid && player_uuid[0] != '\0' &&
+                    adv->first_contributor_uuid[0] == '\0') {
+                    strncpy(adv->first_contributor_uuid, player_uuid,
+                            sizeof(adv->first_contributor_uuid) - 1);
+                    adv->first_contributor_uuid[sizeof(adv->first_contributor_uuid) - 1] = '\0';
+                }
                 adv->done = true;
                 adv->all_template_criteria_met = true;
             }
@@ -3622,7 +3631,8 @@ static void coop_merge_advancements_modern(TemplateData *td, const cJSON *player
  * @brief Merges one player's mid-era achievement data into TemplateData (accumulative).
  * Mid-era (1.7-1.11.2): achievements are in a flat JSON with value/progress fields.
  */
-static void coop_merge_achievements_mid(TemplateData *td, const cJSON *player_stats_json) {
+static void coop_merge_achievements_mid(TemplateData *td, const cJSON *player_stats_json,
+                                         const char *player_uuid) {
     if (!player_stats_json) return;
 
     for (int i = 0; i < td->advancement_count; i++) {
@@ -3643,6 +3653,12 @@ static void coop_merge_achievements_mid(TemplateData *td, const cJSON *player_st
         if (ach->criteria_count == 0) {
             // Simple achievement: OR across players
             if (game_is_done) {
+                if (!ach->done && player_uuid && player_uuid[0] != '\0' &&
+                    ach->first_contributor_uuid[0] == '\0') {
+                    strncpy(ach->first_contributor_uuid, player_uuid,
+                            sizeof(ach->first_contributor_uuid) - 1);
+                    ach->first_contributor_uuid[sizeof(ach->first_contributor_uuid) - 1] = '\0';
+                }
                 ach->done = true;
                 ach->all_template_criteria_met = true;
             }
@@ -3701,7 +3717,8 @@ static void coop_merge_achievements_mid(TemplateData *td, const cJSON *player_st
  * from their baseline, yielding "done_in_snapshot = true iff ALL players held it".
  */
 static void coop_merge_achievements_legacy(TemplateData *td, const cJSON *player_stats_json,
-                                           const std::unordered_set<std::string> *ach_baseline_done) {
+                                           const std::unordered_set<std::string> *ach_baseline_done,
+                                           const char *player_uuid) {
     if (!player_stats_json) return;
 
     cJSON *stats_change = cJSON_GetObjectItem(player_stats_json, "stats-change");
@@ -3714,6 +3731,13 @@ static void coop_merge_achievements_legacy(TemplateData *td, const cJSON *player
         cJSON_ArrayForEach(stat_entry, stats_change) {
             cJSON *item = stat_entry->child;
             if (item && strcmp(item->string, ach->root_name) == 0 && item->valueint >= 1) {
+                // Legacy achievements have no criteria - all are "simple".
+                if (!ach->done && player_uuid && player_uuid[0] != '\0' &&
+                    ach->first_contributor_uuid[0] == '\0') {
+                    strncpy(ach->first_contributor_uuid, player_uuid,
+                            sizeof(ach->first_contributor_uuid) - 1);
+                    ach->first_contributor_uuid[sizeof(ach->first_contributor_uuid) - 1] = '\0';
+                }
                 ach->done = true; // OR across players
                 break;
             }
@@ -4351,16 +4375,16 @@ void tracker_update_coop_merged(Tracker *t, const AppSettings *settings) {
 
         // Merge advancements/achievements
         if (version <= MC_VERSION_1_6_4) {
-            coop_merge_achievements_legacy(t->template_data, player_stats_json, nullptr);
+            coop_merge_achievements_legacy(t->template_data, player_stats_json, nullptr, player->uuid);
             coop_merge_stats_legacy(t->template_data, player_stats_json, settings->coop_stat_merge, nullptr);
         } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_11_2) {
-            coop_merge_achievements_mid(t->template_data, player_stats_json);
+            coop_merge_achievements_mid(t->template_data, player_stats_json, player->uuid);
             coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge);
         } else if (version >= MC_VERSION_1_12 && version <= MC_VERSION_1_12_2) {
-            coop_merge_advancements_modern(t->template_data, player_adv_json);
+            coop_merge_advancements_modern(t->template_data, player_adv_json, player->uuid);
             coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge);
         } else if (version >= MC_VERSION_1_13) {
-            coop_merge_advancements_modern(t->template_data, player_adv_json);
+            coop_merge_advancements_modern(t->template_data, player_adv_json, player->uuid);
             coop_merge_stats_modern(t->template_data, player_stats_json, settings->coop_stat_merge, version);
         }
 
@@ -4523,16 +4547,16 @@ void tracker_update_coop_single_player(Tracker *t, const AppSettings *settings, 
     }
 
     if (version <= MC_VERSION_1_6_4) {
-        coop_merge_achievements_legacy(t->template_data, player_stats_json, nullptr);
+        coop_merge_achievements_legacy(t->template_data, player_stats_json, nullptr, player->uuid);
         coop_merge_stats_legacy(t->template_data, player_stats_json, settings->coop_stat_merge, nullptr);
     } else if (version >= MC_VERSION_1_7_2 && version <= MC_VERSION_1_11_2) {
-        coop_merge_achievements_mid(t->template_data, player_stats_json);
+        coop_merge_achievements_mid(t->template_data, player_stats_json, player->uuid);
         coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge);
     } else if (version >= MC_VERSION_1_12 && version <= MC_VERSION_1_12_2) {
-        coop_merge_advancements_modern(t->template_data, player_adv_json);
+        coop_merge_advancements_modern(t->template_data, player_adv_json, player->uuid);
         coop_merge_stats_mid(t->template_data, player_stats_json, settings->coop_stat_merge);
     } else if (version >= MC_VERSION_1_13) {
-        coop_merge_advancements_modern(t->template_data, player_adv_json);
+        coop_merge_advancements_modern(t->template_data, player_adv_json, player->uuid);
         coop_merge_stats_modern(t->template_data, player_stats_json, settings->coop_stat_merge, version);
     }
 
@@ -6252,6 +6276,33 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     if (!hide_icon_in_layout)
                         draw_list->AddImage((void *) texture_to_draw, p_min, p_max);
                     // --- End Icon Scaling and Centering Logic (Main Icon) ---
+                }
+
+                // Coop: first-contributor face on simple advancements in the merged view.
+                if (!is_stat_section && cat->criteria_count == 0 &&
+                    cat->done && cat->first_contributor_uuid[0] != '\0' &&
+                    t->selected_coop_player_idx == -1 && !hide_icon_in_layout &&
+                    g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE) {
+                    CoopLobbyPlayer face_lobby[COOP_MAX_LOBBY];
+                    int face_lc = coop_net_get_lobby_players(g_coop_ctx, face_lobby, COOP_MAX_LOBBY);
+                    AccountType face_acc = ACCOUNT_ONLINE;
+                    for (int li = 0; li < face_lc; li++) {
+                        if (strcmp(face_lobby[li].uuid, cat->first_contributor_uuid) == 0) {
+                            face_acc = face_lobby[li].is_offline ? ACCOUNT_OFFLINE : ACCOUNT_ONLINE;
+                            break;
+                        }
+                    }
+                    SDL_Texture *face_tex = skin_cache_get_face(cat->first_contributor_uuid, face_acc);
+                    if (face_tex) {
+                        const float face_native = 24.0f;
+                        const float face_pad = 4.0f;
+                        ImVec2 face_min = ImVec2(
+                            screen_pos.x + (bg_size.x - face_native - face_pad) * t->zoom_level,
+                            screen_pos.y + (bg_size.y - face_native - face_pad) * t->zoom_level);
+                        ImVec2 face_max = ImVec2(face_min.x + face_native * t->zoom_level,
+                                                 face_min.y + face_native * t->zoom_level);
+                        draw_list->AddImage((void *) face_tex, face_min, face_max);
+                    }
                 }
 
                 // --- VISUAL LAYOUT DRAGGING (PARENT ICON) ---
@@ -10960,7 +11011,8 @@ static bool hermes_apply_stat_event_cumulative(Tracker *t, const cJSON *data,
  *
  * Returns true if at least one in-memory value changed.
  */
-static bool hermes_apply_advancement_event(Tracker *t, const cJSON *data) {
+static bool hermes_apply_advancement_event(Tracker *t, const cJSON *data,
+                                           const char *player_uuid = nullptr) {
     cJSON *id_json = cJSON_GetObjectItem(data, "id");
     cJSON *criterion_json = cJSON_GetObjectItem(data, "criterion_name");
     cJSON *completed_json = cJSON_GetObjectItem(data, "completed");
@@ -10998,6 +11050,12 @@ static bool hermes_apply_advancement_event(Tracker *t, const cJSON *data) {
 
         // If Hermes says the whole advancement is now complete, mark it so.
         if (adv_completed && !adv->done && !adv->is_manually_completed) {
+            if (adv->criteria_count == 0 && player_uuid && player_uuid[0] != '\0' &&
+                adv->first_contributor_uuid[0] == '\0') {
+                strncpy(adv->first_contributor_uuid, player_uuid,
+                        sizeof(adv->first_contributor_uuid) - 1);
+                adv->first_contributor_uuid[sizeof(adv->first_contributor_uuid) - 1] = '\0';
+            }
             adv->done = true;
 
             // Only count non-recipe advancements toward the completion counter.
@@ -11117,7 +11175,10 @@ static bool hermes_apply_event_to_coop_snapshots(
             if (is_stat) {
                 changed = hermes_apply_stat_event(t, data, false);
             } else {
-                changed = hermes_apply_advancement_event(t, data);
+                const char *own_uuid = (player_idx >= 0 && player_idx < settings->coop_player_count)
+                                           ? settings->coop_players[player_idx].uuid
+                                           : nullptr;
+                changed = hermes_apply_advancement_event(t, data, own_uuid);
             }
             if (changed) {
                 tracker_recalculate_progress(t, settings);
@@ -11226,7 +11287,7 @@ static bool hermes_apply_event_to_coop_snapshots(
                     }
                 } else {
                     // It's a simple advancement with no criteria, regular OR-merge is fine
-                    changed = hermes_apply_advancement_event(t, data);
+                    changed = hermes_apply_advancement_event(t, data, ev_uuid);
                 }
             }
             if (changed) {
@@ -11379,7 +11440,7 @@ static bool hermes_process_decrypted_line(
             if (hermes_apply_stat_event(t, data)) any_changed = true;
         }
     } else if (strcmp(type, "advancement") == 0) {
-        if (hermes_apply_advancement_event(t, data)) any_changed = true;
+        if (hermes_apply_advancement_event(t, data, event_player_uuid)) any_changed = true;
     }
     // ALL OTHER EVENT TYPES ARE IGNORED - speedrun legal this way.
 
