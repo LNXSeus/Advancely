@@ -575,6 +575,7 @@ static int SDLCALL host_thread_func(void *data) {
     const Uint32 HANDSHAKE_TIMEOUT_MS = 10000; // Kick if no JOIN_REQUEST in 10s
 
     Uint32 client_last_ack[COOP_MAX_CLIENTS];
+    bool prev_handshake_done[COOP_MAX_CLIENTS] = {false};
     for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
         client_last_ack[i] = SDL_GetTicks();
     }
@@ -1066,14 +1067,24 @@ static int SDLCALL host_thread_func(void *data) {
         if (now - last_heartbeat >= HEARTBEAT_INTERVAL_MS) {
             last_heartbeat = now;
             for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
-                if (!ctx->clients[i].active) continue;
+                if (!ctx->clients[i].active) {
+                    prev_handshake_done[i] = false;
+                    continue;
+                }
 
                 // Handshake timeout: no JOIN_REQUEST received in time
                 if (!ctx->clients[i].handshake_done && !ctx->clients[i].pending_approval) {
                     if (now - ctx->clients[i].connect_time > HANDSHAKE_TIMEOUT_MS) {
                         log_message(LOG_INFO, "[COOP NET] Client %s handshake timeout.\n", ctx->clients[i].label);
+                        char reason[128];
+                        snprintf(reason, sizeof(reason),
+                                 "Handshake timeout: no JOIN_REQUEST in %ums",
+                                 HANDSHAKE_TIMEOUT_MS);
+                        send_message(ctx->clients[i].socket_fd, COOP_MSG_DISCONNECT,
+                                     reason, (uint32_t) strlen(reason));
                         close_socket(&ctx->clients[i].socket_fd);
                         ctx->clients[i].active = false;
+                        prev_handshake_done[i] = false;
                         continue;
                     }
                 }
@@ -1081,9 +1092,24 @@ static int SDLCALL host_thread_func(void *data) {
                 // Only send heartbeats to approved clients
                 if (!ctx->clients[i].handshake_done) continue;
 
+                // Just transitioned to approved: reset the ack clock so the
+                // first heartbeat check after approval doesn't fire on a stamp
+                // aged during the approval wait.
+                if (!prev_handshake_done[i]) {
+                    prev_handshake_done[i] = true;
+                    client_last_ack[i] = now;
+                }
+
                 if (now - client_last_ack[i] > HEARTBEAT_TIMEOUT_MS) {
-                    log_message(LOG_INFO, "[COOP NET] Client %s timed out (no heartbeat ACK).\n",
-                                ctx->clients[i].label);
+                    Uint32 silent_ms = now - client_last_ack[i];
+                    log_message(LOG_INFO, "[COOP NET] Client %s timed out (no heartbeat ACK for %ums).\n",
+                                ctx->clients[i].label, silent_ms);
+                    char reason[160];
+                    snprintf(reason, sizeof(reason),
+                             "Heartbeat timeout: no ACK for %us (limit %us)",
+                             silent_ms / 1000, HEARTBEAT_TIMEOUT_MS / 1000);
+                    send_message(ctx->clients[i].socket_fd, COOP_MSG_DISCONNECT,
+                                 reason, (uint32_t) strlen(reason));
                     close_socket(&ctx->clients[i].socket_fd);
                     ctx->clients[i].active = false;
                     ctx->client_count--;
@@ -1094,6 +1120,11 @@ static int SDLCALL host_thread_func(void *data) {
                 if (!send_message(ctx->clients[i].socket_fd, COOP_MSG_HEARTBEAT, nullptr, 0)) {
                     log_message(LOG_INFO, "[COOP NET] Failed to send heartbeat to %s.\n",
                                 ctx->clients[i].label);
+                    // Best-effort DISCONNECT — the socket is already failing writes,
+                    // so this may not arrive, but it costs nothing to try.
+                    const char *reason = "Host could not send heartbeat (socket write failed)";
+                    send_message(ctx->clients[i].socket_fd, COOP_MSG_DISCONNECT,
+                                 reason, (uint32_t) strlen(reason));
                     close_socket(&ctx->clients[i].socket_fd);
                     ctx->clients[i].active = false;
                     ctx->client_count--;
@@ -1110,9 +1141,11 @@ static int SDLCALL host_thread_func(void *data) {
     }
 
     // Graceful shutdown: notify all clients
+    const char *shutdown_reason = "Host shut down the lobby";
     for (int i = 0; i < COOP_MAX_CLIENTS; i++) {
         if (ctx->clients[i].active) {
-            send_message(ctx->clients[i].socket_fd, COOP_MSG_DISCONNECT, nullptr, 0);
+            send_message(ctx->clients[i].socket_fd, COOP_MSG_DISCONNECT,
+                         shutdown_reason, (uint32_t) strlen(shutdown_reason));
             close_socket(&ctx->clients[i].socket_fd);
             ctx->clients[i].active = false;
         }
@@ -1154,10 +1187,22 @@ static int receiver_dispatch_message(CoopNetContext *ctx, uint32_t msg_type,
         return 0;
     }
     if (msg_type == COOP_MSG_DISCONNECT) {
+        char reason[256] = {0};
+        if (payload && payload_len > 0) {
+            size_t copy_len = (payload_len < sizeof(reason) - 1) ? payload_len : sizeof(reason) - 1;
+            memcpy(reason, payload, copy_len);
+            reason[copy_len] = '\0';
+        }
         free(payload);
-        log_message(LOG_INFO, "[COOP NET] Host shut down the lobby.\n");
-        set_state(ctx, COOP_NET_DISCONNECTED);
-        set_status(ctx, "Host shut down the lobby");
+        if (reason[0]) {
+            log_message(LOG_INFO, "[COOP NET] Host disconnected us: %s\n", reason);
+            set_state(ctx, COOP_NET_DISCONNECTED);
+            set_status(ctx, "Disconnected by host: %s", reason);
+        } else {
+            log_message(LOG_INFO, "[COOP NET] Host shut down the lobby.\n");
+            set_state(ctx, COOP_NET_DISCONNECTED);
+            set_status(ctx, "Host shut down the lobby");
+        }
         return 1;
     }
     if (msg_type == COOP_MSG_RELAY_ROOM_CLOSED) {
@@ -1575,9 +1620,21 @@ static int SDLCALL receiver_thread_func(void *data) {
                 close_socket(&ctx->client_fd);
                 return 1;
             } else if (msg_type == COOP_MSG_DISCONNECT) {
-                log_message(LOG_INFO, "[COOP NET] Host disconnected while waiting for approval.\n");
-                set_state(ctx, COOP_NET_DISCONNECTED);
-                set_status(ctx, "Host shut down the lobby");
+                char reason[256] = {0};
+                if (payload && payload_len > 0) {
+                    size_t copy_len = (payload_len < sizeof(reason) - 1) ? payload_len : sizeof(reason) - 1;
+                    memcpy(reason, payload, copy_len);
+                    reason[copy_len] = '\0';
+                }
+                if (reason[0]) {
+                    log_message(LOG_INFO, "[COOP NET] Host disconnected us while waiting for approval: %s\n", reason);
+                    set_state(ctx, COOP_NET_DISCONNECTED);
+                    set_status(ctx, "Disconnected by host: %s", reason);
+                } else {
+                    log_message(LOG_INFO, "[COOP NET] Host disconnected while waiting for approval.\n");
+                    set_state(ctx, COOP_NET_DISCONNECTED);
+                    set_status(ctx, "Host shut down the lobby");
+                }
                 free(payload);
                 close_socket(&ctx->client_fd);
                 return 1;
@@ -2081,11 +2138,29 @@ static int SDLCALL host_relay_thread_func(void *data) {
                 if (!ctx->clients[i].active) continue;
                 if (ctx->clients[i].last_seen_ms == 0) continue;
                 if (now - ctx->clients[i].last_seen_ms < STALE_MS) continue;
+                Uint32 silent_ms = now - ctx->clients[i].last_seen_ms;
                 log_message(LOG_INFO, "[COOP NET] Relay slot %d (%s) timed out (no traffic for %ums).\n",
-                            i, ctx->clients[i].username, now - ctx->clients[i].last_seen_ms);
+                            i, ctx->clients[i].username, silent_ms);
                 set_status(ctx, "%s timed out",
                            ctx->clients[i].display_name[0] ? ctx->clients[i].display_name
                                                            : ctx->clients[i].username);
+                // Broadcast a targeted KICK so the dropped receiver gets a
+                // specific reason instead of having to infer eviction from
+                // the next PLAYER_LIST. Receivers self-filter on target_uuid.
+                cJSON *kick_obj = cJSON_CreateObject();
+                cJSON_AddStringToObject(kick_obj, "target_uuid", ctx->clients[i].uuid);
+                char timeout_reason[160];
+                snprintf(timeout_reason, sizeof(timeout_reason),
+                         "Relay timeout: no traffic for %us (limit %us)",
+                         silent_ms / 1000, STALE_MS / 1000);
+                cJSON_AddStringToObject(kick_obj, "reason", timeout_reason);
+                char *kick_json = cJSON_PrintUnformatted(kick_obj);
+                cJSON_Delete(kick_obj);
+                if (kick_json) {
+                    coop_broadcast_internal(ctx, COOP_MSG_KICK, kick_json,
+                                            (uint32_t) strlen(kick_json));
+                    free(kick_json);
+                }
                 ctx->clients[i].active = false;
                 if (ctx->clients[i].handshake_done) ctx->client_count--;
                 any_stale = true;
