@@ -3608,7 +3608,9 @@ static void coop_merge_advancements_modern(TemplateData *td, const cJSON *player
                 }
             }
 
-            // If this player has more criteria than the current best, adopt their state
+            // If this player has more criteria than the current best, adopt their state.
+            // Strict-greater means ties keep the current leader (= lowest roster index,
+            // since callers iterate players in order).
             if (this_player_count > adv->completed_criteria_count) {
                 adv->completed_criteria_count = this_player_count;
                 // Overwrite criteria done flags with this player's state
@@ -3618,6 +3620,11 @@ static void coop_merge_advancements_modern(TemplateData *td, const cJSON *player
                 }
                 adv->all_template_criteria_met = (adv->completed_criteria_count >= adv->criteria_count);
                 adv->done = game_is_done || adv->all_template_criteria_met;
+                if (player_uuid && player_uuid[0] != '\0') {
+                    strncpy(adv->first_contributor_uuid, player_uuid,
+                            sizeof(adv->first_contributor_uuid) - 1);
+                    adv->first_contributor_uuid[sizeof(adv->first_contributor_uuid) - 1] = '\0';
+                }
             } else if (game_is_done && !adv->done) {
                 // Even if another player had more criteria, if this player fully completed it, mark done
                 adv->done = true;
@@ -3699,6 +3706,11 @@ static void coop_merge_achievements_mid(TemplateData *td, const cJSON *player_st
                 }
                 ach->all_template_criteria_met = (ach->completed_criteria_count >= ach->criteria_count);
                 ach->done = game_is_done || ach->all_template_criteria_met;
+                if (player_uuid && player_uuid[0] != '\0') {
+                    strncpy(ach->first_contributor_uuid, player_uuid,
+                            sizeof(ach->first_contributor_uuid) - 1);
+                    ach->first_contributor_uuid[sizeof(ach->first_contributor_uuid) - 1] = '\0';
+                }
             } else if (game_is_done && !ach->done) {
                 ach->done = true;
                 ach->all_template_criteria_met = true;
@@ -6278,9 +6290,15 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     // --- End Icon Scaling and Centering Logic (Main Icon) ---
                 }
 
-                // Coop: first-contributor face on simple advancements in the merged view.
-                if (!is_stat_section && cat->criteria_count == 0 &&
-                    cat->done && cat->first_contributor_uuid[0] != '\0' &&
+                // Coop: contributor face in the merged view.
+                // Simple advancement: face = first player to complete it.
+                // Complex advancement: face = current leader (most criteria, ties go to
+                // lowest roster index). Shown once any criterion is earned.
+                bool show_face = !is_stat_section && cat->first_contributor_uuid[0] != '\0' &&
+                                 (cat->criteria_count == 0
+                                      ? cat->done
+                                      : cat->completed_criteria_count > 0);
+                if (show_face &&
                     t->selected_coop_player_idx == -1 && !hide_icon_in_layout &&
                     g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE) {
                     CoopLobbyPlayer face_lobby[COOP_MAX_LOBBY];
@@ -11234,6 +11252,7 @@ static bool hermes_apply_event_to_coop_snapshots(
 
                     // Overwrite the OR-merged criteria with the "player with most criteria wins" rule
                     int best_count = -1;
+                    int best_player_idx = -1;
                     bool best_done = false;
                     bool best_all_met = false;
                     bool *best_crit_done = (bool *) malloc(adv->criteria_count * sizeof(bool));
@@ -11248,6 +11267,7 @@ static bool hermes_apply_event_to_coop_snapshots(
                                 TrackableCategory *p_adv = t->template_data->advancements[adv_idx];
                                 if (p_adv->completed_criteria_count > best_count) {
                                     best_count = p_adv->completed_criteria_count;
+                                    best_player_idx = p;
                                     best_done = p_adv->done;
                                     best_all_met = p_adv->all_template_criteria_met;
                                     for (int j = 0; j < p_adv->criteria_count; j++) {
@@ -11269,6 +11289,14 @@ static bool hermes_apply_event_to_coop_snapshots(
                         adv->all_template_criteria_met = best_all_met;
                         for (int j = 0; j < adv->criteria_count; j++) {
                             adv->criteria[j]->done = best_crit_done[j];
+                        }
+                        if (best_player_idx >= 0 && best_count > 0) {
+                            const char *winner_uuid = settings->coop_players[best_player_idx].uuid;
+                            if (winner_uuid && winner_uuid[0] != '\0') {
+                                strncpy(adv->first_contributor_uuid, winner_uuid,
+                                        sizeof(adv->first_contributor_uuid) - 1);
+                                adv->first_contributor_uuid[sizeof(adv->first_contributor_uuid) - 1] = '\0';
+                            }
                         }
 
                         free(best_crit_done);

@@ -1218,8 +1218,10 @@ lobby using the same underlying template still works.
 How the Host combines multiple players' progress into the **All Players** view depends on the goal type:
 
 * **Advancements / Achievements / Recipes (all eras):** `OR` - once *any* player completes it, it's marked done in
-  the merged view. Simple advancements (those without sub-criteria) show the **face of the first player to complete
-  them** in the bottom-right corner of the goal in the `All Players` view.
+  the merged view. In the `All Players` view a contributor face is drawn in the bottom-right corner of the goal:
+  for **simple** advancements (no sub-criteria) it's the **first player to complete it**; for **complex** ones it's
+  the **current leader** (most criteria earned, ties go to the lowest roster index) and appears as soon as any
+  criterion is in.
 * **Advancement criteria:** `OR` - once any player has the criterion, it's done globally.
 * **Unlocks (25w14craftmine):** `AND` - an unlock counts only when *every* roster player has obtained it. Pre-
   initialized to done; each player's merge flips it back to false if that player is missing it.
