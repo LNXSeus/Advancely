@@ -166,6 +166,10 @@ static bool are_settings_different(const AppSettings *a, const AppSettings *b) {
         a->coop_stat_merge != b->coop_stat_merge ||
         a->coop_stat_checkbox != b->coop_stat_checkbox ||
         a->coop_custom_goal_mode != b->coop_custom_goal_mode ||
+        a->coop_show_contributor_faces != b->coop_show_contributor_faces ||
+        a->coop_face_corner != b->coop_face_corner ||
+        a->coop_face_size != b->coop_face_size ||
+        a->coop_face_lod_threshold != b->coop_face_lod_threshold ||
         strcmp(a->host_ip, b->host_ip) != 0 ||
         strcmp(a->host_port, b->host_port) != 0 ||
         a->coop_player_count != b->coop_player_count) {
@@ -3264,6 +3268,99 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                             ImGui::PopID();
 
                             if (merge_locked) ImGui::EndDisabled();
+                        }
+
+                        ImGui::Spacing();
+                        ImGui::Separator();
+                        ImGui::Spacing();
+
+                        // --- Contributor Faces (per-user, local visual prefs) ---
+                        // Not locked by net_is_active because each user controls
+                        // their own face display; nothing here is sent over the wire.
+                        {
+                            char tooltip_buf[320];
+                            bool show_faces = temp_settings.coop_show_contributor_faces;
+                            ImGui::Checkbox("Show Contributor Faces", &show_faces);
+                            if (ImGui::IsItemHovered()) {
+                                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                         "Show Minecraft skin faces next to goals in the All Players view to\n"
+                                         "indicate which player contributed. Local visual preference; not shared\n"
+                                         "with other lobby members.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+                            temp_settings.coop_show_contributor_faces = show_faces;
+
+                            if (show_faces) {
+                            // Corner placement (main-goal faces)
+                            ImGui::Text("Face Corner:");
+                            ImGui::SameLine();
+                            int corner = temp_settings.coop_face_corner;
+                            ImGui::PushID("coop_face_corner");
+                            ImGui::RadioButton("Top-Right", &corner, COOP_FACE_CORNER_TOP_RIGHT);
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                         "Render the contributor face in the top-right corner of advancements,\n"
+                                         "simple stats, and counter custom goals.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+                            ImGui::SameLine();
+                            ImGui::RadioButton("Bottom-Left", &corner, COOP_FACE_CORNER_BOTTOM_LEFT);
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                         "Render the contributor face in the bottom-left corner of advancements,\n"
+                                         "simple stats, and counter custom goals.");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+                            ImGui::SameLine();
+                            ImGui::RadioButton("Bottom-Right", &corner, COOP_FACE_CORNER_BOTTOM_RIGHT);
+                            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                                snprintf(tooltip_buf, sizeof(tooltip_buf),
+                                         "Render the contributor face in the bottom-right corner of advancements,\n"
+                                         "simple stats, and counter custom goals. (Default)");
+                                ImGui::SetTooltip("%s", tooltip_buf);
+                            }
+                            temp_settings.coop_face_corner = (CoopFaceCorner) corner;
+                            ImGui::PopID();
+
+                            // Face size (DragFloat to match the other numeric sliders)
+                            if (ImGui::DragFloat("Main-Goal Face Size",
+                                                 &temp_settings.coop_face_size, 1.0f, 16.0f, 48.0f, "%.0f px")) {
+                                if (temp_settings.coop_face_size < 16.0f) temp_settings.coop_face_size = 16.0f;
+                                if (temp_settings.coop_face_size > 48.0f) temp_settings.coop_face_size = 48.0f;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char face_size_tooltip[1024];
+                                snprintf(face_size_tooltip, sizeof(face_size_tooltip),
+                                         "Logical pixel size of the contributor face on main goals (advancements,\n"
+                                         "simple stats, counter custom goals). Range 16-48 px.\n"
+                                         "Sub-stat and checkbox faces use a fixed size that matches the checkbox.\n"
+                                         "Default: %.0f px", DEFAULT_COOP_FACE_SIZE);
+                                ImGui::SetTooltip("%s", face_size_tooltip);
+                            }
+
+                            // Face LOD threshold (matches the other LOD sliders in Visuals)
+                            if (ImGui::DragFloat("Hide Contributor Faces At",
+                                                 &temp_settings.coop_face_lod_threshold, 0.001f, 0.05f, 10.0f,
+                                                 "%.3f")) {
+                                if (temp_settings.coop_face_lod_threshold < 0.05f)
+                                    temp_settings.coop_face_lod_threshold = 0.05f;
+                                if (temp_settings.coop_face_lod_threshold > 10.0f)
+                                    temp_settings.coop_face_lod_threshold = 10.0f;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char lod_face_tooltip[1024];
+                                snprintf(lod_face_tooltip, sizeof(lod_face_tooltip),
+                                         "The zoom threshold below which non-checkbox contributor faces are hidden.\n"
+                                         "Higher values are more zoomed in.\n"
+                                         "Affects:\n"
+                                         " - Main-goal corner faces (advancements, simple stats, counter custom goals).\n"
+                                         " - Sub-stat highest-value faces.\n"
+                                         "Faces drawn behind manual-completion checkboxes follow the checkbox LOD instead.\n"
+                                         "Default: %.3f", DEFAULT_COOP_FACE_LOD_THRESHOLD);
+                                ImGui::SetTooltip("%s", lod_face_tooltip);
+                            }
+
+                            } // end if (show_faces)
                         }
 
                         ImGui::Spacing();

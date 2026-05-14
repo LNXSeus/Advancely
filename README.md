@@ -1247,6 +1247,10 @@ How the Host combines multiple players' progress into the **All Players** view d
   current stage from the Host's broadcast.)_
 * **Counters:** Derived from their linked goals' merged state, so they follow whichever rule applies to each linked
   goal.
+
+The `Show Contributor Faces` toggle (Co-op tab) controls whether any of these face indicators render. When enabled,
+the corner placement, face size (16-48 px, default 28), and LOD threshold (default 0.25) for non-checkbox faces
+are individually configurable per user. They're local visual preferences, not pushed to other lobby members.
 * **Play Time / IGT:** Taken from the Host's own world. The merged run-completion timer freezes the first time the
   view hits 100% (per-view, so a per-player view and the All Players view each have their own frozen timer - see
   the Player Dropdown section below).

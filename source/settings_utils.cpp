@@ -145,6 +145,22 @@ static CoopCustomGoalMode string_to_coop_custom_goal_mode(const char *str) {
     return COOP_CUSTOM_ANY_PLAYER;
 }
 
+static const char *coop_face_corner_to_string(CoopFaceCorner c) {
+    switch (c) {
+        case COOP_FACE_CORNER_TOP_RIGHT: return "top_right";
+        case COOP_FACE_CORNER_BOTTOM_LEFT: return "bottom_left";
+        case COOP_FACE_CORNER_BOTTOM_RIGHT:
+        default: return "bottom_right";
+    }
+}
+
+static CoopFaceCorner string_to_coop_face_corner(const char *str) {
+    if (!str) return DEFAULT_COOP_FACE_CORNER;
+    if (strcmp(str, "top_right") == 0) return COOP_FACE_CORNER_TOP_RIGHT;
+    if (strcmp(str, "bottom_left") == 0) return COOP_FACE_CORNER_BOTTOM_LEFT;
+    return COOP_FACE_CORNER_BOTTOM_RIGHT;
+}
+
 // Helper Prototypes for Loading/Saving
 static cJSON *get_or_create_object(cJSON *parent, const char *key) {
     cJSON *obj = cJSON_GetObjectItem(parent, key);
@@ -578,6 +594,10 @@ void settings_set_defaults(AppSettings *settings) {
     settings->coop_stat_merge = DEFAULT_COOP_STAT_MERGE;
     settings->coop_stat_checkbox = DEFAULT_COOP_STAT_CHECKBOX;
     settings->coop_custom_goal_mode = DEFAULT_COOP_CUSTOM_GOAL_MODE;
+    settings->coop_show_contributor_faces = DEFAULT_COOP_SHOW_FACES;
+    settings->coop_face_corner = DEFAULT_COOP_FACE_CORNER;
+    settings->coop_face_size = DEFAULT_COOP_FACE_SIZE;
+    settings->coop_face_lod_threshold = DEFAULT_COOP_FACE_LOD_THRESHOLD;
     settings->host_ip[0] = '\0';
     settings->host_public_ip[0] = '\0';
     strncpy(settings->host_port, DEFAULT_HOST_PORT, sizeof(settings->host_port) - 1);
@@ -1359,6 +1379,35 @@ bool settings_load(AppSettings *settings) {
             defaults_were_used = true;
         }
 
+        // Per-user contributor face preferences (not synchronised with other lobby members)
+        const cJSON *faces_obj = cJSON_GetObjectItem(coop_settings, "contributor_faces");
+        if (faces_obj && cJSON_IsObject(faces_obj)) {
+            const cJSON *show = cJSON_GetObjectItem(faces_obj, "show");
+            settings->coop_show_contributor_faces = (show && cJSON_IsBool(show))
+                                                        ? cJSON_IsTrue(show)
+                                                        : DEFAULT_COOP_SHOW_FACES;
+            const cJSON *corner = cJSON_GetObjectItem(faces_obj, "corner");
+            settings->coop_face_corner = (corner && cJSON_IsString(corner))
+                                             ? string_to_coop_face_corner(corner->valuestring)
+                                             : DEFAULT_COOP_FACE_CORNER;
+            const cJSON *fsz = cJSON_GetObjectItem(faces_obj, "size");
+            settings->coop_face_size = (fsz && cJSON_IsNumber(fsz)) ? (float) fsz->valuedouble
+                                                                    : DEFAULT_COOP_FACE_SIZE;
+            if (settings->coop_face_size < 16.0f) settings->coop_face_size = 16.0f;
+            if (settings->coop_face_size > 48.0f) settings->coop_face_size = 48.0f;
+            const cJSON *lod = cJSON_GetObjectItem(faces_obj, "lod_threshold");
+            settings->coop_face_lod_threshold = (lod && cJSON_IsNumber(lod))
+                                                    ? (float) lod->valuedouble
+                                                    : DEFAULT_COOP_FACE_LOD_THRESHOLD;
+            if (settings->coop_face_lod_threshold < 0.05f) settings->coop_face_lod_threshold = 0.05f;
+            if (settings->coop_face_lod_threshold > 10.0f) settings->coop_face_lod_threshold = 10.0f;
+        } else {
+            settings->coop_show_contributor_faces = DEFAULT_COOP_SHOW_FACES;
+            settings->coop_face_corner = DEFAULT_COOP_FACE_CORNER;
+            settings->coop_face_size = DEFAULT_COOP_FACE_SIZE;
+            settings->coop_face_lod_threshold = DEFAULT_COOP_FACE_LOD_THRESHOLD;
+        }
+
         const cJSON *ip = cJSON_GetObjectItem(coop_settings, "host_ip");
         if (ip && cJSON_IsString(ip)) {
             strncpy(settings->host_ip, ip->valuestring, sizeof(settings->host_ip) - 1);
@@ -1651,6 +1700,19 @@ void settings_save(const AppSettings *settings, const TemplateData *td, Settings
         cJSON_AddItemToObject(merge_obj, "custom_goal_mode",
                               cJSON_CreateString(coop_custom_goal_mode_to_string(settings->coop_custom_goal_mode)));
         cJSON_AddItemToObject(coop_obj, "merge_settings", merge_obj);
+
+        // Save per-user contributor face preferences
+        cJSON_DeleteItemFromObject(coop_obj, "contributor_faces");
+        cJSON *faces_obj = cJSON_CreateObject();
+        cJSON_AddItemToObject(faces_obj, "show",
+                              cJSON_CreateBool(settings->coop_show_contributor_faces));
+        cJSON_AddItemToObject(faces_obj, "corner",
+                              cJSON_CreateString(coop_face_corner_to_string(settings->coop_face_corner)));
+        cJSON_AddItemToObject(faces_obj, "size", cJSON_CreateNumber(settings->coop_face_size));
+        cJSON_AddItemToObject(faces_obj, "lod_threshold",
+                              cJSON_CreateNumber(settings->coop_face_lod_threshold));
+        cJSON_AddItemToObject(coop_obj, "contributor_faces", faces_obj);
+
         cJSON_DeleteItemFromObject(coop_obj, "host_ip");
         cJSON_AddItemToObject(coop_obj, "host_ip", cJSON_CreateString(settings->host_ip));
         cJSON_DeleteItemFromObject(coop_obj, "host_public_ip");

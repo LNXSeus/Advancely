@@ -6528,8 +6528,10 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     }
                 }
                 if (face_uuid &&
+                    settings->coop_show_contributor_faces &&
                     t->selected_coop_player_idx == -1 && !hide_icon_in_layout &&
-                    g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE) {
+                    g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE &&
+                    t->zoom_level > settings->coop_face_lod_threshold) {
                     CoopLobbyPlayer face_lobby[COOP_MAX_LOBBY];
                     int face_lc = coop_net_get_lobby_players(g_coop_ctx, face_lobby, COOP_MAX_LOBBY);
                     AccountType face_acc = ACCOUNT_ONLINE;
@@ -6541,11 +6543,26 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     }
                     SDL_Texture *face_tex = skin_cache_get_face(face_uuid, face_acc);
                     if (face_tex) {
-                        const float face_native = 24.0f;
+                        const float face_native = settings->coop_face_size;
                         const float face_pad = 4.0f;
-                        ImVec2 face_min = ImVec2(
-                            screen_pos.x + (bg_size.x - face_native - face_pad) * t->zoom_level,
-                            screen_pos.y + (bg_size.y - face_native - face_pad) * t->zoom_level);
+                        float fx, fy;
+                        switch (settings->coop_face_corner) {
+                            case COOP_FACE_CORNER_TOP_RIGHT:
+                                fx = bg_size.x - face_native - face_pad;
+                                fy = face_pad;
+                                break;
+                            case COOP_FACE_CORNER_BOTTOM_LEFT:
+                                fx = face_pad;
+                                fy = bg_size.y - face_native - face_pad;
+                                break;
+                            case COOP_FACE_CORNER_BOTTOM_RIGHT:
+                            default:
+                                fx = bg_size.x - face_native - face_pad;
+                                fy = bg_size.y - face_native - face_pad;
+                                break;
+                        }
+                        ImVec2 face_min = ImVec2(screen_pos.x + fx * t->zoom_level,
+                                                 screen_pos.y + fy * t->zoom_level);
                         ImVec2 face_max = ImVec2(face_min.x + face_native * t->zoom_level,
                                                  face_min.y + face_native * t->zoom_level);
                         draw_list->AddImage((void *) face_tex, face_min, face_max);
@@ -6815,6 +6832,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             // fill so the checkbox tint blends over the face.
                             if (crit->is_manually_completed &&
                                 crit->manual_completer_uuid[0] != '\0' &&
+                                settings->coop_show_contributor_faces &&
                                 t->selected_coop_player_idx == -1 &&
                                 g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE) {
                                 CoopLobbyPlayer mc_lobby[COOP_MAX_LOBBY];
@@ -6946,18 +6964,26 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                             // Checkbox width + padding
                         }
 
-                                            // Coop: highest-contributor face right of sub-stat checkbox.
-                        // HIGHEST mode only; cumulative mode credits no single player.
-                        // Per-row layout: only advance when a face is actually rendered,
-                        // so rows without a leader don't show a gap before the text.
+                        // Coop: highest-contributor face for the sub-stat. HIGHEST
+                        // merge mode only; cumulative mode credits no single player.
+                        // Position rules:
+                        //   - Default flow: right of the checkbox (advances layout).
+                        //   - Manual layout with text_pos set: travels with the
+                        //     sub-stat text (drawn just to its left), since icon +
+                        //     checkbox and text move independently in manual layout.
+                        // LOD: gated by the per-user face LOD threshold, not by
+                        // the checkbox LOD.
                         bool stat_face_eligible = is_stat_section && cat->criteria_count > 1 &&
+                                                  settings->coop_show_contributor_faces &&
                                                   settings->coop_stat_merge == COOP_STAT_HIGHEST &&
                                                   t->selected_coop_player_idx == -1 &&
                                                   g_coop_ctx &&
                                                   coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE &&
                                                   crit->highest_contributor_uuid[0] != '\0' &&
-                                                  crit->progress > 0;
-                        if (stat_face_eligible) {
+                                                  crit->progress > 0 &&
+                                                  t->zoom_level > settings->coop_face_lod_threshold;
+                        bool stat_face_follows_text = settings->use_manual_layout && crit->text_pos.is_set;
+                        if (stat_face_eligible && !stat_face_follows_text) {
                             CoopLobbyPlayer face_lobby[COOP_MAX_LOBBY];
                             int face_lc = coop_net_get_lobby_players(g_coop_ctx, face_lobby, COOP_MAX_LOBBY);
                             AccountType face_acc = ACCOUNT_ONLINE;
@@ -7008,6 +7034,33 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                     ((crit->text_pos.y + crit_text_anchor_off.y) * t->zoom_level) + t->camera_offset.y);
                                 current_element_x_screen = child_text_pos.x;
                                 // Update cursor so progress text follows naturally
+                            }
+
+                            // Coop: deferred sub-stat face render — drawn just left of
+                            // the text when manual layout has moved the text away from
+                            // the checkbox flow (see stat_face_follows_text above).
+                            if (stat_face_eligible && stat_face_follows_text) {
+                                CoopLobbyPlayer face_lobby[COOP_MAX_LOBBY];
+                                int face_lc = coop_net_get_lobby_players(g_coop_ctx, face_lobby, COOP_MAX_LOBBY);
+                                AccountType face_acc = ACCOUNT_ONLINE;
+                                for (int li = 0; li < face_lc; li++) {
+                                    if (strcmp(face_lobby[li].uuid, crit->highest_contributor_uuid) == 0) {
+                                        face_acc = face_lobby[li].is_offline ? ACCOUNT_OFFLINE : ACCOUNT_ONLINE;
+                                        break;
+                                    }
+                                }
+                                SDL_Texture *face_tex = skin_cache_get_face(crit->highest_contributor_uuid, face_acc);
+                                if (face_tex) {
+                                    const float face_size = 20.0f;
+                                    const float face_pad = 4.0f;
+                                    ImVec2 face_min = ImVec2(
+                                        child_text_pos.x - (face_size + face_pad) * t->zoom_level,
+                                        child_text_pos.y + (child_text_size.y * t->zoom_level -
+                                                            face_size * t->zoom_level) * 0.5f);
+                                    ImVec2 face_max = ImVec2(face_min.x + face_size * t->zoom_level,
+                                                             face_min.y + face_size * t->zoom_level);
+                                    draw_list->AddImage((void *) face_tex, face_min, face_max);
+                                }
                             }
 
                             draw_list->AddText(nullptr, sub_font_size * t->zoom_level, child_text_pos,
@@ -7170,6 +7223,7 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     // fill so the checkbox tint blends over the face.
                     if (cat->is_manually_completed &&
                         cat->manual_completer_uuid[0] != '\0' &&
+                        settings->coop_show_contributor_faces &&
                         t->selected_coop_player_idx == -1 &&
                         g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE) {
                         CoopLobbyPlayer mcp_lobby[COOP_MAX_LOBBY];
@@ -8164,8 +8218,10 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
             // background. Only meaningful for counter goals (goal != 0); pure
             // manual checkboxes (goal == 0) show their face under the checkbox.
             if (item->goal != 0 && item->custom_contributor_uuid[0] != '\0' &&
+                settings->coop_show_contributor_faces &&
                 t->selected_coop_player_idx == -1 && !hide_item_icon_in_layout &&
-                g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE) {
+                g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE &&
+                t->zoom_level > settings->coop_face_lod_threshold) {
                 CoopLobbyPlayer cg_lobby[COOP_MAX_LOBBY];
                 int cg_lc = coop_net_get_lobby_players(g_coop_ctx, cg_lobby, COOP_MAX_LOBBY);
                 AccountType cg_acc = ACCOUNT_ONLINE;
@@ -8177,11 +8233,26 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 }
                 SDL_Texture *cg_face = skin_cache_get_face(item->custom_contributor_uuid, cg_acc);
                 if (cg_face) {
-                    const float face_native = 24.0f;
+                    const float face_native = settings->coop_face_size;
                     const float face_pad = 4.0f;
-                    ImVec2 face_min = ImVec2(
-                        screen_pos.x + (bg_size.x - face_native - face_pad) * t->zoom_level,
-                        screen_pos.y + (bg_size.y - face_native - face_pad) * t->zoom_level);
+                    float fx, fy;
+                    switch (settings->coop_face_corner) {
+                        case COOP_FACE_CORNER_TOP_RIGHT:
+                            fx = bg_size.x - face_native - face_pad;
+                            fy = face_pad;
+                            break;
+                        case COOP_FACE_CORNER_BOTTOM_LEFT:
+                            fx = face_pad;
+                            fy = bg_size.y - face_native - face_pad;
+                            break;
+                        case COOP_FACE_CORNER_BOTTOM_RIGHT:
+                        default:
+                            fx = bg_size.x - face_native - face_pad;
+                            fy = bg_size.y - face_native - face_pad;
+                            break;
+                    }
+                    ImVec2 face_min = ImVec2(screen_pos.x + fx * t->zoom_level,
+                                             screen_pos.y + fy * t->zoom_level);
                     ImVec2 face_max = ImVec2(face_min.x + face_native * t->zoom_level,
                                              face_min.y + face_native * t->zoom_level);
                     draw_list->AddImage((void *) cg_face, face_min, face_max);
@@ -8275,6 +8346,7 @@ static void render_custom_goals_section(Tracker *t, const AppSettings *settings,
                 // checkbox tint blends over the face.
                 if (item->is_manually_completed &&
                     item->manual_completer_uuid[0] != '\0' &&
+                    settings->coop_show_contributor_faces &&
                     t->selected_coop_player_idx == -1 &&
                     g_coop_ctx && coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE) {
                     CoopLobbyPlayer cg_mc_lobby[COOP_MAX_LOBBY];

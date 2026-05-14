@@ -62,6 +62,16 @@ enum CoopCustomGoalMode {
     COOP_CUSTOM_ANY_PLAYER // Any player can modify custom goals
 };
 
+// Corner placement for the main-goal contributor face (advancements, simple
+// stats, custom-goal counter contributors). Top-left is intentionally absent
+// because the manual-completion checkbox already lives there for stats and
+// custom goals.
+enum CoopFaceCorner {
+    COOP_FACE_CORNER_TOP_RIGHT,
+    COOP_FACE_CORNER_BOTTOM_LEFT,
+    COOP_FACE_CORNER_BOTTOM_RIGHT // Default
+};
+
 // Account type: online (Mojang API lookup) vs offline (manual UUID entry)
 enum AccountType {
     ACCOUNT_ONLINE, // UUID fetched from Mojang API
@@ -137,6 +147,10 @@ extern const char *TRACKER_SECTION_NAMES[SECTION_COUNT];
 #define DEFAULT_COOP_STAT_MERGE COOP_STAT_HIGHEST
 #define DEFAULT_COOP_STAT_CHECKBOX COOP_STAT_CHECKBOX_ANY_PLAYER
 #define DEFAULT_COOP_CUSTOM_GOAL_MODE COOP_CUSTOM_ANY_PLAYER
+#define DEFAULT_COOP_SHOW_FACES true
+#define DEFAULT_COOP_FACE_CORNER COOP_FACE_CORNER_BOTTOM_RIGHT
+#define DEFAULT_COOP_FACE_SIZE 28.0f
+#define DEFAULT_COOP_FACE_LOD_THRESHOLD 0.25f
 #define DEFAULT_HOST_PORT "12345"
 
 // DEFINE DEFAULT SETTINGS
@@ -369,6 +383,12 @@ struct AppSettings {
     CoopStatMerge coop_stat_merge; // How to merge stat values: highest or cumulative
     CoopStatCheckbox coop_stat_checkbox; // Who can check off stats: host only or any player
     CoopCustomGoalMode coop_custom_goal_mode; // Who can modify custom goals: host only or any player
+    // Per-user contributor-face display preferences (local visual only; not
+    // synchronised with other lobby members).
+    bool coop_show_contributor_faces; // Master toggle for all contributor faces in coop
+    CoopFaceCorner coop_face_corner; // Corner placement for main-goal faces
+    float coop_face_size; // Logical pixel size of main-goal faces (16..48)
+    float coop_face_lod_threshold; // Zoom threshold below which non-checkbox faces hide
     char host_ip[64]; // The IP address to bind the server socket on (local/VPN)
     char host_public_ip[64]; // Optional public IP used for the room code (port forwarding)
     char host_port[16]; // The port the host listens on (default "12345")
