@@ -236,7 +236,8 @@ static bool ssl_write_all(mbedtls_ssl_context *ssl, const void *data, size_t len
 // configured AND zero bytes had been read so far for the current call), -1
 // on connection error. A timeout that occurs mid-buffer is treated as an
 // error since we can't preserve partial frame state across calls.
-static int ssl_read_exact(mbedtls_ssl_context *ssl, void *buf, size_t len) {
+static int ssl_read_exact(mbedtls_ssl_context *ssl, void *buf, size_t len,
+                          size_t *out_consumed) {
     unsigned char *p = (unsigned char *) buf;
     size_t total = len;
     while (len > 0) {
@@ -257,9 +258,11 @@ static int ssl_read_exact(mbedtls_ssl_context *ssl, void *buf, size_t len) {
             if (len == total) return 0;
             continue;
         }
+        if (out_consumed) *out_consumed = total - len;
         set_last_error(len == total ? "ssl_read(header)" : "ssl_read(midframe)", n);
         return -1;
     }
+    if (out_consumed) *out_consumed = total;
     return 1;
 }
 
@@ -284,8 +287,21 @@ int relay_recv_frame_timed(RelayConn *c, uint32_t *out_type, void **out_payload,
     if (max_payload == 0) max_payload = 4 * 1024 * 1024;
 
     unsigned char hdr[8];
-    int rc = ssl_read_exact(&c->ssl, hdr, 8);
-    if (rc <= 0) return rc;
+    size_t hdr_got = 0;
+    int rc = ssl_read_exact(&c->ssl, hdr, 8, &hdr_got);
+    if (rc < 0) {
+        // Append how many header bytes we got so callers can distinguish
+        // "conn closed cleanly between frames" (0/8) from "torn-down
+        // partway through a header" (1..7/8).
+        char base[192];
+        strncpy(base, tls_last_error, sizeof(base) - 1);
+        base[sizeof(base) - 1] = '\0';
+        snprintf(tls_last_error, sizeof(tls_last_error),
+                 "%s [hdr_got=%zu/8]", base, hdr_got);
+        log_message(LOG_ERROR, "[Relay] %s\n", tls_last_error);
+        return rc;
+    }
+    if (rc == 0) return rc;
     uint32_t type = get_be32(hdr);
     uint32_t length = get_be32(hdr + 4);
     if (length > max_payload) {
@@ -300,8 +316,15 @@ int relay_recv_frame_timed(RelayConn *c, uint32_t *out_type, void **out_payload,
         if (!buf) return -1;
         // Header is fully consumed; mid-frame timeouts are fatal here (treated
         // as -1 by ssl_read_exact since len != total on the second call).
-        rc = ssl_read_exact(&c->ssl, buf, length);
+        size_t payload_got = 0;
+        rc = ssl_read_exact(&c->ssl, buf, length, &payload_got);
         if (rc <= 0) {
+            char base[192];
+            strncpy(base, tls_last_error, sizeof(base) - 1);
+            base[sizeof(base) - 1] = '\0';
+            snprintf(tls_last_error, sizeof(tls_last_error),
+                     "%s [type=%u len=%u got=%zu]", base, type, length, payload_got);
+            log_message(LOG_ERROR, "[Relay] %s\n", tls_last_error);
             free(buf);
             return rc < 0 ? -1 : -1;
         }

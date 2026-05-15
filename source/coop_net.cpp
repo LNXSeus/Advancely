@@ -1936,6 +1936,8 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
     Uint32 last_heartbeat_recv = SDL_GetTicks();
     Uint32 last_heartbeat_send = SDL_GetTicks();
     Uint32 last_inbound_ms = SDL_GetTicks(); // ANY frame from the host counts as liveness
+    Uint32 last_diag_log_ms = SDL_GetTicks();
+    uint64_t frames_in = 0, frames_out = 0;
 
     while (!should_stop(ctx)) {
         if (!ctx->relay_conn) break;
@@ -1947,8 +1949,13 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
         if (rc < 0) {
             if (should_stop(ctx)) break;
             const char *reason = relay_last_error();
-            log_message(LOG_ERROR, "[COOP NET] Relay connection lost: %s\n",
-                        reason && reason[0] ? reason : "no reason captured");
+            Uint32 since_inbound = SDL_GetTicks() - last_inbound_ms;
+            log_message(LOG_ERROR,
+                        "[COOP NET] Relay connection lost (receiver): %s | %ums since last inbound | frames_in=%llu frames_out=%llu\n",
+                        reason && reason[0] ? reason : "no reason captured",
+                        since_inbound,
+                        (unsigned long long) frames_in,
+                        (unsigned long long) frames_out);
             set_state(ctx, COOP_NET_DISCONNECTED);
             if (reason && reason[0])
                 set_status(ctx, "Connection lost: %s", reason);
@@ -1977,9 +1984,13 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
                 last_heartbeat_send = now;
                 if (!ok) {
                     const char *reason = relay_last_error();
+                    Uint32 since_inbound = SDL_GetTicks() - last_inbound_ms;
                     log_message(LOG_ERROR,
-                                "[COOP NET] Relay heartbeat send failed: %s\n",
-                                reason && reason[0] ? reason : "no reason captured");
+                                "[COOP NET] Relay heartbeat send failed (receiver): %s | %ums since last inbound | frames_in=%llu frames_out=%llu\n",
+                                reason && reason[0] ? reason : "no reason captured",
+                                since_inbound,
+                                (unsigned long long) frames_in,
+                                (unsigned long long) frames_out);
                     set_state(ctx, COOP_NET_DISCONNECTED);
                     if (reason && reason[0])
                         set_status(ctx, "Heartbeat send failed: %s", reason);
@@ -1987,6 +1998,19 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
                         set_status(ctx, "Heartbeat send failed");
                     break;
                 }
+                frames_out++;
+            }
+            // Periodic "still alive" diag every 30s so post-mortem logs have
+            // breadcrumbs even if nothing went wrong yet. LOG_ERROR so users
+            // see it without enabling debug logging.
+            if (now - last_diag_log_ms >= 30000) {
+                log_message(LOG_ERROR,
+                            "[COOP NET DIAG] Receiver alive: %ums since last inbound, frames_in=%llu frames_out=%llu room=%s\n",
+                            now - last_inbound_ms,
+                            (unsigned long long) frames_in,
+                            (unsigned long long) frames_out,
+                            ctx->relay_room_code);
+                last_diag_log_ms = now;
             }
             // Host-liveness watchdog: the host heartbeats every 5s and the relay
             // forwards them. If we don't see ANY inbound frame for HOST_TIMEOUT_MS,
@@ -2006,6 +2030,7 @@ static int SDLCALL receiver_relay_thread_func(void *data) {
             continue;
         }
         last_inbound_ms = SDL_GetTicks();
+        frames_in++;
         int drc = receiver_dispatch_message(ctx, msg_type, (char *) payload, payload_len,
                                             &last_heartbeat_recv);
         if (drc == 1) break;
@@ -2063,6 +2088,9 @@ static int SDLCALL host_relay_thread_func(void *data) {
     const uint32_t RELAY_HEARTBEAT_INTERVAL_MS = 5000;
     relay_set_read_timeout(ctx->relay_conn, RELAY_READ_TIMEOUT_MS);
     Uint32 last_heartbeat_send = SDL_GetTicks();
+    Uint32 last_inbound_ms = SDL_GetTicks();
+    Uint32 last_diag_log_ms = SDL_GetTicks();
+    uint64_t frames_in = 0, frames_out = 0;
 
     while (!should_stop(ctx)) {
         // Process pending kick actions (no rejects on relay - auto-accept always).
@@ -2102,12 +2130,23 @@ static int SDLCALL host_relay_thread_func(void *data) {
         uint32_t msg_type = 0;
         void *payload = nullptr;
         uint32_t payload_len = 0;
+        relay_clear_last_error();
         int rc = relay_recv_frame_timed(ctx->relay_conn, &msg_type, &payload, &payload_len, 0);
         if (rc < 0) {
             if (should_stop(ctx)) break;
-            log_message(LOG_INFO, "[COOP NET] Relay connection closed (host).\n");
+            const char *reason = relay_last_error();
+            Uint32 since_inbound = SDL_GetTicks() - last_inbound_ms;
+            log_message(LOG_ERROR,
+                        "[COOP NET] Relay connection lost (host): %s | %ums since last inbound | frames_in=%llu frames_out=%llu\n",
+                        reason && reason[0] ? reason : "no reason captured",
+                        since_inbound,
+                        (unsigned long long) frames_in,
+                        (unsigned long long) frames_out);
             set_state(ctx, COOP_NET_DISCONNECTED);
-            set_status(ctx, "Relay connection lost");
+            if (reason && reason[0])
+                set_status(ctx, "Relay connection lost: %s", reason);
+            else
+                set_status(ctx, "Relay connection lost");
             break;
         }
         if (rc == 0) {
@@ -2121,11 +2160,32 @@ static int SDLCALL host_relay_thread_func(void *data) {
                 SDL_UnlockMutex(ctx->relay_send_mutex);
                 last_heartbeat_send = now;
                 if (!ok) {
-                    log_message(LOG_INFO, "[COOP NET] Relay heartbeat send failed (host).\n");
+                    const char *reason = relay_last_error();
+                    Uint32 since_inbound2 = SDL_GetTicks() - last_inbound_ms;
+                    log_message(LOG_ERROR,
+                                "[COOP NET] Relay heartbeat send failed (host): %s | %ums since last inbound | frames_in=%llu frames_out=%llu\n",
+                                reason && reason[0] ? reason : "no reason captured",
+                                since_inbound2,
+                                (unsigned long long) frames_in,
+                                (unsigned long long) frames_out);
                     set_state(ctx, COOP_NET_DISCONNECTED);
-                    set_status(ctx, "Relay connection lost");
+                    if (reason && reason[0])
+                        set_status(ctx, "Relay connection lost: %s", reason);
+                    else
+                        set_status(ctx, "Relay connection lost");
                     break;
                 }
+                frames_out++;
+            }
+            if (now - last_diag_log_ms >= 30000) {
+                log_message(LOG_ERROR,
+                            "[COOP NET DIAG] Host alive: %ums since last inbound, frames_in=%llu frames_out=%llu room=%s active_clients=%d\n",
+                            now - last_inbound_ms,
+                            (unsigned long long) frames_in,
+                            (unsigned long long) frames_out,
+                            ctx->relay_room_code,
+                            ctx->client_count);
+                last_diag_log_ms = now;
             }
             // Stale-slot expiration: if a receiver hasn't sent any traffic
             // (heartbeat, mod, etc.) for STALE_MS, drop the slot. Catches
@@ -2171,6 +2231,9 @@ static int SDLCALL host_relay_thread_func(void *data) {
             }
             continue;
         }
+
+        last_inbound_ms = SDL_GetTicks();
+        frames_in++;
 
         if (msg_type == COOP_MSG_JOIN_REQUEST) {
             char *json_str = (char *) malloc(payload_len + 1);
