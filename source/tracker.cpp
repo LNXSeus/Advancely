@@ -6822,6 +6822,52 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                         current_element_x_screen += 32.0f * t->zoom_level + 4.0f * t->zoom_level;
                         // Icon width + padding
 
+                        // Coop: parent-advancement leader face beside each criterion.
+                        // Reuses cat->first_contributor_uuid (current leader of the
+                        // complex advancement). Mode rule:
+                        //   - HIDE_ALL_COMPLETED: face on every visible criterion
+                        //     (completed ones are filtered out by children_to_render,
+                        //     so this effectively rides on uncompleted criteria,
+                        //     keeping the leader visible while the parent is partial).
+                        //   - HIDE_ONLY_TEMPLATE_HIDDEN / SHOW_ALL: only on completed
+                        //     criteria, since uncompleted criteria don't yet belong
+                        //     to anyone.
+                        // Position mirrors the sub-stat HIGHEST face: right of the
+                        // icon in default flow (advances current_element_x_screen so
+                        // text shifts over); just-left of the crit text in manual
+                        // layout when crit->text_pos.is_set (see deferred render
+                        // alongside stat_face_follows_text below).
+                        bool adv_crit_face_eligible = !is_stat_section &&
+                                                      settings->coop_show_contributor_faces &&
+                                                      t->selected_coop_player_idx == -1 &&
+                                                      g_coop_ctx &&
+                                                      coop_net_get_state(g_coop_ctx) != COOP_NET_IDLE &&
+                                                      cat->first_contributor_uuid[0] != '\0' &&
+                                                      t->zoom_level > settings->coop_face_lod_threshold &&
+                                                      (settings->goal_hiding_mode == HIDE_ALL_COMPLETED || crit->done);
+                        bool adv_crit_face_follows_text = settings->use_manual_layout && crit->text_pos.is_set;
+                        if (adv_crit_face_eligible && !adv_crit_face_follows_text) {
+                            CoopLobbyPlayer ac_lobby[COOP_MAX_LOBBY];
+                            int ac_lc = coop_net_get_lobby_players(g_coop_ctx, ac_lobby, COOP_MAX_LOBBY);
+                            AccountType ac_acc = ACCOUNT_ONLINE;
+                            for (int li = 0; li < ac_lc; li++) {
+                                if (strcmp(ac_lobby[li].uuid, cat->first_contributor_uuid) == 0) {
+                                    ac_acc = ac_lobby[li].is_offline ? ACCOUNT_OFFLINE : ACCOUNT_ONLINE;
+                                    break;
+                                }
+                            }
+                            SDL_Texture *ac_tex = skin_cache_get_face(cat->first_contributor_uuid, ac_acc);
+                            if (ac_tex) {
+                                const float face_size = 20.0f;
+                                ImVec2 face_min = ImVec2(current_element_x_screen,
+                                                         crit_base_pos_screen.y + 6.0f * t->zoom_level);
+                                ImVec2 face_max = ImVec2(face_min.x + face_size * t->zoom_level,
+                                                         face_min.y + face_size * t->zoom_level);
+                                draw_list->AddImage((void *) ac_tex, face_min, face_max);
+                                current_element_x_screen += face_size * t->zoom_level + 4.0f * t->zoom_level;
+                            }
+                        }
+
 
                         // Render Checkbox for Multi-Criteria Stats
                         // LOD: Hide checkbox if zoomed out too far (tied to MAIN text threshold as requested)
@@ -7039,6 +7085,34 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                     ((crit->text_pos.y + crit_text_anchor_off.y) * t->zoom_level) + t->camera_offset.y);
                                 current_element_x_screen = child_text_pos.x;
                                 // Update cursor so progress text follows naturally
+                            }
+
+                            // Coop: deferred advancement-criterion leader face for
+                            // manual layout. When crit->text_pos.is_set the icon and
+                            // text move independently, so the face travels with the
+                            // text (drawn just to its left) rather than the icon.
+                            if (adv_crit_face_eligible && adv_crit_face_follows_text) {
+                                CoopLobbyPlayer ac_lobby[COOP_MAX_LOBBY];
+                                int ac_lc = coop_net_get_lobby_players(g_coop_ctx, ac_lobby, COOP_MAX_LOBBY);
+                                AccountType ac_acc = ACCOUNT_ONLINE;
+                                for (int li = 0; li < ac_lc; li++) {
+                                    if (strcmp(ac_lobby[li].uuid, cat->first_contributor_uuid) == 0) {
+                                        ac_acc = ac_lobby[li].is_offline ? ACCOUNT_OFFLINE : ACCOUNT_ONLINE;
+                                        break;
+                                    }
+                                }
+                                SDL_Texture *ac_tex = skin_cache_get_face(cat->first_contributor_uuid, ac_acc);
+                                if (ac_tex) {
+                                    const float face_size = 20.0f;
+                                    const float face_pad = 4.0f;
+                                    ImVec2 face_min = ImVec2(
+                                        child_text_pos.x - (face_size + face_pad) * t->zoom_level,
+                                        child_text_pos.y + (child_text_size.y * t->zoom_level -
+                                                            face_size * t->zoom_level) * 0.5f);
+                                    ImVec2 face_max = ImVec2(face_min.x + face_size * t->zoom_level,
+                                                             face_min.y + face_size * t->zoom_level);
+                                    draw_list->AddImage((void *) ac_tex, face_min, face_max);
+                                }
                             }
 
                             // Coop: deferred sub-stat face render — drawn just left of

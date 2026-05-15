@@ -1222,7 +1222,10 @@ How the Host combines multiple players' progress into the **All Players** view d
   for **simple** advancements (no sub-criteria) it's the **first player to complete it**; for **complex** ones it's
   the **current leader** (most criteria earned, ties go to the lowest roster index) and appears as soon as any
   criterion is in.
-* **Advancement criteria:** `OR` - once any player has the criterion, it's done globally.
+* **Advancement criteria:** Inside a complex advancement, each criterion can also display the parent advancement's
+  leader face beside its icon. In `Hide All Completed` the face rides on every (still-visible) criterion so the
+  leader stays on screen while the advancement is partial; in `Hide Template-Hidden Only` and `Show All` the face
+  appears only on criteria that have actually been completed, since completed criteria stay visible in those modes.
 * **Unlocks (25w14craftmine):** `AND` - an unlock counts only when *every* roster player has obtained it. Pre-
   initialized to done; each player's merge flips it back to false if that player is missing it.
 * **Stats:** Configurable per lobby via **Stat Merge Mode** in Settings:
