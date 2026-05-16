@@ -3203,7 +3203,7 @@ ImGui::SetTooltip("%s", tooltip_buffer); \
                                              "Goal merging rules are locked while a lobby is active");
                                 else
                                     snprintf(tooltip_buf, sizeof(tooltip_buf),
-                                             "Sum stat values across all players.");
+                                             "Sum stat values across all players. (Default)");
                                 ImGui::SetTooltip("%s", tooltip_buf);
                             }
                             temp_settings.coop_stat_merge = (CoopStatMerge) stat_merge;

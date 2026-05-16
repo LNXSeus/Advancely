@@ -2110,8 +2110,11 @@ int main(int argc, char *argv[]) {
             CoopNetState cur_coop_state = g_coop_ctx ? coop_net_get_state(g_coop_ctx) : COOP_NET_IDLE;
             if (prev_coop_state == COOP_NET_CONNECTED && cur_coop_state == COOP_NET_DISCONNECTED) {
                 log_message(LOG_INFO, "[COOP] Disconnection detected — applying settings for reload.\n");
+                // Refresh template/file watcher (g_settings_changed) but do NOT
+                // restart the overlay (g_apply_button_clicked): a coop event
+                // doesn't change any overlay-bound geometry/settings, so killing
+                // and respawning the process is a wasteful flicker for streamers.
                 SDL_SetAtomicInt(&g_settings_changed, 1);
-                SDL_SetAtomicInt(&g_apply_button_clicked, 1);
             }
             prev_coop_state = cur_coop_state;
 
@@ -2179,12 +2182,18 @@ int main(int argc, char *argv[]) {
                 // anyway, but clearing explicitly keeps the intent local.)
                 tracker_clear_coop_snapshot_cache(tracker);
 
-                // Only the host needs to re-read player files / restart overlay.
-                // Receivers just need the updated roster in app_settings; the next
+                // Only the host needs to re-read player files when the roster
+                // changes (coop merge resolves progress by UUID). Receivers
+                // just need the updated roster in app_settings; the next
                 // render frame picks it up via the player dropdown.
+                // Do NOT restart the overlay (no g_apply_button_clicked): a
+                // lobby join/leave doesn't change any overlay-bound setting,
+                // so the process restart would just flicker the stream for
+                // no benefit. The settings_changed handler re-reads player
+                // files and the overlay picks up the new state via shared
+                // memory in its next frame.
                 if (app_settings.network_mode == NETWORK_HOST) {
                     SDL_SetAtomicInt(&g_settings_changed, 1);
-                    SDL_SetAtomicInt(&g_apply_button_clicked, 1);
                 }
             }
 
