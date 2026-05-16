@@ -23,7 +23,7 @@ type Room struct {
 	PasswordHash string
 	MCVersion    string
 	Host         net.Conn
-	Receivers    map[net.Conn]struct{}
+	Receivers    map[*Receiver]struct{}
 	CreatedAt    time.Time
 	mu           sync.Mutex
 }
@@ -50,7 +50,7 @@ func (rt *RoomTable) Create(host net.Conn, passwordHash, mcVersion string) *Room
 			PasswordHash: passwordHash,
 			MCVersion:    mcVersion,
 			Host:         host,
-			Receivers:    make(map[net.Conn]struct{}),
+			Receivers:    make(map[*Receiver]struct{}),
 			CreatedAt:    time.Now(),
 		}
 		rt.rooms[code] = r
@@ -86,25 +86,25 @@ func (rt *RoomTable) Snapshot() []roomListEntry {
 	return out
 }
 
-func (r *Room) AddReceiver(c net.Conn) {
+func (r *Room) AddReceiver(recv *Receiver) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.Receivers[c] = struct{}{}
+	r.Receivers[recv] = struct{}{}
 }
 
-func (r *Room) RemoveReceiver(c net.Conn) int {
+func (r *Room) RemoveReceiver(recv *Receiver) int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	delete(r.Receivers, c)
+	delete(r.Receivers, recv)
 	return len(r.Receivers)
 }
 
-func (r *Room) ReceiverList() []net.Conn {
+func (r *Room) ReceiverList() []*Receiver {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	out := make([]net.Conn, 0, len(r.Receivers))
-	for c := range r.Receivers {
-		out = append(out, c)
+	out := make([]*Receiver, 0, len(r.Receivers))
+	for recv := range r.Receivers {
+		out = append(out, recv)
 	}
 	return out
 }

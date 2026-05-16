@@ -8,7 +8,6 @@ package main
 
 import (
 	"encoding/binary"
-	"errors"
 	"io"
 	"net"
 	"time"
@@ -16,13 +15,30 @@ import (
 
 const (
 	frameHeaderSize = 8
-	maxFrameSize    = 4 * 1024 * 1024
-	writeTimeout    = 5 * time.Second
+
+	// Base write deadline applied to every frame regardless of size.
+	writeTimeoutBase = 15 * time.Second
+	// Extra deadline budget per MB of payload. A ~1 Mbps residential uplink
+	// needs ~8s to drain a megabyte; we double it for packet-loss headroom.
+	writeTimeoutPerMB = 16 * time.Second
 )
+
+// No hard cap on transferred frame size. The uint32 length field is the
+// only natural limit; the relay forwards frames opaquely and does not
+// allocate against attacker-controlled sizes beyond what the wire encoding
+// already allows.
 
 type Frame struct {
 	Type    uint32
 	Payload []byte
+}
+
+func writeDeadlineFor(payloadLen int) time.Duration {
+	if payloadLen < 0 {
+		payloadLen = 0
+	}
+	extra := time.Duration(payloadLen) * writeTimeoutPerMB / (1024 * 1024)
+	return writeTimeoutBase + extra
 }
 
 func readFrame(conn net.Conn) (Frame, error) {
@@ -32,9 +48,6 @@ func readFrame(conn net.Conn) (Frame, error) {
 	}
 	msgType := binary.BigEndian.Uint32(hdr[0:4])
 	length := binary.BigEndian.Uint32(hdr[4:8])
-	if length > maxFrameSize {
-		return Frame{}, errors.New("frame too large")
-	}
 	payload := make([]byte, length)
 	if length > 0 {
 		if _, err := io.ReadFull(conn, payload); err != nil {
@@ -45,7 +58,7 @@ func readFrame(conn net.Conn) (Frame, error) {
 }
 
 func writeFrame(conn net.Conn, msgType uint32, payload []byte) error {
-	_ = conn.SetWriteDeadline(time.Now().Add(writeTimeout))
+	_ = conn.SetWriteDeadline(time.Now().Add(writeDeadlineFor(len(payload))))
 	defer conn.SetWriteDeadline(time.Time{})
 
 	var hdr [frameHeaderSize]byte

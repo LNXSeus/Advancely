@@ -22,10 +22,13 @@
 #include <psa/crypto.h>
 
 #include <cJSON.h>
+#include <SDL3/SDL.h>
+#include <miniz.h>
 
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
+#include <cstdint>
 
 struct RelayConn {
     mbedtls_net_context net;
@@ -206,8 +209,17 @@ void relay_clear_last_error(void) { tls_last_error[0] = '\0'; }
 
 static void set_last_error(const char *where, int n) {
     char strbuf[128] = "?";
+    // Distinguish the common peer-side close modes so the log tells us
+    // *who* tore the stream down. n == 0 from mbedtls_ssl_read means the
+    // peer's TLS layer signalled close (close_notify or socket EOF before
+    // any alert). The two named mbedTLS codes below are the explicit
+    // variants we'd see if mbedTLS surfaces them instead of collapsing to 0.
     if (n == 0) {
-        snprintf(strbuf, sizeof(strbuf), "EOF");
+        snprintf(strbuf, sizeof(strbuf), "peer closed stream (close_notify or socket EOF)");
+    } else if (n == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY) {
+        snprintf(strbuf, sizeof(strbuf), "peer sent TLS close_notify (graceful shutdown)");
+    } else if (n == MBEDTLS_ERR_NET_CONN_RESET) {
+        snprintf(strbuf, sizeof(strbuf), "TCP connection reset by peer (RST)");
     } else {
         mbedtls_strerror(n, strbuf, sizeof(strbuf));
     }
@@ -218,15 +230,28 @@ static void set_last_error(const char *where, int n) {
 
 static bool ssl_write_all(mbedtls_ssl_context *ssl, const void *data, size_t len) {
     const unsigned char *p = (const unsigned char *) data;
+    const size_t total = len;
+    const Uint32 t_start = SDL_GetTicks();
+    Uint32 t_last_progress = t_start;
     while (len > 0) {
         int n = mbedtls_ssl_write(ssl, p, len);
         if (n > 0) {
             p += n;
             len -= (size_t) n;
+            t_last_progress = SDL_GetTicks();
             continue;
         }
         if (n == MBEDTLS_ERR_SSL_WANT_READ || n == MBEDTLS_ERR_SSL_WANT_WRITE) continue;
         set_last_error("ssl_write", n);
+        char base[160];
+        strncpy(base, tls_last_error, sizeof(base) - 1);
+        base[sizeof(base) - 1] = '\0';
+        snprintf(tls_last_error, sizeof(tls_last_error),
+                 "%s [wrote=%zu/%zu elapsed=%ums idle=%ums]",
+                 base, total - len, total,
+                 (unsigned)(SDL_GetTicks() - t_start),
+                 (unsigned)(SDL_GetTicks() - t_last_progress));
+        log_message(LOG_ERROR, "[Relay] %s\n", tls_last_error);
         return false;
     }
     return true;
@@ -237,14 +262,19 @@ static bool ssl_write_all(mbedtls_ssl_context *ssl, const void *data, size_t len
 // on connection error. A timeout that occurs mid-buffer is treated as an
 // error since we can't preserve partial frame state across calls.
 static int ssl_read_exact(mbedtls_ssl_context *ssl, void *buf, size_t len,
-                          size_t *out_consumed) {
+                          size_t *out_consumed,
+                          uint32_t *out_elapsed_ms,
+                          uint32_t *out_idle_ms) {
     unsigned char *p = (unsigned char *) buf;
     size_t total = len;
+    Uint32 t_start = SDL_GetTicks();
+    Uint32 t_last_progress = t_start;
     while (len > 0) {
         int n = mbedtls_ssl_read(ssl, p, len);
         if (n > 0) {
             p += n;
             len -= (size_t) n;
+            t_last_progress = SDL_GetTicks();
             continue;
         }
         if (n == MBEDTLS_ERR_SSL_WANT_READ || n == MBEDTLS_ERR_SSL_WANT_WRITE) continue;
@@ -255,27 +285,147 @@ static int ssl_read_exact(mbedtls_ssl_context *ssl, void *buf, size_t len,
         if (n == MBEDTLS_ERR_SSL_TIMEOUT) {
             // Only surface as timeout when nothing was consumed yet; otherwise
             // we'd lose mid-frame bytes by retrying from scratch later.
-            if (len == total) return 0;
+            if (len == total) {
+                if (out_elapsed_ms) *out_elapsed_ms = SDL_GetTicks() - t_start;
+                if (out_idle_ms) *out_idle_ms = SDL_GetTicks() - t_last_progress;
+                return 0;
+            }
             continue;
         }
         if (out_consumed) *out_consumed = total - len;
+        if (out_elapsed_ms) *out_elapsed_ms = SDL_GetTicks() - t_start;
+        if (out_idle_ms) *out_idle_ms = SDL_GetTicks() - t_last_progress;
         set_last_error(len == total ? "ssl_read(header)" : "ssl_read(midframe)", n);
         return -1;
     }
     if (out_consumed) *out_consumed = total;
+    if (out_elapsed_ms) *out_elapsed_ms = SDL_GetTicks() - t_start;
+    if (out_idle_ms) *out_idle_ms = SDL_GetTicks() - t_last_progress;
     return 1;
+}
+
+// Wire-level compression flag: bit 31 of the type field. The relay forwards
+// frames opaquely, so this is purely between host and receivers — both ends
+// use the same helpers below and the relay never has to decode it.
+//
+// Compressed frame layout (set the flag, then payload is):
+//   [4B uncompressed_len BE][zlib-deflated original_payload]
+//
+// Below the threshold the deflate overhead would dwarf any size win, so we
+// skip compression entirely. We also fall back to uncompressed if the
+// deflated result isn't actually smaller (already-compressed inputs, tiny
+// inputs that round up after framing).
+static const uint32_t RELAY_FRAME_FLAG_COMPRESSED = 0x80000000u;
+static const uint32_t RELAY_FRAME_TYPE_MASK = 0x7FFFFFFFu;
+static const uint32_t RELAY_COMPRESS_THRESHOLD = 8 * 1024;
+
+// Compresses src into a fresh malloc'd buffer with a 4-byte BE
+// uncompressed-length prefix. On success returns the buffer in *out and the
+// wire length (prefix + deflated bytes) in *out_len. Returns false if
+// compression failed or the result wasn't smaller than the input; caller
+// should fall back to an uncompressed frame in that case.
+static bool relay_compress_payload(const void *src, uint32_t src_len,
+                                   void **out, uint32_t *out_len) {
+    if (!src || src_len == 0 || !out || !out_len) return false;
+    mz_ulong bound = mz_compressBound((mz_ulong) src_len);
+    if (bound > UINT32_MAX - 4) return false;
+    unsigned char *buf = (unsigned char *) malloc(4 + bound);
+    if (!buf) return false;
+    mz_ulong dest_len = bound;
+    int rc = mz_compress(buf + 4, &dest_len,
+                         (const unsigned char *) src, (mz_ulong) src_len);
+    if (rc != MZ_OK) {
+        free(buf);
+        return false;
+    }
+    if ((uint32_t)(4 + dest_len) >= src_len) {
+        // No size win — caller will send uncompressed.
+        free(buf);
+        return false;
+    }
+    put_be32(buf, src_len);
+    *out = buf;
+    *out_len = (uint32_t)(4 + dest_len);
+    return true;
+}
+
+// Inverse of relay_compress_payload. Wire bytes -> heap buffer of the
+// original uncompressed size. Frees src is the caller's job.
+static bool relay_decompress_payload(const void *src, uint32_t src_len,
+                                     void **out, uint32_t *out_len) {
+    if (!src || src_len < 4 || !out || !out_len) return false;
+    const unsigned char *p = (const unsigned char *) src;
+    uint32_t uncompressed_len = get_be32(p);
+    if (uncompressed_len == 0) {
+        *out = nullptr;
+        *out_len = 0;
+        return true;
+    }
+    unsigned char *buf = (unsigned char *) malloc(uncompressed_len);
+    if (!buf) return false;
+    mz_ulong dest_len = uncompressed_len;
+    int rc = mz_uncompress(buf, &dest_len, p + 4, (mz_ulong)(src_len - 4));
+    if (rc != MZ_OK || dest_len != uncompressed_len) {
+        free(buf);
+        return false;
+    }
+    *out = buf;
+    *out_len = uncompressed_len;
+    return true;
 }
 
 bool relay_send_frame(RelayConn *c, uint32_t type, const void *payload, uint32_t payload_len) {
     if (!c) return false;
-    unsigned char hdr[8];
-    put_be32(hdr, type);
-    put_be32(hdr + 4, payload_len);
-    if (!ssl_write_all(&c->ssl, hdr, 8)) return false;
-    if (payload_len > 0 && payload) {
-        if (!ssl_write_all(&c->ssl, payload, payload_len)) return false;
+    // The compression flag is reserved — callers must not set it themselves.
+    type &= RELAY_FRAME_TYPE_MASK;
+
+    const void *wire_payload = payload;
+    uint32_t wire_len = payload_len;
+    uint32_t wire_type = type;
+    void *compressed_buf = nullptr;
+
+    if (payload && payload_len >= RELAY_COMPRESS_THRESHOLD) {
+        void *cbuf = nullptr;
+        uint32_t clen = 0;
+        if (relay_compress_payload(payload, payload_len, &cbuf, &clen)) {
+            compressed_buf = cbuf;
+            wire_payload = cbuf;
+            wire_len = clen;
+            wire_type = type | RELAY_FRAME_FLAG_COMPRESSED;
+        }
     }
-    return true;
+
+    unsigned char hdr[8];
+    put_be32(hdr, wire_type);
+    put_be32(hdr + 4, wire_len);
+    bool ok = ssl_write_all(&c->ssl, hdr, 8);
+    if (ok && wire_len > 0 && wire_payload) {
+        ok = ssl_write_all(&c->ssl, wire_payload, wire_len);
+    }
+    if (compressed_buf) free(compressed_buf);
+    return ok;
+}
+
+// Short tag for a COOP_MSG_* type so logs are readable without a header lookup.
+// Keep in sync with coop_net.h's COOP_MSG_* enum. Unknown types fall back to
+// "?" so the numeric type=N still tells you what it is.
+static const char *coop_msg_type_name(uint32_t type) {
+    switch (type) {
+        case 1: return "HEARTBEAT";
+        case 2: return "HEARTBEAT_ACK";
+        case 3: return "DISCONNECT";
+        case 4: return "STATE_UPDATE";
+        case 5: return "TEMPLATE_SYNC";
+        case 6: return "JOIN_REQUEST";
+        case 7: return "JOIN_ACCEPT";
+        case 8: return "JOIN_REJECT";
+        case 9: return "PLAYER_LIST";
+        case 10: return "KICK";
+        case 11: return "CUSTOM_GOAL_MOD";
+        case 12: return "PLAYER_STATES";
+        case 13: return "LEGACY_STATS_UPLOAD";
+        default: return "?";
+    }
 }
 
 int relay_recv_frame_timed(RelayConn *c, uint32_t *out_type, void **out_payload,
@@ -283,53 +433,96 @@ int relay_recv_frame_timed(RelayConn *c, uint32_t *out_type, void **out_payload,
     if (!c || !out_type || !out_payload || !out_len) return -1;
     *out_payload = nullptr;
     *out_len = 0;
-    // Default cap matches relay/frame.go's maxFrameSize.
-    if (max_payload == 0) max_payload = 4 * 1024 * 1024;
+    // No hard cap by default: the relay forwards arbitrary-size frames and
+    // we want to receive whatever it sends. Callers that need a sanity cap
+    // (e.g. parsing untrusted control frames) can still pass max_payload
+    // explicitly; 0 means "accept up to the wire's natural uint32 limit."
+    if (max_payload == 0) max_payload = UINT32_MAX;
 
     unsigned char hdr[8];
     size_t hdr_got = 0;
-    int rc = ssl_read_exact(&c->ssl, hdr, 8, &hdr_got);
+    uint32_t hdr_elapsed = 0;
+    uint32_t hdr_idle = 0;
+    int rc = ssl_read_exact(&c->ssl, hdr, 8, &hdr_got, &hdr_elapsed, &hdr_idle);
     if (rc < 0) {
         // Append how many header bytes we got so callers can distinguish
         // "conn closed cleanly between frames" (0/8) from "torn-down
-        // partway through a header" (1..7/8).
+        // partway through a header" (1..7/8). Timing helps tell a
+        // timeout-induced close (large elapsed) from an instant peer kick.
         char base[192];
         strncpy(base, tls_last_error, sizeof(base) - 1);
         base[sizeof(base) - 1] = '\0';
         snprintf(tls_last_error, sizeof(tls_last_error),
-                 "%s [hdr_got=%zu/8]", base, hdr_got);
+                 "%s [hdr_got=%zu/8 elapsed=%ums idle=%ums]",
+                 base, hdr_got, (unsigned) hdr_elapsed, (unsigned) hdr_idle);
         log_message(LOG_ERROR, "[Relay] %s\n", tls_last_error);
         return rc;
     }
     if (rc == 0) return rc;
-    uint32_t type = get_be32(hdr);
+    uint32_t wire_type = get_be32(hdr);
     uint32_t length = get_be32(hdr + 4);
+    bool compressed = (wire_type & RELAY_FRAME_FLAG_COMPRESSED) != 0;
+    uint32_t type = wire_type & RELAY_FRAME_TYPE_MASK;
     if (length > max_payload) {
         snprintf(tls_last_error, sizeof(tls_last_error),
-                 "frame oversize: type=%u len=%u cap=%u", type, length, max_payload);
+                 "frame oversize: type=%u(%s)%s len=%u cap=%u",
+                 type, coop_msg_type_name(type), compressed ? "+zlib" : "",
+                 length, max_payload);
         log_message(LOG_ERROR, "[Relay] %s\n", tls_last_error);
         return -1;
     }
 
     if (length > 0) {
         void *buf = malloc(length);
-        if (!buf) return -1;
+        if (!buf) {
+            snprintf(tls_last_error, sizeof(tls_last_error),
+                     "malloc failed for payload: type=%u(%s) len=%u",
+                     type, coop_msg_type_name(type), length);
+            log_message(LOG_ERROR, "[Relay] %s\n", tls_last_error);
+            return -1;
+        }
         // Header is fully consumed; mid-frame timeouts are fatal here (treated
         // as -1 by ssl_read_exact since len != total on the second call).
         size_t payload_got = 0;
-        rc = ssl_read_exact(&c->ssl, buf, length, &payload_got);
+        uint32_t pl_elapsed = 0;
+        uint32_t pl_idle = 0;
+        rc = ssl_read_exact(&c->ssl, buf, length, &payload_got, &pl_elapsed, &pl_idle);
         if (rc <= 0) {
+            // elapsed=total time inside this payload read;
+            // idle=time since the *last* successful byte before the close,
+            // which separates "peer stopped feeding bytes then closed after
+            // T ms" (large idle) from "closed instantly after a chunk"
+            // (idle ~0). pct shows how far we got through the frame.
+            unsigned pct = length > 0 ? (unsigned)((payload_got * 100ULL) / length) : 0;
             char base[192];
             strncpy(base, tls_last_error, sizeof(base) - 1);
             base[sizeof(base) - 1] = '\0';
             snprintf(tls_last_error, sizeof(tls_last_error),
-                     "%s [type=%u len=%u got=%zu]", base, type, length, payload_got);
+                     "%s [type=%u(%s) len=%u got=%zu(%u%%) elapsed=%ums idle=%ums]",
+                     base, type, coop_msg_type_name(type), length, payload_got,
+                     pct, (unsigned) pl_elapsed, (unsigned) pl_idle);
             log_message(LOG_ERROR, "[Relay] %s\n", tls_last_error);
             free(buf);
-            return rc < 0 ? -1 : -1;
+            return -1;
         }
-        *out_payload = buf;
-        *out_len = length;
+        if (compressed) {
+            void *decomp = nullptr;
+            uint32_t decomp_len = 0;
+            if (!relay_decompress_payload(buf, length, &decomp, &decomp_len)) {
+                snprintf(tls_last_error, sizeof(tls_last_error),
+                         "decompress failed: type=%u(%s) wire_len=%u",
+                         type, coop_msg_type_name(type), length);
+                log_message(LOG_ERROR, "[Relay] %s\n", tls_last_error);
+                free(buf);
+                return -1;
+            }
+            free(buf);
+            *out_payload = decomp;
+            *out_len = decomp_len;
+        } else {
+            *out_payload = buf;
+            *out_len = length;
+        }
     }
     *out_type = type;
     return 1;
