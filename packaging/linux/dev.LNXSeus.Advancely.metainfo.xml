@@ -16,6 +16,17 @@
   <url type="homepage">https://github.com/LNXSeus/Advancely</url>
 
   <releases>
+    <release version="1.4.4" date="2026-05-16">
+      <description>
+        <ul>
+          <li>Coop relay: large frames no longer disconnect receivers. Frames are now zlib-compressed, the size cap is gone, and slow consumers no longer block the rest of the room.</li>
+          <li>Player faces now show next to advancement criteria, indicating the player furthest along on that complex advancement.</li>
+          <li>Joining or rejoining a coop lobby no longer restarts the overlay window.</li>
+          <li>Cumulative is now the default stat merge mode for coop (was Highest).</li>
+          <li>Coop disconnect logs now include frame type, payload size, how far the read got, and timing info to distinguish stalls from instant closes.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.4.3" date="2026-05-14">
       <description>
         <ul>
