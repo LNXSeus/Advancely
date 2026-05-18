@@ -411,6 +411,31 @@ uint64_t compute_template_goal_hash(const char *template_file_path) {
             // is_recipe flag affects tracking (recipes vs real advancements)
             cJSON *recipe = cJSON_GetObjectItem(adv, "is_recipe");
             if (recipe && cJSON_IsTrue(recipe)) hash = fnv1a_int(hash, 1);
+            // groups_enabled flag: when set false the runtime ignores criterion groups,
+            // so host/receiver must agree on the toggle (and on the group strings only
+            // when it's enabled) to be considered the same template.
+            cJSON *ge = cJSON_GetObjectItem(adv, "groups_enabled");
+            bool groups_active;
+            if (cJSON_IsBool(ge)) {
+                groups_active = cJSON_IsTrue(ge);
+            } else {
+                // Legacy template (no key): mirror the runtime's backwards-compat default,
+                // which is "on" iff at least one criterion already has a non-empty group.
+                groups_active = false;
+                cJSON *crit_obj = cJSON_GetObjectItem(adv, "criteria");
+                if (crit_obj && cJSON_IsObject(crit_obj)) {
+                    cJSON *c = nullptr;
+                    cJSON_ArrayForEach(c, crit_obj) {
+                        cJSON *g = cJSON_GetObjectItem(c, "group");
+                        if (g && cJSON_IsString(g) && g->valuestring && g->valuestring[0] != '\0') {
+                            groups_active = true; break;
+                        }
+                    }
+                }
+            }
+            // Only mark "active" in the hash. The inactive case is semantically equivalent
+            // to a no-group advancement, so keep its hash identical to legacy no-group ones.
+            if (groups_active) hash = fnv1a_int(hash, 1);
             // Criteria keys (sub-criteria names matter for tracking)
             cJSON *criteria = cJSON_GetObjectItem(adv, "criteria");
             if (criteria && cJSON_IsObject(criteria)) {
@@ -419,9 +444,12 @@ uint64_t compute_template_goal_hash(const char *template_file_path) {
                     hash = fnv1a_str(hash, crit->string); // criterion key
                     cJSON *target = cJSON_GetObjectItem(crit, "target");
                     if (target && cJSON_IsNumber(target)) hash = fnv1a_int(hash, target->valueint);
-                    // Fold group ID into the hash so host/receiver grouping must match.
-                    cJSON *group = cJSON_GetObjectItem(crit, "group");
-                    if (group && cJSON_IsString(group)) hash = fnv1a_str(hash, group->valuestring);
+                    // Only fold group ID into the hash when grouping is active for this
+                    // advancement; otherwise the field is dormant and must not split hashes.
+                    if (groups_active) {
+                        cJSON *group = cJSON_GetObjectItem(crit, "group");
+                        if (group && cJSON_IsString(group)) hash = fnv1a_str(hash, group->valuestring);
+                    }
                 }
             }
         }

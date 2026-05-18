@@ -797,6 +797,16 @@ static bool tracker_view_is_own_uuid(const Tracker *t, const AppSettings *settin
 // Returns the unit count. Pass-through when no criteria have a group set.
 static int tracker_collapse_advancement_groups(TrackableCategory *adv) {
     if (!adv || adv->criteria_count <= 0) return 0;
+    // When the template explicitly disables grouping for this advancement, treat every
+    // criterion as ungrouped: just count completed criteria. Group strings stay in memory
+    // but have no effect on progress or rendering.
+    if (!adv->groups_enabled) {
+        int done_count = 0;
+        for (int j = 0; j < adv->criteria_count; j++) {
+            if (adv->criteria[j] && adv->criteria[j]->done) done_count++;
+        }
+        return done_count;
+    }
     static const int MAX_GROUPS = 256;
     char satisfied[MAX_GROUPS][64];
     int satisfied_count = 0;
@@ -834,6 +844,13 @@ static int tracker_collapse_advancement_groups(TrackableCategory *adv) {
 // Non-mutating; used by coop merge to compare players without touching live state.
 static int tracker_count_groups_from_flags(const TrackableCategory *adv, const char *flags) {
     if (!adv || adv->criteria_count <= 0 || !flags) return 0;
+    if (!adv->groups_enabled) {
+        int done_count = 0;
+        for (int j = 0; j < adv->criteria_count; j++) {
+            if (flags[j]) done_count++;
+        }
+        return done_count;
+    }
     static const int MAX_GROUPS = 256;
     char satisfied[MAX_GROUPS][64];
     int satisfied_count = 0;
@@ -863,6 +880,7 @@ static int tracker_count_groups_from_flags(const TrackableCategory *adv, const c
 // (distinct group IDs) + (ungrouped criteria). Equals criteria_count when no groups set.
 static int tracker_compute_progress_total(const TrackableCategory *adv) {
     if (!adv || adv->criteria_count <= 0) return 0;
+    if (!adv->groups_enabled) return adv->criteria_count;
     static const int MAX_GROUPS = 256;
     char seen[MAX_GROUPS][64];
     int seen_count = 0;
@@ -1477,6 +1495,13 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
         new_cat->is_recipe = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "is_recipe"));
         new_cat->in_2nd_row = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "in_2nd_row")); // 2nd row of overlay
         new_cat->in_3rd_row = cJSON_IsTrue(cJSON_GetObjectItem(cat_json, "in_3rd_row")); // 3rd row of overlay
+        // groups_enabled: if explicit in template, use it verbatim; otherwise default-on
+        // when any criterion already has a non-empty "group" string (backwards compat for
+        // older templates authored before the toggle existed). Resolved after criteria parse.
+        {
+            cJSON *ge = cJSON_GetObjectItem(cat_json, "groups_enabled");
+            new_cat->groups_enabled = cJSON_IsBool(ge) ? cJSON_IsTrue(ge) : false;
+        }
 
         parse_manual_pos(cat_json, "icon_pos", &new_cat->icon_pos);
         parse_manual_pos(cat_json, "text_pos", &new_cat->text_pos);
@@ -1649,6 +1674,21 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                         }
 
                         new_cat->criteria[k++] = new_crit;
+                    }
+                }
+                // Backwards-compat resolution: when the template author didn't include an
+                // explicit "groups_enabled" key but at least one criterion has a non-empty
+                // group, treat it as opted-in so legacy templates keep working. An explicit
+                // "groups_enabled": false (set above) is always respected.
+                if (!is_stat_category && !new_cat->groups_enabled) {
+                    cJSON *ge_check = cJSON_GetObjectItem(cat_json, "groups_enabled");
+                    if (!cJSON_IsBool(ge_check)) {
+                        for (int gi = 0; gi < new_cat->criteria_count; gi++) {
+                            if (new_cat->criteria[gi] && new_cat->criteria[gi]->group[0] != '\0') {
+                                new_cat->groups_enabled = true;
+                                break;
+                            }
+                        }
                     }
                 }
                 // Group-collapse the progress denominator for advancements; stats keep raw count.
@@ -10748,6 +10788,8 @@ void tracker_render_gui(Tracker *t, AppSettings *settings) {
 
         ImGui::TextUnformatted(
             "Search for goals by name, root name, or icon path (case-insensitive).\n"
+            "Criteria also match against their Group ID, so typing a group name surfaces every\n"
+            "criterion that shares that group under its parent advancement.\n"
             "You can also use Ctrl + F (or Cmd + F on macOS).\n"
             "Using the search filter also dynamically updates the completion counters in the section headers.");
         ImGui::Separator();

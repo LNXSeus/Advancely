@@ -184,6 +184,7 @@ struct EditorTrackableCategory {
     bool in_3rd_row; // Forces advancements/recipes from Row 2 to Row 3
     bool is_recipe; // UI flag to distinguish recipes from advancements -> count towards progress percentage instead
     bool is_simple_stat; // UI flag to distinguish simple vs complex stats
+    bool groups_enabled = false; // If true, show criterion grouping UI and persist groups_enabled flag.
     std::vector<EditorTrackableItem> criteria; // Criteria then are trackable items
     int sort_order = 0;
 
@@ -524,6 +525,7 @@ static bool are_editor_categories_different(const EditorTrackableCategory &a, co
         a.in_3rd_row != b.in_3rd_row ||
         a.is_recipe != b.is_recipe ||
         a.is_simple_stat != b.is_simple_stat ||
+        a.groups_enabled != b.groups_enabled ||
         a.linked_goal_mode != b.linked_goal_mode ||
         are_linked_goals_different(a.linked_goals, b.linked_goals) ||
         are_manual_positions_different(a.icon_pos, b.icon_pos) ||
@@ -1184,6 +1186,7 @@ static void parse_editor_trackable_categories(cJSON *json_object,
         cJSON *icon = cJSON_GetObjectItem(category_json, "icon");
         cJSON *hidden = cJSON_GetObjectItem(category_json, "hidden");
         cJSON *is_recipe_json = cJSON_GetObjectItem(category_json, "is_recipe");
+        cJSON *groups_enabled_json = cJSON_GetObjectItem(category_json, "groups_enabled");
 
         if (cJSON_IsString(icon)) {
             strncpy(new_cat.icon_path, icon->valuestring, sizeof(new_cat.icon_path) - 1);
@@ -1191,6 +1194,8 @@ static void parse_editor_trackable_categories(cJSON *json_object,
         }
         if (cJSON_IsBool(hidden)) new_cat.is_hidden = cJSON_IsTrue(hidden);
         if (cJSON_IsBool(is_recipe_json)) new_cat.is_recipe = cJSON_IsTrue(is_recipe_json);
+        const bool groups_enabled_key_present = cJSON_IsBool(groups_enabled_json);
+        if (groups_enabled_key_present) new_cat.groups_enabled = cJSON_IsTrue(groups_enabled_json);
 
         // Parse manual positions for the parent
         parse_editor_manual_pos(category_json, "icon_pos", &new_cat.icon_pos);
@@ -1262,6 +1267,15 @@ static void parse_editor_trackable_categories(cJSON *json_object,
                 criteria_items.push_back(new_crit);
             }
             new_cat.criteria = criteria_items;
+        }
+        // Backwards compatibility: if the JSON had no explicit groups_enabled key and any
+        // criterion already has a non-empty group, default the toggle on. When the key IS
+        // present (true or false), respect it verbatim so users can deliberately disable
+        // grouping for an advancement without losing the underlying group strings.
+        if (!groups_enabled_key_present) {
+            for (const auto &c : new_cat.criteria) {
+                if (c.group[0] != '\0') { new_cat.groups_enabled = true; break; }
+            }
         }
         category_vector.push_back(new_cat);
     }
@@ -1821,6 +1835,10 @@ static void serialize_editor_trackable_categories(cJSON *parent, const char *key
         if (cat.in_3rd_row) {
             cJSON_AddBoolToObject(cat_json, "in_3rd_row", true);
         }
+        // Always write groups_enabled explicitly so an unchecked toggle survives a reload
+        // and so the runtime tracker can honor the user's intent (false = ignore groups
+        // even if they exist in the criteria).
+        cJSON_AddBoolToObject(cat_json, "groups_enabled", cat.groups_enabled);
 
         // Create the nested criteria object
         cJSON *criteria_object = cJSON_CreateObject();
@@ -5169,6 +5187,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         new_advancement.in_3rd_row = source_adv_ptr->in_3rd_row;
                         new_advancement.is_recipe = source_adv_ptr->is_recipe;
                         new_advancement.is_simple_stat = source_adv_ptr->is_simple_stat;
+                        new_advancement.groups_enabled = source_adv_ptr->groups_enabled;
                         new_advancement.criteria = source_adv_ptr->criteria; // std::vector handles its own deep copy.
                         new_advancement.icon_pos = source_adv_ptr->icon_pos;
                         new_advancement.text_pos = source_adv_ptr->text_pos;
@@ -5440,6 +5459,22 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             ImGui::SetTooltip("%s", tooltip_buffer);
                         }
 
+                        ImGui::SameLine();
+                        if (ImGui::Checkbox("Groups", &advancement.groups_enabled)) {
+                            save_message_type = MSG_NONE;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            char groups_tooltip_buffer[512];
+                            snprintf(groups_tooltip_buffer, sizeof(groups_tooltip_buffer),
+                                     "Enable criterion grouping for this %s.\n"
+                                     "When enabled, criteria can be assigned to a shared group ID:\n"
+                                     "all criteria in a group collapse into one progress unit, so\n"
+                                     "completing any one marks the entire group as done (used by\n"
+                                     "special blaze and caves advancements like Ultimate Enchanter).",
+                                     advancements_label_singular_lower);
+                            ImGui::SetTooltip("%s", groups_tooltip_buffer);
+                        }
+
                         if (render_layout_coordinates_header(advancements_label_singular_lower,
                                                              force_open_header_root_name[0] != '\0' && strcmp(
                                                                  advancement.root_name,
@@ -5495,22 +5530,24 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                     }
                                 }
                             }
-                            int distinct_groups = (int)crit_collect_group_ids(advancement).size();
-                            int loose_crit = 0;
-                            for (const auto &c : advancement.criteria) if (c.group[0] == '\0') loose_crit++;
-                            int selected_crit = (int)s_crit_selection.size();
                             int pos = snprintf(crit_counter_text, sizeof(crit_counter_text), "%d %s",
                                                visible_criteria_count,
                                                visible_criteria_count == 1 ? "Criterion" : "Criteria");
-                            if (distinct_groups > 0 && pos < (int)sizeof(crit_counter_text)) {
-                                pos += snprintf(crit_counter_text + pos, sizeof(crit_counter_text) - pos,
-                                                " (%d %s + %d loose)",
-                                                distinct_groups, distinct_groups == 1 ? "group" : "groups",
-                                                loose_crit);
-                            }
-                            if (selected_crit > 0 && pos < (int)sizeof(crit_counter_text)) {
-                                snprintf(crit_counter_text + pos, sizeof(crit_counter_text) - pos,
-                                         " · %d selected", selected_crit);
+                            if (advancement.groups_enabled) {
+                                int distinct_groups = (int)crit_collect_group_ids(advancement).size();
+                                int loose_crit = 0;
+                                for (const auto &c : advancement.criteria) if (c.group[0] == '\0') loose_crit++;
+                                int selected_crit = (int)s_crit_selection.size();
+                                if (distinct_groups > 0 && pos < (int)sizeof(crit_counter_text)) {
+                                    pos += snprintf(crit_counter_text + pos, sizeof(crit_counter_text) - pos,
+                                                    " (%d %s + %d loose)",
+                                                    distinct_groups, distinct_groups == 1 ? "group" : "groups",
+                                                    loose_crit);
+                                }
+                                if (selected_crit > 0 && pos < (int)sizeof(crit_counter_text)) {
+                                    snprintf(crit_counter_text + pos, sizeof(crit_counter_text) - pos,
+                                             " · %d selected", selected_crit);
+                                }
                             }
                             float crit_text_width = ImGui::CalcTextSize(crit_counter_text).x;
                             ImGui::SameLine(ImGui::GetContentRegionAvail().x - crit_text_width);
@@ -5691,7 +5728,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
 
                         // Compact group action bar: only visible when at least one criterion is selected.
                         // Right-aligned to keep the criteria list visually quiet (grouping is niche).
-                        if (!s_crit_selection.empty()) {
+                        if (advancement.groups_enabled && !s_crit_selection.empty()) {
                             // Pre-measure the three buttons + spacing so we can right-align them.
                             ImGuiStyle &style = ImGui::GetStyle();
                             float w_add = ImGui::CalcTextSize("Add selection to group").x + style.FramePadding.x * 2.0f;
@@ -5829,6 +5866,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             // First row: bulk-action checkbox + per-criterion Group field.
                             // The checkbox doubles as a future drag-to-reorder selection handle; the
                             // group field is the niche thing it currently feeds.
+                            if (advancement.groups_enabled) {
                             bool is_selected = s_crit_selection.find((int)j) != s_crit_selection.end();
                             if (ImGui::Checkbox("##select_crit", &is_selected)) {
                                 bool shift = ImGui::GetIO().KeyShift;
@@ -5929,6 +5967,7 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 }
                                 ImGui::EndPopup();
                             }
+                            } // end if (advancement.groups_enabled)
 
                             static char focused_crit_root[192] = {};
                             if (ImGui::InputText("Criterion Root Name", criterion.root_name,

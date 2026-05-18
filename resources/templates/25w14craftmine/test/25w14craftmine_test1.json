@@ -20,6 +20,7 @@
 		},
 		"minecraft:mines/all_special_mines_completed":	{
 			"icon":	"blocks/Beacon_JE6_BE2.png",
+			"groups_enabled":	true,
 			"criteria":	{
 				"minecraft:wither_boss":	{
 					"icon":	"items/wither_spawn_egg_25w14craftmine.png",
@@ -33,7 +34,8 @@
 					}
 				},
 				"minecraft:kuiper_belt":	{
-					"icon":	"items/polar_bear_spawn_egg_25w14craftmine.png"
+					"icon":	"items/polar_bear_spawn_egg_25w14craftmine.png",
+					"group":	"early_bosses"
 				},
 				"minecraft:raid":	{
 					"icon":	"items/pillager_spawn_egg_1.21.5.png"
@@ -45,7 +47,8 @@
 					"icon":	"items/ender_dragon_spawn_egg_25w14craftmine.png"
 				},
 				"minecraft:small_but_deadly_boss":	{
-					"icon":	"items/silverfish_spawn_egg_1.21.5.png"
+					"icon":	"items/silverfish_spawn_egg_1.21.5.png",
+					"group":	"early_bosses"
 				},
 				"minecraft:angry_ghast_boss":	{
 					"icon":	"items/ghast_spawn_egg_25w14craftmine.png"
@@ -54,7 +57,8 @@
 					"icon":	"items/warden_spawn_egg_1.21.5.png"
 				},
 				"minecraft:enderman_boss":	{
-					"icon":	"items/enderman_spawn_egg_25w14craftmine.png"
+					"icon":	"items/enderman_spawn_egg_25w14craftmine.png",
+					"group":	"early_bosses"
 				}
 			},
 			"icon_pos":	{

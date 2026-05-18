@@ -159,14 +159,20 @@ import, create, copy, and modify any template directly within Advancely.
 * **Decorations:** Add visual elements to your manual layout that aren't tied to game data. **Text Headers** display
   custom text using the tracker font, **Lines** connect or separate areas with configurable thickness and opacity,
   and **Arrows** visually link goals together with customizable arrowheads, bend points, and goal-linked opacity.
-* **Criteria Grouping:** Collapse multiple criteria of one advancement into a single progress unit. Assign criteria
-  a shared `Group` ID (per-criterion `Add to group` button next to the field, or tick the row checkboxes and use
-  `Add selection to group` to bulk-assign with auto-naming) and any one member completing in-game marks the whole
-  group done on the tracker, overlay, and manual layout. Useful for advancement packs where multiple ways to satisfy
-  a single objective each appear as separate criteria. For example, the **Ultimate Enchanter** advancement from the
+* **Criteria Grouping:** Collapse multiple criteria of one advancement into a single progress unit. Enable the
+  per-advancement `Groups` checkbox (next to `Row 3` in the Template Editor) to expose the grouping UI for that
+  advancement, then assign criteria a shared `Group` ID (per-criterion `Add to group` button next to the field, or
+  tick the row checkboxes and use `Add selection to group` to bulk-assign with auto-naming). Any one member
+  completing in-game then marks the whole group done on the tracker, overlay, and manual layout. Useful for
+  advancement packs where multiple ways to satisfy a single objective each appear as separate criteria. For example,
+  the **Ultimate Enchanter** advancement from the
   [Blaze and Caves](https://modrinth.com/datapack/blazeandcaves-advancements-pack) datapack has 256 criteria split
   into 128 groups (each enchantment paired with its enchanted-book counterpart) so the tracker shows `X / 128`
-  instead of `X / 256`. Group IDs are part of the coop template hash so host and receivers must agree on the grouping.
+  instead of `X / 256`. The `Groups` checkbox is auto-enabled on load whenever any criterion already has a group
+  written in the template (backwards compatibility); unchecking it makes the tracker ignore every group string on
+  that advancement (without deleting them) and the criteria list reverts to looking and counting exactly like a
+  pre-grouping template. The `Groups` flag itself, along with each `Group` ID (only when grouping is active), is
+  part of the coop template hash so host and receivers must agree on the grouping.
 
 This powerful and flexible system makes Advancely the ultimate tool for any Minecraft challenge, from a vanilla "All
 Advancements" run to a heavily modded playthrough with hundreds of custom milestones.
@@ -538,7 +544,9 @@ corner. The filter is case-insensitive and intelligently searches across differe
 also dynamically updates the completion counters in the section headers.
 
 * **Advancements, Recipes & Statistics**: Shows a category if its main title or any of its sub-criteria/sub-stats match
-  the search term. If only a sub-item matches, it will be the only one shown under its parent.
+  the search term. If only a sub-item matches, it will be the only one shown under its parent. Criterion matches also
+  include the criterion's `Group` ID, so typing a group name (e.g. `enchanter_05`) surfaces every criterion in that
+  group under its parent advancement.
 * **Unlocks & Custom Goals**: Shows the goal if its name matches the search term.
 * **Multi-Stage Goals**: Shows the goal if its main title or the text of its *currently active stage* matches the search
   term.
@@ -1197,7 +1205,11 @@ computed from the raw template `.json` so language file differences are irreleva
 
 _The hash **INCLUDES** (these must match exactly on host and receiver):_
 
-* **Advancements:** each root_name (key), the `is_recipe` flag, every criterion key, and each criterion's `target`.
+* **Advancements:** each root_name (key), the `is_recipe` flag, the `groups_enabled` flag (resolved to its
+  backwards-compat default when absent: "on" iff any criterion already has a group string), every criterion key,
+  each criterion's `target`, and — only when `groups_enabled` is active for that advancement; each criterion's
+  `group` ID. Disabling `Groups` on an advancement makes its `group` strings dormant: they are not folded into the
+  hash, so a `Groups`-off template hashes identically to one with no group strings at all.
 * **Stats:** each category key, each `root_name`, each `target`, every sub-stat key + target, and the
   `linked_goals` array + `linked_goal_mode` (both at the category level and per sub-stat).
 * **Unlocks:** every `root_name`.
