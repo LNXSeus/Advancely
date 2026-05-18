@@ -419,6 +419,9 @@ uint64_t compute_template_goal_hash(const char *template_file_path) {
                     hash = fnv1a_str(hash, crit->string); // criterion key
                     cJSON *target = cJSON_GetObjectItem(crit, "target");
                     if (target && cJSON_IsNumber(target)) hash = fnv1a_int(hash, target->valueint);
+                    // Fold group ID into the hash so host/receiver grouping must match.
+                    cJSON *group = cJSON_GetObjectItem(crit, "group");
+                    if (group && cJSON_IsString(group)) hash = fnv1a_str(hash, group->valuestring);
                 }
             }
         }

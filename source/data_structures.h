@@ -212,6 +212,11 @@ struct TrackableItem {
     char stat_category_key[192]; // e.g., "minecraft:custom"
     char stat_item_key[192]; // e.g., "minecraft:jump"
 
+    // Per-advancement criteria grouping. Criteria sharing the same non-empty
+    // group ID inside one advancement collapse into a single progress unit:
+    // one done means the whole group is done. Empty = ungrouped.
+    char group[64];
+
     bool done; // For advancements/unlocks: Is it completed?
     int progress; // For stats: The current value, e.g., 5.
     int goal; // For stats: The target value, e.g., 40.
@@ -297,7 +302,10 @@ struct TrackableCategory {
     int goal;
 
     int criteria_count;
-    int completed_criteria_count; // Track completed criteria for that advancement
+    int completed_criteria_count; // Group-collapsed numerator (matches criteria_progress_total when fully done).
+    // Group-collapsed denominator: (distinct group IDs) + (ungrouped criteria).
+    // Equals criteria_count when no criteria have a group ID set.
+    int criteria_progress_total;
     TrackableItem **criteria; // An array of sub-items
 
     // Coop: UUID of the player who first completed this goal in the merged "All Players" view.

@@ -159,6 +159,14 @@ import, create, copy, and modify any template directly within Advancely.
 * **Decorations:** Add visual elements to your manual layout that aren't tied to game data. **Text Headers** display
   custom text using the tracker font, **Lines** connect or separate areas with configurable thickness and opacity,
   and **Arrows** visually link goals together with customizable arrowheads, bend points, and goal-linked opacity.
+* **Criteria Grouping:** Collapse multiple criteria of one advancement into a single progress unit. Assign criteria
+  a shared `Group` ID (per-criterion `Add to group` button next to the field, or tick the row checkboxes and use
+  `Add selection to group` to bulk-assign with auto-naming) and any one member completing in-game marks the whole
+  group done on the tracker, overlay, and manual layout. Useful for advancement packs where multiple ways to satisfy
+  a single objective each appear as separate criteria. For example, the **Ultimate Enchanter** advancement from the
+  [Blaze and Caves](https://modrinth.com/datapack/blazeandcaves-advancements-pack) datapack has 256 criteria split
+  into 128 groups (each enchantment paired with its enchanted-book counterpart) so the tracker shows `X / 128`
+  instead of `X / 256`. Group IDs are part of the coop template hash so host and receivers must agree on the grouping.
 
 This powerful and flexible system makes Advancely the ultimate tool for any Minecraft challenge, from a vanilla "All
 Advancements" run to a heavily modded playthrough with hundreds of custom milestones.

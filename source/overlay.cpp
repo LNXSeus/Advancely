@@ -1234,8 +1234,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                 strncpy(name_buf, adv->display_name, sizeof(name_buf) - 1);
                                 name_buf[sizeof(name_buf) - 1] = '\0';
 
-                                if (adv->criteria_count > 0 && adv->completed_criteria_count == adv->criteria_count -
-                                    1) {
+                                if (adv->criteria_progress_total > 0 &&
+                                    adv->completed_criteria_count == adv->criteria_progress_total - 1) {
                                     for (int j = 0; j < adv->criteria_count; ++j) {
                                         if (!adv->criteria[j]->done) {
                                             strncpy(progress_buf, adv->criteria[j]->display_name,
@@ -1244,10 +1244,10 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                             break;
                                         }
                                     }
-                                } else if (adv->criteria_count > 0) {
+                                } else if (adv->criteria_progress_total > 0) {
                                     snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
                                              adv->completed_criteria_count,
-                                             adv->criteria_count);
+                                             adv->criteria_progress_total);
                                 }
                                 break;
                             }
@@ -1727,7 +1727,8 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                             strncpy(name_buf, adv->display_name, sizeof(name_buf) - 1);
                             name_buf[sizeof(name_buf) - 1] = '\0';
 
-                            if (adv->criteria_count > 0 && adv->completed_criteria_count == adv->criteria_count - 1) {
+                            if (adv->criteria_progress_total > 0 &&
+                                adv->completed_criteria_count == adv->criteria_progress_total - 1) {
                                 for (int j = 0; j < adv->criteria_count; ++j) {
                                     if (!adv->criteria[j]->done) {
                                         strncpy(progress_buf, adv->criteria[j]->display_name,
@@ -1736,9 +1737,9 @@ void overlay_render(Overlay *o, const Tracker *t, const AppSettings *settings) {
                                         break;
                                     }
                                 }
-                            } else if (adv->criteria_count > 0) {
+                            } else if (adv->criteria_progress_total > 0) {
                                 snprintf(progress_buf, sizeof(progress_buf), "(%d / %d)",
-                                         adv->completed_criteria_count, adv->criteria_count);
+                                         adv->completed_criteria_count, adv->criteria_progress_total);
                             }
                             break;
                         }

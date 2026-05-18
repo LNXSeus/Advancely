@@ -71,7 +71,8 @@ static std::unordered_set<std::string> s_linked_sub; // Sub-items: composite key
 static bool item_matches_search(const TrackableItem *item, const char *search) {
     return str_contains_insensitive(item->display_name, search)
            || str_contains_insensitive(item->root_name, search)
-           || str_contains_insensitive(item->icon_path, search);
+           || str_contains_insensitive(item->icon_path, search)
+           || str_contains_insensitive(item->group, search);
 }
 
 static bool category_matches_search(const TrackableCategory *cat, const char *search) {
@@ -788,6 +789,101 @@ static bool tracker_view_is_own_uuid(const Tracker *t, const AppSettings *settin
            strcmp(view_uuid, settings->local_player.uuid) == 0;
 }
 
+// Collapse advancement criteria into group-based progress units.
+// Reads each criterion's `done` flag, computes the number of progress units:
+//   (distinct group IDs with >=1 done member) + (ungrouped done criteria).
+// Also marks every criterion in a satisfied group as done so the renderer/overlay
+// shows the entire group as completed even though only one source criterion fired.
+// Returns the unit count. Pass-through when no criteria have a group set.
+static int tracker_collapse_advancement_groups(TrackableCategory *adv) {
+    if (!adv || adv->criteria_count <= 0) return 0;
+    static const int MAX_GROUPS = 256;
+    char satisfied[MAX_GROUPS][64];
+    int satisfied_count = 0;
+    int ungrouped_done = 0;
+    for (int j = 0; j < adv->criteria_count; j++) {
+        TrackableItem *crit = adv->criteria[j];
+        if (!crit) continue;
+        if (crit->group[0] == '\0') {
+            if (crit->done) ungrouped_done++;
+            continue;
+        }
+        if (!crit->done) continue;
+        bool already = false;
+        for (int s = 0; s < satisfied_count; s++) {
+            if (strcmp(satisfied[s], crit->group) == 0) { already = true; break; }
+        }
+        if (!already && satisfied_count < MAX_GROUPS) {
+            strncpy(satisfied[satisfied_count], crit->group, sizeof(satisfied[0]) - 1);
+            satisfied[satisfied_count][sizeof(satisfied[0]) - 1] = '\0';
+            satisfied_count++;
+        }
+    }
+    for (int j = 0; j < adv->criteria_count; j++) {
+        TrackableItem *crit = adv->criteria[j];
+        if (!crit || crit->group[0] == '\0' || crit->done) continue;
+        for (int s = 0; s < satisfied_count; s++) {
+            if (strcmp(satisfied[s], crit->group) == 0) { crit->done = true; break; }
+        }
+    }
+    return satisfied_count + ungrouped_done;
+}
+
+// Count group-collapsed progress units for an advancement given a "done" flag array
+// (0 = not done, non-zero = done) indexed parallel to adv->criteria.
+// Non-mutating; used by coop merge to compare players without touching live state.
+static int tracker_count_groups_from_flags(const TrackableCategory *adv, const char *flags) {
+    if (!adv || adv->criteria_count <= 0 || !flags) return 0;
+    static const int MAX_GROUPS = 256;
+    char satisfied[MAX_GROUPS][64];
+    int satisfied_count = 0;
+    int ungrouped_done = 0;
+    for (int j = 0; j < adv->criteria_count; j++) {
+        const TrackableItem *crit = adv->criteria[j];
+        if (!crit) continue;
+        if (crit->group[0] == '\0') {
+            if (flags[j]) ungrouped_done++;
+            continue;
+        }
+        if (!flags[j]) continue;
+        bool already = false;
+        for (int s = 0; s < satisfied_count; s++) {
+            if (strcmp(satisfied[s], crit->group) == 0) { already = true; break; }
+        }
+        if (!already && satisfied_count < MAX_GROUPS) {
+            strncpy(satisfied[satisfied_count], crit->group, sizeof(satisfied[0]) - 1);
+            satisfied[satisfied_count][sizeof(satisfied[0]) - 1] = '\0';
+            satisfied_count++;
+        }
+    }
+    return satisfied_count + ungrouped_done;
+}
+
+// Compute the static (template-only) progress denominator for an advancement:
+// (distinct group IDs) + (ungrouped criteria). Equals criteria_count when no groups set.
+static int tracker_compute_progress_total(const TrackableCategory *adv) {
+    if (!adv || adv->criteria_count <= 0) return 0;
+    static const int MAX_GROUPS = 256;
+    char seen[MAX_GROUPS][64];
+    int seen_count = 0;
+    int ungrouped = 0;
+    for (int j = 0; j < adv->criteria_count; j++) {
+        const TrackableItem *crit = adv->criteria[j];
+        if (!crit) continue;
+        if (crit->group[0] == '\0') { ungrouped++; continue; }
+        bool already = false;
+        for (int s = 0; s < seen_count; s++) {
+            if (strcmp(seen[s], crit->group) == 0) { already = true; break; }
+        }
+        if (!already && seen_count < MAX_GROUPS) {
+            strncpy(seen[seen_count], crit->group, sizeof(seen[0]) - 1);
+            seen[seen_count][sizeof(seen[0]) - 1] = '\0';
+            seen_count++;
+        }
+    }
+    return seen_count + ungrouped;
+}
+
 /**
  * @brief (Era 1: 1.0-1.6.4) Parses legacy .dat stats files.
  *
@@ -956,12 +1052,12 @@ static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *p
                     cJSON_ArrayForEach(progress_item, progress_array) {
                         if (cJSON_IsString(progress_item) && strcmp(progress_item->valuestring, crit->root_name) == 0) {
                             crit->done = true;
-                            ach->completed_criteria_count++;
                             break;
                         }
                     }
                 }
             }
+            ach->completed_criteria_count = tracker_collapse_advancement_groups(ach);
         }
 
         // Determine if the game file considers the achievement done
@@ -978,7 +1074,7 @@ static void tracker_update_achievements_and_stats_mid(Tracker *t, const cJSON *p
         // Determine final 'done' status either when all criteria from template are done or game says so
         if (ach->criteria_count > 0) {
             // Explicitly set the new flag for hiding logic
-            ach->all_template_criteria_met = (ach->completed_criteria_count >= ach->criteria_count);
+            ach->all_template_criteria_met = (ach->completed_criteria_count >= ach->criteria_progress_total);
             ach->done = game_is_done || ach->all_template_criteria_met;
         } else {
             ach->all_template_criteria_met = game_is_done;
@@ -1160,13 +1256,9 @@ static void tracker_update_advancements_modern(Tracker *t, const cJSON *player_a
                 // If the template has criteria, check them against player data
                 for (int j = 0; j < adv->criteria_count; j++) {
                     TrackableItem *crit = adv->criteria[j];
-                    if (cJSON_HasObjectItem(player_criteria, crit->root_name)) {
-                        crit->done = true;
-                        adv->completed_criteria_count++;
-                    } else {
-                        crit->done = false;
-                    }
+                    crit->done = cJSON_HasObjectItem(player_criteria, crit->root_name);
                 }
+                adv->completed_criteria_count = tracker_collapse_advancement_groups(adv);
             }
 
             // Determine 'done' status when all criteria within the template are done OR the game file marks it as done
@@ -1174,7 +1266,7 @@ static void tracker_update_advancements_modern(Tracker *t, const cJSON *player_a
             if (adv->criteria_count > 0) {
                 // If template has criteria, it's done if the game says so OR all criteria are done
                 // Explicitly set the new flag for hiding logic
-                adv->all_template_criteria_met = (adv->completed_criteria_count >= adv->criteria_count);
+                adv->all_template_criteria_met = (adv->completed_criteria_count >= adv->criteria_progress_total);
                 adv->done = game_is_done || adv->all_template_criteria_met;
             } else {
                 // If no criteria are in the template, fall back to the game file's "done" status
@@ -1469,7 +1561,6 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
             for (cJSON *c = criteria_obj->child; c != nullptr; c = c->next) new_cat->criteria_count++;
             if (new_cat->criteria_count > 0) {
                 new_cat->criteria = (TrackableItem **) calloc(new_cat->criteria_count, sizeof(TrackableItem *));
-                *total_criteria_count += new_cat->criteria_count;
                 int k = 0;
                 for (cJSON *crit_item = criteria_obj->child; crit_item != nullptr; crit_item = crit_item->next) {
                     TrackableItem *new_crit = (TrackableItem *) calloc(1, sizeof(TrackableItem));
@@ -1486,6 +1577,15 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
 
                         strncpy(new_crit->root_name, crit_item->string, sizeof(new_crit->root_name) - 1);
                         new_crit->root_name[sizeof(new_crit->root_name) - 1] = '\0';
+
+                        // Per-advancement criterion group ID (collapses multiple criteria into one progress unit).
+                        if (!is_stat_category) {
+                            cJSON *crit_group = cJSON_GetObjectItem(crit_item, "group");
+                            if (cJSON_IsString(crit_group)) {
+                                strncpy(new_crit->group, crit_group->valuestring, sizeof(new_crit->group) - 1);
+                                new_crit->group[sizeof(new_crit->group) - 1] = '\0';
+                            }
+                        }
 
                         // Sub-stat progress can be positioned independently from its display text
                         if (is_stat_category) {
@@ -1551,11 +1651,17 @@ static void tracker_parse_categories(Tracker *t, cJSON *category_json, cJSON *la
                         new_cat->criteria[k++] = new_crit;
                     }
                 }
+                // Group-collapse the progress denominator for advancements; stats keep raw count.
+                new_cat->criteria_progress_total = is_stat_category
+                    ? new_cat->criteria_count
+                    : tracker_compute_progress_total(new_cat);
+                *total_criteria_count += new_cat->criteria_progress_total;
             }
         } else if (is_stat_category && !criteria_obj) {
             // CASE A: It's a stat defined WITHOUT a "criteria" block (a true single-stat)
             new_cat->is_single_stat_category = true;
             new_cat->criteria_count = 1;
+            new_cat->criteria_progress_total = 1;
             *total_criteria_count += 1;
             new_cat->criteria = (TrackableItem **) calloc(new_cat->criteria_count, sizeof(TrackableItem *));
             if (new_cat->criteria_count) {
@@ -3047,8 +3153,8 @@ void tracker_calculate_overall_progress(Tracker *t, MC_Version version, const Ap
                 completed_steps++;
             }
         } else {
-            // A normal advancement's progress is based on its criteria.
-            total_steps += adv->criteria_count;
+            // A normal advancement's progress is based on group-collapsed criteria units.
+            total_steps += adv->criteria_progress_total;
             completed_steps += adv->completed_criteria_count;
         }
     }
@@ -3696,27 +3802,26 @@ static void coop_merge_advancements_modern(TemplateData *td, const cJSON *player
         } else {
             // Complex advancement: track player with most criteria
             cJSON *player_criteria = cJSON_GetObjectItem(player_entry, "criteria");
-            int this_player_count = 0;
-
+            std::vector<char> player_flags(adv->criteria_count, 0);
             if (player_criteria) {
                 for (int j = 0; j < adv->criteria_count; j++) {
-                    if (cJSON_HasObjectItem(player_criteria, adv->criteria[j]->root_name)) {
-                        this_player_count++;
-                    }
+                    player_flags[j] = cJSON_HasObjectItem(player_criteria, adv->criteria[j]->root_name) ? 1 : 0;
                 }
             }
+            // Compare players on group-collapsed counts so grouping is respected in coop "highest" mode.
+            int this_player_count = tracker_count_groups_from_flags(
+                adv, player_flags.empty() ? nullptr : player_flags.data());
 
-            // If this player has more criteria than the current best, adopt their state.
+            // If this player has more progress units than the current best, adopt their state.
             // Strict-greater means ties keep the current leader (= lowest roster index,
             // since callers iterate players in order).
             if (this_player_count > adv->completed_criteria_count) {
-                adv->completed_criteria_count = this_player_count;
-                // Overwrite criteria done flags with this player's state
+                // Overwrite criteria done flags with this player's state, then collapse to groups.
                 for (int j = 0; j < adv->criteria_count; j++) {
-                    adv->criteria[j]->done = (player_criteria &&
-                                              cJSON_HasObjectItem(player_criteria, adv->criteria[j]->root_name));
+                    adv->criteria[j]->done = player_flags[j];
                 }
-                adv->all_template_criteria_met = (adv->completed_criteria_count >= adv->criteria_count);
+                adv->completed_criteria_count = tracker_collapse_advancement_groups(adv);
+                adv->all_template_criteria_met = (adv->completed_criteria_count >= adv->criteria_progress_total);
                 adv->done = game_is_done || adv->all_template_criteria_met;
                 if (player_uuid && player_uuid[0] != '\0') {
                     strncpy(adv->first_contributor_uuid, player_uuid,
@@ -3770,39 +3875,28 @@ static void coop_merge_achievements_mid(TemplateData *td, const cJSON *player_st
         } else {
             // Complex achievement with criteria: track player with most
             cJSON *progress_array = cJSON_GetObjectItem(ach_entry, "progress");
-            int this_player_count = 0;
-
+            std::vector<char> player_flags(ach->criteria_count, 0);
             if (cJSON_IsArray(progress_array)) {
                 for (int j = 0; j < ach->criteria_count; j++) {
                     cJSON *progress_item;
                     cJSON_ArrayForEach(progress_item, progress_array) {
                         if (cJSON_IsString(progress_item) &&
                             strcmp(progress_item->valuestring, ach->criteria[j]->root_name) == 0) {
-                            this_player_count++;
+                            player_flags[j] = 1;
                             break;
                         }
                     }
                 }
             }
+            int this_player_count = tracker_count_groups_from_flags(
+                ach, player_flags.empty() ? nullptr : player_flags.data());
 
             if (this_player_count > ach->completed_criteria_count) {
-                ach->completed_criteria_count = this_player_count;
-                // Overwrite criteria done flags
                 for (int j = 0; j < ach->criteria_count; j++) {
-                    bool found = false;
-                    if (cJSON_IsArray(progress_array)) {
-                        cJSON *progress_item;
-                        cJSON_ArrayForEach(progress_item, progress_array) {
-                            if (cJSON_IsString(progress_item) &&
-                                strcmp(progress_item->valuestring, ach->criteria[j]->root_name) == 0) {
-                                found = true;
-                                break;
-                            }
-                        }
-                    }
-                    ach->criteria[j]->done = found;
+                    ach->criteria[j]->done = player_flags[j];
                 }
-                ach->all_template_criteria_met = (ach->completed_criteria_count >= ach->criteria_count);
+                ach->completed_criteria_count = tracker_collapse_advancement_groups(ach);
+                ach->all_template_criteria_met = (ach->completed_criteria_count >= ach->criteria_progress_total);
                 ach->done = game_is_done || ach->all_template_criteria_met;
                 if (player_uuid && player_uuid[0] != '\0') {
                     strncpy(ach->first_contributor_uuid, player_uuid,
@@ -6035,10 +6129,11 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                     snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d)", crit->progress);
                 }
             } else if (!is_simple_stat_category) {
-                // Complex stat or Advancement
-                if (cat->criteria_count > 0) {
+                // Complex stat or Advancement (uses group-collapsed total for advancements;
+                // identical to criteria_count for stats since they don't support groups).
+                if (cat->criteria_progress_total > 0) {
                     snprintf(progress_text_width_calc, sizeof(progress_text_width_calc), "(%d / %d)",
-                             cat->completed_criteria_count, cat->criteria_count);
+                             cat->completed_criteria_count, cat->criteria_progress_total);
                 }
             }
             // Scale for progress text width calculation
@@ -6394,8 +6489,9 @@ static void render_trackable_category_section(Tracker *t, const AppSettings *set
                                          crit->progress);
                         }
                     } else {
+                        // Advancement progress is group-collapsed (matches criteria_count when no groups).
                         snprintf(progress_text, sizeof(progress_text), "(%d / %d)", cat->completed_criteria_count,
-                                 cat->criteria_count);
+                                 cat->criteria_progress_total);
                     }
                 }
 
@@ -11598,11 +11694,13 @@ static bool hermes_apply_advancement_event(Tracker *t, const cJSON *data,
 
                 if (!crit->done) {
                     crit->done = true;
-                    adv->completed_criteria_count++;
                     changed = true;
                 }
                 break;
             }
+            // Re-collapse groups so siblings of the just-completed criterion get marked
+            // done (and the unit count is correct, not raw-incremented).
+            adv->completed_criteria_count = tracker_collapse_advancement_groups(adv);
         }
 
         // If Hermes says the whole advancement is now complete, mark it so.
@@ -11622,9 +11720,9 @@ static bool hermes_apply_advancement_event(Tracker *t, const cJSON *data,
             changed = true;
         }
 
-        // Mark all_template_criteria_met if every criterion is done.
-        if (adv->criteria_count > 0 &&
-            adv->completed_criteria_count >= adv->criteria_count) {
+        // Mark all_template_criteria_met if every progress unit is done (group-collapsed).
+        if (adv->criteria_progress_total > 0 &&
+            adv->completed_criteria_count >= adv->criteria_progress_total) {
             adv->all_template_criteria_met = true;
         }
 

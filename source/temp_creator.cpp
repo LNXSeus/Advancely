@@ -23,6 +23,7 @@
 
 #include <vector>
 #include <string>
+#include <set>
 #include <unordered_set> // For checking duplicates
 
 #include "tinyfiledialogs.h"
@@ -162,6 +163,7 @@ struct EditorTrackableItem {
     bool in_2nd_row;
     bool in_3rd_row; // Forces unlocks from Row 2 to Row 3
     int sort_order = 0;
+    char group[64] = ""; // Per-advancement criterion group ID (free-form). Empty = ungrouped.
 
     // Stat auto-completion via linked goals (only used for sub-stats)
     std::vector<EditorCounterLinkedGoal> linked_goals;
@@ -508,7 +510,8 @@ static bool are_editor_items_different(const EditorTrackableItem &a, const Edito
            a.linked_goal_mode != b.linked_goal_mode ||
            are_linked_goals_different(a.linked_goals, b.linked_goals) ||
            are_manual_positions_different(a.icon_pos, b.icon_pos) ||
-           are_manual_positions_different(a.text_pos, b.text_pos);
+           are_manual_positions_different(a.text_pos, b.text_pos) ||
+           strcmp(a.group, b.group) != 0;
 }
 
 // Helper function to compare two EditorTrackableCategory structs, advancements and stats
@@ -732,6 +735,45 @@ static bool are_editor_templates_different(const EditorTemplate &a, const Editor
         if (are_editor_decorations_different(a.decorations[i], b.decorations[i])) return true;
     }
     return false;
+}
+
+// Pick the lowest free name in the sequence "group", "group_2", "group_3", ...
+// that is not already used by any other criterion of `adv`. Result written to `out`.
+static void crit_auto_name_group(const EditorTrackableCategory &adv, char out[64]) {
+    for (int n = 1; n < 100000; n++) {
+        if (n == 1) snprintf(out, 64, "group");
+        else snprintf(out, 64, "group_%d", n);
+        bool taken = false;
+        for (const auto &c : adv.criteria) {
+            if (strcmp(c.group, out) == 0) { taken = true; break; }
+        }
+        if (!taken) return;
+    }
+    out[0] = '\0';
+}
+
+// Returns the distinct non-empty group IDs used by `adv`'s criteria, in first-seen order.
+static std::vector<std::string> crit_collect_group_ids(const EditorTrackableCategory &adv) {
+    std::vector<std::string> ids;
+    for (const auto &c : adv.criteria) {
+        if (c.group[0] == '\0') continue;
+        bool seen = false;
+        for (const auto &id : ids) if (id == c.group) { seen = true; break; }
+        if (!seen) ids.emplace_back(c.group);
+    }
+    return ids;
+}
+
+// Hash a group ID into a distinct ImGui color for the swatch / stripe indicator.
+static ImU32 crit_group_color(const char *id) {
+    uint32_t h = 2166136261u;
+    for (const unsigned char *p = (const unsigned char *)id; *p; p++) {
+        h ^= *p;
+        h *= 16777619u;
+    }
+    float hue = (float)(h % 360u) / 360.0f;
+    ImVec4 c = ImColor::HSV(hue, 0.55f, 0.95f).Value;
+    return ImGui::ColorConvertFloat4ToU32(c);
 }
 
 // Sorts only the items that have a sort_order > 0, leaving others in their original positions.
@@ -1194,6 +1236,12 @@ static void parse_editor_trackable_categories(cJSON *json_object,
                     new_crit.icon_path[sizeof(new_crit.icon_path) - 1] = '\0';
                 }
                 if (cJSON_IsBool(crit_hidden)) new_crit.is_hidden = cJSON_IsTrue(crit_hidden);
+
+                cJSON *crit_group = cJSON_GetObjectItem(criterion_json, "group");
+                if (cJSON_IsString(crit_group)) {
+                    strncpy(new_crit.group, crit_group->valuestring, sizeof(new_crit.group) - 1);
+                    new_crit.group[sizeof(new_crit.group) - 1] = '\0';
+                }
 
                 // Load display name for the criterion
                 char crit_lang_key[512];
@@ -1781,6 +1829,9 @@ static void serialize_editor_trackable_categories(cJSON *parent, const char *key
             cJSON_AddStringToObject(crit_json, "icon", crit.icon_path);
             if (crit.is_hidden) {
                 cJSON_AddBoolToObject(crit_json, "hidden", crit.is_hidden);
+            }
+            if (crit.group[0] != '\0') {
+                cJSON_AddStringToObject(crit_json, "group", crit.group);
             }
             save_editor_manual_pos(crit_json, "icon_pos", crit.icon_pos);
             save_editor_manual_pos(crit_json, "text_pos", crit.text_pos);
@@ -4917,7 +4968,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             for (const auto &criterion: advancement.criteria) {
                                 if (str_contains_insensitive(criterion.display_name, tc_search_buffer) ||
                                     str_contains_insensitive(criterion.root_name, tc_search_buffer) ||
-                                    str_contains_insensitive(criterion.icon_path, tc_search_buffer)) {
+                                    str_contains_insensitive(criterion.icon_path, tc_search_buffer) ||
+                                    str_contains_insensitive(criterion.group, tc_search_buffer)) {
                                     child_match = true;
                                     break;
                                 }
@@ -5404,13 +5456,30 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             }
                         }
 
+                        // --- Per-advancement criterion selection state (declared outside the version
+                        // conditional so the per-row checkboxes and bulk-action bar below can see it).
+                        // Kept alive between frames so the criteria counter can show "N selected".
+                        static char s_crit_sel_owner[192] = "";
+                        static std::set<int> s_crit_selection;
+                        static int s_crit_last_clicked = -1;
+                        if (strcmp(s_crit_sel_owner, advancement.root_name) != 0) {
+                            strncpy(s_crit_sel_owner, advancement.root_name, sizeof(s_crit_sel_owner) - 1);
+                            s_crit_sel_owner[sizeof(s_crit_sel_owner) - 1] = '\0';
+                            s_crit_selection.clear();
+                            s_crit_last_clicked = -1;
+                        }
+                        for (auto it = s_crit_selection.begin(); it != s_crit_selection.end();) {
+                            if (*it < 0 || (size_t)*it >= advancement.criteria.size()) it = s_crit_selection.erase(it);
+                            else ++it;
+                        }
+
                         // Conditionally render the criteria section only for versions that support it.
                         if (creator_selected_version > MC_VERSION_1_6_4) {
                             ImGui::Separator();
                             ImGui::Text("Criteria");
 
                             // --- Counter for the criteria list ---
-                            char crit_counter_text[128];
+                            char crit_counter_text[256];
                             bool is_details_search_active = (
                                 current_search_scope == SCOPE_ADVANCEMENT_DETAILS && tc_search_buffer[0] != '\0');
                             int visible_criteria_count = 0;
@@ -5420,13 +5489,29 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 for (const auto &criterion: advancement.criteria) {
                                     if (str_contains_insensitive(criterion.display_name, tc_search_buffer) ||
                                         str_contains_insensitive(criterion.root_name, tc_search_buffer) ||
-                                        str_contains_insensitive(criterion.icon_path, tc_search_buffer)) {
+                                        str_contains_insensitive(criterion.icon_path, tc_search_buffer) ||
+                                        str_contains_insensitive(criterion.group, tc_search_buffer)) {
                                         visible_criteria_count++;
                                     }
                                 }
                             }
-                            snprintf(crit_counter_text, sizeof(crit_counter_text), "%d %s", visible_criteria_count,
-                                     visible_criteria_count == 1 ? "Criterion" : "Criteria");
+                            int distinct_groups = (int)crit_collect_group_ids(advancement).size();
+                            int loose_crit = 0;
+                            for (const auto &c : advancement.criteria) if (c.group[0] == '\0') loose_crit++;
+                            int selected_crit = (int)s_crit_selection.size();
+                            int pos = snprintf(crit_counter_text, sizeof(crit_counter_text), "%d %s",
+                                               visible_criteria_count,
+                                               visible_criteria_count == 1 ? "Criterion" : "Criteria");
+                            if (distinct_groups > 0 && pos < (int)sizeof(crit_counter_text)) {
+                                pos += snprintf(crit_counter_text + pos, sizeof(crit_counter_text) - pos,
+                                                " (%d %s + %d loose)",
+                                                distinct_groups, distinct_groups == 1 ? "group" : "groups",
+                                                loose_crit);
+                            }
+                            if (selected_crit > 0 && pos < (int)sizeof(crit_counter_text)) {
+                                snprintf(crit_counter_text + pos, sizeof(crit_counter_text) - pos,
+                                         " · %d selected", selected_crit);
+                            }
                             float crit_text_width = ImGui::CalcTextSize(crit_counter_text).x;
                             ImGui::SameLine(ImGui::GetContentRegionAvail().x - crit_text_width);
                             ImGui::TextDisabled("%s", crit_counter_text);
@@ -5604,13 +5689,107 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                         int criterion_dnd_source_index = -1;
                         int criterion_dnd_target_index = -1;
 
+                        // Compact group action bar: only visible when at least one criterion is selected.
+                        // Right-aligned to keep the criteria list visually quiet (grouping is niche).
+                        if (!s_crit_selection.empty()) {
+                            // Pre-measure the three buttons + spacing so we can right-align them.
+                            ImGuiStyle &style = ImGui::GetStyle();
+                            float w_add = ImGui::CalcTextSize("Add selection to group").x + style.FramePadding.x * 2.0f;
+                            float w_un  = ImGui::CalcTextSize("Ungroup selection").x      + style.FramePadding.x * 2.0f;
+                            float w_des = ImGui::CalcTextSize("Deselect all").x           + style.FramePadding.x * 2.0f;
+                            float total_w = w_add + w_un + w_des + style.ItemSpacing.x * 2.0f;
+                            float avail = ImGui::GetContentRegionAvail().x;
+                            if (avail > total_w) {
+                                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - total_w));
+                            }
+
+                            static char s_new_group_buffer[64] = "";
+                            if (ImGui::SmallButton("Add selection to group")) {
+                                crit_auto_name_group(advancement, s_new_group_buffer);
+                                ImGui::OpenPopup("crit_add_to_group_popup");
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tip[320];
+                                snprintf(tip, sizeof(tip),
+                                         "Assign every selected criterion to a group.\n"
+                                         "Either click an existing group, or type a new name.\n"
+                                         "Criteria sharing a group collapse into one progress unit.");
+                                ImGui::SetTooltip("%s", tip);
+                            }
+                            if (ImGui::BeginPopup("crit_add_to_group_popup")) {
+                                std::vector<std::string> existing = crit_collect_group_ids(advancement);
+                                if (!existing.empty()) {
+                                    ImGui::TextDisabled("Existing groups");
+                                    for (const auto &id : existing) {
+                                        char row[128];
+                                        snprintf(row, sizeof(row), "%s##existing", id.c_str());
+                                        if (ImGui::Selectable(row)) {
+                                            for (int idx : s_crit_selection) {
+                                                if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                                strncpy(advancement.criteria[idx].group, id.c_str(),
+                                                        sizeof(advancement.criteria[idx].group) - 1);
+                                                advancement.criteria[idx].group[sizeof(advancement.criteria[idx].group) - 1] = '\0';
+                                            }
+                                            save_message_type = MSG_NONE;
+                                            ImGui::CloseCurrentPopup();
+                                        }
+                                    }
+                                    ImGui::Separator();
+                                }
+                                ImGui::TextDisabled("New group");
+                                ImGui::SetNextItemWidth(160.0f);
+                                bool submit_enter = ImGui::InputText("##new_group", s_new_group_buffer,
+                                                                     sizeof(s_new_group_buffer),
+                                                                     ImGuiInputTextFlags_EnterReturnsTrue);
+                                ImGui::SameLine();
+                                bool submit_button = ImGui::Button("Apply##new_group");
+                                if ((submit_enter || submit_button) && s_new_group_buffer[0] != '\0') {
+                                    for (int idx : s_crit_selection) {
+                                        if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                        strncpy(advancement.criteria[idx].group, s_new_group_buffer,
+                                                sizeof(advancement.criteria[idx].group) - 1);
+                                        advancement.criteria[idx].group[sizeof(advancement.criteria[idx].group) - 1] = '\0';
+                                    }
+                                    save_message_type = MSG_NONE;
+                                    ImGui::CloseCurrentPopup();
+                                }
+                                ImGui::EndPopup();
+                            }
+
+                            ImGui::SameLine();
+                            if (ImGui::SmallButton("Ungroup selection")) {
+                                for (int idx : s_crit_selection) {
+                                    if (idx < 0 || (size_t)idx >= advancement.criteria.size()) continue;
+                                    advancement.criteria[idx].group[0] = '\0';
+                                }
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tip[160];
+                                snprintf(tip, sizeof(tip), "Clear the group ID on every selected criterion.");
+                                ImGui::SetTooltip("%s", tip);
+                            }
+
+                            ImGui::SameLine();
+                            if (ImGui::SmallButton("Deselect all")) {
+                                s_crit_selection.clear();
+                                s_crit_last_clicked = -1;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tip[128];
+                                snprintf(tip, sizeof(tip), "Clear the selection checkboxes.");
+                                ImGui::SetTooltip("%s", tip);
+                            }
+                        }
+
                         for (size_t j = 0; j < advancement.criteria.size(); j++) {
                             auto &criterion = advancement.criteria[j];
 
                             if (is_details_search_active) {
                                 if (!str_contains_insensitive(criterion.display_name, tc_search_buffer) &&
                                     !str_contains_insensitive(criterion.root_name, tc_search_buffer) &&
-                                    !str_contains_insensitive(criterion.icon_path, tc_search_buffer)) {
+                                    !str_contains_insensitive(criterion.icon_path, tc_search_buffer) &&
+                                    !str_contains_insensitive(criterion.group, tc_search_buffer)) {
                                     continue;
                                 }
                             }
@@ -5645,6 +5824,110 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                                 strcmp(criterion.root_name, scroll_to_child_root_name) == 0) {
                                 ImGui::SetScrollHereY(0.0f);
                                 scroll_to_child_root_name[0] = '\0';
+                            }
+
+                            // First row: bulk-action checkbox + per-criterion Group field.
+                            // The checkbox doubles as a future drag-to-reorder selection handle; the
+                            // group field is the niche thing it currently feeds.
+                            bool is_selected = s_crit_selection.find((int)j) != s_crit_selection.end();
+                            if (ImGui::Checkbox("##select_crit", &is_selected)) {
+                                bool shift = ImGui::GetIO().KeyShift;
+                                if (shift && s_crit_last_clicked >= 0 && s_crit_last_clicked != (int)j) {
+                                    int lo = std::min(s_crit_last_clicked, (int)j);
+                                    int hi = std::max(s_crit_last_clicked, (int)j);
+                                    for (int k = lo; k <= hi && k < (int)advancement.criteria.size(); k++) {
+                                        // Skip rows hidden by the details search so range-select can't
+                                        // silently toggle off-screen criteria.
+                                        if (is_details_search_active) {
+                                            const auto &cc = advancement.criteria[k];
+                                            if (!str_contains_insensitive(cc.display_name, tc_search_buffer) &&
+                                                !str_contains_insensitive(cc.root_name, tc_search_buffer) &&
+                                                !str_contains_insensitive(cc.icon_path, tc_search_buffer) &&
+                                                !str_contains_insensitive(cc.group, tc_search_buffer)) {
+                                                continue;
+                                            }
+                                        }
+                                        if (is_selected) s_crit_selection.insert(k);
+                                        else s_crit_selection.erase(k);
+                                    }
+                                } else {
+                                    if (is_selected) s_crit_selection.insert((int)j);
+                                    else s_crit_selection.erase((int)j);
+                                }
+                                s_crit_last_clicked = (int)j;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tip[160];
+                                snprintf(tip, sizeof(tip),
+                                         "Select for bulk actions. Shift-click to range select or deselect.");
+                                ImGui::SetTooltip("%s", tip);
+                            }
+                            if (criterion.group[0] != '\0') {
+                                ImGui::SameLine();
+                                ImVec2 sw = ImGui::GetCursorScreenPos();
+                                float h = ImGui::GetFrameHeight();
+                                ImGui::GetWindowDrawList()->AddRectFilled(
+                                    sw, ImVec2(sw.x + 8.0f, sw.y + h), crit_group_color(criterion.group));
+                                ImGui::Dummy(ImVec2(8.0f, h));
+                            }
+                            ImGui::SameLine();
+                            ImGui::SetNextItemWidth(160.0f);
+                            if (ImGui::InputText("Group", criterion.group, sizeof(criterion.group))) {
+                                save_message_type = MSG_NONE;
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tip[384];
+                                snprintf(tip, sizeof(tip),
+                                         "Optional group ID. Criteria in this %s sharing the same group\n"
+                                         "collapse into one progress unit: one done marks the whole group done\n"
+                                         "and renders every member as completed. Leave empty for default behaviour.",
+                                         advancements_label_singular_lower);
+                                ImGui::SetTooltip("%s", tip);
+                            }
+                            ImGui::SameLine();
+                            static char s_row_new_group_buffer[64] = "";
+                            if (ImGui::Button("Add to group##row")) {
+                                crit_auto_name_group(advancement, s_row_new_group_buffer);
+                                ImGui::OpenPopup("crit_row_add_to_group_popup");
+                            }
+                            if (ImGui::IsItemHovered()) {
+                                char tip[448];
+                                snprintf(tip, sizeof(tip),
+                                         "Assign this criterion to a group. Pick an existing group or type a new name.\n"
+                                         "Only applies to this single criterion. To group several at once, tick their\n"
+                                         "checkboxes and use the \"Add selection to group\" button at the top.");
+                                ImGui::SetTooltip("%s", tip);
+                            }
+                            if (ImGui::BeginPopup("crit_row_add_to_group_popup")) {
+                                std::vector<std::string> existing = crit_collect_group_ids(advancement);
+                                if (!existing.empty()) {
+                                    ImGui::TextDisabled("Existing groups");
+                                    for (const auto &id : existing) {
+                                        char row[128];
+                                        snprintf(row, sizeof(row), "%s##row_existing", id.c_str());
+                                        if (ImGui::Selectable(row)) {
+                                            strncpy(criterion.group, id.c_str(), sizeof(criterion.group) - 1);
+                                            criterion.group[sizeof(criterion.group) - 1] = '\0';
+                                            save_message_type = MSG_NONE;
+                                            ImGui::CloseCurrentPopup();
+                                        }
+                                    }
+                                    ImGui::Separator();
+                                }
+                                ImGui::TextDisabled("New group");
+                                ImGui::SetNextItemWidth(160.0f);
+                                bool submit_enter = ImGui::InputText("##row_new_group", s_row_new_group_buffer,
+                                                                     sizeof(s_row_new_group_buffer),
+                                                                     ImGuiInputTextFlags_EnterReturnsTrue);
+                                ImGui::SameLine();
+                                bool submit_button = ImGui::Button("Apply##row_new_group");
+                                if ((submit_enter || submit_button) && s_row_new_group_buffer[0] != '\0') {
+                                    strncpy(criterion.group, s_row_new_group_buffer, sizeof(criterion.group) - 1);
+                                    criterion.group[sizeof(criterion.group) - 1] = '\0';
+                                    save_message_type = MSG_NONE;
+                                    ImGui::CloseCurrentPopup();
+                                }
+                                ImGui::EndPopup();
                             }
 
                             static char focused_crit_root[192] = {};
@@ -5832,6 +6115,9 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             if (criterion_dnd_target_index > criterion_dnd_source_index) criterion_dnd_target_index--;
                             advancement.criteria.insert(advancement.criteria.begin() + criterion_dnd_target_index,
                                                         item_to_move);
+                            // Indices in the selection set no longer correspond to the same criteria.
+                            s_crit_selection.clear();
+                            s_crit_last_clicked = -1;
                             save_message_type = MSG_NONE;
                         }
 
@@ -5840,6 +6126,15 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             clear_goal_links(current_template_data.decorations, current_template_data.counter_goals,
                                              advancement.criteria[criterion_to_remove].root_name);
                             advancement.criteria.erase(advancement.criteria.begin() + criterion_to_remove);
+                            // Shift selection indices: drop the removed one, decrement those above it.
+                            std::set<int> shifted;
+                            for (int idx : s_crit_selection) {
+                                if (idx == criterion_to_remove) continue;
+                                shifted.insert(idx > criterion_to_remove ? idx - 1 : idx);
+                            }
+                            s_crit_selection = shifted;
+                            if (s_crit_last_clicked == criterion_to_remove) s_crit_last_clicked = -1;
+                            else if (s_crit_last_clicked > criterion_to_remove) s_crit_last_clicked--;
                             save_message_type = MSG_NONE;
                         }
 
@@ -5864,6 +6159,8 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             new_criterion.icon_pos = source_criterion.icon_pos;
                             new_criterion.text_pos = source_criterion.text_pos;
                             new_criterion.progress_pos = source_criterion.progress_pos;
+                            strncpy(new_criterion.group, source_criterion.group, sizeof(new_criterion.group) - 1);
+                            new_criterion.group[sizeof(new_criterion.group) - 1] = '\0';
 
                             new_criterion.sort_order = 0;
 
@@ -5889,6 +6186,11 @@ void temp_creator_render_gui(bool *p_open, AppSettings *app_settings, ImFont *ro
                             new_criterion.root_name[sizeof(new_criterion.root_name) - 1] = '\0';
                             advancement.criteria.insert(advancement.criteria.begin() + criterion_to_copy + 1,
                                                         new_criterion);
+                            // Shift selection indices above the insertion point.
+                            std::set<int> shifted;
+                            for (int idx : s_crit_selection) shifted.insert(idx > criterion_to_copy ? idx + 1 : idx);
+                            s_crit_selection = shifted;
+                            if (s_crit_last_clicked > criterion_to_copy) s_crit_last_clicked++;
                             save_message_type = MSG_NONE;
                         }
                     } else {
