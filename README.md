@@ -75,9 +75,9 @@ Love using Advancely? You can have your name immortalized in the tracker!
 * Zesskyo: $10
 
 Simply [**donate here**](https://streamlabs.com/lnxseus/tip) and include the word "**Advancely**" in your donation
-message. **With the next release** your name will be added permanently to two places:
+message. Your name will be added permanently to two places:
 
-- The **Settings window** inside Advancely, visible to every user on every tab
+- The **Settings window** inside Advancely, where the supporter list is always visible to every user on every tab
 - The **overlay supporter showcase** that appears when anyone completes a run on stream
 
 You'll also get a special role on my [Discord](https://discord.gg/TyNgXDz).
